@@ -1,3 +1,10 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+
 import { createConfig, factory } from "ponder";
 import { parseAbiItem } from "viem";
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from "@loar/abis/generated"

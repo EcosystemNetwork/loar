@@ -4,9 +4,7 @@ import {
 } from "../lib/trpc";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { db } from "../db";
-import { characters } from "../db/schema/characters";
-import { eq } from "drizzle-orm";
+import { db } from "../lib/firebase";
 import { z } from "zod";
 
 import { falService } from "../services/fal";
@@ -17,8 +15,9 @@ import { synapseService } from "../services/synapse";
 import { wikiaService } from "../services/wikia";
 import { minioService } from "../services/minio";
 import { geminiService } from "../services/gemini";
-import { eventWikis } from "../db/schema";
 
+const charactersCol = db.collection("characters");
+const eventWikisCol = db.collection("eventWikis");
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -27,7 +26,7 @@ export const appRouter = router({
   privateData: protectedProcedure.query(({ ctx }) => {
     return {
       message: "This is private",
-      user: ctx.session.user,
+      user: { uid: ctx.user.uid, email: ctx.user.email },
     };
   }),
   cinematicUniverses: cinematicUniversesRouter,
@@ -35,7 +34,11 @@ export const appRouter = router({
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {
-        const result = await db.select().from(characters);
+        const snapshot = await charactersCol.get();
+        const result = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         return {
           metadata: {
             version: "5.0",
@@ -43,7 +46,7 @@ export const appRouter = router({
             total_characters: result.length,
             last_updated: new Date().toISOString()
           },
-          characters: result.map(char => ({
+          characters: result.map((char: any) => ({
             id: char.id,
             character_name: char.character_name,
             collection: char.collection,
@@ -53,12 +56,11 @@ export const appRouter = router({
             rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
             image_url: char.image_url,
             description: char.description,
-            created_at: char.created_at.toISOString()
+            created_at: char.created_at?.toDate?.()?.toISOString?.() || new Date().toISOString()
           }))
         };
       } catch (error) {
         console.error("Failed to load characters from database:", error);
-        // Fallback to JSON file if database fails
         try {
           const wikiPath = join(process.cwd(), "../character-wiki/simple_character_wiki.json");
           const wikiData = readFileSync(wikiPath, "utf-8");
@@ -73,14 +75,14 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         try {
-          const result = await db.select().from(characters).where(eq(characters.id, input.id));
-          if (result.length === 0) {
+          const doc = await charactersCol.doc(input.id).get();
+          if (!doc.exists) {
             throw new Error("Character not found");
           }
 
-          const char = result[0];
+          const char = doc.data() as any;
           return {
-            id: char.id,
+            id: doc.id,
             character_name: char.character_name,
             collection: char.collection,
             token_id: char.token_id,
@@ -89,14 +91,13 @@ export const appRouter = router({
             rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
             image_url: char.image_url,
             description: char.description,
-            created_at: char.created_at.toISOString()
+            created_at: char.created_at?.toDate?.()?.toISOString?.() || new Date().toISOString()
           };
         } catch (error) {
           console.error("Failed to load character from database:", error);
           throw new Error("Could not load character");
         }
       }),
-    // Generate wikia entry for a video node/event
     generateEventWikia: publicProcedure
       .input(z.object({
         nodeId: z.number(),
@@ -128,7 +129,6 @@ export const appRouter = router({
           throw new Error("Could not generate wikia entry");
         }
       }),
-    // Generate detailed storyline from simple user prompt (for event creation)
     generateStoryline: publicProcedure
       .input(z.object({
         prompt: z.string().min(1, "Prompt is required"),
@@ -152,7 +152,6 @@ export const appRouter = router({
         }
       }),
 
-    // Generate wiki from video using Gemini 2.5 Pro
     generateFromVideo: publicProcedure
       .input(z.object({
         universeId: z.string(),
@@ -173,28 +172,27 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         try {
-          console.log(`🎬 Generating wiki for ${input.universeId}-${input.eventId}`);
+          console.log(`Generating wiki for ${input.universeId}-${input.eventId}`);
 
-          // If characterIds are provided but not full character data, fetch from DB
           let characterData = input.characters;
           if (!characterData && input.characterIds && input.characterIds.length > 0) {
-            console.log(`📥 Fetching character data for IDs: ${input.characterIds.join(', ')}`);
-            const charResults = await Promise.all(
-              input.characterIds.map(id =>
-                db.select().from(characters).where(eq(characters.id, id))
-              )
+            console.log(`Fetching character data for IDs: ${input.characterIds.join(', ')}`);
+            const charDocs = await Promise.all(
+              input.characterIds.map((id) => charactersCol.doc(id).get())
             );
-            characterData = charResults
-              .filter(result => result.length > 0)
-              .map(result => ({
-                name: result[0].character_name,
-                userDescription: result[0].description,
-                visualDescription: result[0].detailed_visual_description || undefined,
-              }));
-            console.log(`✅ Fetched ${characterData.length} characters`);
+            characterData = charDocs
+              .filter((doc) => doc.exists)
+              .map((doc) => {
+                const d = doc.data() as any;
+                return {
+                  name: d.character_name,
+                  userDescription: d.description,
+                  visualDescription: d.detailed_visual_description || undefined,
+                };
+              });
+            console.log(`Fetched ${characterData.length} characters`);
           }
 
-          // Generate wiki using Gemini
           const result = await geminiService.generateWikiFromVideo(
             input.videoUrl,
             {
@@ -207,10 +205,8 @@ export const appRouter = router({
             }
           );
 
-          // Save to database (upsert to handle regeneration)
           const wikiId = `${input.universeId}-${input.eventId}`;
           const wikiEntry = {
-            id: wikiId,
             universeId: input.universeId,
             eventId: input.eventId,
             wikiData: result.wikiData,
@@ -224,30 +220,13 @@ export const appRouter = router({
             outputTokens: result.metadata.outputTokens,
             costUsd: result.metadata.costUsd.toString(),
             generatedAt: new Date(),
-            createdAt: new Date(),
             updatedAt: new Date(),
           };
 
-          // Use onConflictDoUpdate to handle regeneration (upsert)
-          await db.insert(eventWikis).values(wikiEntry).onConflictDoUpdate({
-            target: eventWikis.id,
-            set: {
-              wikiData: result.wikiData,
-              videoUrl: input.videoUrl,
-              eventTitle: input.title,
-              eventDescription: input.description,
-              characterIds: input.characterIds || null,
-              generatedBy: result.metadata.generatedBy,
-              tokensUsed: result.metadata.tokensUsed,
-              inputTokens: result.metadata.inputTokens,
-              outputTokens: result.metadata.outputTokens,
-              costUsd: result.metadata.costUsd.toString(),
-              generatedAt: new Date(),
-              updatedAt: new Date(),
-            }
-          });
+          // Firestore set with merge acts as upsert
+          await eventWikisCol.doc(wikiId).set(wikiEntry, { merge: true });
 
-          console.log(`✅ Wiki saved to database: ${wikiId}`);
+          console.log(`Wiki saved to database: ${wikiId}`);
 
           return {
             success: true,
@@ -261,7 +240,6 @@ export const appRouter = router({
         }
       }),
 
-    // Get wiki by ID
     getWiki: publicProcedure
       .input(z.object({
         universeId: z.string(),
@@ -270,42 +248,37 @@ export const appRouter = router({
       .query(async ({ input }) => {
         try {
           const wikiId = `${input.universeId}-${input.eventId}`;
-          const wiki = await db.select()
-            .from(eventWikis)
-            .where(eq(eventWikis.id, wikiId))
-            .limit(1);
+          const doc = await eventWikisCol.doc(wikiId).get();
 
-          if (wiki.length === 0) {
+          if (!doc.exists) {
             return null;
           }
 
-          return wiki[0];
+          return { id: doc.id, ...doc.data() };
         } catch (error) {
           console.error("Failed to fetch wiki:", error);
           throw new Error("Could not fetch wiki");
         }
       }),
 
-    // Get all wikis for a universe
     getUniverseWikis: publicProcedure
       .input(z.object({
         universeId: z.string(),
       }))
       .query(async ({ input }) => {
         try {
-          const wikis = await db.select()
-            .from(eventWikis)
-            .where(eq(eventWikis.universeId, input.universeId))
-            .orderBy(eventWikis.createdAt);
+          const snapshot = await eventWikisCol
+            .where("universeId", "==", input.universeId)
+            .orderBy("generatedAt")
+            .get();
 
-          return wikis;
+          return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         } catch (error) {
           console.error("Failed to fetch universe wikis:", error);
           throw new Error("Could not fetch universe wikis");
         }
       }),
 
-    // Improve video generation prompt using Gemini
     improveVideoPrompt: publicProcedure
       .input(z.object({
         userPrompt: z.string().min(1, "Prompt is required"),
@@ -334,7 +307,6 @@ export const appRouter = router({
       }),
   }),
   video: router({
-    // Use Fal AI service for video generation
     generateWithProvider: publicProcedure
       .input(z.object({
         provider: z.enum(['fal']),
@@ -373,7 +345,6 @@ export const appRouter = router({
           const result = await minioService.uploadFromUrl(input.url, input.filename)
           console.log(`MinIO S3 upload successful - key:`, result)
 
-          // Return both the key and the public URL
           return {
             key: result,
             url: minioService.getPublicUrl(result)
@@ -387,36 +358,20 @@ export const appRouter = router({
       .input(z.object({ key: z.string() }))
       .query(async ({ input }) => {
         try {
-          console.log(`Starting MinIO download for key: ${input.key}`);
-
           const data = await minioService.download(input.key);
 
-          console.log(`Downloaded ${data.length} bytes for key: ${input.key}`);
-
-          // Check if data is too large (> 5MB for tRPC transport safety)
           if (data.length > 5 * 1024 * 1024) {
-            console.error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB`);
             throw new Error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB (max 5MB). Use public URL instead.`);
           }
 
-          try {
-            console.log(`🔄 Converting ${data.length} bytes to base64...`);
+          const base64Data = Buffer.from(data).toString('base64');
 
-            const base64Data = Buffer.from(data).toString('base64');
-
-            console.log(`✅ Base64 conversion successful, encoded length: ${base64Data.length}`);
-
-            return {
-              data: base64Data,
-              key: input.key,
-              originalSize: data.length,
-              encodedSize: base64Data.length
-            };
-
-          } catch (base64Error) {
-            console.error(`❌ Base64 conversion failed for ${input.key}:`, base64Error);
-            throw new Error(`Base64 encoding failed: File too large for memory. Use public URL instead.`);
-          }
+          return {
+            data: base64Data,
+            key: input.key,
+            originalSize: data.length,
+            encodedSize: base64Data.length
+          };
         } catch (error) {
           console.error(`Failed to download key ${input.key}:`, error);
           throw new Error(`Failed to download from MinIO: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -438,9 +393,7 @@ export const appRouter = router({
           console.log(`Filecoin Synapse upload for ${input.url}`)
           const service = await synapseService;
           const result = await service.uploadFromUrl(input.url)
-          console.log(`Filecoin Synapse successful - result type:`, typeof result)
-          console.log(`Filecoin Synapse successful - result value:`, result)
-          console.log(`Filecoin Synapse successful - stringified:`, JSON.stringify(result))
+          console.log(`Filecoin Synapse successful - result:`, JSON.stringify(result))
           return result;
         } catch (error) {
           console.error("Synapse upload error:", error)
@@ -451,44 +404,21 @@ export const appRouter = router({
       .input(z.object({ pieceCid: z.string() }))
       .query(async ({ input }) => {
         try {
-          console.log(`Starting download for PieceCID: ${input.pieceCid}`);
           const service = await synapseService;
-          
-          console.log(`Service ready, attempting download...`);
           const data = await service.download(input.pieceCid);
-          
-          console.log(`Downloaded ${data.length} bytes for PieceCID: ${input.pieceCid}`);
-          
-          // Check if data is too large (> 5MB for tRPC transport safety)
-          // Base64 encoding increases size by ~33%, so 5MB becomes ~6.7MB encoded
+
           if (data.length > 5 * 1024 * 1024) {
-            console.error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB`);
             throw new Error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB (max 5MB). Use HTTP gateway instead.`);
           }
-          
-          try {
-            console.log(`🔄 Converting ${data.length} bytes to base64...`);
-            
-            // Memory-safe base64 conversion with error handling
-            const base64Data = Buffer.from(data).toString('base64');
-            
-            console.log(`✅ Base64 conversion successful, encoded length: ${base64Data.length}`);
-            
-            // Log memory usage after conversion
-            const memUsage = process.memoryUsage();
-            console.log(`📊 Memory after base64: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB heap`);
-            
-            return { 
-              data: base64Data,
-              pieceCid: input.pieceCid,
-              originalSize: data.length,
-              encodedSize: base64Data.length
-            };
-            
-          } catch (base64Error) {
-            console.error(`❌ Base64 conversion failed for ${input.pieceCid}:`, base64Error);
-            throw new Error(`Base64 encoding failed: File too large for memory. Use HTTP gateway instead.`);
-          }
+
+          const base64Data = Buffer.from(data).toString('base64');
+
+          return {
+            data: base64Data,
+            pieceCid: input.pieceCid,
+            originalSize: data.length,
+            encodedSize: base64Data.length
+          };
         } catch (error) {
           console.error(`Failed to download PieceCID ${input.pieceCid}:`, error);
           throw new Error(`Failed to download from Filecoin: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -497,9 +427,8 @@ export const appRouter = router({
     getHttpUrl: publicProcedure
       .input(z.object({ pieceCid: z.string() }))
       .query(({ input }) => {
-        // Return an HTTP URL that can be used to access the Filecoin content
-        const baseUrl = process.env.NODE_ENV === 'production' 
-          ? 'https://your-domain.com' 
+        const baseUrl = process.env.NODE_ENV === 'production'
+          ? 'https://your-domain.com'
           : 'http://localhost:3000';
         return { url: `${baseUrl}/api/filecoin/${input.pieceCid}` };
       }),

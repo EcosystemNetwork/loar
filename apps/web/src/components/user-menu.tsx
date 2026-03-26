@@ -6,7 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
+import { useAuth, signOut } from "@/lib/auth-client";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
@@ -14,13 +14,13 @@ import { Link } from "@tanstack/react-router";
 
 export default function UserMenu() {
   const navigate = useNavigate();
-  const { data: session, isPending } = authClient.useSession();
+  const { user, loading: isPending } = useAuth();
 
   if (isPending) {
     return <Skeleton className="h-9 w-24" />;
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <Button variant="outline" asChild>
         <Link to="/login">Sign In</Link>
@@ -28,10 +28,8 @@ export default function UserMenu() {
     );
   }
 
-  // Safely access user data with fallbacks
-  const user = session?.user || {};
-  const displayName = user?.name || user?.email || 'User';
-  const userEmail = user?.email || 'No email available';
+  const displayName = user.displayName || user.email || "User";
+  const userEmail = user.email || "No email available";
 
   return (
     <DropdownMenu>
@@ -46,16 +44,9 @@ export default function UserMenu() {
           <Button
             variant="destructive"
             className="w-full"
-            onClick={() => {
-              authClient.signOut({
-                fetchOptions: {
-                  onSuccess: () => {
-                    navigate({
-                      to: "/",
-                    });
-                  },
-                },
-              });
+            onClick={async () => {
+              await signOut();
+              navigate({ to: "/" });
             }}
           >
             Sign Out

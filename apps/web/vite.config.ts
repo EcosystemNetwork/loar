@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "/",
+  envDir: path.resolve(__dirname, "../../"),
   plugins: [
     tailwindcss(),
     react(),
@@ -17,6 +18,7 @@ export default defineConfig({
       "@loar/abis/addresses": path.resolve(__dirname, "../../packages/abis/src/addresses.ts"),
       "@loar/abis/generated": path.resolve(__dirname, "../../packages/abis/src/generated.ts"),
     },
+    dedupe: ["wagmi", "viem", "@tanstack/react-query", "react", "react-dom"],
   },
   // Remove external wagmi/codegen - let it be bundled properly
   server: {

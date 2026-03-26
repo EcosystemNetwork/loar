@@ -3,46 +3,20 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "contracts/*"
+    "packages/*"
   ],
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
-    "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
-    "db:push": "turbo -F server db:push",
-    "db:studio": "turbo -F server db:studio",
-    "db:generate": "turbo -F server db:generate",
-    "db:migrate": "turbo -F server db:migrate",
-    "db:start": "turbo -F server db:start",
-    "db:watch": "turbo -F server db:watch",
-    "db:stop": "turbo -F server db:stop",
-    "db:down": "turbo -F server db:down",
     "sc:test": "turbo run sc:test",
     "sc:test:cov": "turbo run sc:test:cov",
     "sc:test:integration": "turbo run sc:test:integration"
   },
-  "dependencies": {
-    "@langchain/openai": "^0.6.7",
-    "@modelcontextprotocol/sdk": "^1.17.3",
-    "@openai/agents": "^0.0.17",
-    "@tanstack/react-query": "^5.85.3",
-    "@types/node": "^24.3.0",
-    "@wagmi/cli": "^0.0.0-canary-20251023193249",
-    "dotenv": "^17.2.1",
-    "install": "^0.13.0",
-    "jsonwebtoken": "^9.0.2",
-    "mcp-use": "^0.1.15",
-    "openai": "^5.12.2",
-    "server": "./apps/server",
-    "web": "./apps/web",
-    "zod": "^4.0.17"
-  },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
+    "@wagmi/cli": "^0.0.0-canary-20251023193249",
     "turbo": "^2.5.4"
   },
   "packageManager": "pnpm@9.15.0"

@@ -1,20 +1,4 @@
 services:
-  caddy:
-    image: lucaslorentz/caddy-docker-proxy:ci-alpine
-    container_name: loar-caddy
-    ports:
-      - "80:80"
-      - "443:443"
-
-    environment:
-      - CADDY_INGRESS_NETWORK=loar-network
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - caddy_data:/data
-    restart: unless-stopped
-    networks:
-      - loar-network
-
   app-server:
     build:
       context: .
@@ -22,83 +6,45 @@ services:
       target: production
     container_name: loar-server
     env_file:
-      - ./apps/server/.env
+      - ./.env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
-      - CORS_ORIGIN=https://loartech.xyz
-      - BETTER_AUTH_URL=https://loartech.xyz
-    depends_on:
-      - postgres
+    ports:
+      - "3000:3000"
     restart: unless-stopped
     networks:
       - loar-network
-    labels:
-      caddy: loartech.xyz
-      caddy.0_route: /trpc/*
-      caddy.0_route.reverse_proxy: "{{upstreams 3000}}"
-      caddy.1_route: /api/*
-      caddy.1_route.reverse_proxy: "{{upstreams 3000}}"
 
-      
   app-web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      target: production
     container_name: loar-web
+    ports:
+      - "3001:3001"
     restart: unless-stopped
     networks:
       - loar-network
-    labels:
-      caddy: loartech.xyz
-      caddy.2_route: /*
-      caddy.2_route.reverse_proxy: "{{upstreams 80}}"
 
   indexer:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: apps/indexer/Dockerfile
     container_name: loar-indexer
-    working_dir: /app
-    volumes:
-      - .:/app
     env_file:
-      - ./apps/indexer/.env.local
+      - ./.env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
-    command: ["sh", "-c", "corepack enable && cd apps/indexer && pnpm install && pnpm start"]
     ports:
       - "42069:42069"
-    depends_on:
-      - postgres
     restart: unless-stopped
     networks:
       - loar-network
-    labels:
-      caddy: loartech.xyz
-      caddy.3_handle_path: /indexer/*
-      caddy.3_handle_path.0_reverse_proxy: "{{upstreams 42069}}"
-
-
-
-  postgres:
-    image: postgres:15
-    container_name: loar-postgres
-    environment:
-      POSTGRES_DB: loar-fullstack
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - loar-network
-      #change this to extend from the apps/server/docker-compose.yml
 
   minio:
     image: minio/minio
-    container_name: loar-minio-prod
+    container_name: loar-minio
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -116,16 +62,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    # MinIO Caddy routing disabled - will be enabled when we switch from Fal AI to MinIO for video storage
-    # labels:
-    #   caddy: loartech.xyz
-    #   caddy.4_handle: /media/*
-    #   caddy.4_handle.0_uri: strip_prefix /media
-    #   caddy.4_handle.1_reverse_proxy: "{{upstreams 9000}}"
 
 volumes:
-  postgres_data:
-  caddy_data:
   minio_data:
 
 networks:

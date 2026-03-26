@@ -17,48 +17,14 @@
 			"cache": false,
 			"persistent": true
 		},
-		"db:push": {
-			"cache": false,
-			"persistent": true
+		"sc:test": {
+			"dependsOn": ["build"]
 		},
-		"db:studio": {
-			"cache": false,
-			"persistent": true
+		"sc:test:cov": {
+			"dependsOn": ["build"]
 		},
-		"db:migrate": {
-			"cache": false,
-			"persistent": true
-		},
-		"db:generate": {
-			"cache": false,
-			"persistent": true
+		"sc:test:integration": {
+			"dependsOn": ["build"]
 		}
-		
-		,
-		"db:start": {
-			"cache": false,
-			"persistent": true
-		},
-		"db:stop": {
-			"cache": false,
-			"persistent": true
-		},
-		"db:watch": {
-			"cache": false,
-			"persistent": true
-		},
-		"db:down": {
-			"cache": false,
-			"persistent": true
-		},
-    "sc:test": {
-      "dependsOn": ["build"]
-    },
-    "sc:test:cov": {
-      "dependsOn": ["build"]
-    },
-    "sc:test:integration" : { 
-      "dependsOn": ["build"]
-    }
 	}
 }
