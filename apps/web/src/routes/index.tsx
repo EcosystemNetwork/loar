@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
@@ -9,8 +8,6 @@ import {
   Plus,
   Search,
   TrendingUp,
-  Clock,
-  Sparkles,
   Users,
   ArrowUpRight,
   ArrowDownRight,
@@ -21,18 +18,16 @@ import {
   Wallet,
 } from "lucide-react";
 import { useAccount } from "wagmi";
-import { usePonderQuery } from "@ponder/react";
-import { desc, eq } from "@ponder/client";
+import { useQuery } from "@tanstack/react-query";
 import {
-  universe,
-  token,
-  node,
-  nodeContent,
-  swap,
-  tokenTransfer,
-  tokenHolder,
-  pool,
-} from "../../../indexer/ponder.schema";
+  ponderGql,
+  type Universe,
+  type Token,
+  type Node,
+  type NodeContent,
+  type Swap,
+  type TokenHolder,
+} from "@/utils/ponder-api";
 import { useMemo, useState, useEffect, useRef } from "react";
 
 export const Route = createFileRoute("/")({
@@ -43,41 +38,50 @@ export const Route = createFileRoute("/")({
 function ActivityFeedBanner() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: nodesData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(node as any)
-        .orderBy(desc((node as any).createdAt))
-        .limit(20),
+  const { data: nodesData } = useQuery({
+    queryKey: ["ponder", "nodes", "recent-20"],
+    queryFn: () =>
+      ponderGql<{ nodes: { items: Node[] } }>(`{
+        nodes(orderBy: "createdAt", orderDirection: "desc", limit: 20) {
+          items { id universeAddress nodeId previousNodeId creator createdAt }
+        }
+      }`).then((d) => d.nodes.items),
   });
 
-  const { data: nodeContentData } = usePonderQuery({
-    queryFn: (db) => db.select().from(nodeContent as any),
+  const { data: nodeContentData } = useQuery({
+    queryKey: ["ponder", "nodeContents"],
+    queryFn: () =>
+      ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
+        nodeContents(limit: 1000) {
+          items { id videoLink plot }
+        }
+      }`).then((d) => d.nodeContents.items),
   });
 
-  const { data: universesData } = usePonderQuery({
-    queryFn: (db) => db.select().from(universe as any),
+  const { data: universesData } = useQuery({
+    queryKey: ["ponder", "universes", "all"],
+    queryFn: () =>
+      ponderGql<{ universes: { items: Universe[] } }>(`{
+        universes(limit: 1000) {
+          items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
+        }
+      }`).then((d) => d.universes.items),
   });
 
   const activities = useMemo(() => {
     if (!nodesData || !nodeContentData || !universesData) return [];
 
-    type NodeRow = typeof node.$inferSelect;
-    type NodeContentRow = typeof nodeContent.$inferSelect;
-    type UniverseRow = typeof universe.$inferSelect;
-
-    const contentMap = new Map<string, NodeContentRow>();
-    (nodeContentData as NodeContentRow[]).forEach((c) => {
+    const contentMap = new Map<string, NodeContent>();
+    nodeContentData.forEach((c) => {
       contentMap.set(c.id, c);
     });
 
-    const universeMap = new Map<string, UniverseRow>();
-    (universesData as UniverseRow[]).forEach((u) => {
+    const universeMap = new Map<string, Universe>();
+    universesData.forEach((u) => {
       universeMap.set(u.id.toLowerCase(), u);
     });
 
-    return (nodesData as NodeRow[])
+    return nodesData
       .map((n) => {
         const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
         const uni = universeMap.get(n.universeAddress.toLowerCase());
@@ -403,27 +407,31 @@ function EnhancedSidebar({ universes }: { universes: any[] }) {
   const { isConnected } = useAccount();
 
   // Query recent events with video content
-  const { data: nodesData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(node as any)
-        .orderBy(desc((node as any).createdAt))
-        .limit(10),
+  const { data: nodesData } = useQuery({
+    queryKey: ["ponder", "nodes", "recent-10"],
+    queryFn: () =>
+      ponderGql<{ nodes: { items: Node[] } }>(`{
+        nodes(orderBy: "createdAt", orderDirection: "desc", limit: 10) {
+          items { id universeAddress nodeId previousNodeId creator createdAt }
+        }
+      }`).then((d) => d.nodes.items),
   });
 
-  const { data: nodeContentData } = usePonderQuery({
-    queryFn: (db) => db.select().from(nodeContent as any),
+  const { data: nodeContentData } = useQuery({
+    queryKey: ["ponder", "nodeContents"],
+    queryFn: () =>
+      ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
+        nodeContents(limit: 1000) {
+          items { id videoLink plot }
+        }
+      }`).then((d) => d.nodeContents.items),
   });
 
   const eventVideos = useMemo(() => {
     if (!nodesData || !nodeContentData) return [];
 
-    type NodeRow = typeof node.$inferSelect;
-    type NodeContentRow = typeof nodeContent.$inferSelect;
-
-    const contentMap = new Map<string, NodeContentRow>();
-    (nodeContentData as NodeContentRow[]).forEach((c) => {
+    const contentMap = new Map<string, NodeContent>();
+    nodeContentData.forEach((c) => {
       contentMap.set(c.id, c);
     });
 
@@ -432,7 +440,7 @@ function EnhancedSidebar({ universes }: { universes: any[] }) {
       universeMap.set(u.id.toLowerCase(), u);
     });
 
-    return (nodesData as NodeRow[])
+    return nodesData
       .map((n) => {
         const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
         const uni = universeMap.get(n.universeAddress.toLowerCase());
@@ -686,47 +694,56 @@ function HomeComponent() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Query universes
-  const { data: universesData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(universe as any)
-        .orderBy(desc((universe as any).createdAt))
-        .limit(50),
+  const { data: universesData } = useQuery({
+    queryKey: ["ponder", "universes", "top-50"],
+    queryFn: () =>
+      ponderGql<{ universes: { items: Universe[] } }>(`{
+        universes(orderBy: "createdAt", orderDirection: "desc", limit: 50) {
+          items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
+        }
+      }`).then((d) => d.universes.items),
   });
 
   // Query tokens
-  const { data: tokensData } = usePonderQuery({
-    queryFn: (db) => db.select().from(token as any),
+  const { data: tokensData } = useQuery({
+    queryKey: ["ponder", "tokens"],
+    queryFn: () =>
+      ponderGql<{ tokens: { items: Token[] } }>(`{
+        tokens(limit: 1000) {
+          items { id universeAddress deployer tokenAdmin name symbol imageURL metadata context startingTick poolHook poolId pairedToken locker createdAt }
+        }
+      }`).then((d) => d.tokens.items),
   });
 
   // Query swaps for volume calculation
-  const { data: swapsData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(swap as any)
-        .orderBy(desc((swap as any).timestamp))
-        .limit(1000),
+  const { data: swapsData } = useQuery({
+    queryKey: ["ponder", "swaps"],
+    queryFn: () =>
+      ponderGql<{ swaps: { items: Swap[] } }>(`{
+        swaps(orderBy: "timestamp", orderDirection: "desc", limit: 1000) {
+          items { id poolId sender amount0 amount1 sqrtPriceX96 liquidity tick timestamp blockNumber }
+        }
+      }`).then((d) => d.swaps.items),
   });
 
   // Query token holders
-  const { data: holdersData } = usePonderQuery({
-    queryFn: (db) => db.select().from(tokenHolder as any),
+  const { data: holdersData } = useQuery({
+    queryKey: ["ponder", "tokenHolders"],
+    queryFn: () =>
+      ponderGql<{ tokenHolders: { items: TokenHolder[] } }>(`{
+        tokenHolders(limit: 1000) {
+          items { id tokenAddress holderAddress balance }
+        }
+      }`).then((d) => d.tokenHolders.items),
   });
 
   // Combine all data
   const universes = useMemo(() => {
     if (!universesData) return [];
 
-    type UniverseRow = typeof universe.$inferSelect;
-    type TokenRow = typeof token.$inferSelect;
-    type SwapRow = typeof swap.$inferSelect;
-    type HolderRow = typeof tokenHolder.$inferSelect;
-
-    const tokenMap = new Map<string, TokenRow>();
+    const tokenMap = new Map<string, Token>();
     if (tokensData) {
-      (tokensData as TokenRow[]).forEach((t) => {
+      tokensData.forEach((t) => {
         tokenMap.set(t.universeAddress.toLowerCase(), t);
       });
     }
@@ -736,7 +753,7 @@ function HomeComponent() {
     const dayAgo = now - 86400;
     const volumeMap = new Map<string, number>();
     if (swapsData) {
-      (swapsData as SwapRow[]).forEach((s) => {
+      swapsData.forEach((s) => {
         if (s.timestamp >= dayAgo) {
           const current = volumeMap.get(s.poolId) || 0;
           volumeMap.set(s.poolId, current + Math.abs(Number(s.amount0)));
@@ -747,13 +764,13 @@ function HomeComponent() {
     // Count holders per token
     const holderCountMap = new Map<string, number>();
     if (holdersData) {
-      (holdersData as HolderRow[]).forEach((h) => {
+      holdersData.forEach((h) => {
         const current = holderCountMap.get(h.tokenAddress.toLowerCase()) || 0;
         holderCountMap.set(h.tokenAddress.toLowerCase(), current + 1);
       });
     }
 
-    return (universesData as UniverseRow[]).map((u) => {
+    return universesData.map((u) => {
       const tokenData = tokenMap.get(u.id.toLowerCase());
       const poolId = tokenData?.poolId;
       const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;

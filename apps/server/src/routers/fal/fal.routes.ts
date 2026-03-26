@@ -1,12 +1,12 @@
 import { router, publicProcedure } from "../../lib/trpc";
 import { z } from "zod";
 import { falService } from "../../services/fal";
-import { db } from "../../db";
-import { characters } from "../../db/schema/characters";
+import { db } from "../../lib/firebase";
 import { geminiService } from "../../services/gemini";
 
+const charactersCol = db.collection("characters");
+
 export const falRouter = router({
-  // Test FAL connection
   testConnection: publicProcedure.query(async () => {
     try {
       const hasKey = !!process.env.FAL_KEY;
@@ -25,7 +25,6 @@ export const falRouter = router({
     }
   }),
 
-  // Image Generation with Nano Banana
   generateImage: publicProcedure
     .input(
       z.object({
@@ -60,7 +59,6 @@ export const falRouter = router({
       return await falService.generateImage(input);
     }),
 
-  // Image Editing with Nano Banana
   editImage: publicProcedure
     .input(
       z.object({
@@ -76,14 +74,11 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      console.log("🚨 === TRPC ROUTER: editImage called ===");
-      console.log("Input received:", JSON.stringify(input, null, 2));
       try {
         const result = await falService.editImage(input);
-        console.log("🚨 FAL service returned:", JSON.stringify(result, null, 2));
         return result;
       } catch (error) {
-        console.error("🚨 FAL service error:", error);
+        console.error("FAL service error:", error);
         throw error;
       }
     }),
@@ -106,19 +101,15 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      console.log("🖼️ === TRPC ROUTER: imageToImage called ===");
-      console.log("Input received:", JSON.stringify(input, null, 2));
       try {
         const result = await falService.imageToImage(input);
-        console.log("🖼️ FAL imageToImage service returned:", JSON.stringify(result, null, 2));
         return result;
       } catch (error) {
-        console.error("🖼️ FAL imageToImage service error:", error);
+        console.error("FAL imageToImage service error:", error);
         throw error;
       }
     }),
 
-  // Character Generation with Nano Banana + DB Save
   generateCharacter: publicProcedure
     .input(
       z.object({
@@ -155,17 +146,11 @@ export const falRouter = router({
       let characterId: string | undefined;
       let localImageUrl: string | undefined;
 
-      console.log('💾 saveToDatabase flag:', input.saveToDatabase);
-
       if (input.saveToDatabase) {
-        console.log('✅ Saving character to database...');
-        // Use the original FAL image URL directly instead of uploading to Walrus
         localImageUrl = imageResult.imageUrl;
-
         characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
-        const characterData = {
-          id: characterId,
+        await charactersCol.doc(characterId).set({
           character_name: input.name,
           collection: "Nano Banana AI",
           token_id: characterId,
@@ -181,19 +166,7 @@ export const falRouter = router({
           detailed_visual_description: input.detailedVisualDescription || null,
           created_at: new Date(),
           updated_at: new Date(),
-        };
-
-        console.log('📝 Character data to insert:', characterData);
-
-        try {
-          await db.insert(characters).values(characterData);
-          console.log('✅ Character saved successfully with ID:', characterId);
-        } catch (dbError) {
-          console.error('❌ Database insert failed:', dbError);
-          throw dbError;
-        }
-      } else {
-        console.log('⏭️  Skipping database save (saveToDatabase: false)');
+        });
       }
 
       return {
@@ -207,7 +180,6 @@ export const falRouter = router({
       };
     }),
 
-  // Analyze character image with Gemini
   analyzeCharacter: publicProcedure
     .input(
       z.object({
@@ -217,8 +189,6 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      console.log(`🔍 Analyzing character: ${input.characterName}`);
-
       try {
         const detailedDescription = await geminiService.analyzeCharacterImage(
           input.imageUrl,
@@ -232,14 +202,13 @@ export const falRouter = router({
           detailedVisualDescription: detailedDescription,
         };
       } catch (error) {
-        console.error("❌ Character analysis failed:", error);
+        console.error("Character analysis failed:", error);
         throw new Error(
           error instanceof Error ? error.message : "Failed to analyze character image"
         );
       }
     }),
 
-  // Save character with existing image URL (no regeneration)
   saveCharacter: publicProcedure
     .input(
       z.object({
@@ -251,33 +220,25 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      console.log(`💾 Saving character: ${input.name} with existing image`);
-
       const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
-      const characterData = {
-        id: characterId,
-        character_name: input.name,
-        collection: "Nano Banana AI",
-        token_id: characterId,
-        traits: {
-          style: input.style,
-          generated_with: "nano-banana",
-        },
-        rarity_rank: 0,
-        rarity_percentage: null,
-        image_url: input.imageUrl, // Use provided URL instead of generating
-        description: input.description,
-        detailed_visual_description: input.detailedVisualDescription || null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      console.log('📝 Saving character data:', characterData);
-
       try {
-        await db.insert(characters).values(characterData);
-        console.log('✅ Character saved successfully with ID:', characterId);
+        await charactersCol.doc(characterId).set({
+          character_name: input.name,
+          collection: "Nano Banana AI",
+          token_id: characterId,
+          traits: {
+            style: input.style,
+            generated_with: "nano-banana",
+          },
+          rarity_rank: 0,
+          rarity_percentage: null,
+          image_url: input.imageUrl,
+          description: input.description,
+          detailed_visual_description: input.detailedVisualDescription || null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
 
         return {
           success: true,
@@ -286,14 +247,13 @@ export const falRouter = router({
           imageUrl: input.imageUrl,
         };
       } catch (dbError) {
-        console.error('❌ Database insert failed:', dbError);
+        console.error('Database insert failed:', dbError);
         throw new Error(
           dbError instanceof Error ? dbError.message : "Failed to save character to database"
         );
       }
     }),
 
-  // Character + Video pipeline
   generateCharacterAndVideo: publicProcedure
     .input(
       z.object({
@@ -306,7 +266,6 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      // Step 1: Character
       const stylePrompts = {
         cute: "cute kawaii style, adorable, soft colors",
         realistic: "photorealistic, detailed, cinematic lighting",
@@ -329,11 +288,9 @@ export const falRouter = router({
       }
 
       const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      // Use the original FAL image URL directly instead of uploading to Walrus
       const localImageUrl = imageResult.imageUrl;
 
-      await db.insert(characters).values({
-        id: characterId,
+      await charactersCol.doc(characterId).set({
         character_name: input.characterName,
         collection: "Nano Banana AI",
         token_id: characterId,
@@ -350,7 +307,6 @@ export const falRouter = router({
         updated_at: new Date(),
       });
 
-      // Step 2: Video
       const videoResult = await falService.generateVideo({
         prompt: input.videoPrompt,
         model: "fal-ai/veo3.1/fast/image-to-video",
@@ -376,14 +332,12 @@ export const falRouter = router({
       };
     }),
 
-  // Video Generation
   generateVideo: publicProcedure
     .input(
       z.object({
         prompt: z.string().min(1),
         model: z
           .enum([
-            // Text-to-Video models
             "fal-ai/hunyuan-video",
             "fal-ai/ltx-video",
             "fal-ai/cogvideox-5b",
@@ -392,7 +346,6 @@ export const falRouter = router({
             "fal-ai/sora-2/text-to-video",
             "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
             "fal-ai/wan-25-preview/text-to-video",
-            // Image-to-Video models
             "fal-ai/veo3.1/fast/image-to-video",
             "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
             "fal-ai/wan-25-preview/image-to-video",
@@ -416,12 +369,9 @@ export const falRouter = router({
     )
     .mutation(async ({ input }) => {
       const result = await falService.generateVideo(input);
-      
-      // Check if the generation failed
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Video generation failed');
       }
-      
       return result;
     }),
 
@@ -466,12 +416,9 @@ export const falRouter = router({
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,
       });
-      
-      // Check if the generation failed
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Veo3 video generation failed');
       }
-      
       return result;
     }),
 
@@ -496,12 +443,9 @@ export const falRouter = router({
         negativePrompt: input.negativePrompt,
         cfgScale: input.cfgScale,
       });
-      
-      // Check if the generation failed
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Kling video generation failed');
       }
-      
       return result;
     }),
 
@@ -526,12 +470,9 @@ export const falRouter = router({
         negativePrompt: input.negativePrompt,
         enablePromptExpansion: input.enablePromptExpansion,
       });
-      
-      // Check if the generation failed
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Wan25 video generation failed');
       }
-      
       return result;
     }),
 
@@ -554,12 +495,9 @@ export const falRouter = router({
         aspectRatio: input.aspectRatio,
         resolution: input.resolution,
       });
-      
-      // Check if the generation failed
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Sora video generation failed');
       }
-      
       return result;
     }),
 });

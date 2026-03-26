@@ -1,68 +1,52 @@
-# Multi-stage build for both development and production
-FROM oven/bun:1.1.8-alpine AS base
+FROM node:20-alpine AS builder
 
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
-
-# Copy package files
-COPY package.json bun.lock ./
+# Copy workspace root files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
-COPY turbo.json ./
+COPY packages/abis/package.json ./packages/abis/
 
-# Development stage - for local dev dependencies
-FROM base AS development
-RUN bun install --frozen-lockfile && \
-    rm -rf ~/.bun/install/cache && \
-    rm -rf /tmp/*
-CMD ["tail", "-f", "/dev/null"]
-
-# Build stage - for production builds
-FROM base AS builder
-RUN bun install --frozen-lockfile && \
-    rm -rf ~/.bun/install/cache && \
-    rm -rf /tmp/*
+# Install dependencies
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
-COPY apps/server/drizzle.config.ts ./apps/server/
 
-# Build the application with bun build configured for better compatibility
-RUN cd apps/server && bun build src/index.ts --outdir dist --target node --external ethers --external viem
+# Bundle with esbuild for node target
+RUN npx esbuild apps/server/src/index.ts \
+  --bundle \
+  --platform=node \
+  --format=esm \
+  --outdir=apps/server/dist \
+  --external:better-sqlite3
 
 # Production stage
-FROM oven/bun:1.1.8-alpine AS production
+FROM node:20-alpine AS production
 
+RUN apk add --no-cache curl
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
-
-# Copy package files for production dependencies only
-COPY package.json bun.lock ./
+# Copy workspace root files for pnpm install
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
+COPY packages/abis/package.json ./packages/abis/
 
-# Install only production dependencies
-RUN bun install --production --frozen-lockfile && \
-    rm -rf ~/.bun/install/cache && \
-    rm -rf /tmp/*
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN pnpm install --frozen-lockfile --prod
 
-# Copy built application from builder stage
+# Copy built application
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
-
-# Use existing bun user from base image
-USER bun
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# Default to production
-CMD ["bun", "run", "apps/server/dist/index.js"]
+CMD ["node", "apps/server/dist/index.js"]

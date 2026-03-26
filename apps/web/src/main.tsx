@@ -5,8 +5,6 @@ import { routeTree } from "./routeTree.gen";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, trpc } from "./utils/trpc";
-import { PonderProvider } from "@ponder/react";
-import { client } from "./utils/ponder";
 
 import { RainbowKitWrapper } from "./lib/rainbowkit-provider";
 
@@ -17,13 +15,11 @@ const router = createRouter({
   context: { trpc, queryClient },
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
     return (
-      <PonderProvider client={client}>
-        <QueryClientProvider client={queryClient}>
-          <RainbowKitWrapper>
-            {children}
-          </RainbowKitWrapper>
-        </QueryClientProvider>
-      </PonderProvider>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitWrapper>
+          {children}
+        </RainbowKitWrapper>
+      </QueryClientProvider>
     );
   },
 });

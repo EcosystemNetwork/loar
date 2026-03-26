@@ -1,7 +1,4 @@
-import { db } from "../../db";
-import { cinematicUniverses } from "../../db/schema";
-import { eq } from "drizzle-orm";
-import type { newCinematicUniverse } from "../../db/schema/cinematicUniverses";
+import { db } from "../../lib/firebase";
 
 interface CreateCinematicUniverseInput {
   address: string;
@@ -12,51 +9,55 @@ interface CreateCinematicUniverseInput {
   description: string;
 }
 
+const collection = db.collection("cinematicUniverses");
+
 export async function createCinematicUniverse(input: CreateCinematicUniverseInput) {
   try {
-    // Generate a unique ID based on the timeline contract address
     const id = input.address.toLowerCase();
-    
-    const newUniverse: newCinematicUniverse = {
-      id,
+
+    const existing = await collection.doc(id).get();
+    if (existing.exists) {
+      throw new Error("A cinematic universe with this timeline contract address already exists");
+    }
+
+    const data = {
       address: input.address,
       creator: input.creator,
       tokenAddress: input.tokenAddress,
       governanceAddress: input.governanceAddress,
       image_url: input.imageUrl,
-      description: input.description
+      description: input.description,
+      created_at: new Date(),
+      updated_at: new Date(),
     };
 
-    const result = await db.insert(cinematicUniverses).values(newUniverse).returning();
-    
+    await collection.doc(id).set(data);
+
     return {
       success: true,
-      data: result[0],
-      message: "Cinematic universe created successfully"
+      data: { id, ...data },
+      message: "Cinematic universe created successfully",
     };
   } catch (error) {
     console.error("Error creating cinematic universe:", error);
-    
-    // Handle duplicate key error
-    if (error instanceof Error && error.message.includes("duplicate key")) {
-      throw new Error("A cinematic universe with this timeline contract address already exists");
+    if (error instanceof Error && error.message.includes("already exists")) {
+      throw error;
     }
-    
     throw new Error("Failed to create cinematic universe");
   }
 }
 
 export async function getCinematicUniverse(id: string) {
   try {
-    const result = await db.select().from(cinematicUniverses).where(eq(cinematicUniverses.id, id));
-    
-    if (result.length === 0) {
+    const doc = await collection.doc(id).get();
+
+    if (!doc.exists) {
       throw new Error("Cinematic universe not found");
     }
-    
+
     return {
       success: true,
-      data: result[0]
+      data: { id: doc.id, ...doc.data() },
     };
   } catch (error) {
     console.error("Error fetching cinematic universe:", error);
@@ -66,12 +67,13 @@ export async function getCinematicUniverse(id: string) {
 
 export async function getAllCinematicUniverses() {
   try {
-    const result = await db.select().from(cinematicUniverses).orderBy(cinematicUniverses.created_at);
-    
+    const snapshot = await collection.orderBy("created_at").get();
+    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
     return {
       success: true,
-      data: result,
-      total: result.length
+      data,
+      total: data.length,
     };
   } catch (error) {
     console.error("Error fetching all cinematic universes:", error);
@@ -81,14 +83,16 @@ export async function getAllCinematicUniverses() {
 
 export async function getCinematicUniversesByCreator(creator: string) {
   try {
-    const result = await db.select().from(cinematicUniverses)
-      .where(eq(cinematicUniverses.creator, creator))
-      .orderBy(cinematicUniverses.created_at);
-    
+    const snapshot = await collection
+      .where("creator", "==", creator)
+      .orderBy("created_at")
+      .get();
+    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
     return {
       success: true,
-      data: result,
-      total: result.length
+      data,
+      total: data.length,
     };
   } catch (error) {
     console.error("Error fetching cinematic universes by creator:", error);
