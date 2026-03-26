@@ -1,255 +1,97 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, CreateBucketCommand, PutBucketPolicyCommand } from "@aws-sdk/client-s3";
-import { promises as fs } from "fs";
-import { Readable } from "stream";
+import { db } from "../lib/firebase";
+import { getStorage } from "firebase-admin/storage";
 
-export class MinIOService {
-  private static instance: MinIOService | null = null;
-  private client: S3Client;
-  private bucketName: string;
-  private bucketInitialized: boolean = false;
+const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || "";
+
+class StorageService {
+  private static instance: StorageService | null = null;
+  private bucket;
 
   private constructor() {
-    // Initialize MinIO client with AWS SDK
-    this.client = new S3Client({
-      endpoint: process.env.MINIO_ENDPOINT || "http://localhost:9000",
-      region: process.env.MINIO_REGION || "us-east-1",
-      credentials: {
-        accessKeyId: process.env.MINIO_ACCESS_KEY || "minioadmin",
-        secretAccessKey: process.env.MINIO_SECRET_KEY || "minioadmin",
-      },
-      forcePathStyle: true, // Required for MinIO
-    });
-
-    this.bucketName = process.env.MINIO_BUCKET_NAME || "loar-videos";
+    this.bucket = getStorage().bucket(BUCKET_NAME);
   }
 
-  static getInstance(): MinIOService {
+  static getInstance(): StorageService {
     if (!this.instance) {
-      this.instance = new MinIOService();
+      this.instance = new StorageService();
     }
     return this.instance;
   }
 
-  /**
-   * Ensure bucket exists and is publicly accessible
-   */
-  private async ensureBucket(): Promise<void> {
-    if (this.bucketInitialized) return;
+  async upload(buffer: Buffer, filename: string): Promise<string> {
+    const key = `videos/${filename}`;
+    const file = this.bucket.file(key);
 
-    try {
-      // Try to create bucket (will fail if already exists, which is fine)
-      try {
-        await this.client.send(new CreateBucketCommand({
-          Bucket: this.bucketName
-        }));
-        console.log(`✅ Created bucket: ${this.bucketName}`);
-      } catch (error: any) {
-        if (error.name === 'BucketAlreadyOwnedByYou' || error.Code === 'BucketAlreadyOwnedByYou') {
-          console.log(`✅ Bucket already exists: ${this.bucketName}`);
-        } else {
-          throw error;
-        }
-      }
+    await file.save(buffer, {
+      contentType: this.getContentType(filename),
+      metadata: { cacheControl: "public, max-age=31536000" },
+    });
 
-      // Set bucket policy to allow public read access
-      const publicReadPolicy = {
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Principal: "*",
-            Action: ["s3:GetObject"],
-            Resource: [`arn:aws:s3:::${this.bucketName}/*`]
-          }
-        ]
-      };
+    await file.makePublic();
 
-      await this.client.send(new PutBucketPolicyCommand({
-        Bucket: this.bucketName,
-        Policy: JSON.stringify(publicReadPolicy)
-      }));
-
-      console.log(`✅ Set public read policy for bucket: ${this.bucketName}`);
-      this.bucketInitialized = true;
-    } catch (error) {
-      console.error(`❌ Failed to ensure bucket setup:`, error);
-      // Don't throw - let uploads proceed and fail if needed
-    }
+    return key;
   }
 
-  /**
-   * Upload a file to MinIO from a buffer or file path
-   */
-  async upload(buffer: Buffer, filename: string): Promise<string>;
-  async upload(path: string): Promise<string>;
-
-  async upload(input: Buffer | string, filename?: string): Promise<string> {
-    // Ensure bucket is set up before upload
-    await this.ensureBucket();
-
-    let buffer: Buffer;
-    let key: string;
-
-    if (typeof input === "string") {
-      // If input is a file path, read it and use the filename from path
-      buffer = await fs.readFile(input);
-      key = filename || input.split("/").pop() || `file-${Date.now()}`;
-    } else {
-      // If input is a buffer, use the provided filename
-      buffer = input;
-      key = filename || `file-${Date.now()}`;
-    }
-
-    try {
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: this.getContentType(key),
-      });
-
-      await this.client.send(command);
-
-      console.log(`✅ Upload complete! Key: ${key}`);
-
-      // Return the object key (can be used to construct URLs)
-      return key;
-    } catch (error) {
-      console.error(`❌ MinIO upload failed:`, error);
-      throw new Error(`MinIO upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Upload a file from a URL
-   */
   async uploadFromUrl(url: string, filename?: string): Promise<string> {
-    console.log(`Attempting to fetch URL: ${url}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; LOARUploader/1.0)" },
+      signal: controller.signal,
+    });
 
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; MinIOUploader/1.0)",
-        },
-        signal: controller.signal,
-      });
+    clearTimeout(timeoutId);
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      console.log(
-        `Successfully fetched URL, content-type: ${response.headers.get(
-          "content-type"
-        )}, size: ${response.headers.get("content-length")}`
-      );
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-      console.log(`Buffer created, size: ${buffer.length} bytes`);
-
-      // Determine filename from URL if not provided
-      const urlFilename = filename || url.split("/").pop()?.split("?")[0] || `video-${Date.now()}.mp4`;
-
-      return await this.upload(buffer, urlFilename);
-    } catch (error) {
-      console.error(`Failed to fetch URL ${url}:`, error);
-      throw new Error(`Unable to fetch and upload from URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const urlFilename =
+      filename ||
+      url.split("/").pop()?.split("?")[0] ||
+      `video-${Date.now()}.mp4`;
+
+    return await this.upload(buffer, urlFilename);
   }
 
-  /**
-   * Download a file from MinIO
-   */
   async download(key: string): Promise<Uint8Array> {
-    try {
-      console.log(`🔽 Starting MinIO download for Key: ${key}`);
-
-      // Validate key format
-      if (!key || typeof key !== "string" || key.length < 1) {
-        throw new Error(`Invalid key format: ${key}`);
-      }
-
-      const command = new GetObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      });
-
-      const response = await this.client.send(command);
-
-      if (!response.Body) {
-        throw new Error(`No data received from MinIO for key: ${key}`);
-      }
-
-      // Convert stream to buffer
-      const chunks: Uint8Array[] = [];
-      const stream = response.Body as Readable;
-
-      for await (const chunk of stream) {
-        chunks.push(chunk);
-      }
-
-      const buffer = Buffer.concat(chunks);
-      const data = new Uint8Array(buffer);
-
-      console.log(`✅ Download successful! Retrieved ${data.length} bytes for ${key}`);
-
-      // Validate file size
-      if (data.length === 0) {
-        throw new Error(`Empty file downloaded from MinIO for key: ${key}`);
-      }
-
-      if (data.length > 200 * 1024 * 1024) {
-        // 200MB limit
-        throw new Error(
-          `File too large: ${Math.round(data.length / 1024 / 1024)}MB for key: ${key}`
-        );
-      }
-
-      return data;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error(`❌ MinIO download failed for key ${key}:`, errorMessage);
-      console.error(`❌ Full error:`, error);
-
-      throw new Error(`MinIO download failed for ${key}: ${errorMessage}`);
+    if (!key || key.length < 1) {
+      throw new Error(`Invalid key: ${key}`);
     }
+
+    const file = this.bucket.file(key);
+    const [data] = await file.download();
+
+    if (data.length === 0) {
+      throw new Error(`Empty file for key: ${key}`);
+    }
+
+    if (data.length > 200 * 1024 * 1024) {
+      throw new Error(
+        `File too large: ${Math.round(data.length / 1024 / 1024)}MB`
+      );
+    }
+
+    return new Uint8Array(data);
   }
 
-  /**
-   * Get the public URL for an object
-   */
   getPublicUrl(key: string): string {
-    const endpoint = process.env.MINIO_ENDPOINT || "http://localhost:9000";
-    return `${endpoint}/${this.bucketName}/${key}`;
+    return `https://storage.googleapis.com/${BUCKET_NAME}/${key}`;
   }
 
-  /**
-   * Check if an object exists
-   */
   async exists(key: string): Promise<boolean> {
     try {
-      const command = new HeadObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      });
-      await this.client.send(command);
-      return true;
-    } catch (error) {
+      const [exists] = await this.bucket.file(key).exists();
+      return exists;
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Get content type based on file extension
-   */
   private getContentType(filename: string): string {
     const ext = filename.split(".").pop()?.toLowerCase();
-
     const mimeTypes: Record<string, string> = {
       mp4: "video/mp4",
       webm: "video/webm",
@@ -262,9 +104,9 @@ export class MinIOService {
       json: "application/json",
       txt: "text/plain",
     };
-
     return mimeTypes[ext || ""] || "application/octet-stream";
   }
 }
 
-export const minioService = MinIOService.getInstance();
+// Keep the same export name so all imports still work
+export const minioService = StorageService.getInstance();
