@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
 import ReactFlow, {
@@ -37,6 +37,7 @@ const nodeTypes = {
 
 function UniverseTimelineEditor() {
   const { id } = useParams({ from: "/universe/$id" });
+  const navigate = useNavigate();
   const chainId = useChainId();
 
   // Timeline flow state
@@ -330,8 +331,8 @@ function UniverseTimelineEditor() {
     await handleGenerateVideoFromHook(generatedImageUrl, uploadedUrl);
   }, [handleGenerateVideoFromHook, generatedImageUrl, uploadedUrl]);
 
-  // File upload to tmpfiles.org
-  const uploadToTmpfiles = useCallback(async () => {
+  // Upload generated image to decentralized storage
+  const uploadToStorage = useCallback(async () => {
     if (!generatedImageUrl) return;
 
     setIsUploading(true);
@@ -340,32 +341,28 @@ function UniverseTimelineEditor() {
       const response = await fetch(generatedImageUrl);
       const blob = await response.blob();
 
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', blob, 'generated-image.png');
+      // Convert blob to base64 for tRPC upload
+      const arrayBuffer = await blob.arrayBuffer();
+      const base64 = btoa(
+        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
 
-      // Upload to tmpfiles.org
-      const uploadResponse = await fetch('https://tmpfiles.org/api/v1/upload', {
-        method: 'POST',
-        body: formData,
+      // Upload via unified storage service
+      const manifest = await trpcClient.storage.uploadDirect.mutate({
+        data: base64,
+        filename: `generated-image-${Date.now()}.png`,
+        mimeType: 'image/png',
       });
 
-      if (uploadResponse.ok) {
-        const result = await uploadResponse.json();
-        if (result?.status === 'success') {
-          // Convert to direct access URL
-          const fileUrl = result.data.url;
-          const directUrl = fileUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-          setUploadedUrl(directUrl);
-          console.log('✅ Image uploaded to tmpfiles.org:', directUrl);
-        } else {
-          throw new Error('Upload failed');
-        }
+      const publicUrl = manifest.uploads[0]?.url;
+      if (publicUrl) {
+        setUploadedUrl(publicUrl);
+        console.log('Image uploaded to decentralized storage:', publicUrl);
       } else {
-        throw new Error(`Upload failed: ${uploadResponse.status}`);
+        throw new Error('No URL returned from storage');
       }
     } catch (error) {
-      console.error('Error uploading to tmpfiles.org:', error);
+      console.error('Error uploading to storage:', error);
       alert('Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
@@ -899,10 +896,7 @@ function UniverseTimelineEditor() {
       });
 
       if (eventId && universeId) {
-        // Navigate to event page with universe and event parameters
-        const eventUrl = `/event/${universeId}/${eventId}`;
-        console.log('🔗 Navigating to:', eventUrl);
-        window.location.href = eventUrl;
+        navigate({ to: `/event/${universeId}/${eventId}` });
       }
     }
   }, [id]);
@@ -1082,7 +1076,7 @@ function UniverseTimelineEditor() {
             uploadedUrl={uploadedUrl}
             setUploadedUrl={setUploadedUrl}
             isUploading={isUploading}
-            uploadToTmpfiles={uploadToTmpfiles}
+            uploadToStorage={uploadToStorage}
             generatedVideoUrl={generatedVideoUrl}
             setGeneratedVideoUrl={setGeneratedVideoUrl}
             setGeneratedImageUrl={setGeneratedImageUrl}

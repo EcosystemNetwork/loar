@@ -65,7 +65,7 @@ interface FlowCreationPanelProps {
   uploadedUrl: string | null;
   setUploadedUrl: (url: string | null) => void;
   isUploading: boolean;
-  uploadToTmpfiles: () => void;
+  uploadToStorage: () => void;
   generatedVideoUrl: string | null;
   setGeneratedVideoUrl: (url: string | null) => void;
   setGeneratedImageUrl: (url: string | null) => void;

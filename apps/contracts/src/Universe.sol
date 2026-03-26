@@ -7,13 +7,11 @@ import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 
 contract Universe is IUniverse {
-    //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
-    //Either that or functions on this contract that
 
     struct VideoNode {
-        string link;
+        bytes32 contentHash;   // SHA-256 hash of media file
         uint id;
-        string plot;
+        bytes32 plotHash;      // SHA-256 hash of plot text
         uint previous;
         uint[] next;
         bool canon;
@@ -23,6 +21,8 @@ contract Universe is IUniverse {
     constructor(
         IUniverseManager.UniverseConfig memory config
     ) {
+        require(config.universeAdmin != address(0), "Zero admin address");
+        require(config.universeManager != address(0), "Zero manager address");
         nodeCreationOption = config.nodeCreationOption;
         nodeVisibilityOption = config.nodeVisibilityOption;
         universeImageUrl = config.imageURL;
@@ -39,7 +39,6 @@ contract Universe is IUniverse {
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
 
-    //WIP: better structure types
     NodeCreationOptions private nodeCreationOption;
     NodeVisibilityOptions private nodeVisibilityOption;
 
@@ -47,11 +46,6 @@ contract Universe is IUniverse {
     IUniverseManager public universeManager;
     address public universeAdmin;
 
-    //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
-    //for profile -> videos created by user
-
-    //use this for converting internal uint id to frontend display id
-    //if necessary truncate it to six chars like github
     modifier onlyAdmin() {
       if (universeAdmin != msg.sender) {
         revert CallerNotAdmin(msg.sender);
@@ -61,46 +55,63 @@ contract Universe is IUniverse {
     modifier onlyManager() {
       if (address(universeManager) != msg.sender) {
         revert CallerNotManager();
-      } 
+      }
       _;
     }
 
     function nodeIDToHex(uint id) public view returns (bytes32){
-        if (id <= latestNodeId) {
+        if (id == 0 || id > latestNodeId) {
             revert NodeDoesNotExist();
         }
         bytes32 hash = keccak256(abi.encode(id));
         return hash;
     }
 
+    function setWhitelisted(address user, bool status) public onlyAdmin {
+        isWhitelisted[user] = status;
+    }
+
+    function getWhitelisted(address user) public view returns (bool) {
+        return isWhitelisted[user];
+    }
+
+    /// @notice Create a new narrative node. Hashes are stored on-chain; full strings emitted in event only.
+    /// @param _contentHash SHA-256 hash of the media file
+    /// @param _plotHash SHA-256 hash of the plot text
+    /// @param _previous ID of parent node (0 if root)
+    /// @param _link Full media URL (emitted in event only, not stored)
+    /// @param _plot Full plot text (emitted in event only, not stored)
     function createNode(
-        string memory _link,
-        string memory _plot,
-        uint _previous // id of previous node, 0 if root should do input validation on this later
+        bytes32 _contentHash,
+        bytes32 _plotHash,
+        uint _previous,
+        string calldata _link,
+        string calldata _plot
     ) public returns (uint) {
+        if (nodeCreationOption == NodeCreationOptions.WHITELISTED) {
+            require(isWhitelisted[msg.sender], "Not whitelisted");
+        }
         latestNodeId++;
         uint newId = latestNodeId;
 
-        // create node
         nodes[newId].id = newId;
-        nodes[newId].link = _link;
-        nodes[newId].plot = _plot;
+        nodes[newId].contentHash = _contentHash;
+        nodes[newId].plotHash = _plotHash;
         nodes[newId].previous = _previous;
+        nodes[newId].creator = msg.sender;
 
         if (_previous == 0) {
             nodes[newId].canon = true;
         }
 
-        // link it as "next" from its parent
         if (_previous != 0) {
             nodes[_previous].next.push(newId);
         }
 
-        emit NodeCreated(newId, _previous, msg.sender);
+        emit NodeCreated(newId, _previous, msg.sender, _contentHash, _plotHash, _link, _plot);
         return newId;
     }
 
-    // Utility: get a node's full data
     function getNode(
         uint id
     )
@@ -108,8 +119,8 @@ contract Universe is IUniverse {
         view
         returns (
             uint,
-            string memory,
-            string memory,
+            bytes32,
+            bytes32,
             uint,
             uint[] memory,
             bool,
@@ -117,14 +128,13 @@ contract Universe is IUniverse {
         )
     {
         VideoNode storage n = nodes[id];
-        return (n.id, n.link, n.plot, n.previous, n.next, n.canon, n.creator);
+        return (n.id, n.contentHash, n.plotHash, n.previous, n.next, n.canon, n.creator);
     }
 
     function getTimeline(uint fromId) public view returns (uint[] memory) {
         uint count = 0;
         uint cursor = fromId;
 
-        // Count length first
         while (cursor != 0) {
             count++;
             cursor = nodes[cursor].previous;
@@ -137,10 +147,9 @@ contract Universe is IUniverse {
             cursor = nodes[cursor].previous;
         }
 
-        return chain; // from leaf → root order
+        return chain;
     }
 
-    // Get all leaf nodes (no "next")
     function getLeaves() public view returns (uint[] memory) {
         uint[] memory temp = new uint[](latestNodeId);
         uint count = 0;
@@ -152,7 +161,6 @@ contract Universe is IUniverse {
             }
         }
 
-        // resize to count
         uint[] memory leaves = new uint[](count);
         for (uint j = 0; j < count; j++) {
             leaves[j] = temp[j];
@@ -160,13 +168,13 @@ contract Universe is IUniverse {
         return leaves;
     }
 
-    function getMedia(uint id) public view returns (string memory) {
-        return nodes[id].link;
+    function getMedia(uint id) public view returns (bytes32) {
+        return nodes[id].contentHash;
     }
 
-    function setMedia(uint id, string memory _link) public onlyAdmin {
-        nodes[id].link = _link;
-        emit MediaUpdated(msg.sender, _link);
+    function setMedia(uint id, bytes32 _contentHash, string calldata _link) public onlyAdmin {
+        nodes[id].contentHash = _contentHash;
+        emit MediaUpdated(msg.sender, _contentHash, _link);
     }
 
     function setNodeVisibilityOption(
@@ -186,8 +194,8 @@ contract Universe is IUniverse {
         view
         returns (
             uint[] memory ids,
-            string[] memory links,
-            string[] memory plots,
+            bytes32[] memory contentHashes,
+            bytes32[] memory plotHashes,
             uint[] memory previousIds,
             uint[][] memory nextIds,
             bool[] memory canonFlags
@@ -196,8 +204,8 @@ contract Universe is IUniverse {
         uint total = latestNodeId;
 
         ids = new uint[](total);
-        links = new string[](total);
-        plots = new string[](total);
+        contentHashes = new bytes32[](total);
+        plotHashes = new bytes32[](total);
         previousIds = new uint[](total);
         nextIds = new uint[][](total);
         canonFlags = new bool[](total);
@@ -206,12 +214,11 @@ contract Universe is IUniverse {
             VideoNode storage n = nodes[i];
 
             ids[i - 1] = n.id;
-            links[i - 1] = n.link;
-            plots[i - 1] = n.plot;
+            contentHashes[i - 1] = n.contentHash;
+            plotHashes[i - 1] = n.plotHash;
             previousIds[i - 1] = n.previous;
             canonFlags[i - 1] = n.canon;
 
-            // Copy next IDs
             uint len = n.next.length;
             uint[] memory tmpNext = new uint[](len);
             for (uint j = 0; j < len; j++) {
@@ -220,7 +227,7 @@ contract Universe is IUniverse {
             nextIds[i - 1] = tmpNext;
         }
 
-        return (ids, links, plots, previousIds, nextIds, canonFlags);
+        return (ids, contentHashes, plotHashes, previousIds, nextIds, canonFlags);
     }
 
     // ---- Canon ----
@@ -230,7 +237,6 @@ contract Universe is IUniverse {
             revert NodeDoesNotExist();
         }
 
-        // Clear old canon (at most one canon at a time)
         for (uint i = 1; i <= latestNodeId; i++) {
             if (nodes[i].canon) {
                 nodes[i].canon = false;
@@ -241,7 +247,6 @@ contract Universe is IUniverse {
         emit NodeCanonized(id, msg.sender);
     }
 
-    // Get the canon chain (canon + all its ancestors)
     function getCanonChain() public view returns (uint[] memory) {
         uint canonId = 0;
         for (uint i = 1; i <= latestNodeId; i++) {
@@ -269,5 +274,4 @@ contract Universe is IUniverse {
     function getAdmin() external view returns(address) {
       return universeAdmin;
     }
-    //Might work as well to have a function that gets the canon status of an indiviudal node
 }

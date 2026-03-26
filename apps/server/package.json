@@ -4,13 +4,15 @@
   "type": "module",
   "scripts": {
     "check-types": "tsc -b",
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.js"
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@fal-ai/serverless-client": "^0.15.0",
     "@filoz/synapse-sdk": "^0.24.11",
     "@google/generative-ai": "^0.24.1",
+    "@hono/node-server": "^1.19.11",
     "@hono/trpc-server": "^0.4.0",
     "@trpc/client": "^11.7.0",
     "@trpc/server": "^11.7.0",
@@ -20,11 +22,15 @@
     "formdata-node": "^6.0.3",
     "hono": "^4.8.2",
     "openai": "^6.3.0",
+    "pinata": "^2.5.5",
     "viem": "^2.0.0",
     "zod": "^4.0.2"
   },
   "devDependencies": {
+    "tsx": "^4.21.0",
     "typescript": "^5.8.2",
-    "@types/bun": "^1.2.6"
+    "eslint": "^9.18.0",
+    "@eslint/js": "^9.18.0",
+    "typescript-eslint": "^8.21.0"
   }
 }

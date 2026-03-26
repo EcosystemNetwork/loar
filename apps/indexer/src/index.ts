@@ -107,7 +107,13 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
   const universeAddress = getAddress(event.log.address).toLowerCase();
   const nodeId = Number(event.args.id);
 
-  // Insert node
+  // Content is now available directly in event args (no readContract needed)
+  const contentHash = event.args.contentHash;
+  const plotHash = event.args.plotHash;
+  const videoLink = event.args.link;
+  const plot = event.args.plot;
+
+  // Insert node with content hashes
   await context.db.insert(node).values({
     id: `${universeAddress}:${nodeId}`,
     universeAddress: universeAddress,
@@ -115,29 +121,18 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
     previousNodeId: Number(event.args.previous),
     creator: getAddress(event.args.creator),
     createdAt: Number(event.block.timestamp),
+    contentHash: contentHash,
+    plotHash: plotHash,
   });
 
-  // Read node content from Universe contract
-  try {
-    const nodeData = await context.client.readContract({
-      abi: context.contracts.Universe.abi,
-      address: universeAddress,
-      functionName: "getNode",
-      args: [BigInt(nodeId)],
-      cache: "immutable",
-    });
-
-    // nodeData returns: (id, link, plot, previous, next[], canon, creator)
-    const [, videoLink, plot] = nodeData as [bigint, string, string, bigint, bigint[], boolean, string];
-
-    await context.db.insert(nodeContent).values({
-      id: `${universeAddress}:${nodeId}`,
-      videoLink,
-      plot,
-    });
-  } catch (error) {
-    console.error(`Failed to read node content for ${universeAddress}:${nodeId}:`, error);
-  }
+  // Insert node content (full strings from event, plus hashes)
+  await context.db.insert(nodeContent).values({
+    id: `${universeAddress}:${nodeId}`,
+    contentHash: contentHash,
+    plotHash: plotHash,
+    videoLink: videoLink,
+    plot: plot,
+  });
 
   // Increment node count for the universe
   const universeRecord = await context.db.find(universe, { id: universeAddress });
