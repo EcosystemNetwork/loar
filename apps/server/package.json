@@ -8,7 +8,6 @@
     "start": "bun run dist/index.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.917.0",
     "@fal-ai/serverless-client": "^0.15.0",
     "@filoz/synapse-sdk": "^0.24.11",
     "@google/generative-ai": "^0.24.1",
