@@ -56,7 +56,7 @@ interface EventCreationSidebarProps {
   uploadedUrl: string | null;
   setUploadedUrl: (url: string | null) => void;
   isUploading: boolean;
-  uploadToTmpfiles: () => void;
+  uploadToStorage: () => void;
   generatedVideoUrl: string | null;
   setGeneratedImageUrl: (url: string | null) => void;
   isGeneratingVideo: boolean;
@@ -129,7 +129,7 @@ export function EventCreationSidebar({
   uploadedUrl,
   setUploadedUrl,
   isUploading,
-  uploadToTmpfiles,
+  uploadToStorage,
   generatedVideoUrl,
   setGeneratedImageUrl,
   isGeneratingVideo,
@@ -807,10 +807,10 @@ export function EventCreationSidebar({
                 className="w-full h-auto object-contain rounded-lg border max-h-64"
               />
 
-              {/* Upload to tmpfiles.org */}
+              {/* Upload Image */}
               <div className="mt-3 space-y-2">
                 <Button
-                  onClick={uploadToTmpfiles}
+                  onClick={uploadToStorage}
                   disabled={isUploading}
                   variant="outline"
                   size="sm"
@@ -819,12 +819,12 @@ export function EventCreationSidebar({
                   {isUploading ? (
                     <>
                       <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                      Uploading to tmpfiles.org...
+                      Uploading to storage...
                     </>
                   ) : (
                     <>
                       <Image className="h-3 w-3 mr-2" />
-                      Upload to tmpfiles.org
+                      Upload Image
                     </>
                   )}
                 </Button>

@@ -67,6 +67,8 @@ export const node = onchainTable(
     previousNodeId: t.integer().notNull(),
     creator: t.hex().notNull(),
     createdAt: t.integer().notNull(),
+    contentHash: t.hex(),  // bytes32 SHA-256 of media file
+    plotHash: t.hex(),     // bytes32 SHA-256 of plot text
   }),
   (table) => ({
     universeIdx: index("node_universe_idx").on(table.universeAddress),
@@ -92,8 +94,10 @@ export const nodeContent = onchainTable(
   "node_content",
   (t) => ({
     id: t.text().primaryKey(), // universe:nodeId
-    videoLink: t.text().notNull(),
-    plot: t.text().notNull(),
+    contentHash: t.hex(),      // bytes32 content hash
+    plotHash: t.hex(),         // bytes32 plot hash
+    videoLink: t.text().notNull(),  // Full URL from event
+    plot: t.text().notNull(),       // Full plot text from event
   })
 );
 

@@ -11,7 +11,8 @@ import { falService } from "../services/fal";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
 import { falRouter } from "./fal/fal.routes";
-import { synapseService } from "../services/synapse";
+import { storageRouter } from "./storage/storage.routes";
+import { getSynapseService } from "../services/synapse";
 import { wikiaService } from "../services/wikia";
 import { minioService } from "../services/minio";
 import { geminiService } from "../services/gemini";
@@ -31,6 +32,7 @@ export const appRouter = router({
   }),
   cinematicUniverses: cinematicUniversesRouter,
   fal: falRouter,
+  storage: storageRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {
@@ -98,7 +100,7 @@ export const appRouter = router({
           throw new Error("Could not load character");
         }
       }),
-    generateEventWikia: publicProcedure
+    generateEventWikia: protectedProcedure
       .input(z.object({
         nodeId: z.number(),
         title: z.string(),
@@ -129,7 +131,7 @@ export const appRouter = router({
           throw new Error("Could not generate wikia entry");
         }
       }),
-    generateStoryline: publicProcedure
+    generateStoryline: protectedProcedure
       .input(z.object({
         prompt: z.string().min(1, "Prompt is required"),
         characters: z.array(z.string()).optional(),
@@ -152,7 +154,7 @@ export const appRouter = router({
         }
       }),
 
-    generateFromVideo: publicProcedure
+    generateFromVideo: protectedProcedure
       .input(z.object({
         universeId: z.string(),
         eventId: z.string(),
@@ -254,7 +256,24 @@ export const appRouter = router({
             return null;
           }
 
-          return { id: doc.id, ...doc.data() };
+          const data = doc.data()!;
+          return {
+            id: doc.id,
+            universeId: data.universeId as string,
+            eventId: data.eventId as string,
+            wikiData: data.wikiData as any,
+            videoUrl: data.videoUrl as string | undefined,
+            eventTitle: data.eventTitle as string | undefined,
+            eventDescription: data.eventDescription as string | undefined,
+            characterIds: data.characterIds as string[] | null,
+            generatedBy: data.generatedBy as string | undefined,
+            tokensUsed: data.tokensUsed as number | undefined,
+            inputTokens: data.inputTokens as number | undefined,
+            outputTokens: data.outputTokens as number | undefined,
+            costUsd: data.costUsd as string | undefined,
+            generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
+            updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
+          };
         } catch (error) {
           console.error("Failed to fetch wiki:", error);
           throw new Error("Could not fetch wiki");
@@ -272,14 +291,23 @@ export const appRouter = router({
             .orderBy("generatedAt")
             .get();
 
-          return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          return snapshot.docs.map((doc) => {
+            const data = doc.data()!;
+            return {
+              id: doc.id,
+              universeId: data.universeId as string,
+              eventId: data.eventId as string,
+              wikiData: data.wikiData as any,
+              generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
+            };
+          });
         } catch (error) {
           console.error("Failed to fetch universe wikis:", error);
           throw new Error("Could not fetch universe wikis");
         }
       }),
 
-    improveVideoPrompt: publicProcedure
+    improveVideoPrompt: protectedProcedure
       .input(z.object({
         userPrompt: z.string().min(1, "Prompt is required"),
         characterContext: z.array(z.object({
@@ -307,7 +335,7 @@ export const appRouter = router({
       }),
   }),
   video: router({
-    generateWithProvider: publicProcedure
+    generateWithProvider: protectedProcedure
       .input(z.object({
         provider: z.enum(['fal']),
         prompt: z.string().min(1, "Prompt is required"),
@@ -334,7 +362,7 @@ export const appRouter = router({
       }),
   }),
   minio: router({
-    uploadFromUrl: publicProcedure
+    uploadFromUrl: protectedProcedure
       .input(z.object({
         url: z.string().min(1, "URL is required"),
         filename: z.string().optional()
@@ -384,14 +412,14 @@ export const appRouter = router({
       }),
   }),
   synapse: router({
-    uploadFromUrl: publicProcedure
+    uploadFromUrl: protectedProcedure
       .input(z.object({
         url: z.string().min(1, "URL is required")
       }))
       .mutation(async ({ input}) => {
         try {
           console.log(`Filecoin Synapse upload for ${input.url}`)
-          const service = await synapseService;
+          const service = await getSynapseService();
           const result = await service.uploadFromUrl(input.url)
           console.log(`Filecoin Synapse successful - result:`, JSON.stringify(result))
           return result;
@@ -404,7 +432,7 @@ export const appRouter = router({
       .input(z.object({ pieceCid: z.string() }))
       .query(async ({ input }) => {
         try {
-          const service = await synapseService;
+          const service = await getSynapseService();
           const data = await service.download(input.pieceCid);
 
           if (data.length > 5 * 1024 * 1024) {
