@@ -1,3 +1,7 @@
+/**
+ * tRPC initialization and base procedure definitions.
+ * Exports public (unauthenticated) and protected (Firebase-auth-required) procedures.
+ */
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { Context } from './context';
 

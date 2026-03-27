@@ -1,3 +1,7 @@
+/**
+ * Wikia generation service — uses OpenAI GPT-4o-mini to generate rich narrative
+ * wiki entries, storylines, and summaries for cinematic universe events.
+ */
 import OpenAI from 'openai';
 
 const openai = process.env.OPENAI_API_KEY

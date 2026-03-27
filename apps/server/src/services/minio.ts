@@ -1,3 +1,8 @@
+/**
+ * Firebase Cloud Storage service — singleton wrapper around Google Cloud Storage bucket.
+ * Handles file upload, download, and public URL generation for media assets.
+ * Named "minio" for legacy reasons (migrated from MinIO to Firebase Storage).
+ */
 import { getStorage } from 'firebase-admin/storage';
 // @ts-expect-error firebase-admin/storage re-exports this type
 import type { Bucket } from '@google-cloud/storage';

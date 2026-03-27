@@ -1,3 +1,4 @@
+/** Barrel exports for the unified decentralized storage layer. */
 export type { StorageProvider, UploadResult, StorageManifest, ProviderStatus } from './types';
 export { computeSha256, sha256ToBytes32, getMimeType } from './types';
 export { WalrusProvider } from './walrus';

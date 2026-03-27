@@ -1,7 +1,11 @@
+/**
+ * Root tRPC router — aggregates all sub-routers (wiki, video, fal, storage, minio, synapse)
+ * and defines top-level procedures (healthCheck, privateData).
+ */
 import { protectedProcedure, publicProcedure, router } from '../lib/trpc';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { db } from '../lib/firebase';
+import { db, firebaseAvailable } from '../lib/firebase';
 import { z } from 'zod';
 
 import { falService } from '../services/fal';
@@ -9,13 +13,25 @@ import { falService } from '../services/fal';
 import { cinematicUniversesRouter } from './cinematicUniverses/cinematicUniverses.index';
 import { falRouter } from './fal/fal.routes';
 import { storageRouter } from './storage/storage.routes';
+import { profilesRouter } from './profiles/profiles.routes';
+import { contentRouter } from './content/content.routes';
+import { nftRouter } from './nft/nft.routes';
+import { marketplaceRouter } from './marketplace/marketplace.routes';
+import { creditsRouter } from './credits/credits.routes';
+import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
+import { collabsRouter } from './collabs/collabs.routes';
+import { adsRouter } from './ads/ads.routes';
+import { licensingRouter } from './licensing/licensing.routes';
+import { analyticsRouter } from './analytics/analytics.routes';
 import { getSynapseService } from '../services/synapse';
 import { wikiaService } from '../services/wikia';
 import { minioService } from '../services/minio';
 import { geminiService } from '../services/gemini';
 
-const charactersCol = db.collection('characters');
-const eventWikisCol = db.collection('eventWikis');
+const charactersCol = firebaseAvailable ? db.collection('characters') : null;
+const eventWikisCol = firebaseAvailable ? db.collection('eventWikis') : null;
+const walletLoginsCol = firebaseAvailable ? db.collection('walletLogins') : null;
+const usersCol = firebaseAvailable ? db.collection('users') : null;
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -24,12 +40,70 @@ export const appRouter = router({
   privateData: protectedProcedure.query(({ ctx }) => {
     return {
       message: 'This is private',
-      user: { uid: ctx.user.uid, email: ctx.user.email },
+      user: { uid: ctx.user.uid, address: ctx.user.address, email: ctx.user.email },
     };
   }),
+  trackWalletLogin: publicProcedure
+    .input(
+      z.object({
+        address: z.string(),
+        chainId: z.number(),
+        connector: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      if (!walletLoginsCol || !usersCol) {
+        console.warn('Firebase unavailable — skipping wallet login tracking');
+        return { ok: true };
+      }
+
+      const now = new Date();
+      const addressLower = input.address.toLowerCase();
+
+      // Log every login event
+      await walletLoginsCol.add({
+        address: addressLower,
+        chainId: input.chainId,
+        connector: input.connector || 'unknown',
+        loginAt: now,
+        userAgent: '',
+      });
+
+      // Upsert user profile
+      const userRef = usersCol.doc(addressLower);
+      const userDoc = await userRef.get();
+      if (userDoc.exists) {
+        await userRef.update({
+          lastLoginAt: now,
+          loginCount: (userDoc.data()?.loginCount || 0) + 1,
+          chainId: input.chainId,
+        });
+      } else {
+        await userRef.set({
+          address: addressLower,
+          firstLoginAt: now,
+          lastLoginAt: now,
+          loginCount: 1,
+          chainId: input.chainId,
+          connector: input.connector || 'unknown',
+        });
+      }
+
+      return { ok: true };
+    }),
   cinematicUniverses: cinematicUniversesRouter,
   fal: falRouter,
   storage: storageRouter,
+  profiles: profilesRouter,
+  content: contentRouter,
+  nft: nftRouter,
+  marketplace: marketplaceRouter,
+  credits: creditsRouter,
+  subscriptions: subscriptionsRouter,
+  collabs: collabsRouter,
+  ads: adsRouter,
+  licensing: licensingRouter,
+  analytics: analyticsRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {

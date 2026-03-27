@@ -1,3 +1,7 @@
+/**
+ * Global error handler middleware for Hono.
+ * Returns sanitized error messages in production, detailed errors in development.
+ */
 import type { Context } from 'hono';
 
 export function errorHandler(err: Error, c: Context) {

@@ -1,3 +1,13 @@
+/**
+ * Timeline Node Components
+ *
+ * Custom ReactFlow node for timeline events. Displays a video thumbnail
+ * (with hover-to-play), event label, canon status badge, and action buttons
+ * for adding subsequent or branching events.
+ *
+ * Also exports the TimelineNodeData interface used across the flow system.
+ */
+
 import { Handle, Position } from 'reactflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

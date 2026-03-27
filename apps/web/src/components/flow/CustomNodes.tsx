@@ -1,3 +1,13 @@
+/**
+ * Custom ReactFlow Nodes
+ *
+ * Presentational node types for the narrative flow graph:
+ * - CharacterNode: character card with emoji avatar and optional NFT ID
+ * - PlotPointNode: green-bordered story beat with timestamp
+ * - MediaNode: purple-bordered media item (image/video/audio)
+ * - VotingNode: amber-bordered governance voting node with vote counts
+ */
+
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 

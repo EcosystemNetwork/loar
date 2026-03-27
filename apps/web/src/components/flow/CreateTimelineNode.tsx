@@ -1,3 +1,14 @@
+/**
+ * Create Timeline Node Form
+ *
+ * Simple form card for creating a new timeline node with a plot description.
+ * Currently uses a mock blockchain interaction (to be replaced with real
+ * smart contract calls).
+ *
+ * @param previousNodeId - The parent node ID this new node follows
+ * @param onSuccess - Callback invoked with the new node's ID after creation
+ */
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -1,3 +1,11 @@
+/**
+ * Event Detail Route
+ *
+ * Displays a single timeline event within a universe: video player, AI-generated
+ * wiki content (plot, characters, key moments, visual details), and navigation
+ * to previous/next/branching events in the timeline graph.
+ */
+
 import { createFileRoute, useParams, useNavigate } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

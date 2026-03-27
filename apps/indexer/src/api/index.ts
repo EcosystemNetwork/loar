@@ -1,3 +1,10 @@
+/**
+ * Ponder API Layer
+ *
+ * Exposes REST endpoints and a GraphQL API for querying indexed blockchain data.
+ * Includes custom Hono routes for universe, node, proposal, and token queries
+ * alongside Ponder's built-in SQL client and GraphQL middleware.
+ */
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import { Hono } from 'hono';

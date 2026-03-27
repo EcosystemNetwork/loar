@@ -45,6 +45,20 @@ export interface UseContractSaveReturn {
   handleRefreshTimeline: () => Promise<void>;
 }
 
+/**
+ * Orchestrates saving a generated video to decentralized storage and the blockchain.
+ *
+ * Flow:
+ * 1. Upload video to unified StorageManager (Walrus/IPFS/Synapse/Firebase)
+ * 2. Determine the previous node (linear continuation or branch)
+ * 3. Compute keccak256 content/plot hashes
+ * 4. Call `createNode` on the Universe contract
+ * 5. Trigger background wiki generation via tRPC
+ * 6. Refresh on-chain data after confirmation
+ *
+ * @param props - All required state, setters, and refetch functions (see UseContractSaveProps)
+ * @returns `{ handleSaveToContract, handleRefreshTimeline }`
+ */
 export function useContractSave({
   generatedVideoUrl,
   videoTitle,

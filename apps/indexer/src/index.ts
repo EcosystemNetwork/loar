@@ -1,3 +1,13 @@
+/**
+ * Ponder Event Handlers
+ *
+ * Indexes on-chain events from the LOAR protocol contracts on Sepolia:
+ * - UniverseManager: universe creation, token deployments, hook/locker config
+ * - Universe: node creation, canonization, media updates
+ * - UniverseGovernor: proposals, votes, execution
+ * - GovernanceERC20: token transfers, holder balance tracking
+ * - PoolManager: Uniswap v4 swap events
+ */
 import { ponder } from 'ponder:registry';
 import {
   universe,

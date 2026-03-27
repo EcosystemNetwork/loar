@@ -1,3 +1,9 @@
+/**
+ * Mode Toggle
+ *
+ * Dropdown button that switches between light, dark, and system color themes.
+ */
+
 import { Moon, Sun } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

@@ -1,3 +1,8 @@
+/**
+ * Temporary image serving routes — stores base64-encoded images in memory
+ * and serves them via /temp/:id. Images are auto-cleaned after 1 hour.
+ * Used as a bridge for AI-generated images before permanent storage.
+ */
 import { Hono } from 'hono';
 import { randomBytes } from 'crypto';
 

@@ -26,9 +26,22 @@ export interface UploadJobStatus {
   updatedAt: number;
 }
 
+/**
+ * Manages async file uploads with status polling.
+ * Tracks active upload jobs, polls their status every 2 seconds, and
+ * auto-removes completed jobs after 10 seconds.
+ *
+ * @returns `{ jobs, activeJobIds, uploadFromUrl, retryJob, removeJob, hasActiveUploads }`
+ */
 export function useUploadQueue() {
   const [activeJobIds, setActiveJobIds] = useState<string[]>([]);
 
+  /**
+   * Initiates an async upload from a URL via the storage tRPC endpoint.
+   * @param url - Source URL of the file to upload
+   * @param filename - Optional filename override
+   * @returns The job ID for status polling
+   */
   const uploadFromUrl = useCallback(async (url: string, filename?: string) => {
     const result = await trpcClient.storage.uploadAsync.mutate({
       url,
@@ -38,10 +51,18 @@ export function useUploadQueue() {
     return result.jobId;
   }, []);
 
+  /**
+   * Retries a failed upload job.
+   * @param jobId - The job ID to retry
+   */
   const retryJob = useCallback(async (jobId: string) => {
     await trpcClient.storage.retryUpload.mutate({ jobId });
   }, []);
 
+  /**
+   * Removes a job from the active polling list (does not cancel the server-side job).
+   * @param jobId - The job ID to stop tracking
+   */
   const removeJob = useCallback((jobId: string) => {
     setActiveJobIds((prev) => prev.filter((id) => id !== jobId));
   }, []);

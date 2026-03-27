@@ -1,3 +1,12 @@
+/**
+ * Universe Timeline Editor Route
+ *
+ * Main workspace for a single narrative universe. Renders a ReactFlow-based
+ * timeline graph where users can view, create, and branch narrative events.
+ * Integrates AI video/image generation, character management, blockchain
+ * contract interactions, and governance sidebar.
+ */
+
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';

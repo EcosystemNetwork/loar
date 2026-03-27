@@ -4,7 +4,10 @@ pragma solidity ^0.8.28;
 import {GovernanceERC20} from "../GovernanceERC20.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
 
-/// @notice Loar Token Launcher
+/// @title LoarDeployer
+/// @notice Library for deploying GovernanceERC20 tokens during universe creation.
+/// @dev Used by UniverseManager to deploy governance tokens with voting capabilities.
+///      Deployed as a library to keep the factory contract size under the EIP-170 limit.
 library LoarDeployer {
     function deployToken(
         IUniverseManager.TokenConfig memory tokenConfig,

@@ -1,3 +1,11 @@
+/**
+ * Editable ReactFlow Nodes
+ *
+ * Variants of the custom nodes (Character, PlotPoint, Media) that expose
+ * inline-editable description fields. Used in edit mode so users can
+ * modify node content directly on the canvas.
+ */
+
 import { memo, useState, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 

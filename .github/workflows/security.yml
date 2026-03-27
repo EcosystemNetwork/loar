@@ -1,0 +1,42 @@
+name: Security Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  contracts-security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Run Forge tests
+        run: forge test -vvv
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        with:
+          target: apps/contracts
+          slither-config: apps/contracts/slither.config.json
+        continue-on-error: true
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+        continue-on-error: true

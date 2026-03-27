@@ -1,3 +1,11 @@
+/**
+ * Timeline Flow Editor
+ *
+ * ReactFlow-based visual timeline editor for a single universe. Renders
+ * TimelineEventNode custom nodes, supports adding/branching events via a
+ * sidebar panel, and handles edge connections between timeline nodes.
+ */
+
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   Background,

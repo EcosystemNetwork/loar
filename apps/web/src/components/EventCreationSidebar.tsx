@@ -1,3 +1,11 @@
+/**
+ * Event Creation Sidebar
+ *
+ * Right-side panel used during timeline event creation. Provides controls
+ * for title, description, AI image/video generation steps, character
+ * selection and generation, video model configuration, and saving to chain.
+ */
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -1,3 +1,8 @@
+/**
+ * In-memory upload queue with retry logic (3x exponential backoff).
+ * Jobs are processed in the background and can be polled for status.
+ * Completed/failed jobs are cleaned up after 1 hour.
+ */
 import type { StorageManifest, ProviderStatus } from './types';
 import { getStorageManager } from './manager';
 

@@ -1,3 +1,8 @@
+/**
+ * Filecoin Synapse service — uploads and downloads files to/from the Filecoin network
+ * via the Synapse SDK (Calibration testnet). Includes a circuit breaker (3 failures / 60s)
+ * and per-PieceCID failure tracking for download resilience.
+ */
 import { Synapse, RPC_URLS } from '@filoz/synapse-sdk';
 import { promises as fs } from 'fs';
 import { Readable } from 'stream';

@@ -1,3 +1,7 @@
+/**
+ * Cinematic Universes Firestore handlers — CRUD operations for universe documents.
+ * Documents are keyed by the lowercase contract address to ensure uniqueness.
+ */
 import { db } from '../../lib/firebase';
 
 interface CreateCinematicUniverseInput {

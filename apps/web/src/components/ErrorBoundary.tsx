@@ -1,3 +1,13 @@
+/**
+ * Error Boundary
+ *
+ * React class component that catches unhandled errors in its subtree and
+ * renders a fallback UI instead of crashing the whole app.
+ *
+ * @param children - Component tree to wrap
+ * @param fallback - Optional custom fallback; defaults to a generic error message
+ */
+
 import { Component, type ReactNode } from 'react';
 
 interface Props {

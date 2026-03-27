@@ -36,12 +36,15 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key.pem
           chmod 600 private_key.pem
 
-          ssh -i private_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -tt $SSH_USER@$SSH_HOST << EOF
+          ssh-keyscan -H $SSH_HOST >> known_hosts 2>/dev/null
+
+          ssh -i private_key.pem -o StrictHostKeyChecking=yes -o UserKnownHostsFile=known_hosts -tt $SSH_USER@$SSH_HOST << EOF
             echo "✅ SSH connection successful"
             cd $WORK_DIR
             git pull origin
-            bun install
-            bun run build
+            corepack enable && corepack prepare pnpm@9.15.0 --activate
+            pnpm install --frozen-lockfile
+            pnpm run build
             docker compose down || true
             docker compose build
             docker compose up -d
@@ -49,4 +52,4 @@ jobs:
             exit
           EOF
 
-
+          rm -f private_key.pem known_hosts

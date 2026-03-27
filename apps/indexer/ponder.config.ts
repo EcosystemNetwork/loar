@@ -1,3 +1,11 @@
+/**
+ * Ponder Indexer Configuration
+ *
+ * Configures Ponder to index LOAR protocol contracts on Sepolia testnet.
+ * Uses the factory pattern to dynamically track Universe, Governor, and Token
+ * contracts spawned by the UniverseManager factory. Also indexes Uniswap v4
+ * PoolManager swap events for token price tracking.
+ */
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';

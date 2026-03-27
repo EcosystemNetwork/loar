@@ -6,6 +6,10 @@ import {ERC20Permit} from "@openzeppelin/token/ERC20/extensions/ERC20Permit.sol"
 import {ERC20Votes} from "@openzeppelin/token/ERC20/extensions/ERC20Votes.sol";
 import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 
+/// @title GovernanceERC20
+/// @notice ERC20 token with voting and permit capabilities for universe governance.
+/// @dev Extends OpenZeppelin's ERC20Votes for on-chain vote delegation and ERC20Permit for gasless approvals.
+///      Mints the full supply to the deployer (UniverseTokenDeployer) on construction.
 contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
     string public imageUrl;
     string public metadata;
