@@ -13,7 +13,7 @@ import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from '
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { GenerativeMedia } from '@/components/GenerativeMedia';
-import Header from '@/components/header';
+
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useEffect } from 'react';
 
@@ -135,7 +135,7 @@ function RouteComponent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+
       {/* Dashboard Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-6 py-4">

@@ -15,7 +15,7 @@ import {
   Megaphone, FileText, ShoppingBag, BarChart3,
   TrendingUp, Sparkles, ArrowRight
 } from 'lucide-react';
-import Header from '@/components/header';
+
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 
@@ -36,7 +36,7 @@ function MarketPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Hero Stats */}
         <div className="mb-8">

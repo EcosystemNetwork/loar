@@ -9,7 +9,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import Header from '@/components/header';
+
 import {
   Play,
   Plus,
@@ -1141,7 +1141,6 @@ function HomeComponent() {
         }
       `}</style>
 
-      <Header />
       <ActivityTicker />
 
       {/* Floating search button */}

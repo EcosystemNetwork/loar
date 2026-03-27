@@ -8,6 +8,7 @@
 
 import Loader from '@/components/loader';
 import AdminToolbar from '@/components/admin-toolbar';
+import Header from '@/components/header';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import type { trpc } from '@/utils/trpc';
@@ -67,7 +68,16 @@ function RootComponent() {
         disableTransitionOnChange
         storageKey="vite-ui-theme"
       >
-        <div className="h-svh">{isFetching ? <Loader /> : <Outlet />}</div>
+        <div className="h-svh">
+          {isFetching ? (
+            <Loader />
+          ) : (
+            <>
+              <Header />
+              <Outlet />
+            </>
+          )}
+        </div>
         <Toaster richColors />
         <AdminToolbar />
       </ThemeProvider>
