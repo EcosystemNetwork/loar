@@ -14,6 +14,14 @@ import { universe, node, proposal, token, vote } from 'ponder:schema';
 
 const app = new Hono();
 
+app.get('/health', (c) => {
+  return c.json({
+    status: 'healthy',
+    service: 'indexer',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use('/sql/*', client({ db, schema }));
 
 // Custom REST endpoints

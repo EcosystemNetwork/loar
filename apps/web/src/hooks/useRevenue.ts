@@ -32,7 +32,10 @@ export function useMyNFTs() {
 
 // ---- Canon Marketplace ----
 
-export function useCanonSubmissions(universeId: string, status = 'ALL' as const) {
+export function useCanonSubmissions(
+  universeId: string,
+  status: 'VOTING' | 'ACCEPTED' | 'REJECTED' | 'ALL' = 'ALL'
+) {
   return useQuery({
     queryKey: ['canon-submissions', universeId, status],
     queryFn: () => trpcClient.marketplace.getByUniverse.query({ universeId, status }),

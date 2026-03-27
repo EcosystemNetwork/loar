@@ -39,7 +39,10 @@ export const creditsRouter = router({
   // ---- Tiers ----
 
   getTiers: publicProcedure.query(async () => {
-    const snapshot = await creditTiersCol.where('active', '==', true).orderBy('credits', 'asc').get();
+    const snapshot = await creditTiersCol
+      .where('active', '==', true)
+      .orderBy('credits', 'asc')
+      .get();
 
     return snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -108,7 +111,7 @@ export const creditsRouter = router({
       z.object({
         generationType: z.enum(['image', 'video', 'story', 'spinoff', 'character', 'scene']),
         universeId: z.string().optional(),
-        metadata: z.record(z.string()).optional(),
+        metadata: z.record(z.string(), z.string()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -119,7 +122,8 @@ export const creditsRouter = router({
 
       if (!userDoc.exists) throw new Error('No credits available');
       const data = userDoc.data()!;
-      if ((data.balance || 0) < cost) throw new Error(`Insufficient credits. Need ${cost}, have ${data.balance || 0}`);
+      if ((data.balance || 0) < cost)
+        throw new Error(`Insufficient credits. Need ${cost}, have ${data.balance || 0}`);
 
       await userRef.update({
         balance: data.balance - cost,

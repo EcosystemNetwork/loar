@@ -13,6 +13,16 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+// Fail fast on missing critical env vars
+const requiredEnv = ['PONDER_RPC_URL_2'] as const;
+const missing = requiredEnv.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  console.error(`\n❌ Indexer environment validation failed:`);
+  missing.forEach((key) => console.error(`  - ${key} is required`));
+  console.error('\nCheck .env.example for required variables.\n');
+  process.exit(1);
+}
+
 import { createConfig, factory } from 'ponder';
 import { parseAbiItem } from 'viem';
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from '@loar/abis/generated';

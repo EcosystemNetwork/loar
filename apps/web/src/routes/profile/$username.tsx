@@ -40,21 +40,22 @@ function ProfilePage() {
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', username],
-    queryFn: () => trpcClient.profiles.getByUsername.query({ username }),
+    queryFn: () => trpcClient.profiles.getByUsername.query({ username }) as Promise<any>,
   });
 
   const { data: contentData, isLoading: contentLoading } = useQuery({
     queryKey: ['profile-content', profile?.id],
-    queryFn: () =>
-      trpcClient.content.getByCreator.query({ creatorUid: profile!.id, limit: 50 }),
+    queryFn: () => trpcClient.content.getByCreator.query({ creatorUid: profile!.id, limit: 50 }),
     enabled: !!profile?.id && profile.visibility !== 'private',
   });
 
   if (profileLoading) {
     return (
       <div className="min-h-screen bg-background">
-
-        <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ minHeight: 'calc(100vh - 64px)' }}
+        >
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       </div>
@@ -64,8 +65,10 @@ function ProfilePage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-background">
-
-        <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div
+          className="flex flex-col items-center justify-center gap-4"
+          style={{ minHeight: 'calc(100vh - 64px)' }}
+        >
           <h2 className="text-xl font-semibold">Profile not found</h2>
           <p className="text-muted-foreground">The user @{username} doesn't exist.</p>
           <Button asChild variant="outline">
@@ -80,8 +83,10 @@ function ProfilePage() {
   if (profile.visibility === 'private') {
     return (
       <div className="min-h-screen bg-background">
-
-        <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div
+          className="flex flex-col items-center justify-center gap-4"
+          style={{ minHeight: 'calc(100vh - 64px)' }}
+        >
           <Lock className="h-12 w-12 text-muted-foreground" />
           <h2 className="text-xl font-semibold">{profile.displayName}</h2>
           <p className="text-muted-foreground">This profile is private.</p>
@@ -102,12 +107,15 @@ function ProfilePage() {
   const items = contentData?.items || [];
   const funItems = items.filter((i: any) => i.classification === 'fun');
   const monetizedItems = items.filter((i: any) => i.classification === 'monetized');
-  const gridCols = layout.gridColumns === '2' ? 'md:grid-cols-2' : layout.gridColumns === '4' ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-2 lg:grid-cols-3';
+  const gridCols =
+    layout.gridColumns === '2'
+      ? 'md:grid-cols-2'
+      : layout.gridColumns === '4'
+        ? 'md:grid-cols-2 lg:grid-cols-4'
+        : 'md:grid-cols-2 lg:grid-cols-3';
 
   return (
     <div className={`min-h-screen bg-background ${themeClass}`}>
-
-
       {/* Banner */}
       <div
         className="h-48 md:h-64 relative"
@@ -129,7 +137,11 @@ function ProfilePage() {
             style={{ borderColor: accentColor }}
           >
             {(profile as any).avatarUrl ? (
-              <img src={(profile as any).avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
+              <img
+                src={(profile as any).avatarUrl}
+                alt={profile.displayName}
+                className="w-full h-full object-cover"
+              />
             ) : (
               profile.displayName.charAt(0).toUpperCase()
             )}
@@ -150,7 +162,9 @@ function ProfilePage() {
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {tags.map((tag: string) => (
-                  <Badge key={tag} variant="secondary">{tag}</Badge>
+                  <Badge key={tag} variant="secondary">
+                    {tag}
+                  </Badge>
                 ))}
               </div>
             )}
@@ -158,17 +172,32 @@ function ProfilePage() {
             {/* Social Links */}
             <div className="flex gap-3 mt-3">
               {socialLinks.website && (
-                <a href={socialLinks.website} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                <a
+                  href={socialLinks.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
                   <ExternalLink className="h-3 w-3" /> Website
                 </a>
               )}
               {socialLinks.twitter && (
-                <a href={`https://x.com/${socialLinks.twitter}`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
+                <a
+                  href={`https://x.com/${socialLinks.twitter}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
                   @{socialLinks.twitter}
                 </a>
               )}
               {socialLinks.youtube && (
-                <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
+                <a
+                  href={socialLinks.youtube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
                   YouTube
                 </a>
               )}
@@ -241,7 +270,12 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
           {item.thumbnailUrl ? (
             <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
           ) : isVideo ? (
-            <video src={item.mediaUrl} className="w-full h-full object-cover" muted preload="metadata" />
+            <video
+              src={item.mediaUrl}
+              className="w-full h-full object-cover"
+              muted
+              preload="metadata"
+            />
           ) : (
             <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
           )}
@@ -258,16 +292,24 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
               style={item.classification === 'monetized' ? { backgroundColor: accentColor } : {}}
             >
               {item.classification === 'monetized' ? (
-                <><DollarSign className="h-3 w-3 mr-0.5" /> Monetized</>
+                <>
+                  <DollarSign className="h-3 w-3 mr-0.5" /> Monetized
+                </>
               ) : (
-                <><Sparkles className="h-3 w-3 mr-0.5" /> Fun</>
+                <>
+                  <Sparkles className="h-3 w-3 mr-0.5" /> Fun
+                </>
               )}
             </Badge>
           </div>
           {/* Media type */}
           <div className="absolute bottom-2 left-2">
             <Badge variant="outline" className="text-xs bg-black/40 text-white border-0">
-              {item.mediaType === 'ai-video' ? 'AI Video' : item.mediaType === 'ai-image' ? 'AI Image' : item.mediaType}
+              {item.mediaType === 'ai-video'
+                ? 'AI Video'
+                : item.mediaType === 'ai-image'
+                  ? 'AI Image'
+                  : item.mediaType}
             </Badge>
           </div>
         </div>
@@ -281,12 +323,12 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
           <div className="flex items-center justify-between mt-2">
             <div className="flex gap-2">
               {item.tags?.slice(0, 3).map((tag: string) => (
-                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
               ))}
             </div>
-            <span className="text-xs text-muted-foreground">
-              {item.views} views
-            </span>
+            <span className="text-xs text-muted-foreground">{item.views} views</span>
           </div>
         </div>
       </CardContent>

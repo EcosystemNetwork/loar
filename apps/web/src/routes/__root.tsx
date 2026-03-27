@@ -7,6 +7,7 @@
  */
 
 import Loader from '@/components/loader';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AdminToolbar from '@/components/admin-toolbar';
 import Header from '@/components/header';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -16,12 +17,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import {
   HeadContent,
+  Link,
   Outlet,
   createRootRouteWithContext,
   useRouterState,
 } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-// import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 import { useTrackWalletLogin } from '@/hooks/useTrackWalletLogin';
 import '../index.css';
 
@@ -32,14 +33,17 @@ export interface RouterAppContext {
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootComponent,
+  pendingComponent: RootPending,
+  errorComponent: RootError,
+  notFoundComponent: RootNotFound,
   head: () => ({
     meta: [
       {
-        title: 'loar-fullstack',
+        title: 'LOAR',
       },
       {
         name: 'description',
-        content: 'loar-fullstack is a web application',
+        content: 'Decentralized Narrative Control Suite',
       },
     ],
     links: [
@@ -51,17 +55,56 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   }),
 });
 
+function RootPending() {
+  return (
+    <div className="h-svh flex items-center justify-center bg-background">
+      <Loader />
+    </div>
+  );
+}
+
+function RootError({ error }: { error: Error }) {
+  return (
+    <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
+      <h1 className="text-2xl font-bold">Something went wrong</h1>
+      <p className="text-muted-foreground max-w-md text-center">
+        {error?.message || 'An unexpected error occurred.'}
+      </p>
+      <button
+        onClick={() => window.location.reload()}
+        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+      >
+        Reload Page
+      </button>
+    </div>
+  );
+}
+
+function RootNotFound() {
+  return (
+    <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
+      <h1 className="text-4xl font-bold">404</h1>
+      <p className="text-muted-foreground">This page doesn't exist.</p>
+      <Link
+        to="/"
+        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+      >
+        Go Home
+      </Link>
+    </div>
+  );
+}
+
 function RootComponent() {
   useTrackWalletLogin();
 
-  const isFetching = useRouterState({
+  const isLoading = useRouterState({
     select: (s) => s.isLoading,
   });
 
   return (
-    <>
+    <ErrorBoundary>
       <HeadContent />
-      {/* <DynamicWidget variant="modal" /> */}
       <ThemeProvider
         attribute="class"
         defaultTheme="dark"
@@ -69,7 +112,7 @@ function RootComponent() {
         storageKey="vite-ui-theme"
       >
         <div className="h-svh">
-          {isFetching ? (
+          {isLoading ? (
             <Loader />
           ) : (
             <>
@@ -83,6 +126,6 @@ function RootComponent() {
       </ThemeProvider>
       <TanStackRouterDevtools position="bottom-left" />
       <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
-    </>
+    </ErrorBoundary>
   );
 }

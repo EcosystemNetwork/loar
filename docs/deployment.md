@@ -1,18 +1,46 @@
 # Deployment Guide
 
-## Docker Deployment
+## Canonical Deployment Path
 
-### Architecture
+**Docker Compose** is the canonical deployment path for all environments. It runs all three services (server, web, indexer) in isolated containers behind a shared bridge network.
 
-`docker-compose.yml` defines three services:
+**Vercel** is supported as a secondary path for the **web frontend only** (static hosting). The server and indexer must still run via Docker or bare-metal.
 
-| Service      | Dockerfile                | Port  | Image                            |
-| ------------ | ------------------------- | ----- | -------------------------------- |
-| `app-server` | `apps/server/Dockerfile`  | 3000  | node:20-alpine, esbuild bundle   |
-| `app-web`    | `apps/web/Dockerfile`     | 3001  | alpine, static files via `serve` |
-| `indexer`    | `apps/indexer/Dockerfile` | 42069 | node:20-alpine, Ponder           |
+## Architecture
 
-All services connect via the `loar-network` bridge network.
+| Service      | Dockerfile                | Port  | Health Check          |
+| ------------ | ------------------------- | ----- | --------------------- |
+| `app-server` | `apps/server/Dockerfile`  | 3000  | `GET /health`         |
+| `app-web`    | `apps/web/Dockerfile`     | 3001  | `wget localhost:3001` |
+| `indexer`    | `apps/indexer/Dockerfile` | 42069 | `GET /health`         |
+
+All services connect via the `loar-network` bridge network. Each Dockerfile includes a `HEALTHCHECK` directive — Docker will restart unhealthy containers automatically with `restart: unless-stopped`.
+
+## Quick Start (Local Development)
+
+```bash
+# 1. Clone and install
+git clone <repo-url> && cd loar
+pnpm install
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env — at minimum set SIWE_JWT_SECRET (see docs/environment.md)
+
+# 3. Start all services
+pnpm dev
+# Or individual services:
+#   make dev-web      (port 3001)
+#   make dev-server   (port 3000)
+#   make dev-indexer  (port 42069)
+```
+
+## Docker Deployment (Staging & Production)
+
+### Prerequisites
+
+- Docker Engine 20+ with Compose V2
+- `.env` file configured at repo root (see [environment.md](./environment.md))
 
 ### Build & Run
 
@@ -26,7 +54,7 @@ docker compose up -d
 # View logs
 docker compose logs -f
 
-# Stop all services
+# Stop
 docker compose down
 ```
 
@@ -40,59 +68,53 @@ make docker-down
 make docker-restart   # rebuild + restart
 ```
 
-### Environment Variables
+### Environment Variables in Docker
 
-- **Server** and **Indexer**: `.env` file is mounted via `env_file: ./.env` in `docker-compose.yml`
-- **Web**: Environment variables are baked at build time by Vite. To change them, rebuild the container:
+- **Server & Indexer**: `.env` is injected at runtime via `env_file` in `docker-compose.yml`
+- **Web**: `VITE_*` variables are baked at build time by Vite. To change them, rebuild:
   ```bash
-  docker compose build app-web
-  docker compose up -d app-web
+  docker compose build app-web && docker compose up -d app-web
   ```
 
 ### Health Checks
 
-Both server and web Dockerfiles include `HEALTHCHECK` directives:
+All services expose health endpoints. Docker checks them every 30s and restarts unresponsive containers.
 
 ```bash
-# Server health check
-curl http://localhost:3000/health
-
-# Web health check
-wget -q -O /dev/null http://localhost:3001
+# Manual verification
+curl http://localhost:3000/health   # Server — returns JSON with status, uptime, env
+curl http://localhost:42069/health  # Indexer — returns JSON with status
+wget -qO- http://localhost:3001    # Web — returns HTML
 ```
 
 ### Build Details
 
 **Server** (`apps/server/Dockerfile`):
 
-- Multi-stage build (builder + production)
-- Uses esbuild to bundle into a single ESM file
-- Production image contains only runtime dependencies + bundle
-- Healthcheck: `curl /health`
+- Multi-stage: builder (esbuild bundle) → production (runtime only)
+- Bundles to single ESM file, excludes `better-sqlite3` (native module)
+- Production image: `node:20-alpine` + `curl` (for healthcheck)
 
 **Web** (`apps/web/Dockerfile`):
 
-- Multi-stage build (builder + production)
-- Vite build produces static files
-- Production image uses lightweight `serve` static server
-- Healthcheck: `wget localhost:3001`
+- Multi-stage: builder (Vite build) → production (static `serve`)
+- Production image: `node:20-alpine` + `serve@14`
 
 **Indexer** (`apps/indexer/Dockerfile`):
 
-- Single-stage build
-- Runs `pnpm start` (Ponder CLI)
-- No healthcheck configured
+- Single-stage: installs deps, runs `ponder start`
+- Longer start period (30s) — Ponder needs time to sync initial blocks
 
 ## CI/CD (GitHub Actions)
 
-### Workflow: `.github/workflows/deploy.yml`
+### Deploy Workflow (`.github/workflows/deploy.yml`)
 
-**Trigger:** Push to `main` branch
+**Trigger:** Push to `main`
 
 **Process:**
 
-1. SSH into the deployment server
-2. `git pull` latest code
+1. SSH into deployment server
+2. Pull latest code
 3. Install dependencies with pnpm
 4. Build with Turbo
 5. Rebuild and restart Docker containers
@@ -107,38 +129,49 @@ wget -q -O /dev/null http://localhost:3001
 | `WORK_DIR`        | Path to the repo on the server     |
 | `MAIN_BRANCH`     | Branch name (typically `main`)     |
 
-### Setup
+### CI Workflow (`.github/workflows/ci.yml`)
 
-1. Add secrets in GitHub repo > Settings > Secrets and variables > Actions
-2. Ensure the server has:
-   - Node.js 18+ installed
-   - Docker + Docker Compose installed
-   - The repo cloned at `WORK_DIR`
-   - `.env` file configured on the server
+Runs on every push/PR to `main`:
 
-## Manual Deployment
+1. **Quality**: format check → lint → type check
+2. **Build**: full Turbo build
+3. **Contracts**: Foundry fmt → build → test
 
-If you prefer deploying without Docker:
+## Vercel (Web Frontend Only)
+
+`vercel.json` at the repo root deploys **only the web app** as a static site:
+
+```json
+{
+  "buildCommand": "pnpm install --frozen-lockfile && cd apps/web && pnpm run build",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "npm i -g pnpm@9.15.0 && pnpm install --frozen-lockfile",
+  "framework": null
+}
+```
+
+Vercel handles the web frontend. The server and indexer must be deployed separately (Docker on a VPS, Railway, Fly.io, etc.).
+
+Set `VITE_SERVER_URL` and `VITE_PONDER_URL` in Vercel's environment variables to point at your deployed server and indexer.
+
+## Manual Deployment (Without Docker)
+
+If Docker is not available:
 
 ### Server
 
 ```bash
-# Build
 cd apps/server
-npx esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:firebase-admin
-
-# Run
+npx esbuild src/index.ts --bundle --platform=node --format=esm \
+  --outfile=dist/index.js --external:better-sqlite3
 node dist/index.js
 ```
 
 ### Web
 
 ```bash
-# Build
 cd apps/web
 pnpm run build
-
-# Serve static files (port 3001)
 npx serve -s dist -l 3001
 ```
 
@@ -151,16 +184,10 @@ pnpm start
 
 ## Contract Deployment
 
-Deploy smart contracts to Sepolia:
-
 ```bash
 cd apps/contracts
-
-# Set env vars
 export RPC_11155111=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 export VERIFICATION_KEY_1=YOUR_ETHERSCAN_KEY
-
-# Deploy
 forge script script/Deploy.s.sol --rpc-url $RPC_11155111 --broadcast --verify
 ```
 
@@ -170,13 +197,54 @@ After deployment:
 2. Run `pnpm exec wagmi generate` to regenerate hooks
 3. Update the indexer's `ponder.config.ts` with new addresses
 
+## Environment Matrix
+
+| Variable           | Local Dev         | Staging                       | Production                 |
+| ------------------ | ----------------- | ----------------------------- | -------------------------- |
+| `NODE_ENV`         | `development`     | `production`                  | `production`               |
+| `CORS_ORIGIN`      | `localhost:3001`  | `https://staging.loar...`     | `https://loartech.xyz`     |
+| `VITE_SERVER_URL`  | `localhost:3000`  | `https://api-staging.loar...` | `https://api.loartech.xyz` |
+| `VITE_PONDER_URL`  | `localhost:42069` | `https://idx-staging.loar...` | `https://idx.loartech.xyz` |
+| `PONDER_RPC_URL_2` | Alchemy free      | Alchemy growth                | Alchemy growth             |
+| Firebase           | Test mode / none  | Test project                  | Production project         |
+
 ## Production Checklist
 
 - [ ] `.env` has production Firebase credentials
+- [ ] `NODE_ENV=production`
 - [ ] `CORS_ORIGIN` set to production domain
+- [ ] `SIWE_JWT_SECRET` is a secure random 256-bit hex string
 - [ ] AI service keys (FAL_KEY, GOOGLE_API_KEY, OPENAI_API_KEY) configured
 - [ ] `PONDER_RPC_URL_2` uses a production-grade RPC endpoint
 - [ ] Firestore security rules are locked down (not test mode)
-- [ ] Firebase Auth settings restrict signup as needed
-- [ ] Docker containers are running with `restart: unless-stopped`
-- [ ] SSL/TLS termination configured (reverse proxy)
+- [ ] Docker containers running with `restart: unless-stopped`
+- [ ] SSL/TLS termination configured (reverse proxy: nginx, Caddy, or cloud LB)
+- [ ] All three health checks return healthy responses
+
+## Rollback
+
+If a deploy breaks production:
+
+```bash
+# SSH into server
+cd $WORK_DIR
+
+# Revert to last known good commit
+git log --oneline -5       # find the commit
+git checkout <good-commit>
+
+# Rebuild
+docker compose build && docker compose up -d
+
+# Verify health
+curl http://localhost:3000/health
+curl http://localhost:42069/health
+```
+
+To restore from a specific tag/branch:
+
+```bash
+git checkout main
+git reset --hard <good-commit>
+docker compose build && docker compose up -d
+```

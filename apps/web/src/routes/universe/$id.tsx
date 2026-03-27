@@ -120,7 +120,7 @@ function UniverseTimelineEditor() {
   // Governance state
   const [showGovernanceSidebar, setShowGovernanceSidebar] = useState(false);
 
-  // MinIO/Storage integration state
+  // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
   const [storageSaved, setStorageSaved] = useState(false);
   const [storageKey, setStorageKey] = useState<string | null>(null);

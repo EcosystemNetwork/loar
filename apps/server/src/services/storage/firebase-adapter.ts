@@ -1,9 +1,9 @@
 import type { StorageProvider, UploadResult } from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
-import { minioService } from '../minio';
+import { firebaseStorageService } from '../firebase-storage';
 
 /**
- * Adapter wrapping the existing Firebase Storage service (minio.ts) as a StorageProvider.
+ * Adapter wrapping the Firebase Storage service as a StorageProvider.
  * Acts as the reliable centralized fallback (priority 4).
  */
 export class FirebaseAdapter implements StorageProvider {
@@ -16,13 +16,13 @@ export class FirebaseAdapter implements StorageProvider {
 
   async upload(buffer: Buffer, filename: string, _mimeType?: string): Promise<UploadResult> {
     const contentHash = computeSha256(buffer);
-    const key = await minioService.upload(buffer, filename);
+    const key = await firebaseStorageService.upload(buffer, filename);
 
     return {
       provider: this.name,
       contentId: key,
       contentHash,
-      url: minioService.getPublicUrl(key),
+      url: firebaseStorageService.getPublicUrl(key),
       size: buffer.length,
     };
   }
@@ -35,10 +35,10 @@ export class FirebaseAdapter implements StorageProvider {
   }
 
   async download(key: string): Promise<Uint8Array> {
-    return minioService.download(key);
+    return firebaseStorageService.download(key);
   }
 
   getPublicUrl(key: string): string {
-    return minioService.getPublicUrl(key);
+    return firebaseStorageService.getPublicUrl(key);
   }
 }
