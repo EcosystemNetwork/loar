@@ -41,6 +41,10 @@ export const queryClient = new QueryClient({
   },
   queryCache: new QueryCache({
     onError: (error) => {
+      // Don't toast on network errors (server/indexer not running)
+      if (error.message === 'Failed to fetch' || error.message.includes('ERR_CONNECTION_REFUSED')) {
+        return;
+      }
       toast.error(error.message, {
         action: {
           label: 'retry',
