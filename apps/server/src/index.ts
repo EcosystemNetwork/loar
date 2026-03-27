@@ -184,13 +184,23 @@ app.get('/', (c) => {
   return c.text('OK');
 });
 
-app.get('/health', (c) => {
+app.get('/health', async (c) => {
+  const { firebaseAvailable } = await import('./lib/firebase');
+
+  const checks = {
+    firebase: firebaseAvailable ? 'ok' : 'degraded',
+  };
+
+  const status = Object.values(checks).every((v) => v === 'ok') ? 'healthy' : 'degraded';
+
   return c.json({
-    status: 'healthy',
-    service: 'server',
+    status,
+    service: 'loar-server',
+    version: process.env.npm_package_version || '0.0.0',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
     env: env.NODE_ENV,
+    checks,
   });
 });
 

@@ -1,197 +1,225 @@
 # LOAR — Creator Journey
 
-The end-to-end flow from signing up to earning revenue.
+Step-by-step from zero to a monetizable cinematic universe. Each step notes what works today and what doesn't.
 
 ---
 
-## 1. Connect Wallet
+## Step 1: Connect Your Wallet
 
 **Route:** `/login`
+**Status:** LIVE
 
-- Connect via RainbowKit (MetaMask, Coinbase Wallet, WalletConnect, etc.)
-- Sign an SIWE message to authenticate
-- Server issues a JWT session token
-- Wallet address becomes your creator identity
+1. Click "Connect Wallet" — RainbowKit modal opens
+2. Choose wallet (MetaMask, Coinbase, WalletConnect, etc.)
+3. Sign the SIWE (Sign-In with Ethereum) message
+4. Server verifies signature, issues JWT session token
+5. You're authenticated — wallet address is your identity
 
-**What you need:** A browser wallet with Sepolia ETH for gas.
+**What you need:** A browser wallet with Sepolia ETH for gas fees.
+**Time:** ~30 seconds
 
 ---
 
-## 2. Create Your Universe
+## Step 2: Create Your Universe
 
 **Route:** `/cinematicUniverseCreate`
+**Status:** LIVE
 
-**Step 1 — Deploy Universe Contract**
+### Step 2a: Deploy the Universe Contract
 
-- Name your cinematic universe
-- Write a description
-- Upload or AI-generate a cover image (FAL AI)
-- Deploy the Universe smart contract to Sepolia
-- Transaction creates your universe on-chain via UniverseManager
+1. Enter universe name and description
+2. Upload or AI-generate a cover image
+3. Click "Deploy" — sends transaction to UniverseManager contract
+4. Wait for confirmation (~15 seconds on Sepolia)
+5. Your Universe smart contract is live on-chain
 
-**Step 2 — Deploy Governance Token**
+### Step 2b: Deploy Governance Token
 
-- Set token symbol and metadata
-- Deploy GovernanceERC20 + UniverseGovernor
-- Initialize a Uniswap v4 liquidity pool
-- LP tokens are locked (anti-rug protection)
+1. Set token name and symbol
+2. Configure metadata
+3. Click "Deploy Token" — this triggers:
+   - GovernanceERC20 deployment (100B supply)
+   - UniverseGovernor deployment (DAO)
+   - Uniswap v4 pool initialization
+   - LP token locking (anti-rug)
+4. Your universe now has a tradeable governance token
 
-**Result:** You own a cinematic universe with its own governance token and trading pool.
+**Time:** ~3-5 minutes (two transactions)
 
 ---
 
-## 3. Build Your Story
+## Step 3: Build Your Story
 
 **Route:** `/universe/$id`
+**Status:** LIVE
 
-The timeline editor is your workspace:
+The timeline editor is your creative workspace:
 
-- **Create nodes** — Each node is a narrative event (episode, scene, chapter)
-- **Generate content** — AI video (Veo3, Kling, Wan2.5, Sora; 1–60s) or images (4 FAL models)
-- **Link events** — Build linear storylines or branching narrative paths
-- **Canonize** — Mark events as official canon (owner-only)
-- **Store content** — Automatically uploaded to Walrus/IPFS/Filecoin with SHA-256 dedup
-- **Create characters** — AI-powered character creation with visual generation and trait analysis
+1. **Create a node** — Click "Create Event" in the sidebar
+2. **Write your prompt** — Describe the scene, select characters
+3. **Generate image** — AI creates a scene image (4 models available)
+4. **Generate video** — AI creates a 1-60s video from the image
+   - Choose provider: Veo3, Kling, Wan2.5, or Sora
+   - Set duration and aspect ratio
+5. **Preview and confirm** — Watch the video, edit if needed
+6. **Save to blockchain** — Content hash stored in Universe contract
+7. **Storage** — Video/image automatically uploaded to Walrus/IPFS/Filecoin
 
-**On-chain:** Each node's contentHash and plotHash are stored in the Universe contract. Full content is emitted in events and indexed by Ponder.
+### Branching Narratives
+
+- Each node can have multiple children (branching paths)
+- Mark one path as "canon" (official storyline)
+- Community can explore alternate timelines
+
+### Characters
+
+- AI-generate characters with visual descriptions
+- Characters are reusable across episodes
+- Gemini analyzes character images for traits/descriptions
+
+**Time per episode:** ~5-10 minutes
 
 ---
 
-## 4. Set Up Your Profile
+## Step 4: Set Up Your Profile
 
 **Route:** `/profile/edit`
+**Status:** LIVE
 
-- Choose a username (unique, checked for availability)
-- Write a bio, add social links
-- Select a theme (default, minimal, cinematic, neon, retro)
-- Customize layout: accent color, banner, grid columns
-- Toggle public/private visibility
+1. Choose a unique username (availability checked in real-time)
+2. Write your bio
+3. Add social links (Twitter, Discord, website)
+4. Select a theme: Default, Minimal, Cinematic, Neon, or Retro
+5. Customize accent color, banner, grid layout
+6. Toggle public/private visibility
 
-**Public profile** at `/profile/$username` — your portfolio for fans and collaborators.
+Your public profile at `/profile/$username` is your portfolio for fans and collaborators.
+
+**Time:** ~5 minutes
 
 ---
 
-## 5. Upload Additional Content
+## Step 5: Upload Additional Content
 
 **Route:** `/upload`
+**Status:** LIVE
 
-For content outside the timeline editor:
+For content outside the timeline editor (standalone videos, images, promotional material):
 
-- **Classification** — Choose "Fun" (non-commercial, flexible IP) or "Monetized" (commercial, strict IP)
-- **IP Declaration** — Confirm originality, flag copyrighted materials, select license
-- **Enforcement** — Monetized content must be original with no copyrighted material
-- **Visibility** — Public, private, or unlisted
-- **Tags** — Categorize for discovery
+1. **Classify your content:**
+   - **Fun** — Non-commercial. Can include fan works, copyrighted references. Cannot be monetized.
+   - **Monetized** — Commercial. Must be original, no copyrighted material. Eligible for all revenue streams.
+
+2. **Declare IP status:**
+   - Is it original? (required for monetized)
+   - Does it use copyrighted material? (blocks monetization if yes)
+   - Add copyright notes if needed
+   - Select a license (All Rights Reserved, CC-BY, CC-BY-SA, CC-BY-NC, CC0)
+
+3. **Set visibility:** Public, Private, or Unlisted
+4. **Add tags** for discovery
+5. **Submit** — Content appears in discovery feed
+
+**Time:** ~2-3 minutes
 
 ---
 
-## 6. Monetize
+## Step 6: Monetize (Current Status: PARTIALLY WIRED)
 
 **Route:** `/market`
 
-### Revenue Stream 1: Credits
+The marketplace has 10 tabs for revenue streams. Here's the honest status:
 
-- Users buy credits to fund AI generation
-- Your universe's content drives credit purchases
-- Costs: image (1 credit), video (5), story (2), spinoff (10), character (3), scene (8)
+### What You Can See Today
 
-### Revenue Stream 2: Episode NFTs
+- Your credit balance and generation costs
+- Platform stats (universes, views, mints, revenue)
+- Descriptions of how each revenue stream works
+- Your NFT collection (episodes + characters)
 
-- Mint narrative events as NFTs
-- Set price (ETH), max supply, royalty percentage
-- Track mints and revenue
+### What You CANNOT Do Yet (Frontend Not Wired)
 
-### Revenue Stream 3: Character NFTs
+| Action                          | Backend Ready | Frontend Ready |
+| ------------------------------- | :-----------: | :------------: |
+| List an episode as NFT          |      Yes      |       No       |
+| Set NFT price and royalties     |      Yes      |       No       |
+| Buy credits with ETH            |      Yes      |       No       |
+| Configure subscription tiers    |      Yes      |       No       |
+| Submit content for canon vote   |      Yes      |       No       |
+| Vote on canon submissions       |      Yes      |       No       |
+| Propose a cross-universe collab |      Yes      |       No       |
+| Create an ad slot               |      Yes      |       No       |
+| License your IP                 |      Yes      |       No       |
 
-- Mint AI-generated characters
-- Rare characters (by trait/rarity rank) command higher prices
-
-### Revenue Stream 4: Subscriptions
-
-- Configure tiers: Free, Basic, Premium, VIP
-- Gate features per tier: early access, voting boost, premium content, behind-the-scenes
-- Set duration and pricing
-- Track subscriber count and revenue
-
-### Revenue Stream 5: Canon Marketplace
-
-- Community members submit story contributions (characters, plot arcs, locations, lore)
-- Token-weighted voting decides which submissions win
-- License winning submissions for revenue
-
-### Revenue Stream 6: Cross-Universe Collabs
-
-- Propose partnerships with other universe creators
-- Define revenue sharing (basis points)
-- Activate within a time window
-- Record joint episodes
-
-### Revenue Stream 7: IP Licensing
-
-- License your universe for: streaming, merch, gaming, comic, audio, other
-- Set upfront fees and royalty rates
-- Track payments and duration
-
-### Revenue Stream 8: Programmatic Ads
-
-- Create ad slots: billboard, product placement, sponsored character, audio mention
-- Sponsors bid competitively
-- Accept winning bids
-- Track impressions for payout
-
-### Revenue Stream 9: Token Trading
-
-- Your governance token trades on Uniswap v4
-- Fee hooks collect revenue on every swap
-- LP locking prevents rug pulls, building holder trust
-
-### Revenue Stream 10: Merch (Coming Soon)
-
-- Sell physical merchandise tied to your universe
-- Backend infrastructure exists; needs fulfillment partner
+**What this means:** The marketplace page explains the revenue model but doesn't yet let you transact. This is the #1 priority to fix (see [roadmap](roadmap.md)).
 
 ---
 
-## 7. Govern Your Universe
+## Step 7: Govern Your Universe (PARTIALLY WORKING)
 
-**From the universe editor + governance sidebar:**
+**From the universe editor's governance sidebar:**
 
-- **Proposals** — Token holders submit governance proposals
-- **Voting** — Token-weighted voting on canon decisions, policy changes
-- **Execution** — Passed proposals execute on-chain via UniverseGovernor
-- **Whitelisting** — Control who can create nodes (open or gated)
+### What Works Today
+
+- View governance token info (name, symbol, supply)
+- See contract addresses
+- View universe metadata
+
+### What Doesn't Work Yet
+
+- Creating governance proposals
+- Voting on proposals
+- Executing passed proposals
+- Delegating voting power
+
+The smart contracts and backend indexing for governance are fully functional — the frontend UI needs to be connected.
 
 ---
 
-## 8. Grow Your Audience
+## Step 8: Grow Your Audience
 
 **Route:** `/discover`
+**Status:** LIVE
 
 Your universe appears in:
 
-- **Discovery feed** — Filtered by classification, media type, tags
-- **Trending** — Ranked by views, trading volume, engagement
-- **Creator profiles** — Your portfolio showcases your work
-- **Platform stats** — Total universes, views, mints, revenue displayed on marketplace
+- **Content feed** — Filtered by classification, media type, tags
+- **Creator gallery** — Browseable profiles with search
+- **Trending** — Ranked by views and engagement (when analytics are wired)
 
-**Analytics tracked:**
+### What's Missing for Growth
 
-- Episode views (with duration)
-- Engagement: likes, shares, comments, bookmarks
-- Subscriber growth
-- Mint count and revenue
-- Trending score
+- No follow/subscribe notification when you publish new episodes
+- No comments or social interaction on episodes
+- No share buttons or embed codes
+- No recommendation engine
+- No email or push notifications
 
 ---
 
 ## Journey Summary
 
 ```
+WORKING:
 Connect Wallet → Create Universe → Generate AI Content → Build Timeline
-    → Canonize Story → Set Up Monetization → Attract Audience → Earn Revenue
-        → Govern with Community → Scale via Collabs & Licensing
+    → Store Decentralized → Set Up Profile → Upload Content → Get Discovered
+
+NOT YET WORKING:
+    → List NFTs → Fans Mint → Earn Revenue
+    → Set Subscriptions → Fans Subscribe → Recurring Revenue
+    → Token Governance → Community Decisions → Universe Evolution
 ```
 
-**Time to first universe:** ~5 minutes (wallet connect + contract deployment)
-**Time to first content:** ~10 minutes (AI generation + on-chain storage)
-**Time to first revenue:** Depends on audience, but all rails are live from day one
+**Time to first universe:** ~5 minutes
+**Time to first AI content:** ~10 minutes
+**Time to first revenue:** Not yet possible (marketplace transactions not wired)
+
+---
+
+## What Creators Should Know
+
+1. **You own your universe.** The smart contract is deployed from your wallet. You are the admin.
+2. **Content is decentralized.** Your videos/images are stored across Walrus, IPFS, and Filecoin — not just one server.
+3. **This is testnet.** Everything runs on Sepolia. No real money is at stake. When we launch on mainnet, you'll need to redeploy.
+4. **IP matters.** If you want to monetize, your content must be original. Fan works are welcome in the "Fun" category but can't generate revenue.
+5. **AI costs are currently free.** Credit spending isn't enforced yet. This will change.

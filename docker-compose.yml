@@ -1,5 +1,5 @@
 services:
-  app-server:
+  server:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
@@ -14,24 +14,6 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
-      interval: 30s
-      timeout: 10s
-      start_period: 5s
-      retries: 3
-    networks:
-      - loar-network
-
-  app-web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      target: production
-    container_name: loar-web
-    ports:
-      - '3001:3001'
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:3001']
       interval: 30s
       timeout: 10s
       start_period: 5s

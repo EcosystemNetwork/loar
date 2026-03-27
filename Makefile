@@ -64,24 +64,28 @@ lint: ## Run linting
 check-types: ## Run TypeScript type checking across all apps
 	pnpm check-types
 
-# ---- Docker ----
+# ---- Docker (server + indexer only; web deploys via Vercel) ----
 
-docker-build: ## Build all Docker containers
+docker-build: ## Build server + indexer containers
 	docker compose build
 
-docker-up: ## Start all services in Docker (detached)
+docker-up: ## Start server + indexer in Docker (detached)
 	docker compose up -d
 
-docker-down: ## Stop all Docker services
+docker-down: ## Stop Docker services
 	docker compose down
 
 docker-logs: ## Tail Docker logs (all services)
 	docker compose logs -f
 
-docker-restart: ## Rebuild and restart all Docker services
+docker-restart: ## Rebuild and restart Docker services
 	docker compose down
 	docker compose build
 	docker compose up -d
+
+docker-health: ## Check health of running services
+	@curl -sf http://localhost:3000/health | python3 -m json.tool 2>/dev/null || echo "Server: not running"
+	@curl -sf http://localhost:42069/health | python3 -m json.tool 2>/dev/null || echo "Indexer: not running"
 
 # ---- Code Generation ----
 

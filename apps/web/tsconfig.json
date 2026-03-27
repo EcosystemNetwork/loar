@@ -19,12 +19,8 @@
       "@loar/abis/addresses": ["../../packages/abis/src/addresses.ts"],
       "@loar/abis/generated": ["../../packages/abis/src/generated.ts"],
 
+      "@loar/shared/trpc": ["../../packages/shared/src/trpc.ts"],
       "@/*": ["./src/*"]
     }
-  },
-  "references": [
-    {
-      "path": "../server"
-    }
-  ]
+  }
 }

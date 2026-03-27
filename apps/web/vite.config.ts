@@ -9,17 +9,28 @@ import { defineConfig, type Plugin } from 'vite';
  * or server-only packages (ponder, @ponder/*).
  */
 function browserBoundaryGuard(): Plugin {
-  const BANNED = /^(node:|ponder|@ponder\/)/;
+  const BANNED = /^(node:|ponder|@ponder\/|firebase-admin|hono)/;
+  const CROSS_APP = /\/apps\/(server|indexer)\//;
   return {
     name: 'browser-boundary-guard',
     enforce: 'pre',
     resolveId(source, importer) {
-      if (BANNED.test(source) && importer && !importer.includes('node_modules')) {
-        throw new Error(
-          `[browser-boundary-guard] Browser code cannot import "${source}".\n` +
-            `  Imported from: ${importer}\n` +
-            `  Move this import to a server-only module or use a browser-safe alternative.`
-        );
+      if (importer && !importer.includes('node_modules')) {
+        if (BANNED.test(source)) {
+          throw new Error(
+            `[browser-boundary-guard] Browser code cannot import "${source}".\n` +
+              `  Imported from: ${importer}\n` +
+              `  Move this import to a server-only module or use a browser-safe alternative.`
+          );
+        }
+        if (CROSS_APP.test(source)) {
+          throw new Error(
+            `[browser-boundary-guard] Browser code cannot import from apps/server or apps/indexer.\n` +
+              `  Import: "${source}"\n` +
+              `  Imported from: ${importer}\n` +
+              `  Use @loar/shared for shared types instead.`
+          );
+        }
       }
       return null;
     },
@@ -35,6 +46,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@loar/abis/addresses': path.resolve(__dirname, '../../packages/abis/src/addresses.ts'),
       '@loar/abis/generated': path.resolve(__dirname, '../../packages/abis/src/generated.ts'),
+      '@loar/shared/trpc': path.resolve(__dirname, '../../packages/shared/src/trpc.ts'),
     },
     dedupe: ['wagmi', 'viem', '@tanstack/react-query', 'react', 'react-dom'],
   },
