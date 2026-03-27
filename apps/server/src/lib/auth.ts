@@ -8,6 +8,7 @@ import { verifySessionToken } from './siwe';
 export interface AuthUser {
   uid: string;
   address?: string;
+  email?: string;
 }
 
 export async function verifyAuth(headers: Headers): Promise<AuthUser | null> {

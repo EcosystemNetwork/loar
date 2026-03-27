@@ -16,22 +16,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import {
-  User,
-  Palette,
-  Globe,
-  Lock,
-  Eye,
-  Save,
-  Check,
-  X,
-  Plus,
-  Link2,
-} from 'lucide-react';
+import { User, Palette, Globe, Lock, Eye, Save, Check, X, Plus, Link2 } from 'lucide-react';
 
 export const Route = createFileRoute('/profile/edit')({
   component: ProfileEditor,
@@ -84,12 +79,16 @@ function ProfileEditor() {
   const [gridColumns, setGridColumns] = useState('3');
 
   // Username availability check
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>(
+    'idle'
+  );
 
   useEffect(() => {
     if (profile) {
       const p = profile as any;
-      setDisplayName(p.displayName || user?.displayName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''));
+      setDisplayName(
+        p.displayName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '')
+      );
       setUsername(p.username || '');
       setBio(p.bio || '');
       setAvatarUrl(p.avatarUrl || '');
@@ -104,12 +103,10 @@ function ProfileEditor() {
       setBannerUrl(p.layout?.bannerUrl || '');
       setShowStats(p.layout?.showStats !== false);
       setGridColumns(p.layout?.gridColumns || '3');
-    } else if (user) {
-      setDisplayName(user.displayName || '');
     } else if (address) {
       setDisplayName(`${address.slice(0, 6)}...${address.slice(-4)}`);
     }
-  }, [profile, user, address]);
+  }, [profile, address]);
 
   // Check username availability with debounce
   useEffect(() => {
@@ -138,7 +135,7 @@ function ProfileEditor() {
 
   const upsertMutation = useMutation({
     mutationFn: (data: any) => trpcClient.profiles.upsert.mutate(data),
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
       toast.success('Profile saved!');
       navigate({ to: '/profile/$username', params: { username: result.username } });
@@ -197,8 +194,10 @@ function ProfileEditor() {
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
-
-        <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ minHeight: 'calc(100vh - 64px)' }}
+        >
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       </div>
@@ -208,8 +207,10 @@ function ProfileEditor() {
   if (!isAuthed) {
     return (
       <div className="min-h-screen bg-background">
-
-        <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div
+          className="flex flex-col items-center justify-center gap-4"
+          style={{ minHeight: 'calc(100vh - 64px)' }}
+        >
           <h2 className="text-xl font-semibold">Connect your wallet to create a profile</h2>
           <p className="text-muted-foreground">Sign in with your wallet or email to get started</p>
           <WalletConnectButton size="lg" />
@@ -220,7 +221,6 @@ function ProfileEditor() {
 
   return (
     <div className="min-h-screen bg-background">
-
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -244,10 +244,18 @@ function ProfileEditor() {
 
         <Tabs defaultValue="basic" className="space-y-6">
           <TabsList className="w-full justify-start">
-            <TabsTrigger value="basic" className="gap-1"><User className="h-4 w-4" /> Basic</TabsTrigger>
-            <TabsTrigger value="design" className="gap-1"><Palette className="h-4 w-4" /> Design</TabsTrigger>
-            <TabsTrigger value="social" className="gap-1"><Link2 className="h-4 w-4" /> Social</TabsTrigger>
-            <TabsTrigger value="privacy" className="gap-1"><Lock className="h-4 w-4" /> Privacy</TabsTrigger>
+            <TabsTrigger value="basic" className="gap-1">
+              <User className="h-4 w-4" /> Basic
+            </TabsTrigger>
+            <TabsTrigger value="design" className="gap-1">
+              <Palette className="h-4 w-4" /> Design
+            </TabsTrigger>
+            <TabsTrigger value="social" className="gap-1">
+              <Link2 className="h-4 w-4" /> Social
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="gap-1">
+              <Lock className="h-4 w-4" /> Privacy
+            </TabsTrigger>
           </TabsList>
 
           {/* Basic Info */}
@@ -284,7 +292,9 @@ function ProfileEditor() {
                         {usernameStatus === 'checking' && (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
                         )}
-                        {usernameStatus === 'available' && <Check className="h-4 w-4 text-green-500" />}
+                        {usernameStatus === 'available' && (
+                          <Check className="h-4 w-4 text-green-500" />
+                        )}
                         {usernameStatus === 'taken' && <X className="h-4 w-4 text-red-500" />}
                       </div>
                     </div>
@@ -327,13 +337,23 @@ function ProfileEditor() {
                       maxLength={20}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                     />
-                    <Button type="button" variant="outline" onClick={addTag} disabled={tags.length >= 10}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addTag}
+                      disabled={tags.length >= 10}
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="gap-1 cursor-pointer" onClick={() => setTags(tags.filter((t) => t !== tag))}>
+                      <Badge
+                        key={tag}
+                        variant="secondary"
+                        className="gap-1 cursor-pointer"
+                        onClick={() => setTags(tags.filter((t) => t !== tag))}
+                      >
                         {tag} <X className="h-3 w-3" />
                       </Badge>
                     ))}
@@ -359,7 +379,9 @@ function ProfileEditor() {
                         key={t.value}
                         onClick={() => setTheme(t.value)}
                         className={`p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                          theme === t.value ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'
+                          theme === t.value
+                            ? 'border-primary bg-primary/5'
+                            : 'border-muted hover:border-muted-foreground/30'
                         }`}
                       >
                         <p className="font-medium text-sm">{t.label}</p>
@@ -397,7 +419,9 @@ function ProfileEditor() {
                       </SelectTrigger>
                       <SelectContent>
                         {GRID_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -414,7 +438,11 @@ function ProfileEditor() {
                   />
                   {bannerUrl && (
                     <div className="h-24 rounded-md overflow-hidden">
-                      <img src={bannerUrl} alt="Banner preview" className="w-full h-full object-cover" />
+                      <img
+                        src={bannerUrl}
+                        alt="Banner preview"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   )}
                 </div>
@@ -443,19 +471,39 @@ function ProfileEditor() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="website">Website</Label>
-                  <Input id="website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yoursite.com" />
+                  <Input
+                    id="website"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://yoursite.com"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="twitter">X / Twitter handle</Label>
-                  <Input id="twitter" value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="username" />
+                  <Input
+                    id="twitter"
+                    value={twitter}
+                    onChange={(e) => setTwitter(e.target.value)}
+                    placeholder="username"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="youtube">YouTube</Label>
-                  <Input id="youtube" value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtube.com/@channel" />
+                  <Input
+                    id="youtube"
+                    value={youtube}
+                    onChange={(e) => setYoutube(e.target.value)}
+                    placeholder="https://youtube.com/@channel"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="discord">Discord</Label>
-                  <Input id="discord" value={discord} onChange={(e) => setDiscord(e.target.value)} placeholder="username#1234" />
+                  <Input
+                    id="discord"
+                    value={discord}
+                    onChange={(e) => setDiscord(e.target.value)}
+                    placeholder="username#1234"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -473,7 +521,9 @@ function ProfileEditor() {
                   <div
                     onClick={() => setVisibility('public')}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      visibility === 'public' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'
+                      visibility === 'public'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -481,13 +531,16 @@ function ProfileEditor() {
                       <h3 className="font-semibold">Public</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Your profile appears in the creator gallery. Anyone can view your portfolio and public content.
+                      Your profile appears in the creator gallery. Anyone can view your portfolio
+                      and public content.
                     </p>
                   </div>
                   <div
                     onClick={() => setVisibility('private')}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      visibility === 'private' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/30'
+                      visibility === 'private'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -495,7 +548,8 @@ function ProfileEditor() {
                       <h3 className="font-semibold">Private</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Your profile is hidden from the gallery. Only your username and avatar are visible to others.
+                      Your profile is hidden from the gallery. Only your username and avatar are
+                      visible to others.
                     </p>
                   </div>
                 </div>

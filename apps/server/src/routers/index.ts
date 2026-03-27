@@ -1,6 +1,6 @@
 /**
- * Root tRPC router — aggregates all sub-routers (wiki, video, fal, storage, minio, synapse)
- * and defines top-level procedures (healthCheck, privateData).
+ * Root tRPC router — aggregates all domain sub-routers and top-level procedures.
+ * See docs/api.md for the full router inventory and auth matrix.
  */
 import { protectedProcedure, publicProcedure, router } from '../lib/trpc';
 import { readFileSync } from 'fs';
@@ -25,11 +25,11 @@ import { licensingRouter } from './licensing/licensing.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
 import { getSynapseService } from '../services/synapse';
 import { wikiaService } from '../services/wikia';
-import { minioService } from '../services/minio';
+import { firebaseStorageService } from '../services/firebase-storage';
 import { geminiService } from '../services/gemini';
 
-const charactersCol = firebaseAvailable ? db.collection('characters') : null;
-const eventWikisCol = firebaseAvailable ? db.collection('eventWikis') : null;
+const charactersCol = db.collection('characters');
+const eventWikisCol = db.collection('eventWikis');
 const walletLoginsCol = firebaseAvailable ? db.collection('walletLogins') : null;
 const usersCol = firebaseAvailable ? db.collection('users') : null;
 
@@ -476,7 +476,7 @@ export const appRouter = router({
         };
       }),
   }),
-  minio: router({
+  firebaseStorage: router({
     uploadFromUrl: protectedProcedure
       .input(
         z.object({
@@ -486,22 +486,22 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         try {
-          console.log(`MinIO S3 upload for ${input.url}`);
-          const result = await minioService.uploadFromUrl(input.url, input.filename);
-          console.log(`MinIO S3 upload successful - key:`, result);
+          console.log(`Firebase Storage upload for ${input.url}`);
+          const result = await firebaseStorageService.uploadFromUrl(input.url, input.filename);
+          console.log(`Firebase Storage upload successful - key:`, result);
 
           return {
             key: result,
-            url: minioService.getPublicUrl(result),
+            url: firebaseStorageService.getPublicUrl(result),
           };
         } catch (error) {
-          console.error('MinIO upload error:', error);
+          console.error('Firebase Storage upload error:', error);
           throw error;
         }
       }),
     download: publicProcedure.input(z.object({ key: z.string() })).query(async ({ input }) => {
       try {
-        const data = await minioService.download(input.key);
+        const data = await firebaseStorageService.download(input.key);
 
         if (data.length > 5 * 1024 * 1024) {
           throw new Error(
@@ -520,12 +520,12 @@ export const appRouter = router({
       } catch (error) {
         console.error(`Failed to download key ${input.key}:`, error);
         throw new Error(
-          `Failed to download from MinIO: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Failed to download from Firebase Storage: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
       }
     }),
     getPublicUrl: publicProcedure.input(z.object({ key: z.string() })).query(({ input }) => {
-      return { url: minioService.getPublicUrl(input.key) };
+      return { url: firebaseStorageService.getPublicUrl(input.key) };
     }),
   }),
   synapse: router({

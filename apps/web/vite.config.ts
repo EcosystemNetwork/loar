@@ -2,12 +2,34 @@ import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+/**
+ * Vite plugin that fails the build if browser code imports Node.js builtins
+ * or server-only packages (ponder, @ponder/*).
+ */
+function browserBoundaryGuard(): Plugin {
+  const BANNED = /^(node:|ponder|@ponder\/)/;
+  return {
+    name: 'browser-boundary-guard',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (BANNED.test(source) && importer && !importer.includes('node_modules')) {
+        throw new Error(
+          `[browser-boundary-guard] Browser code cannot import "${source}".\n` +
+            `  Imported from: ${importer}\n` +
+            `  Move this import to a server-only module or use a browser-safe alternative.`
+        );
+      }
+      return null;
+    },
+  };
+}
 
 export default defineConfig({
   base: '/',
   envDir: path.resolve(__dirname, '../../'),
-  plugins: [tailwindcss(), react(), tanstackRouter({})],
+  plugins: [browserBoundaryGuard(), tailwindcss(), react(), tanstackRouter({})],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

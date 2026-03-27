@@ -43,9 +43,9 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   // Debug: Log the node data
   console.log('TimelineEventNode data:', data);
 
-  // MinIO URLs are direct HTTP URLs, no conversion needed
+  // Storage URLs are direct HTTP URLs, no conversion needed
   useEffect(() => {
-    // Simply use the video URL directly - MinIO provides HTTP URLs
+    // Simply use the video URL directly — Firebase Storage provides HTTP URLs
     setDisplayVideoUrl(data.videoUrl || null);
     setIsLoadingStorage(false);
   }, [data.videoUrl]);

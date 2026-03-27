@@ -88,13 +88,11 @@ export const nftRouter = router({
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     }),
 
-  getEpisode: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
-      const doc = await episodesCol.doc(input.id).get();
-      if (!doc.exists) return null;
-      return { id: doc.id, ...doc.data() };
-    }),
+  getEpisode: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
+    const doc = await episodesCol.doc(input.id).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
+  }),
 
   deactivateEpisode: protectedProcedure
     .input(z.object({ episodeId: z.string() }))
@@ -119,7 +117,7 @@ export const nftRouter = router({
         imageUrl: z.string(),
         visualHash: z.string(),
         metadataURI: z.string(),
-        traits: z.record(z.string()).optional(),
+        traits: z.record(z.string(), z.string()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

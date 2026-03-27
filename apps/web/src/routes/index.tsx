@@ -438,7 +438,7 @@ function WideCard({ universe }: { universe: any }) {
 function HeroBillboard({ universes }: { universes: any[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const navigate = Route.useNavigate();
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const featured = useMemo(() => {
     let picks = universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 5);

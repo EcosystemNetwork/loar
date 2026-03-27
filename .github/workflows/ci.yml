@@ -60,6 +60,41 @@ jobs:
       - name: Build
         run: pnpm build
 
+  web:
+    name: Web App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check (server — needed for AppRouter types)
+        run: pnpm --filter server check-types
+
+      - name: Type check (web)
+        run: pnpm --filter web check-types
+
+      - name: Build web
+        run: pnpm --filter web build
+
+      - name: "Verify no node: imports in bundle"
+        run: |
+          if grep -rP 'require\("node:|from "node:|from '\''node:' apps/web/dist/assets/*.js 2>/dev/null; then
+            echo "ERROR: node: module imports found in browser bundle"
+            exit 1
+          fi
+          echo "No node: module imports in bundle"
+
   contracts:
     name: Smart Contracts
     runs-on: ubuntu-latest

@@ -12,7 +12,10 @@ const profilesCol = db.collection('profiles');
 
 const profileLayoutSchema = z.object({
   theme: z.enum(['default', 'minimal', 'cinematic', 'neon', 'retro']).default('default'),
-  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#8b5cf6'),
+  accentColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default('#8b5cf6'),
   bannerUrl: z.string().url().optional(),
   showStats: z.boolean().default(true),
   gridColumns: z.enum(['2', '3', '4']).default('3'),
@@ -21,18 +24,27 @@ const profileLayoutSchema = z.object({
 
 const profileSchema = z.object({
   displayName: z.string().min(1).max(50),
-  username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores'),
+  username: z
+    .string()
+    .min(3)
+    .max(30)
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      'Username can only contain letters, numbers, hyphens, and underscores'
+    ),
   bio: z.string().max(500).default(''),
   avatarUrl: z.string().url().optional(),
   visibility: z.enum(['public', 'private']).default('private'),
   tags: z.array(z.string().max(20)).max(10).default([]),
-  socialLinks: z.object({
-    website: z.string().url().optional(),
-    twitter: z.string().max(50).optional(),
-    youtube: z.string().max(100).optional(),
-    discord: z.string().max(50).optional(),
-  }).default({}),
-  layout: profileLayoutSchema.default({}),
+  socialLinks: z
+    .object({
+      website: z.string().url().optional(),
+      twitter: z.string().max(50).optional(),
+      youtube: z.string().max(100).optional(),
+      discord: z.string().max(50).optional(),
+    })
+    .default({}),
+  layout: profileLayoutSchema.optional(),
 });
 
 export const profilesRouter = router({
@@ -72,65 +84,56 @@ export const profilesRouter = router({
     }),
 
   /** Get a profile by uid (public, respects privacy) */
-  getByUid: publicProcedure
-    .input(z.object({ uid: z.string() }))
-    .query(async ({ input }) => {
-      const doc = await profilesCol.doc(input.uid).get();
-      if (!doc.exists) return null;
+  getByUid: publicProcedure.input(z.object({ uid: z.string() })).query(async ({ input }) => {
+    const doc = await profilesCol.doc(input.uid).get();
+    if (!doc.exists) return null;
 
-      const data = doc.data()!;
-      if (data.visibility === 'private') {
-        return {
-          id: doc.id,
-          displayName: data.displayName,
-          username: data.username,
-          avatarUrl: data.avatarUrl || null,
-          visibility: 'private' as const,
-        };
-      }
-      return { id: doc.id, ...data };
-    }),
+    const data = doc.data()!;
+    if (data.visibility === 'private') {
+      return {
+        id: doc.id,
+        displayName: data.displayName,
+        username: data.username,
+        avatarUrl: data.avatarUrl || null,
+        visibility: 'private' as const,
+      };
+    }
+    return { id: doc.id, ...data };
+  }),
 
   /** Create or update the current user's profile */
-  upsert: protectedProcedure
-    .input(profileSchema)
-    .mutation(async ({ ctx, input }) => {
-      const usernameLower = input.username.toLowerCase();
+  upsert: protectedProcedure.input(profileSchema).mutation(async ({ ctx, input }) => {
+    const usernameLower = input.username.toLowerCase();
 
-      // Check username uniqueness (excluding current user)
-      const existing = await profilesCol
-        .where('username', '==', usernameLower)
-        .limit(1)
-        .get();
+    // Check username uniqueness (excluding current user)
+    const existing = await profilesCol.where('username', '==', usernameLower).limit(1).get();
 
-      if (!existing.empty && existing.docs[0].id !== ctx.user.uid) {
-        throw new Error('Username is already taken');
-      }
+    if (!existing.empty && existing.docs[0].id !== ctx.user.uid) {
+      throw new Error('Username is already taken');
+    }
 
-      const now = new Date();
-      const ref = profilesCol.doc(ctx.user.uid);
-      const doc = await ref.get();
+    const now = new Date();
+    const ref = profilesCol.doc(ctx.user.uid);
+    const doc = await ref.get();
 
-      const profileData = {
-        ...input,
-        username: usernameLower,
-        uid: ctx.user.uid,
-        updatedAt: now,
-        ...(doc.exists ? {} : { createdAt: now }),
-      };
+    const profileData = {
+      ...input,
+      username: usernameLower,
+      uid: ctx.user.uid,
+      updatedAt: now,
+      ...(doc.exists ? {} : { createdAt: now }),
+    };
 
-      await ref.set(profileData, { merge: true });
-      return { id: ctx.user.uid, ...profileData };
-    }),
+    await ref.set(profileData, { merge: true });
+    return { id: ctx.user.uid, ...profileData };
+  }),
 
   /** Update just the layout/theme settings */
-  updateLayout: protectedProcedure
-    .input(profileLayoutSchema)
-    .mutation(async ({ ctx, input }) => {
-      const ref = profilesCol.doc(ctx.user.uid);
-      await ref.update({ layout: input, updatedAt: new Date() });
-      return { ok: true };
-    }),
+  updateLayout: protectedProcedure.input(profileLayoutSchema).mutation(async ({ ctx, input }) => {
+    const ref = profilesCol.doc(ctx.user.uid);
+    await ref.update({ layout: input, updatedAt: new Date() });
+    return { ok: true };
+  }),
 
   /** Toggle visibility between public and private */
   setVisibility: protectedProcedure
@@ -156,12 +159,14 @@ export const profilesRouter = router({
 
   /** Browse public profiles with optional search */
   discover: publicProcedure
-    .input(z.object({
-      search: z.string().optional(),
-      tags: z.array(z.string()).optional(),
-      limit: z.number().min(1).max(50).default(20),
-      cursor: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        search: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
       let query = profilesCol
         .where('visibility', '==', 'public')
@@ -187,7 +192,10 @@ export const profilesRouter = router({
           bio: data.bio || '',
           avatarUrl: data.avatarUrl || null,
           tags: data.tags || [],
-          layout: { theme: data.layout?.theme || 'default', accentColor: data.layout?.accentColor || '#8b5cf6' },
+          layout: {
+            theme: data.layout?.theme || 'default',
+            accentColor: data.layout?.accentColor || '#8b5cf6',
+          },
           contentCount: data.contentCount || 0,
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
         };

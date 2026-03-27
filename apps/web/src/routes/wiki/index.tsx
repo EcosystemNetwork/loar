@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { trpc } from '@/utils/trpc';
+import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo, useEffect } from 'react';
 import * as React from 'react';
@@ -30,7 +30,14 @@ interface Character {
 }
 
 function WikiPage() {
-  const { data: wikiData, isLoading, error } = useQuery(trpc.wiki.characters.queryOptions());
+  const {
+    data: wikiData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['wiki', 'characters'],
+    queryFn: () => trpcClient.wiki.characters.query(),
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCollection, setSelectedCollection] = useState<string>('all');
   const [selectedTraits, setSelectedTraits] = useState<Set<string>>(new Set());
@@ -266,7 +273,12 @@ function WikiPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCharacters.map((character: Character) => (
-          <Link key={character.id} to={`/wiki/character/${character.id}`} className="block">
+          <Link
+            key={character.id}
+            to="/wiki/character/$id"
+            params={{ id: character.id }}
+            className="block"
+          >
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <div className="aspect-square w-full mb-4">

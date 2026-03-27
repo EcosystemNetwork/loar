@@ -12,6 +12,12 @@ services:
     ports:
       - '3000:3000'
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
     networks:
       - loar-network
 
@@ -24,6 +30,12 @@ services:
     ports:
       - '3001:3001'
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:3001']
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
     networks:
       - loar-network
 
@@ -39,6 +51,12 @@ services:
     ports:
       - '42069:42069'
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:42069/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     networks:
       - loar-network
 
