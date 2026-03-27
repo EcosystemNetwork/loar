@@ -18,6 +18,7 @@ export interface TimelineNodeData {
   timelineId?: string;
   universeId?: string;
   nodeType?: 'scene' | 'branch' | 'add';
+  isCanon?: boolean; // Whether this node is canonical
   isInCanonChain?: boolean; // Whether this node is part of the canonical chain
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
   onEditScene?: (eventId: string) => void;
@@ -54,12 +55,14 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
       }
     } else {
       if (playPromise !== undefined) {
-        playPromise.then(() => {
-          videoElement.pause();
-          videoElement.currentTime = 0;
-        }).catch(() => {
-          // Play was prevented, no need to pause
-        });
+        playPromise
+          .then(() => {
+            videoElement.pause();
+            videoElement.currentTime = 0;
+          })
+          .catch(() => {
+            // Play was prevented, no need to pause
+          });
       } else {
         videoElement.pause();
         videoElement.currentTime = 0;
@@ -119,9 +122,9 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   return (
     <>
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      
+
       <div className="relative group">
-        <div 
+        <div
           className={`w-80 h-72 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
           style={{ borderColor: data.timelineColor || '#10b981' }}
           onClick={handleClick}
@@ -167,16 +170,19 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   <source src={displayVideoUrl} type="video/mp4" />
                   <source src={displayVideoUrl} />
                 </video>
-                
+
                 {/* Event ID overlay - with displayName support */}
                 <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
                   {data.displayName || `Event ${data.eventId || '?'}`}
                 </div>
-                
+
                 {/* Canon badge - displayed if node is in canonical chain */}
                 {data.isInCanonChain && (
                   <div className="absolute top-2 right-2">
-                    <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs px-2 py-1">
+                    <Badge
+                      variant="default"
+                      className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs px-2 py-1"
+                    >
                       Canon
                     </Badge>
                   </div>
@@ -196,7 +202,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
               <div
                 className={`w-3 h-3 rounded-full flex-shrink-0 ${data.isRoot ? 'bg-primary' : 'bg-current'}`}
                 style={{
-                  backgroundColor: data.timelineColor || '#10b981'
+                  backgroundColor: data.timelineColor || '#10b981',
                 }}
               />
               <span className="text-lg font-bold text-primary truncate">
@@ -204,7 +210,11 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
+              {data.isRoot && (
+                <Badge variant="secondary" className="text-sm">
+                  Start
+                </Badge>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -220,7 +230,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
             </div>
           </div>
         </div>
-        
+
         {/* Branch button - appears on hover */}
         <Button
           variant="outline"
@@ -236,7 +246,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
           <Plus className="h-4 w-4 text-primary" />
         </Button>
       </div>
-      
+
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </>
   );
@@ -246,7 +256,7 @@ export function TimelineBranchNode({ data }: { data: { label: string; color: str
   return (
     <>
       <Handle type="target" position={Position.Top} />
-      <div 
+      <div
         className="px-3 py-1 rounded-full text-xs font-medium text-white"
         style={{ backgroundColor: data.color }}
       >

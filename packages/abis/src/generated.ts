@@ -1938,9 +1938,11 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [
+      { name: '_contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: '_plotHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: '_previous', internalType: 'uint256', type: 'uint256' },
       { name: '_link', internalType: 'string', type: 'string' },
       { name: '_plot', internalType: 'string', type: 'string' },
-      { name: '_previous', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'createNode',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -1966,8 +1968,8 @@ export const universeAbi = [
     name: 'getFullGraph',
     outputs: [
       { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
-      { name: 'links', internalType: 'string[]', type: 'string[]' },
-      { name: 'plots', internalType: 'string[]', type: 'string[]' },
+      { name: 'contentHashes', internalType: 'bytes32[]', type: 'bytes32[]' },
+      { name: 'plotHashes', internalType: 'bytes32[]', type: 'bytes32[]' },
       { name: 'previousIds', internalType: 'uint256[]', type: 'uint256[]' },
       { name: 'nextIds', internalType: 'uint256[][]', type: 'uint256[][]' },
       { name: 'canonFlags', internalType: 'bool[]', type: 'bool[]' },
@@ -1985,7 +1987,7 @@ export const universeAbi = [
     type: 'function',
     inputs: [{ name: 'id', internalType: 'uint256', type: 'uint256' }],
     name: 'getMedia',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'view',
   },
   {
@@ -1994,8 +1996,8 @@ export const universeAbi = [
     name: 'getNode',
     outputs: [
       { name: '', internalType: 'uint256', type: 'uint256' },
-      { name: '', internalType: 'string', type: 'string' },
-      { name: '', internalType: 'string', type: 'string' },
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
       { name: '', internalType: 'uint256', type: 'uint256' },
       { name: '', internalType: 'uint256[]', type: 'uint256[]' },
       { name: '', internalType: 'bool', type: 'bool' },
@@ -2019,6 +2021,13 @@ export const universeAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'user', internalType: 'address', type: 'address' }],
+    name: 'getWhitelisted',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'latestNodeId',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -2036,9 +2045,9 @@ export const universeAbi = [
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     name: 'nodes',
     outputs: [
-      { name: 'link', internalType: 'string', type: 'string' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'id', internalType: 'uint256', type: 'uint256' },
-      { name: 'plot', internalType: 'string', type: 'string' },
+      { name: 'plotHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'previous', internalType: 'uint256', type: 'uint256' },
       { name: 'canon', internalType: 'bool', type: 'bool' },
       { name: 'creator', internalType: 'address', type: 'address' },
@@ -2063,6 +2072,7 @@ export const universeAbi = [
     type: 'function',
     inputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: '_contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: '_link', internalType: 'string', type: 'string' },
     ],
     name: 'setMedia',
@@ -2099,6 +2109,16 @@ export const universeAbi = [
     type: 'function',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'setToken',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'user', internalType: 'address', type: 'address' },
+      { name: 'status', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setWhitelisted',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -2149,6 +2169,12 @@ export const universeAbi = [
         type: 'address',
         indexed: false,
       },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
       { name: 'link', internalType: 'string', type: 'string', indexed: false },
     ],
     name: 'MediaUpdated',
@@ -2171,19 +2197,33 @@ export const universeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: true },
       {
         name: 'previous',
         internalType: 'uint256',
         type: 'uint256',
-        indexed: false,
+        indexed: true,
       },
       {
         name: 'creator',
         internalType: 'address',
         type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
         indexed: false,
       },
+      {
+        name: 'plotHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      { name: 'link', internalType: 'string', type: 'string', indexed: false },
+      { name: 'plot', internalType: 'string', type: 'string', indexed: false },
     ],
     name: 'NodeCreated',
   },
@@ -5147,6 +5187,15 @@ export const useUniverse_GetToken_read = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getWhitelisted"`
+ */
+export const useUniverse_GetWhitelisted_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: universeAbi,
+    functionName: 'getWhitelisted',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"latestNodeId"`
  */
 export const useUniverse_LatestNodeId_read =
@@ -5282,6 +5331,15 @@ export const useUniverse_SetToken_write = /*#__PURE__*/ createUseWriteContract({
 })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setWhitelisted"`
+ */
+export const useUniverse_SetWhitelisted_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeAbi,
+    functionName: 'setWhitelisted',
+  })
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__
  */
 export const useUniverse_undefined_simulate =
@@ -5348,6 +5406,15 @@ export const useUniverse_SetToken_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeAbi,
     functionName: 'setToken',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setWhitelisted"`
+ */
+export const useUniverse_SetWhitelisted_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeAbi,
+    functionName: 'setWhitelisted',
   })
 
 /**

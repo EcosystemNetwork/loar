@@ -1,14 +1,14 @@
-import type { StorageProvider, UploadResult } from "./types";
-import { computeSha256, fetchToBuffer, getMimeType } from "./types";
+import type { StorageProvider, UploadResult } from './types';
+import { computeSha256, fetchToBuffer, getMimeType } from './types';
 
-const DEFAULT_GATEWAY = "https://gateway.pinata.cloud";
+const DEFAULT_GATEWAY = 'https://gateway.pinata.cloud';
 
 // Circuit breaker
 const MAX_CONSECUTIVE_FAILURES = 3;
 const CIRCUIT_BREAKER_RESET_MS = 60_000;
 
 export class IpfsProvider implements StorageProvider {
-  readonly name = "ipfs";
+  readonly name = 'ipfs';
   readonly priority = 2;
 
   private jwt: string;
@@ -17,7 +17,7 @@ export class IpfsProvider implements StorageProvider {
   private lastFailureTime = 0;
 
   constructor() {
-    this.jwt = process.env.PINATA_JWT || "";
+    this.jwt = process.env.PINATA_JWT || '';
     this.gatewayUrl = process.env.PINATA_GATEWAY_URL || DEFAULT_GATEWAY;
   }
 
@@ -32,11 +32,7 @@ export class IpfsProvider implements StorageProvider {
     return true;
   }
 
-  async upload(
-    buffer: Buffer,
-    filename: string,
-    mimeType?: string
-  ): Promise<UploadResult> {
+  async upload(buffer: Buffer, filename: string, mimeType?: string): Promise<UploadResult> {
     try {
       const contentHash = computeSha256(buffer);
       const resolvedMime = mimeType || getMimeType(filename);
@@ -44,27 +40,22 @@ export class IpfsProvider implements StorageProvider {
       // Pinata v2 pinning API
       const formData = new FormData();
       const blob = new Blob([new Uint8Array(buffer)], { type: resolvedMime });
-      formData.append("file", blob, filename);
+      formData.append('file', blob, filename);
 
       const metadata = JSON.stringify({ name: filename });
-      formData.append("pinataMetadata", metadata);
+      formData.append('pinataMetadata', metadata);
 
-      const response = await fetch(
-        "https://api.pinata.cloud/pinning/pinFileToIPFS",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.jwt}`,
-          },
-          body: formData,
-        }
-      );
+      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.jwt}`,
+        },
+        body: formData,
+      });
 
       if (!response.ok) {
         const body = await response.text();
-        throw new Error(
-          `Pinata upload failed: HTTP ${response.status} — ${body}`
-        );
+        throw new Error(`Pinata upload failed: HTTP ${response.status} — ${body}`);
       }
 
       const result = (await response.json()) as {
@@ -92,7 +83,7 @@ export class IpfsProvider implements StorageProvider {
   async uploadFromUrl(url: string, filename?: string): Promise<UploadResult> {
     const { buffer, contentType } = await fetchToBuffer(url);
     const resolvedFilename =
-      filename || url.split("/").pop()?.split("?")[0] || `file-${Date.now()}`;
+      filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
     return this.upload(buffer, resolvedFilename, contentType);
   }
 

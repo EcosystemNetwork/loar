@@ -13,10 +13,10 @@ import { type Address } from 'viem';
 
 export interface GraphData {
   nodeIds: readonly (string | number | bigint)[];
-  contentHashes: readonly string[];   // bytes32 content hashes from chain
-  plotHashes: readonly string[];       // bytes32 plot hashes from chain
-  urls: readonly string[];             // Resolved URLs (from indexer/storage)
-  descriptions: readonly string[];     // Resolved descriptions (from indexer/storage)
+  contentHashes: readonly string[]; // bytes32 content hashes from chain
+  plotHashes: readonly string[]; // bytes32 plot hashes from chain
+  urls: readonly string[]; // Resolved URLs (from indexer/storage)
+  descriptions: readonly string[]; // Resolved descriptions (from indexer/storage)
   previousNodes: readonly (string | number | bigint)[];
   children: readonly (string | number | bigint)[][];
   flags: readonly boolean[];
@@ -49,47 +49,35 @@ export interface UseUniverseBlockchainReturn {
 }
 
 function useUniverseLeaves(contractAddress?: string) {
-  if (!contractAddress) {
-    return { data: null, isLoading: false, refetch: async () => {} };
-  }
-
   return useReadContract({
     abi: universeAbi,
-    address: contractAddress as Address,
+    address: (contractAddress || '0x') as Address,
     functionName: 'getLeaves',
     query: {
-      enabled: !!contractAddress
-    }
+      enabled: !!contractAddress,
+    },
   });
 }
 
 function useUniverseFullGraph(contractAddress?: string) {
-  if (!contractAddress) {
-    return { data: null, isLoading: false, refetch: async () => {} };
-  }
-
   return useReadContract({
     abi: universeAbi,
-    address: contractAddress as Address,
+    address: (contractAddress || '0x') as Address,
     functionName: 'getFullGraph',
     query: {
-      enabled: !!contractAddress
-    }
+      enabled: !!contractAddress,
+    },
   });
 }
 
 function useUniverseCanonChain(contractAddress?: string) {
-  if (!contractAddress) {
-    return { data: null, isLoading: false, refetch: async () => {} };
-  }
-
   return useReadContract({
     abi: universeAbi,
-    address: contractAddress as Address,
+    address: (contractAddress || '0x') as Address,
     functionName: 'getCanonChain',
     query: {
-      enabled: !!contractAddress
-    }
+      enabled: !!contractAddress,
+    },
   });
 }
 
@@ -102,17 +90,29 @@ export function useUniverseBlockchain({
   contractAddress,
   isBlockchainUniverse,
 }: UseUniverseBlockchainProps): UseUniverseBlockchainReturn {
-  const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(contractAddress);
-  const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(contractAddress);
-  const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useUniverseCanonChain(contractAddress);
+  const {
+    data: leavesData,
+    isLoading: isLoadingLeaves,
+    refetch: refetchLeaves,
+  } = useUniverseLeaves(contractAddress);
+  const {
+    data: fullGraphData,
+    isLoading: isLoadingFullGraph,
+    refetch: refetchFullGraph,
+  } = useUniverseFullGraph(contractAddress);
+  const {
+    data: canonChainData,
+    isLoading: isLoadingCanonChain,
+    refetch: refetchCanonChain,
+  } = useUniverseCanonChain(contractAddress);
 
   const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
     abi: universeAbi,
     address: contractAddress as Address,
     functionName: 'latestNodeId',
     query: {
-      enabled: !!contractAddress && isBlockchainUniverse
-    }
+      enabled: !!contractAddress && isBlockchainUniverse,
+    },
   });
 
   const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
@@ -132,12 +132,12 @@ export function useUniverseBlockchain({
         nodeIds: (nodeIds || []) as readonly (string | number | bigint)[],
         contentHashes: hashStrings,
         plotHashes: plotHashStrings,
-        urls: hashStrings,             // Placeholder — resolved by the page component
-        descriptions: plotHashStrings,  // Placeholder — resolved by the page component
+        urls: hashStrings, // Placeholder — resolved by the page component
+        descriptions: plotHashStrings, // Placeholder — resolved by the page component
         previousNodes: (previousIds || []) as readonly (string | number | bigint)[],
         children: (nextIds || []) as readonly (string | number | bigint)[][],
         flags: flags || [],
-        canonChain: (canonChainData || []) as readonly (string | number | bigint)[]
+        canonChain: (canonChainData || []) as readonly (string | number | bigint)[],
       };
     }
 
@@ -150,7 +150,7 @@ export function useUniverseBlockchain({
       previousNodes: [],
       children: [],
       flags: [],
-      canonChain: []
+      canonChain: [],
     };
   }, [universeId, isBlockchainUniverse, fullGraphData, canonChainData, contractAddress]);
 

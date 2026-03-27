@@ -1,9 +1,9 @@
-import { index, onchainTable, relations } from "ponder";
+import { index, onchainTable, relations } from 'ponder';
 
 // ============= UniverseManager Events =============
 
 export const universe = onchainTable(
-  "universe",
+  'universe',
   (t) => ({
     id: t.text().primaryKey(), // universe address
     universeId: t.integer(), // universe ID from UniverseManager (if trackable)
@@ -17,12 +17,12 @@ export const universe = onchainTable(
     nodeCount: t.integer().notNull().default(0), // track number of nodes
   }),
   (table) => ({
-    creatorIdx: index("universe_creator_idx").on(table.creator),
+    creatorIdx: index('universe_creator_idx').on(table.creator),
   })
 );
 
 export const token = onchainTable(
-  "token",
+  'token',
   (t) => ({
     id: t.text().primaryKey(), // token address
     universeAddress: t.hex().notNull(),
@@ -41,25 +41,22 @@ export const token = onchainTable(
     createdAt: t.integer().notNull(),
   }),
   (table) => ({
-    deployerIdx: index("token_deployer_idx").on(table.deployer),
-    universeIdx: index("token_universe_idx").on(table.universeAddress),
+    deployerIdx: index('token_deployer_idx').on(table.deployer),
+    universeIdx: index('token_universe_idx').on(table.universeAddress),
   })
 );
 
-export const hookEvent = onchainTable(
-  "hook_event",
-  (t) => ({
-    id: t.text().primaryKey(),
-    timestamp: t.integer().notNull(),
-    hook_address: t.hex().notNull(),
-    enabled: t.boolean().notNull(),
-  })
-);
+export const hookEvent = onchainTable('hook_event', (t) => ({
+  id: t.text().primaryKey(),
+  timestamp: t.integer().notNull(),
+  hook_address: t.hex().notNull(),
+  enabled: t.boolean().notNull(),
+}));
 
 // ============= Universe (dynamic) Events =============
 
 export const node = onchainTable(
-  "node",
+  'node',
   (t) => ({
     id: t.text().primaryKey(), // universe_address:node_id
     universeAddress: t.hex().notNull(),
@@ -67,17 +64,17 @@ export const node = onchainTable(
     previousNodeId: t.integer().notNull(),
     creator: t.hex().notNull(),
     createdAt: t.integer().notNull(),
-    contentHash: t.hex(),  // bytes32 SHA-256 of media file
-    plotHash: t.hex(),     // bytes32 SHA-256 of plot text
+    contentHash: t.hex(), // bytes32 SHA-256 of media file
+    plotHash: t.hex(), // bytes32 SHA-256 of plot text
   }),
   (table) => ({
-    universeIdx: index("node_universe_idx").on(table.universeAddress),
-    creatorIdx: index("node_creator_idx").on(table.creator),
+    universeIdx: index('node_universe_idx').on(table.universeAddress),
+    creatorIdx: index('node_creator_idx').on(table.creator),
   })
 );
 
 export const nodeCanonization = onchainTable(
-  "node_canonization",
+  'node_canonization',
   (t) => ({
     id: t.text().primaryKey(),
     universeAddress: t.hex().notNull(),
@@ -86,25 +83,22 @@ export const nodeCanonization = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    universeIdx: index("canon_universe_idx").on(table.universeAddress),
+    universeIdx: index('canon_universe_idx').on(table.universeAddress),
   })
 );
 
-export const nodeContent = onchainTable(
-  "node_content",
-  (t) => ({
-    id: t.text().primaryKey(), // universe:nodeId
-    contentHash: t.hex(),      // bytes32 content hash
-    plotHash: t.hex(),         // bytes32 plot hash
-    videoLink: t.text().notNull(),  // Full URL from event
-    plot: t.text().notNull(),       // Full plot text from event
-  })
-);
+export const nodeContent = onchainTable('node_content', (t) => ({
+  id: t.text().primaryKey(), // universe:nodeId
+  contentHash: t.hex(), // bytes32 content hash
+  plotHash: t.hex(), // bytes32 plot hash
+  videoLink: t.text().notNull(), // Full URL from event
+  plot: t.text().notNull(), // Full plot text from event
+}));
 
 // ============= Token Transfer Tracking =============
 
 export const tokenTransfer = onchainTable(
-  "token_transfer",
+  'token_transfer',
   (t) => ({
     id: t.text().primaryKey(),
     tokenAddress: t.hex().notNull(),
@@ -115,14 +109,14 @@ export const tokenTransfer = onchainTable(
     blockNumber: t.integer().notNull(),
   }),
   (table) => ({
-    tokenIdx: index("transfer_token_idx").on(table.tokenAddress),
-    fromIdx: index("transfer_from_idx").on(table.from),
-    toIdx: index("transfer_to_idx").on(table.to),
+    tokenIdx: index('transfer_token_idx').on(table.tokenAddress),
+    fromIdx: index('transfer_from_idx').on(table.from),
+    toIdx: index('transfer_to_idx').on(table.to),
   })
 );
 
 export const tokenHolder = onchainTable(
-  "token_holder",
+  'token_holder',
   (t) => ({
     id: t.text().primaryKey(), // tokenAddress:holderAddress
     tokenAddress: t.hex().notNull(),
@@ -130,15 +124,15 @@ export const tokenHolder = onchainTable(
     balance: t.text().notNull(), // bigint as string
   }),
   (table) => ({
-    tokenIdx: index("holder_token_idx").on(table.tokenAddress),
-    holderIdx: index("holder_address_idx").on(table.holderAddress),
+    tokenIdx: index('holder_token_idx').on(table.tokenAddress),
+    holderIdx: index('holder_address_idx').on(table.holderAddress),
   })
 );
 
 // ============= Uniswap v4 Pool Tracking =============
 
 export const pool = onchainTable(
-  "pool",
+  'pool',
   (t) => ({
     poolId: t.hex().primaryKey(),
     currency0: t.hex().notNull(),
@@ -151,14 +145,14 @@ export const pool = onchainTable(
     creationBlock: t.integer().notNull(),
   }),
   (table) => ({
-    currency0Idx: index("pool_currency0_idx").on(table.currency0),
-    currency1Idx: index("pool_currency1_idx").on(table.currency1),
-    hooksIdx: index("pool_hooks_idx").on(table.hooks),
+    currency0Idx: index('pool_currency0_idx').on(table.currency0),
+    currency1Idx: index('pool_currency1_idx').on(table.currency1),
+    hooksIdx: index('pool_hooks_idx').on(table.hooks),
   })
 );
 
 export const swap = onchainTable(
-  "swap",
+  'swap',
   (t) => ({
     id: t.text().primaryKey(),
     poolId: t.hex().notNull(),
@@ -172,16 +166,16 @@ export const swap = onchainTable(
     blockNumber: t.integer().notNull(),
   }),
   (table) => ({
-    poolIdIdx: index("swap_pool_idx").on(table.poolId),
-    senderIdx: index("swap_sender_idx").on(table.sender),
-    blockIdx: index("swap_block_idx").on(table.blockNumber),
+    poolIdIdx: index('swap_pool_idx').on(table.poolId),
+    senderIdx: index('swap_sender_idx').on(table.sender),
+    blockIdx: index('swap_block_idx').on(table.blockNumber),
   })
 );
 
 // ============= UniverseGovernor Events =============
 
 export const proposal = onchainTable(
-  "proposal",
+  'proposal',
   (t) => ({
     id: t.text().primaryKey(), // proposalId
     governorAddress: t.hex().notNull(),
@@ -198,14 +192,14 @@ export const proposal = onchainTable(
     cancelled: t.boolean().notNull().default(false),
   }),
   (table) => ({
-    governorIdx: index("proposal_governor_idx").on(table.governorAddress),
-    proposerIdx: index("proposal_proposer_idx").on(table.proposer),
-    universeIdx: index("proposal_universe_idx").on(table.universeAddress),
+    governorIdx: index('proposal_governor_idx').on(table.governorAddress),
+    proposerIdx: index('proposal_proposer_idx').on(table.proposer),
+    universeIdx: index('proposal_universe_idx').on(table.universeAddress),
   })
 );
 
 export const proposalExecution = onchainTable(
-  "proposal_execution",
+  'proposal_execution',
   (t) => ({
     id: t.text().primaryKey(),
     proposalId: t.text().notNull(),
@@ -213,12 +207,12 @@ export const proposalExecution = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    proposalIdx: index("execution_proposal_idx").on(table.proposalId),
+    proposalIdx: index('execution_proposal_idx').on(table.proposalId),
   })
 );
 
 export const proposalCancellation = onchainTable(
-  "proposal_cancellation",
+  'proposal_cancellation',
   (t) => ({
     id: t.text().primaryKey(),
     proposalId: t.text().notNull(),
@@ -226,12 +220,12 @@ export const proposalCancellation = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    proposalIdx: index("cancellation_proposal_idx").on(table.proposalId),
+    proposalIdx: index('cancellation_proposal_idx').on(table.proposalId),
   })
 );
 
 export const vote = onchainTable(
-  "vote",
+  'vote',
   (t) => ({
     id: t.text().primaryKey(), // proposalId:voter
     proposalId: t.text().notNull(),
@@ -243,8 +237,8 @@ export const vote = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    proposalIdx: index("vote_proposal_idx").on(table.proposalId),
-    voterIdx: index("vote_voter_idx").on(table.voter),
+    proposalIdx: index('vote_proposal_idx').on(table.proposalId),
+    voterIdx: index('vote_voter_idx').on(table.voter),
   })
 );
 

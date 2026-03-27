@@ -15,7 +15,9 @@ function ProviderBadge({ name, status }: { name: string; status: string }) {
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[status] || colors.pending}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[status] || colors.pending}`}
+    >
       {name}
     </span>
   );
@@ -40,9 +42,7 @@ function UploadJobCard({
   return (
     <div className="border rounded-lg p-3 bg-card text-card-foreground">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium truncate max-w-[180px]">
-          {job.filename}
-        </span>
+        <span className="text-sm font-medium truncate max-w-[180px]">{job.filename}</span>
         <span className={`text-xs font-medium ${statusColors[job.status]}`}>
           {job.status === 'uploading' ? `${job.progress}%` : job.status}
         </span>
@@ -99,19 +99,15 @@ export function UploadQueue() {
     <div className="fixed bottom-4 right-4 w-80 max-h-96 overflow-y-auto z-50 bg-background border rounded-xl shadow-lg p-3 space-y-2">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-sm font-semibold">
-          Uploads {hasActiveUploads && <span className="animate-pulse text-blue-500 ml-1">...</span>}
+          Uploads{' '}
+          {hasActiveUploads && <span className="animate-pulse text-blue-500 ml-1">...</span>}
         </h3>
         <span className="text-xs text-muted-foreground">
           {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
         </span>
       </div>
       {jobs.map((job) => (
-        <UploadJobCard
-          key={job.id}
-          job={job}
-          onRetry={retryJob}
-          onRemove={removeJob}
-        />
+        <UploadJobCard key={job.id} job={job} onRetry={retryJob} onRemove={removeJob} />
       ))}
     </div>
   );

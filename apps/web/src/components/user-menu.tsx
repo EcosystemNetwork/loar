@@ -5,12 +5,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAuth, signOut } from "@/lib/auth-client";
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "./ui/button";
-import { Skeleton } from "./ui/skeleton";
-import { Link } from "@tanstack/react-router";
+} from '@/components/ui/dropdown-menu';
+import { useAuth, signOut } from '@/lib/auth-client';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from './ui/button';
+import { Skeleton } from './ui/skeleton';
+import { Link } from '@tanstack/react-router';
 
 export default function UserMenu() {
   const navigate = useNavigate();
@@ -28,8 +28,8 @@ export default function UserMenu() {
     );
   }
 
-  const displayName = user.displayName || user.email || "User";
-  const userEmail = user.email || "No email available";
+  const displayName = user.displayName || user.email || 'User';
+  const userEmail = user.email || 'No email available';
 
   return (
     <DropdownMenu>
@@ -46,7 +46,7 @@ export default function UserMenu() {
             className="w-full"
             onClick={async () => {
               await signOut();
-              navigate({ to: "/" });
+              navigate({ to: '/' });
             }}
           >
             Sign Out

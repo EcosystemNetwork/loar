@@ -1,4 +1,4 @@
-import { ponder } from "ponder:registry";
+import { ponder } from 'ponder:registry';
 import {
   universe,
   token,
@@ -14,38 +14,38 @@ import {
   proposalExecution,
   proposalCancellation,
   vote,
-} from "ponder:schema";
-import { getAddress } from "viem";
+} from 'ponder:schema';
+import { getAddress } from 'viem';
 
 // ============= UniverseManager Events =============
 
-ponder.on("UniverseManager:UniverseCreated", async ({ event, context }) => {
+ponder.on('UniverseManager:UniverseCreated', async ({ event, context }) => {
   const universeAddress = getAddress(event.args.universe).toLowerCase();
 
   // Read metadata directly from the Universe contract
-  let universeName = "Untitled Universe";
-  let universeDescription = "A narrative universe";
-  let imageURL = "";
+  let universeName = 'Untitled Universe';
+  let universeDescription = 'A narrative universe';
+  let imageURL = '';
 
   try {
     const nameResult = await context.client.readContract({
       abi: context.contracts.Universe.abi,
       address: universeAddress,
-      functionName: "universeName",
+      functionName: 'universeName',
     });
     universeName = nameResult as string;
 
     const descResult = await context.client.readContract({
       abi: context.contracts.Universe.abi,
       address: universeAddress,
-      functionName: "universeDescription",
+      functionName: 'universeDescription',
     });
     universeDescription = descResult as string;
 
     const imageResult = await context.client.readContract({
       abi: context.contracts.Universe.abi,
       address: universeAddress,
-      functionName: "universeImageUrl",
+      functionName: 'universeImageUrl',
     });
     imageURL = imageResult as string;
   } catch (error) {
@@ -66,7 +66,7 @@ ponder.on("UniverseManager:UniverseCreated", async ({ event, context }) => {
   });
 });
 
-ponder.on("UniverseManager:TokenCreated", async ({ event, context }) => {
+ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
   const tokenAddress = getAddress(event.args.tokenAddress);
   const deployer = getAddress(event.args.msgSender);
   const governorAddress = getAddress(event.args.governor);
@@ -75,7 +75,7 @@ ponder.on("UniverseManager:TokenCreated", async ({ event, context }) => {
   // Note: universeAddress will be linked via API queries using creator/governor
   await context.db.insert(token).values({
     id: tokenAddress,
-    universeAddress: "0x0000000000000000000000000000000000000000", // Will query via creator
+    universeAddress: '0x0000000000000000000000000000000000000000', // Will query via creator
     deployer: deployer,
     tokenAdmin: getAddress(event.args.tokenAdmin),
     name: event.args.tokenName,
@@ -92,7 +92,7 @@ ponder.on("UniverseManager:TokenCreated", async ({ event, context }) => {
   });
 });
 
-ponder.on("UniverseManager:SetHook", async ({ event, context }) => {
+ponder.on('UniverseManager:SetHook', async ({ event, context }) => {
   await context.db.insert(hookEvent).values({
     id: event.id,
     timestamp: Number(event.block.timestamp),
@@ -103,7 +103,7 @@ ponder.on("UniverseManager:SetHook", async ({ event, context }) => {
 
 // ============= Universe (Dynamic Contract) Events =============
 
-ponder.on("Universe:NodeCreated", async ({ event, context }) => {
+ponder.on('Universe:NodeCreated', async ({ event, context }) => {
   const universeAddress = getAddress(event.log.address).toLowerCase();
   const nodeId = Number(event.args.id);
 
@@ -144,7 +144,7 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
   }
 });
 
-ponder.on("Universe:NodeCanonized", async ({ event, context }) => {
+ponder.on('Universe:NodeCanonized', async ({ event, context }) => {
   const universeAddress = getAddress(event.log.address).toLowerCase();
   const nodeId = Number(event.args.id);
 
@@ -159,7 +159,7 @@ ponder.on("Universe:NodeCanonized", async ({ event, context }) => {
 
 // ============= UniverseGovernor Events =============
 
-ponder.on("UniverseGovernor:ProposalCreated", async ({ event, context }) => {
+ponder.on('UniverseGovernor:ProposalCreated', async ({ event, context }) => {
   const governorAddress = getAddress(event.log.address);
   const proposalId = event.args.proposalId.toString();
 
@@ -193,14 +193,12 @@ ponder.on("UniverseGovernor:ProposalCreated", async ({ event, context }) => {
   });
 });
 
-ponder.on("UniverseGovernor:ProposalExecuted", async ({ event, context }) => {
+ponder.on('UniverseGovernor:ProposalExecuted', async ({ event, context }) => {
   const governorAddress = getAddress(event.log.address);
   const proposalId = event.args.proposalId.toString();
 
   // Update proposal status
-  await context.db
-    .update(proposal, { id: proposalId })
-    .set({ executed: true });
+  await context.db.update(proposal, { id: proposalId }).set({ executed: true });
 
   // Record execution event
   await context.db.insert(proposalExecution).values({
@@ -211,14 +209,12 @@ ponder.on("UniverseGovernor:ProposalExecuted", async ({ event, context }) => {
   });
 });
 
-ponder.on("UniverseGovernor:ProposalCanceled", async ({ event, context }) => {
+ponder.on('UniverseGovernor:ProposalCanceled', async ({ event, context }) => {
   const governorAddress = getAddress(event.log.address);
   const proposalId = event.args.proposalId.toString();
 
   // Update proposal status
-  await context.db
-    .update(proposal, { id: proposalId })
-    .set({ cancelled: true });
+  await context.db.update(proposal, { id: proposalId }).set({ cancelled: true });
 
   // Record cancellation event
   await context.db.insert(proposalCancellation).values({
@@ -229,7 +225,7 @@ ponder.on("UniverseGovernor:ProposalCanceled", async ({ event, context }) => {
   });
 });
 
-ponder.on("UniverseGovernor:VoteCast", async ({ event, context }) => {
+ponder.on('UniverseGovernor:VoteCast', async ({ event, context }) => {
   const governorAddress = getAddress(event.log.address);
   const proposalId = event.args.proposalId.toString();
   const voter = getAddress(event.args.voter);
@@ -248,7 +244,7 @@ ponder.on("UniverseGovernor:VoteCast", async ({ event, context }) => {
 
 // ============= Token Transfer Tracking =============
 
-ponder.on("GovernanceToken:Transfer", async ({ event, context }) => {
+ponder.on('GovernanceToken:Transfer', async ({ event, context }) => {
   const tokenAddress = getAddress(event.log.address);
   const from = getAddress(event.args.from);
   const to = getAddress(event.args.to);
@@ -266,7 +262,7 @@ ponder.on("GovernanceToken:Transfer", async ({ event, context }) => {
   });
 
   // Update holder balances (skip mint/burn from/to zero address for balance tracking)
-  if (from !== "0x0000000000000000000000000000000000000000") {
+  if (from !== '0x0000000000000000000000000000000000000000') {
     const fromHolder = await context.db.find(tokenHolder, { id: `${tokenAddress}:${from}` });
     if (fromHolder) {
       const newBalance = BigInt(fromHolder.balance) - value;
@@ -278,12 +274,12 @@ ponder.on("GovernanceToken:Transfer", async ({ event, context }) => {
         // Balance is zero, could delete the record but we'll keep it
         await context.db
           .update(tokenHolder, { id: `${tokenAddress}:${from}` })
-          .set({ balance: "0" });
+          .set({ balance: '0' });
       }
     }
   }
 
-  if (to !== "0x0000000000000000000000000000000000000000") {
+  if (to !== '0x0000000000000000000000000000000000000000') {
     await context.db
       .insert(tokenHolder)
       .values({
@@ -300,7 +296,7 @@ ponder.on("GovernanceToken:Transfer", async ({ event, context }) => {
 
 // ============= Uniswap v4 Pool Tracking =============
 
-ponder.on("PoolManager:Initialize", async ({ event, context }) => {
+ponder.on('PoolManager:Initialize', async ({ event, context }) => {
   await context.db.insert(pool).values({
     poolId: event.args.id,
     currency0: getAddress(event.args.currency0),
@@ -314,7 +310,7 @@ ponder.on("PoolManager:Initialize", async ({ event, context }) => {
   });
 });
 
-ponder.on("PoolManager:Swap", async ({ event, context }) => {
+ponder.on('PoolManager:Swap', async ({ event, context }) => {
   await context.db.insert(swap).values({
     id: event.id,
     poolId: event.args.id,

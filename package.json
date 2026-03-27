@@ -9,6 +9,10 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
+    "lint": "turbo lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
     "sc:test": "turbo run sc:test",
@@ -17,6 +21,9 @@
   },
   "devDependencies": {
     "@wagmi/cli": "^0.0.0-canary-20251023193249",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.3",
     "turbo": "^2.5.4"
   },
   "packageManager": "pnpm@9.15.0"

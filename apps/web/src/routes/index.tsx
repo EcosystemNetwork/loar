@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { WalletConnectButton } from '@/components/wallet-connect-button';
 import {
   Play,
   Plus,
@@ -16,9 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
-} from "lucide-react";
-import { useAccount } from "wagmi";
-import { useQuery } from "@tanstack/react-query";
+} from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 import {
   ponderGql,
   type Universe,
@@ -27,10 +27,10 @@ import {
   type NodeContent,
   type Swap,
   type TokenHolder,
-} from "@/utils/ponder-api";
-import { useMemo, useState, useEffect, useRef } from "react";
+} from '@/utils/ponder-api';
+import { useMemo, useState, useEffect, useRef } from 'react';
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
   component: HomeComponent,
 });
 
@@ -39,7 +39,7 @@ function ActivityFeedBanner() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: nodesData } = useQuery({
-    queryKey: ["ponder", "nodes", "recent-20"],
+    queryKey: ['ponder', 'nodes', 'recent-20'],
     queryFn: () =>
       ponderGql<{ nodes: { items: Node[] } }>(`{
         nodes(orderBy: "createdAt", orderDirection: "desc", limit: 20) {
@@ -49,7 +49,7 @@ function ActivityFeedBanner() {
   });
 
   const { data: nodeContentData } = useQuery({
-    queryKey: ["ponder", "nodeContents"],
+    queryKey: ['ponder', 'nodeContents'],
     queryFn: () =>
       ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
         nodeContents(limit: 1000) {
@@ -59,7 +59,7 @@ function ActivityFeedBanner() {
   });
 
   const { data: universesData } = useQuery({
-    queryKey: ["ponder", "universes", "all"],
+    queryKey: ['ponder', 'universes', 'all'],
     queryFn: () =>
       ponderGql<{ universes: { items: Universe[] } }>(`{
         universes(limit: 1000) {
@@ -89,7 +89,7 @@ function ActivityFeedBanner() {
         return {
           id: n.id,
           universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
-          action: content?.plot ? "Added Event" : "Created Node",
+          action: content?.plot ? 'Added Event' : 'Created Node',
           universeId: n.universeAddress,
           nodeId: n.nodeId,
           timestamp: new Date(Number(n.createdAt) * 1000),
@@ -206,7 +206,9 @@ function FeaturedCarousel({ universes }: { universes: any[] }) {
                   <div className="text-white">
                     <div className="text-3xl font-bold">${current.tokenData.symbol}</div>
                     {current.swapVolume > 0 && (
-                      <div className="text-sm text-white/70">24h Vol: ${(current.swapVolume / 1e18).toFixed(2)}</div>
+                      <div className="text-sm text-white/70">
+                        24h Vol: ${(current.swapVolume / 1e18).toFixed(2)}
+                      </div>
                     )}
                   </div>
                 )}
@@ -215,10 +217,20 @@ function FeaturedCarousel({ universes }: { universes: any[] }) {
 
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
-                <Button size="icon" variant="ghost" onClick={prev} className="text-white hover:bg-white/20">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={prev}
+                  className="text-white hover:bg-white/20"
+                >
                   <ChevronLeft className="h-6 w-6" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={next} className="text-white hover:bg-white/20">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={next}
+                  className="text-white hover:bg-white/20"
+                >
                   <ChevronRight className="h-6 w-6" />
                 </Button>
               </div>
@@ -231,7 +243,7 @@ function FeaturedCarousel({ universes }: { universes: any[] }) {
                       key={index}
                       onClick={() => setCurrentIndex(index)}
                       className={`w-2 h-2 rounded-full transition-all ${
-                        index === currentIndex ? "bg-white w-6" : "bg-white/50"
+                        index === currentIndex ? 'bg-white w-6' : 'bg-white/50'
                       }`}
                     />
                   ))}
@@ -268,7 +280,15 @@ function CopyAddressButton({ address }: { address: string }) {
 }
 
 // Top Universes Table
-function TopUniversesTable({ universes, swapData, holderData }: { universes: any[]; swapData: any[]; holderData: any[] }) {
+function TopUniversesTable({
+  universes,
+  swapData,
+  holderData,
+}: {
+  universes: any[];
+  swapData: any[];
+  holderData: any[];
+}) {
   const navigate = Route.useNavigate();
 
   if (universes.length === 0) {
@@ -305,12 +325,24 @@ function TopUniversesTable({ universes, swapData, holderData }: { universes: any
           <table className="w-full">
             <thead>
               <tr className="border-b border-border/30 bg-muted/20">
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Universe</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Events</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Volume (24h)</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Holders</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Token</th>
-                <th className="text-right p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Action</th>
+                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">
+                  Universe
+                </th>
+                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">
+                  Events
+                </th>
+                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">
+                  Volume (24h)
+                </th>
+                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">
+                  Holders
+                </th>
+                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">
+                  Token
+                </th>
+                <th className="text-right p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -408,7 +440,7 @@ function EnhancedSidebar({ universes }: { universes: any[] }) {
 
   // Query recent events with video content
   const { data: nodesData } = useQuery({
-    queryKey: ["ponder", "nodes", "recent-10"],
+    queryKey: ['ponder', 'nodes', 'recent-10'],
     queryFn: () =>
       ponderGql<{ nodes: { items: Node[] } }>(`{
         nodes(orderBy: "createdAt", orderDirection: "desc", limit: 10) {
@@ -418,7 +450,7 @@ function EnhancedSidebar({ universes }: { universes: any[] }) {
   });
 
   const { data: nodeContentData } = useQuery({
-    queryKey: ["ponder", "nodeContents"],
+    queryKey: ['ponder', 'nodeContents'],
     queryFn: () =>
       ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
         nodeContents(limit: 1000) {
@@ -488,130 +520,134 @@ function EnhancedSidebar({ universes }: { universes: any[] }) {
       <div className="flex-1 overflow-y-auto scrollbar-thin space-y-4 min-h-0">
         {/* Recent Event Videos */}
         {eventVideos.length > 0 && (
-        <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
-          <div className="p-4 border-b border-border/30">
-            <div className="flex items-center justify-between">
+          <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
+            <div className="p-4 border-b border-border/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-primary/10">
+                    <Play className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="font-bold">Recent Events</h3>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {eventVideos.length}
+                </Badge>
+              </div>
+            </div>
+            <div className="divide-y divide-border/30">
+              {eventVideos.map((event: any) => (
+                <Link
+                  key={event.id}
+                  to="/event/$universe/$event"
+                  params={{ universe: event.universeId, event: event.nodeId.toString() }}
+                  className="block p-3 hover:bg-muted/30 transition-colors group"
+                >
+                  <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 rounded-xl overflow-hidden mb-3 group-hover:ring-2 group-hover:ring-primary/50 transition-all">
+                    {event.videoLink.includes('walrus') ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500/20 to-purple-500/20">
+                        <Play className="h-10 w-10 text-white/80 mb-2 group-hover:scale-110 transition-transform" />
+                        <span className="text-xs text-white/60 font-medium">Walrus Storage</span>
+                      </div>
+                    ) : (
+                      <>
+                        <video
+                          src={event.videoLink}
+                          className="w-full h-full object-cover"
+                          muted
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <Play className="h-10 w-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </>
+                    )}
+                    {/* Time badge */}
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded-md">
+                      <span className="text-xs text-white font-medium">
+                        {new Date(event.timestamp).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-sm font-semibold line-clamp-1 group-hover:text-primary transition-colors">
+                        {event.universeName}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                      {event.plot}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Token Trading */}
+        {tradableUniverses.length > 0 && (
+          <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
+            <div className="p-4 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-primary/10">
-                  <Play className="h-4 w-4 text-primary" />
+                  <TrendingUp className="h-4 w-4 text-primary" />
                 </div>
-                <h3 className="font-bold">Recent Events</h3>
+                <h3 className="font-bold">Token Trading</h3>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {eventVideos.length}
-              </Badge>
             </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {eventVideos.map((event: any) => (
-              <Link
-                key={event.id}
-                to="/event/$universe/$event"
-                params={{ universe: event.universeId, event: event.nodeId.toString() }}
-                className="block p-3 hover:bg-muted/30 transition-colors group"
-              >
-                <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 rounded-xl overflow-hidden mb-3 group-hover:ring-2 group-hover:ring-primary/50 transition-all">
-                  {event.videoLink.includes("walrus") ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500/20 to-purple-500/20">
-                      <Play className="h-10 w-10 text-white/80 mb-2 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs text-white/60 font-medium">Walrus Storage</span>
-                    </div>
-                  ) : (
-                    <>
-                      <video
-                        src={event.videoLink}
-                        className="w-full h-full object-cover"
-                        muted
-                        preload="metadata"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <Play className="h-10 w-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </>
-                  )}
-                  {/* Time badge */}
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded-md">
-                    <span className="text-xs text-white font-medium">
-                      {new Date(event.timestamp).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-semibold line-clamp-1 group-hover:text-primary transition-colors">
-                      {event.universeName}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                    {event.plot}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Token Trading */}
-      {tradableUniverses.length > 0 && (
-        <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
-          <div className="p-4 border-b border-border/30">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-primary/10">
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </div>
-              <h3 className="font-bold">Token Trading</h3>
-            </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {tradableUniverses.map((u) => (
-              <Link
-                key={u.id}
-                to="/universe/$id"
-                params={{ id: u.id }}
-                className="block p-4 hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {u.imageURL || u.tokenData?.imageURL ? (
-                      <img src={u.imageURL || u.tokenData.imageURL} alt="" className="w-8 h-8 rounded" />
-                    ) : (
-                      <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
-                    )}
-                    <div>
-                      <div className="font-bold text-sm">${u.tokenData.symbol}</div>
-                      <div className="text-xs text-muted-foreground truncate max-w-[120px]">
-                        {u.name || u.tokenData.name}
-                      </div>
-                    </div>
-                  </div>
-                  {u.priceChange24h !== undefined && (
-                    <div
-                      className={`flex items-center gap-1 text-sm font-bold ${
-                        u.priceChange24h >= 0 ? "text-green-500" : "text-red-500"
-                      }`}
-                    >
-                      {u.priceChange24h >= 0 ? (
-                        <ArrowUpRight className="h-4 w-4" />
+            <div className="divide-y divide-border/30">
+              {tradableUniverses.map((u) => (
+                <Link
+                  key={u.id}
+                  to="/universe/$id"
+                  params={{ id: u.id }}
+                  className="block p-4 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {u.imageURL || u.tokenData?.imageURL ? (
+                        <img
+                          src={u.imageURL || u.tokenData.imageURL}
+                          alt=""
+                          className="w-8 h-8 rounded"
+                        />
                       ) : (
-                        <ArrowDownRight className="h-4 w-4" />
+                        <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
                       )}
-                      {Math.abs(u.priceChange24h).toFixed(2)}%
+                      <div>
+                        <div className="font-bold text-sm">${u.tokenData.symbol}</div>
+                        <div className="text-xs text-muted-foreground truncate max-w-[120px]">
+                          {u.name || u.tokenData.name}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Vol: ${((u.swapVolume || 0) / 1e18).toFixed(2)}</span>
-                  <span>{u.holderCount || 0} holders</span>
-                </div>
-              </Link>
-            ))}
+                    {u.priceChange24h !== undefined && (
+                      <div
+                        className={`flex items-center gap-1 text-sm font-bold ${
+                          u.priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'
+                        }`}
+                      >
+                        {u.priceChange24h >= 0 ? (
+                          <ArrowUpRight className="h-4 w-4" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4" />
+                        )}
+                        {Math.abs(u.priceChange24h).toFixed(2)}%
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Vol: ${((u.swapVolume || 0) / 1e18).toFixed(2)}</span>
+                    <span>{u.holderCount || 0} holders</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
         )}
       </div>
     </div>
@@ -645,7 +681,11 @@ function TrendingUniverses({ universes }: { universes: any[] }) {
           >
             <div className="relative h-48 bg-muted">
               {u.imageURL || u.tokenData?.imageURL ? (
-                <img src={u.imageURL || u.tokenData.imageURL} alt="" className="w-full h-full object-cover" />
+                <img
+                  src={u.imageURL || u.tokenData.imageURL}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
               )}
@@ -656,10 +696,14 @@ function TrendingUniverses({ universes }: { universes: any[] }) {
                 </h3>
                 <div className="flex gap-2">
                   {u.nodeCount > 0 && (
-                    <Badge className="bg-green-500/90 text-white text-xs">{u.nodeCount} events</Badge>
+                    <Badge className="bg-green-500/90 text-white text-xs">
+                      {u.nodeCount} events
+                    </Badge>
                   )}
                   {u.tokenData && (
-                    <Badge className="bg-primary/90 text-white text-xs">${u.tokenData.symbol}</Badge>
+                    <Badge className="bg-primary/90 text-white text-xs">
+                      ${u.tokenData.symbol}
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -674,7 +718,11 @@ function TrendingUniverses({ universes }: { universes: any[] }) {
                   <div className="text-muted-foreground text-xs">Holders</div>
                   <div className="font-bold">{u.holderCount || 0}</div>
                 </div>
-                <Button size="sm" variant="outline" className="rounded-full group-hover:bg-primary group-hover:text-white">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full group-hover:bg-primary group-hover:text-white"
+                >
                   <Play className="h-3 w-3 mr-1" />
                   View
                 </Button>
@@ -690,12 +738,12 @@ function TrendingUniverses({ universes }: { universes: any[] }) {
 function HomeComponent() {
   const { isConnected } = useAccount();
   const navigate = Route.useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Query universes
   const { data: universesData } = useQuery({
-    queryKey: ["ponder", "universes", "top-50"],
+    queryKey: ['ponder', 'universes', 'top-50'],
     queryFn: () =>
       ponderGql<{ universes: { items: Universe[] } }>(`{
         universes(orderBy: "createdAt", orderDirection: "desc", limit: 50) {
@@ -706,7 +754,7 @@ function HomeComponent() {
 
   // Query tokens
   const { data: tokensData } = useQuery({
-    queryKey: ["ponder", "tokens"],
+    queryKey: ['ponder', 'tokens'],
     queryFn: () =>
       ponderGql<{ tokens: { items: Token[] } }>(`{
         tokens(limit: 1000) {
@@ -717,7 +765,7 @@ function HomeComponent() {
 
   // Query swaps for volume calculation
   const { data: swapsData } = useQuery({
-    queryKey: ["ponder", "swaps"],
+    queryKey: ['ponder', 'swaps'],
     queryFn: () =>
       ponderGql<{ swaps: { items: Swap[] } }>(`{
         swaps(orderBy: "timestamp", orderDirection: "desc", limit: 1000) {
@@ -728,7 +776,7 @@ function HomeComponent() {
 
   // Query token holders
   const { data: holdersData } = useQuery({
-    queryKey: ["ponder", "tokenHolders"],
+    queryKey: ['ponder', 'tokenHolders'],
     queryFn: () =>
       ponderGql<{ tokenHolders: { items: TokenHolder[] } }>(`{
         tokenHolders(limit: 1000) {
@@ -791,11 +839,11 @@ function HomeComponent() {
     if (!searchQuery) return universes;
     const query = searchQuery.toLowerCase();
     return universes.filter((u: any) => {
-      const name = u.name?.toLowerCase() || "";
-      const tokenName = u.tokenData?.name?.toLowerCase() || "";
-      const tokenSymbol = u.tokenData?.symbol?.toLowerCase() || "";
-      const metadata = u.tokenData?.metadata?.toLowerCase() || "";
-      const description = u.description?.toLowerCase() || "";
+      const name = u.name?.toLowerCase() || '';
+      const tokenName = u.tokenData?.name?.toLowerCase() || '';
+      const tokenSymbol = u.tokenData?.symbol?.toLowerCase() || '';
+      const metadata = u.tokenData?.metadata?.toLowerCase() || '';
+      const description = u.description?.toLowerCase() || '';
       const address = u.id.toLowerCase();
 
       return (
@@ -812,7 +860,9 @@ function HomeComponent() {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Top Navigation Bar */}
-      <div className={`sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 ${searchOpen ? 'pointer-events-none' : ''}`}>
+      <div
+        className={`sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 ${searchOpen ? 'pointer-events-none' : ''}`}
+      >
         <div className="container mx-auto max-w-[1800px] px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo */}
@@ -852,147 +902,150 @@ function HomeComponent() {
             className="fixed inset-0 z-[100] bg-black/60"
             onClick={() => {
               setSearchOpen(false);
-              setSearchQuery("");
+              setSearchQuery('');
             }}
           />
 
           {/* Modal Content */}
           <div className="fixed inset-0 z-[101] flex items-start justify-center pt-20 px-4 pointer-events-none">
             <div className="relative w-full max-w-2xl bg-background/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden pointer-events-auto">
-            {/* Search Input */}
-            <div className="p-6 border-b border-border/30">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search universes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
-                  className="w-full pl-12 pr-12 h-12 text-base bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full"
-                  onClick={() => {
-                    setSearchOpen(false);
-                    setSearchQuery("");
-                  }}
-                >
-                  <Plus className="h-5 w-5 rotate-45" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Search Results */}
-            <div className="max-h-[60vh] overflow-y-auto">
-              {searchQuery ? (
-                filteredUniverses.length > 0 ? (
-                  <div className="p-2">
-                    {filteredUniverses.slice(0, 8).map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          navigate({ to: `/universe/${u.id}` });
-                          setSearchOpen(false);
-                          setSearchQuery("");
-                        }}
-                        className="w-full p-4 rounded-xl hover:bg-muted/50 transition-colors text-left flex items-center gap-4"
-                      >
-                        {/* Universe Image */}
-                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-                          {u.imageURL || u.tokenData?.imageURL ? (
-                            <img
-                              src={u.imageURL || u.tokenData.imageURL}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : null}
-                        </div>
-
-                        {/* Universe Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm mb-1">
-                            {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
-                          </div>
-                          <div className="text-xs text-muted-foreground line-clamp-1">
-                            {u.description || u.tokenData?.metadata || "No description"}
-                          </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          {u.nodeCount > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              {u.nodeCount} events
-                            </Badge>
-                          )}
-                          {u.tokenData && (
-                            <Badge className="text-xs">
-                              ${u.tokenData.symbol}
-                            </Badge>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-12 text-center text-muted-foreground">
-                    No universes found matching "{searchQuery}"
-                  </div>
-                )
-              ) : (
-                <div className="p-6">
-                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Trending Universes
-                  </h3>
-                  <div className="space-y-1">
-                    {universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 6).map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          navigate({ to: `/universe/${u.id}` });
-                          setSearchOpen(false);
-                        }}
-                        className="w-full p-3 rounded-xl hover:bg-muted/50 transition-colors text-left flex items-center gap-3"
-                      >
-                        <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-                          {u.imageURL || u.tokenData?.imageURL ? (
-                            <img
-                              src={u.imageURL || u.tokenData.imageURL}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : null}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">
-                            {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {u.tokenData?.symbol || `${u.nodeCount} events`}
-                          </div>
-                        </div>
-                        {u.swapVolume > 0 && (
-                          <div className="text-xs text-green-500 font-medium">
-                            ${(u.swapVolume / 1e18).toFixed(2)}
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
+              {/* Search Input */}
+              <div className="p-6 border-b border-border/30">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search universes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
+                    className="w-full pl-12 pr-12 h-12 text-base bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full"
+                    onClick={() => {
+                      setSearchOpen(false);
+                      setSearchQuery('');
+                    }}
+                  >
+                    <Plus className="h-5 w-5 rotate-45" />
+                  </Button>
                 </div>
-              )}
-            </div>
+              </div>
+
+              {/* Search Results */}
+              <div className="max-h-[60vh] overflow-y-auto">
+                {searchQuery ? (
+                  filteredUniverses.length > 0 ? (
+                    <div className="p-2">
+                      {filteredUniverses.slice(0, 8).map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => {
+                            navigate({ to: `/universe/${u.id}` });
+                            setSearchOpen(false);
+                            setSearchQuery('');
+                          }}
+                          className="w-full p-4 rounded-xl hover:bg-muted/50 transition-colors text-left flex items-center gap-4"
+                        >
+                          {/* Universe Image */}
+                          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+                            {u.imageURL || u.tokenData?.imageURL ? (
+                              <img
+                                src={u.imageURL || u.tokenData?.imageURL}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : null}
+                          </div>
+
+                          {/* Universe Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm mb-1">
+                              {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
+                            </div>
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {u.description || u.tokenData?.metadata || 'No description'}
+                            </div>
+                          </div>
+
+                          {/* Stats */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {u.nodeCount > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                {u.nodeCount} events
+                              </Badge>
+                            )}
+                            {u.tokenData && (
+                              <Badge className="text-xs">${u.tokenData.symbol}</Badge>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center text-muted-foreground">
+                      No universes found matching "{searchQuery}"
+                    </div>
+                  )
+                ) : (
+                  <div className="p-6">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Trending Universes
+                    </h3>
+                    <div className="space-y-1">
+                      {universes
+                        .filter((u) => u.tokenData || u.nodeCount > 0)
+                        .slice(0, 6)
+                        .map((u) => (
+                          <button
+                            key={u.id}
+                            onClick={() => {
+                              navigate({ to: `/universe/${u.id}` });
+                              setSearchOpen(false);
+                            }}
+                            className="w-full p-3 rounded-xl hover:bg-muted/50 transition-colors text-left flex items-center gap-3"
+                          >
+                            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+                              {u.imageURL || u.tokenData?.imageURL ? (
+                                <img
+                                  src={u.imageURL || u.tokenData?.imageURL}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">
+                                {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {u.tokenData?.symbol || `${u.nodeCount} events`}
+                              </div>
+                            </div>
+                            {u.swapVolume > 0 && (
+                              <div className="text-xs text-green-500 font-medium">
+                                ${(u.swapVolume / 1e18).toFixed(2)}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </>
       )}
 
       {/* Main Content */}
-      <main className={`container mx-auto max-w-[1600px] py-8 px-4 transition-all ${searchOpen ? 'pointer-events-none blur-sm' : ''}`}>
+      <main
+        className={`container mx-auto max-w-[1600px] py-8 px-4 transition-all ${searchOpen ? 'pointer-events-none blur-sm' : ''}`}
+      >
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 items-start">
           {/* Left - Main Content */}
           <div className="min-w-0">

@@ -1,15 +1,15 @@
-import { protectedProcedure, publicProcedure, router } from "../../lib/trpc";
-import { z } from "zod";
-import { getStorageManager } from "../../services/storage";
-import { getUploadQueue } from "../../services/storage/upload-queue";
-import type { StorageManifest } from "../../services/storage";
+import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { z } from 'zod';
+import { getStorageManager } from '../../services/storage';
+import { getUploadQueue } from '../../services/storage/upload-queue';
+import type { StorageManifest } from '../../services/storage';
 
 export const storageRouter = router({
   /** Upload a file from URL via the unified StorageManager. Returns manifest immediately. */
   upload: protectedProcedure
     .input(
       z.object({
-        url: z.string().min(1, "URL is required"),
+        url: z.string().min(1, 'URL is required'),
         filename: z.string().optional(),
       })
     )
@@ -23,17 +23,17 @@ export const storageRouter = router({
   uploadDirect: protectedProcedure
     .input(
       z.object({
-        data: z.string().min(1, "Data is required"), // base64-encoded
+        data: z.string().min(1, 'Data is required'), // base64-encoded
         filename: z.string(),
         mimeType: z.string(),
       })
     )
     .mutation(async ({ input }): Promise<StorageManifest> => {
-      const buffer = Buffer.from(input.data, "base64");
+      const buffer = Buffer.from(input.data, 'base64');
 
       if (buffer.length > 10 * 1024 * 1024) {
         throw new Error(
-          "File too large for tRPC upload (max 10MB). Use /api/upload for larger files."
+          'File too large for tRPC upload (max 10MB). Use /api/upload for larger files.'
         );
       }
 
@@ -42,13 +42,11 @@ export const storageRouter = router({
     }),
 
   /** Resolve a contentHash to the best available URL. */
-  resolve: publicProcedure
-    .input(z.object({ contentHash: z.string() }))
-    .query(async ({ input }) => {
-      const manager = getStorageManager();
-      const url = await manager.resolve(input.contentHash);
-      return { url };
-    }),
+  resolve: publicProcedure.input(z.object({ contentHash: z.string() })).query(async ({ input }) => {
+    const manager = getStorageManager();
+    const url = await manager.resolve(input.contentHash);
+    return { url };
+  }),
 
   /** Get the full storage manifest for a contentHash. */
   getManifest: publicProcedure
@@ -74,21 +72,19 @@ export const storageRouter = router({
       const jobId = await queue.enqueue(
         input.url,
         input.filename || `file-${Date.now()}`,
-        input.mimeType || "application/octet-stream",
+        input.mimeType || 'application/octet-stream',
         ctx.user.uid
       );
       return { jobId };
     }),
 
   /** Poll the status of an upload job. */
-  uploadStatus: publicProcedure
-    .input(z.object({ jobId: z.string() }))
-    .query(({ input }) => {
-      const queue = getUploadQueue();
-      const job = queue.getStatus(input.jobId);
-      if (!job) return null;
-      return job;
-    }),
+  uploadStatus: publicProcedure.input(z.object({ jobId: z.string() })).query(({ input }) => {
+    const queue = getUploadQueue();
+    const job = queue.getStatus(input.jobId);
+    if (!job) return null;
+    return job;
+  }),
 
   /** Get all active uploads for the current user. */
   activeUploads: protectedProcedure.query(({ ctx }) => {

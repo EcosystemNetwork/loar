@@ -1,10 +1,11 @@
-import { router, publicProcedure } from "../../lib/trpc";
-import { z } from "zod";
-import { falService } from "../../services/fal";
-import { db } from "../../lib/firebase";
-import { geminiService } from "../../services/gemini";
+import { router, publicProcedure, protectedProcedure } from '../../lib/trpc';
+import { z } from 'zod';
+import { randomUUID } from 'crypto';
+import { falService } from '../../services/fal';
+import { db } from '../../lib/firebase';
+import { geminiService } from '../../services/gemini';
 
-const charactersCol = db.collection("characters");
+const charactersCol = db.collection('characters');
 
 export const falRouter = router({
   testConnection: publicProcedure.query(async () => {
@@ -13,39 +14,33 @@ export const falRouter = router({
       return {
         success: true,
         hasApiKey: hasKey,
-        keyLength: hasKey ? process.env.FAL_KEY!.length : 0,
-        message: hasKey ? "FAL API key is configured" : "FAL API key is missing",
+        message: hasKey ? 'FAL API key is configured' : 'FAL API key is missing',
       };
     } catch (error) {
       return {
         success: false,
         hasApiKey: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }),
 
-  generateImage: publicProcedure
+  generateImage: protectedProcedure
     .input(
       z.object({
-        prompt: z.string().min(1, "Prompt is required"),
+        prompt: z.string().min(1, 'Prompt is required'),
         model: z
-          .enum([
-            "fal-ai/nano-banana",
-            "fal-ai/flux/dev",
-            "fal-ai/flux-pro",
-            "fal-ai/flux/schnell",
-          ])
+          .enum(['fal-ai/nano-banana', 'fal-ai/flux/dev', 'fal-ai/flux-pro', 'fal-ai/flux/schnell'])
           .optional(),
         negativePrompt: z.string().optional(),
         imageSize: z
           .enum([
-            "square_hd",
-            "square",
-            "portrait_4_3",
-            "portrait_16_9",
-            "landscape_4_3",
-            "landscape_16_9",
+            'square_hd',
+            'square',
+            'portrait_4_3',
+            'portrait_16_9',
+            'landscape_4_3',
+            'landscape_16_9',
           ])
           .optional(),
         numInferenceSteps: z.number().min(1).max(50).optional(),
@@ -59,10 +54,10 @@ export const falRouter = router({
       return await falService.generateImage(input);
     }),
 
-  editImage: publicProcedure
+  editImage: protectedProcedure
     .input(
       z.object({
-        prompt: z.string().min(1, "Edit prompt is required"),
+        prompt: z.string().min(1, 'Edit prompt is required'),
         imageUrls: z.array(z.string().url()).min(1),
         numImages: z.number().min(1).max(4).optional(),
         strength: z.number().min(0.1).max(1.0).optional(),
@@ -78,24 +73,33 @@ export const falRouter = router({
         const result = await falService.editImage(input);
         return result;
       } catch (error) {
-        console.error("FAL service error:", error);
+        console.error('FAL service error:', error);
         throw error;
       }
     }),
 
-  imageToImage: publicProcedure
+  imageToImage: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1).max(2000),
         imageUrls: z.array(z.string().url()).min(1).max(2),
         negativePrompt: z.string().max(500).optional(),
-        imageSize: z.union([
-          z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']),
-          z.object({
-            width: z.number().min(384).max(5000),
-            height: z.number().min(384).max(5000)
-          })
-        ]).optional(),
+        imageSize: z
+          .union([
+            z.enum([
+              'square_hd',
+              'square',
+              'portrait_4_3',
+              'portrait_16_9',
+              'landscape_4_3',
+              'landscape_16_9',
+            ]),
+            z.object({
+              width: z.number().min(384).max(5000),
+              height: z.number().min(384).max(5000),
+            }),
+          ])
+          .optional(),
         numImages: z.number().min(1).max(4).optional().default(1),
         seed: z.number().optional(),
       })
@@ -105,28 +109,28 @@ export const falRouter = router({
         const result = await falService.imageToImage(input);
         return result;
       } catch (error) {
-        console.error("FAL imageToImage service error:", error);
+        console.error('FAL imageToImage service error:', error);
         throw error;
       }
     }),
 
-  generateCharacter: publicProcedure
+  generateCharacter: protectedProcedure
     .input(
       z.object({
         name: z.string().min(1),
         description: z.string().min(1),
-        style: z.enum(["cute", "realistic", "anime", "fantasy", "cyberpunk"]).optional(),
+        style: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']).optional(),
         saveToDatabase: z.boolean().optional().default(true),
         detailedVisualDescription: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
       const stylePrompts = {
-        cute: "cute kawaii style, adorable, soft colors",
-        realistic: "photorealistic, detailed, cinematic lighting",
-        anime: "anime style, manga aesthetic, vibrant",
-        fantasy: "fantasy art, magical, ethereal",
-        cyberpunk: "cyberpunk style, neon, futuristic",
+        cute: 'cute kawaii style, adorable, soft colors',
+        realistic: 'photorealistic, detailed, cinematic lighting',
+        anime: 'anime style, manga aesthetic, vibrant',
+        fantasy: 'fantasy art, magical, ethereal',
+        cyberpunk: 'cyberpunk style, neon, futuristic',
       };
 
       const stylePrompt = input.style ? stylePrompts[input.style] : stylePrompts.cute;
@@ -134,13 +138,13 @@ export const falRouter = router({
 
       const imageResult = await falService.generateImage({
         prompt: fullPrompt,
-        model: "fal-ai/nano-banana",
-        imageSize: "square_hd",
+        model: 'fal-ai/nano-banana',
+        imageSize: 'square_hd',
         numImages: 1,
       });
 
-      if (imageResult.status !== "completed" || !imageResult.imageUrl) {
-        throw new Error(imageResult.error || "Failed to generate character image");
+      if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
+        throw new Error(imageResult.error || 'Failed to generate character image');
       }
 
       let characterId: string | undefined;
@@ -148,16 +152,16 @@ export const falRouter = router({
 
       if (input.saveToDatabase) {
         localImageUrl = imageResult.imageUrl;
-        characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
         await charactersCol.doc(characterId).set({
           character_name: input.name,
-          collection: "Nano Banana AI",
+          collection: 'Nano Banana AI',
           token_id: characterId,
           traits: {
-            style: input.style || "cute",
-            generated_with: "nano-banana",
-            seed: imageResult.seed?.toString() || "random",
+            style: input.style || 'cute',
+            generated_with: 'nano-banana',
+            seed: imageResult.seed?.toString() || 'random',
           },
           rarity_rank: 0,
           rarity_percentage: null,
@@ -180,12 +184,12 @@ export const falRouter = router({
       };
     }),
 
-  analyzeCharacter: publicProcedure
+  analyzeCharacter: protectedProcedure
     .input(
       z.object({
-        imageUrl: z.string().min(1, "Image URL is required"),
-        characterName: z.string().min(1, "Character name is required"),
-        userDescription: z.string().min(1, "Description is required"),
+        imageUrl: z.string().min(1, 'Image URL is required'),
+        characterName: z.string().min(1, 'Character name is required'),
+        userDescription: z.string().min(1, 'Description is required'),
       })
     )
     .mutation(async ({ input }) => {
@@ -202,34 +206,34 @@ export const falRouter = router({
           detailedVisualDescription: detailedDescription,
         };
       } catch (error) {
-        console.error("Character analysis failed:", error);
+        console.error('Character analysis failed:', error);
         throw new Error(
-          error instanceof Error ? error.message : "Failed to analyze character image"
+          error instanceof Error ? error.message : 'Failed to analyze character image'
         );
       }
     }),
 
-  saveCharacter: publicProcedure
+  saveCharacter: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1, "Character name is required"),
-        description: z.string().min(1, "Description is required"),
-        imageUrl: z.string().min(1, "Image URL is required"),
-        style: z.enum(["cute", "realistic", "anime", "fantasy", "cyberpunk"]),
+        name: z.string().min(1, 'Character name is required'),
+        description: z.string().min(1, 'Description is required'),
+        imageUrl: z.string().min(1, 'Image URL is required'),
+        style: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']),
         detailedVisualDescription: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
       try {
         await charactersCol.doc(characterId).set({
           character_name: input.name,
-          collection: "Nano Banana AI",
+          collection: 'Nano Banana AI',
           token_id: characterId,
           traits: {
             style: input.style,
-            generated_with: "nano-banana",
+            generated_with: 'nano-banana',
           },
           rarity_rank: 0,
           rarity_percentage: null,
@@ -249,55 +253,57 @@ export const falRouter = router({
       } catch (dbError) {
         console.error('Database insert failed:', dbError);
         throw new Error(
-          dbError instanceof Error ? dbError.message : "Failed to save character to database"
+          dbError instanceof Error ? dbError.message : 'Failed to save character to database'
         );
       }
     }),
 
-  generateCharacterAndVideo: publicProcedure
+  generateCharacterAndVideo: protectedProcedure
     .input(
       z.object({
         characterName: z.string().min(1),
         characterDescription: z.string().min(1),
-        characterStyle: z.enum(["cute", "realistic", "anime", "fantasy", "cyberpunk"]).optional(),
+        characterStyle: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']).optional(),
         videoPrompt: z.string().min(1),
         videoDuration: z.number().min(5).max(10).optional(),
-        videoProvider: z.enum(["fal"]).optional().default("fal"),
+        videoProvider: z.enum(['fal']).optional().default('fal'),
       })
     )
     .mutation(async ({ input }) => {
       const stylePrompts = {
-        cute: "cute kawaii style, adorable, soft colors",
-        realistic: "photorealistic, detailed, cinematic lighting",
-        anime: "anime style, manga aesthetic, vibrant",
-        fantasy: "fantasy art, magical, ethereal",
-        cyberpunk: "cyberpunk style, neon, futuristic",
+        cute: 'cute kawaii style, adorable, soft colors',
+        realistic: 'photorealistic, detailed, cinematic lighting',
+        anime: 'anime style, manga aesthetic, vibrant',
+        fantasy: 'fantasy art, magical, ethereal',
+        cyberpunk: 'cyberpunk style, neon, futuristic',
       };
-      const stylePrompt = input.characterStyle ? stylePrompts[input.characterStyle] : stylePrompts.cute;
+      const stylePrompt = input.characterStyle
+        ? stylePrompts[input.characterStyle]
+        : stylePrompts.cute;
       const characterPrompt = `Character portrait of ${input.characterName}, ${input.characterDescription}, ${stylePrompt}, high quality digital art`;
 
       const imageResult = await falService.generateImage({
         prompt: characterPrompt,
-        model: "fal-ai/nano-banana",
-        imageSize: "square_hd",
+        model: 'fal-ai/nano-banana',
+        imageSize: 'square_hd',
         numImages: 1,
       });
 
-      if (imageResult.status !== "completed" || !imageResult.imageUrl) {
-        throw new Error(imageResult.error || "Failed to generate character image");
+      if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
+        throw new Error(imageResult.error || 'Failed to generate character image');
       }
 
-      const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
       const localImageUrl = imageResult.imageUrl;
 
       await charactersCol.doc(characterId).set({
         character_name: input.characterName,
-        collection: "Nano Banana AI",
+        collection: 'Nano Banana AI',
         token_id: characterId,
         traits: {
-          style: input.characterStyle || "cute",
-          generated_with: "nano-banana",
-          seed: imageResult.seed?.toString() || "random",
+          style: input.characterStyle || 'cute',
+          generated_with: 'nano-banana',
+          seed: imageResult.seed?.toString() || 'random',
         },
         rarity_rank: 0,
         rarity_percentage: null,
@@ -309,10 +315,10 @@ export const falRouter = router({
 
       const videoResult = await falService.generateVideo({
         prompt: input.videoPrompt,
-        model: "fal-ai/veo3.1/fast/image-to-video",
+        model: 'fal-ai/veo3.1/fast/image-to-video',
         imageUrl: imageResult.imageUrl,
         duration: input.videoDuration || 5,
-        aspectRatio: "16:9",
+        aspectRatio: '16:9',
         motionStrength: 127,
       });
 
@@ -332,24 +338,24 @@ export const falRouter = router({
       };
     }),
 
-  generateVideo: publicProcedure
+  generateVideo: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1),
         model: z
           .enum([
-            "fal-ai/hunyuan-video",
-            "fal-ai/ltx-video",
-            "fal-ai/cogvideox-5b",
-            "fal-ai/runway-gen3",
-            "fal-ai/veo3.1/fast",
-            "fal-ai/sora-2/text-to-video",
-            "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
-            "fal-ai/wan-25-preview/text-to-video",
-            "fal-ai/veo3.1/fast/image-to-video",
-            "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
-            "fal-ai/wan-25-preview/image-to-video",
-            "fal-ai/sora-2/image-to-video",
+            'fal-ai/hunyuan-video',
+            'fal-ai/ltx-video',
+            'fal-ai/cogvideox-5b',
+            'fal-ai/runway-gen3',
+            'fal-ai/veo3.1/fast',
+            'fal-ai/sora-2/text-to-video',
+            'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+            'fal-ai/wan-25-preview/text-to-video',
+            'fal-ai/veo3.1/fast/image-to-video',
+            'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+            'fal-ai/wan-25-preview/image-to-video',
+            'fal-ai/sora-2/image-to-video',
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
@@ -359,11 +365,11 @@ export const falRouter = router({
         height: z.number().min(256).max(1080).optional(),
         guidanceScale: z.number().min(1).max(20).optional(),
         numInferenceSteps: z.number().min(10).max(50).optional(),
-        aspectRatio: z.enum(["16:9", "9:16", "1:1", "auto"]).optional(),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1', 'auto']).optional(),
         motionStrength: z.number().min(1).max(255).optional(),
         negativePrompt: z.string().optional(),
         cfgScale: z.number().min(0.1).max(2.0).optional(),
-        resolution: z.enum(["720p", "1080p", "auto"]).optional(),
+        resolution: z.enum(['720p', '1080p', 'auto']).optional(),
         enablePromptExpansion: z.boolean().optional(),
       })
     )
@@ -375,19 +381,17 @@ export const falRouter = router({
       return result;
     }),
 
-  getStatus: publicProcedure
-    .input(z.object({ id: z.string().min(1) }))
-    .query(async ({ input }) => {
-      return await falService.getGenerationStatus(input.id);
-    }),
+  getStatus: publicProcedure.input(z.object({ id: z.string().min(1) })).query(async ({ input }) => {
+    return await falService.getGenerationStatus(input.id);
+  }),
 
-  quickGenerate: publicProcedure
+  quickGenerate: protectedProcedure
     .input(z.object({ prompt: z.string().min(1), imageUrl: z.string().url().optional() }))
     .mutation(async ({ input }) => {
       return await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
-        model: "fal-ai/ltx-video",
+        model: 'fal-ai/ltx-video',
         duration: 5,
         fps: 25,
         width: 768,
@@ -397,13 +401,16 @@ export const falRouter = router({
       });
     }),
 
-  veo3ImageToVideo: publicProcedure
+  veo3ImageToVideo: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1),
         imageUrl: z.string().url(),
-        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
-        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        duration: z
+          .union([z.literal(5), z.literal(10)])
+          .optional()
+          .default(5),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
         motionStrength: z.number().min(1).max(255).optional().default(127),
       })
     )
@@ -411,7 +418,7 @@ export const falRouter = router({
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
-        model: "fal-ai/veo3.1/fast/image-to-video",
+        model: 'fal-ai/veo3.1/fast/image-to-video',
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,
@@ -422,13 +429,16 @@ export const falRouter = router({
       return result;
     }),
 
-  klingVideo: publicProcedure
+  klingVideo: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1),
         imageUrl: z.string().url(),
-        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
-        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        duration: z
+          .union([z.literal(5), z.literal(10)])
+          .optional()
+          .default(5),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
         negativePrompt: z.string().optional(),
         cfgScale: z.number().min(0.1).max(2.0).optional().default(0.5),
       })
@@ -437,7 +447,7 @@ export const falRouter = router({
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
-        model: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+        model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         negativePrompt: input.negativePrompt,
@@ -449,13 +459,16 @@ export const falRouter = router({
       return result;
     }),
 
-  wan25ImageToVideo: publicProcedure
+  wan25ImageToVideo: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1),
         imageUrl: z.string().url(),
-        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
-        resolution: z.enum(["720p", "1080p", "auto"]).optional().default("1080p"),
+        duration: z
+          .union([z.literal(5), z.literal(10)])
+          .optional()
+          .default(5),
+        resolution: z.enum(['720p', '1080p', 'auto']).optional().default('1080p'),
         negativePrompt: z.string().optional(),
         enablePromptExpansion: z.boolean().optional().default(true),
       })
@@ -464,7 +477,7 @@ export const falRouter = router({
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
-        model: "fal-ai/wan-25-preview/image-to-video",
+        model: 'fal-ai/wan-25-preview/image-to-video',
         duration: input.duration,
         resolution: input.resolution,
         negativePrompt: input.negativePrompt,
@@ -476,21 +489,24 @@ export const falRouter = router({
       return result;
     }),
 
-  soraImageToVideo: publicProcedure
+  soraImageToVideo: protectedProcedure
     .input(
       z.object({
-        prompt: z.string().min(1, "Prompt is required for Sora video generation"),
-        imageUrl: z.string().url("Valid image URL is required for Sora image-to-video"),
-        duration: z.union([z.literal(4), z.literal(8), z.literal(12)]).optional().default(4),
-        aspectRatio: z.enum(["16:9", "9:16", "1:1", "auto"]).optional().default("auto"),
-        resolution: z.enum(["720p", "1080p", "auto"]).optional().default("auto"),
+        prompt: z.string().min(1, 'Prompt is required for Sora video generation'),
+        imageUrl: z.string().url('Valid image URL is required for Sora image-to-video'),
+        duration: z
+          .union([z.literal(4), z.literal(8), z.literal(12)])
+          .optional()
+          .default(4),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1', 'auto']).optional().default('auto'),
+        resolution: z.enum(['720p', '1080p', 'auto']).optional().default('auto'),
       })
     )
     .mutation(async ({ input }) => {
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
-        model: "fal-ai/sora-2/image-to-video",
+        model: 'fal-ai/sora-2/image-to-video',
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         resolution: input.resolution,

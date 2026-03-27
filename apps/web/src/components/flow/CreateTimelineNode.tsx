@@ -15,23 +15,23 @@ export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimeline
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!plot.trim()) {
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       // Mock blockchain interaction - in real implementation this would call smart contract
       const mockNodeId = Math.floor(Math.random() * 10000) + previousNodeId + 1;
-      
+
       // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Call success callback with the new node ID
       onSuccess(mockNodeId);
-      
+
       // Reset form
       setPlot('');
     } catch (error) {
@@ -46,11 +46,9 @@ export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimeline
       <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold">Create New Timeline Event</h3>
-          <p className="text-sm text-muted-foreground">
-            Add a new narrative event to the timeline
-          </p>
+          <p className="text-sm text-muted-foreground">Add a new narrative event to the timeline</p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="plot">Plot Description</Label>
@@ -63,17 +61,11 @@ export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimeline
               required
             />
           </div>
-          
-          <div className="text-sm text-muted-foreground">
-            Previous Node ID: {previousNodeId}
-          </div>
-          
+
+          <div className="text-sm text-muted-foreground">Previous Node ID: {previousNodeId}</div>
+
           <div className="flex gap-2">
-            <Button 
-              type="submit" 
-              disabled={!plot.trim() || isLoading}
-              className="flex-1"
-            >
+            <Button type="submit" disabled={!plot.trim() || isLoading} className="flex-1">
               {isLoading ? 'Creating...' : 'Create Event'}
             </Button>
           </div>

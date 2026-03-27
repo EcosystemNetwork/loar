@@ -1,12 +1,12 @@
-import { db } from "../../lib/firebase";
-import type { StorageProvider, StorageManifest, UploadResult } from "./types";
-import { computeSha256, fetchToBuffer, getMimeType } from "./types";
-import { WalrusProvider } from "./walrus";
-import { IpfsProvider } from "./ipfs";
-import { SynapseAdapter } from "./synapse-adapter";
-import { FirebaseAdapter } from "./firebase-adapter";
+import { db } from '../../lib/firebase';
+import type { StorageProvider, StorageManifest, UploadResult } from './types';
+import { computeSha256, fetchToBuffer, getMimeType } from './types';
+import { WalrusProvider } from './walrus';
+import { IpfsProvider } from './ipfs';
+import { SynapseAdapter } from './synapse-adapter';
+import { FirebaseAdapter } from './firebase-adapter';
 
-const MANIFESTS_COLLECTION = "storageManifests";
+const MANIFESTS_COLLECTION = 'storageManifests';
 
 /** Default provider priority order. Can be overridden via STORAGE_PROVIDER_PRIORITY env. */
 function buildProviders(): StorageProvider[] {
@@ -18,7 +18,7 @@ function buildProviders(): StorageProvider[] {
   ];
 
   // Allow reordering via env: "walrus,ipfs,synapse,firebase"
-  const order = process.env.STORAGE_PROVIDER_PRIORITY?.split(",").map((s) =>
+  const order = process.env.STORAGE_PROVIDER_PRIORITY?.split(',').map((s) =>
     s.trim().toLowerCase()
   );
 
@@ -42,13 +42,11 @@ export class StorageManager {
   private constructor() {
     this.providers = buildProviders();
 
-    const available = this.providers
-      .filter((p) => p.isAvailable())
-      .map((p) => p.name);
+    const available = this.providers.filter((p) => p.isAvailable()).map((p) => p.name);
     console.log(
-      `[StorageManager] Initialized with providers (priority order): ${this.providers.map((p) => p.name).join(", ")}`
+      `[StorageManager] Initialized with providers (priority order): ${this.providers.map((p) => p.name).join(', ')}`
     );
-    console.log(`[StorageManager] Currently available: ${available.join(", ") || "none"}`);
+    console.log(`[StorageManager] Currently available: ${available.join(', ') || 'none'}`);
   }
 
   static getInstance(): StorageManager {
@@ -60,11 +58,7 @@ export class StorageManager {
 
   // ─── Upload ───────────────────────────────────────────────
 
-  async upload(
-    buffer: Buffer,
-    filename: string,
-    mimeType?: string
-  ): Promise<StorageManifest> {
+  async upload(buffer: Buffer, filename: string, mimeType?: string): Promise<StorageManifest> {
     const contentHash = computeSha256(buffer);
     const resolvedMime = mimeType || getMimeType(filename);
 
@@ -77,7 +71,7 @@ export class StorageManager {
 
     const available = this.providers.filter((p) => p.isAvailable());
     if (available.length === 0) {
-      throw new Error("No storage providers available");
+      throw new Error('No storage providers available');
     }
 
     // Try providers in priority order until one succeeds
@@ -100,9 +94,7 @@ export class StorageManager {
     }
 
     if (!primaryResult) {
-      throw new Error(
-        `All storage providers failed:\n${errors.join("\n")}`
-      );
+      throw new Error(`All storage providers failed:\n${errors.join('\n')}`);
     }
 
     // Build manifest
@@ -119,31 +111,18 @@ export class StorageManager {
     await this.saveManifest(manifest);
 
     // Background: upload to remaining providers for redundancy
-    const remaining = available.filter(
-      (p) => !results.some((r) => r.provider === p.name)
-    );
+    const remaining = available.filter((p) => !results.some((r) => r.provider === p.name));
     if (remaining.length > 0) {
-      this.uploadToRemainingProviders(
-        buffer,
-        filename,
-        resolvedMime,
-        contentHash,
-        remaining
-      );
+      this.uploadToRemainingProviders(buffer, filename, resolvedMime, contentHash, remaining);
     }
 
     return manifest;
   }
 
-  async uploadFromUrl(
-    url: string,
-    filename?: string
-  ): Promise<StorageManifest> {
+  async uploadFromUrl(url: string, filename?: string): Promise<StorageManifest> {
     const { buffer, contentType } = await fetchToBuffer(url);
     const resolvedFilename =
-      filename ||
-      url.split("/").pop()?.split("?")[0] ||
-      `file-${Date.now()}`;
+      filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
     return this.upload(buffer, resolvedFilename, contentType);
   }
 
@@ -170,26 +149,18 @@ export class StorageManager {
       try {
         return await provider.download(upload.contentId);
       } catch (err) {
-        console.error(
-          `[StorageManager] Download from ${upload.provider} failed:`,
-          err
-        );
+        console.error(`[StorageManager] Download from ${upload.provider} failed:`, err);
       }
     }
 
-    throw new Error(
-      `All providers failed to download contentHash: ${contentHash}`
-    );
+    throw new Error(`All providers failed to download contentHash: ${contentHash}`);
   }
 
   // ─── Manifest Persistence ─────────────────────────────────
 
   async findManifest(contentHash: string): Promise<StorageManifest | null> {
     try {
-      const doc = await db
-        .collection(MANIFESTS_COLLECTION)
-        .doc(contentHash)
-        .get();
+      const doc = await db.collection(MANIFESTS_COLLECTION).doc(contentHash).get();
 
       if (!doc.exists) return null;
       return doc.data() as StorageManifest;
@@ -209,7 +180,7 @@ export class StorageManager {
         .doc(manifest.contentHash)
         .set(manifest, { merge: true });
     } catch (err) {
-      console.error("[StorageManager] Failed to save manifest:", err);
+      console.error('[StorageManager] Failed to save manifest:', err);
     }
   }
 
@@ -227,9 +198,7 @@ export class StorageManager {
       provider
         .upload(buffer, filename, mimeType)
         .then(async (result) => {
-          console.log(
-            `[StorageManager] Background upload to ${provider.name} succeeded`
-          );
+          console.log(`[StorageManager] Background upload to ${provider.name} succeeded`);
 
           // Append to manifest
           try {

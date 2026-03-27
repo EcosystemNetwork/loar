@@ -192,7 +192,9 @@ export function migrateLegacyEvent(legacyEvent: LegacyEvent): MultiSegmentEvent 
 /**
  * Helper function to check if event has multiple segments
  */
-export function isMultiSegmentEvent(event: MultiSegmentEvent | LegacyEvent): event is MultiSegmentEvent {
+export function isMultiSegmentEvent(
+  event: MultiSegmentEvent | LegacyEvent
+): event is MultiSegmentEvent {
   return 'segments' in event && Array.isArray(event.segments);
 }
 

@@ -1,0 +1,8 @@
+dist
+node_modules
+.turbo
+*.gen.ts
+apps/contracts
+pnpm-lock.yaml
+dataconnect
+src/dataconnect-generated

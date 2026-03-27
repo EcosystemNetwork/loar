@@ -1,14 +1,21 @@
-import { db } from "../lib/firebase";
-import { getStorage } from "firebase-admin/storage";
+import { getStorage } from 'firebase-admin/storage';
+// @ts-expect-error firebase-admin/storage re-exports this type
+import type { Bucket } from '@google-cloud/storage';
 
-const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || "";
+const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || '';
 
 class StorageService {
   private static instance: StorageService | null = null;
-  private bucket;
+  private _bucket: Bucket | null = null;
 
-  private constructor() {
-    this.bucket = getStorage().bucket(BUCKET_NAME);
+  private get bucket(): Bucket {
+    if (!this._bucket) {
+      if (!BUCKET_NAME) {
+        throw new Error('FIREBASE_STORAGE_BUCKET not set — file storage unavailable');
+      }
+      this._bucket = getStorage().bucket(BUCKET_NAME);
+    }
+    return this._bucket;
   }
 
   static getInstance(): StorageService {
@@ -24,7 +31,7 @@ class StorageService {
 
     await file.save(buffer, {
       contentType: this.getContentType(filename),
-      metadata: { cacheControl: "public, max-age=31536000" },
+      metadata: { cacheControl: 'public, max-age=31536000' },
     });
 
     await file.makePublic();
@@ -33,11 +40,14 @@ class StorageService {
   }
 
   async uploadFromUrl(url: string, filename?: string): Promise<string> {
+    const { validateUploadUrl } = await import('../lib/url-validator');
+    await validateUploadUrl(url);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; LOARUploader/1.0)" },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LOARUploader/1.0)' },
       signal: controller.signal,
     });
 
@@ -49,9 +59,7 @@ class StorageService {
 
     const buffer = Buffer.from(await response.arrayBuffer());
     const urlFilename =
-      filename ||
-      url.split("/").pop()?.split("?")[0] ||
-      `video-${Date.now()}.mp4`;
+      filename || url.split('/').pop()?.split('?')[0] || `video-${Date.now()}.mp4`;
 
     return await this.upload(buffer, urlFilename);
   }
@@ -69,9 +77,7 @@ class StorageService {
     }
 
     if (data.length > 200 * 1024 * 1024) {
-      throw new Error(
-        `File too large: ${Math.round(data.length / 1024 / 1024)}MB`
-      );
+      throw new Error(`File too large: ${Math.round(data.length / 1024 / 1024)}MB`);
     }
 
     return new Uint8Array(data);
@@ -91,22 +97,21 @@ class StorageService {
   }
 
   private getContentType(filename: string): string {
-    const ext = filename.split(".").pop()?.toLowerCase();
+    const ext = filename.split('.').pop()?.toLowerCase();
     const mimeTypes: Record<string, string> = {
-      mp4: "video/mp4",
-      webm: "video/webm",
-      mov: "video/quicktime",
-      avi: "video/x-msvideo",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      gif: "image/gif",
-      json: "application/json",
-      txt: "text/plain",
+      mp4: 'video/mp4',
+      webm: 'video/webm',
+      mov: 'video/quicktime',
+      avi: 'video/x-msvideo',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      gif: 'image/gif',
+      json: 'application/json',
+      txt: 'text/plain',
     };
-    return mimeTypes[ext || ""] || "application/octet-stream";
+    return mimeTypes[ext || ''] || 'application/octet-stream';
   }
 }
 
-// Keep the same export name so all imports still work
 export const minioService = StorageService.getInstance();

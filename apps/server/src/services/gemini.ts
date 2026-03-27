@@ -1,9 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { GoogleAIFileManager } from "@google/generative-ai/server";
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
 
 // Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
-const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY || "");
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY || '');
 
 export interface WikiData {
   title: string;
@@ -58,30 +58,30 @@ export async function generateWikiFromVideo(
   console.log(`🎬 Generating wiki for event ${eventData.eventId}`);
   console.log(`📝 Characters provided: ${eventData.characters?.length || 0}`);
   if (eventData.characters && eventData.characters.length > 0) {
-    console.log(`👥 Character names: ${eventData.characters.map(c => c.name).join(', ')}`);
+    console.log(`👥 Character names: ${eventData.characters.map((c) => c.name).join(', ')}`);
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
   // Build context from characters
-  let characterContext = "";
-  let characterNames: string[] = [];
+  let characterContext = '';
+  const characterNames: string[] = [];
   if (eventData.characters && eventData.characters.length > 0) {
-    characterContext = "\n\nCHARACTERS IN THIS SCENE:\n";
+    characterContext = '\n\nCHARACTERS IN THIS SCENE:\n';
     eventData.characters.forEach((char) => {
       characterNames.push(char.name);
       characterContext += `- **${char.name}**: ${char.userDescription}`;
       if (char.visualDescription) {
         characterContext += `\n  Visual appearance: ${char.visualDescription}`;
       }
-      characterContext += "\n";
+      characterContext += '\n';
     });
   }
 
   // Build context from previous events
-  let context = "";
+  let context = '';
   if (eventData.previousEvents && eventData.previousEvents.length > 0) {
-    context = "\n\nPREVIOUS EVENTS IN THIS TIMELINE:\n";
+    context = '\n\nPREVIOUS EVENTS IN THIS TIMELINE:\n';
     eventData.previousEvents.forEach((evt, idx) => {
       context += `${idx + 1}. ${evt.title}: ${evt.description}\n`;
     });
@@ -106,9 +106,11 @@ CRITICAL RULES:
 - Describe ONLY what you see in the video
 - Do NOT invent objects, dialogue, or actions not visible
 - Do NOT add dramatic interpretations unless clearly shown
-${eventData.characters && eventData.characters.length > 0
-  ? `- **IMPORTANT**: The following characters are in this scene: ${characterNames.join(', ')}. When you recognize these characters in the video based on their descriptions, you MUST use their exact names (e.g., "${eventData.characters[0]?.name}"). Do NOT use generic terms like "elf", "wizard", "man", "woman" - always use the specific character names provided.`
-  : '- Identify characters/subjects based on what\'s visible (e.g., "person in red shirt", "eagle", "car")'}
+${
+  eventData.characters && eventData.characters.length > 0
+    ? `- **IMPORTANT**: The following characters are in this scene: ${characterNames.join(', ')}. When you recognize these characters in the video based on their descriptions, you MUST use their exact names (e.g., "${eventData.characters[0]?.name}"). Do NOT use generic terms like "elf", "wizard", "man", "woman" - always use the specific character names provided.`
+    : '- Identify characters/subjects based on what\'s visible (e.g., "person in red shirt", "eagle", "car")'
+}
 - Focus on observable actions and events
 ${eventData.characters && eventData.characters.length > 0 ? '- In the "elements" array, the "name" field should use the provided character names when describing those characters' : ''}
 
@@ -154,23 +156,23 @@ Output valid JSON only. Be precise and factual.`;
     // Upload video file to Gemini
     console.log(`📤 Uploading video to Gemini...`);
     const uploadResult = await fileManager.uploadFile(videoBuffer, {
-      mimeType: "video/mp4",
+      mimeType: 'video/mp4',
       displayName: `event-${eventData.eventId}.mp4`,
     });
 
     // Wait for video to be processed
     let file = uploadResult.file;
-    while (file.state === "PROCESSING") {
-      console.log("⏳ Video processing...");
+    while (file.state === 'PROCESSING') {
+      console.log('⏳ Video processing...');
       await new Promise((resolve) => setTimeout(resolve, 2000));
       file = await fileManager.getFile(file.name);
     }
 
-    if (file.state === "FAILED") {
-      throw new Error("Video processing failed");
+    if (file.state === 'FAILED') {
+      throw new Error('Video processing failed');
     }
 
-    console.log("✅ Video ready, analyzing...");
+    console.log('✅ Video ready, analyzing...');
 
     // Generate content
     const result = await model.generateContent([
@@ -188,10 +190,10 @@ Output valid JSON only. Be precise and factual.`;
 
     // Extract JSON from markdown if needed
     let jsonText = text.trim();
-    if (jsonText.startsWith("```json")) {
-      jsonText = jsonText.split("```json")[1].split("```")[0].trim();
-    } else if (jsonText.startsWith("```")) {
-      jsonText = jsonText.split("```")[1].split("```")[0].trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.split('```json')[1].split('```')[0].trim();
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.split('```')[1].split('```')[0].trim();
     }
 
     const wikiData = JSON.parse(jsonText) as WikiData;
@@ -199,8 +201,8 @@ Output valid JSON only. Be precise and factual.`;
     // Map character IDs to elements by matching character names (case-insensitive)
     if (eventData.characters && eventData.characterIds && eventData.characters.length > 0) {
       console.log('🔍 Matching elements to characters:');
-      console.log(`   Elements found: ${wikiData.elements.map(e => e.name).join(', ')}`);
-      console.log(`   Characters available: ${eventData.characters.map(c => c.name).join(', ')}`);
+      console.log(`   Elements found: ${wikiData.elements.map((e) => e.name).join(', ')}`);
+      console.log(`   Characters available: ${eventData.characters.map((c) => c.name).join(', ')}`);
 
       wikiData.elements = wikiData.elements.map((element) => {
         // Find matching character by name (case-insensitive)
@@ -209,7 +211,9 @@ Output valid JSON only. Be precise and factual.`;
         );
 
         if (characterIndex !== -1 && eventData.characterIds![characterIndex]) {
-          console.log(`   ✅ Matched "${element.name}" to character ID: ${eventData.characterIds![characterIndex]}`);
+          console.log(
+            `   ✅ Matched "${element.name}" to character ID: ${eventData.characterIds![characterIndex]}`
+          );
           return {
             ...element,
             characterId: eventData.characterIds![characterIndex],
@@ -221,13 +225,15 @@ Output valid JSON only. Be precise and factual.`;
         return element;
       });
 
-      console.log(`🔗 Mapped character IDs to ${wikiData.elements.filter(e => e.characterId).length} elements`);
+      console.log(
+        `🔗 Mapped character IDs to ${wikiData.elements.filter((e) => e.characterId).length} elements`
+      );
     }
 
     // Calculate costs
     const usage = response.usageMetadata;
     if (!usage) {
-      throw new Error("No usage metadata returned");
+      throw new Error('No usage metadata returned');
     }
 
     const inputTokens = usage.promptTokenCount || 0;
@@ -250,11 +256,11 @@ Output valid JSON only. Be precise and factual.`;
         inputTokens,
         outputTokens,
         costUsd,
-        generatedBy: "gemini-2.5-pro",
+        generatedBy: 'gemini-2.5-pro',
       },
     };
   } catch (error) {
-    console.error("❌ Wiki generation failed:", error);
+    console.error('❌ Wiki generation failed:', error);
     throw error;
   }
 }
@@ -269,7 +275,7 @@ export async function analyzeCharacterImage(
 ): Promise<string> {
   console.log(`🎨 Analyzing character image for: ${characterName}`);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
   const prompt = `You are analyzing a character image to create a detailed visual description for narrative consistency.
 
@@ -302,9 +308,11 @@ Generate a detailed visual description in plain text (no JSON, no formatting).`;
     const result = await model.generateContent([
       {
         inlineData: {
-          mimeType: "image/png",
-          data: await fetch(imageUrl).then(r => r.arrayBuffer()).then(b => Buffer.from(b).toString('base64'))
-        }
+          mimeType: 'image/png',
+          data: await fetch(imageUrl)
+            .then((r) => r.arrayBuffer())
+            .then((b) => Buffer.from(b).toString('base64')),
+        },
       },
       { text: prompt },
     ]);
@@ -316,15 +324,17 @@ Generate a detailed visual description in plain text (no JSON, no formatting).`;
     const usage = response.usageMetadata;
     const inputTokens = usage?.promptTokenCount || 0;
     const outputTokens = usage?.candidatesTokenCount || 0;
-    const costUsd = ((inputTokens / 1_000_000) * 1.25) + ((outputTokens / 1_000_000) * 10.0);
+    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
 
     console.log(`✅ Character analysis complete!`);
-    console.log(`📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(
+      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
+    );
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
     return description;
   } catch (error) {
-    console.error("❌ Character analysis failed:", error);
+    console.error('❌ Character analysis failed:', error);
     throw error;
   }
 }
@@ -338,11 +348,11 @@ export async function improveImagePrompt(
 ): Promise<string> {
   console.log(`🎨 Improving image prompt with Gemini...`);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
-  let characterInfo = "";
+  let characterInfo = '';
   if (characterContext && characterContext.length > 0) {
-    characterInfo = "\n\nCHARACTERS IN THIS SCENE:\n";
+    characterInfo = '\n\nCHARACTERS IN THIS SCENE:\n';
     characterContext.forEach((char) => {
       characterInfo += `- ${char.name}: ${char.description}\n`;
     });
@@ -373,7 +383,7 @@ RULES:
 - Include atmospheric and lighting details
 - Use vivid, descriptive language
 - Mention colors, textures, and mood
-${characterContext ? "- Use the provided character names and descriptions" : ""}
+${characterContext ? '- Use the provided character names and descriptions' : ''}
 - Keep it as one cohesive paragraph (2-4 sentences)
 - Output ONLY the description, no explanations or extra text
 - Do NOT use markdown formatting or code blocks
@@ -387,23 +397,25 @@ Generate the improved image prompt now:`;
 
     // Remove any markdown formatting if present
     let cleanPrompt = improvedPrompt;
-    if (cleanPrompt.startsWith("```")) {
-      cleanPrompt = cleanPrompt.split("```")[1].trim();
+    if (cleanPrompt.startsWith('```')) {
+      cleanPrompt = cleanPrompt.split('```')[1].trim();
     }
 
     // Calculate costs
     const usage = response.usageMetadata;
     const inputTokens = usage?.promptTokenCount || 0;
     const outputTokens = usage?.candidatesTokenCount || 0;
-    const costUsd = ((inputTokens / 1_000_000) * 1.25) + ((outputTokens / 1_000_000) * 10.0);
+    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
 
     console.log(`✅ Image prompt improved!`);
-    console.log(`📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(
+      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
+    );
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
     return cleanPrompt;
   } catch (error) {
-    console.error("❌ Image prompt improvement failed:", error);
+    console.error('❌ Image prompt improvement failed:', error);
     throw error;
   }
 }
@@ -422,17 +434,17 @@ export async function improveVideoPrompt(
 ): Promise<string> {
   console.log(`🎬 Improving video prompt with Gemini...`);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
-  let characterInfo = "";
+  let characterInfo = '';
   if (characterContext && characterContext.length > 0) {
-    characterInfo = "\n\nCHARACTERS IN THIS SCENE:\n";
+    characterInfo = '\n\nCHARACTERS IN THIS SCENE:\n';
     characterContext.forEach((char) => {
       characterInfo += `- ${char.name}: ${char.description}\n`;
     });
   }
 
-  let previousEventInfo = "";
+  let previousEventInfo = '';
   if (previousEventContext) {
     previousEventInfo = `\n\nPREVIOUS EVENT CONTEXT:\n`;
     previousEventInfo += `Title: ${previousEventContext.title}\n`;
@@ -473,7 +485,7 @@ RULES:
 - Create visual flow between shots
 - Build narrative tension or emotion
 - Be specific about actions and details
-${characterContext ? "- Use the provided character names and descriptions" : ""}
+${characterContext ? '- Use the provided character names and descriptions' : ''}
 - Output ONLY the shot sequence, no explanations or extra text
 - Do NOT use markdown formatting or code blocks
 
@@ -486,23 +498,25 @@ Generate the improved prompt now:`;
 
     // Remove any markdown formatting if present
     let cleanPrompt = improvedPrompt;
-    if (cleanPrompt.startsWith("```")) {
-      cleanPrompt = cleanPrompt.split("```")[1].trim();
+    if (cleanPrompt.startsWith('```')) {
+      cleanPrompt = cleanPrompt.split('```')[1].trim();
     }
 
     // Calculate costs
     const usage = response.usageMetadata;
     const inputTokens = usage?.promptTokenCount || 0;
     const outputTokens = usage?.candidatesTokenCount || 0;
-    const costUsd = ((inputTokens / 1_000_000) * 1.25) + ((outputTokens / 1_000_000) * 10.0);
+    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
 
     console.log(`✅ Prompt improved!`);
-    console.log(`📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(
+      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
+    );
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
     return cleanPrompt;
   } catch (error) {
-    console.error("❌ Prompt improvement failed:", error);
+    console.error('❌ Prompt improvement failed:', error);
     throw error;
   }
 }

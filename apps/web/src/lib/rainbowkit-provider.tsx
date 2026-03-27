@@ -10,9 +10,7 @@ interface RainbowKitWrapperProps {
 export function RainbowKitWrapper({ children }: RainbowKitWrapperProps) {
   return (
     <WagmiProvider config={config}>
-      <RainbowKitProvider>
-        {children}
-      </RainbowKitProvider>
+      <RainbowKitProvider>{children}</RainbowKitProvider>
     </WagmiProvider>
   );
 }

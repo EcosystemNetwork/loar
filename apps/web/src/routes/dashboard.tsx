@@ -1,14 +1,14 @@
 // import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from "lucide-react";
+import { createFileRoute } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
-import { GenerativeMedia } from "@/components/GenerativeMedia";
+import { GenerativeMedia } from '@/components/GenerativeMedia';
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute('/dashboard')({
   component: RouteComponent,
 });
 
@@ -27,15 +27,15 @@ function RouteComponent() {
       description: 'A dystopian future where technology and humanity collide in Night City',
       createdAt: '2024-01-15',
       creator: '0x1234...5678',
-      address: '0xabcd...ef01'
+      address: '0xabcd...ef01',
     },
     {
       id: 'space-odyssey',
       name: 'Space Odyssey',
       description: 'An epic journey through the cosmos exploring alien civilizations',
-      createdAt: '2024-02-10', 
+      createdAt: '2024-02-10',
       creator: '0x2345...6789',
-      address: '0xbcde...f012'
+      address: '0xbcde...f012',
     },
     {
       id: 'medieval-kingdoms',
@@ -43,7 +43,7 @@ function RouteComponent() {
       description: 'Knights, dragons, and magic in a fantasy realm of endless adventures',
       createdAt: '2024-03-05',
       creator: '0x3456...789a',
-      address: '0xcdef...0123'
+      address: '0xcdef...0123',
     },
     {
       id: 'detective-noir',
@@ -51,7 +51,7 @@ function RouteComponent() {
       description: 'Dark mysteries in 1940s Los Angeles with corruption and crime',
       createdAt: '2024-01-20',
       creator: '0x4567...89ab',
-      address: '0xdef0...1234'
+      address: '0xdef0...1234',
     },
     {
       id: 'zombie-apocalypse',
@@ -59,7 +59,7 @@ function RouteComponent() {
       description: 'Survival horror in a world overrun by the undead',
       createdAt: '2024-02-28',
       creator: '0x5678...9abc',
-      address: '0xef01...2345'
+      address: '0xef01...2345',
     },
     {
       id: 'blockchain-universe',
@@ -68,8 +68,8 @@ function RouteComponent() {
       createdAt: '2024-01-01',
       creator: '0x0000...0000',
       address: null,
-      isDefault: true
-    }
+      isDefault: true,
+    },
   ];
 
   // Use dummy data instead of API call for testing
@@ -86,21 +86,21 @@ function RouteComponent() {
   useEffect(() => {
     if (!user && !isConnecting) {
       navigate({
-        to: "/",
+        to: '/',
       });
     }
   }, [user, isConnecting, navigate]);
 
   const selectUniverse = (universeId: string) => {
     navigate({
-      to: "/universe/$id",
+      to: '/universe/$id',
       params: { id: universeId },
     });
   };
 
   const createNewUniverse = () => {
     navigate({
-      to: "/cinematicUniverseCreate",
+      to: '/cinematicUniverseCreate',
     });
   };
 
@@ -121,9 +121,7 @@ function RouteComponent() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Connect Your Wallet</CardTitle>
-            <CardDescription>
-              Connect your wallet to access the dashboard
-            </CardDescription>
+            <CardDescription>Connect your wallet to access the dashboard</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={handleConnect} className="w-full">
@@ -173,7 +171,7 @@ function RouteComponent() {
           <section className="mb-12">
             <h2 className="text-xl font-semibold mb-6">Featured Universe</h2>
             <div className="relative">
-              <Card 
+              <Card
                 className="cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden h-64 bg-gradient-to-r from-blue-600 to-purple-600"
                 onClick={() => selectUniverse(universes[0].id)}
               >
@@ -182,10 +180,10 @@ function RouteComponent() {
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                     <h3 className="text-2xl font-bold mb-2">{universes[0].name}</h3>
                     <p className="text-sm opacity-90 mb-4">
-                      {universes[0].description || "A captivating narrative universe awaits"}
+                      {universes[0].description || 'A captivating narrative universe awaits'}
                     </p>
-                    <Button 
-                      variant="secondary" 
+                    <Button
+                      variant="secondary"
                       className="flex items-center gap-2"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -220,7 +218,9 @@ function RouteComponent() {
                 <Users className="h-12 w-12 mx-auto text-muted-foreground" />
               </div>
               <h3 className="text-lg font-medium mb-2">No universes yet</h3>
-              <p className="text-muted-foreground mb-4">Create your first narrative universe to get started</p>
+              <p className="text-muted-foreground mb-4">
+                Create your first narrative universe to get started
+              </p>
               <Button onClick={createNewUniverse} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Create Your First Universe
@@ -229,7 +229,7 @@ function RouteComponent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {universes.map((universe: any) => (
-                <Card 
+                <Card
                   key={universe.id}
                   className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden"
                   onClick={() => selectUniverse(universe.id)}
@@ -249,22 +249,22 @@ function RouteComponent() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Universe Info */}
                     <div className="p-4">
                       <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
                         {universe.name}
                       </h3>
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {universe.description || "Explore this narrative universe"}
+                        {universe.description || 'Explore this narrative universe'}
                       </p>
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-xs text-muted-foreground">
                           Created {new Date(universe.createdAt).toLocaleDateString()}
                         </span>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => {
                             e.stopPropagation();

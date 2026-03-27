@@ -1,10 +1,10 @@
-import type { StorageManifest, ProviderStatus } from "./types";
-import { getStorageManager } from "./manager";
+import type { StorageManifest, ProviderStatus } from './types';
+import { getStorageManager } from './manager';
 
 export interface UploadJob {
   id: string;
   userId: string;
-  status: "pending" | "uploading" | "completed" | "failed";
+  status: 'pending' | 'uploading' | 'completed' | 'failed';
   progress: number; // 0-100
   filename: string;
   mimeType: string;
@@ -50,7 +50,7 @@ export class UploadQueue {
     const job: UploadJob = {
       id: jobId,
       userId,
-      status: "pending",
+      status: 'pending',
       progress: 0,
       filename,
       mimeType,
@@ -82,7 +82,7 @@ export class UploadQueue {
     const job: UploadJob = {
       id: jobId,
       userId,
-      status: "pending",
+      status: 'pending',
       progress: 0,
       filename,
       mimeType,
@@ -106,9 +106,7 @@ export class UploadQueue {
 
   getActiveJobs(userId?: string): UploadJob[] {
     const all = [...this.jobs.values()];
-    const active = all.filter(
-      (j) => j.status === "pending" || j.status === "uploading"
-    );
+    const active = all.filter((j) => j.status === 'pending' || j.status === 'uploading');
     if (userId) {
       return active.filter((j) => j.userId === userId);
     }
@@ -120,17 +118,15 @@ export class UploadQueue {
     if (userId) {
       all = all.filter((j) => j.userId === userId);
     }
-    return all
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, limit);
+    return all.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
   }
 
   /** Retry a failed job. */
   async retry(jobId: string): Promise<boolean> {
     const job = this.jobs.get(jobId);
-    if (!job || job.status !== "failed") return false;
+    if (!job || job.status !== 'failed') return false;
 
-    job.status = "pending";
+    job.status = 'pending';
     job.progress = 0;
     job.error = undefined;
     job.retryCount++;
@@ -148,7 +144,7 @@ export class UploadQueue {
     const job = this.jobs.get(jobId);
     if (!job || !job.sourceUrl) return;
 
-    job.status = "uploading";
+    job.status = 'uploading';
     job.progress = 10;
     job.updatedAt = Date.now();
 
@@ -157,17 +153,14 @@ export class UploadQueue {
       job.progress = 30;
       job.updatedAt = Date.now();
 
-      const manifest = await manager.uploadFromUrl(
-        job.sourceUrl,
-        job.filename
-      );
+      const manifest = await manager.uploadFromUrl(job.sourceUrl, job.filename);
 
-      job.status = "completed";
+      job.status = 'completed';
       job.progress = 100;
       job.manifest = manifest;
       job.providers = manifest.uploads.map((u) => ({
         name: u.provider,
-        status: "completed" as const,
+        status: 'completed' as const,
         contentId: u.contentId,
         url: u.url,
       }));
@@ -178,7 +171,7 @@ export class UploadQueue {
 
       if (job.retryCount < MAX_RETRIES) {
         const delay = RETRY_DELAYS[job.retryCount] || 15_000;
-        job.status = "pending";
+        job.status = 'pending';
         job.retryCount++;
         job.updatedAt = Date.now();
 
@@ -188,7 +181,7 @@ export class UploadQueue {
 
         setTimeout(() => this.processJob(jobId), delay);
       } else {
-        job.status = "failed";
+        job.status = 'failed';
         job.updatedAt = Date.now();
         console.error(
           `[UploadQueue] Job ${jobId} permanently failed after ${MAX_RETRIES} retries: ${msg}`
@@ -197,14 +190,11 @@ export class UploadQueue {
     }
   }
 
-  private async processBufferJob(
-    jobId: string,
-    buffer: Buffer
-  ): Promise<void> {
+  private async processBufferJob(jobId: string, buffer: Buffer): Promise<void> {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
-    job.status = "uploading";
+    job.status = 'uploading';
     job.progress = 10;
     job.updatedAt = Date.now();
 
@@ -215,19 +205,19 @@ export class UploadQueue {
 
       const manifest = await manager.upload(buffer, job.filename, job.mimeType);
 
-      job.status = "completed";
+      job.status = 'completed';
       job.progress = 100;
       job.manifest = manifest;
       job.providers = manifest.uploads.map((u) => ({
         name: u.provider,
-        status: "completed" as const,
+        status: 'completed' as const,
         contentId: u.contentId,
         url: u.url,
       }));
       job.updatedAt = Date.now();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      job.status = "failed";
+      job.status = 'failed';
       job.error = msg;
       job.updatedAt = Date.now();
       console.error(`[UploadQueue] Buffer job ${jobId} failed: ${msg}`);
@@ -238,7 +228,7 @@ export class UploadQueue {
     const now = Date.now();
     for (const [id, job] of this.jobs) {
       if (
-        (job.status === "completed" || job.status === "failed") &&
+        (job.status === 'completed' || job.status === 'failed') &&
         now - job.updatedAt > JOB_TTL_MS
       ) {
         this.jobs.delete(id);

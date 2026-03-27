@@ -40,7 +40,8 @@ query ListUserReviews @auth(level: USER) {
 }
 
 # Get movie by id
-query GetMovieById($id: UUID!) @auth(level: PUBLIC, insecureReason: "Anyone can get a movie by id.") {
+query GetMovieById($id: UUID!)
+@auth(level: PUBLIC, insecureReason: "Anyone can get a movie by id.") {
   movie(id: $id) {
     id
     title
@@ -64,12 +65,9 @@ query GetMovieById($id: UUID!) @auth(level: PUBLIC, insecureReason: "Anyone can 
 }
 
 # Search for movies, actors, and reviews
-query SearchMovie($titleInput: String, $genre: String) @auth(level: PUBLIC, insecureReason: "Anyone can search for movies.") {
-  movies(
-    where: {
-      _and: [{ genre: { eq: $genre } }, { title: { contains: $titleInput } }]
-    }
-  ) {
+query SearchMovie($titleInput: String, $genre: String)
+@auth(level: PUBLIC, insecureReason: "Anyone can search for movies.") {
+  movies(where: { _and: [{ genre: { eq: $genre } }, { title: { contains: $titleInput } }] }) {
     id
     title
     genre

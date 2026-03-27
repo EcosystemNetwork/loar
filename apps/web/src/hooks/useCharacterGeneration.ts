@@ -10,7 +10,13 @@ import { useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { type StatusMessage } from '@/hooks/useVideoGeneration';
 
-export type ImageFormat = 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9';
+export type ImageFormat =
+  | 'square_hd'
+  | 'square'
+  | 'portrait_4_3'
+  | 'portrait_16_9'
+  | 'landscape_4_3'
+  | 'landscape_16_9';
 
 export interface UseCharacterGenerationProps {
   selectedCharacters: string[];
@@ -47,7 +53,9 @@ export function useCharacterGeneration({
     mutationFn: async (prompt: string) => {
       // Check if we have selected characters to edit into the scene
       if (selectedCharacters.length > 0 && charactersData?.characters) {
-        const selectedChars = charactersData.characters.filter((c: any) => selectedCharacters.includes(c.id));
+        const selectedChars = charactersData.characters.filter((c: any) =>
+          selectedCharacters.includes(c.id)
+        );
 
         if (selectedChars.length > 0) {
           // Process all selected character images
@@ -62,7 +70,10 @@ export function useCharacterGeneration({
             .map((char: any) => char.image_url);
 
           console.log('🎭 === CHARACTER SCENE EDITING WITH NANO BANANA ===');
-          console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
+          console.log(
+            'Selected characters:',
+            selectedChars.map((c: any) => c.character_name)
+          );
           console.log('Number of characters:', selectedChars.length);
           console.log('Image URLs:', processedImageUrls);
           console.log('Scene prompt:', editPrompt);
@@ -97,11 +108,14 @@ export function useCharacterGeneration({
             console.error('❌ NANO BANANA EDIT FAILED:', imageToImageError);
             console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
 
-            const errorMessage = imageToImageError instanceof Error
-              ? imageToImageError.message
-              : 'Nano Banana edit failed';
+            const errorMessage =
+              imageToImageError instanceof Error
+                ? imageToImageError.message
+                : 'Nano Banana edit failed';
 
-            throw new Error(`Frame generation failed: ${errorMessage}. Please check character images and try again.`);
+            throw new Error(
+              `Frame generation failed: ${errorMessage}. Please check character images and try again.`
+            );
           }
         }
       }
@@ -114,7 +128,7 @@ export function useCharacterGeneration({
           prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
           model: 'fal-ai/nano-banana',
           imageSize: imageFormat,
-          numImages: 1
+          numImages: 1,
         });
 
         if (result.status !== 'completed' || !result.imageUrl) {
@@ -140,40 +154,42 @@ export function useCharacterGeneration({
         setStatusMessage({
           type: 'success',
           title: 'Image Generated Successfully!',
-          description: 'Your scene image has been generated. Now you can create a video animation from it.',
+          description:
+            'Your scene image has been generated. Now you can create a video animation from it.',
         });
       }
     },
     onError: (error) => {
-      console.error("Error generating image:", error);
-      console.error("Error details:", {
+      console.error('Error generating image:', error);
+      console.error('Error details:', {
         message: error.message,
         stack: error.stack,
         selectedCharacters,
-        charactersData: charactersData?.characters?.length
+        charactersData: charactersData?.characters?.length,
       });
 
-      let errorTitle = "Image Generation Failed";
-      let errorMessage = "Failed to generate image. ";
+      let errorTitle = 'Image Generation Failed';
+      let errorMessage = 'Failed to generate image. ';
       if (selectedCharacters.length > 0) {
-        errorMessage += "Character image editing failed. ";
+        errorMessage += 'Character image editing failed. ';
       }
-      errorMessage += "Please try again.";
+      errorMessage += 'Please try again.';
 
       if (error.message?.includes('FAL_KEY')) {
-        errorTitle = "API Configuration Error";
-        errorMessage = "FAL API key is missing. Please configure FAL_KEY in environment variables.";
+        errorTitle = 'API Configuration Error';
+        errorMessage = 'FAL API key is missing. Please configure FAL_KEY in environment variables.';
       } else if (error.message?.includes('nano-banana')) {
-        errorTitle = "Nano Banana API Error";
-        errorMessage = "The Nano Banana image generation service encountered an error. Please try again.";
+        errorTitle = 'Nano Banana API Error';
+        errorMessage =
+          'The Nano Banana image generation service encountered an error. Please try again.';
       }
 
       setStatusMessage({
         type: 'error',
         title: errorTitle,
-        description: errorMessage
+        description: errorMessage,
       });
-    }
+    },
   });
 
   // Handle image generation for the event
@@ -186,7 +202,7 @@ export function useCharacterGeneration({
       // Use the video description as the image prompt
       await generateImageMutation.mutateAsync(videoDescription);
     } catch (error) {
-      console.error("Error:", error);
+      console.error('Error:', error);
     } finally {
       setIsGeneratingImage(false);
     }
@@ -201,9 +217,9 @@ export function useCharacterGeneration({
 
     try {
       // Get selected character data
-      const selectedChars = charactersData?.characters?.filter((c: any) =>
-        selectedImageCharacters.includes(c.id)
-      ) || [];
+      const selectedChars =
+        charactersData?.characters?.filter((c: any) => selectedImageCharacters.includes(c.id)) ||
+        [];
 
       if (selectedChars.length === 0) {
         setStatusMessage({
@@ -240,7 +256,7 @@ export function useCharacterGeneration({
         selectedImageCharacters,
         characterNames,
         characterImageUrls,
-        prompt: videoDescription
+        prompt: videoDescription,
       });
 
       // Call nano-banana edit directly with the character images
@@ -270,12 +286,22 @@ export function useCharacterGeneration({
       setStatusMessage({
         type: 'error',
         title: 'Frame Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to generate character frame. Please try again.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to generate character frame. Please try again.',
       });
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [videoDescription, selectedImageCharacters, charactersData, imageFormat, setGeneratedImageUrl, setStatusMessage]);
+  }, [
+    videoDescription,
+    selectedImageCharacters,
+    charactersData,
+    imageFormat,
+    setGeneratedImageUrl,
+    setStatusMessage,
+  ]);
 
   return {
     isGeneratingImage,

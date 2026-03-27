@@ -1,9 +1,9 @@
-import type { AppRouter } from "../../../server/dist/src/routers";
-import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
-import { toast } from "sonner";
-import { auth } from "../lib/firebase";
+import type { AppRouter } from '../../../server/src/routers';
+import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import { toast } from 'sonner';
+import { auth } from '../lib/firebase';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +30,7 @@ export const queryClient = new QueryClient({
     onError: (error) => {
       toast.error(error.message, {
         action: {
-          label: "retry",
+          label: 'retry',
           onClick: () => {
             queryClient.invalidateQueries();
           },
@@ -45,8 +45,12 @@ export const trpcClient = createTRPCClient<AppRouter>({
     httpBatchLink({
       url: `${import.meta.env.VITE_SERVER_URL}/trpc`,
       async headers() {
-        const token = await auth.currentUser?.getIdToken();
-        return token ? { Authorization: `Bearer ${token}` } : {};
+        try {
+          const token = await auth.currentUser?.getIdToken(true);
+          return token ? { Authorization: `Bearer ${token}` } : {};
+        } catch {
+          return {};
+        }
       },
     }),
   ],

@@ -65,6 +65,7 @@ The wikia feature is integrated into the event detail page with:
 Add your OpenAI API key to the server environment:
 
 **`apps/server/.env`**:
+
 ```bash
 OPENAI_API_KEY=your-openai-api-key-here
 ```
@@ -110,15 +111,11 @@ import { trpcClient } from '@/utils/trpc';
 
 const wikiaEntry = await trpcClient.wiki.generateEventWikia.mutate({
   nodeId: 1,
-  title: "The Neon Awakening",
-  description: "Our heroes discover the truth behind the corporate conspiracy",
-  videoUrl: "https://example.com/video.mp4",
-  previousNodes: [
-    { title: "Previous Event", plot: "What happened before..." }
-  ],
-  nextNodes: [
-    { title: "Next Event", plot: "What happens next..." }
-  ]
+  title: 'The Neon Awakening',
+  description: 'Our heroes discover the truth behind the corporate conspiracy',
+  videoUrl: 'https://example.com/video.mp4',
+  previousNodes: [{ title: 'Previous Event', plot: 'What happened before...' }],
+  nextNodes: [{ title: 'Next Event', plot: 'What happens next...' }],
 });
 
 console.log(wikiaEntry.plot); // Detailed narrative
@@ -130,6 +127,7 @@ console.log(wikiaEntry.themes); // ["conspiracy", "discovery", "truth"]
 ### Contextual Generation
 
 The wikia service considers:
+
 - The event's description and title
 - Previous events (for narrative continuity)
 - Next events (for foreshadowing)
@@ -142,6 +140,7 @@ If OpenAI fails or is unavailable, the service returns a basic wikia entry using
 ### Customization
 
 You can modify the prompts in `wikia.ts` to:
+
 - Change the tone (e.g., more dramatic, technical, humorous)
 - Adjust length (shorter summaries, longer plots)
 - Focus on specific aspects (character development, world-building)
@@ -158,6 +157,7 @@ Format responses as structured wikia articles with clear sections.`;
 ## Model Configuration
 
 Current settings:
+
 - **Model**: `gpt-4o-mini` (fast and cost-effective)
 - **Temperature**: 0.8 (creative but consistent)
 - **Max Tokens**: 2000 (allows detailed responses)
@@ -167,7 +167,7 @@ To use a more powerful model:
 
 ```typescript
 const response = await openai.chat.completions.create({
-  model: 'gpt-4o',  // Change to gpt-4o for better quality
+  model: 'gpt-4o', // Change to gpt-4o for better quality
   // ... rest of config
 });
 ```
@@ -175,11 +175,13 @@ const response = await openai.chat.completions.create({
 ## Cost Considerations
 
 With `gpt-4o-mini`:
+
 - ~$0.15 per 1M input tokens
 - ~$0.60 per 1M output tokens
 - Typical wikia generation: ~$0.001-0.003 per entry
 
 For production, consider:
+
 - Caching generated wikias in database
 - Rate limiting generation requests
 - Using webhooks for background processing
@@ -187,6 +189,7 @@ For production, consider:
 ## Future Enhancements
 
 Potential improvements:
+
 1. **Database Storage**: Save generated wikias to avoid regeneration
 2. **Version History**: Track wikia edits and versions
 3. **User Editing**: Allow manual wikia editing with AI suggestions
@@ -207,6 +210,7 @@ Potential improvements:
 ### "No content returned from OpenAI"
 
 This usually means:
+
 - The response was empty (rare)
 - The API request timed out
 - The model refused the request (content policy violation)
@@ -216,6 +220,7 @@ Check the server logs for the full error.
 ### Slow Generation
 
 If wikia generation is slow:
+
 - Switch to `gpt-4o-mini` (already default)
 - Reduce `max_tokens` to 1000 for shorter content
 - Consider background processing with webhooks

@@ -7,9 +7,9 @@
 
 export interface TreeLayoutConfig {
   horizontalSpacing: number; // Space between depth levels (columns)
-  verticalSpacing: number;   // Base space between sibling branches
-  startX: number;            // Starting X position
-  startY: number;            // Starting Y position
+  verticalSpacing: number; // Base space between sibling branches
+  startX: number; // Starting X position
+  startY: number; // Starting Y position
 }
 
 export interface TreeLayoutResult {
@@ -61,9 +61,8 @@ export function calculateTreeLayout(
   nodeIds.forEach((nodeIdStr, index) => {
     const nodeId = normalizeNodeId(nodeIdStr);
     const previousNode = previousNodes[index] || '';
-    const parentId = (previousNode && String(previousNode) !== '0')
-      ? normalizeNodeId(previousNode)
-      : 0;
+    const parentId =
+      previousNode && String(previousNode) !== '0' ? normalizeNodeId(previousNode) : 0;
 
     // Add to parent's children list
     if (!nodesByParent.has(parentId)) {
@@ -119,9 +118,8 @@ export function calculateTreeLayout(
   nodeIds.forEach((nodeIdStr, index) => {
     const nodeId = normalizeNodeId(nodeIdStr);
     const previousNode = previousNodes[index] || '';
-    const parentId = (previousNode && String(previousNode) !== '0')
-      ? normalizeNodeId(previousNode)
-      : 0;
+    const parentId =
+      previousNode && String(previousNode) !== '0' ? normalizeNodeId(previousNode) : 0;
 
     const depth = nodeDepths.get(nodeId) || 0;
     let x: number, y: number;
@@ -135,7 +133,7 @@ export function calculateTreeLayout(
       const siblingIndex = siblings.indexOf(nodeId);
 
       // X position based on depth (creates vertical columns)
-      x = startX + (depth * horizontalSpacing);
+      x = startX + depth * horizontalSpacing;
 
       // Y position based on sibling index and subtree heights
       if (siblingIndex === 0) {

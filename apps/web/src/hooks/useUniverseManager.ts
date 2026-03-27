@@ -14,7 +14,7 @@ export function useUniverseManager() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const contractAddress = UniverseManager[sepolia.id as keyof typeof UniverseManager];
+  const contractAddress = UniverseManager[String(sepolia.id) as keyof typeof UniverseManager];
 
   /**
    * Step 1: Create a new Universe contract

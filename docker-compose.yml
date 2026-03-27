@@ -10,7 +10,7 @@ services:
     environment:
       - NODE_ENV=production
     ports:
-      - "3000:3000"
+      - '3000:3000'
     restart: unless-stopped
     networks:
       - loar-network
@@ -22,7 +22,7 @@ services:
       target: production
     container_name: loar-web
     ports:
-      - "3001:3001"
+      - '3001:3001'
     restart: unless-stopped
     networks:
       - loar-network
@@ -37,7 +37,7 @@ services:
     environment:
       - NODE_ENV=production
     ports:
-      - "42069:42069"
+      - '42069:42069'
     restart: unless-stopped
     networks:
       - loar-network
