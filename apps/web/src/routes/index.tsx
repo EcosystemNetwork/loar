@@ -46,6 +46,156 @@ export const Route = createFileRoute('/')({
 });
 
 /* ──────────────────────────────────────────
+ * Curated placeholder universes
+ * Shown when indexer has no data yet
+ * ────────────────────────────────────────── */
+const PLACEHOLDER_UNIVERSES = [
+  {
+    id: 'placeholder-neon-genesis',
+    name: 'Neon Genesis',
+    description:
+      "In a rain-soaked megacity, rogue AI awakens inside a dead hacker's neural implant. A street medic must decide: destroy it or let it rewrite humanity.",
+    imageURL: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&h=600&fit=crop',
+    nodeCount: 24,
+    tokenData: { symbol: 'NEON', name: 'Neon Genesis Token', imageURL: '', metadata: '' },
+    swapVolume: 4.2e18,
+    holderCount: 312,
+    _genre: 'Cyberpunk',
+  },
+  {
+    id: 'placeholder-wyrdwood',
+    name: 'The Wyrdwood Chronicles',
+    description:
+      'An ancient forest is waking up — and it remembers everything. Follow three bloodlines bound by a pact older than language itself.',
+    imageURL: 'https://images.unsplash.com/photo-1518562180175-34a163b1a9a6?w=800&h=600&fit=crop',
+    nodeCount: 18,
+    tokenData: { symbol: 'WYRD', name: 'Wyrdwood Token', imageURL: '', metadata: '' },
+    swapVolume: 1.8e18,
+    holderCount: 187,
+    _genre: 'Dark Fantasy',
+  },
+  {
+    id: 'placeholder-orbit',
+    name: 'Orbit Zero',
+    description:
+      'The last colony ship has 40 days of oxygen. The captain is hiding something. The AI navigator just locked everyone out of the bridge.',
+    imageURL: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&h=600&fit=crop',
+    nodeCount: 31,
+    tokenData: { symbol: 'ORBT', name: 'Orbit Zero Token', imageURL: '', metadata: '' },
+    swapVolume: 6.1e18,
+    holderCount: 524,
+    _genre: 'Sci-Fi Thriller',
+  },
+  {
+    id: 'placeholder-jade-empire',
+    name: 'Jade Empire: Shattered Dynasties',
+    description:
+      "Warring kingdoms. Forbidden martial arts. A peasant girl discovers she's the reincarnation of the empire's most feared warlord.",
+    imageURL: 'https://images.unsplash.com/photo-1535930749574-1399327ce78f?w=800&h=600&fit=crop',
+    nodeCount: 42,
+    tokenData: { symbol: 'JADE', name: 'Jade Empire Token', imageURL: '', metadata: '' },
+    swapVolume: 8.3e18,
+    holderCount: 891,
+    _genre: 'Wuxia',
+  },
+  {
+    id: 'placeholder-bloom',
+    name: 'BLOOM',
+    description:
+      'A solarpunk utopia where flowers are currency, memories are compostable, and the biggest crime is forgetting to dream.',
+    imageURL: 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=800&h=600&fit=crop',
+    nodeCount: 15,
+    tokenData: { symbol: 'BLOOM', name: 'Bloom Token', imageURL: '', metadata: '' },
+    swapVolume: 2.5e18,
+    holderCount: 203,
+    _genre: 'Solarpunk',
+  },
+  {
+    id: 'placeholder-void-divers',
+    name: 'Void Divers',
+    description:
+      "Deep-sea explorers discover a trench that doesn't appear on any map. At the bottom, something is broadcasting coordinates to a star that went dark 10,000 years ago.",
+    imageURL: 'https://images.unsplash.com/photo-1551244072-5d12893278ab?w=800&h=600&fit=crop',
+    nodeCount: 27,
+    tokenData: { symbol: 'VOID', name: 'Void Divers Token', imageURL: '', metadata: '' },
+    swapVolume: 3.7e18,
+    holderCount: 445,
+    _genre: 'Cosmic Horror',
+  },
+  {
+    id: 'placeholder-ferro',
+    name: 'Ferro City Blues',
+    description:
+      'Jazz clubs, flying cars, and a private detective who can taste lies. Noir reimagined in a retro-future where the mob runs the weather.',
+    imageURL: 'https://images.unsplash.com/photo-1514539079130-25950c84af65?w=800&h=600&fit=crop',
+    nodeCount: 20,
+    tokenData: { symbol: 'FERRO', name: 'Ferro Token', imageURL: '', metadata: '' },
+    swapVolume: 1.2e18,
+    holderCount: 156,
+    _genre: 'Neo-Noir',
+  },
+  {
+    id: 'placeholder-mythic',
+    name: 'Mythic Protocol',
+    description:
+      "Gods are real — they're just running out of believers. A mythology professor accidentally becomes the host for a dying trickster god.",
+    imageURL: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&h=600&fit=crop',
+    nodeCount: 36,
+    tokenData: { symbol: 'MYTH', name: 'Mythic Token', imageURL: '', metadata: '' },
+    swapVolume: 5.5e18,
+    holderCount: 678,
+    _genre: 'Urban Fantasy',
+  },
+  {
+    id: 'placeholder-signal',
+    name: 'The Last Signal',
+    description:
+      'A radio astronomer receives a message from a civilization that died a million years ago. The message is a warning. The warning is about us.',
+    imageURL: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&h=600&fit=crop',
+    nodeCount: 12,
+    swapVolume: 0,
+    holderCount: 89,
+    _genre: 'Hard Sci-Fi',
+  },
+  {
+    id: 'placeholder-kindling',
+    name: 'Kindling',
+    description:
+      'After the collapse, a group of teenagers discover that campfire stories can literally reshape reality. But every story demands a sacrifice.',
+    imageURL: 'https://images.unsplash.com/photo-1475274047050-1d0c55b7b10c?w=800&h=600&fit=crop',
+    nodeCount: 22,
+    tokenData: { symbol: 'KNDL', name: 'Kindling Token', imageURL: '', metadata: '' },
+    swapVolume: 2.9e18,
+    holderCount: 334,
+    _genre: 'Post-Apocalyptic',
+  },
+  {
+    id: 'placeholder-atlas',
+    name: 'Atlas Unchained',
+    description:
+      'A world where maps are alive and borders fight back. Cartographers are the most dangerous people alive — and someone just drew a new continent.',
+    imageURL: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&h=600&fit=crop',
+    nodeCount: 19,
+    tokenData: { symbol: 'ATLS', name: 'Atlas Token', imageURL: '', metadata: '' },
+    swapVolume: 1.6e18,
+    holderCount: 211,
+    _genre: 'Adventure',
+  },
+  {
+    id: 'placeholder-echo',
+    name: 'Echo Chamber',
+    description:
+      'In a society where thoughts are public, one woman discovers she can think in silence. The government calls it a disease. The underground calls it a weapon.',
+    imageURL: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&h=600&fit=crop',
+    nodeCount: 28,
+    tokenData: { symbol: 'ECHO', name: 'Echo Token', imageURL: '', metadata: '' },
+    swapVolume: 4.8e18,
+    holderCount: 567,
+    _genre: 'Dystopian',
+  },
+];
+
+/* ──────────────────────────────────────────
  * Utility: horizontal scroll row with arrows
  * ────────────────────────────────────────── */
 function ScrollRow({
@@ -141,9 +291,7 @@ function SectionHeader({
         <Icon className="h-6 w-6 text-primary" />
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-white">{title}</h2>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -293,9 +441,7 @@ function HeroBillboard({ universes }: { universes: any[] }) {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
   const featured = useMemo(() => {
-    let picks = universes
-      .filter((u) => u.tokenData || u.nodeCount > 0)
-      .slice(0, 5);
+    let picks = universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 5);
     if (picks.length === 0) picks = universes.slice(0, 5);
     return picks;
   }, [universes]);
@@ -321,9 +467,7 @@ function HeroBillboard({ universes }: { universes: any[] }) {
     return (
       <div className="relative h-[70vh] min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
         <div className="text-center px-4">
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight">
-            LOAR
-          </h1>
+          <h1 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight">LOAR</h1>
           <p className="text-xl text-white/70 mb-8 max-w-lg mx-auto">
             Create, own, and trade narrative universes on-chain
           </p>
@@ -358,7 +502,8 @@ function HeroBillboard({ universes }: { universes: any[] }) {
               alt=""
               className="w-full h-full object-cover scale-105"
               style={{
-                animation: i === currentIndex ? 'kenburns 12s ease-in-out infinite alternate' : 'none',
+                animation:
+                  i === currentIndex ? 'kenburns 12s ease-in-out infinite alternate' : 'none',
               }}
             />
           ) : (
@@ -445,9 +590,7 @@ function HeroBillboard({ universes }: { universes: any[] }) {
               key={i}
               onClick={() => goTo(i)}
               className={`h-1 rounded-full transition-all duration-500 ${
-                i === currentIndex
-                  ? 'bg-white w-8'
-                  : 'bg-white/30 w-4 hover:bg-white/60'
+                i === currentIndex ? 'bg-white w-8' : 'bg-white/30 w-4 hover:bg-white/60'
               }`}
             />
           ))}
@@ -497,7 +640,13 @@ function ActivityTicker() {
   });
 
   const activities = useMemo(() => {
-    if (!nodesData || !nodeContentData || !universesData) return [];
+    if (!nodesData || !nodeContentData || !universesData) {
+      // Placeholder activity when indexer is offline
+      return PLACEHOLDER_UNIVERSES.slice(0, 8).flatMap((u) => [
+        { id: `${u.id}-ep`, universeName: u.name, action: 'New Episode', universeId: u.id },
+        { id: `${u.id}-vote`, universeName: u.name, action: 'Governance Vote', universeId: u.id },
+      ]);
+    }
 
     const contentMap = new Map<string, NodeContent>();
     nodeContentData.forEach((c) => contentMap.set(c.id, c));
@@ -580,7 +729,30 @@ function RecentEpisodes({ universes }: { universes: any[] }) {
   });
 
   const episodes = useMemo(() => {
-    if (!nodesData || !nodeContentData) return [];
+    if (!nodesData || !nodeContentData) {
+      // Placeholder episodes when indexer is offline
+      const placeholderPlots = [
+        'The neural implant begins broadcasting fragmented memories across the city grid.',
+        'Deep in the Wyrdwood, the eldest tree speaks for the first time in a thousand years.',
+        'Oxygen reserves drop to 38 days. The navigator AI proposes an impossible detour.',
+        'A forbidden technique resurfaces — the Jade Fist, lost since the dynasty fell.',
+        'The bloom market crashes overnight. Someone is hoarding dreams.',
+        "At 11,000 meters depth, the sonar returns a shape that shouldn't exist.",
+        'A witness disappears from a locked room. The detective tastes copper — someone is lying.',
+        'The trickster god makes a bet: one week in a mortal body, no powers.',
+      ];
+      return PLACEHOLDER_UNIVERSES.slice(0, 8).map((u, i) => ({
+        id: `placeholder-ep-${u.id}`,
+        videoLink: null,
+        plot: placeholderPlots[i],
+        universeName: u.name,
+        universeImage: u.imageURL,
+        universeId: u.id,
+        nodeId: String(i + 1),
+        timestamp: Date.now() - i * 3600000,
+      }));
+    }
+
     const contentMap = new Map<string, NodeContent>();
     nodeContentData.forEach((c) => contentMap.set(c.id, c));
 
@@ -611,11 +783,7 @@ function RecentEpisodes({ universes }: { universes: any[] }) {
 
   return (
     <section className="py-6">
-      <SectionHeader
-        icon={Clock}
-        title="New Episodes"
-        subtitle="Latest story updates"
-      />
+      <SectionHeader icon={Clock} title="New Episodes" subtitle="Latest story updates" />
       <ScrollRow>
         {episodes.map((ep: any) => (
           <Link
@@ -690,8 +858,10 @@ function Top10Strip({ universes }: { universes: any[] }) {
   const sorted = useMemo(() => {
     return [...universes]
       .sort((a, b) => {
-        const aScore = (a.nodeCount || 0) * 100 + (a.tokenData ? 50 : 0) + (a.swapVolume || 0) / 1e18;
-        const bScore = (b.nodeCount || 0) * 100 + (b.tokenData ? 50 : 0) + (b.swapVolume || 0) / 1e18;
+        const aScore =
+          (a.nodeCount || 0) * 100 + (a.tokenData ? 50 : 0) + (a.swapVolume || 0) / 1e18;
+        const bScore =
+          (b.nodeCount || 0) * 100 + (b.tokenData ? 50 : 0) + (b.swapVolume || 0) / 1e18;
         return bScore - aScore;
       })
       .slice(0, 10)
@@ -702,11 +872,7 @@ function Top10Strip({ universes }: { universes: any[] }) {
 
   return (
     <section className="py-6">
-      <SectionHeader
-        icon={Flame}
-        title="Top 10 Universes"
-        subtitle="Most active this week"
-      />
+      <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
       <ScrollRow>
         {sorted.map((u) => (
           <div key={u.id} className="flex-shrink-0 flex items-end gap-0">
@@ -772,11 +938,7 @@ function TrendingRow({ universes }: { universes: any[] }) {
 
   return (
     <section className="py-6">
-      <SectionHeader
-        icon={TrendingUp}
-        title="Trending Now"
-        subtitle="Buzzing with activity"
-      />
+      <SectionHeader icon={TrendingUp} title="Trending Now" subtitle="Buzzing with activity" />
       <ScrollRow>
         {trending.map((u) => (
           <WideCard key={u.id} universe={u} />
@@ -824,11 +986,7 @@ function MostEpisodesRow({ universes }: { universes: any[] }) {
 
   return (
     <section className="py-6">
-      <SectionHeader
-        icon={Tv}
-        title="Binge-Worthy"
-        subtitle="Universes with the most episodes"
-      />
+      <SectionHeader icon={Tv} title="Binge-Worthy" subtitle="Universes with the most episodes" />
       <ScrollRow>
         {byEpisodes.map((u) => (
           <UniverseCard key={u.id} universe={u} />
@@ -850,9 +1008,7 @@ function CreateBanner() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(var(--primary),0.15),transparent_70%)]" />
         <div className="relative px-8 py-12 md:py-16 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">
-              Start Your Universe
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">Start Your Universe</h2>
             <p className="text-white/60 text-lg max-w-md">
               Create AI-powered narrative worlds. Launch tokens. Build community.
             </p>
@@ -936,7 +1092,10 @@ function SearchOverlay({
               autoFocus
               className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-base placeholder:text-muted-foreground/50"
             />
-            <button onClick={onClose} className="text-muted-foreground hover:text-white transition-colors">
+            <button
+              onClick={onClose}
+              className="text-muted-foreground hover:text-white transition-colors"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -1095,7 +1254,7 @@ function HomeComponent() {
 
   // ─── Combine data ───
   const universes = useMemo(() => {
-    if (!universesData) return [];
+    if (!universesData) return PLACEHOLDER_UNIVERSES;
 
     const tokenMap = new Map<string, Token>();
     if (tokensData) {
@@ -1122,13 +1281,16 @@ function HomeComponent() {
       });
     }
 
-    return universesData.map((u) => {
+    const combined = universesData.map((u) => {
       const tokenData = tokenMap.get(u.id.toLowerCase());
       const poolId = tokenData?.poolId;
       const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
       const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
       return { ...u, tokenData, swapVolume, holderCount };
     });
+
+    // Fall back to curated placeholders when indexer has no data
+    return combined.length > 0 ? combined : PLACEHOLDER_UNIVERSES;
   }, [universesData, tokensData, swapsData, holdersData]);
 
   return (
@@ -1163,11 +1325,7 @@ function HomeComponent() {
         </kbd>
       </button>
 
-      <SearchOverlay
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        universes={universes}
-      />
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} universes={universes} />
 
       {/* Hero */}
       <HeroBillboard universes={universes} />
