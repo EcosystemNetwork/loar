@@ -1,96 +1,96 @@
 # LOAR — Product Roadmap
 
-## Phase 1: Foundation (Complete)
+## Current State (March 2026)
 
-Everything needed for the core creator loop.
-
-- [x] Monorepo setup (Turbo, pnpm, TypeScript)
-- [x] Smart contracts: UniverseManager, Universe, GovernanceERC20, Governor
-- [x] Ponder indexer: universes, tokens, nodes, swaps, proposals, votes
-- [x] tRPC server: 12 routers, 60+ procedures
-- [x] Web app: 15 routes, TanStack Router
-- [x] Wallet auth: SIWE → JWT sessions
-- [x] AI generation: FAL (video + image), Gemini (wiki + storylines)
-- [x] Decentralized storage: Walrus, IPFS, Filecoin, Firebase with dedup
-- [x] Narrative timeline editor (ReactFlow)
-- [x] On-chain node creation + canonization
-
-## Phase 2: Monetization Stack (Complete)
-
-Revenue rails for creators and the platform.
-
-- [x] Credit system with generation cost model
-- [x] Episode + Character NFT minting
-- [x] Creator subscription tiers (4 levels, feature gating)
-- [x] Canon marketplace (submit, vote, license)
-- [x] Cross-universe collaborations with revenue sharing
-- [x] IP licensing (6 types, royalty tracking)
-- [x] Programmatic ad marketplace (bid, accept, impressions)
-- [x] Uniswap v4 token pools + fee hooks + LP locking
-- [x] Analytics: views, engagement, trending, platform stats
-
-## Phase 3: Product Polish (Current)
-
-Make the platform pitch-ready and onboarding-smooth.
-
-- [x] Landing page redesign (Netflix × Webtoons aesthetic)
-- [x] Creator profiles with customizable themes
-- [x] Content discovery with classification filters
-- [x] IP/copyright enforcement in upload flow
-- [x] Product documentation (MVP, roadmap, creator journey, IP policy)
-- [ ] Dashboard — replace placeholder data with live universe data
-- [ ] Bundle optimization — code split MetaMask SDK, viem/wagmi
-- [ ] Install `@coinbase/cdp-react` for embedded wallet support
-- [ ] Error states and loading UX across all routes
-- [ ] Mobile-responsive layouts for all pages
-
-## Phase 4: Growth & Retention
-
-Features that drive recurring usage and network effects.
-
-- [ ] Social layer — follows, comments, activity feed
-- [ ] Notification system — governance events, new episodes, mints
-- [ ] Creator analytics dashboard — per-universe P&L, subscriber funnels, retention curves
-- [ ] Recommendation engine — personalized universe suggestions
-- [ ] Onboarding tutorial — guided first-universe creation
-- [ ] Referral system — credits for bringing new creators
-- [ ] Leaderboards — top universes, most active creators
-
-## Phase 5: Scale & Compliance
-
-Prepare for mainnet and real-money flows.
-
-- [ ] Smart contract audit
-- [ ] Mainnet deployment (Ethereum L1 or L2)
-- [ ] Fiat on-ramp — credit card → credits/subscriptions
-- [ ] KYC/AML for high-value transactions
-- [ ] Content moderation tools — review queue, flagging, appeals
-- [ ] DMCA takedown process
-- [ ] Multi-chain support (Base, Arbitrum, Polygon)
-- [ ] Rate limiting and abuse prevention
-
-## Phase 6: Platform Expansion
-
-New surfaces and formats.
-
-- [ ] Mobile app (React Native or native)
-- [ ] Merch fulfillment integration (print-on-demand partner)
-- [ ] Live events — premiere screenings, community votes
-- [ ] API for third-party apps (read universe data, embed episodes)
-- [ ] Creator SDK — programmatic universe management
-- [ ] Franchise tools — universe templates, story frameworks
-- [ ] Cross-platform syndication — YouTube, TikTok, Webtoon exports
+The platform has strong infrastructure — smart contracts deployed, backend fully implemented, AI generation working, timeline editor functional. The critical gap is **closing the monetization loop on the frontend** and **proving the product works for one external creator**.
 
 ---
 
-## Key Milestones
+## Milestone 1: Revenue Loop Closed (Target: 2-3 weeks)
 
-| Milestone                       | Phase | Signal                              |
-| ------------------------------- | ----- | ----------------------------------- |
-| First external universe created | 3     | Product works for non-team creators |
-| 10 monetized universes          | 4     | Revenue model validated             |
-| First fiat payment              | 5     | Non-crypto users can participate    |
-| 100 DAU                         | 4     | Retention loop working              |
-| Smart contract audit complete   | 5     | Ready for mainnet                   |
-| Mainnet launch                  | 5     | Real economic activity              |
-| 1,000 universes                 | 6     | Platform-scale network effects      |
+**Goal:** One creator can earn real (testnet) revenue from one fan transaction.
+
+**Why this matters:** Every investor will ask "can I see someone buy something?" Right now the answer is no, despite the backend being ready.
+
+### Deliverables
+
+- [ ] **Wire NFT Minting** — Add mint/buy buttons in Episode NFT and Character NFT marketplace tabs, connected to smart contracts via wagmi
+- [ ] **Wire Credit Purchases** — Credits tab purchase flow connected to `credits.purchase` tRPC mutation
+- [ ] **Wire Canon Voting** — Submission form + token-weighted voting UI in Canon marketplace tab
+- [ ] **Fix Dashboard** — Replace dummy data with real `cinematicUniverses.getByCreator()` data
+- [ ] **Basic Governance Voting** — Complete GovernanceSidebar with proposal creation and vote casting
+- [ ] **Wire Subscriptions** — Subscribe button connected to `subscriptions.subscribe()` mutation
+- [ ] **End-to-End Smoke Test** — One full creator journey: wallet > universe > content > list NFT > fan mints
+
+### Success Signal
+
+A non-team wallet can: create a universe, generate AI content, list an episode NFT, and another wallet can mint it.
+
+---
+
+## Milestone 2: Demo-Ready Product (Target: 4-6 weeks after M1)
+
+**Goal:** The platform can sustain a 30-minute investor demo or a 50-person creator beta without embarrassment.
+
+### Deliverables
+
+- [ ] **Loading & Error States** — Skeleton loaders, error boundaries, retry logic on all routes
+- [ ] **Per-Universe Analytics Dashboard** — Visualize views, mints, subscribers, revenue per universe
+- [ ] **Collab + Ad + Licensing UI** — Wire remaining marketplace tabs to backend mutations
+- [ ] **Mobile-Responsive Layouts** — Market page, timeline editor, profiles work on mobile
+- [ ] **Onboarding Flow** — Guided first-universe creation with tooltips
+- [ ] **Swap UI for Universe Tokens** — Embed Uniswap widget or build simple swap interface
+- [ ] **Creator Earnings Page** — Show consolidated revenue across all streams
+- [ ] **Bundle Optimization** — Code-split MetaMask SDK (~558KB) and viem/wagmi (~1.8MB)
+- [ ] **Rate Limiting Tuning** — Validate 100 concurrent users without degradation
+
+### Success Signal
+
+50 beta creators can use the platform independently. Average session > 10 minutes. At least 3 monetization paths see real transactions.
+
+---
+
+## Milestone 3: Mainnet-Ready (Target: 3-4 months after M2)
+
+**Goal:** Real money can flow through the platform safely.
+
+### Deliverables
+
+- [ ] **Smart Contract Audit** — Third-party audit of all deployed contracts
+- [ ] **Fiat On-Ramp** — Stripe or MoonPay integration for credit/subscription purchases
+- [ ] **Content Moderation** — Review queue, flagging, DMCA takedown process
+- [ ] **KYC/AML** — For high-value transactions (licensing, large NFT sales)
+- [ ] **Social Layer** — Follows, comments, activity feed, notifications
+- [ ] **Mainnet Deployment** — Ethereum L2 (Base or Arbitrum) for lower gas costs
+- [ ] **Creator SDK / API** — Third-party apps can read universe data, embed episodes
+- [ ] **Recommendation Engine** — Personalized universe suggestions
+
+### Success Signal
+
+First fiat payment processed. 100+ DAU. Platform passes security audit. One licensing deal signed.
+
+---
+
+## What We're NOT Building (And Why)
+
+| Feature                        | Why Not                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| **Mobile App**                 | Web-first validates faster. Mobile is a growth investment, not a validation tool |
+| **Multi-Chain**                | Complexity without validation signal. One chain is enough to prove the model     |
+| **AI Model Training**          | We use third-party models (FAL, Gemini, OpenAI). Training our own is a $10M+ bet |
+| **Physical Merch Fulfillment** | Requires logistics infrastructure. Partner with print-on-demand later            |
+| **Live Events / Premieres**    | Cool feature, zero validation signal at this stage                               |
+| **Cross-Platform Syndication** | YouTube/TikTok export is a growth play, not a core loop                          |
+
+---
+
+## Key Milestones Timeline
+
+| Milestone                     | Target | Signal                           |
+| ----------------------------- | ------ | -------------------------------- |
+| First external NFT mint       | M1     | Revenue loop works               |
+| 10 external creators          | M2     | Product works beyond team        |
+| 50 DAU on testnet             | M2     | Retention loop working           |
+| Smart contract audit complete | M3     | Ready for real money             |
+| First fiat payment            | M3     | Non-crypto users can participate |
+| Mainnet launch                | M3     | Real economic activity           |

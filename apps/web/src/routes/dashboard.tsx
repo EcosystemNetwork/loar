@@ -32,69 +32,20 @@ function RouteComponent() {
     }
   }, [isConnected, isAuthenticating, navigate]);
 
-  // Dummy data for testing
-  const dummyUniverses = [
-    {
-      id: 'cyberpunk-2077',
-      name: 'Cyberpunk 2077',
-      description: 'A dystopian future where technology and humanity collide in Night City',
-      createdAt: '2024-01-15',
-      creator: '0x1234...5678',
-      address: '0xabcd...ef01',
-    },
-    {
-      id: 'space-odyssey',
-      name: 'Space Odyssey',
-      description: 'An epic journey through the cosmos exploring alien civilizations',
-      createdAt: '2024-02-10',
-      creator: '0x2345...6789',
-      address: '0xbcde...f012',
-    },
-    {
-      id: 'medieval-kingdoms',
-      name: 'Medieval Kingdoms',
-      description: 'Knights, dragons, and magic in a fantasy realm of endless adventures',
-      createdAt: '2024-03-05',
-      creator: '0x3456...789a',
-      address: '0xcdef...0123',
-    },
-    {
-      id: 'detective-noir',
-      name: 'Detective Noir',
-      description: 'Dark mysteries in 1940s Los Angeles with corruption and crime',
-      createdAt: '2024-01-20',
-      creator: '0x4567...89ab',
-      address: '0xdef0...1234',
-    },
-    {
-      id: 'zombie-apocalypse',
-      name: 'Zombie Apocalypse',
-      description: 'Survival horror in a world overrun by the undead',
-      createdAt: '2024-02-28',
-      creator: '0x5678...9abc',
-      address: '0xef01...2345',
-    },
-    {
-      id: 'blockchain-universe',
-      name: 'Blockchain Universe',
-      description: 'A decentralized narrative universe powered by smart contracts',
-      createdAt: '2024-01-01',
-      creator: '0x0000...0000',
-      address: null,
-      isDefault: true,
-    },
-  ];
+  // Fetch user's universes (by creator address)
+  const { data: myUniverses, isLoading: isLoadingMine } = useQuery({
+    queryKey: ['my-universes', address],
+    queryFn: () => trpcClient.cinematicUniverses.getByCreator.query({ creator: address! }),
+    enabled: !!address,
+  });
 
-  // Use dummy data instead of API call for testing
-  const universesData = { data: dummyUniverses };
-  const isLoading = false;
+  // Fetch all universes for discovery
+  const { data: allUniverses, isLoading: isLoadingAll } = useQuery({
+    queryKey: ['all-universes'],
+    queryFn: () => trpcClient.cinematicUniverses.getAll.query(),
+  });
 
-  // Fetch all universes for the selection page (commented out for testing)
-  // const { data: universesData, isLoading } = useQuery({
-  //   queryKey: ['universes'],
-  //   queryFn: () => trpcClient.cinematicUniverses.list.query({}),
-  //   enabled: !!user,
-  // });
+  const isLoading = isLoadingMine || isLoadingAll;
 
   const selectUniverse = (universeId: string) => {
     navigate({
@@ -131,17 +82,23 @@ function RouteComponent() {
     );
   }
 
-  const universes = universesData?.data || [];
+  const myUniverseList: any[] = (myUniverses as any)?.data ?? [];
+  const allUniverseList: any[] = (allUniverses as any)?.data ?? [];
+  const otherUniverses = allUniverseList.filter(
+    (u: any) => !myUniverseList.some((m: any) => m.id === u.id)
+  );
+  const universes = [...myUniverseList, ...otherUniverses];
 
   return (
     <div className="min-h-screen bg-background">
-
       {/* Dashboard Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Welcome back{address ? `, ${address.slice(0, 6)}...${address.slice(-4)}` : ''}</h1>
+              <h1 className="text-2xl font-bold">
+                Welcome back{address ? `, ${address.slice(0, 6)}...${address.slice(-4)}` : ''}
+              </h1>
               <p className="text-muted-foreground">Select a narrative universe to explore</p>
             </div>
             <Button onClick={createNewUniverse} className="flex items-center gap-2">
@@ -196,10 +153,10 @@ function RouteComponent() {
           <GenerativeMedia />
         </section>
 
-        {/* All Universes Grid */}
-        <section>
+        {/* Your Universes */}
+        <section className="mb-12">
           <h2 className="text-xl font-semibold mb-6">Your Universes</h2>
-          {universes.length === 0 ? (
+          {myUniverseList.length === 0 ? (
             <div className="text-center py-12">
               <div className="mb-4">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground" />
@@ -214,61 +171,87 @@ function RouteComponent() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {universes.map((universe: any) => (
-                <Card
-                  key={universe.id}
-                  className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden"
-                  onClick={() => selectUniverse(universe.id)}
-                >
-                  <CardContent className="p-0">
-                    {/* Universe Thumbnail/Header */}
-                    <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-600 relative">
-                      <div className="absolute inset-0 bg-black/20" />
-                      <div className="absolute top-2 right-2">
-                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                          <Calendar className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
-                      <div className="absolute bottom-2 left-2">
-                        <div className="text-white text-xs bg-black/40 px-2 py-1 rounded">
-                          Active Timeline
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Universe Info */}
-                    <div className="p-4">
-                      <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
-                        {universe.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {universe.description || 'Explore this narrative universe'}
-                      </p>
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-xs text-muted-foreground">
-                          Created {new Date(universe.createdAt).toLocaleDateString()}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectUniverse(universe.id);
-                          }}
-                        >
-                          <Play className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
           )}
         </section>
+
+        {/* Other Universes */}
+        {otherUniverses.length > 0 && (
+          <section>
+            <h2 className="text-xl font-semibold mb-6">Explore All Universes</h2>
+            <UniverseGrid universes={otherUniverses} onSelect={selectUniverse} />
+          </section>
+        )}
       </div>
+    </div>
+  );
+}
+
+function UniverseGrid({
+  universes,
+  onSelect,
+}: {
+  universes: any[];
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {universes.map((universe: any) => (
+        <Card
+          key={universe.id}
+          className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden"
+          onClick={() => onSelect(universe.id)}
+        >
+          <CardContent className="p-0">
+            <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-600 relative">
+              {universe.imageUrl && (
+                <img
+                  src={universe.imageUrl}
+                  alt={universe.name}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
+              <div className="absolute inset-0 bg-black/20" />
+              <div className="absolute top-2 right-2">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <Calendar className="h-4 w-4 text-white" />
+                </div>
+              </div>
+              <div className="absolute bottom-2 left-2">
+                <div className="text-white text-xs bg-black/40 px-2 py-1 rounded">
+                  Active Timeline
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
+                {universe.name}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                {universe.description || 'Explore this narrative universe'}
+              </p>
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-muted-foreground">
+                  {universe.createdAt
+                    ? `Created ${new Date(universe.createdAt).toLocaleDateString()}`
+                    : ''}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect(universe.id);
+                  }}
+                >
+                  <Play className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

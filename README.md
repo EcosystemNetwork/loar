@@ -4,7 +4,7 @@
 
 ![LOAR Banner](https://fungerbil.com/LOARLOGO.png)
 
-### _AI-Powered Cinematic Universes with On-Chain Governance and Creator Monetization_
+### _Create AI-powered cinematic universes. Own them on-chain. Monetize them._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
@@ -13,195 +13,257 @@
 
 </div>
 
+---
+
 ## What is LOAR?
 
-LOAR is a platform where creators build cinematic universes using AI video generation, govern them through on-chain voting, and monetize them through 10+ revenue streams — NFTs, subscriptions, licensing, ads, credits, and token trading.
+LOAR is a platform where creators deploy cinematic universes as smart contracts, generate AI video/image content, build branching narratives, and set up multiple revenue streams — all governed by token holders.
 
-Think **Naver Webtoons × TikTok × Web3**: communities consume AI-generated episodes, produce new storylines with accessible tooling, debate canon through governance, and speculate on universe tokens via Uniswap v4.
+**One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
 
-**Live at:** [loartech.xyz](https://loartech.xyz) (Sepolia testnet)
+**Live testnet demo:** [loartech.xyz](https://loartech.xyz) (Sepolia)
 
 ---
 
-## Feature Status
+## Honest Feature Status
 
-### Shipped
+We classify every feature by what actually works end-to-end today, not what has backend code or UI shells.
 
-| Feature                    | Description                                                                                                     |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Universe Creation**      | Deploy a cinematic universe + governance token in a two-step wizard                                             |
-| **Narrative Timeline**     | ReactFlow-based branching story editor with node linking and canonization                                       |
-| **AI Video Generation**    | FAL AI integration (Veo3, Kling, Wan2.5, Sora) with 1–60s duration, multiple aspect ratios                      |
-| **AI Image Generation**    | 4 FAL models (nano-banana, flux/dev, flux-pro, flux/schnell)                                                    |
-| **AI Wiki Generation**     | Gemini-powered character profiles, storyline generation, video-to-wiki extraction                               |
-| **On-Chain Governance**    | OpenZeppelin Governor — proposals, voting, execution via governance tokens                                      |
-| **SIWE Authentication**    | Wallet login → Sign-In with Ethereum → JWT session tokens                                                       |
-| **Decentralized Storage**  | Multi-provider (Walrus, IPFS/Pinata, Filecoin/Synapse, Firebase) with SHA-256 dedup and priority-based fallback |
-| **NFT Marketplace**        | Episode and character NFT minting, listing, royalty tracking                                                    |
-| **Canon Submissions**      | Community-submitted characters, plot arcs, locations, lore — with token-weighted voting                         |
-| **Credit System**          | Purchase credits, spend on AI generation (image=1, video=5, story=2, spinoff=10, character=3, scene=8)          |
-| **Subscriptions**          | Creator-configurable tiers (Free/Basic/Premium/VIP) with feature gating                                         |
-| **Cross-Universe Collabs** | Proposals, acceptance, activation with revenue sharing                                                          |
-| **IP Licensing**           | Streaming, merch, gaming, comic, audio licenses with royalty tracking                                           |
-| **Programmatic Ads**       | Ad slot creation, bidding, acceptance, impression tracking                                                      |
-| **Creator Profiles**       | Public portfolios with 5 themes, privacy controls, layout customization                                         |
-| **Content Upload**         | IP classification (fun vs monetized), copyright declarations, license selection                                 |
-| **Discovery**              | Creator and content search with classification and media type filters                                           |
-| **Analytics**              | View/engagement tracking, trending computation, platform-wide stats                                             |
-| **Blockchain Indexer**     | Ponder v0.15 indexing 14+ on-chain tables via GraphQL                                                           |
-| **Uniswap v4 Integration** | Custom fee hooks, LP locking, token pool creation                                                               |
+### LIVE (Working end-to-end)
 
-### Partial / In Progress
+| Feature                       | What Works Today                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| **Wallet Auth (SIWE)**        | Connect wallet, sign message, get JWT, access protected routes                       |
+| **Universe Creation**         | Two-step wizard: deploy Universe contract + governance token + Uniswap v4 pool       |
+| **Narrative Timeline Editor** | ReactFlow-based visual story builder. Create, link, and branch narrative nodes       |
+| **AI Video Generation**       | 4 providers (Veo3, Kling, Wan2.5, Sora) via FAL AI. 1-60s duration, configurable     |
+| **AI Image Generation**       | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                  |
+| **AI Wiki Generation**        | Gemini-powered character analysis, storyline generation, video-to-wiki extraction    |
+| **On-Chain Node Storage**     | Content hashes + plot hashes stored in Universe contract, indexed by Ponder          |
+| **Decentralized Storage**     | Multi-provider fallback: Walrus > IPFS/Pinata > Filecoin/Synapse > Firebase          |
+| **Creator Profiles**          | Username, bio, themes (5 options), social links, privacy controls, public portfolios |
+| **Content Upload**            | IP classification (Fun vs Monetized), copyright declarations, license selection      |
+| **Content Discovery**         | Search/filter by classification, media type, tags. Creator gallery + content feed    |
+| **Character Wiki**            | Browse, search, filter characters by collection/traits. Individual character pages   |
+| **Blockchain Indexer**        | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                    |
 
-| Feature                 | Status                                                              |
-| ----------------------- | ------------------------------------------------------------------- |
-| **Dashboard**           | Functional but uses placeholder universe data alongside live data   |
-| **Merch Tab**           | UI shell exists in marketplace; backend routing present but minimal |
-| **Coinbase CDP Wallet** | Referenced in code but `@coinbase/cdp-react` not yet installed      |
+### PARTIAL (Backend + contracts exist, frontend not fully wired)
 
-### Planned
+These have working smart contracts deployed on Sepolia AND fully implemented backend APIs (tRPC), but the marketplace frontend is informational UI — it shows stats and explains how things work, without interactive buy/sell/bid transaction flows.
 
-| Feature                 | Target                                                                    |
-| ----------------------- | ------------------------------------------------------------------------- |
-| **Mainnet Deployment**  | Contracts currently on Sepolia testnet only                               |
-| **Bundle Optimization** | Large chunks (MetaMask SDK ~558KB, viem/wagmi ~1.8MB) need code splitting |
-| **Fiat On-Ramp**        | Credit card purchases for credits and subscriptions                       |
-| **Mobile App**          | Native mobile experience                                                  |
+| Feature                 | What Exists                                                                          | What's Missing                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| **Episode NFTs**        | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: stats cards | No mint/buy buttons in marketplace. No NFT gallery with purchase flow                 |
+| **Character NFTs**      | Contract: ownership + appearance royalties. API: full CRUD                           | No frontend mint flow. Marketplace tab is explainer text only                         |
+| **Canon Marketplace**   | Contract: submit/vote/finalize/license. API: all operations                          | No submission form or voting UI in marketplace. Tab shows category cards only         |
+| **Credit System**       | API: balance, tiers, purchase, spend, history. Generation costs defined              | Credits tab shows balance + tiers from API, but "purchase" has no payment integration |
+| **Subscriptions**       | API: configure tiers, subscribe, check access. 4-tier model                          | Tab UI exists but no subscribe/payment flow                                           |
+| **Collabs**             | API: propose, accept, activate, record episodes, complete                            | Tab UI placeholder only                                                               |
+| **Ad Marketplace**      | Contract: slots, bidding, impressions. API: full CRUD                                | Tab UI placeholder only                                                               |
+| **IP Licensing**        | Contract: 6 license types, royalty tracking. API: full CRUD + merch                  | Tab UI placeholder only                                                               |
+| **On-Chain Governance** | Contract: OpenZeppelin Governor. Ponder indexes proposals/votes                      | Governance sidebar shows token info, but voting UI is incomplete                      |
+| **Token Trading**       | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live          | No swap UI. Users must use Uniswap directly                                           |
+| **Analytics**           | API: views, engagement, trending, platform stats                                     | Market page queries real stats. No per-universe analytics dashboard                   |
+| **Dashboard**           | Route exists with AI generation tools working                                        | Universe list uses hardcoded dummy data instead of API                                |
+
+### PLANNED (Not implemented)
+
+| Feature                | Notes                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| **Mainnet Deployment** | All contracts on Sepolia testnet only. Needs audit first                            |
+| **Fiat On-Ramp**       | No credit card payments. Credits "purchase" is a Firestore record, not real payment |
+| **Mobile App**         | Web-only. Not responsive on all pages                                               |
+| **Social Features**    | No follows, comments, activity feed, or notifications                               |
+| **Content Moderation** | No review queue, flagging, or DMCA process                                          |
+| **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders                        |
+| **Creator Analytics**  | No per-universe P&L, subscriber funnels, or retention data                          |
 
 ---
 
 ## Architecture
 
-| App              | Stack                                                    | Port  | Description              |
-| ---------------- | -------------------------------------------------------- | ----- | ------------------------ |
-| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | 3001  | Frontend SPA             |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore only)              | 3000  | API server               |
-| `apps/indexer`   | Ponder v0.15, GraphQL (Sepolia)                          | 42069 | Blockchain indexer       |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                                | —     | Smart contracts          |
-| `packages/abis`  | Auto-generated wagmi hooks                               | —     | Shared contract bindings |
-
-### Auth Flow
-
 ```
-Wallet Connect → SIWE Signature → Server JWT → Bearer Token → protectedProcedure
-```
-
-### Storage Flow
-
-```
-Upload → SHA-256 Hash → Dedup Check → Primary Provider → Manifest → Background Redundancy
-```
-
-Priority: Walrus → IPFS (Pinata) → Filecoin (Synapse) → Firebase (fallback)
-
----
-
-## Quick Start
-
-```bash
-git clone <repo-url>
-cd loar
-bash setup.sh    # checks prereqs, copies .env.example → .env, installs deps
-pnpm dev         # starts web + server + indexer
+                 ┌─────────────────────────────────────────────────┐
+                 │                    Frontend                      │
+                 │  React 18 + Vite + TanStack Router + wagmi      │
+                 │  Port 3001                                       │
+                 └──────────┬──────────────────┬───────────────────┘
+                            │ tRPC              │ wagmi
+                            ▼                   ▼
+              ┌─────────────────────┐  ┌──────────────────────┐
+              │   API Server        │  │  Sepolia Contracts   │
+              │   Hono + tRPC       │  │  8 core + per-       │
+              │   14 routers        │  │  universe children   │
+              │   150+ procedures   │  └──────────┬───────────┘
+              │   Port 3000         │             │ events
+              └──────────┬──────────┘             ▼
+                         │               ┌──────────────────┐
+                         ▼               │  Ponder Indexer   │
+              ┌──────────────────┐       │  37+ tables       │
+              │  Firestore       │       │  GraphQL API      │
+              │  (user data,     │       │  Port 42069       │
+              │   content meta,  │       └──────────────────┘
+              │   analytics)     │
+              └──────────────────┘
 ```
 
-### Prerequisites
+| App              | Stack                                                    | Description                              |
+| ---------------- | -------------------------------------------------------- | ---------------------------------------- |
+| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | Frontend SPA                             |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (14 routers, 150+ procedures) |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37+ tables)    |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (deployed on Sepolia)    |
+| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                 |
 
-| Tool                 | Required | Notes                                                                                      |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| **Node.js** >= 18    | Yes      | [nodejs.org](https://nodejs.org/)                                                          |
-| **pnpm** 9.15.0      | Yes      | Auto-installed via `corepack`                                                              |
-| **Foundry**          | Optional | For smart contract dev. [Install](https://book.getfoundry.sh/getting-started/installation) |
-| **Firebase project** | Yes      | Firestore for data storage                                                                 |
+### Key Flows
 
-### Environment
+**Auth:** Wallet Connect > SIWE Signature > Server JWT > Bearer Token > protectedProcedure
 
-All apps read from a single `.env` at the repo root. At minimum you need:
+**Content Creation:** AI Generate > Decentralized Storage (SHA-256 dedup) > On-Chain Hash > Ponder Index
 
-- `FIREBASE_SERVICE_ACCOUNT` — Firestore access
-- `SIWE_JWT_SECRET` — JWT signing for wallet auth
-- `FAL_KEY` — AI generation
-- `PONDER_RPC_URL_2` — Sepolia RPC for indexer
-
-See [docs/environment.md](docs/environment.md) for the full reference.
+**Universe Deployment:** UniverseManager.createUniverse() > Deploy GovernanceERC20 + Governor > Initialize Uniswap v4 Pool > Lock LP
 
 ---
 
 ## Smart Contracts (Sepolia)
 
-| Contract                  | Purpose                                                    |
-| ------------------------- | ---------------------------------------------------------- |
-| **UniverseManager**       | Factory for deploying universes + governance tokens        |
-| **Universe**              | Narrative node graph — create, link, canonize story events |
-| **GovernanceERC20**       | Voting-power tokens for universe governance                |
-| **UniverseGovernor**      | On-chain proposals, voting, execution                      |
-| **UniverseTokenDeployer** | Token + Governor + Uniswap pool deployment                 |
-| **LoarHookStaticFee**     | Uniswap v4 fee collection hook                             |
-| **LoarFeeLocker**         | Fee escrow and creator payouts                             |
-| **LoarLpLockerMultiple**  | LP token locking (anti-rug)                                |
+| Contract                  | Address         | Purpose                             |
+| ------------------------- | --------------- | ----------------------------------- |
+| **UniverseManager**       | `0x7af1...8114` | Factory: deploys universes + tokens |
+| **UniverseTokenDeployer** | `0xE34D...8d8B` | Token + Governor + pool deployment  |
+| **LoarFeeLocker**         | `0xEB2B...38f`  | Fee escrow and creator payouts      |
+| **LoarLpLockerMultiple**  | `0x3E66...ca6`  | LP token locking (anti-rug)         |
+| **LoarHookStaticFee**     | `0xa664...A8cC` | Uniswap v4 fee collection hook      |
 
-See [docs/contracts.md](docs/contracts.md) for development and deployment.
+Plus per-universe: Universe, GovernanceERC20, UniverseGovernor contracts.
 
----
-
-## Monetization Stack
-
-LOAR has **10 revenue streams** implemented across the marketplace:
-
-| Stream             | How It Works                                                  | Status  |
-| ------------------ | ------------------------------------------------------------- | ------- |
-| **Episode NFTs**   | Mint narrative events as NFTs with royalties                  | Shipped |
-| **Character NFTs** | Mint AI-generated characters as tradeable assets              | Shipped |
-| **Canon Market**   | Submit + vote on story contributions; license winning entries | Shipped |
-| **Credits**        | Platform currency for AI generation (tiered pricing)          | Shipped |
-| **Subscriptions**  | Creator-set tiers with gated features                         | Shipped |
-| **Collabs**        | Cross-universe partnerships with revenue sharing              | Shipped |
-| **IP Licensing**   | License universes for streaming, gaming, merch, etc.          | Shipped |
-| **Ads**            | Programmatic ad slots with bidding                            | Shipped |
-| **Token Trading**  | Universe tokens on Uniswap v4 with fee hooks                  | Shipped |
-| **Merch**          | Merchandise orders linked to universes                        | Shell   |
+Revenue contracts (not yet deployed separately — logic in backend + planned for on-chain):
+EpisodeNFT, CharacterNFT, CanonMarketplace, CreditManager, SubscriptionManager, CollabManager, AdPlacement, LicensingRegistry
 
 ---
 
-## Server API
+## How to Run Locally
 
-12 tRPC routers with 60+ procedures:
+### Prerequisites
 
-| Router               | Procedures                                                                 | Auth                |
-| -------------------- | -------------------------------------------------------------------------- | ------------------- |
-| `cinematicUniverses` | create, get, getAll, getByCreator                                          | Public + wallet sig |
-| `fal`                | generateImage, generateVideo, editImage, analyzeCharacter, createCharacter | Protected           |
-| `storage`            | upload, uploadDirect, resolve, uploadAsync, uploadStatus                   | Protected           |
-| `profiles`           | me, upsert, discover, checkUsername, setVisibility                         | Mixed               |
-| `content`            | create, update, delete, getFeed, getByCreator                              | Mixed               |
-| `nft`                | createEpisodeListing, recordMint, createCharacterListing                   | Protected           |
-| `marketplace`        | submit, vote, licenseSubmission, recordRoyalty                             | Protected           |
-| `credits`            | getBalance, getTiers, purchase, spend, refund                              | Protected           |
-| `subscriptions`      | configureTier, getTiers, subscribe, checkAccess                            | Mixed               |
-| `collabs`            | propose, accept, activate, recordEpisode, getActive                        | Protected           |
-| `licensing`          | createLicense, activateLicense, recordRoyalty                              | Protected           |
-| `analytics`          | recordView, recordEngagement, getUniverseMetrics, getTrending              | Mixed               |
-| `ads`                | createSlot, placeBid, acceptBid, recordImpression                          | Protected           |
-| `wiki`               | characters, generateEventWikia, generateStoryline, generateFromVideo       | Mixed               |
+| Tool              | Required | Notes                                  |
+| ----------------- | -------- | -------------------------------------- |
+| **Node.js** >= 18 | Yes      | [nodejs.org](https://nodejs.org/)      |
+| **pnpm** 9.15.0   | Yes      | Auto-installed via `corepack`          |
+| **Foundry**       | Optional | For smart contract dev                 |
+| **Docker**        | Optional | Only for production-like local testing |
+
+### Quick Start
+
+```bash
+git clone <repo-url>
+cd loar
+bash setup.sh          # checks prereqs, copies .env.example → .env, installs deps
+# Edit .env — at minimum set SIWE_JWT_SECRET and FIREBASE_SERVICE_ACCOUNT
+pnpm dev               # starts web (3001) + server (3000) + indexer (42069)
+```
+
+### Environment
+
+All apps read from a single `.env` at the repo root. Copy `.env.example` and fill in values.
+
+**Required for server:**
+
+- `SIWE_JWT_SECRET` — JWT signing (`openssl rand -hex 32`)
+- `FIREBASE_SERVICE_ACCOUNT` — Firestore access (JSON string or file path)
+
+**Required for indexer:**
+
+- `PONDER_RPC_URL_2` — Sepolia RPC endpoint
+
+**Optional (server starts without these):**
+
+- `FAL_KEY` — AI generation
+- `GOOGLE_API_KEY` — Gemini wiki generation
+- `OPENAI_API_KEY` — GPT-4o-mini storyline generation
+
+See [docs/environment.md](docs/environment.md) for the full reference.
+
+### Individual Services
+
+```bash
+pnpm dev:web           # web only (port 3001)
+pnpm dev:server        # server only (port 3000)
+pnpm -F indexer dev    # indexer only (port 42069)
+```
+
+---
+
+## How to Deploy
+
+### Architecture
+
+```
+                    ┌─────────────────┐
+                    │   Vercel (CDN)   │  ← apps/web (static SPA)
+                    │   loartech.xyz   │
+                    └────────┬────────┘
+                             │ HTTPS
+        ┌────────────────────┼────────────────────┐
+        │                    │                     │
+┌───────▼────────┐   ┌──────▼───────┐   ┌────────▼────────┐
+│  loar-server   │   │ loar-indexer │   │    Firebase      │
+│  Docker :3000  │   │ Docker :42069│   │    Firestore     │
+│  Hono + tRPC   │   │ Ponder v0.15 │   │   (data store)   │
+└───────┬────────┘   └──────┬───────┘   └─────────────────┘
+        │                    │
+  Storage providers    Sepolia RPC
+```
+
+| Service              | Deployed To          | Trigger                                                 |
+| -------------------- | -------------------- | ------------------------------------------------------- |
+| **Web**              | Vercel               | Push to `main` (Vercel Git integration)                 |
+| **Server + Indexer** | VPS (Docker Compose) | Push to `main` (`.github/workflows/deploy.yml` via SSH) |
+
+### Web → Vercel
+
+1. Connect the repo to Vercel
+2. Set env vars in Vercel dashboard: `VITE_SERVER_URL`, `VITE_PONDER_URL`
+3. Build config is in `vercel.json` — SPA rewrites included
+
+### Server + Indexer → VPS (Docker)
+
+```bash
+# On the VPS:
+git clone <repo-url> && cd loar
+cp .env.example .env   # fill in production values (CORS_ORIGIN = your Vercel URL)
+docker compose build
+docker compose up -d
+```
+
+**CI/CD:** `deploy.yml` SSHs to VPS on push to `main` and runs `docker compose build && up -d`.
+Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
+
+### Health Checks
+
+| Service | Endpoint      | Response                                        |
+| ------- | ------------- | ----------------------------------------------- |
+| Server  | `GET /health` | `{ status, checks: { firebase }, uptime, env }` |
+| Indexer | `GET /health` | Ponder built-in                                 |
 
 ---
 
 ## Documentation
 
-| Document                                        | Description                                            |
-| ----------------------------------------------- | ------------------------------------------------------ |
-| [MVP Scope](docs/mvp.md)                        | What's in the MVP, what's deferred                     |
-| [Roadmap](docs/roadmap.md)                      | Phase-by-phase delivery plan                           |
-| [Creator Journey](docs/creator-journey.md)      | End-to-end flow from universe creation to monetization |
-| [IP & Content Policy](docs/ip-policy.md)        | Copyright rules, licensing, compliance                 |
-| [Analytics & Cost Spec](docs/analytics-spec.md) | KPIs, unit economics, cost model                       |
-| [Architecture](docs/architecture.md)            | System design, auth flow, service connections          |
-| [Environment](docs/environment.md)              | All env vars, Firebase setup guide                     |
-| [API Reference](docs/api.md)                    | REST + tRPC + GraphQL endpoints                        |
-| [Smart Contracts](docs/contracts.md)            | Contract guide, ABI generation                         |
-| [Database](docs/database.md)                    | Firestore + Ponder schema reference                    |
-| [Deployment](docs/deployment.md)                | Docker, CI/CD, manual deploy                           |
-| [Troubleshooting](docs/troubleshooting.md)      | Common errors and fixes                                |
+| Document                                     | Description                                          |
+| -------------------------------------------- | ---------------------------------------------------- |
+| [MVP Scope](docs/mvp.md)                     | What's in the MVP, what's deferred, success criteria |
+| [Roadmap](docs/roadmap.md)                   | 3 milestones with concrete deliverables              |
+| [Creator Journey](docs/creator-journey.md)   | Step-by-step from wallet connect to revenue          |
+| [IP & Content Policy](docs/ip-policy.md)     | Copyright rules, licensing, compliance               |
+| [Monetization Map](docs/monetization-map.md) | How money flows, who pays, what's owned              |
+| [Product Loops](docs/product-loops.md)       | Core loops with status assessment                    |
+| [Architecture](docs/architecture.md)         | System design, auth flow, service connections        |
+| [Environment](docs/environment.md)           | All env vars, Firebase setup guide                   |
+| [API Reference](docs/api.md)                 | REST + tRPC + GraphQL endpoints                      |
+| [Smart Contracts](docs/contracts.md)         | Contract guide, ABI generation                       |
+| [Database](docs/database.md)                 | Firestore + Ponder schema reference                  |
+| [Deployment](docs/deployment.md)             | Docker, CI/CD, manual deploy                         |
 
 ---
 
@@ -211,15 +273,15 @@ LOAR has **10 revenue streams** implemented across the marketplace:
 loar/
 ├── apps/
 │   ├── web/             # React 18 SPA (Vite + TanStack Router)
-│   ├── server/          # Hono + tRPC API (12 routers, 60+ procedures)
-│   ├── indexer/         # Ponder v0.15 blockchain indexer (14+ tables)
-│   └── contracts/       # Foundry/Solidity (8 contracts on Sepolia)
+│   ├── server/          # Hono + tRPC API (14 routers, 150+ procedures)
+│   ├── indexer/         # Ponder v0.15 blockchain indexer (37+ tables)
+│   └── contracts/       # Foundry/Solidity (8 core contracts on Sepolia)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs
-├── docs/                # Architecture, API, product docs
+├── docs/                # Product + technical documentation
 ├── .env.example         # Environment variable template
 ├── setup.sh             # First-time setup script
-├── Makefile             # Command shortcuts (make help)
+├── Makefile             # Command shortcuts
 └── turbo.json           # Turbo build config
 ```
 
@@ -233,10 +295,6 @@ loar/
 | `make build`      | Build all apps                              |
 | `make test`       | Run smart contract tests                    |
 | `make codegen`    | Generate wagmi hooks from ABIs              |
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 

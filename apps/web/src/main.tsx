@@ -10,6 +10,9 @@
  * route loaders have access to tRPC and the query client.
  */
 
+import { validateWebEnv } from './lib/env';
+validateWebEnv();
+
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import ReactDOM from 'react-dom/client';
 import Loader from './components/loader';
