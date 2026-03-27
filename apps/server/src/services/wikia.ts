@@ -1,8 +1,12 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+if (!openai) {
+  console.warn('OPENAI_API_KEY not set — wikia generation will be unavailable');
+}
 
 export interface WikiaEntry {
   title: string;
@@ -68,11 +72,12 @@ Generate a wikia entry with the following structure (respond in JSON format):
 IMPORTANT: The "plot" field should be the heart of this wikia - a complete, engaging storyline that tells readers exactly what happens in this event from beginning to end. Write it like you're narrating a movie scene.`;
 
   try {
+    if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user', content: userPrompt },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.9, // Higher creativity for storytelling
@@ -186,11 +191,12 @@ Respond in JSON format:
 }`;
 
   try {
+    if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: fullPrompt }
+        { role: 'user', content: fullPrompt },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.8,
@@ -217,10 +223,7 @@ Respond in JSON format:
 /**
  * Generate a shorter summary for display in lists
  */
-export async function generateEventSummary(
-  title: string,
-  description: string
-): Promise<string> {
+export async function generateEventSummary(title: string, description: string): Promise<string> {
   const systemPrompt = `You are a concise editor. Create brief, engaging summaries for story events.`;
 
   const userPrompt = `Create a single engaging sentence (max 20 words) that summarizes this event:
@@ -231,11 +234,12 @@ Description: ${description}
 Return only the summary sentence, no additional text.`;
 
   try {
+    if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user', content: userPrompt },
       ],
       temperature: 0.7,
       max_tokens: 100,

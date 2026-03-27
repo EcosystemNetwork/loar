@@ -9,16 +9,12 @@
   "orm": "drizzle",
   "backend": "hono",
   "runtime": "bun",
-  "frontend": [
-    "tanstack-router"
-  ],
-  "addons": [
-    "turborepo"
-  ],
+  "frontend": ["tanstack-router"],
+  "addons": ["turborepo"],
   "examples": [],
   "auth": true,
   "packageManager": "bun",
   "dbSetup": "docker",
   "api": "trpc",
-  "webDeploy": "none"
+  "webDeploy": "none",
 }

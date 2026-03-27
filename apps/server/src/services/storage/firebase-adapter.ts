@@ -1,24 +1,20 @@
-import type { StorageProvider, UploadResult } from "./types";
-import { computeSha256, fetchToBuffer, getMimeType } from "./types";
-import { minioService } from "../minio";
+import type { StorageProvider, UploadResult } from './types';
+import { computeSha256, fetchToBuffer, getMimeType } from './types';
+import { minioService } from '../minio';
 
 /**
  * Adapter wrapping the existing Firebase Storage service (minio.ts) as a StorageProvider.
  * Acts as the reliable centralized fallback (priority 4).
  */
 export class FirebaseAdapter implements StorageProvider {
-  readonly name = "firebase";
+  readonly name = 'firebase';
   readonly priority = 4;
 
   isAvailable(): boolean {
     return !!process.env.FIREBASE_STORAGE_BUCKET;
   }
 
-  async upload(
-    buffer: Buffer,
-    filename: string,
-    _mimeType?: string
-  ): Promise<UploadResult> {
+  async upload(buffer: Buffer, filename: string, _mimeType?: string): Promise<UploadResult> {
     const contentHash = computeSha256(buffer);
     const key = await minioService.upload(buffer, filename);
 
@@ -34,7 +30,7 @@ export class FirebaseAdapter implements StorageProvider {
   async uploadFromUrl(url: string, filename?: string): Promise<UploadResult> {
     const { buffer } = await fetchToBuffer(url);
     const resolvedFilename =
-      filename || url.split("/").pop()?.split("?")[0] || `file-${Date.now()}.mp4`;
+      filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}.mp4`;
     return this.upload(buffer, resolvedFilename);
   }
 

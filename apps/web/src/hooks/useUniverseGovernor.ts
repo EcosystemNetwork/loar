@@ -1,7 +1,8 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { universeGovernorAbi } from '@loar/abis/generated';
 import { sepolia } from 'viem/chains';
-import { encodeAbiParameters, keccak256, toHex } from 'viem';
+import { encodeAbiParameters } from 'viem';
+import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';
 
 /**
  * Hook for interacting with a UniverseGovernor contract
@@ -212,11 +213,8 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
  * This encodes a call to Universe.setCanon(nodeId)
  */
 export function encodeCanonizeNodeProposal(universeAddress: `0x${string}`, nodeId: bigint) {
-  // Import universeAbi for encoding
-  const { universeAbi } = require('@loar/abis/generated');
-
   const calldata = encodeAbiParameters(
-    universeAbi.find((f: any) => f.name === 'setCanon')?.inputs || [],
+    universeAbiForEncoding.find((f: any) => f.name === 'setCanon')?.inputs || [],
     [nodeId]
   );
 

@@ -6,9 +6,9 @@ interface WalletConnectButtonProps {
   className?: string;
 }
 
-export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ 
-  size = 'sm', 
-  className = '' 
+export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
+  size = 'sm',
+  className = '',
 }) => {
   const { address, isConnected } = useAccount();
 
@@ -29,8 +29,7 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
             ready &&
             account &&
             chain &&
-            (!authenticationStatus ||
-              authenticationStatus === 'authenticated');
+            (!authenticationStatus || authenticationStatus === 'authenticated');
 
           return (
             <div
@@ -106,9 +105,7 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
                       className="px-3 py-2 rounded-md bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
                     >
                       {account.displayName}
-                      {account.displayBalance
-                        ? ` (${account.displayBalance})`
-                        : ''}
+                      {account.displayBalance ? ` (${account.displayBalance})` : ''}
                     </button>
                   </div>
                 );

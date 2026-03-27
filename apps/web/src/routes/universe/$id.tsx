@@ -1,6 +1,6 @@
-import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { Home } from "lucide-react";
+import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
+import { Home } from 'lucide-react';
 import ReactFlow, {
   Background,
   Controls,
@@ -12,7 +12,7 @@ import ReactFlow, {
   addEdge,
   type Node,
   type Edge,
-  type Connection
+  type Connection,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
@@ -36,7 +36,7 @@ const nodeTypes = {
 };
 
 function UniverseTimelineEditor() {
-  const { id } = useParams({ from: "/universe/$id" });
+  const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
   const chainId = useChainId();
 
@@ -47,23 +47,29 @@ function UniverseTimelineEditor() {
   const [eventCounter, setEventCounter] = useState(1);
 
   // Timeline parameters
-  const [timelineTitle, setTimelineTitle] = useState("Universe Timeline");
-  const [timelineDescription, setTimelineDescription] = useState("Blockchain-powered narrative timeline");
-  const [selectedEventTitle, setSelectedEventTitle] = useState("");
-  const [selectedEventDescription, setSelectedEventDescription] = useState("");
+  const [timelineTitle, setTimelineTitle] = useState('Universe Timeline');
+  const [timelineDescription, setTimelineDescription] = useState(
+    'Blockchain-powered narrative timeline'
+  );
+  const [selectedEventTitle, setSelectedEventTitle] = useState('');
+  const [selectedEventDescription, setSelectedEventDescription] = useState('');
 
   // Video generation dialog state
   const [showVideoDialog, setShowVideoDialog] = useState(false);
-  const [videoTitle, setVideoTitle] = useState("");
-  const [videoDescription, setVideoDescription] = useState("");
+  const [videoTitle, setVideoTitle] = useState('');
+  const [videoDescription, setVideoDescription] = useState('');
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
-  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'>('fal-veo3');
+  const [selectedVideoModel, setSelectedVideoModel] = useState<
+    'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'
+  >('fal-veo3');
   const [selectedVideoDuration, setSelectedVideoDuration] = useState<number>(8);
-  const [negativePrompt, setNegativePrompt] = useState("");
-  const [videoPrompt, setVideoPrompt] = useState("");
-  const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
-  const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'>('landscape_16_9');
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [videoPrompt, setVideoPrompt] = useState('');
+  const [videoRatio, setVideoRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
+  const [imageFormat, setImageFormat] = useState<
+    'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'
+  >('landscape_16_9');
 
   // Status message for sidebar
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
@@ -79,7 +85,9 @@ function UniverseTimelineEditor() {
   const [showCharacterGenerator, setShowCharacterGenerator] = useState(false);
   const [characterName, setCharacterName] = useState('');
   const [characterDescription, setCharacterDescription] = useState('');
-  const [characterStyle, setCharacterStyle] = useState<'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'>('cute');
+  const [characterStyle, setCharacterStyle] = useState<
+    'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'
+  >('cute');
   const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
   const [generatedCharacter, setGeneratedCharacter] = useState<{
     name: string;
@@ -92,7 +100,7 @@ function UniverseTimelineEditor() {
   // Image-to-video character selection (1-2 max)
   const [selectedImageCharacters, setSelectedImageCharacters] = useState<string[]>([]);
 
-  // File upload state  
+  // File upload state
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -109,8 +117,8 @@ function UniverseTimelineEditor() {
   const [storageKey, setStorageKey] = useState<string | null>(null);
 
   // Music/soundtrack state
-  const [soundtrackUrl, setSoundtrackUrl] = useState<string>("");
-  const [soundtrackName, setSoundtrackName] = useState<string>("");
+  const [soundtrackUrl, setSoundtrackUrl] = useState<string>('');
+  const [soundtrackName, setSoundtrackName] = useState<string>('');
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -169,21 +177,25 @@ function UniverseTimelineEditor() {
   });
 
   // Fallback for blockchain universes if not found
-  const finalUniverse = universe || (isBlockchainUniverse ? {
-    id: id,
-    name: `Universe ${id.slice(0, 8)}...`,
-    description: 'Blockchain-based cinematic universe',
-    address: id,
-    isDefault: false,
-    tokenAddress: null,
-    governanceAddress: null
-  } : null);
+  const finalUniverse =
+    universe ||
+    (isBlockchainUniverse
+      ? {
+          id: id,
+          name: `Universe ${id.slice(0, 8)}...`,
+          description: 'Blockchain-based cinematic universe',
+          address: id,
+          isDefault: false,
+          tokenAddress: null,
+          governanceAddress: null,
+        }
+      : null);
 
   // Each universe with a 0x address IS its own Timeline contract
   // So we use the universe ID as the contract address
   const timelineContractAddress = isBlockchainUniverse
-    ? id  // Use the universe ID as the contract address
-    : universe?.address || undefined;  // For non-blockchain universes, use the stored address
+    ? id // Use the universe ID as the contract address
+    : universe?.address || undefined; // For non-blockchain universes, use the stored address
 
   console.log('Universe ID:', id);
   console.log('Is Blockchain Universe:', isBlockchainUniverse);
@@ -211,26 +223,38 @@ function UniverseTimelineEditor() {
 
   // Update timeline title when universe data loads
   useEffect(() => {
-    const universeToUse = universe || (isBlockchainUniverse ? {
-      name: `Universe ${id.slice(0, 8)}...`,
-      description: 'Blockchain-based cinematic universe'
-    } : null);
+    const universeToUse =
+      universe ||
+      (isBlockchainUniverse
+        ? {
+            name: `Universe ${id.slice(0, 8)}...`,
+            description: 'Blockchain-based cinematic universe',
+          }
+        : null);
 
     if (universeToUse?.name) {
       setTimelineTitle(universeToUse.name);
-      setTimelineDescription(universeToUse.description || "Blockchain-powered narrative timeline");
+      setTimelineDescription(universeToUse.description || 'Blockchain-powered narrative timeline');
     }
   }, [universe, id, isBlockchainUniverse]);
 
   // Fetch available characters
-  const { data: charactersData, isLoading: isLoadingCharacters, refetch: refetchCharacters } = useQuery({
+  const {
+    data: charactersData,
+    isLoading: isLoadingCharacters,
+    refetch: refetchCharacters,
+  } = useQuery({
     queryKey: ['characters'],
     queryFn: () => trpcClient.wiki.characters.query(),
   });
 
   // Analyze character image with Gemini
   const analyzeCharacterMutation = useMutation({
-    mutationFn: async (input: { imageUrl: string; characterName: string; userDescription: string }) => {
+    mutationFn: async (input: {
+      imageUrl: string;
+      characterName: string;
+      userDescription: string;
+    }) => {
       const result = await trpcClient.fal.analyzeCharacter.mutate(input);
       return result;
     },
@@ -238,10 +262,16 @@ function UniverseTimelineEditor() {
 
   // Generate character mutation (with optional DB save)
   const generateCharacterMutation = useMutation({
-    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'; saveToDatabase?: boolean; detailedVisualDescription?: string }) => {
+    mutationFn: async (input: {
+      name: string;
+      description: string;
+      style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk';
+      saveToDatabase?: boolean;
+      detailedVisualDescription?: string;
+    }) => {
       const result = await trpcClient.fal.generateCharacter.mutate({
         ...input,
-        saveToDatabase: input.saveToDatabase ?? false // Use input value or default to false
+        saveToDatabase: input.saveToDatabase ?? false, // Use input value or default to false
       });
       return result;
     },
@@ -254,14 +284,14 @@ function UniverseTimelineEditor() {
         name: characterName,
         description: characterDescription,
         style: characterStyle,
-        imageUrl: data.imageUrl
+        imageUrl: data.imageUrl,
       });
     },
     onError: (error) => {
       console.error('Character generation failed:', error);
-      alert("Failed to generate character. Please try again.");
+      alert('Failed to generate character. Please try again.');
       setIsGeneratingCharacter(false);
-    }
+    },
   });
 
   // Save character to database mutation (uses existing image URL, no regeneration)
@@ -281,7 +311,7 @@ function UniverseTimelineEditor() {
 
       // Add to selected characters
       if (data.characterId) {
-        setSelectedCharacters(prev => [...prev, data.characterId!]);
+        setSelectedCharacters((prev) => [...prev, data.characterId!]);
       }
 
       // Clear generated character and close dialog
@@ -293,8 +323,8 @@ function UniverseTimelineEditor() {
     },
     onError: (error) => {
       console.error('Failed to save character:', error);
-      alert("Failed to save character to database. Please try again.");
-    }
+      alert('Failed to save character to database. Please try again.');
+    },
   });
 
   // Character generation - using extracted hook
@@ -315,7 +345,11 @@ function UniverseTimelineEditor() {
   });
 
   // Video generation - using extracted hook
-  const { isGeneratingVideo, handleGenerateVideo: handleGenerateVideoFromHook, generateVideoMutation } = useVideoGeneration({
+  const {
+    isGeneratingVideo,
+    handleGenerateVideo: handleGenerateVideoFromHook,
+    generateVideoMutation,
+  } = useVideoGeneration({
     videoDescription,
     selectedVideoModel,
     selectedVideoDuration,
@@ -405,12 +439,12 @@ function UniverseTimelineEditor() {
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
     console.log('🔵 handleAddEvent called:', {
       type,
-      nodeId
+      nodeId,
     });
     setAdditionType(type);
     setSourceNodeId(nodeId || null);
-    setVideoTitle("");
-    setVideoDescription("");
+    setVideoTitle('');
+    setVideoDescription('');
     setGeneratedImageUrl(null);
     setGeneratedVideoUrl(null);
     setShowVideoStep(false);
@@ -419,12 +453,12 @@ function UniverseTimelineEditor() {
     setIsSavingToContract(false);
     setSelectedVideoModel('fal-veo3'); // Reset to default
     setSelectedVideoDuration(8); // Reset video duration to default
-    setNegativePrompt(""); // Reset negative prompt
-    setVideoPrompt(""); // Reset video prompt
-    setVideoRatio("16:9"); // Reset video ratio
+    setNegativePrompt(''); // Reset negative prompt
+    setVideoPrompt(''); // Reset video prompt
+    setVideoRatio('16:9'); // Reset video ratio
     setImageFormat('landscape_16_9'); // Reset image format
-    setSoundtrackUrl(""); // Reset soundtrack URL
-    setSoundtrackName(""); // Reset soundtrack name
+    setSoundtrackUrl(''); // Reset soundtrack URL
+    setSoundtrackName(''); // Reset soundtrack name
     setSelectedCharacters([]); // Reset selected characters
     setStatusMessage(null); // Clear any status messages
     setShowVideoDialog(true);
@@ -436,7 +470,7 @@ function UniverseTimelineEditor() {
 
     // Find source node if specified
     const sourceNode = sourceNodeId
-      ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
+      ? nodes.find((n) => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
       : null;
     const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
     const referenceNode = sourceNode || lastEventNode;
@@ -444,15 +478,19 @@ function UniverseTimelineEditor() {
     // Debug: Log what we found for the source node
     console.log('handleCreateEvent sourceNode lookup:', {
       sourceNodeId,
-      foundSourceNode: sourceNode ? {
-        id: sourceNode.id,
-        eventId: sourceNode.data.eventId,
-        position: sourceNode.position
-      } : null,
-      allSceneNodes: nodes.filter(n => n.data.nodeType === 'scene').map(n => ({
-        id: n.id,
-        eventId: n.data.eventId
-      }))
+      foundSourceNode: sourceNode
+        ? {
+            id: sourceNode.id,
+            eventId: sourceNode.data.eventId,
+            position: sourceNode.position,
+          }
+        : null,
+      allSceneNodes: nodes
+        .filter((n) => n.data.nodeType === 'scene')
+        .map((n) => ({
+          id: n.id,
+          eventId: n.data.eventId,
+        })),
     });
 
     // Generate appropriate event ID based on addition type - Keep universe branch logic
@@ -476,8 +514,8 @@ function UniverseTimelineEditor() {
 
       console.log('Creating branch:', {
         sourceEventId,
-        existingBranches: existingBranches.map(n => n.data.eventId),
-        newEventId
+        existingBranches: existingBranches.map((n) => n.data.eventId),
+        newEventId,
       });
     } else {
       // For linear continuation, determine if we're continuing a branch or main timeline
@@ -485,7 +523,7 @@ function UniverseTimelineEditor() {
 
       if (sceneNodes.length === 0) {
         // First event
-        newEventId = "1";
+        newEventId = '1';
       } else {
         // Find the rightmost (last added) event to continue from
         const lastNode = sceneNodes.reduce((latest: any, node: any) => {
@@ -524,8 +562,12 @@ function UniverseTimelineEditor() {
       additionType,
       sourceNodeId,
       newEventId,
-      sourceNode: sourceNode ? { id: sourceNode.id, position: sourceNode.position, eventId: sourceNode.data.eventId } : null,
-      referenceNode: referenceNode ? { id: referenceNode.id, position: referenceNode.position } : null
+      sourceNode: sourceNode
+        ? { id: sourceNode.id, position: sourceNode.position, eventId: sourceNode.data.eventId }
+        : null,
+      referenceNode: referenceNode
+        ? { id: referenceNode.id, position: referenceNode.position }
+        : null,
     });
 
     // Calculate position based on addition type and depth in tree
@@ -539,30 +581,36 @@ function UniverseTimelineEditor() {
       // Create branch: same X depth as if it were a linear continuation, but offset vertically
       // Count how many children the source node already has to position this branch correctly
       const sourceChildren = nodes.filter((n: any) => {
-        const parentMatch = edges.find(e => e.source === sourceNode.id && e.target === n.id);
+        const parentMatch = edges.find((e) => e.source === sourceNode.id && e.target === n.id);
         return parentMatch && n.data.nodeType === 'scene';
       });
 
       const branchIndex = sourceChildren.length; // 0-based index for this new branch
-      const branchY = sourceNode.position.y + (branchIndex * verticalSpacing);
+      const branchY = sourceNode.position.y + branchIndex * verticalSpacing;
 
       // Use same X as linear continuation would use
       newEventPosition = { x: sourceNode.position.x + horizontalSpacing, y: branchY };
-      newAddPosition = { x: sourceNode.position.x + (horizontalSpacing * 2), y: branchY };
+      newAddPosition = { x: sourceNode.position.x + horizontalSpacing * 2, y: branchY };
 
       console.log('Branch positioning:', {
         sourceNodeX: sourceNode.position.x,
         sourceChildren: sourceChildren.length,
         branchIndex,
         newX: newEventPosition.x,
-        newY: branchY
+        newY: branchY,
       });
     } else {
       // Linear addition to the right of the reference node (or source node)
       if (referenceNode) {
         // Place after the specific reference/source node at same depth
-        newEventPosition = { x: referenceNode.position.x + horizontalSpacing, y: referenceNode.position.y };
-        newAddPosition = { x: referenceNode.position.x + (horizontalSpacing * 2), y: referenceNode.position.y };
+        newEventPosition = {
+          x: referenceNode.position.x + horizontalSpacing,
+          y: referenceNode.position.y,
+        };
+        newAddPosition = {
+          x: referenceNode.position.x + horizontalSpacing * 2,
+          y: referenceNode.position.y,
+        };
       } else {
         // No reference node, start fresh
         newEventPosition = { x: 100, y: 100 };
@@ -637,13 +685,18 @@ function UniverseTimelineEditor() {
     if (additionType === 'after') {
       // Linear addition: remove all existing add nodes and their edges
       filteredNodes = nodes.filter((n: any) => n.data.nodeType !== 'add');
-      filteredEdges = edges.filter((e: any) => !nodes.some((n: any) => n.data.nodeType === 'add' && (e.source === n.id || e.target === n.id)));
+      filteredEdges = edges.filter(
+        (e: any) =>
+          !nodes.some(
+            (n: any) => n.data.nodeType === 'add' && (e.source === n.id || e.target === n.id)
+          )
+      );
     }
     // For branches: keep all existing nodes and just add the new ones
 
     setNodes([...filteredNodes, newEventNode as any, newAddNode as any]);
     setEdges([...filteredEdges, ...newEdges]);
-    setEventCounter(prev => prev + 1);
+    setEventCounter((prev) => prev + 1);
 
     // Save event data to localStorage for ALL events (not just branched)
     console.log('🔍 Checking if should save event:', {
@@ -651,7 +704,7 @@ function UniverseTimelineEditor() {
       additionType,
       isBranched: /[a-z]/.test(newEventId),
       hasVideo: !!generatedVideoUrl,
-      hasImage: !!generatedImageUrl
+      hasImage: !!generatedImageUrl,
     });
 
     // Save ALL events to localStorage for now (easier debugging)
@@ -664,11 +717,12 @@ function UniverseTimelineEditor() {
 
       // Characters used in this event
       characterIds: selectedCharacters, // Array of character IDs
-      characterNames: selectedCharacters.length > 0 && charactersData?.characters
-        ? charactersData.characters
-            .filter((c: any) => selectedCharacters.includes(c.id))
-            .map((c: any) => c.character_name)
-        : [],
+      characterNames:
+        selectedCharacters.length > 0 && charactersData?.characters
+          ? charactersData.characters
+              .filter((c: any) => selectedCharacters.includes(c.id))
+              .map((c: any) => c.character_name)
+          : [],
 
       // Generation prompts and settings
       imagePrompt: videoDescription, // The prompt used for image generation
@@ -688,7 +742,7 @@ function UniverseTimelineEditor() {
       sourceNodeId: sourceNodeId,
       additionType: additionType,
       timestamp: Date.now(),
-      position: newEventPosition
+      position: newEventPosition,
     };
 
     // Store in universe-specific localStorage
@@ -703,18 +757,30 @@ function UniverseTimelineEditor() {
       key: storageKey,
       eventId: newEventId,
       eventData,
-      allEvents: eventsData
+      allEvents: eventsData,
     });
 
     // Close dialog and reset
     setShowVideoDialog(false);
-    setVideoTitle("");
-    setVideoDescription("");
+    setVideoTitle('');
+    setVideoDescription('');
     setSourceNodeId(null);
     setGeneratedImageUrl(null);
     setGeneratedVideoUrl(null);
     setShowVideoStep(false);
-  }, [nodes, edges, eventCounter, id, videoTitle, videoDescription, additionType, sourceNodeId, handleAddEvent, generatedVideoUrl, generatedImageUrl]);
+  }, [
+    nodes,
+    edges,
+    eventCounter,
+    id,
+    videoTitle,
+    videoDescription,
+    additionType,
+    sourceNodeId,
+    handleAddEvent,
+    generatedVideoUrl,
+    generatedImageUrl,
+  ]);
 
   // Convert blockchain data to timeline nodes
   useEffect(() => {
@@ -741,21 +807,23 @@ function UniverseTimelineEditor() {
 
       // Handle description which might be an object {timestamp, description} or a string
       const rawDesc = graphData.descriptions[index];
-      const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-        ? String((rawDesc as any).description)
-        : String(rawDesc || '');
+      const description =
+        rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : String(rawDesc || '');
 
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
-      const parentId = (previousNode && String(previousNode) !== '0')
-        ? normalizeNodeId(previousNode)
-        : 0;
+      const parentId =
+        previousNode && String(previousNode) !== '0' ? normalizeNodeId(previousNode) : 0;
 
       // Check if this node is in the canon chain
-      const isInCanonChain = graphData.canonChain && graphData.canonChain.some((canonId: any) => {
-        const canonNodeId = normalizeNodeId(canonId);
-        return canonNodeId === nodeId;
-      });
+      const isInCanonChain =
+        graphData.canonChain &&
+        graphData.canonChain.some((canonId: any) => {
+          const canonNodeId = normalizeNodeId(canonId);
+          return canonNodeId === nodeId;
+        });
 
       // Get position from layout calculation
       const position = layout.nodePositions.get(nodeId) || { x: 100, y: 100 };
@@ -773,7 +841,7 @@ function UniverseTimelineEditor() {
         description,
         previousNode,
         parentId,
-        position
+        position,
       });
 
       blockchainNodes.push({
@@ -781,9 +849,10 @@ function UniverseTimelineEditor() {
         type: 'timelineEvent',
         position,
         data: {
-          label: description && description.length > 0 && description !== `Timeline event ${nodeId}`
-            ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-            : `Event ${nodeId}`, // Always show actual blockchain node ID
+          label:
+            description && description.length > 0 && description !== `Timeline event ${nodeId}`
+              ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
+              : `Event ${nodeId}`, // Always show actual blockchain node ID
           description: description || `Timeline event ${nodeId}`,
           videoUrl: url,
           timelineColor: color,
@@ -796,7 +865,7 @@ function UniverseTimelineEditor() {
           isRoot: String(previousNode) === '0' || !previousNode,
           isInCanonChain: isInCanonChain, // Pass canon chain information
           onAddScene: handleAddEvent,
-        }
+        },
       });
     });
 
@@ -837,7 +906,7 @@ function UniverseTimelineEditor() {
           description: '',
           nodeType: 'add',
           onAddScene: handleAddEvent,
-        }
+        },
       });
 
       blockchainEdges.push({
@@ -857,49 +926,58 @@ function UniverseTimelineEditor() {
   // Handle connections between nodes
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge({
-        ...connection,
-        animated: true,
-        style: { stroke: '#10b981' },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#10b981',
-        },
-      }, eds));
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...connection,
+            animated: true,
+            style: { stroke: '#10b981' },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#10b981',
+            },
+          },
+          eds
+        )
+      );
     },
     [setEdges]
   );
 
   // Handle node selection
-  const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
-    setSelectedNode(node);
-    if (node.data.nodeType === 'scene') {
-      setSelectedEventTitle(node.data.label);
-      // Extract description string from object if needed
-      const rawDesc = node.data.description;
-      const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-        ? String((rawDesc as any).description)
-        : String(rawDesc || '');
-      setSelectedEventDescription(description);
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: any) => {
+      setSelectedNode(node);
+      if (node.data.nodeType === 'scene') {
+        setSelectedEventTitle(node.data.label);
+        // Extract description string from object if needed
+        const rawDesc = node.data.description;
+        const description =
+          rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+            ? String((rawDesc as any).description)
+            : String(rawDesc || '');
+        setSelectedEventDescription(description);
 
-      // Navigate to event page with specific event
-      const universeId = node.data.universeId || id;
-      // Use blockchainNodeId if available (for blockchain nodes), otherwise use eventId
-      const eventId = node.data.blockchainNodeId || node.data.eventId;
+        // Navigate to event page with specific event
+        const universeId = node.data.universeId || id;
+        // Use blockchainNodeId if available (for blockchain nodes), otherwise use eventId
+        const eventId = node.data.blockchainNodeId || node.data.eventId;
 
-      console.log('🎯 Node clicked:', {
-        eventId: node.data.eventId,
-        blockchainNodeId: node.data.blockchainNodeId,
-        selectedEventId: eventId,
-        label: node.data.label,
-        universeId
-      });
+        console.log('🎯 Node clicked:', {
+          eventId: node.data.eventId,
+          blockchainNodeId: node.data.blockchainNodeId,
+          selectedEventId: eventId,
+          label: node.data.label,
+          universeId,
+        });
 
-      if (eventId && universeId) {
-        navigate({ to: `/event/${universeId}/${eventId}` });
+        if (eventId && universeId) {
+          navigate({ to: `/event/${universeId}/${eventId}` });
+        }
       }
-    }
-  }, [id]);
+    },
+    [id]
+  );
 
   // Update selected node data
   const updateSelectedNode = useCallback(() => {
@@ -908,13 +986,13 @@ function UniverseTimelineEditor() {
         nds.map((node: any) =>
           node.id === selectedNode.id
             ? {
-              ...node,
-              data: {
-                ...node.data,
-                label: selectedEventTitle,
-                description: selectedEventDescription,
-              },
-            }
+                ...node,
+                data: {
+                  ...node.data,
+                  label: selectedEventTitle,
+                  description: selectedEventDescription,
+                },
+              }
             : node
         )
       );
@@ -927,7 +1005,9 @@ function UniverseTimelineEditor() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Universe Not Found</h1>
-          <p className="text-muted-foreground mb-6">The universe with ID "{id}" could not be found.</p>
+          <p className="text-muted-foreground mb-6">
+            The universe with ID "{id}" could not be found.
+          </p>
           <Button asChild>
             <Link to="/market">← Back to Market</Link>
           </Button>
@@ -982,7 +1062,10 @@ function UniverseTimelineEditor() {
               <Background />
               <Controls />
 
-              <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+              <Panel
+                position="top-center"
+                className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border"
+              >
                 <h2 className="text-lg font-semibold">{timelineTitle}</h2>
                 <p className="text-sm text-muted-foreground">{timelineDescription}</p>
               </Panel>
@@ -1002,7 +1085,10 @@ function UniverseTimelineEditor() {
               </Panel>
 
               {isLoadingAny && (
-                <Panel position="bottom-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4">
+                <Panel
+                  position="bottom-right"
+                  className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4"
+                >
                   <div className="flex items-center gap-2 text-sm">
                     <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
                     Loading blockchain data...
@@ -1018,24 +1104,29 @@ function UniverseTimelineEditor() {
       {(() => {
         // Find previous event's video URL and description - always use the last event or the source node
         const sourceNode = sourceNodeId
-          ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
+          ? nodes.find((n) => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
           : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
 
         // Handle description which might be an object {timestamp, description} or a string
         const rawDesc = sourceNode?.data.description;
-        const previousEventDescription = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-          ? String((rawDesc as any).description)
-          : (rawDesc ? String(rawDesc) : null);
+        const previousEventDescription =
+          rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+            ? String((rawDesc as any).description)
+            : rawDesc
+              ? String(rawDesc)
+              : null;
 
         const previousEventTitle = sourceNode?.data.label || null;
 
         // Get previous event wiki data if available
-        const previousEventWiki = sourceNode?.data.wiki ? {
-          title: sourceNode.data.wiki.title || previousEventTitle || '',
-          summary: sourceNode.data.wiki.summary || '',
-          plot: sourceNode.data.wiki.plot,
-        } : null;
+        const previousEventWiki = sourceNode?.data.wiki
+          ? {
+              title: sourceNode.data.wiki.title || previousEventTitle || '',
+              summary: sourceNode.data.wiki.summary || '',
+              plot: sourceNode.data.wiki.plot,
+            }
+          : null;
 
         return (
           <FlowCreationPanel
@@ -1069,7 +1160,11 @@ function UniverseTimelineEditor() {
             generatedImageUrl={generatedImageUrl}
             isGeneratingImage={isGeneratingImage}
             imageFormat={imageFormat}
-            setImageFormat={(format: string) => setImageFormat(format as 'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3')}
+            setImageFormat={(format: string) =>
+              setImageFormat(
+                format as 'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'
+              )
+            }
             handleGenerateEventImage={handleGenerateEventImage}
             showVideoStep={showVideoStep}
             setShowVideoStep={setShowVideoStep}
@@ -1125,6 +1220,6 @@ function UniverseTimelineEditor() {
   );
 }
 
-export const Route = createFileRoute("/universe/$id")({
+export const Route = createFileRoute('/universe/$id')({
   component: UniverseTimelineEditor,
 });

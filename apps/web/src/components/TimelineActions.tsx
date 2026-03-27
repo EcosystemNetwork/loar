@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader, Plus, Database } from 'lucide-react';
+import { keccak256, toBytes } from 'viem';
 import { useCreateNode, useGetNode } from '@/hooks/useTimeline';
 
 export function TimelineActions() {
@@ -14,15 +15,21 @@ export function TimelineActions() {
   const [queryNodeId, setQueryNodeId] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
 
-  const { writeAsync: createNode } = useCreateNode(nodeLink, nodePlot, previousNode);
-  const { data: nodeData, isLoading: isLoadingNode, refetch: refetchNode } = useGetNode(queryNodeId);
+  const { writeAsync: createNode } = useCreateNode();
+  const {
+    data: nodeData,
+    isLoading: isLoadingNode,
+    refetch: refetchNode,
+  } = useGetNode(queryNodeId);
 
   const handleCreateNode = async () => {
     if (!nodeLink || !nodePlot) return;
-    
+
     try {
       setIsCreating(true);
-      await createNode(nodeLink, nodePlot, previousNode);
+      const contentHash = keccak256(toBytes(nodeLink));
+      const plotHash = keccak256(toBytes(nodePlot));
+      await createNode(contentHash, plotHash, previousNode, nodeLink, nodePlot);
       // Reset form
       setNodeLink('');
       setNodePlot('');
@@ -54,7 +61,7 @@ export function TimelineActions() {
               <Plus className="w-4 h-4" />
               Create Node
             </h3>
-            
+
             <div className="space-y-3">
               <div>
                 <Label htmlFor="nodeLink">Video Link (Walrus URL)</Label>
@@ -65,7 +72,7 @@ export function TimelineActions() {
                   onChange={(e) => setNodeLink(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="nodePlot">Plot Description</Label>
                 <Input
@@ -75,7 +82,7 @@ export function TimelineActions() {
                   onChange={(e) => setNodePlot(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="previousNode">Previous Node ID</Label>
                 <Input
@@ -86,8 +93,8 @@ export function TimelineActions() {
                   onChange={(e) => setPreviousNode(Number(e.target.value))}
                 />
               </div>
-              
-              <Button 
+
+              <Button
                 onClick={handleCreateNode}
                 disabled={!nodeLink || !nodePlot || isCreating}
                 className="w-full"
@@ -113,7 +120,7 @@ export function TimelineActions() {
               <Database className="w-4 h-4" />
               Query Node
             </h3>
-            
+
             <div className="space-y-3">
               <div>
                 <Label htmlFor="queryNodeId">Node ID to Query</Label>
@@ -125,20 +132,12 @@ export function TimelineActions() {
                     value={queryNodeId}
                     onChange={(e) => setQueryNodeId(Number(e.target.value))}
                   />
-                  <Button 
-                    onClick={handleQueryNode}
-                    disabled={isLoadingNode}
-                    variant="outline"
-                  >
-                    {isLoadingNode ? (
-                      <Loader className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Query'
-                    )}
+                  <Button onClick={handleQueryNode} disabled={isLoadingNode} variant="outline">
+                    {isLoadingNode ? <Loader className="w-4 h-4 animate-spin" /> : 'Query'}
                   </Button>
                 </div>
               </div>
-              
+
               {/* Node Data Display */}
               {nodeData && (
                 <div className="space-y-2">
@@ -147,9 +146,15 @@ export function TimelineActions() {
                     <div className="space-y-2 text-sm">
                       {Array.isArray(nodeData) && nodeData.length >= 3 ? (
                         <>
-                          <div><strong>Link:</strong> {nodeData[0] || 'N/A'}</div>
-                          <div><strong>Plot:</strong> {nodeData[1] || 'N/A'}</div>
-                          <div><strong>Previous:</strong> {nodeData[2]?.toString() || 'N/A'}</div>
+                          <div>
+                            <strong>Link:</strong> {nodeData[0] || 'N/A'}
+                          </div>
+                          <div>
+                            <strong>Plot:</strong> {nodeData[1] || 'N/A'}
+                          </div>
+                          <div>
+                            <strong>Previous:</strong> {nodeData[2]?.toString() || 'N/A'}
+                          </div>
                         </>
                       ) : (
                         <div>No data or invalid format</div>
@@ -158,7 +163,7 @@ export function TimelineActions() {
                   </Card>
                 </div>
               )}
-              
+
               {!nodeData && !isLoadingNode && (
                 <div className="text-sm text-muted-foreground">
                   Enter a node ID and click Query to fetch data from the blockchain
@@ -167,7 +172,7 @@ export function TimelineActions() {
             </div>
           </div>
         </div>
-        
+
         <div className="mt-4 pt-4 border-t">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Badge variant="outline">Smart Contract</Badge>

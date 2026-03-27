@@ -92,11 +92,14 @@ export function useContractSave({
         const uuid = crypto.randomUUID();
         const manifest = await trpcClient.storage.upload.mutate({
           url: generatedVideoUrl,
-          filename: `${uuid}.mp4`
+          filename: `${uuid}.mp4`,
         });
 
         console.log('Storage upload successful. Content hash:', manifest.contentHash);
-        console.log('Providers:', manifest.uploads.map((u: { provider: string }) => u.provider).join(', '));
+        console.log(
+          'Providers:',
+          manifest.uploads.map((u: { provider: string }) => u.provider).join(', ')
+        );
 
         contentHashHex = manifest.contentHash;
         storageUrl = manifest.uploads[0]?.url || generatedVideoUrl;
@@ -119,7 +122,7 @@ export function useContractSave({
         previousNodeId = numericPart ? parseInt(numericPart[0]) : 0;
         console.log('Creating branch from event:', sourceNodeId, '-> numeric:', previousNodeId);
       } else {
-        const numericIds = graphData.nodeIds.map(id => {
+        const numericIds = graphData.nodeIds.map((id) => {
           const idStr = String(id);
           const numericPart = idStr.match(/^\d+/);
           return numericPart ? parseInt(numericPart[0]) : 0;
@@ -130,7 +133,7 @@ export function useContractSave({
 
       // Step 3: Compute content hashes for on-chain storage
       const contentHash: `0x${string}` = contentHashHex
-        ? `0x${contentHashHex}` as `0x${string}`
+        ? (`0x${contentHashHex}` as `0x${string}`)
         : keccak256(toBytes(storageUrl || generatedVideoUrl));
       const plotHash: `0x${string}` = keccak256(toBytes(videoDescription));
 
@@ -146,15 +149,15 @@ export function useContractSave({
 
       // Determine which contract address to use
       const contractAddressToUse = isBlockchainUniverse
-        ? universeId as Address
-        : TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address;
+        ? (universeId as Address)
+        : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address);
 
       // Step 4: Create node on-chain (hashes stored, full strings emitted in event)
       const txHash = await writeContractAsync({
         abi: universeAbi,
         address: contractAddressToUse,
         functionName: 'createNode',
-        args: [contentHash, plotHash, BigInt(previousNodeId), videoUrlForEvent, videoDescription]
+        args: [contentHash, plotHash, BigInt(previousNodeId), videoUrlForEvent, videoDescription],
       });
 
       console.log('Transaction submitted:', txHash);
@@ -162,7 +165,7 @@ export function useContractSave({
 
       toast.success('Event Saved to Blockchain & Decentralized Storage!', {
         description: `Your timeline event has been permanently stored.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
-        duration: 8000
+        duration: 8000,
       });
 
       // Step 5: Generate wiki entry in background (non-blocking)
@@ -170,33 +173,39 @@ export function useContractSave({
         .slice(-3)
         .map((nodeId, idx) => ({
           title: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || `Event ${nodeId}`,
-          description: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || ''
+          description: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || '',
         }))
-        .filter(evt => evt.description.length > 0);
+        .filter((evt) => evt.description.length > 0);
 
-      const characterIdsForWiki = selectedImageCharacters.length > 0
-        ? selectedImageCharacters
-        : (selectedCharacters.length > 0 ? selectedCharacters : undefined);
+      const characterIdsForWiki =
+        selectedImageCharacters.length > 0
+          ? selectedImageCharacters
+          : selectedCharacters.length > 0
+            ? selectedCharacters
+            : undefined;
 
       const newEventId = latestNodeId + 1;
 
-      trpcClient.wiki.generateFromVideo.mutate({
-        universeId: universeId,
-        eventId: String(newEventId),
-        videoUrl: videoUrlForEvent,
-        title: videoTitle,
-        description: videoDescription,
-        characterIds: characterIdsForWiki,
-        previousEvents: previousEvents.length > 0 ? previousEvents : undefined
-      }).then((wikiResult: unknown) => {
-        console.log('Wiki generated successfully!', wikiResult);
-        toast.success('Wiki Generated!', {
-          description: 'AI-powered wiki entry created for your event.',
-          duration: 4000
+      trpcClient.wiki.generateFromVideo
+        .mutate({
+          universeId: universeId,
+          eventId: String(newEventId),
+          videoUrl: videoUrlForEvent,
+          title: videoTitle,
+          description: videoDescription,
+          characterIds: characterIdsForWiki,
+          previousEvents: previousEvents.length > 0 ? previousEvents : undefined,
+        })
+        .then((wikiResult: unknown) => {
+          console.log('Wiki generated successfully!', wikiResult);
+          toast.success('Wiki Generated!', {
+            description: 'AI-powered wiki entry created for your event.',
+            duration: 4000,
+          });
+        })
+        .catch((wikiError: unknown) => {
+          console.error('Wiki generation failed:', wikiError);
         });
-      }).catch((wikiError: unknown) => {
-        console.error('Wiki generation failed:', wikiError);
-      });
 
       // Refresh the blockchain data
       setTimeout(async () => {
@@ -208,12 +217,13 @@ export function useContractSave({
         }
         await queryClient.invalidateQueries();
       }, 5000);
-
     } catch (error) {
       console.error('Error saving to contract:', error);
       toast.error('Contract Save Failed', {
-        description: 'Failed to save event to blockchain: ' + (error instanceof Error ? error.message : 'Unknown error'),
-        duration: 5000
+        description:
+          'Failed to save event to blockchain: ' +
+          (error instanceof Error ? error.message : 'Unknown error'),
+        duration: 5000,
       });
     } finally {
       setIsSavingToContract(false);
@@ -244,7 +254,7 @@ export function useContractSave({
     refetchFullGraph,
     refetchCanonChain,
     refetchLatestNodeId,
-    queryClient
+    queryClient,
   ]);
 
   const handleRefreshTimeline = useCallback(async () => {
@@ -256,7 +266,15 @@ export function useContractSave({
       await refetchLatestNodeId();
     }
     await queryClient.invalidateQueries();
-  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, refetchLatestNodeId, universeId]);
+  }, [
+    queryClient,
+    isBlockchainUniverse,
+    refetchLeaves,
+    refetchFullGraph,
+    refetchCanonChain,
+    refetchLatestNodeId,
+    universeId,
+  ]);
 
   return {
     handleSaveToContract,

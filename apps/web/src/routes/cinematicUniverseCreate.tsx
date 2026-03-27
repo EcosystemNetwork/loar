@@ -1,31 +1,46 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useAccount, useBalance, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { useMutation } from "@tanstack/react-query";
-import { trpcClient } from "@/utils/trpc";
-import { WalletConnectButton } from "@/components/wallet-connect-button";
-import { Rocket, CheckCircle2, Loader2, ExternalLink, AlertCircle, Sparkles, Image as ImageIcon, ArrowLeft } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { useUniverseManager, useDefaultDeploymentConfig } from "@/hooks/useUniverseManager";
-import { parseEther } from "viem";
+import { createFileRoute } from '@tanstack/react-router';
+import { useState } from 'react';
+import {
+  useAccount,
+  useBalance,
+  useChainId,
+  useSwitchChain,
+  useWaitForTransactionReceipt,
+} from 'wagmi';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { useMutation } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
+import { WalletConnectButton } from '@/components/wallet-connect-button';
+import {
+  Rocket,
+  CheckCircle2,
+  Loader2,
+  ExternalLink,
+  AlertCircle,
+  Sparkles,
+  Image as ImageIcon,
+  ArrowLeft,
+} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
+import { parseEther } from 'viem';
 
-export const Route = createFileRoute("/cinematicUniverseCreate")({
+export const Route = createFileRoute('/cinematicUniverseCreate')({
   component: CinematicUniverseCreate,
 });
 
 // Deployment steps
 enum DeploymentStep {
-  IDLE = "idle",
-  CREATING_UNIVERSE = "creating_universe",
-  UNIVERSE_CREATED = "universe_created",
-  DEPLOYING_TOKEN = "deploying_token",
-  TOKEN_DEPLOYED = "token_deployed",
-  COMPLETED = "completed",
+  IDLE = 'idle',
+  CREATING_UNIVERSE = 'creating_universe',
+  UNIVERSE_CREATED = 'universe_created',
+  DEPLOYING_TOKEN = 'deploying_token',
+  TOKEN_DEPLOYED = 'token_deployed',
+  COMPLETED = 'completed',
 }
 
 function CinematicUniverseCreate() {
@@ -35,12 +50,12 @@ function CinematicUniverseCreate() {
   const { switchChain } = useSwitchChain();
 
   // Form state
-  const [universeName, setUniverseName] = useState("");
-  const [tokenSymbol, setTokenSymbol] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [metadata, setMetadata] = useState(""); // Additional token metadata
-  const [context, setContext] = useState(""); // Universe context/lore
+  const [universeName, setUniverseName] = useState('');
+  const [tokenSymbol, setTokenSymbol] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [description, setDescription] = useState('');
+  const [metadata, setMetadata] = useState(''); // Additional token metadata
+  const [context, setContext] = useState(''); // Universe context/lore
 
   // Deployment state
   const [deploymentStep, setDeploymentStep] = useState<DeploymentStep>(DeploymentStep.IDLE);
@@ -54,7 +69,8 @@ function CinematicUniverseCreate() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   // Hooks
-  const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } = useUniverseManager();
+  const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } =
+    useUniverseManager();
   const defaultConfig = useDefaultDeploymentConfig();
   const { isSuccess: txSuccess, data: txReceipt } = useWaitForTransactionReceipt({ hash });
 
@@ -62,7 +78,7 @@ function CinematicUniverseCreate() {
     try {
       await switchChain({ chainId: 11155111 });
     } catch (error) {
-      console.error("Failed to switch network:", error);
+      console.error('Failed to switch network:', error);
     }
   };
 
@@ -73,8 +89,8 @@ function CinematicUniverseCreate() {
 
       const result = await trpcClient.fal.generateImage.mutate({
         prompt,
-        model: "fal-ai/nano-banana",
-        imageSize: "landscape_16_9",
+        model: 'fal-ai/nano-banana',
+        imageSize: 'landscape_16_9',
       });
 
       return result;
@@ -86,14 +102,14 @@ function CinematicUniverseCreate() {
       }
     },
     onError: (error) => {
-      console.error("Cover generation failed:", error);
-      alert("Failed to generate cover. Please try again.");
+      console.error('Cover generation failed:', error);
+      alert('Failed to generate cover. Please try again.');
     },
   });
 
   const handleGenerateCover = async () => {
     if (!universeName) {
-      alert("Please enter a universe name first");
+      alert('Please enter a universe name first');
       return;
     }
     setIsGeneratingCover(true);
@@ -109,7 +125,7 @@ function CinematicUniverseCreate() {
     // Parse UniverseCreated event from receipt
     // The createUniverse function returns (universeId, universeAddress)
     // We need to extract these from the transaction logs
-    console.log("Universe creation tx successful:", txReceipt);
+    console.log('Universe creation tx successful:', txReceipt);
 
     // TODO: Parse the UniverseCreated event to get universeId and universeAddress
     // For now, we'll need to manually track these or use a read contract call
@@ -117,7 +133,7 @@ function CinematicUniverseCreate() {
   }
 
   if (txSuccess && deploymentStep === DeploymentStep.DEPLOYING_TOKEN) {
-    console.log("Token deployment tx successful:", txReceipt);
+    console.log('Token deployment tx successful:', txReceipt);
     setDeploymentStep(DeploymentStep.TOKEN_DEPLOYED);
     // Parse TokenCreated event to get token, governor, pool addresses
     // The indexer will pick these up automatically
@@ -126,17 +142,17 @@ function CinematicUniverseCreate() {
 
   const handleCreateUniverse = async () => {
     if (!isConnected || !address) {
-      alert("Please connect your wallet first");
+      alert('Please connect your wallet first');
       return;
     }
 
     if (chainId !== 11155111) {
-      alert("Wrong Network! Please switch to Sepolia Testnet (Chain ID: 11155111)");
+      alert('Wrong Network! Please switch to Sepolia Testnet (Chain ID: 11155111)');
       return;
     }
 
     if (!universeName || !imageUrl || !description) {
-      alert("Please fill in universe name, image URL, and description");
+      alert('Please fill in universe name, image URL, and description');
       return;
     }
 
@@ -152,20 +168,22 @@ function CinematicUniverseCreate() {
         initialOwner: address,
       });
     } catch (error) {
-      console.error("Universe creation failed:", error);
-      alert(`Universe creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error('Universe creation failed:', error);
+      alert(
+        `Universe creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       setDeploymentStep(DeploymentStep.IDLE);
     }
   };
 
   const handleDeployToken = async () => {
     if (!universeId || !address) {
-      alert("Universe must be created first");
+      alert('Universe must be created first');
       return;
     }
 
     if (!tokenSymbol) {
-      alert("Please enter a token symbol");
+      alert('Please enter a token symbol');
       return;
     }
 
@@ -189,7 +207,7 @@ function CinematicUniverseCreate() {
             pairedToken: defaultConfig.defaultPairedToken,
             tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
             tickSpacing: defaultConfig.defaultTickSpacing,
-            poolData: "0x" as `0x${string}`, // Empty bytes for now
+            poolData: '0x' as `0x${string}`, // Empty bytes for now
           },
           lockerConfig: {
             locker: defaultConfig.defaultLocker,
@@ -199,15 +217,15 @@ function CinematicUniverseCreate() {
             tickLower: [-887220], // Full range example
             tickUpper: [887220],
             positionBps: [10000], // 100% (full position)
-            lockerData: "0x" as `0x${string}`, // Empty bytes for now
+            lockerData: '0x' as `0x${string}`, // Empty bytes for now
           },
         },
         universeId,
-        parseEther("0.01") // Sending 0.01 ETH for initial liquidity - adjust as needed
+        parseEther('0.01') // Sending 0.01 ETH for initial liquidity - adjust as needed
       );
     } catch (error) {
-      console.error("Token deployment failed:", error);
-      alert(`Token deployment failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error('Token deployment failed:', error);
+      alert(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
     }
   };
@@ -220,7 +238,9 @@ function CinematicUniverseCreate() {
           <CardContent className="text-center space-y-4 p-8">
             <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary" />
             <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
-            <p className="text-muted-foreground">Please connect your wallet to create a universe.</p>
+            <p className="text-muted-foreground">
+              Please connect your wallet to create a universe.
+            </p>
             <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
@@ -268,7 +288,9 @@ function CinematicUniverseCreate() {
               {universeAddress && (
                 <div className="p-4 bg-muted rounded-lg flex items-center justify-between">
                   <div className="text-left">
-                    <p className="text-xs text-muted-foreground mb-1 uppercase font-semibold">Universe Contract</p>
+                    <p className="text-xs text-muted-foreground mb-1 uppercase font-semibold">
+                      Universe Contract
+                    </p>
                     <code className="text-sm font-mono">
                       {universeAddress.slice(0, 16)}...{universeAddress.slice(-14)}
                     </code>
@@ -305,7 +327,7 @@ function CinematicUniverseCreate() {
               )}
             </div>
 
-            <Button size="lg" onClick={() => (window.location.href = "/")}>
+            <Button size="lg" onClick={() => (window.location.href = '/')}>
               <ArrowLeft className="h-5 w-5 mr-2" />
               View All Universes
             </Button>
@@ -336,9 +358,10 @@ function CinematicUniverseCreate() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold">Step 1: Create Universe</h3>
-                  {deploymentStep !== DeploymentStep.IDLE && deploymentStep !== DeploymentStep.CREATING_UNIVERSE && (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  )}
+                  {deploymentStep !== DeploymentStep.IDLE &&
+                    deploymentStep !== DeploymentStep.CREATING_UNIVERSE && (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    )}
                 </div>
 
                 <div>
@@ -410,7 +433,9 @@ function CinematicUniverseCreate() {
                 {deploymentStep === DeploymentStep.IDLE && (
                   <Button
                     onClick={handleCreateUniverse}
-                    disabled={!universeName || !imageUrl || !description || isPending || isConfirming}
+                    disabled={
+                      !universeName || !imageUrl || !description || isPending || isConfirming
+                    }
                     className="w-full h-12 text-base font-bold"
                     size="lg"
                   >
@@ -434,7 +459,7 @@ function CinematicUniverseCreate() {
                 <div className="space-y-4 pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold">Step 2: Deploy Token & Pool</h3>
-                    {deploymentStep === DeploymentStep.COMPLETED && (
+                    {(deploymentStep as DeploymentStep) === DeploymentStep.COMPLETED && (
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
                     )}
                   </div>
@@ -483,8 +508,12 @@ function CinematicUniverseCreate() {
                       <div className="flex items-center gap-3">
                         <Loader2 className="h-5 w-5 text-primary animate-spin" />
                         <div>
-                          <p className="text-sm font-semibold">Deploying token and setting up liquidity pool...</p>
-                          <p className="text-xs text-muted-foreground mt-1">This may take a few moments...</p>
+                          <p className="text-sm font-semibold">
+                            Deploying token and setting up liquidity pool...
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            This may take a few moments...
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -494,9 +523,7 @@ function CinematicUniverseCreate() {
 
               {error && (
                 <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                  <p className="text-sm text-red-500">
-                    Error: {error.message}
-                  </p>
+                  <p className="text-sm text-red-500">Error: {error.message}</p>
                 </div>
               )}
             </CardContent>
@@ -513,7 +540,7 @@ function CinematicUniverseCreate() {
                     alt="Preview"
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      e.currentTarget.style.display = 'none';
                     }}
                   />
                 ) : (
@@ -524,10 +551,12 @@ function CinematicUniverseCreate() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <h3 className="text-2xl font-bold text-white drop-shadow-2xl mb-2">
-                    {universeName || "Your Universe Name"}
+                    {universeName || 'Your Universe Name'}
                   </h3>
                   {tokenSymbol && (
-                    <Badge className="bg-white/20 backdrop-blur-sm text-white border-0">${tokenSymbol}</Badge>
+                    <Badge className="bg-white/20 backdrop-blur-sm text-white border-0">
+                      ${tokenSymbol}
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -538,49 +567,45 @@ function CinematicUniverseCreate() {
                   <p className="text-xs font-bold text-muted-foreground mb-2 uppercase">About</p>
                   <p className="text-sm text-foreground leading-relaxed">
                     {description ||
-                      "Your universe description will appear here. Share the vision and story of your cinematic world..."}
+                      'Your universe description will appear here. Share the vision and story of your cinematic world...'}
                   </p>
                 </div>
 
                 {deploymentStep !== DeploymentStep.IDLE && (
                   <div className="pt-4 border-t space-y-3">
-                    <p className="text-xs font-bold text-muted-foreground uppercase">Deployment Progress</p>
+                    <p className="text-xs font-bold text-muted-foreground uppercase">
+                      Deployment Progress
+                    </p>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm">
-                        {deploymentStep !== DeploymentStep.IDLE &&
-                        deploymentStep !== DeploymentStep.CREATING_UNIVERSE ? (
+                        {deploymentStep !== DeploymentStep.CREATING_UNIVERSE ? (
                           <CheckCircle2 className="h-4 w-4 text-green-500" />
                         ) : (
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
                         )}
                         <span
                           className={
-                            deploymentStep !== DeploymentStep.IDLE &&
                             deploymentStep !== DeploymentStep.CREATING_UNIVERSE
-                              ? "text-green-500 font-medium"
-                              : ""
+                              ? 'text-green-500 font-medium'
+                              : ''
                           }
                         >
                           Universe Contract
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
-                        {deploymentStep === DeploymentStep.COMPLETED ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        ) : deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
-                          deploymentStep === DeploymentStep.TOKEN_DEPLOYED ? (
+                        {deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
+                        deploymentStep === DeploymentStep.TOKEN_DEPLOYED ? (
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
                         ) : (
                           <Loader2 className="h-4 w-4 opacity-40" />
                         )}
                         <span
                           className={
-                            deploymentStep === DeploymentStep.COMPLETED
-                              ? "text-green-500 font-medium"
-                              : deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
-                                deploymentStep === DeploymentStep.TOKEN_DEPLOYED
-                              ? ""
-                              : "opacity-40"
+                            deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
+                            deploymentStep === DeploymentStep.TOKEN_DEPLOYED
+                              ? ''
+                              : 'opacity-40'
                           }
                         >
                           Token & Liquidity Pool

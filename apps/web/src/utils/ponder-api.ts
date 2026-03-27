@@ -1,13 +1,12 @@
-const PONDER_URL =
-  import.meta.env.VITE_PONDER_URL || "http://localhost:42069";
+const PONDER_URL = import.meta.env.VITE_PONDER_URL || 'http://localhost:42069';
 
 export async function ponderGql<T = any>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
   const res = await fetch(`${PONDER_URL}/graphql`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
 

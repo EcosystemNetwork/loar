@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Universe} from "../src/Universe.sol";
+import {IUniverse} from "../src/interfaces/IUniverse.sol";
 import {IUniverseManager} from "../src/interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "../src/libraries/NodeOptions.sol";
 
@@ -68,7 +69,7 @@ contract UniverseTest is Test {
 
     function test_eventEmission() public {
         vm.expectEmit(true, true, true, true);
-        emit Universe.NodeCreated(
+        emit IUniverse.NodeCreated(
             1,
             0,
             address(this),
@@ -126,6 +127,7 @@ contract UniverseTest is Test {
     function test_setMedia() public {
         uint id = createNode();
         bytes32 newHash = keccak256("new-link");
+        vm.prank(msg.sender); // admin is msg.sender from setUp
         universe.setMedia(id, newHash, "new-link.org");
         assertEq(universe.getMedia(id), newHash);
     }
@@ -133,6 +135,7 @@ contract UniverseTest is Test {
     function test_setCanon() public {
         uint root = createNode();
         uint child = universe.createNode(keccak256("c"), keccak256("p"), root, "c", "p");
+        vm.prank(msg.sender); // admin is msg.sender from setUp
         universe.setCanon(child);
 
         (,,,,,bool rootCanon,) = universe.getNode(root);
@@ -151,12 +154,12 @@ contract UniverseTest is Test {
 
     function test_nodeIDToHex_invalidId() public {
         createNode(); // latestNodeId = 1
-        vm.expectRevert(abi.encodeWithSelector(Universe.NodeDoesNotExist.selector));
+        vm.expectRevert(abi.encodeWithSelector(IUniverse.NodeDoesNotExist.selector));
         universe.nodeIDToHex(999);
     }
 
     function test_nodeIDToHex_zeroId() public {
-        vm.expectRevert(abi.encodeWithSelector(Universe.NodeDoesNotExist.selector));
+        vm.expectRevert(abi.encodeWithSelector(IUniverse.NodeDoesNotExist.selector));
         universe.nodeIDToHex(0);
     }
 

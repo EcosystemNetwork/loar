@@ -1,4 +1,4 @@
-import { db } from "../../lib/firebase";
+import { db } from '../../lib/firebase';
 
 interface CreateCinematicUniverseInput {
   address: string;
@@ -9,7 +9,7 @@ interface CreateCinematicUniverseInput {
   description: string;
 }
 
-const collection = db.collection("cinematicUniverses");
+const collection = db.collection('cinematicUniverses');
 
 export async function createCinematicUniverse(input: CreateCinematicUniverseInput) {
   try {
@@ -17,7 +17,7 @@ export async function createCinematicUniverse(input: CreateCinematicUniverseInpu
 
     const existing = await collection.doc(id).get();
     if (existing.exists) {
-      throw new Error("A cinematic universe with this timeline contract address already exists");
+      throw new Error('A cinematic universe with this timeline contract address already exists');
     }
 
     const data = {
@@ -36,14 +36,14 @@ export async function createCinematicUniverse(input: CreateCinematicUniverseInpu
     return {
       success: true,
       data: { id, ...data },
-      message: "Cinematic universe created successfully",
+      message: 'Cinematic universe created successfully',
     };
   } catch (error) {
-    console.error("Error creating cinematic universe:", error);
-    if (error instanceof Error && error.message.includes("already exists")) {
+    console.error('Error creating cinematic universe:', error);
+    if (error instanceof Error && error.message.includes('already exists')) {
       throw error;
     }
-    throw new Error("Failed to create cinematic universe");
+    throw new Error('Failed to create cinematic universe');
   }
 }
 
@@ -52,7 +52,7 @@ export async function getCinematicUniverse(id: string) {
     const doc = await collection.doc(id).get();
 
     if (!doc.exists) {
-      throw new Error("Cinematic universe not found");
+      throw new Error('Cinematic universe not found');
     }
 
     return {
@@ -60,14 +60,14 @@ export async function getCinematicUniverse(id: string) {
       data: { id: doc.id, ...doc.data() },
     };
   } catch (error) {
-    console.error("Error fetching cinematic universe:", error);
-    throw new Error("Failed to fetch cinematic universe");
+    console.error('Error fetching cinematic universe:', error);
+    throw new Error('Failed to fetch cinematic universe');
   }
 }
 
 export async function getAllCinematicUniverses() {
   try {
-    const snapshot = await collection.orderBy("created_at").get();
+    const snapshot = await collection.orderBy('created_at').get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {
@@ -76,17 +76,14 @@ export async function getAllCinematicUniverses() {
       total: data.length,
     };
   } catch (error) {
-    console.error("Error fetching all cinematic universes:", error);
-    throw new Error("Failed to fetch cinematic universes");
+    console.error('Error fetching all cinematic universes:', error);
+    throw new Error('Failed to fetch cinematic universes');
   }
 }
 
 export async function getCinematicUniversesByCreator(creator: string) {
   try {
-    const snapshot = await collection
-      .where("creator", "==", creator)
-      .orderBy("created_at")
-      .get();
+    const snapshot = await collection.where('creator', '==', creator).orderBy('created_at').get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {
@@ -95,7 +92,7 @@ export async function getCinematicUniversesByCreator(creator: string) {
       total: data.length,
     };
   } catch (error) {
-    console.error("Error fetching cinematic universes by creator:", error);
-    throw new Error("Failed to fetch cinematic universes by creator");
+    console.error('Error fetching cinematic universes by creator:', error);
+    throw new Error('Failed to fetch cinematic universes by creator');
   }
 }

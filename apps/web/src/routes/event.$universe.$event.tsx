@@ -1,14 +1,23 @@
-import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, BookOpen, Users as UsersIcon, Calendar, Film, ChevronLeft, ChevronRight } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { trpcClient } from "@/utils/trpc";
-import { useGetFullGraph } from "@/hooks/useTimeline";
+import { createFileRoute, useParams, useNavigate } from '@tanstack/react-router';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  ArrowLeft,
+  Loader2,
+  BookOpen,
+  Users as UsersIcon,
+  Calendar,
+  Film,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
+import { useGetFullGraph } from '@/hooks/useTimeline';
 
 function EventPage() {
-  const { universe: universeId, event: eventId } = useParams({ from: "/event/$universe/$event" });
+  const { universe: universeId, event: eventId } = useParams({ from: '/event/$universe/$event' });
   const navigate = useNavigate();
 
   const isBlockchainUniverse = universeId?.startsWith('0x');
@@ -19,47 +28,57 @@ function EventPage() {
   );
 
   // Find the event in the graph
-  const eventIndex = graphData ? graphData[0]?.findIndex((id: any) => {
-    const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
-    return numericId === parseInt(eventId);
-  }) : -1;
+  const eventIndex = graphData
+    ? graphData[0]?.findIndex((id: any) => {
+        const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
+        return numericId === parseInt(eventId);
+      })
+    : -1;
 
   const eventVideoUrl = eventIndex !== -1 ? String(graphData?.[1]?.[eventIndex] || '') : '';
   const rawDescription = eventIndex !== -1 ? graphData?.[2]?.[eventIndex] : '';
-  const eventDescription = typeof rawDescription === 'object' && rawDescription !== null && 'description' in rawDescription
-    ? String((rawDescription as any).description)
-    : String(rawDescription || '');
+  const eventDescription =
+    typeof rawDescription === 'object' && rawDescription !== null && 'description' in rawDescription
+      ? String((rawDescription as any).description)
+      : String(rawDescription || '');
 
   // Find previous event (the parent node)
   const previousNodeId = eventIndex !== -1 ? graphData?.[3]?.[eventIndex] : null;
-  const previousEventId = previousNodeId && String(previousNodeId) !== '0'
-    ? (typeof previousNodeId === 'bigint' ? Number(previousNodeId) : parseInt(String(previousNodeId)))
-    : null;
+  const previousEventId =
+    previousNodeId && String(previousNodeId) !== '0'
+      ? typeof previousNodeId === 'bigint'
+        ? Number(previousNodeId)
+        : parseInt(String(previousNodeId))
+      : null;
 
   // Find next events (all children of this node)
   const nextEventIds: number[] = [];
   const nextEventData: Array<{ id: number; videoUrl: string; description: string }> = [];
   if (graphData && eventIndex !== -1) {
     const currentNodeId = graphData[0][eventIndex];
-    const currentId = typeof currentNodeId === 'bigint' ? Number(currentNodeId) : parseInt(String(currentNodeId));
+    const currentId =
+      typeof currentNodeId === 'bigint' ? Number(currentNodeId) : parseInt(String(currentNodeId));
 
     // Find all nodes that have this node as their parent
     graphData[3]?.forEach((parentId: any, idx: number) => {
-      const parentNumeric = typeof parentId === 'bigint' ? Number(parentId) : parseInt(String(parentId));
+      const parentNumeric =
+        typeof parentId === 'bigint' ? Number(parentId) : parseInt(String(parentId));
       if (parentNumeric === currentId) {
         const childId = graphData[0][idx];
-        const childNumeric = typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
+        const childNumeric =
+          typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
         nextEventIds.push(childNumeric);
 
         const rawDesc = graphData[2]?.[idx];
-        const description = typeof rawDesc === 'object' && rawDesc !== null && 'description' in rawDesc
-          ? String((rawDesc as any).description)
-          : String(rawDesc || `Event ${childNumeric}`);
+        const description =
+          typeof rawDesc === 'object' && rawDesc !== null && 'description' in rawDesc
+            ? String((rawDesc as any).description)
+            : String(rawDesc || `Event ${childNumeric}`);
 
         nextEventData.push({
           id: childNumeric,
           videoUrl: String(graphData[1]?.[idx] || ''),
-          description
+          description,
         });
       }
     });
@@ -74,14 +93,15 @@ function EventPage() {
     });
     if (prevIndex !== -1) {
       const rawPrevDesc = graphData[2]?.[prevIndex];
-      const prevDescription = typeof rawPrevDesc === 'object' && rawPrevDesc !== null && 'description' in rawPrevDesc
-        ? String((rawPrevDesc as any).description)
-        : String(rawPrevDesc || `Event ${previousEventId}`);
+      const prevDescription =
+        typeof rawPrevDesc === 'object' && rawPrevDesc !== null && 'description' in rawPrevDesc
+          ? String((rawPrevDesc as any).description)
+          : String(rawPrevDesc || `Event ${previousEventId}`);
 
       previousEventData = {
         id: previousEventId,
         videoUrl: String(graphData[1]?.[prevIndex] || ''),
-        description: prevDescription
+        description: prevDescription,
       };
     }
   }
@@ -95,7 +115,7 @@ function EventPage() {
       try {
         const result = await trpcClient.wiki.getWiki.query({
           universeId: universeId,
-          eventId: eventId
+          eventId: eventId,
         });
         return result;
       } catch (error) {
@@ -104,7 +124,7 @@ function EventPage() {
       }
     },
     enabled: !!universeId && !!eventId,
-    retry: 1
+    retry: 1,
   });
 
   // Fetch characters to get images for character elements
@@ -118,7 +138,7 @@ function EventPage() {
         console.error('Failed to fetch characters:', error);
         return null;
       }
-    }
+    },
   });
 
   const wiki = wikiData?.wikiData;
@@ -133,7 +153,7 @@ function EventPage() {
             <p className="text-muted-foreground mb-4">
               Please provide both universe and event parameters.
             </p>
-            <Button onClick={() => navigate({ to: "/" })}>
+            <Button onClick={() => navigate({ to: '/' })}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
@@ -212,9 +232,7 @@ function EventPage() {
           <Card className="mb-4 shadow-sm bg-muted/50">
             <CardContent className="p-4">
               <h3 className="text-base font-semibold mb-1.5">Event Description</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {eventDescription}
-              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">{eventDescription}</p>
             </CardContent>
           </Card>
         )}
@@ -223,10 +241,7 @@ function EventPage() {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-bold">Navigate Timeline</h3>
-            <Button
-              variant="outline"
-              onClick={() => navigate({ to: `/universe/${universeId}` })}
-            >
+            <Button variant="outline" onClick={() => navigate({ to: `/universe/${universeId}` })}>
               View Full Timeline
             </Button>
           </div>
@@ -341,7 +356,9 @@ function EventPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">Branch {idx + 1} - Event #{event.id}</p>
+                            <p className="text-sm font-medium">
+                              Branch {idx + 1} - Event #{event.id}
+                            </p>
                             <p className="text-xs text-muted-foreground line-clamp-1">
                               {event.description}
                             </p>
@@ -377,9 +394,7 @@ function EventPage() {
                   {wiki.title}
                 </h2>
                 {wiki.summary && (
-                  <p className="text-base text-muted-foreground leading-relaxed">
-                    {wiki.summary}
-                  </p>
+                  <p className="text-base text-muted-foreground leading-relaxed">{wiki.summary}</p>
                 )}
               </div>
             </div>
@@ -414,17 +429,18 @@ function EventPage() {
 
                   {/* Character details */}
                   <div className="space-y-4">
-                    {wiki.elements.map((element, idx) => {
+                    {wiki.elements.map((element: any, idx: number) => {
                       // Get character image for the detail card
                       let matchingCharacter;
                       if (element.characterId) {
-                        matchingCharacter = charactersData?.characters?.find((char: any) =>
-                          char.id === element.characterId
+                        matchingCharacter = charactersData?.characters?.find(
+                          (char: any) => char.id === element.characterId
                         );
                       }
                       if (!matchingCharacter) {
-                        matchingCharacter = charactersData?.characters?.find((char: any) =>
-                          char.character_name.toLowerCase() === element.name.toLowerCase()
+                        matchingCharacter = charactersData?.characters?.find(
+                          (char: any) =>
+                            char.character_name.toLowerCase() === element.name.toLowerCase()
                         );
                       }
 
@@ -445,8 +461,12 @@ function EventPage() {
 
                               {/* Content */}
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors">{element.name}</h4>
-                                <p className="text-sm text-muted-foreground leading-relaxed mb-3">{element.description}</p>
+                                <h4 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
+                                  {element.name}
+                                </h4>
+                                <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                                  {element.description}
+                                </p>
 
                                 {element.actions && element.actions.length > 0 && (
                                   <div className="bg-muted/30 rounded-lg p-3 border border-primary/10">
@@ -455,8 +475,11 @@ function EventPage() {
                                       Actions
                                     </p>
                                     <ul className="space-y-1.5">
-                                      {element.actions.map((action, actionIdx) => (
-                                        <li key={actionIdx} className="text-xs flex items-start gap-2">
+                                      {element.actions.map((action: any, actionIdx: number) => (
+                                        <li
+                                          key={actionIdx}
+                                          className="text-xs flex items-start gap-2"
+                                        >
                                           <span className="text-primary mt-0.5">•</span>
                                           <span className="text-foreground/90">{action}</span>
                                         </li>
@@ -484,17 +507,23 @@ function EventPage() {
                     Key Moments
                   </h3>
                   <ol className="space-y-3">
-                    {wiki.keyMoments.map((moment, idx) => {
+                    {wiki.keyMoments.map((moment: any, idx: number) => {
                       // Extract string from moment (might be object or string)
-                      const momentText = typeof moment === 'object' && moment !== null && 'description' in moment
-                        ? String((moment as any).description)
-                        : String(moment || '');
+                      const momentText =
+                        typeof moment === 'object' && moment !== null && 'description' in moment
+                          ? String((moment as any).description)
+                          : String(moment || '');
                       return (
-                        <li key={idx} className="group flex items-start gap-3 p-3 rounded-lg hover:bg-primary/5 transition-all duration-300">
+                        <li
+                          key={idx}
+                          className="group flex items-start gap-3 p-3 rounded-lg hover:bg-primary/5 transition-all duration-300"
+                        >
                           <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-sm font-bold flex items-center justify-center shadow group-hover:scale-110 transition-transform duration-300">
                             {idx + 1}
                           </span>
-                          <span className="text-sm leading-relaxed pt-0.5 text-foreground/90 group-hover:text-foreground">{momentText}</span>
+                          <span className="text-sm leading-relaxed pt-0.5 text-foreground/90 group-hover:text-foreground">
+                            {momentText}
+                          </span>
                         </li>
                       );
                     })}
@@ -512,15 +541,23 @@ function EventPage() {
                     Visual Details
                   </h3>
                   <ul className="grid md:grid-cols-2 gap-3">
-                    {wiki.visualDetails.map((detail, idx) => {
+                    {wiki.visualDetails.map((detail: any, idx: number) => {
                       // Extract string from detail (might be object or string)
-                      const detailText = typeof detail === 'object' && detail !== null && 'description' in detail
-                        ? String((detail as any).description)
-                        : String(detail || '');
+                      const detailText =
+                        typeof detail === 'object' && detail !== null && 'description' in detail
+                          ? String((detail as any).description)
+                          : String(detail || '');
                       return (
-                        <li key={idx} className="group flex items-start gap-2 p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 border border-transparent hover:border-primary/20">
-                          <span className="text-primary mt-0.5 group-hover:scale-125 transition-transform duration-300">✦</span>
-                          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{detailText}</span>
+                        <li
+                          key={idx}
+                          className="group flex items-start gap-2 p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 border border-transparent hover:border-primary/20"
+                        >
+                          <span className="text-primary mt-0.5 group-hover:scale-125 transition-transform duration-300">
+                            ✦
+                          </span>
+                          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                            {detailText}
+                          </span>
                         </li>
                       );
                     })}
@@ -561,7 +598,8 @@ function EventPage() {
               <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-2xl font-bold mb-3">No Wiki Available</h3>
               <p className="text-muted-foreground mb-6">
-                This event doesn't have a wiki entry yet. Wikis are automatically generated when events are saved to the blockchain.
+                This event doesn't have a wiki entry yet. Wikis are automatically generated when
+                events are saved to the blockchain.
               </p>
               {eventDescription && (
                 <div className="bg-muted rounded-lg p-4 mb-4">
@@ -576,6 +614,6 @@ function EventPage() {
   );
 }
 
-export const Route = createFileRoute("/event/$universe/$event")({
+export const Route = createFileRoute('/event/$universe/$event')({
   component: EventPage,
 });

@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash } from 'crypto';
 
 // ─── Core Types ──────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ export interface StorageManifest {
 
 export interface ProviderStatus {
   name: string;
-  status: "pending" | "uploading" | "completed" | "failed";
+  status: 'pending' | 'uploading' | 'completed' | 'failed';
   contentId?: string;
   url?: string;
   error?: string;
@@ -34,11 +34,7 @@ export interface StorageProvider {
   readonly priority: number;
 
   isAvailable(): boolean;
-  upload(
-    buffer: Buffer,
-    filename: string,
-    mimeType?: string
-  ): Promise<UploadResult>;
+  upload(buffer: Buffer, filename: string, mimeType?: string): Promise<UploadResult>;
   uploadFromUrl(url: string, filename?: string): Promise<UploadResult>;
   download(contentId: string): Promise<Uint8Array>;
   getPublicUrl(contentId: string): string;
@@ -47,7 +43,7 @@ export interface StorageProvider {
 // ─── Helpers ─────────────────────────────────────────────────
 
 export function computeSha256(buffer: Buffer): string {
-  return createHash("sha256").update(buffer).digest("hex");
+  return createHash('sha256').update(buffer).digest('hex');
 }
 
 export function sha256ToBytes32(hex: string): `0x${string}` {
@@ -66,7 +62,7 @@ export async function fetchToBuffer(
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; LOARStorage/1.0)",
+        'User-Agent': 'Mozilla/5.0 (compatible; LOARStorage/1.0)',
       },
       signal: controller.signal,
     });
@@ -78,7 +74,7 @@ export async function fetchToBuffer(
     const buffer = Buffer.from(await response.arrayBuffer());
 
     if (buffer.length === 0) {
-      throw new Error("Empty response body");
+      throw new Error('Empty response body');
     }
     if (buffer.length > maxBytes) {
       throw new Error(
@@ -86,8 +82,7 @@ export async function fetchToBuffer(
       );
     }
 
-    const contentType =
-      response.headers.get("content-type") || "application/octet-stream";
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
     return { buffer, contentType };
   } finally {
     clearTimeout(timeoutId);
@@ -95,17 +90,17 @@ export async function fetchToBuffer(
 }
 
 export function getMimeType(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
+  const ext = filename.split('.').pop()?.toLowerCase();
   const mimeTypes: Record<string, string> = {
-    mp4: "video/mp4",
-    webm: "video/webm",
-    mov: "video/quicktime",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    json: "application/json",
-    txt: "text/plain",
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    mov: 'video/quicktime',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    json: 'application/json',
+    txt: 'text/plain',
   };
-  return mimeTypes[ext || ""] || "application/octet-stream";
+  return mimeTypes[ext || ''] || 'application/octet-stream';
 }

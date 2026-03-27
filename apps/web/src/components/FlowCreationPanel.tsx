@@ -1,7 +1,7 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Sparkles,
   Loader2,
@@ -16,7 +16,7 @@ import {
   Image as ImageIcon,
   Type,
   Wand2,
-} from "lucide-react";
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import { trpcClient } from '@/utils/trpc';
 
 interface FlowCreationPanelProps {
@@ -72,8 +72,8 @@ interface FlowCreationPanelProps {
   isGeneratingVideo: boolean;
   videoPrompt: string;
   setVideoPrompt: (prompt: string) => void;
-  videoRatio: "16:9" | "9:16" | "1:1";
-  setVideoRatio: (ratio: "16:9" | "9:16" | "1:1") => void;
+  videoRatio: '16:9' | '9:16' | '1:1';
+  setVideoRatio: (ratio: '16:9' | '9:16' | '1:1') => void;
   selectedVideoModel: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
   setSelectedVideoModel: (model: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora') => void;
   selectedVideoDuration: number;
@@ -165,12 +165,16 @@ export function FlowCreationPanel({
   const [isExtractingFrame, setIsExtractingFrame] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>('text-to-video');
+  const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>(
+    'text-to-video'
+  );
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showQuickCharacterDialog, setShowQuickCharacterDialog] = useState(false);
   const [quickCharName, setQuickCharName] = useState('');
   const [quickCharDescription, setQuickCharDescription] = useState('');
-  const [quickCharStyle, setQuickCharStyle] = useState<'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'>('realistic');
+  const [quickCharStyle, setQuickCharStyle] = useState<
+    'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'
+  >('realistic');
   const [isCreatingQuickChar, setIsCreatingQuickChar] = useState(false);
   const [quickCharPreview, setQuickCharPreview] = useState<string | null>(null);
   const [isSavingQuickChar, setIsSavingQuickChar] = useState(false);
@@ -180,9 +184,13 @@ export function FlowCreationPanel({
 
   // Local state for image-to-video character selection (1-2 characters max)
   // Use external state if provided, otherwise use local state
-  const [internalSelectedImageCharacters, setInternalSelectedImageCharacters] = useState<string[]>([]);
-  const selectedImageCharacters = externalSelectedImageCharacters ?? internalSelectedImageCharacters;
-  const setSelectedImageCharacters = externalSetSelectedImageCharacters ?? setInternalSelectedImageCharacters;
+  const [internalSelectedImageCharacters, setInternalSelectedImageCharacters] = useState<string[]>(
+    []
+  );
+  const selectedImageCharacters =
+    externalSelectedImageCharacters ?? internalSelectedImageCharacters;
+  const setSelectedImageCharacters =
+    externalSetSelectedImageCharacters ?? setInternalSelectedImageCharacters;
 
   // Local state for event description (separate from videoDescription which is for prompts)
   const [eventDescription, setEventDescription] = useState('');
@@ -240,11 +248,12 @@ export function FlowCreationPanel({
           .map((charId) => {
             const char = charactersData.characters.find((c: any) => c.id === charId);
             if (!char) return null;
-            const description = char.visual_description || char.user_description || char.character_name || '';
+            const description =
+              char.visual_description || char.user_description || char.character_name || '';
             // Include character even if description is just the name
             return {
               name: char.character_name,
-              description: description.trim()
+              description: description.trim(),
             };
           })
           .filter((c) => c && c.name) as Array<{ name: string; description: string }>;
@@ -252,19 +261,19 @@ export function FlowCreationPanel({
 
       // Determine if we're improving an image prompt (Step 1) or video prompt (Step 2)
       const isImprovingImagePrompt =
-        generationMode === 'image-to-video' &&
-        imageSource === 'create-frame' &&
-        !generatedImageUrl;
+        generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl;
 
       // Call video prompt improvement (works for both image and video prompts)
       const improvedPrompt = await trpcClient.wiki.improveVideoPrompt.mutate({
         userPrompt: videoDescription,
         characterContext: characterContext,
-        previousEventContext: previousEventWiki ? {
-          title: previousEventWiki.title || '',
-          summary: previousEventWiki.summary || '',
-          plot: previousEventWiki.plot || undefined,
-        } : undefined,
+        previousEventContext: previousEventWiki
+          ? {
+              title: previousEventWiki.title || '',
+              summary: previousEventWiki.summary || '',
+              plot: previousEventWiki.plot || undefined,
+            }
+          : undefined,
       });
 
       // The result is just a string (the improved prompt)
@@ -304,7 +313,7 @@ export function FlowCreationPanel({
         name: quickCharName,
         description: quickCharDescription,
         style: quickCharStyle,
-        saveToDatabase: false
+        saveToDatabase: false,
       });
 
       // Set preview image
@@ -317,7 +326,7 @@ export function FlowCreationPanel({
         setStatusMessage({
           type: 'error',
           title: 'Generation Failed',
-          description: 'Failed to generate character. Please try again.'
+          description: 'Failed to generate character. Please try again.',
         });
       }
     } finally {
@@ -335,7 +344,7 @@ export function FlowCreationPanel({
         name: quickCharName,
         description: quickCharDescription,
         style: quickCharStyle,
-        saveToDatabase: true
+        saveToDatabase: true,
       });
 
       // Step 1: Analyze character image with Gemini (if available)
@@ -385,7 +394,7 @@ export function FlowCreationPanel({
         setStatusMessage({
           type: 'success',
           title: 'Character Saved',
-          description: `${quickCharName} has been saved successfully!`
+          description: `${quickCharName} has been saved successfully!`,
         });
       }
     } catch (error) {
@@ -394,14 +403,16 @@ export function FlowCreationPanel({
         setStatusMessage({
           type: 'error',
           title: 'Save Failed',
-          description: error instanceof Error ? error.message : 'Failed to save character to database. Please try again.'
+          description:
+            error instanceof Error
+              ? error.message
+              : 'Failed to save character to database. Please try again.',
         });
       }
     } finally {
       setIsSavingQuickChar(false);
     }
   };
-
 
   // Reset when dialog closes
   useEffect(() => {
@@ -421,12 +432,12 @@ export function FlowCreationPanel({
     'fal-veo3': 'Veo 3.1 - Fast',
     'fal-kling': 'Kling 2.5',
     'fal-wan25': 'Wan 2.5',
-    'fal-sora': 'Sora 2'
+    'fal-sora': 'Sora 2',
   };
 
   const modeNames = {
     'text-to-video': 'Text to Video',
-    'image-to-video': 'Image to Video'
+    'image-to-video': 'Image to Video',
   };
 
   return (
@@ -469,19 +480,21 @@ export function FlowCreationPanel({
                 <div className="space-y-2">
                   <Label>Style</Label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['realistic', 'anime', 'cute', 'fantasy', 'cyberpunk'] as const).map((style) => (
-                      <button
-                        key={style}
-                        onClick={() => setQuickCharStyle(style)}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors capitalize ${
-                          quickCharStyle === style
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        {style}
-                      </button>
-                    ))}
+                    {(['realistic', 'anime', 'cute', 'fantasy', 'cyberpunk'] as const).map(
+                      (style) => (
+                        <button
+                          key={style}
+                          onClick={() => setQuickCharStyle(style)}
+                          className={`px-3 py-2 text-sm rounded-md border transition-colors capitalize ${
+                            quickCharStyle === style
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-input bg-background hover:bg-muted'
+                          }`}
+                        >
+                          {style}
+                        </button>
+                      )
+                    )}
                   </div>
                 </div>
               </>
@@ -517,7 +530,9 @@ export function FlowCreationPanel({
                   </Button>
                   <Button
                     onClick={handleQuickCharacterGenerate}
-                    disabled={!quickCharName.trim() || !quickCharDescription.trim() || isCreatingQuickChar}
+                    disabled={
+                      !quickCharName.trim() || !quickCharDescription.trim() || isCreatingQuickChar
+                    }
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                   >
                     {isCreatingQuickChar ? (
@@ -600,10 +615,7 @@ export function FlowCreationPanel({
 
             {/* Save Button */}
             <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowSaveDialog(false)}
-              >
+              <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
                 Cancel
               </Button>
               <Button
@@ -665,8 +677,8 @@ export function FlowCreationPanel({
                     onClick={() => setSelectedVideoModel(model)}
                     className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${
                       selectedVideoModel === model
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background hover:bg-muted'
                     }`}
                   >
                     {modelNames[model]}
@@ -685,8 +697,8 @@ export function FlowCreationPanel({
                     onClick={() => setVideoRatio(ratio)}
                     className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
                       videoRatio === ratio
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background hover:bg-muted'
                     }`}
                   >
                     {ratio}
@@ -699,37 +711,39 @@ export function FlowCreationPanel({
             <div className="space-y-2">
               <Label>Duration</Label>
               <div className="flex gap-2">
-                {selectedVideoModel === 'fal-sora' && [4, 8, 12].map((duration) => (
-                  <button
-                    key={duration}
-                    onClick={() => setSelectedVideoDuration(duration)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      selectedVideoDuration === duration
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
-                    }`}
-                  >
-                    {duration}s
-                  </button>
-                ))}
+                {selectedVideoModel === 'fal-sora' &&
+                  [4, 8, 12].map((duration) => (
+                    <button
+                      key={duration}
+                      onClick={() => setSelectedVideoDuration(duration)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                        selectedVideoDuration === duration
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-input bg-background hover:bg-muted'
+                      }`}
+                    >
+                      {duration}s
+                    </button>
+                  ))}
                 {selectedVideoModel === 'fal-veo3' && (
                   <button className="flex-1 px-3 py-2 text-sm rounded-md border border-primary bg-primary text-primary-foreground">
                     8s
                   </button>
                 )}
-                {(selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-wan25') && [5, 10].map((duration) => (
-                  <button
-                    key={duration}
-                    onClick={() => setSelectedVideoDuration(duration)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      selectedVideoDuration === duration
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
-                    }`}
-                  >
-                    {duration}s
-                  </button>
-                ))}
+                {(selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-wan25') &&
+                  [5, 10].map((duration) => (
+                    <button
+                      key={duration}
+                      onClick={() => setSelectedVideoDuration(duration)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                        selectedVideoDuration === duration
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-input bg-background hover:bg-muted'
+                      }`}
+                    >
+                      {duration}s
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -738,15 +752,24 @@ export function FlowCreationPanel({
               <div className="space-y-2">
                 <Label>Selected Characters</Label>
                 <div className="flex flex-wrap gap-2">
-                  {selectedCharacters.map(charId => {
+                  {selectedCharacters.map((charId) => {
                     const char = charactersData.characters.find((c: any) => c.id === charId);
                     if (!char) return null;
                     return (
-                      <div key={charId} className="flex items-center gap-2 px-2 py-1 rounded-md border bg-background text-sm">
-                        <img src={char.image_url} alt={char.character_name} className="w-6 h-6 rounded-full object-cover" />
+                      <div
+                        key={charId}
+                        className="flex items-center gap-2 px-2 py-1 rounded-md border bg-background text-sm"
+                      >
+                        <img
+                          src={char.image_url}
+                          alt={char.character_name}
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
                         <span>{char.character_name}</span>
                         <button
-                          onClick={() => setSelectedCharacters(prev => prev.filter(id => id !== charId))}
+                          onClick={() =>
+                            setSelectedCharacters((prev) => prev.filter((id) => id !== charId))
+                          }
                           className="text-muted-foreground hover:text-destructive ml-1"
                         >
                           ×
@@ -770,15 +793,21 @@ export function FlowCreationPanel({
               <div className="rounded border-0 p-2 bg-black/80 backdrop-blur-sm shadow-lg">
                 <div className="flex items-start gap-2">
                   <div className="mt-0.5">
-                    {statusMessage.type === 'error' && <XCircle className="h-3.5 w-3.5 text-red-400" />}
-                    {statusMessage.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />}
-                    {statusMessage.type === 'warning' && <AlertCircle className="h-3.5 w-3.5 text-yellow-400" />}
-                    {statusMessage.type === 'info' && <Info className="h-3.5 w-3.5 text-blue-400" />}
+                    {statusMessage.type === 'error' && (
+                      <XCircle className="h-3.5 w-3.5 text-red-400" />
+                    )}
+                    {statusMessage.type === 'success' && (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                    )}
+                    {statusMessage.type === 'warning' && (
+                      <AlertCircle className="h-3.5 w-3.5 text-yellow-400" />
+                    )}
+                    {statusMessage.type === 'info' && (
+                      <Info className="h-3.5 w-3.5 text-blue-400" />
+                    )}
                   </div>
                   <div className="flex-1 space-y-0.5">
-                    <h4 className="text-xs font-medium text-white">
-                      {statusMessage.title}
-                    </h4>
+                    <h4 className="text-xs font-medium text-white">{statusMessage.title}</h4>
                     <p className="text-[10px] text-white/60 whitespace-pre-line">
                       {statusMessage.description}
                     </p>
@@ -805,7 +834,6 @@ export function FlowCreationPanel({
               </div>
             </div>
           )}
-
 
           {/* Compact Main Panel */}
           <Card className="bg-black/90 backdrop-blur-sm shadow-2xl border-0 flex flex-col overflow-hidden">
@@ -920,8 +948,8 @@ export function FlowCreationPanel({
               {generationMode === 'image-to-video' && (
                 <div className="space-y-1.5">
                   {/* Show video preview if generated, otherwise show extracted frame for Previous Event tab */}
-                  {imageSource === 'last-frame' && (
-                    generatedVideoUrl ? (
+                  {imageSource === 'last-frame' &&
+                    (generatedVideoUrl ? (
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <Label className="text-[10px] text-white/70 flex items-center gap-1">
@@ -958,8 +986,7 @@ export function FlowCreationPanel({
                           </div>
                         </div>
                       </div>
-                    ) : null
-                  )}
+                    ) : null)}
 
                   {/* Character Selection Tab */}
                   {imageSource === 'create-frame' && (
@@ -1013,91 +1040,95 @@ export function FlowCreationPanel({
 
                       {/* Character Grid - Hidden when preview is shown */}
                       {!generatedImageUrl && !generatedVideoUrl && (
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <Label className="text-[10px] text-white/70">
-                              Characters ({selectedImageCharacters.length}/2)
-                            </Label>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowQuickCharacterDialog(true)}
-                              className="h-4 w-4 p-0 text-white/70 hover:text-white hover:bg-white/20 rounded-full"
-                              title="Create new character"
-                            >
-                              <UserPlus className="h-3 w-3" />
-                            </Button>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <Label className="text-[10px] text-white/70">
+                                Characters ({selectedImageCharacters.length}/2)
+                              </Label>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowQuickCharacterDialog(true)}
+                                className="h-4 w-4 p-0 text-white/70 hover:text-white hover:bg-white/20 rounded-full"
+                                title="Create new character"
+                              >
+                                <UserPlus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            {selectedImageCharacters.length > 0 && (
+                              <button
+                                onClick={() => setSelectedImageCharacters([])}
+                                className="text-[9px] text-white/60 hover:text-white transition-colors"
+                              >
+                                Clear
+                              </button>
+                            )}
                           </div>
-                          {selectedImageCharacters.length > 0 && (
-                            <button
-                              onClick={() => setSelectedImageCharacters([])}
-                              className="text-[9px] text-white/60 hover:text-white transition-colors"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
 
-                        {charactersData?.characters && charactersData.characters.length > 0 ? (
-                          <div className="grid grid-cols-5 gap-2 p-2 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-lg border border-white/10 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-                            {charactersData.characters.map((char: any) => {
-                              const isSelected = selectedImageCharacters.includes(char.id);
-                              const selectionIndex = selectedImageCharacters.indexOf(char.id);
+                          {charactersData?.characters && charactersData.characters.length > 0 ? (
+                            <div className="grid grid-cols-5 gap-2 p-2 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-lg border border-white/10 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+                              {charactersData.characters.map((char: any) => {
+                                const isSelected = selectedImageCharacters.includes(char.id);
+                                const selectionIndex = selectedImageCharacters.indexOf(char.id);
 
-                              return (
-                                <button
-                                  key={char.id}
-                                  onClick={() => toggleCharacterSelection(char.id)}
-                                  className={`group relative aspect-square rounded-lg overflow-hidden transition-all duration-200 ${
-                                    isSelected
-                                      ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-black scale-95 shadow-lg shadow-purple-500/50'
-                                      : 'ring-1 ring-white/20 hover:ring-white/40 hover:scale-105'
-                                  }`}
-                                >
-                                  {/* Character Image */}
-                                  <div className="relative w-full h-full">
-                                    <img
-                                      src={char.image_url}
-                                      alt={char.character_name}
-                                      className={`w-full h-full object-cover transition-all ${
-                                        isSelected ? 'brightness-90' : 'brightness-100 group-hover:brightness-110'
+                                return (
+                                  <button
+                                    key={char.id}
+                                    onClick={() => toggleCharacterSelection(char.id)}
+                                    className={`group relative aspect-square rounded-lg overflow-hidden transition-all duration-200 ${
+                                      isSelected
+                                        ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-black scale-95 shadow-lg shadow-purple-500/50'
+                                        : 'ring-1 ring-white/20 hover:ring-white/40 hover:scale-105'
+                                    }`}
+                                  >
+                                    {/* Character Image */}
+                                    <div className="relative w-full h-full">
+                                      <img
+                                        src={char.image_url}
+                                        alt={char.character_name}
+                                        className={`w-full h-full object-cover transition-all ${
+                                          isSelected
+                                            ? 'brightness-90'
+                                            : 'brightness-100 group-hover:brightness-110'
+                                        }`}
+                                      />
+                                      {/* Gradient overlay */}
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+
+                                    {/* Selection Badge */}
+                                    {isSelected && (
+                                      <div className="absolute top-1 right-1 bg-gradient-to-br from-purple-500 to-purple-600 text-white text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-purple-300/50">
+                                        {selectionIndex + 1}
+                                      </div>
+                                    )}
+
+                                    {/* Character Name */}
+                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/90 to-transparent p-1.5 pt-4">
+                                      <span className="text-[9px] text-white font-semibold line-clamp-1 drop-shadow">
+                                        {char.character_name}
+                                      </span>
+                                    </div>
+
+                                    {/* Hover Effect Border */}
+                                    <div
+                                      className={`absolute inset-0 rounded-lg bg-gradient-to-tr from-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
+                                        isSelected ? 'opacity-30' : ''
                                       }`}
                                     />
-                                    {/* Gradient overlay */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                  </div>
-
-                                  {/* Selection Badge */}
-                                  {isSelected && (
-                                    <div className="absolute top-1 right-1 bg-gradient-to-br from-purple-500 to-purple-600 text-white text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-purple-300/50">
-                                      {selectionIndex + 1}
-                                    </div>
-                                  )}
-
-                                  {/* Character Name */}
-                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/90 to-transparent p-1.5 pt-4">
-                                    <span className="text-[9px] text-white font-semibold line-clamp-1 drop-shadow">
-                                      {char.character_name}
-                                    </span>
-                                  </div>
-
-                                  {/* Hover Effect Border */}
-                                  <div className={`absolute inset-0 rounded-lg bg-gradient-to-tr from-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
-                                    isSelected ? 'opacity-30' : ''
-                                  }`} />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-center py-4 text-xs text-white/50 bg-white/5 rounded-lg border border-white/10">
-                            <UserPlus className="h-6 w-6 mx-auto mb-1 text-white/30" />
-                            <p>No characters available</p>
-                            <p className="text-[10px] mt-0.5">Create one to get started</p>
-                          </div>
-                        )}
-                      </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-xs text-white/50 bg-white/5 rounded-lg border border-white/10">
+                              <UserPlus className="h-6 w-6 mx-auto mb-1 text-white/30" />
+                              <p>No characters available</p>
+                              <p className="text-[10px] mt-0.5">Create one to get started</p>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -1110,17 +1141,25 @@ export function FlowCreationPanel({
                   {previousEventDescription && (
                     <div>
                       <span className="text-white/50">Previous: </span>
-                      <span className="text-white/90">{previousEventDescription.substring(0, 100)}{previousEventDescription.length > 100 ? '...' : ''}</span>
+                      <span className="text-white/90">
+                        {previousEventDescription.substring(0, 100)}
+                        {previousEventDescription.length > 100 ? '...' : ''}
+                      </span>
                     </div>
                   )}
                   {selectedCharacters.length > 0 && charactersData?.characters && (
                     <div>
                       <span className="text-white/50">Characters: </span>
                       <span className="text-white/90">
-                        {selectedCharacters.map(charId => {
-                          const char = charactersData.characters.find((c: any) => c.id === charId);
-                          return char?.character_name;
-                        }).filter(Boolean).join(', ')}
+                        {selectedCharacters
+                          .map((charId) => {
+                            const char = charactersData.characters.find(
+                              (c: any) => c.id === charId
+                            );
+                            return char?.character_name;
+                          })
+                          .filter(Boolean)
+                          .join(', ')}
                       </span>
                     </div>
                   )}
@@ -1132,11 +1171,13 @@ export function FlowCreationPanel({
                 {/* Label based on current step */}
                 <div className="flex items-center justify-between">
                   <Label className="text-[10px] text-white/70">
-                    {generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl
+                    {generationMode === 'image-to-video' &&
+                    imageSource === 'create-frame' &&
+                    !generatedImageUrl
                       ? 'Step 1: Describe the frame'
                       : generatedImageUrl && !generatedVideoUrl
-                      ? 'Step 2: Describe the animation'
-                      : 'Describe your scene'}
+                        ? 'Step 2: Describe the animation'
+                        : 'Describe your scene'}
                   </Label>
                 </div>
 
@@ -1146,11 +1187,11 @@ export function FlowCreationPanel({
                   placeholder={
                     generationMode === 'text-to-video'
                       ? previousEventDescription
-                        ? "Continue the story..."
-                        : "Describe your scene..."
+                        ? 'Continue the story...'
+                        : 'Describe your scene...'
                       : imageSource === 'create-frame' && !generatedImageUrl
-                      ? "Describe the scene with your characters..."
-                      : "Describe how the image should animate..."
+                        ? 'Describe the scene with your characters...'
+                        : 'Describe how the image should animate...'
                   }
                   rows={3}
                   className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
@@ -1174,11 +1215,13 @@ export function FlowCreationPanel({
                       ) : (
                         <>
                           <Wand2 className="h-3 w-3 mr-1.5" />
-                          {generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl
+                          {generationMode === 'image-to-video' &&
+                          imageSource === 'create-frame' &&
+                          !generatedImageUrl
                             ? 'Improve Frame Prompt'
                             : generatedImageUrl && !generatedVideoUrl
-                            ? 'Improve Animation Prompt'
-                            : 'Improve with AI'}
+                              ? 'Improve Animation Prompt'
+                              : 'Improve with AI'}
                         </>
                       )}
                     </Button>
@@ -1190,42 +1233,50 @@ export function FlowCreationPanel({
               {!generatedVideoUrl ? (
                 <>
                   {/* Show "Generate Frame" button in create-frame mode when no frame exists */}
-                  {generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl && (
-                    <Button
-                      onClick={handleGenerateCharacterFrame}
-                      disabled={
-                        isGeneratingImage ||
-                        !videoDescription.trim() ||
-                        selectedImageCharacters.length === 0
-                      }
-                      size="sm"
-                      className="h-10 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium"
-                    >
-                      {isGeneratingImage ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating Frame...
-                        </>
-                      ) : (
-                        <>
-                          <ImageIcon className="h-4 w-4 mr-2" />
-                          Generate Frame with Characters
-                        </>
-                      )}
-                    </Button>
-                  )}
+                  {generationMode === 'image-to-video' &&
+                    imageSource === 'create-frame' &&
+                    !generatedImageUrl && (
+                      <Button
+                        onClick={handleGenerateCharacterFrame}
+                        disabled={
+                          isGeneratingImage ||
+                          !videoDescription.trim() ||
+                          selectedImageCharacters.length === 0
+                        }
+                        size="sm"
+                        className="h-10 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium"
+                      >
+                        {isGeneratingImage ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Generating Frame...
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="h-4 w-4 mr-2" />
+                            Generate Frame with Characters
+                          </>
+                        )}
+                      </Button>
+                    )}
 
                   {/* Show "Generate Video" button in other cases */}
                   {(generationMode === 'text-to-video' ||
                     (generationMode === 'image-to-video' && imageSource === 'last-frame') ||
-                    (generationMode === 'image-to-video' && imageSource === 'create-frame' && generatedImageUrl)) && (
+                    (generationMode === 'image-to-video' &&
+                      imageSource === 'create-frame' &&
+                      generatedImageUrl)) && (
                     <Button
                       onClick={handleGenerateVideo}
                       disabled={
                         !videoDescription.trim() ||
                         isGeneratingVideo ||
-                        (generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl) ||
-                        (generationMode === 'image-to-video' && imageSource === 'last-frame' && !extractedFrameUrl)
+                        (generationMode === 'image-to-video' &&
+                          imageSource === 'create-frame' &&
+                          !generatedImageUrl) ||
+                        (generationMode === 'image-to-video' &&
+                          imageSource === 'last-frame' &&
+                          !extractedFrameUrl)
                       }
                       size="sm"
                       className="h-10 w-full bg-white text-black hover:bg-white/90 text-sm font-medium"
@@ -1286,7 +1337,6 @@ export function FlowCreationPanel({
           </p>
         </div>
       </div>
-
     </>
   );
 }

@@ -52,9 +52,7 @@ export function useUploadQueue() {
     queryFn: async () => {
       if (activeJobIds.length === 0) return [];
       const results = await Promise.all(
-        activeJobIds.map((id) =>
-          trpcClient.storage.uploadStatus.query({ jobId: id })
-        )
+        activeJobIds.map((id) => trpcClient.storage.uploadStatus.query({ jobId: id }))
       );
       return results.filter(Boolean) as UploadJobStatus[];
     },
@@ -66,9 +64,7 @@ export function useUploadQueue() {
   const completedJobs = jobStatuses?.filter((j) => j.status === 'completed') || [];
   if (completedJobs.length > 0) {
     setTimeout(() => {
-      setActiveJobIds((prev) =>
-        prev.filter((id) => !completedJobs.some((j) => j.id === id))
-      );
+      setActiveJobIds((prev) => prev.filter((id) => !completedJobs.some((j) => j.id === id)));
     }, 10_000);
   }
 

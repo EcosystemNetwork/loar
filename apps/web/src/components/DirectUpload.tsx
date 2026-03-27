@@ -80,42 +80,40 @@ export function DirectUpload({
         formData.append('file', file);
 
         // Use XMLHttpRequest for progress tracking
-        const result = await new Promise<{ manifest: StorageManifest }>(
-          (resolve, reject) => {
-            const xhr = new XMLHttpRequest();
+        const result = await new Promise<{ manifest: StorageManifest }>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
 
-            xhr.upload.addEventListener('progress', (event) => {
-              if (event.lengthComputable) {
-                const pct = Math.round((event.loaded / event.total) * 100);
-                setProgress(pct);
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              const pct = Math.round((event.loaded / event.total) * 100);
+              setProgress(pct);
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch {
+                reject(new Error('Invalid response'));
               }
-            });
-
-            xhr.addEventListener('load', () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  resolve(JSON.parse(xhr.responseText));
-                } catch {
-                  reject(new Error('Invalid response'));
-                }
-              } else {
-                try {
-                  const err = JSON.parse(xhr.responseText);
-                  reject(new Error(err.error || `HTTP ${xhr.status}`));
-                } catch {
-                  reject(new Error(`HTTP ${xhr.status}`));
-                }
+            } else {
+              try {
+                const err = JSON.parse(xhr.responseText);
+                reject(new Error(err.error || `HTTP ${xhr.status}`));
+              } catch {
+                reject(new Error(`HTTP ${xhr.status}`));
               }
-            });
+            }
+          });
 
-            xhr.addEventListener('error', () => reject(new Error('Network error')));
-            xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
-            xhr.open('POST', `${serverUrl}/api/upload`);
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-            xhr.send(formData);
-          }
-        );
+          xhr.open('POST', `${serverUrl}/api/upload`);
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.send(formData);
+        });
 
         const previewUrl = URL.createObjectURL(file);
         onUploadComplete(result.manifest, previewUrl);
@@ -180,9 +178,10 @@ export function DirectUpload({
       onClick={handleClick}
       className={`
         relative cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors
-        ${isDragging
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-          : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+        ${
+          isDragging
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
         }
         ${isUploading ? 'pointer-events-none opacity-70' : ''}
       `}

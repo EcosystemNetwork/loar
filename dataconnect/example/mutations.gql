@@ -2,7 +2,10 @@
 
 # Create a movie based on user input
 mutation CreateMovie($title: String!, $genre: String!, $imageUrl: String!)
-@auth(level: USER_EMAIL_VERIFIED, insecureReason: "Any email verified users can create a new movie.") {
+@auth(
+  level: USER_EMAIL_VERIFIED
+  insecureReason: "Any email verified users can create a new movie."
+) {
   movie_insert(data: { title: $title, genre: $genre, imageUrl: $imageUrl })
 }
 
@@ -13,8 +16,7 @@ mutation UpsertUser($username: String!) @auth(level: USER) {
 }
 
 # Add a review for a movie
-mutation AddReview($movieId: UUID!, $rating: Int!, $reviewText: String!)
-@auth(level: USER) {
+mutation AddReview($movieId: UUID!, $rating: Int!, $reviewText: String!) @auth(level: USER) {
   review_upsert(
     data: {
       userId_expr: "auth.uid"

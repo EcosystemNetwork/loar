@@ -89,7 +89,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint id
     ) public payable nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
-        require(universe.getAdmin() == msg.sender, "Not universe owner");
+        require(address(universe) != address(0), "Universe does not exist");
         if (universe.getAdmin() != msg.sender) {
           revert CallerIsNotOwner();
         }
@@ -111,6 +111,9 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
                 deploymentConfig,
                 id
             );
+
+        require(_tokenAddress != address(0), "Token deployment returned zero address");
+        require(governor != address(0), "Governor deployment returned zero address");
 
         tokenAddress = _tokenAddress;
 

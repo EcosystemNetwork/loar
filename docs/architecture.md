@@ -1,0 +1,199 @@
+# Architecture
+
+## System Overview
+
+```mermaid
+graph TD
+    subgraph Frontend
+        WEB[Web App<br/>React 18 + Vite<br/>:3001]
+    end
+
+    subgraph Backend
+        SERVER[API Server<br/>Hono + tRPC<br/>:3000]
+        INDEXER[Blockchain Indexer<br/>Ponder v0.15<br/>:42069]
+    end
+
+    subgraph External Services
+        FIREBASE[(Firebase<br/>Firestore + Auth)]
+        FAL[Fal AI<br/>Video Generation]
+        GEMINI[Google Gemini<br/>Wiki Generation]
+        OPENAI[OpenAI<br/>Storyline Generation]
+        SYNAPSE[Synapse/Filecoin<br/>Decentralized Storage]
+        FB_STORAGE[Firebase Storage<br/>File Storage]
+    end
+
+    subgraph Blockchain
+        SEPOLIA[Sepolia Testnet<br/>Smart Contracts]
+    end
+
+    WEB -->|tRPC over HTTP| SERVER
+    WEB -->|GraphQL| INDEXER
+    WEB -->|wagmi + RainbowKit| SEPOLIA
+
+    SERVER --> FIREBASE
+    SERVER --> FAL
+    SERVER --> GEMINI
+    SERVER --> OPENAI
+    SERVER --> SYNAPSE
+    SERVER --> FB_STORAGE
+
+    INDEXER -->|RPC polling| SEPOLIA
+```
+
+## Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Web as Web App
+    participant Firebase as Firebase Auth
+    participant Server as API Server
+
+    User->>Web: Sign in (email/password)
+    Web->>Firebase: signInWithEmailAndPassword()
+    Firebase-->>Web: UserCredential
+    Web->>Web: onAuthStateChanged() stores user state
+
+    Note over Web,Server: On each tRPC request:
+    Web->>Firebase: currentUser.getIdToken()
+    Firebase-->>Web: ID Token (JWT)
+    Web->>Server: tRPC request + Authorization: Bearer <token>
+    Server->>Firebase: adminAuth.verifyIdToken(token)
+    Firebase-->>Server: DecodedIdToken { uid, email, ... }
+    Server->>Server: ctx.user = DecodedIdToken
+    Server-->>Web: Response
+```
+
+### Key Auth Files
+
+| File                              | Role                                                    |
+| --------------------------------- | ------------------------------------------------------- |
+| `apps/web/src/lib/firebase.ts`    | Firebase client SDK initialization                      |
+| `apps/web/src/lib/auth-client.ts` | `useAuth()` hook, `signIn()`, `signUp()`, `signOut()`   |
+| `apps/web/src/utils/trpc.ts`      | Attaches Bearer token to tRPC requests                  |
+| `apps/server/src/lib/firebase.ts` | Firebase Admin SDK init (exports `db`, `adminAuth`)     |
+| `apps/server/src/lib/auth.ts`     | `verifyAuth()` — extracts and verifies Bearer token     |
+| `apps/server/src/lib/context.ts`  | `createContext()` — sets `ctx.user` from verified token |
+| `apps/server/src/lib/trpc.ts`     | Defines `publicProcedure` and `protectedProcedure`      |
+
+### Access Control
+
+- **`publicProcedure`** — No authentication required. Used for read-only queries (characters, health check).
+- **`protectedProcedure`** — Requires valid Firebase ID token. Rejects with UNAUTHORIZED if `ctx.user` is null. Used for private data access.
+
+## Server Architecture
+
+**Entry point:** `apps/server/src/index.ts`
+
+The server uses [Hono](https://hono.dev/) as the HTTP framework with middleware:
+
+1. **Logger** — Request/response logging
+2. **CORS** — Origin restricted to `CORS_ORIGIN` env var
+3. **Image routes** — `GET /images/*` serves stored images
+4. **Filecoin route** — `GET /api/filecoin/:pieceCid` streams content from Filecoin/Synapse
+5. **tRPC** — `POST /trpc/*` handles all tRPC procedures
+6. **Health** — `GET /` returns "OK", `GET /health` returns JSON status
+
+### tRPC Router Tree
+
+```
+appRouter
+├── healthCheck          (query, public)
+├── privateData          (query, protected)
+├── cinematicUniverses   (sub-router)
+│   ├── createcu         (mutation)
+│   ├── get              (query)
+│   ├── getAll           (query)
+│   └── getByCreator     (query)
+├── fal                  (sub-router)
+│   ├── generateImage    (mutation)
+│   ├── generateVideo    (mutation)
+│   └── generateCharacter (mutation)
+├── wiki                 (sub-router)
+│   ├── characters       (query)
+│   ├── character        (query)
+│   ├── generateEventWikia (mutation)
+│   ├── generateStoryline  (mutation)
+│   ├── generateFromVideo  (mutation)
+│   ├── getWiki          (query)
+│   ├── getUniverseWikis (query)
+│   └── improveVideoPrompt (mutation)
+├── video                (sub-router)
+│   └── generateWithProvider (mutation)
+├── minio                (sub-router)
+│   ├── uploadFromUrl    (mutation)
+│   ├── download         (query)
+│   └── getPublicUrl     (query)
+└── synapse              (sub-router)
+    ├── uploadFromUrl    (mutation)
+    ├── download         (query)
+    └── getHttpUrl       (query)
+```
+
+### Services
+
+| Service | File                  | External API          | Purpose                             |
+| ------- | --------------------- | --------------------- | ----------------------------------- |
+| Fal AI  | `services/fal.ts`     | fal.ai                | Image and video generation          |
+| Gemini  | `services/gemini.ts`  | Google Gemini 2.5 Pro | Wiki generation from video analysis |
+| MinIO\* | `services/minio.ts`   | Firebase Storage      | File upload/download                |
+| Synapse | `services/synapse.ts` | Filecoin/Synapse      | Decentralized video storage         |
+| Wikia   | `services/wikia.ts`   | OpenAI                | Storyline generation                |
+
+_Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved)._
+
+## Web Architecture
+
+**Entry point:** `apps/web/src/main.tsx`
+
+| Layer         | Technology               | Purpose                                 |
+| ------------- | ------------------------ | --------------------------------------- |
+| Bundler       | Vite                     | Dev server (port 3001), build           |
+| Routing       | TanStack Router          | File-based routing (`src/routes/`)      |
+| Data Fetching | TanStack Query + tRPC    | Server state management                 |
+| Web3          | wagmi + RainbowKit       | Wallet connection, contract interaction |
+| Auth          | Firebase Auth            | Email/password authentication           |
+| UI            | Tailwind CSS + shadcn/ui | Component library                       |
+| Flow Editor   | ReactFlow                | Narrative node visualization            |
+
+### Route Map
+
+| Route                      | Description                        |
+| -------------------------- | ---------------------------------- |
+| `/`                        | Home / landing page                |
+| `/login`                   | Authentication (sign in / sign up) |
+| `/dashboard`               | User dashboard                     |
+| `/market`                  | Token marketplace                  |
+| `/cinematicUniverseCreate` | Create new universe                |
+| `/universe/$id`            | Universe detail view               |
+| `/event.$universe.$event`  | Event detail within universe       |
+
+### Environment Variable Loading
+
+The web app reads env vars from the root `.env` file via Vite's `envDir` config in `vite.config.ts`. Only variables prefixed with `VITE_` are exposed to the browser.
+
+## Indexer Architecture
+
+**Framework:** [Ponder v0.15](https://ponder.sh/)
+
+The indexer watches Sepolia blockchain events and builds a queryable GraphQL API.
+
+### Factory Pattern
+
+The indexer uses Ponder's factory pattern:
+
+1. **UniverseManager** is the root contract (fixed address)
+2. When `UniverseCreated` fires, Ponder dynamically tracks the new **Universe** contract
+3. When `TokenCreated` fires, Ponder tracks the new **GovernanceERC20** and **UniverseGovernor** contracts
+
+### Indexed Data
+
+- **Universes** — Creator, name, description, image, token/governor addresses
+- **Nodes** — Narrative nodes forming a tree (previousNodeId links)
+- **Tokens** — ERC20 governance tokens, transfers, holders, balances
+- **Pools** — Uniswap v4 pools, swaps
+- **Proposals** — Governance proposals, votes, executions, cancellations
+
+### GraphQL API
+
+Available at `http://localhost:42069/graphql` during development. See [docs/api.md](api.md) for query examples.

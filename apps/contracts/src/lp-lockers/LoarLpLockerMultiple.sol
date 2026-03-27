@@ -363,6 +363,8 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         external
     {
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
+        require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
+        require(newRecipient != address(0), "Cannot set zero address recipient");
 
         // Only admin can replace the reward recipient
         if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
@@ -379,13 +381,15 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     // Replace the reward admin
     function updateRewardAdmin(address token, uint256 rewardIndex, address newAdmin) external {
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
+        require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
+        require(newAdmin != address(0), "Cannot set zero address admin");
 
-        // Only admin can replace the reward recipient
+        // Only admin can replace the reward admin
         if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
             revert Unauthorized();
         }
 
-        // Add the new recipient
+        // Add the new admin
         address oldAdmin = tokenRewardInfo.rewardAdmins[rewardIndex];
         tokenRewardInfo.rewardAdmins[rewardIndex] = newAdmin;
 
@@ -408,7 +412,9 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
     // Withdraw ETH from the contract
     function withdrawETH(address recipient) public onlyOwner nonReentrant {
-        payable(recipient).transfer(address(this).balance);
+        require(recipient != address(0), "Invalid recipient");
+        (bool success, ) = payable(recipient).call{value: address(this).balance}("");
+        require(success, "ETH transfer failed");
     }
 
     // Withdraw ERC20 tokens from the contract
