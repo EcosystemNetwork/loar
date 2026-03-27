@@ -7,7 +7,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import Header from '@/components/header';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +53,7 @@ function ProfilePage() {
   if (profileLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+
         <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -64,7 +64,7 @@ function ProfilePage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+
         <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 'calc(100vh - 64px)' }}>
           <h2 className="text-xl font-semibold">Profile not found</h2>
           <p className="text-muted-foreground">The user @{username} doesn't exist.</p>
@@ -80,7 +80,7 @@ function ProfilePage() {
   if (profile.visibility === 'private') {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+
         <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 'calc(100vh - 64px)' }}>
           <Lock className="h-12 w-12 text-muted-foreground" />
           <h2 className="text-xl font-semibold">{profile.displayName}</h2>
@@ -106,7 +106,7 @@ function ProfilePage() {
 
   return (
     <div className={`min-h-screen bg-background ${themeClass}`}>
-      <Header />
+
 
       {/* Banner */}
       <div

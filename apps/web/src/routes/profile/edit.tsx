@@ -8,7 +8,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import Header from '@/components/header';
+
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -197,7 +197,7 @@ function ProfileEditor() {
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+
         <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -208,7 +208,7 @@ function ProfileEditor() {
   if (!isAuthed) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+
         <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 'calc(100vh - 64px)' }}>
           <h2 className="text-xl font-semibold">Connect your wallet to create a profile</h2>
           <p className="text-muted-foreground">Sign in with your wallet or email to get started</p>
@@ -220,7 +220,7 @@ function ProfileEditor() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <div className="flex items-center justify-between mb-8">
           <div>

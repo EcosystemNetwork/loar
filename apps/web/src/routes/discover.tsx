@@ -7,7 +7,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import Header from '@/components/header';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +57,7 @@ function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+
 
       {/* Hero */}
       <div className="border-b bg-gradient-to-r from-primary/5 to-purple-500/5">

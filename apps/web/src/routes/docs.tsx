@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import Header from '@/components/header';
+
 import { useState } from 'react';
 import {
   ChevronDown,
@@ -128,7 +128,7 @@ const NAV_ITEMS = [
 function DocsPage() {
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+
       <div className="container mx-auto px-4 py-8 flex gap-8">
         {/* Sidebar Navigation */}
         <aside className="hidden lg:block w-56 shrink-0">
