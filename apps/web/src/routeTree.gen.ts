@@ -17,9 +17,11 @@ import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as ProfileEditRouteImport } from './routes/profile/edit'
 import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
+import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
 const UploadRoute = UploadRouteImport.update({
@@ -62,6 +64,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WikiIndexRoute = WikiIndexRouteImport.update({
+  id: '/wiki/',
+  path: '/wiki/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UniverseIdRoute = UniverseIdRouteImport.update({
   id: '/universe/$id',
   path: '/universe/$id',
@@ -75,6 +82,11 @@ const ProfileEditRoute = ProfileEditRouteImport.update({
 const ProfileUsernameRoute = ProfileUsernameRouteImport.update({
   id: '/profile/$username',
   path: '/profile/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
+  id: '/wiki/character/$id',
+  path: '/wiki/character/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
@@ -95,7 +107,9 @@ export interface FileRoutesByFullPath {
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -109,7 +123,9 @@ export interface FileRoutesByTo {
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -124,7 +140,9 @@ export interface FileRoutesById {
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,7 +158,9 @@ export interface FileRouteTypes {
     | '/profile/$username'
     | '/profile/edit'
     | '/universe/$id'
+    | '/wiki/'
     | '/event/$universe/$event'
+    | '/wiki/character/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -154,7 +174,9 @@ export interface FileRouteTypes {
     | '/profile/$username'
     | '/profile/edit'
     | '/universe/$id'
+    | '/wiki'
     | '/event/$universe/$event'
+    | '/wiki/character/$id'
   id:
     | '__root__'
     | '/'
@@ -168,7 +190,9 @@ export interface FileRouteTypes {
     | '/profile/$username'
     | '/profile/edit'
     | '/universe/$id'
+    | '/wiki/'
     | '/event/$universe/$event'
+    | '/wiki/character/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -183,7 +207,9 @@ export interface RootRouteChildren {
   ProfileUsernameRoute: typeof ProfileUsernameRoute
   ProfileEditRoute: typeof ProfileEditRoute
   UniverseIdRoute: typeof UniverseIdRoute
+  WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
+  WikiCharacterIdRoute: typeof WikiCharacterIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -244,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wiki/': {
+      id: '/wiki/'
+      path: '/wiki'
+      fullPath: '/wiki/'
+      preLoaderRoute: typeof WikiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/universe/$id': {
       id: '/universe/$id'
       path: '/universe/$id'
@@ -263,6 +296,13 @@ declare module '@tanstack/react-router' {
       path: '/profile/$username'
       fullPath: '/profile/$username'
       preLoaderRoute: typeof ProfileUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki/character/$id': {
+      id: '/wiki/character/$id'
+      path: '/wiki/character/$id'
+      fullPath: '/wiki/character/$id'
+      preLoaderRoute: typeof WikiCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/event/$universe/$event': {
@@ -287,7 +327,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileUsernameRoute: ProfileUsernameRoute,
   ProfileEditRoute: ProfileEditRoute,
   UniverseIdRoute: UniverseIdRoute,
+  WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
+  WikiCharacterIdRoute: WikiCharacterIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
