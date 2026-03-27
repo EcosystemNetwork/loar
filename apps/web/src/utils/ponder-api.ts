@@ -19,11 +19,17 @@ export async function ponderGql<T = any>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
-  const res = await fetch(`${PONDER_URL}/graphql`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${PONDER_URL}/graphql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    });
+  } catch {
+    // Indexer not running — return empty data silently
+    return {} as T;
+  }
 
   if (!res.ok) throw new Error(`Ponder query failed: ${res.statusText}`);
 

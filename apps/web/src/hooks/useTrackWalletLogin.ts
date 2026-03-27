@@ -21,8 +21,8 @@ export function useTrackWalletLogin() {
         chainId: chain?.id ?? 0,
         connector: connector?.name,
       })
-      .catch((err: unknown) => {
-        console.warn('Failed to track wallet login:', err);
+      .catch(() => {
+        // Server not running — silently ignore
       });
   }, [isConnected, address, chain?.id, connector?.name]);
 }
