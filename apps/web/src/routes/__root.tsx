@@ -1,4 +1,13 @@
+/**
+ * Root Layout Route
+ *
+ * Top-level layout wrapping every page. Provides the ThemeProvider, toast
+ * notifications, admin toolbar, and TanStack Router/Query devtools.
+ * Shows a loading spinner while route transitions are in progress.
+ */
+
 import Loader from '@/components/loader';
+import AdminToolbar from '@/components/admin-toolbar';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import type { trpc } from '@/utils/trpc';
@@ -12,6 +21,7 @@ import {
 } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 // import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
+import { useTrackWalletLogin } from '@/hooks/useTrackWalletLogin';
 import '../index.css';
 
 export interface RouterAppContext {
@@ -41,6 +51,8 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 function RootComponent() {
+  useTrackWalletLogin();
+
   const isFetching = useRouterState({
     select: (s) => s.isLoading,
   });
@@ -57,6 +69,7 @@ function RootComponent() {
       >
         <div className="h-svh">{isFetching ? <Loader /> : <Outlet />}</div>
         <Toaster richColors />
+        <AdminToolbar />
       </ThemeProvider>
       <TanStackRouterDevtools position="bottom-left" />
       <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />

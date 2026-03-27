@@ -6,6 +6,8 @@ import "@openzeppelin/governance/IGovernor.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
 
+/// @notice Aggregates all contract references for a deployed universe instance.
+/// @dev Returned by UniverseManager when querying a universe by ID.
 struct UniverseData {
   IUniverse universe;
   IERC20 token;

@@ -4,6 +4,8 @@ pragma solidity ^0.8.30;
 import {IUniverseManager} from "./IUniverseManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
+/// @title ILoarLpLocker
+/// @notice Interface for LP position lockers that permanently lock liquidity and distribute swap fee rewards.
 interface ILoarLpLocker {
     struct TokenRewardInfo {
         address token;

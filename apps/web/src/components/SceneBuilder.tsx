@@ -1,3 +1,11 @@
+/**
+ * Scene Builder Dialog
+ *
+ * Full-screen dialog for composing a scene from multiple video segments.
+ * Supports segment reordering, playback preview, and export/download of
+ * the assembled sequence.
+ */
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';

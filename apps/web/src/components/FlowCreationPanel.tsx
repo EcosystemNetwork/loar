@@ -1,3 +1,13 @@
+/**
+ * Flow Creation Panel (Dialog)
+ *
+ * Multi-step dialog for generating a new timeline event:
+ * 1. Enter title/description and select characters.
+ * 2. Generate a cover image via AI (text-to-image).
+ * 3. Generate a video from the image (image-to-video) with model selection.
+ * 4. Preview results and confirm creation.
+ */
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

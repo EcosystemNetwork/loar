@@ -1,3 +1,7 @@
+/**
+ * FAL AI router — tRPC procedures for image generation, video generation,
+ * character creation, image editing, and Gemini-powered character analysis.
+ */
 import { router, publicProcedure, protectedProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
+/// @notice Controls who can create new nodes in a universe timeline.
 enum NodeCreationOptions {
-    PUBLIC,
-    WHITELISTED
+    PUBLIC,      // Anyone can create nodes
+    WHITELISTED  // Only whitelisted addresses can create nodes
 }
 
+/// @notice Controls who can view node content in a universe timeline.
 enum NodeVisibilityOptions {
-    PUBLIC,
-    HOLDERS,
-    WHITELISTED
+    PUBLIC,      // Visible to everyone
+    HOLDERS,     // Only governance token holders can view
+    WHITELISTED  // Only whitelisted addresses can view
 }

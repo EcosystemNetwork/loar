@@ -1,3 +1,11 @@
+/**
+ * Universe Sidebar
+ *
+ * Collapsible left sidebar on the timeline editor page. Shows universe metadata,
+ * on-chain contract addresses, event/leaf counts, and action buttons for creating
+ * events, refreshing the timeline, and opening governance. Expands on hover.
+ */
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';

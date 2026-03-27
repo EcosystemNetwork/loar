@@ -1,3 +1,7 @@
+/**
+ * Security headers middleware — adds standard HTTP security headers
+ * (HSTS, CSP, X-Frame-Options, etc.) to all responses.
+ */
 import type { Context, Next } from 'hono';
 
 export async function securityHeaders(c: Context, next: Next) {

@@ -1,5 +1,9 @@
+/**
+ * tRPC context factory -- extracts the authenticated user (if any) from the
+ * incoming request headers and makes it available to all tRPC procedures.
+ */
 import type { Context as HonoContext } from 'hono';
-import { verifyAuth } from './auth';
+import { verifyAuth, type AuthUser } from './auth';
 
 export type CreateContextOptions = {
   context: HonoContext;

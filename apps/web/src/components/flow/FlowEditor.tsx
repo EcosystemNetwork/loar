@@ -1,3 +1,11 @@
+/**
+ * Flow Editor
+ *
+ * General-purpose ReactFlow canvas with custom node types (Character, PlotPoint,
+ * Media, Voting). Provides a MiniMap, controls, and grid background. Primarily
+ * used as a demo/sandbox for the narrative flow graph.
+ */
+
 import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,

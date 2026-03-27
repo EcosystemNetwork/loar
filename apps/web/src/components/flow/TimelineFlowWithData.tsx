@@ -1,3 +1,11 @@
+/**
+ * Timeline Flow With Data
+ *
+ * Data-fetching wrapper around TimelineFlowEditor. Loads the full graph from
+ * the blockchain via useGetFullGraph, converts raw contract data into ReactFlow
+ * nodes and edges, then passes them to the editor component.
+ */
+
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { Loader2 } from 'lucide-react';

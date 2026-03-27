@@ -1,3 +1,8 @@
+/**
+ * Storage router — tRPC procedures for uploading files to the unified
+ * decentralized storage layer (Walrus, IPFS, Synapse, Firebase) and
+ * resolving content hashes to URLs. Supports sync and async uploads.
+ */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { z } from 'zod';
 import { getStorageManager } from '../../services/storage';

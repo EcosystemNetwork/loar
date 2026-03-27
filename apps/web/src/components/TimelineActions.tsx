@@ -1,3 +1,11 @@
+/**
+ * Timeline Actions Card
+ *
+ * Low-level blockchain interface for creating and querying timeline nodes
+ * directly via smart contract calls. Hashes content with keccak256 before
+ * submitting. Mostly used for debugging/admin purposes.
+ */
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

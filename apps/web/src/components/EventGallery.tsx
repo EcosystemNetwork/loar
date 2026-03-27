@@ -1,3 +1,11 @@
+/**
+ * Event Gallery
+ *
+ * Searchable, filterable grid/list view of timeline events. Supports grid
+ * and list view modes, a favorites filter, and text search across event
+ * titles and descriptions.
+ */
+
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

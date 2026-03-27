@@ -1,3 +1,11 @@
+/**
+ * Generative Media Panel
+ *
+ * AI content generation UI for creating images and videos from text prompts.
+ * Uses fal.ai models via tRPC mutations. Supports prompt input, model selection,
+ * aspect ratio configuration, and displays generated results with download links.
+ */
+
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from './ui/button';

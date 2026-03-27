@@ -25,6 +25,13 @@ interface UseSegmentsOptions {
   eventId: string;
 }
 
+/**
+ * Manages video segments for a specific event within a universe.
+ * Persists segments to localStorage and supports CRUD, reordering, and legacy migration.
+ *
+ * @param options - `{ universeId, eventId }` identifying the target event
+ * @returns Segment state and mutation functions (add, update, delete, reorder, clear, refresh)
+ */
 export function useSegments({ universeId, eventId }: UseSegmentsOptions) {
   const [segments, setSegments] = useState<VideoSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);

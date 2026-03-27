@@ -12,6 +12,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { imageRouter } from './routes/image';
+import { authRoutes } from './routes/auth';
 import { verifyAuth } from './lib/auth';
 import { securityHeaders } from './middleware/security-headers';
 import { rateLimiter } from './middleware/rate-limit';
@@ -43,6 +44,9 @@ app.use(
     credentials: true,
   })
 );
+
+// SIWE authentication routes
+app.route('/auth', authRoutes);
 
 // Add image serving routes
 app.route('/images', imageRouter);

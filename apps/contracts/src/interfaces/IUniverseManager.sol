@@ -9,6 +9,9 @@ import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {ILoarLpLocker} from "./ILoarLpLocker.sol";
 
+/// @title IUniverseManager
+/// @notice Interface for the factory contract that creates universes, deploys governance tokens,
+///         initializes Uniswap v4 pools, and locks LP positions.
 interface IUniverseManager {
     struct UniverseConfig {
         NodeCreationOptions nodeCreationOption;

@@ -1,10 +1,23 @@
+/**
+ * tRPC Client Configuration
+ *
+ * Sets up the tRPC client and React Query client for server communication.
+ * - `queryClient`: Shared React Query client with retry logic and error toasts.
+ * - `trpcClient`: Vanilla tRPC client for imperative calls (e.g., in hooks/callbacks).
+ * - `trpc`: TanStack React Query-integrated tRPC proxy for use in components and loaders.
+ *
+ * Authentication is handled automatically -- the httpBatchLink injects the
+ * SIWE JWT session token as a Bearer header on every request.
+ */
+
 import type { AppRouter } from '../../../server/src/routers';
 import { QueryCache, QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
-import { auth } from '../lib/firebase';
+import { getSiweToken } from '../lib/wallet-auth';
 
+/** Shared React Query client. Retries 5xx errors and shows toast on failure. */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -40,22 +53,20 @@ export const queryClient = new QueryClient({
   }),
 });
 
+/** Vanilla tRPC client for imperative (non-hook) usage. */
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
       url: `${import.meta.env.VITE_SERVER_URL}/trpc`,
-      async headers() {
-        try {
-          const token = await auth.currentUser?.getIdToken(true);
-          return token ? { Authorization: `Bearer ${token}` } : {};
-        } catch {
-          return {};
-        }
+      headers() {
+        const token = getSiweToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
       },
     }),
   ],
 });
 
+/** TanStack React Query-integrated tRPC proxy for use in components and route loaders. */
 export const trpc = createTRPCOptionsProxy<AppRouter>({
   client: trpcClient,
   queryClient,

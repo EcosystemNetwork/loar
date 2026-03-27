@@ -6,6 +6,8 @@ import {IUniverseManager} from "./IUniverseManager.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
+/// @title ILoarHook
+/// @notice Interface for the base Uniswap v4 hook that manages pool initialization and protocol fee collection.
 interface ILoarHook {
     error ETHPoolNotAllowed();
     error OnlyFactory();

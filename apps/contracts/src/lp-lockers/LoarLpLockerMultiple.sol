@@ -18,6 +18,10 @@ import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionMa
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
 import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
 
+/// @title LoarLpLockerMultiple
+/// @notice Permanently locks Uniswap v4 LP positions and distributes swap fee rewards to configurable recipients.
+/// @dev Supports multiple tick-range positions per token and up to 7 reward recipients with basis-point splits.
+///      LP NFTs are locked forever — only accrued fees can be collected and distributed via the FeeLocker.
 contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable {
     using TickMath for int24;
 

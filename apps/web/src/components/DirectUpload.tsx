@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { getSiweToken } from '@/lib/wallet-auth';
 
 interface StorageManifest {
   contentHash: string;
@@ -37,14 +38,8 @@ export function DirectUpload({
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getAuthToken = useCallback(async (): Promise<string | null> => {
-    try {
-      const { auth } = await import('@/lib/firebase');
-      const token = await auth.currentUser?.getIdToken();
-      return token || null;
-    } catch {
-      return null;
-    }
+  const getAuthToken = useCallback((): string | null => {
+    return getSiweToken();
   }, []);
 
   const uploadFile = useCallback(
@@ -63,7 +58,7 @@ export function DirectUpload({
         return;
       }
 
-      const token = await getAuthToken();
+      const token = getAuthToken();
       if (!token) {
         toast.error('Authentication required');
         return;

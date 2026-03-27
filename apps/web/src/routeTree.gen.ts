@@ -9,14 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DocsRouteImport } from './routes/docs'
+import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
+import { Route as ProfileEditRouteImport } from './routes/profile/edit'
+import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketRoute = MarketRouteImport.update({
   id: '/market',
   path: '/market',
@@ -25,6 +35,16 @@ const MarketRoute = MarketRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiscoverRoute = DiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -47,6 +67,16 @@ const UniverseIdRoute = UniverseIdRouteImport.update({
   path: '/universe/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileEditRoute = ProfileEditRouteImport.update({
+  id: '/profile/edit',
+  path: '/profile/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileUsernameRoute = ProfileUsernameRouteImport.update({
+  id: '/profile/$username',
+  path: '/profile/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   id: '/event/$universe/$event',
   path: '/event/$universe/$event',
@@ -57,8 +87,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/dashboard': typeof DashboardRoute
+  '/discover': typeof DiscoverRoute
+  '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/upload': typeof UploadRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/profile/edit': typeof ProfileEditRoute
   '/universe/$id': typeof UniverseIdRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
 }
@@ -66,8 +101,13 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/dashboard': typeof DashboardRoute
+  '/discover': typeof DiscoverRoute
+  '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/upload': typeof UploadRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/profile/edit': typeof ProfileEditRoute
   '/universe/$id': typeof UniverseIdRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
 }
@@ -76,8 +116,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/dashboard': typeof DashboardRoute
+  '/discover': typeof DiscoverRoute
+  '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/upload': typeof UploadRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/profile/edit': typeof ProfileEditRoute
   '/universe/$id': typeof UniverseIdRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
 }
@@ -87,8 +132,13 @@ export interface FileRouteTypes {
     | '/'
     | '/cinematicUniverseCreate'
     | '/dashboard'
+    | '/discover'
+    | '/docs'
     | '/login'
     | '/market'
+    | '/upload'
+    | '/profile/$username'
+    | '/profile/edit'
     | '/universe/$id'
     | '/event/$universe/$event'
   fileRoutesByTo: FileRoutesByTo
@@ -96,8 +146,13 @@ export interface FileRouteTypes {
     | '/'
     | '/cinematicUniverseCreate'
     | '/dashboard'
+    | '/discover'
+    | '/docs'
     | '/login'
     | '/market'
+    | '/upload'
+    | '/profile/$username'
+    | '/profile/edit'
     | '/universe/$id'
     | '/event/$universe/$event'
   id:
@@ -105,8 +160,13 @@ export interface FileRouteTypes {
     | '/'
     | '/cinematicUniverseCreate'
     | '/dashboard'
+    | '/discover'
+    | '/docs'
     | '/login'
     | '/market'
+    | '/upload'
+    | '/profile/$username'
+    | '/profile/edit'
     | '/universe/$id'
     | '/event/$universe/$event'
   fileRoutesById: FileRoutesById
@@ -115,14 +175,26 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   DashboardRoute: typeof DashboardRoute
+  DiscoverRoute: typeof DiscoverRoute
+  DocsRoute: typeof DocsRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
+  UploadRoute: typeof UploadRoute
+  ProfileUsernameRoute: typeof ProfileUsernameRoute
+  ProfileEditRoute: typeof ProfileEditRoute
   UniverseIdRoute: typeof UniverseIdRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/market': {
       id: '/market'
       path: '/market'
@@ -135,6 +207,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discover': {
+      id: '/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof DiscoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -165,6 +251,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile/edit': {
+      id: '/profile/edit'
+      path: '/profile/edit'
+      fullPath: '/profile/edit'
+      preLoaderRoute: typeof ProfileEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/$username': {
+      id: '/profile/$username'
+      path: '/profile/$username'
+      fullPath: '/profile/$username'
+      preLoaderRoute: typeof ProfileUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/event/$universe/$event': {
       id: '/event/$universe/$event'
       path: '/event/$universe/$event'
@@ -179,8 +279,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   DashboardRoute: DashboardRoute,
+  DiscoverRoute: DiscoverRoute,
+  DocsRoute: DocsRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
+  UploadRoute: UploadRoute,
+  ProfileUsernameRoute: ProfileUsernameRoute,
+  ProfileEditRoute: ProfileEditRoute,
   UniverseIdRoute: UniverseIdRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
 }

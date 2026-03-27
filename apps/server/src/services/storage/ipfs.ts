@@ -1,3 +1,7 @@
+/**
+ * IPFS storage provider via Pinata — pins files to IPFS and serves them through a Pinata gateway.
+ * Priority 2 in the storage fallback chain. Requires PINATA_JWT env var.
+ */
 import type { StorageProvider, UploadResult } from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
 

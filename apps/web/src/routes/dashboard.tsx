@@ -1,23 +1,36 @@
-// import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { createFileRoute } from '@tanstack/react-router';
-import { useEffect } from 'react';
+/**
+ * Dashboard Route
+ *
+ * Authenticated user dashboard showing owned/available narrative universes,
+ * an AI media generation section, and navigation to create new universes.
+ * Redirects to /login when unauthenticated.
+ */
+
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { GenerativeMedia } from '@/components/GenerativeMedia';
+import Header from '@/components/header';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { useEffect } from 'react';
 
 export const Route = createFileRoute('/dashboard')({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  // const { user, isConnecting, handleConnect } = useDynamicContext();
-  const user = null;
-  const isConnecting = false;
-  const handleConnect = () => {};
+  const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = Route.useNavigate();
+
+  // Redirect unauthenticated users to login
+  useEffect(() => {
+    if (!isConnected && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/dashboard' } });
+    }
+  }, [isConnected, isAuthenticating, navigate]);
 
   // Dummy data for testing
   const dummyUniverses = [
@@ -83,14 +96,6 @@ function RouteComponent() {
   //   enabled: !!user,
   // });
 
-  useEffect(() => {
-    if (!user && !isConnecting) {
-      navigate({
-        to: '/',
-      });
-    }
-  }, [user, isConnecting, navigate]);
-
   const selectUniverse = (universeId: string) => {
     navigate({
       to: '/universe/$id',
@@ -104,32 +109,13 @@ function RouteComponent() {
     });
   };
 
-  if (isConnecting) {
+  if (isAuthenticating || !isConnected) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Connecting wallet...</p>
+          <p>Connecting...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Connect Your Wallet</CardTitle>
-            <CardDescription>Connect your wallet to access the dashboard</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleConnect} className="w-full">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -149,12 +135,13 @@ function RouteComponent() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      <Header />
+      {/* Dashboard Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">LOAR Dashboard</h1>
+              <h1 className="text-2xl font-bold">Welcome back{address ? `, ${address.slice(0, 6)}...${address.slice(-4)}` : ''}</h1>
               <p className="text-muted-foreground">Select a narrative universe to explore</p>
             </div>
             <Button onClick={createNewUniverse} className="flex items-center gap-2">

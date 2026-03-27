@@ -1,3 +1,8 @@
+/**
+ * Walrus Protocol storage provider — stores blobs on the Sui-based Walrus network.
+ * Highest priority (1) in the storage fallback chain. Includes a circuit breaker
+ * that disables the provider after 3 consecutive failures for 60 seconds.
+ */
 import type { StorageProvider, UploadResult } from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
 

@@ -1,3 +1,10 @@
+/**
+ * Flow Components Barrel Export
+ *
+ * Re-exports all ReactFlow custom node types and editor components
+ * for convenient single-path imports.
+ */
+
 // Re-export all components from the flow directory
 export * from './CustomNodes';
 export * from './EditableNodes';

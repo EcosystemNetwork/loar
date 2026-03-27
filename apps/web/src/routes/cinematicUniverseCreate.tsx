@@ -1,3 +1,12 @@
+/**
+ * Cinematic Universe Creation Route
+ *
+ * Two-step wizard for deploying a new narrative universe on-chain:
+ * 1. Create the Universe smart contract (name, image, description).
+ * 2. Deploy a governance token and liquidity pool for the universe.
+ * Includes AI-powered cover image generation via fal.ai.
+ */
+
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import {

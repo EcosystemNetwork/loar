@@ -9,6 +9,10 @@ import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/Pool
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
+/// @title LoarHookStaticFee
+/// @notice Uniswap v4 hook with static (fixed) fee configuration per pool.
+/// @dev Each pool gets separate fee rates for governance-token and paired-token swap directions,
+///      set at pool initialization time and immutable thereafter.
 contract LoarHookStaticFee is LoarHook, ILoarHookStaticFee {
     mapping(PoolId => uint24) public loarFee;
     mapping(PoolId => uint24) public pairedFee;

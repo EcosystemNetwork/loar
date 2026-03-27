@@ -1,3 +1,11 @@
+/**
+ * Governance Sidebar
+ *
+ * Slide-over panel for on-chain governance of a universe. Allows users to
+ * create proposals, delegate voting power, vote on active proposals, and
+ * view proposal history. Reads from Governor and ERC20 governance contracts.
+ */
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

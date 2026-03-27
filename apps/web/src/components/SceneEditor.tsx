@@ -1,3 +1,11 @@
+/**
+ * Scene Editor Dialog
+ *
+ * Advanced video scene editing interface with segment-level controls:
+ * text overlays, transitions, AI regeneration, trim/split, and per-segment
+ * settings. Used within the timeline editor for fine-grained scene composition.
+ */
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

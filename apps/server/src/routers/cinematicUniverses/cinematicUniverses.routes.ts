@@ -1,3 +1,7 @@
+/**
+ * Cinematic Universes router — CRUD operations for universe metadata in Firestore.
+ * Uses wallet signature verification (not Firebase auth) for create operations.
+ */
 import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import {

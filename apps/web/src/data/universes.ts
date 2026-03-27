@@ -1,3 +1,12 @@
+/**
+ * Static Universe Seed Data
+ *
+ * Hard-coded demo universes used for the landing page and local-only mode.
+ * Each universe contains timelines with interconnected narrative nodes.
+ * These are NOT fetched from the blockchain -- see useUniverseBlockchain for on-chain data.
+ */
+
+/** A single node in a narrative timeline graph. */
 export interface TimelineNode {
   id: string;
   title: string;
@@ -8,6 +17,7 @@ export interface TimelineNode {
   connections: string[];
 }
 
+/** A linear or branching sequence of narrative nodes. */
 export interface Timeline {
   id: string;
   name: string;
@@ -15,6 +25,7 @@ export interface Timeline {
   nodes: TimelineNode[];
 }
 
+/** A complete narrative universe containing one or more timelines. */
 export interface Universe {
   id: string;
   name: string;
@@ -23,6 +34,7 @@ export interface Universe {
   timelines: Timeline[];
 }
 
+/** Pre-seeded demo universes for the landing page carousel. */
 export const universes: Universe[] = [
   {
     id: 'cyberpunk-city',
