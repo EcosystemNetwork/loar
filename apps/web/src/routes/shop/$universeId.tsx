@@ -19,13 +19,14 @@ import {
   Volume2,
   User,
   Plus,
+  Gavel,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUniverseStorefront } from '@/hooks/useListings';
-import { useSubscriptionTiers, useAdSlots } from '@/hooks/useRevenue';
+import { useSubscriptionTiers, useAdSlots, useCanonSubmissions } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { formatEther } from 'viem';
 import { useQuery } from '@tanstack/react-query';
@@ -42,6 +43,7 @@ function UniverseShopPage() {
   const { data: storefront, isLoading } = useUniverseStorefront(universeId);
   const { data: subTiers } = useSubscriptionTiers(universeId);
   const { data: adSlots, isLoading: adsLoading } = useAdSlots(universeId);
+  const { data: votingSubmissions } = useCanonSubmissions(universeId, 'VOTING');
   const { data: universe } = useQuery({
     queryKey: ['universe', universeId],
     queryFn: () => trpcClient.universes.get.query({ id: universeId }),
@@ -50,14 +52,11 @@ function UniverseShopPage() {
 
   const listings = storefront?.listings ?? [];
 
-  const byType = listings.reduce(
-    (acc: Record<string, any[]>, l: any) => {
-      const k = l.productType ?? 'OTHER';
-      acc[k] = [...(acc[k] ?? []), l];
-      return acc;
-    },
-    {}
-  );
+  const byType = listings.reduce((acc: Record<string, any[]>, l: any) => {
+    const k = l.productType ?? 'OTHER';
+    acc[k] = [...(acc[k] ?? []), l];
+    return acc;
+  }, {});
 
   const SECTIONS = [
     { key: 'EPISODE_NFT', label: 'Episodes', icon: <Film className="w-4 h-4" /> },
@@ -90,7 +89,11 @@ function UniverseShopPage() {
         <div className="px-4 pb-4 -mt-8 relative">
           <div className="w-16 h-16 rounded-2xl border-4 border-background bg-muted flex items-center justify-center overflow-hidden shadow-lg">
             {(universe as any)?.thumbnailUrl ? (
-              <img src={(universe as any).thumbnailUrl} alt="" className="w-full h-full object-cover" />
+              <img
+                src={(universe as any).thumbnailUrl}
+                alt=""
+                className="w-full h-full object-cover"
+              />
             ) : (
               <Store className="w-8 h-8 text-muted-foreground" />
             )}
@@ -101,9 +104,7 @@ function UniverseShopPage() {
               {(universe as any)?.description ?? ''}
             </p>
             <div className="flex gap-2 mt-2 flex-wrap">
-              {listings.length > 0 && (
-                <Badge variant="secondary">{listings.length} listings</Badge>
-              )}
+              {listings.length > 0 && <Badge variant="secondary">{listings.length} listings</Badge>}
               {subTiers && subTiers.length > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <Crown className="w-3 h-3" />
@@ -114,6 +115,12 @@ function UniverseShopPage() {
                 <Badge variant="outline" className="gap-1">
                   <Megaphone className="w-3 h-3" />
                   {adSlots.length} ad slots
+                </Badge>
+              )}
+              {votingSubmissions && votingSubmissions.length > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <Gavel className="w-3 h-3" />
+                  {votingSubmissions.length} voting
                 </Badge>
               )}
             </div>
@@ -129,8 +136,16 @@ function UniverseShopPage() {
         ) : (
           <Tabs defaultValue="all">
             <TabsList className="w-full mb-4">
-              <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-              <TabsTrigger value="subs" className="flex-1">Subscribe</TabsTrigger>
+              <TabsTrigger value="all" className="flex-1">
+                All
+              </TabsTrigger>
+              <TabsTrigger value="subs" className="flex-1">
+                Subscribe
+              </TabsTrigger>
+              <TabsTrigger value="canon" className="flex-1 gap-1">
+                <Gavel className="w-3 h-3" />
+                Canon
+              </TabsTrigger>
               <TabsTrigger value="ads" className="flex-1 gap-1">
                 <Megaphone className="w-3 h-3" />
                 Ads
@@ -164,6 +179,28 @@ function UniverseShopPage() {
               )}
             </TabsContent>
 
+            <TabsContent value="canon">
+              <div className="text-center py-6 space-y-3">
+                <Gavel className="w-10 h-10 mx-auto text-primary/40" />
+                <p className="text-sm font-medium">Canon Marketplace</p>
+                <p className="text-xs text-muted-foreground">
+                  Submit content proposals and vote on what becomes permanent universe canon.
+                </p>
+                {votingSubmissions && votingSubmissions.length > 0 && (
+                  <p className="text-xs text-yellow-500 font-medium">
+                    {votingSubmissions.length} active submission
+                    {votingSubmissions.length !== 1 ? 's' : ''} need your vote
+                  </p>
+                )}
+                <Link to="/canon/$universeId" params={{ universeId }}>
+                  <Button className="gap-2">
+                    <Gavel className="w-4 h-4" />
+                    Open Canon Marketplace
+                  </Button>
+                </Link>
+              </div>
+            </TabsContent>
+
             <TabsContent value="ads">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">Open Ad Slots</h3>
@@ -189,7 +226,9 @@ function UniverseShopPage() {
                   <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No open ad slots</p>
                   <Link to="/ads/new">
-                    <Button variant="outline" size="sm" className="mt-3">Create a Slot</Button>
+                    <Button variant="outline" size="sm" className="mt-3">
+                      Create a Slot
+                    </Button>
                   </Link>
                 </div>
               )}
@@ -231,9 +270,7 @@ const PLACEMENT_LABELS: Record<string, string> = {
 };
 
 function AdSlotCard({ slot }: { slot: any }) {
-  const minBidEth = slot.minBid
-    ? parseFloat(formatEther(BigInt(slot.minBid))).toFixed(4)
-    : '—';
+  const minBidEth = slot.minBid ? parseFloat(formatEther(BigInt(slot.minBid))).toFixed(4) : '—';
   const topBidEth =
     slot.currentBid && slot.currentBid !== '0'
       ? parseFloat(formatEther(BigInt(slot.currentBid))).toFixed(4)
@@ -304,7 +341,11 @@ function ShopListingCard({ listing }: { listing: any }) {
       <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
         <div className="aspect-square bg-muted flex items-center justify-center">
           {listing.thumbnailUrl ? (
-            <img src={listing.thumbnailUrl} alt={listing.title} className="w-full h-full object-cover" />
+            <img
+              src={listing.thumbnailUrl}
+              alt={listing.title}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <Package className="w-8 h-8 text-muted-foreground opacity-30" />
           )}
@@ -359,8 +400,19 @@ function SubTierCard({ tier, universeId }: { tier: any; universeId: string }) {
             ))}
           </ul>
         )}
-        <Link to="/checkout" search={{ listingId: `sub:${universeId}:${tier.tier}`, productType: 'SUBSCRIPTION_TIER', title: `${tier.tier} Subscription`, price: tier.pricePerMonth, currency: 'ETH' }}>
-          <Button size="sm" className="w-full">Subscribe</Button>
+        <Link
+          to="/checkout"
+          search={{
+            listingId: `sub:${universeId}:${tier.tier}`,
+            productType: 'SUBSCRIPTION_TIER',
+            title: `${tier.tier} Subscription`,
+            price: tier.pricePerMonth,
+            currency: 'ETH',
+          }}
+        >
+          <Button size="sm" className="w-full">
+            Subscribe
+          </Button>
         </Link>
       </CardContent>
     </Card>

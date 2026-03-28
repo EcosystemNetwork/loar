@@ -48,8 +48,15 @@ export default function PortfolioHomeScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 24 }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7c3aed" />}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 32,
+          gap: 24,
+        }}
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7c3aed" />
+        }
       >
         {/* Wallet address pill */}
         <View className="flex-row items-center justify-between">
@@ -113,7 +120,7 @@ export default function PortfolioHomeScreen() {
             <AssetRow
               icon="🔁"
               label="Subscriptions"
-              subtitle={`${activeSubscriptions} active`}
+              subtitle={`${summary.activeSubscriptions} active`}
               onPress={() => router.push('/subscriptions')}
             />
             <AssetRow
@@ -126,7 +133,7 @@ export default function PortfolioHomeScreen() {
             <AssetRow
               icon="📝"
               label="Drafts"
-              subtitle={`${drafts.length} unpublished`}
+              subtitle={`${summary.draftsCount} unpublished`}
               onPress={() => router.push('/drafts')}
             />
             <AssetRow

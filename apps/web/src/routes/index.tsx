@@ -28,7 +28,6 @@ import {
   Zap,
   Eye,
 } from 'lucide-react';
-import { useAccount } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import {
   ponderGql,
@@ -44,156 +43,6 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 export const Route = createFileRoute('/')({
   component: HomeComponent,
 });
-
-/* ──────────────────────────────────────────
- * Curated placeholder universes
- * Shown when indexer has no data yet
- * ────────────────────────────────────────── */
-const PLACEHOLDER_UNIVERSES = [
-  {
-    id: 'placeholder-neon-genesis',
-    name: 'Neon Genesis',
-    description:
-      "In a rain-soaked megacity, rogue AI awakens inside a dead hacker's neural implant. A street medic must decide: destroy it or let it rewrite humanity.",
-    imageURL: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&h=600&fit=crop',
-    nodeCount: 24,
-    tokenData: { symbol: 'NEON', name: 'Neon Genesis Token', imageURL: '', metadata: '' },
-    swapVolume: 4.2e18,
-    holderCount: 312,
-    _genre: 'Cyberpunk',
-  },
-  {
-    id: 'placeholder-wyrdwood',
-    name: 'The Wyrdwood Chronicles',
-    description:
-      'An ancient forest is waking up — and it remembers everything. Follow three bloodlines bound by a pact older than language itself.',
-    imageURL: 'https://images.unsplash.com/photo-1518562180175-34a163b1a9a6?w=800&h=600&fit=crop',
-    nodeCount: 18,
-    tokenData: { symbol: 'WYRD', name: 'Wyrdwood Token', imageURL: '', metadata: '' },
-    swapVolume: 1.8e18,
-    holderCount: 187,
-    _genre: 'Dark Fantasy',
-  },
-  {
-    id: 'placeholder-orbit',
-    name: 'Orbit Zero',
-    description:
-      'The last colony ship has 40 days of oxygen. The captain is hiding something. The AI navigator just locked everyone out of the bridge.',
-    imageURL: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&h=600&fit=crop',
-    nodeCount: 31,
-    tokenData: { symbol: 'ORBT', name: 'Orbit Zero Token', imageURL: '', metadata: '' },
-    swapVolume: 6.1e18,
-    holderCount: 524,
-    _genre: 'Sci-Fi Thriller',
-  },
-  {
-    id: 'placeholder-jade-empire',
-    name: 'Jade Empire: Shattered Dynasties',
-    description:
-      "Warring kingdoms. Forbidden martial arts. A peasant girl discovers she's the reincarnation of the empire's most feared warlord.",
-    imageURL: 'https://images.unsplash.com/photo-1535930749574-1399327ce78f?w=800&h=600&fit=crop',
-    nodeCount: 42,
-    tokenData: { symbol: 'JADE', name: 'Jade Empire Token', imageURL: '', metadata: '' },
-    swapVolume: 8.3e18,
-    holderCount: 891,
-    _genre: 'Wuxia',
-  },
-  {
-    id: 'placeholder-bloom',
-    name: 'BLOOM',
-    description:
-      'A solarpunk utopia where flowers are currency, memories are compostable, and the biggest crime is forgetting to dream.',
-    imageURL: 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=800&h=600&fit=crop',
-    nodeCount: 15,
-    tokenData: { symbol: 'BLOOM', name: 'Bloom Token', imageURL: '', metadata: '' },
-    swapVolume: 2.5e18,
-    holderCount: 203,
-    _genre: 'Solarpunk',
-  },
-  {
-    id: 'placeholder-void-divers',
-    name: 'Void Divers',
-    description:
-      "Deep-sea explorers discover a trench that doesn't appear on any map. At the bottom, something is broadcasting coordinates to a star that went dark 10,000 years ago.",
-    imageURL: 'https://images.unsplash.com/photo-1551244072-5d12893278ab?w=800&h=600&fit=crop',
-    nodeCount: 27,
-    tokenData: { symbol: 'VOID', name: 'Void Divers Token', imageURL: '', metadata: '' },
-    swapVolume: 3.7e18,
-    holderCount: 445,
-    _genre: 'Cosmic Horror',
-  },
-  {
-    id: 'placeholder-ferro',
-    name: 'Ferro City Blues',
-    description:
-      'Jazz clubs, flying cars, and a private detective who can taste lies. Noir reimagined in a retro-future where the mob runs the weather.',
-    imageURL: 'https://images.unsplash.com/photo-1514539079130-25950c84af65?w=800&h=600&fit=crop',
-    nodeCount: 20,
-    tokenData: { symbol: 'FERRO', name: 'Ferro Token', imageURL: '', metadata: '' },
-    swapVolume: 1.2e18,
-    holderCount: 156,
-    _genre: 'Neo-Noir',
-  },
-  {
-    id: 'placeholder-mythic',
-    name: 'Mythic Protocol',
-    description:
-      "Gods are real — they're just running out of believers. A mythology professor accidentally becomes the host for a dying trickster god.",
-    imageURL: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&h=600&fit=crop',
-    nodeCount: 36,
-    tokenData: { symbol: 'MYTH', name: 'Mythic Token', imageURL: '', metadata: '' },
-    swapVolume: 5.5e18,
-    holderCount: 678,
-    _genre: 'Urban Fantasy',
-  },
-  {
-    id: 'placeholder-signal',
-    name: 'The Last Signal',
-    description:
-      'A radio astronomer receives a message from a civilization that died a million years ago. The message is a warning. The warning is about us.',
-    imageURL: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&h=600&fit=crop',
-    nodeCount: 12,
-    swapVolume: 0,
-    holderCount: 89,
-    _genre: 'Hard Sci-Fi',
-  },
-  {
-    id: 'placeholder-kindling',
-    name: 'Kindling',
-    description:
-      'After the collapse, a group of teenagers discover that campfire stories can literally reshape reality. But every story demands a sacrifice.',
-    imageURL: 'https://images.unsplash.com/photo-1475274047050-1d0c55b7b10c?w=800&h=600&fit=crop',
-    nodeCount: 22,
-    tokenData: { symbol: 'KNDL', name: 'Kindling Token', imageURL: '', metadata: '' },
-    swapVolume: 2.9e18,
-    holderCount: 334,
-    _genre: 'Post-Apocalyptic',
-  },
-  {
-    id: 'placeholder-atlas',
-    name: 'Atlas Unchained',
-    description:
-      'A world where maps are alive and borders fight back. Cartographers are the most dangerous people alive — and someone just drew a new continent.',
-    imageURL: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&h=600&fit=crop',
-    nodeCount: 19,
-    tokenData: { symbol: 'ATLS', name: 'Atlas Token', imageURL: '', metadata: '' },
-    swapVolume: 1.6e18,
-    holderCount: 211,
-    _genre: 'Adventure',
-  },
-  {
-    id: 'placeholder-echo',
-    name: 'Echo Chamber',
-    description:
-      'In a society where thoughts are public, one woman discovers she can think in silence. The government calls it a disease. The underground calls it a weapon.',
-    imageURL: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&h=600&fit=crop',
-    nodeCount: 28,
-    tokenData: { symbol: 'ECHO', name: 'Echo Token', imageURL: '', metadata: '' },
-    swapVolume: 4.8e18,
-    holderCount: 567,
-    _genre: 'Dystopian',
-  },
-];
 
 /* ──────────────────────────────────────────
  * Utility: horizontal scroll row with arrows
@@ -433,6 +282,40 @@ function WideCard({ universe }: { universe: any }) {
 }
 
 /* ──────────────────────────────────────────
+ * Indexer offline / stale banner
+ * ────────────────────────────────────────── */
+function IndexerBanner() {
+  return (
+    <div className="bg-amber-950/40 border-b border-amber-800/40 px-4 md:px-12 py-2 flex items-center gap-2.5 text-sm">
+      <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+      <span className="text-amber-200/80">
+        Blockchain indexer is offline — on-chain universe data is unavailable
+      </span>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Hero skeleton shown during initial load
+ * ────────────────────────────────────────── */
+function HeroSkeleton() {
+  return (
+    <div className="relative h-[70vh] min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+      <div className="w-full px-4 md:px-12 pb-24 md:pb-32 max-w-3xl space-y-4 animate-pulse">
+        <div className="h-4 w-24 rounded bg-white/10" />
+        <div className="h-14 w-80 rounded bg-white/10" />
+        <div className="h-4 w-96 rounded bg-white/10" />
+        <div className="h-4 w-72 rounded bg-white/10" />
+        <div className="flex gap-3 pt-2">
+          <div className="h-11 w-32 rounded-full bg-white/10" />
+          <div className="h-11 w-28 rounded-full bg-white/10" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
  * Hero Billboard (Netflix-style)
  * ────────────────────────────────────────── */
 function HeroBillboard({ universes }: { universes: any[] }) {
@@ -641,11 +524,7 @@ function ActivityTicker() {
 
   const activities = useMemo(() => {
     if (!nodesData || !nodeContentData || !universesData) {
-      // Placeholder activity when indexer is offline
-      return PLACEHOLDER_UNIVERSES.slice(0, 8).flatMap((u) => [
-        { id: `${u.id}-ep`, universeName: u.name, action: 'New Episode', universeId: u.id },
-        { id: `${u.id}-vote`, universeName: u.name, action: 'Governance Vote', universeId: u.id },
-      ]);
+      return [];
     }
 
     const contentMap = new Map<string, NodeContent>();
@@ -730,27 +609,7 @@ function RecentEpisodes({ universes }: { universes: any[] }) {
 
   const episodes = useMemo(() => {
     if (!nodesData || !nodeContentData) {
-      // Placeholder episodes when indexer is offline
-      const placeholderPlots = [
-        'The neural implant begins broadcasting fragmented memories across the city grid.',
-        'Deep in the Wyrdwood, the eldest tree speaks for the first time in a thousand years.',
-        'Oxygen reserves drop to 38 days. The navigator AI proposes an impossible detour.',
-        'A forbidden technique resurfaces — the Jade Fist, lost since the dynasty fell.',
-        'The bloom market crashes overnight. Someone is hoarding dreams.',
-        "At 11,000 meters depth, the sonar returns a shape that shouldn't exist.",
-        'A witness disappears from a locked room. The detective tastes copper — someone is lying.',
-        'The trickster god makes a bet: one week in a mortal body, no powers.',
-      ];
-      return PLACEHOLDER_UNIVERSES.slice(0, 8).map((u, i) => ({
-        id: `placeholder-ep-${u.id}`,
-        videoLink: null,
-        plot: placeholderPlots[i],
-        universeName: u.name,
-        universeImage: u.imageURL,
-        universeId: u.id,
-        nodeId: String(i + 1),
-        timestamp: Date.now() - i * 3600000,
-      }));
+      return [];
     }
 
     const contentMap = new Map<string, NodeContent>();
@@ -1196,7 +1055,6 @@ function SearchOverlay({
  * Main Home Component
  * ────────────────────────────────────────── */
 function HomeComponent() {
-  const { isConnected } = useAccount();
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Keyboard shortcut: Cmd/Ctrl + K to open search
@@ -1211,8 +1069,12 @@ function HomeComponent() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // ─── Data Queries (same as before) ───
-  const { data: universesData } = useQuery({
+  // ─── Data Queries ───
+  const {
+    data: universesData,
+    isLoading: universesLoading,
+    isError: universesError,
+  } = useQuery({
     queryKey: ['ponder', 'universes', 'top-50'],
     queryFn: () =>
       ponderGql<{ universes: { items: Universe[] } }>(`{
@@ -1220,6 +1082,7 @@ function HomeComponent() {
           items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
         }
       }`).then((d) => d.universes.items),
+    retry: 1,
   });
 
   const { data: tokensData } = useQuery({
@@ -1230,6 +1093,7 @@ function HomeComponent() {
           items { id universeAddress deployer tokenAdmin name symbol imageURL metadata context startingTick poolHook poolId pairedToken locker createdAt }
         }
       }`).then((d) => d.tokens.items),
+    retry: 1,
   });
 
   const { data: swapsData } = useQuery({
@@ -1240,6 +1104,7 @@ function HomeComponent() {
           items { id poolId sender amount0 amount1 sqrtPriceX96 liquidity tick timestamp blockNumber }
         }
       }`).then((d) => d.swaps.items),
+    retry: 1,
   });
 
   const { data: holdersData } = useQuery({
@@ -1250,11 +1115,12 @@ function HomeComponent() {
           items { id tokenAddress holderAddress balance }
         }
       }`).then((d) => d.tokenHolders.items),
+    retry: 1,
   });
 
-  // ─── Combine data ───
+  // ─── Combine real on-chain data (no fallback to fake data) ───
   const universes = useMemo(() => {
-    if (!universesData) return PLACEHOLDER_UNIVERSES;
+    if (!universesData) return [];
 
     const tokenMap = new Map<string, Token>();
     if (tokensData) {
@@ -1281,16 +1147,13 @@ function HomeComponent() {
       });
     }
 
-    const combined = universesData.map((u) => {
+    return universesData.map((u) => {
       const tokenData = tokenMap.get(u.id.toLowerCase());
       const poolId = tokenData?.poolId;
       const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
       const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
       return { ...u, tokenData, swapVolume, holderCount };
     });
-
-    // Fall back to curated placeholders when indexer has no data
-    return combined.length > 0 ? combined : PLACEHOLDER_UNIVERSES;
   }, [universesData, tokensData, swapsData, holdersData]);
 
   return (
@@ -1303,6 +1166,7 @@ function HomeComponent() {
         }
       `}</style>
 
+      {universesError && <IndexerBanner />}
       <ActivityTicker />
 
       {/* Floating search button */}
@@ -1327,19 +1191,21 @@ function HomeComponent() {
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} universes={universes} />
 
-      {/* Hero */}
-      <HeroBillboard universes={universes} />
+      {/* Hero: skeleton during load, real billboard once data arrives */}
+      {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
 
-      {/* Content Rows */}
-      <div className="-mt-16 relative z-10 pb-20 space-y-2">
-        <Top10Strip universes={universes} />
-        <TrendingRow universes={universes} />
-        <RecentEpisodes universes={universes} />
-        <NewArrivalsRow universes={universes} />
-        <MostEpisodesRow universes={universes} />
-        <TokenPoweredRow universes={universes} />
-        <CreateBanner />
-      </div>
+      {/* Content Rows — only render once we have real data */}
+      {!universesLoading && (
+        <div className="-mt-16 relative z-10 pb-20 space-y-2">
+          <Top10Strip universes={universes} />
+          <TrendingRow universes={universes} />
+          <RecentEpisodes universes={universes} />
+          <NewArrivalsRow universes={universes} />
+          <MostEpisodesRow universes={universes} />
+          <TokenPoweredRow universes={universes} />
+          <CreateBanner />
+        </div>
+      )}
     </div>
   );
 }

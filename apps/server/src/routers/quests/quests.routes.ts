@@ -404,7 +404,7 @@ export const questsRouter = router({
         code: data.code as string,
         totalReferrals: data.totalReferrals as number,
         totalEarned: data.totalEarned as number,
-        link: `${process.env.CORS_ORIGIN || 'https://loartech.xyz'}?ref=${data.code}`,
+        link: `${process.env.CORS_ORIGIN || 'https://loar.fun'}?ref=${data.code}`,
       };
     }
 
@@ -423,7 +423,7 @@ export const questsRouter = router({
       code,
       totalReferrals: 0,
       totalEarned: 0,
-      link: `${process.env.CORS_ORIGIN || 'https://loartech.xyz'}?ref=${code}`,
+      link: `${process.env.CORS_ORIGIN || 'https://loar.fun'}?ref=${code}`,
     };
   }),
 

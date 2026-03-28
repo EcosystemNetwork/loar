@@ -78,7 +78,7 @@ export const marketplaceRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // Check if already voted
-      const existingVote = await canonVotesCol
+      const existingVote = await canonVotesCol()
         .where('submissionId', '==', input.submissionId)
         .where('voterUid', '==', ctx.user.uid)
         .get();
@@ -150,7 +150,7 @@ export const marketplaceRouter = router({
           });
 
           // If there's a linked content doc, lock it too
-          const contentSnap = await contentCol
+          const contentSnap = await contentCol()
             .where('contentHash', '==', sub.contentHash)
             .limit(1)
             .get();
@@ -215,7 +215,7 @@ export const marketplaceRouter = router({
   getVotes: publicProcedure
     .input(z.object({ submissionId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await canonVotesCol
+      const snapshot = await canonVotesCol()
         .where('submissionId', '==', input.submissionId)
         .orderBy('votedAt', 'desc')
         .get();
@@ -224,7 +224,7 @@ export const marketplaceRouter = router({
     }),
 
   getCanon: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
-    const snapshot = await submissionsCol
+    const snapshot = await submissionsCol()
       .where('universeId', '==', input.universeId)
       .where('status', '==', 'ACCEPTED')
       .orderBy('finalizedAt', 'desc')
@@ -302,7 +302,7 @@ export const marketplaceRouter = router({
   }),
 
   mySubmissions: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await submissionsCol
+    const snapshot = await submissionsCol()
       .where('creatorUid', '==', ctx.user.uid)
       .orderBy('createdAt', 'desc')
       .get();

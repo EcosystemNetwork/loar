@@ -160,7 +160,8 @@ function UniverseTimelineEditor() {
       // If not in localStorage and it's a blockchain universe, fetch from indexer
       if (isBlockchainUniverse) {
         try {
-          const response = await fetch(`https://loartech.xyz/indexer/universe/${id}`);
+          const ponderUrl = import.meta.env.VITE_PONDER_URL || 'http://localhost:42069';
+          const response = await fetch(`${ponderUrl}/universe/${id}`);
           if (!response.ok) return null;
           const data = await response.json();
           if (data.universe) {

@@ -52,7 +52,7 @@ export const subscriptionsRouter = router({
     }),
 
   getTiers: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
-    const snapshot = await subTiersCol
+    const snapshot = await subTiersCol()
       .where('universeId', '==', input.universeId)
       .where('active', '==', true)
       .get();
@@ -163,7 +163,7 @@ export const subscriptionsRouter = router({
   // ---- My Subscriptions ----
 
   mySubscriptions: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await subscriptionsCol.where('uid', '==', ctx.user.uid).get();
+    const snapshot = await subscriptionsCol().where('uid', '==', ctx.user.uid).get();
 
     return snapshot.docs.map((doc) => {
       const data = doc.data();

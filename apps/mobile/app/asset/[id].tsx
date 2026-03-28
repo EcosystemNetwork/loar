@@ -23,9 +23,7 @@ export default function AssetDetailScreen() {
   const router = useRouter();
 
   // Fetch the NFT record (content item)
-  const contentQuery = useQuery(
-    trpc.content.get.queryOptions({ id })
-  );
+  const contentQuery = useQuery(trpc.content.get.queryOptions({ id }));
 
   const content = contentQuery.data;
 
@@ -33,7 +31,7 @@ export default function AssetDetailScreen() {
     try {
       await Share.share({
         message: `Check out "${content?.title ?? 'this asset'}" on LOAR`,
-        url: `https://loartech.xyz/asset/${id}`,
+        url: `https://loar.fun/asset/${id}`,
       });
     } catch {
       // user cancelled
@@ -47,11 +45,10 @@ export default function AssetDetailScreen() {
   };
 
   const handleTransfer = () => {
-    Alert.alert(
-      'Transfer',
-      'Enter the destination wallet address to transfer this asset.',
-      [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue (Web)', onPress: () => {} }]
-    );
+    Alert.alert('Transfer', 'Enter the destination wallet address to transfer this asset.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Continue (Web)', onPress: () => {} },
+    ]);
   };
 
   if (contentQuery.isLoading) return <LoadingSpinner message="Loading asset…" />;
@@ -73,10 +70,7 @@ export default function AssetDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 32 }}
-      >
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 32 }}>
         {/* Media */}
         {mediaUrl ? (
           <Image
@@ -99,9 +93,7 @@ export default function AssetDetailScreen() {
           <View className="gap-2">
             <Text className="text-text-primary text-2xl font-bold">{content.title}</Text>
             <View className="flex-row gap-2 flex-wrap">
-              {content.mediaType ? (
-                <Badge variant="primary">{content.mediaType}</Badge>
-              ) : null}
+              {content.mediaType ? <Badge variant="primary">{content.mediaType}</Badge> : null}
               {content.classification ? (
                 <Badge variant={content.classification === 'original' ? 'success' : 'default'}>
                   {content.classification}

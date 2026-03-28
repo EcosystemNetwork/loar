@@ -96,17 +96,20 @@ Bottom tabs:
 ### Feed card anatomy
 
 **Top-left:**
+
 - universe name
 - content lane badge
 - event title
 
 **Bottom-left:**
+
 - caption
 - tags
 - linked people / places / things
 - "Open World"
 
 **Right rail:**
+
 - like
 - save
 - comment
@@ -117,6 +120,7 @@ Bottom tabs:
 ### Quick-create entry points
 
 **From any clip:**
+
 - Branch Scene
 - Add Person
 - Add Place
@@ -125,6 +129,7 @@ Bottom tabs:
 - Upload Response
 
 **From center Create button:**
+
 - Scene
 - Person
 - Place
@@ -167,6 +172,7 @@ Bottom tabs:
 The current wiki is character-centric; mobile wiki must become universe-centric. Today the server wiki surface is centered on character fetches and event wiki generation, while entities exist in a separate router. Mobile should unify those.
 
 Required sections:
+
 - People
 - Places
 - Things
@@ -191,6 +197,7 @@ Required sections:
 ### Backend reuse
 
 Use existing:
+
 - content
 - wiki
 - generation
@@ -265,25 +272,25 @@ Every screen and interaction has a measurable SLA. These are non-negotiable gate
 
 #### Launch and Navigation
 
-| Interaction | Target | Measurement method |
-|---|---|---|
-| Cold launch to first frame (JS bundle hydrated, splash shown) | < 1200ms on a 2021 mid-range Android | Expo `performance.now()` from process start to first `useEffect` on the splash screen |
-| Feed first clip visible (video thumbnail rendered + autoplay starts) | < 2000ms from cold launch | Custom trace: `feed_session_started` → `clip_viewed` first event |
-| Feed swipe-to-next latency (gesture release to next clip fully rendered) | < 100ms perceived; next clip fully playing within 300ms | Reanimated gesture callback timestamp to video `onReadyForDisplay` callback |
-| Universe peek sheet open time (bottom sheet spring animation complete + data visible) | < 250ms animation; data < 600ms | Sheet `onOpen` to `onContentReady` trace |
-| Quick-create form ready (sheet open + entity prefill from `entities.suggest` complete) | < 400ms | `quick_create_menu_opened` to `quick_create_form_shown` trace |
+| Interaction                                                                            | Target                                                  | Measurement method                                                                    |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Cold launch to first frame (JS bundle hydrated, splash shown)                          | < 1200ms on a 2021 mid-range Android                    | Expo `performance.now()` from process start to first `useEffect` on the splash screen |
+| Feed first clip visible (video thumbnail rendered + autoplay starts)                   | < 2000ms from cold launch                               | Custom trace: `feed_session_started` → `clip_viewed` first event                      |
+| Feed swipe-to-next latency (gesture release to next clip fully rendered)               | < 100ms perceived; next clip fully playing within 300ms | Reanimated gesture callback timestamp to video `onReadyForDisplay` callback           |
+| Universe peek sheet open time (bottom sheet spring animation complete + data visible)  | < 250ms animation; data < 600ms                         | Sheet `onOpen` to `onContentReady` trace                                              |
+| Quick-create form ready (sheet open + entity prefill from `entities.suggest` complete) | < 400ms                                                 | `quick_create_menu_opened` to `quick_create_form_shown` trace                         |
 
 #### API Response Time SLAs
 
-| Endpoint | p50 | p95 | p99 |
-|---|---|---|---|
-| `content.feedMobile` (first page, 10 clips) | 120ms | 400ms | 800ms |
-| `content.feedMobile` (subsequent pages) | 80ms | 300ms | 600ms |
-| `entities.suggest` | 80ms | 250ms | 500ms |
+| Endpoint                                      | p50   | p95   | p99    |
+| --------------------------------------------- | ----- | ----- | ------ |
+| `content.feedMobile` (first page, 10 clips)   | 120ms | 400ms | 800ms  |
+| `content.feedMobile` (subsequent pages)       | 80ms  | 300ms | 600ms  |
+| `entities.suggest`                            | 80ms  | 250ms | 500ms  |
 | `generation.generate` (queue submission only) | 200ms | 600ms | 1200ms |
-| `universes.preview` | 60ms | 200ms | 400ms |
-| `content.branch` | 150ms | 500ms | 1000ms |
-| `notifications.register` | 100ms | 300ms | 600ms |
+| `universes.preview`                           | 60ms  | 200ms | 400ms  |
+| `content.branch`                              | 150ms | 500ms | 1000ms |
+| `notifications.register`                      | 100ms | 300ms | 600ms  |
 
 These are server-side processing times (excluding client network RTT). At p99, the client must show a skeleton/spinner; if the SLA is exceeded at p99, an alert fires (see Section 5).
 
@@ -314,10 +321,10 @@ The feed preloads clips ahead of the current position using a sliding window:
 
 #### Memory Budget
 
-| Platform | Feed memory budget |
-|---|---|
-| iOS | 180MB resident RAM for the feed tab. Above 200MB, begin proactive clip eviction. Above 250MB, the OS will send a memory warning — the feed must respond by evicting all non-visible videos immediately. |
-| Android | 150MB heap for the feed tab. Android has stricter per-app limits on mid-range devices. Above 180MB, proactive eviction. The feed must handle `onTrimMemory` callbacks and release video resources in response to `TRIM_MEMORY_RUNNING_CRITICAL`. |
+| Platform | Feed memory budget                                                                                                                                                                                                                               |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| iOS      | 180MB resident RAM for the feed tab. Above 200MB, begin proactive clip eviction. Above 250MB, the OS will send a memory warning — the feed must respond by evicting all non-visible videos immediately.                                          |
+| Android  | 150MB heap for the feed tab. Android has stricter per-app limits on mid-range devices. Above 180MB, proactive eviction. The feed must handle `onTrimMemory` callbacks and release video resources in response to `TRIM_MEMORY_RUNNING_CRITICAL`. |
 
 Memory is measured via the Hermes profiler in development and via device vitals in production (tracked as a custom metric in the analytics sink).
 
@@ -349,11 +356,11 @@ Memory is measured via the Hermes profiler in development and via device vitals 
 - The SIWE nonce is generated server-side by a `auth.getNonce` tRPC call. The server stores the nonce in Firestore under `nonces/{nonce}` with a TTL of 5 minutes (enforced by a Firestore TTL policy on that collection).
 - On successful SIWE verification, the nonce document is deleted. Any attempt to reuse the nonce returns `UNAUTHORIZED` because the document no longer exists.
 - On the mobile client, the nonce is held only in memory (a local variable in the auth flow) — it is never written to storage. There is no nonce in AsyncStorage or SecureStore.
-- The SIWE message includes `domain` (set to `loartech.xyz`) and `uri` (set to `https://loartech.xyz`) — the server validates both fields against its own known domain before accepting the signature. A message signed against a phishing domain will be rejected.
+- The SIWE message includes `domain` (set to `loar.fun`) and `uri` (set to `https://loar.fun`) — the server validates both fields against its own known domain before accepting the signature. A message signed against a phishing domain will be rejected.
 
 #### Deep Link Validation
 
-All deep links into the app follow the scheme `loar://` (and the HTTPS universal link `https://loartech.xyz/`). The pattern for safe deep link handling is:
+All deep links into the app follow the scheme `loar://` (and the HTTPS universal link `https://loar.fun/`). The pattern for safe deep link handling is:
 
 1. The deep link is parsed in the Expo Router root layout's `linking` configuration.
 2. Before navigating to the target screen, the app dispatches a preflight query:
@@ -385,23 +392,24 @@ Certificate pinning is not implemented in Workstream 1. Rationale: the LOAR back
 
 The rule is: **anything that grants access or proves identity goes in SecureStore; everything else goes in AsyncStorage.**
 
-| Data | Storage |
-|---|---|
-| JWT (SIWE session token) | `expo-secure-store` — hardware-backed on supported devices |
+| Data                                                   | Storage                                                        |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| JWT (SIWE session token)                               | `expo-secure-store` — hardware-backed on supported devices     |
 | Wallet private key / CDP embedded wallet session token | CDP SDK manages this internally (SecureStore-backed on mobile) |
-| SIWE nonce | In-memory only, never persisted |
-| Feed cache (paginated clip list) | AsyncStorage via TanStack Query's `AsyncStoragePersister` |
-| Draft content (unsaved quick-create forms) | AsyncStorage |
-| Notification preferences | AsyncStorage |
-| User settings (font size, reduced motion preference) | AsyncStorage |
-| Universe preview cache | AsyncStorage |
-| Analytics event queue (offline buffer) | AsyncStorage |
+| SIWE nonce                                             | In-memory only, never persisted                                |
+| Feed cache (paginated clip list)                       | AsyncStorage via TanStack Query's `AsyncStoragePersister`      |
+| Draft content (unsaved quick-create forms)             | AsyncStorage                                                   |
+| Notification preferences                               | AsyncStorage                                                   |
+| User settings (font size, reduced motion preference)   | AsyncStorage                                                   |
+| Universe preview cache                                 | AsyncStorage                                                   |
+| Analytics event queue (offline buffer)                 | AsyncStorage                                                   |
 
 SecureStore is synchronous on Android (using the Android Keystore) and uses iOS Keychain on iOS. The JWT is encrypted at rest via the platform's hardware security module where available.
 
 #### Branch/Remix Abuse Prevention
 
 Beyond the per-minute rate limit, the server enforces:
+
 - A **per-source cooldown**: a given user may only branch the same `sourceContentId` once per 24 hours. This is checked by querying `branches` collection for `{userId, sourceContentId}` with `createdAt > now - 24h`. If a match exists, the server returns a 429 with `"You've already branched this clip today."`.
 - A **universe-level daily cap**: a user may create at most 20 branch operations per universe per day. This prevents a single user from flooding a universe's branch graph.
 - Both limits are checked in a single Firestore transaction before creating the branch document, so there is no race condition between concurrent requests.
@@ -412,15 +420,15 @@ Beyond the per-minute rate limit, the server enforces:
 
 #### Error Table
 
-| Error category | Examples | Client behavior | User-visible message | Retry strategy |
-|---|---|---|---|---|
-| Network timeout | `content.feedMobile` takes > 10s; swipe loads nothing | Show skeleton cards in the feed for up to 3s, then replace with an inline "No connection" state in the feed area. Do not show a full-screen error unless the entire session is offline. | "Having trouble loading — pull down to refresh" (inside the feed, below the last loaded clip) | User-initiated pull-to-refresh. Auto-retry once after 5s with exponential backoff (10s, 20s). After 3 failed retries, show persistent inline error. |
-| Auth expired | 401 from any tRPC call | Silent re-auth attempt (see Section 2). If re-auth succeeds, original request is retried transparently. If re-auth fails, navigate to auth screen. | Only shown if silent re-auth fails: "Your session expired. Please sign in again." (full-screen overlay, not a disruptive modal — user can still see the feed behind it) | Silent auto-retry once. If that fails, user-initiated (tap "Sign In"). |
-| Rate limited | 429 from `generation.generate` or `content.branch` | Inline error below the submit button in the create form. Countdown timer if `retryAfterSeconds < 60`. Submit button disabled. | "You're creating too fast. Try again in {N}s." | Auto-retry after `retryAfterSeconds` elapses (client re-enables the button; user must tap). |
-| Content not found | Deleted clip still in user's local feed cache | The clip card is silently replaced with the next clip (no error shown for mid-feed tombstoned content). If the user navigates directly to a deleted clip via deep link, show an inline card: "This clip was removed." | "This clip is no longer available." (shown only on direct navigation, not mid-feed) | No retry. The clip is tombstoned: its ID is stored in AsyncStorage under `tombstones` and filtered out of subsequent feed renders without an API call. |
-| Generation failed | AI model returns an error; generation job times out | Show an error state inside the quick-create scene form: a red banner below the preview area. The draft is preserved. | "Generation failed — your draft was saved. You can try again or adjust your prompt." | User-initiated retry (tap "Try Again"). The prompt and settings are preserved. No auto-retry (generation errors often indicate a prompt issue; auto-retry would waste credits). |
-| Upload failed | Video from camera roll exceeds 500MB; network drops mid-upload | Show an inline error below the media picker. For size errors, show the limit. For network errors, show a retry button. The draft (prompt, caption, entity links) is preserved in AsyncStorage. | For size: "Video must be under 500MB. Your clip is {N}MB." For network: "Upload interrupted. Tap to retry." | For network errors: auto-retry 2 times with 5s / 15s backoff. If both fail, surface user-initiated retry. For size/validation errors: no retry (permanent failure — user must re-encode). |
-| Partial failure | Bulk entity save in quick-create: 3/5 entities saved, 2 failed | Show a bottom-sheet error summary: "3 of 5 saved successfully. 2 failed — tap to retry the failed items." List the failed entity names. Successful items are committed. | "Some items couldn't be saved. Tap to retry." (bottom sheet) | User-initiated retry for the failed subset only. Successful items are not re-submitted. After 2 user-initiated retries, offer "Skip and continue." |
+| Error category    | Examples                                                       | Client behavior                                                                                                                                                                                                       | User-visible message                                                                                                                                                    | Retry strategy                                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network timeout   | `content.feedMobile` takes > 10s; swipe loads nothing          | Show skeleton cards in the feed for up to 3s, then replace with an inline "No connection" state in the feed area. Do not show a full-screen error unless the entire session is offline.                               | "Having trouble loading — pull down to refresh" (inside the feed, below the last loaded clip)                                                                           | User-initiated pull-to-refresh. Auto-retry once after 5s with exponential backoff (10s, 20s). After 3 failed retries, show persistent inline error.                                       |
+| Auth expired      | 401 from any tRPC call                                         | Silent re-auth attempt (see Section 2). If re-auth succeeds, original request is retried transparently. If re-auth fails, navigate to auth screen.                                                                    | Only shown if silent re-auth fails: "Your session expired. Please sign in again." (full-screen overlay, not a disruptive modal — user can still see the feed behind it) | Silent auto-retry once. If that fails, user-initiated (tap "Sign In").                                                                                                                    |
+| Rate limited      | 429 from `generation.generate` or `content.branch`             | Inline error below the submit button in the create form. Countdown timer if `retryAfterSeconds < 60`. Submit button disabled.                                                                                         | "You're creating too fast. Try again in {N}s."                                                                                                                          | Auto-retry after `retryAfterSeconds` elapses (client re-enables the button; user must tap).                                                                                               |
+| Content not found | Deleted clip still in user's local feed cache                  | The clip card is silently replaced with the next clip (no error shown for mid-feed tombstoned content). If the user navigates directly to a deleted clip via deep link, show an inline card: "This clip was removed." | "This clip is no longer available." (shown only on direct navigation, not mid-feed)                                                                                     | No retry. The clip is tombstoned: its ID is stored in AsyncStorage under `tombstones` and filtered out of subsequent feed renders without an API call.                                    |
+| Generation failed | AI model returns an error; generation job times out            | Show an error state inside the quick-create scene form: a red banner below the preview area. The draft is preserved.                                                                                                  | "Generation failed — your draft was saved. You can try again or adjust your prompt."                                                                                    | User-initiated retry (tap "Try Again"). The prompt and settings are preserved. No auto-retry (generation errors often indicate a prompt issue; auto-retry would waste credits).           |
+| Upload failed     | Video from camera roll exceeds 500MB; network drops mid-upload | Show an inline error below the media picker. For size errors, show the limit. For network errors, show a retry button. The draft (prompt, caption, entity links) is preserved in AsyncStorage.                        | For size: "Video must be under 500MB. Your clip is {N}MB." For network: "Upload interrupted. Tap to retry."                                                             | For network errors: auto-retry 2 times with 5s / 15s backoff. If both fail, surface user-initiated retry. For size/validation errors: no retry (permanent failure — user must re-encode). |
+| Partial failure   | Bulk entity save in quick-create: 3/5 entities saved, 2 failed | Show a bottom-sheet error summary: "3 of 5 saved successfully. 2 failed — tap to retry the failed items." List the failed entity names. Successful items are committed.                                               | "Some items couldn't be saved. Tap to retry." (bottom sheet)                                                                                                            | User-initiated retry for the failed subset only. Successful items are not re-submitted. After 2 user-initiated retries, offer "Skip and continue."                                        |
 
 #### Error Display Hierarchy
 
@@ -455,6 +463,7 @@ Specific unit test cases:
 #### Integration Tests
 
 Test environment: local Firestore emulator (`firebase emulators:start --only firestore`) with seeded test data. Seeding is done by a `scripts/seed-test-data.ts` script that creates:
+
 - 3 test universes with 20 clips each
 - 10 test entities (2 per kind across the universes)
 - 2 test users (one with auth, one without)
@@ -472,6 +481,7 @@ Specific integration test cases:
 #### E2E Tests (Maestro)
 
 Device configurations:
+
 - iOS: iPhone 15 simulator (iOS 17), iPhone SE 3rd gen simulator (small screen, iOS 16)
 - Android: Pixel 7 emulator (Android 14), Samsung Galaxy A13 emulator (mid-range, Android 12)
 - Physical device gate (runs only pre-release): one iOS device (iPhone 14) and one Android device (Pixel 7a) for push notification testing and real video playback validation.
@@ -486,6 +496,7 @@ Specific E2E flows:
 6. **Auth expiry recovery**: Inject an expired JWT into SecureStore. Launch the app. Verify: the feed attempts to load, receives a 401, silently re-authenticates via CDP SDK, and loads the feed without showing an error to the user.
 
 CI triggers:
+
 - **On every PR**: unit tests + integration tests (emulator-based). Fast feedback — must complete in < 5 minutes.
 - **On merge to main**: full E2E suite on iOS simulator + Android emulator. Allowed to take up to 15 minutes.
 - **Pre-release (tag `release/*`)**: full E2E suite on physical devices (push notification tests), performance SLA checks, and accessibility audit (VoiceOver automation via Maestro accessibility actions).
@@ -542,14 +553,14 @@ All client metrics are sent to the analytics sink (Segment, or a lightweight cus
 
 All alerts are configured in PagerDuty (or equivalent) with severity levels:
 
-| Alert | Threshold | Severity | Response |
-|---|---|---|---|
-| `content.feedMobile` p95 latency | > 800ms for 5 consecutive minutes | P2 — High | Investigate Firestore query performance; check for missing indexes; consider enabling server-side cache |
-| Push notification delivery rate | < 90% over 5 minutes | P2 — High | Check FCM/APNs credentials; investigate token expiry; check notification payload size |
-| `generation.generate` queue depth | > 50 jobs waiting | P2 — High | Scale generation workers; check for stuck jobs; alert the user-facing "generation is busy" banner via remote config |
-| Feed crash rate (client-side) | > 0.5% of sessions on any screen | P1 — Critical | Trigger Expo OTA hotfix evaluation; escalate to on-call engineer; consider disabling feed autoplay via kill switch |
-| `content.branch` error rate | > 5% over 5 minutes | P2 — High | Investigate Firestore transaction failures; check rate limit logic for false positives |
-| Cold launch time | > 2000ms p95 over 1 hour | P3 — Medium | Investigate bundle size regression; check for new synchronous imports in app entrypoint |
+| Alert                             | Threshold                         | Severity      | Response                                                                                                            |
+| --------------------------------- | --------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `content.feedMobile` p95 latency  | > 800ms for 5 consecutive minutes | P2 — High     | Investigate Firestore query performance; check for missing indexes; consider enabling server-side cache             |
+| Push notification delivery rate   | < 90% over 5 minutes              | P2 — High     | Check FCM/APNs credentials; investigate token expiry; check notification payload size                               |
+| `generation.generate` queue depth | > 50 jobs waiting                 | P2 — High     | Scale generation workers; check for stuck jobs; alert the user-facing "generation is busy" banner via remote config |
+| Feed crash rate (client-side)     | > 0.5% of sessions on any screen  | P1 — Critical | Trigger Expo OTA hotfix evaluation; escalate to on-call engineer; consider disabling feed autoplay via kill switch  |
+| `content.branch` error rate       | > 5% over 5 minutes               | P2 — High     | Investigate Firestore transaction failures; check rate limit logic for false positives                              |
+| Cold launch time                  | > 2000ms p95 over 1 hour          | P3 — Medium   | Investigate bundle size regression; check for new synchronous imports in app entrypoint                             |
 
 #### Dashboards
 
@@ -759,26 +770,26 @@ All flags are evaluated via a Firestore-backed remote config service (`apps/serv
 
 Flag evaluation is: `GET /api/config` (unauthenticated, cacheable, CDN-friendly) returns the full flag set. The client applies flags locally after fetch.
 
-| Flag | Description | Why flag-gated |
-|---|---|---|
-| `feed_algorithm_v1` | Enables the engagement-ranked feed algorithm | May have ranking bugs at launch; fallback is chronological |
-| `universe_following_tab` | Shows the "Following" tab in the feed | Requires sufficient follow graph data to be useful; useless at < 100 users |
-| `generation_quick_create` | Enables AI scene generation from quick-create | Generation costs money; gate behind credits check AND flag for emergency shutoff |
-| `branch_remix_flow` | Enables the branch/remix button in the right rail | Branch fanout is untested at scale; can be disabled if Firestore write volume spikes |
-| `push_notifications` | Enables push notification registration and delivery | APNs/FCM credentials may need rotation; must be disableable without a build |
-| `universe_peek_sheet` | Shows the universe bottom sheet from feed clips | Data completeness — useless if most clips don't have enriched universe data yet |
-| `entity_chips_on_feed` | Shows entity chips below the caption on feed cards | UI may be visually cluttered; can be disabled for A/B test |
+| Flag                      | Description                                         | Why flag-gated                                                                       |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `feed_algorithm_v1`       | Enables the engagement-ranked feed algorithm        | May have ranking bugs at launch; fallback is chronological                           |
+| `universe_following_tab`  | Shows the "Following" tab in the feed               | Requires sufficient follow graph data to be useful; useless at < 100 users           |
+| `generation_quick_create` | Enables AI scene generation from quick-create       | Generation costs money; gate behind credits check AND flag for emergency shutoff     |
+| `branch_remix_flow`       | Enables the branch/remix button in the right rail   | Branch fanout is untested at scale; can be disabled if Firestore write volume spikes |
+| `push_notifications`      | Enables push notification registration and delivery | APNs/FCM credentials may need rotation; must be disableable without a build          |
+| `universe_peek_sheet`     | Shows the universe bottom sheet from feed clips     | Data completeness — useless if most clips don't have enriched universe data yet      |
+| `entity_chips_on_feed`    | Shows entity chips below the caption on feed cards  | UI may be visually cluttered; can be disabled for A/B test                           |
 
 **Kill switches** (override to false disables the feature globally, no deploy needed): `generation_quick_create`, `branch_remix_flow`, `push_notifications`. These three features have external service dependencies or write-heavy paths that could cause a cascade if a dependency degrades.
 
 #### Staged Rollout Plan
 
-| Stage | Size | Criteria to enter | Go criteria |
-|---|---|---|---|
-| Internal alpha | ~10 users (team + advisors) | Build passes all CI checks; E2E suite green on simulator | Crash rate < 2%, all P1 bugs fixed, video plays on both platforms |
-| Closed beta | ~500 users (TestFlight / Play Store internal track) | Alpha ran for 7 days with no P1 crashes | Crash rate < 1%, D1 retention > 30%, no data loss bugs, store review approved |
-| Open beta | ~5000 users (invite code via loartech.xyz waitlist) | Closed beta ran for 14 days; performance SLAs met | Crash rate < 0.5%, D7 retention > 20%, `content.feedMobile` p95 < 400ms at observed load |
-| GA | Full public release on App Store + Play Store | Open beta ran for 14 days; no P2 bugs open | Crash rate < 0.3%, App Store rating >= 4.3, D7 retention stable |
+| Stage          | Size                                                | Criteria to enter                                        | Go criteria                                                                              |
+| -------------- | --------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Internal alpha | ~10 users (team + advisors)                         | Build passes all CI checks; E2E suite green on simulator | Crash rate < 2%, all P1 bugs fixed, video plays on both platforms                        |
+| Closed beta    | ~500 users (TestFlight / Play Store internal track) | Alpha ran for 7 days with no P1 crashes                  | Crash rate < 1%, D1 retention > 30%, no data loss bugs, store review approved            |
+| Open beta      | ~5000 users (invite code via loar.fun waitlist)     | Closed beta ran for 14 days; performance SLAs met        | Crash rate < 0.5%, D7 retention > 20%, `content.feedMobile` p95 < 400ms at observed load |
+| GA             | Full public release on App Store + Play Store       | Open beta ran for 14 days; no P2 bugs open               | Crash rate < 0.3%, App Store rating >= 4.3, D7 retention stable                          |
 
 Rollout percentage at each stage: 10% → 100% within each stage via TestFlight/Play Store staged rollout. Each stage begins with 10% of the cohort and expands to 100% over 48 hours if no alert fires.
 
@@ -803,13 +814,16 @@ Rollout percentage at each stage: 10% → 100% within each stage via TestFlight/
 #### Screen Reader Support (VoiceOver / TalkBack)
 
 **Feed card `accessibilityLabel` pattern**:
+
 ```
 "{universeTitle} — {contentTitle}. {rightsClassification} content.
 {likeCount} likes. {position_in_feed + 1} of {total_in_feed} clips."
 ```
+
 Example: `"The Veil Chronicles — Episode 3: The Crossing. Original content. 142 likes. 3 of 10 clips."`
 
 The entire card is a single accessible element with `accessibilityRole="none"` (it is not a button; it is a media container). The right-rail action buttons are separate accessible elements with `accessibilityRole="button"` and individual labels:
+
 - Like button: `"Like. Currently {liked ? 'liked' : 'not liked'}. {likeCount} likes."`
 - Save button: `"Save clip"`
 - Comment button: `"Comments. {commentCount} comments"`
@@ -817,11 +831,13 @@ The entire card is a single accessible element with `accessibilityRole="none"` (
 - Create from this: `"Create from this universe"`
 
 **Universe peek sheet focus management**:
+
 - When the sheet opens, focus is moved to the sheet's header (`accessibilityViewIsModal: true` on the sheet container, so VoiceOver/TalkBack cannot navigate outside the sheet while it is open).
 - The first focused element inside the sheet is the universe title (announced as `"Universe: {name}"`).
 - When the sheet closes (by any mechanism), focus is returned to the "Open World" button on the feed card that triggered the sheet.
 
 **Quick-create forms**:
+
 - Every `TextInput` has an explicit `accessibilityLabel` (not relying on placeholder text, which is not announced by all screen readers).
 - When a validation error appears, `accessibilityLiveRegion="polite"` on the error text ensures it is announced without stealing focus.
 - The submit button announces its current state: `"Publish — ready to submit"` vs `"Publish — disabled, title required"`.
@@ -836,16 +852,19 @@ The entire card is a single accessible element with `accessibilityRole="none"` (
 #### Visual Accessibility
 
 **Color contrast on video cards**: Video backgrounds are dynamic (bright sky, dark dungeon, etc.), making a fixed text color insufficient. The solution is a semi-transparent scrim:
+
 - Bottom-left text area (caption, tags, entity chips): a linear gradient scrim from `rgba(0,0,0,0.6)` at the bottom to `rgba(0,0,0,0)` at 40% height. White text (#FFFFFF) on `rgba(0,0,0,0.6)` achieves contrast ratio of > 7:1 (WCAG AAA), well above the AA minimum of 4.5:1.
 - Top-left text area (universe name, badge): a `rgba(0,0,0,0.5)` pill background behind the universe name. White text achieves > 5:1 contrast.
 - Right-rail icons: white icon on a `rgba(0,0,0,0.4)` circular background. Icon contrast > 4.5:1 against the background circle. The circle is always present regardless of video background color.
 
 **Dynamic Type (iOS) and Font Scale (Android)**:
+
 - All text in the feed uses `Text` components with no fixed `fontSize`. Instead, font sizes use a scale from the design system (`theme.typography`) that respects `allowFontScaling: true` (the default). The caption area uses `numberOfLines` capping at 3 lines to prevent layout overflow on large fonts, with an expandable "more" affordance.
 - The right-rail icon labels (numerical counts) allow font scaling up to 130% before switching to an abbreviated display (e.g., "1.2K" instead of "1,247").
 - The universe peek sheet uses `ScrollView` so that large font sizes do not clip content.
 
 **Motion reduction**:
+
 - The app checks `AccessibilityInfo.isReduceMotionEnabled()` at launch and stores the result in a React context.
 - If reduce motion is enabled: feed auto-advance (if implemented as a feature) is disabled. The Reanimated spring animations for card transitions are replaced with an instant `withTiming(0, { duration: 0 })`. Video autoplay is replaced with a play button (video does not autoplay) — the user must tap to play.
 - Video autoplay can also be suppressed in Settings > Accessibility within the app, independent of the system setting, for users who prefer it (e.g., saves data without enabling full reduce motion system-wide).
@@ -853,6 +872,7 @@ The entire card is a single accessible element with `accessibilityRole="none"` (
 #### Accessibility Testing Protocol
 
 Before every release candidate:
+
 1. Run the complete feed viewing flow with VoiceOver (iOS) enabled. Every clip must be reachable, its label must be meaningful, and the right-rail actions must be individually tappable.
 2. Run the quick-create flow (add a person from a clip) with TalkBack (Android) enabled. Form submission must succeed without requiring touch-only gestures.
 3. Run the feed with font size set to the maximum system scale (235% on iOS). Verify no text is clipped or overlapping.
@@ -864,14 +884,14 @@ Before every release candidate:
 
 All rate limits are enforced server-side in the tRPC procedure handlers using a sliding window counter stored in Firestore (`rateLimits/{userId}/{procedure}/{windowKey}`). The window key is a truncated epoch timestamp (e.g., floor to the nearest minute). On limit breach, the server returns HTTP 429 with the tRPC error code `TOO_MANY_REQUESTS` and a body of `{ retryAfterSeconds: number, limitType: 'burst' | 'sustained' }`.
 
-| Endpoint | Burst limit | Sustained limit | Key | Client behavior on 429 |
-|---|---|---|---|---|
-| `content.feedMobile` | 10 requests / 10 seconds | 60 requests / minute | Per user ID (authenticated); per IP (unauthenticated) | Queue the next page fetch and retry after `retryAfterSeconds`. Show a brief skeleton state. No user-visible message unless the limit is sustained (> 30s of retries). |
-| `content.branch` | 3 requests / 10 seconds | 5 requests / minute | Per user ID | Disable the branch button for `retryAfterSeconds`. Show inline: "Slow down — try again in {N}s." |
-| `entities.suggest` | 5 requests / 10 seconds | 20 requests / minute | Per user ID | Delay the suggest call client-side using TanStack Query's `staleTime` (cache suggest results for 30 seconds per contentId — many suggest calls are redundant). On actual 429, return the cached suggestion if available; if no cache, show the form without prefill. |
-| `generation.generate` | 2 requests / 30 seconds | 3 requests / minute (secondary limit; primary limit is credit balance) | Per user ID | Disable the generate button. Show inline countdown: "Generating too fast. Try again in {N}s." If credits are also exhausted, show the credits purchase sheet instead. |
-| `notifications.register` | 3 requests / minute | 10 requests / hour | Per user ID + device ID | Silent failure on the client (silently drop the registration call and retry at next app launch). The user is unaffected — push notifications continue working from the last registered token. |
-| `universes.preview` | 20 requests / 10 seconds | 120 requests / minute | Per user ID (but this endpoint is aggressively cached — most calls never reach the rate limiter) | Use cached response if available. If cache miss and 429, show the universe peek sheet in a "loading failed" state with a retry button. |
+| Endpoint                 | Burst limit              | Sustained limit                                                        | Key                                                                                              | Client behavior on 429                                                                                                                                                                                                                                               |
+| ------------------------ | ------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content.feedMobile`     | 10 requests / 10 seconds | 60 requests / minute                                                   | Per user ID (authenticated); per IP (unauthenticated)                                            | Queue the next page fetch and retry after `retryAfterSeconds`. Show a brief skeleton state. No user-visible message unless the limit is sustained (> 30s of retries).                                                                                                |
+| `content.branch`         | 3 requests / 10 seconds  | 5 requests / minute                                                    | Per user ID                                                                                      | Disable the branch button for `retryAfterSeconds`. Show inline: "Slow down — try again in {N}s."                                                                                                                                                                     |
+| `entities.suggest`       | 5 requests / 10 seconds  | 20 requests / minute                                                   | Per user ID                                                                                      | Delay the suggest call client-side using TanStack Query's `staleTime` (cache suggest results for 30 seconds per contentId — many suggest calls are redundant). On actual 429, return the cached suggestion if available; if no cache, show the form without prefill. |
+| `generation.generate`    | 2 requests / 30 seconds  | 3 requests / minute (secondary limit; primary limit is credit balance) | Per user ID                                                                                      | Disable the generate button. Show inline countdown: "Generating too fast. Try again in {N}s." If credits are also exhausted, show the credits purchase sheet instead.                                                                                                |
+| `notifications.register` | 3 requests / minute      | 10 requests / hour                                                     | Per user ID + device ID                                                                          | Silent failure on the client (silently drop the registration call and retry at next app launch). The user is unaffected — push notifications continue working from the last registered token.                                                                        |
+| `universes.preview`      | 20 requests / 10 seconds | 120 requests / minute                                                  | Per user ID (but this endpoint is aggressively cached — most calls never reach the rate limiter) | Use cached response if available. If cache miss and 429, show the universe peek sheet in a "loading failed" state with a retry button.                                                                                                                               |
 
 The unauthenticated rate limit (per-IP) for `content.feedMobile` applies to guest browsing. A guest may view up to 20 clips before being prompted to sign in. The 20-clip gate is enforced client-side (via a clip view counter in AsyncStorage) and server-side (the per-IP limit is set at 20 requests total for unauthenticated callers, after which the server returns 401 with `{ requiresAuth: true }`).
 
@@ -881,14 +901,14 @@ The unauthenticated rate limit (per-IP) for `content.feedMobile` applies to gues
 
 #### Cache Table
 
-| Data | Client cache TTL | Server cache TTL | Invalidation trigger | SWR? |
-|---|---|---|---|---|
-| Feed page (first 10 clips) | 60 seconds in TanStack Query in-memory cache; 5 minutes in AsyncStorage persistence | No server-side cache in v1 (Firestore reads directly). Add Upstash Redis cache at > 300 RPS with 30s TTL. | New clip published to a universe the user follows → emit a Firestore onWrite trigger that bumps a feed version counter; client polls version counter (lightweight) to know when to invalidate | Yes. Show stale feed immediately on app foreground; re-fetch in background; insert new clips at the top of the feed without displacing the user's scroll position. |
-| Universe preview (peek sheet) | 5 minutes in TanStack Query | 2 minutes in server-side Upstash (keyed by `universeId`) | Universe metadata updated (name, cover image, entity count changes) → server invalidates Upstash key on `universes.update` mutation | Yes. Show stale preview immediately; re-fetch after 2 minutes. Universe data changes rarely. |
-| Entity chips (linked people/places on a clip) | 10 minutes in TanStack Query (keyed by `contentId`) | 5 minutes in Upstash (keyed by `contentId`) | Entity linked or unlinked from content → invalidate the cache key for that `contentId` | Yes. Entity chip changes are rare mid-session. Stale chips are acceptable for up to 10 minutes. |
-| Notification preferences | 15 minutes in TanStack Query | Not cached server-side (Firestore read is fast for a single document) | User changes a preference → `notifications.updatePreferences` mutation invalidates the query client-side immediately via `queryClient.invalidateQueries(['notifications.preferences'])` | No. Preferences must be fresh to avoid sending notifications the user has disabled. Refetch on every app foreground. |
-| User's own drafts | No TTL (always fresh — user's own data) | Not cached server-side | User creates, updates, or deletes a draft → optimistic update in TanStack Query cache; server confirms | No. Drafts must always reflect the server state. On conflict (e.g., draft edited on two devices), last-write-wins via Firestore. |
-| `entities.suggest` results | 30 seconds (per `contentId`) | Not cached server-side | Not applicable (suggestions are computed fresh; 30s client cache is sufficient since the user sees the form for < 30s on average) | No. If the cache is empty, show the form without prefill immediately and populate chips when the suggest call completes (non-blocking). |
+| Data                                          | Client cache TTL                                                                    | Server cache TTL                                                                                          | Invalidation trigger                                                                                                                                                                          | SWR?                                                                                                                                                               |
+| --------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Feed page (first 10 clips)                    | 60 seconds in TanStack Query in-memory cache; 5 minutes in AsyncStorage persistence | No server-side cache in v1 (Firestore reads directly). Add Upstash Redis cache at > 300 RPS with 30s TTL. | New clip published to a universe the user follows → emit a Firestore onWrite trigger that bumps a feed version counter; client polls version counter (lightweight) to know when to invalidate | Yes. Show stale feed immediately on app foreground; re-fetch in background; insert new clips at the top of the feed without displacing the user's scroll position. |
+| Universe preview (peek sheet)                 | 5 minutes in TanStack Query                                                         | 2 minutes in server-side Upstash (keyed by `universeId`)                                                  | Universe metadata updated (name, cover image, entity count changes) → server invalidates Upstash key on `universes.update` mutation                                                           | Yes. Show stale preview immediately; re-fetch after 2 minutes. Universe data changes rarely.                                                                       |
+| Entity chips (linked people/places on a clip) | 10 minutes in TanStack Query (keyed by `contentId`)                                 | 5 minutes in Upstash (keyed by `contentId`)                                                               | Entity linked or unlinked from content → invalidate the cache key for that `contentId`                                                                                                        | Yes. Entity chip changes are rare mid-session. Stale chips are acceptable for up to 10 minutes.                                                                    |
+| Notification preferences                      | 15 minutes in TanStack Query                                                        | Not cached server-side (Firestore read is fast for a single document)                                     | User changes a preference → `notifications.updatePreferences` mutation invalidates the query client-side immediately via `queryClient.invalidateQueries(['notifications.preferences'])`       | No. Preferences must be fresh to avoid sending notifications the user has disabled. Refetch on every app foreground.                                               |
+| User's own drafts                             | No TTL (always fresh — user's own data)                                             | Not cached server-side                                                                                    | User creates, updates, or deletes a draft → optimistic update in TanStack Query cache; server confirms                                                                                        | No. Drafts must always reflect the server state. On conflict (e.g., draft edited on two devices), last-write-wins via Firestore.                                   |
+| `entities.suggest` results                    | 30 seconds (per `contentId`)                                                        | Not cached server-side                                                                                    | Not applicable (suggestions are computed fresh; 30s client cache is sufficient since the user sees the form for < 30s on average)                                                             | No. If the cache is empty, show the form without prefill immediately and populate chips when the suggest call completes (non-blocking).                            |
 
 #### Tombstone Pattern for Deleted Clips
 

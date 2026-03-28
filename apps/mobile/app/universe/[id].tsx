@@ -35,7 +35,7 @@ export default function UniverseDetailScreen() {
   const handleShare = async () => {
     await Share.share({
       message: `Check out this LOAR Universe: ${universe?.description?.slice(0, 80) ?? ''}`,
-      url: `https://loartech.xyz/universe/${id}`,
+      url: `https://loar.fun/universe/${id}`,
     });
   };
 
@@ -54,15 +54,11 @@ export default function UniverseDetailScreen() {
   }
 
   const u = universe as any;
-  const shortAddr = (addr: string) =>
-    addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '–';
+  const shortAddr = (addr: string) => (addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '–');
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 32 }}
-      >
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 32 }}>
         {/* Hero image */}
         {u.imageUrl ? (
           <Image
@@ -114,7 +110,10 @@ export default function UniverseDetailScreen() {
               { label: 'Governor', value: shortAddr(u.governanceAddress) },
               { label: 'Creator', value: shortAddr(u.creator) },
             ].map((row) => (
-              <View key={row.label} className="flex-row justify-between py-1.5 border-b border-border last:border-0">
+              <View
+                key={row.label}
+                className="flex-row justify-between py-1.5 border-b border-border last:border-0"
+              >
                 <Text className="text-text-tertiary text-xs">{row.label}</Text>
                 <Text className="text-text-secondary text-xs font-mono">{row.value}</Text>
               </View>
@@ -133,9 +132,7 @@ export default function UniverseDetailScreen() {
                       {subStats.tierCounts?.[tier.tier] ?? 0} subscribers
                     </Text>
                   </View>
-                  <Badge variant={tier.tier === 'VIP' ? 'warning' : 'primary'}>
-                    {tier.tier}
-                  </Badge>
+                  <Badge variant={tier.tier === 'VIP' ? 'warning' : 'primary'}>{tier.tier}</Badge>
                 </Card>
               ))}
             </View>

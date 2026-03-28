@@ -1,12 +1,26 @@
 import { db } from '../../lib/firebase';
-import type { StorageProvider, StorageManifest, UploadResult } from './types';
+import type {
+  StorageProvider,
+  StorageManifest,
+  UploadResult,
+  ProviderAttempt,
+  UploadTrace,
+} from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
 import { PinataProvider } from './ipfs';
 import { LighthouseProvider } from './lighthouse';
 import { StorachaProvider } from './storacha';
 import { FirebaseAdapter } from './firebase-adapter';
+import { getCostLedger } from './cost-ledger';
 
 const MANIFESTS_COLLECTION = 'storageManifests';
+
+// How long to wait for a HEAD verification request (ms).
+const VERIFY_TIMEOUT_MS = 8_000;
+
+// Max attempts per provider in the background redundancy path.
+const BG_MAX_RETRIES = 2;
+const BG_RETRY_DELAYS = [5_000, 15_000];
 
 /** Default provider priority order. Can be overridden via STORAGE_PROVIDER_PRIORITY env. */
 function buildProviders(): StorageProvider[] {
@@ -35,6 +49,22 @@ function buildProviders(): StorageProvider[] {
   return all;
 }
 
+/**
+ * Verify a URL is accessible with a HEAD request.
+ * Returns true if HTTP 200–399, false on error or timeout.
+ */
+async function headVerify(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
+    const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    clearTimeout(tid);
+    return res.status >= 200 && res.status < 400;
+  } catch {
+    return false;
+  }
+}
+
 export class StorageManager {
   private static instance: StorageManager | null = null;
   private providers: StorageProvider[];
@@ -58,7 +88,13 @@ export class StorageManager {
 
   // ─── Upload ───────────────────────────────────────────────
 
-  async upload(buffer: Buffer, filename: string, mimeType?: string): Promise<StorageManifest> {
+  async upload(
+    buffer: Buffer,
+    filename: string,
+    mimeType?: string,
+    userId?: string
+  ): Promise<StorageManifest> {
+    const uploadStart = Date.now();
     const contentHash = computeSha256(buffer);
     const resolvedMime = mimeType || getMimeType(filename);
 
@@ -66,38 +102,100 @@ export class StorageManager {
     const existing = await this.findManifest(contentHash);
     if (existing) {
       console.log(`[StorageManager] Dedup hit for ${contentHash.slice(0, 12)}…`);
-      return existing;
+      // Return with a lightweight trace indicating cache hit
+      return {
+        ...existing,
+        trace: {
+          contentHash,
+          attempts: [],
+          primaryProvider: existing.uploads[0]?.provider ?? 'unknown',
+          totalDurationMs: Date.now() - uploadStart,
+          verified: false,
+          fromCache: true,
+        },
+      };
     }
 
     const available = this.providers.filter((p) => p.isAvailable());
+    const skipped = this.providers.filter((p) => !p.isAvailable());
+
     if (available.length === 0) {
       throw new Error('No storage providers available');
+    }
+
+    const attempts: ProviderAttempt[] = [];
+
+    // Record skipped providers in the trace
+    for (const p of skipped) {
+      attempts.push({ provider: p.name, status: 'skipped', durationMs: 0 });
     }
 
     // Try providers in priority order until one succeeds
     let primaryResult: UploadResult | null = null;
     const results: UploadResult[] = [];
-    const errors: string[] = [];
 
     for (const provider of available) {
+      const t0 = Date.now();
       try {
         console.log(`[StorageManager] Uploading to ${provider.name}…`);
         const result = await provider.upload(buffer, filename, resolvedMime);
+        const durationMs = Date.now() - t0;
+
+        // Post-upload HEAD verification
+        const verified = await headVerify(result.url);
+        if (!verified) {
+          console.warn(
+            `[StorageManager] ${provider.name} upload succeeded but HEAD verify failed for ${result.url}`
+          );
+        }
+
+        attempts.push({
+          provider: provider.name,
+          status: 'success',
+          durationMs,
+          contentId: result.contentId,
+          url: result.url,
+          verified,
+        });
+
         results.push(result);
         primaryResult = result;
+
+        // Record cost
+        void getCostLedger().recordUpload({
+          provider: provider.name,
+          bytes: buffer.length,
+          contentHash,
+          userId,
+        });
+
         break;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[StorageManager] ${provider.name} failed: ${msg}`);
-        errors.push(`${provider.name}: ${msg}`);
+        const durationMs = Date.now() - t0;
+        console.error(`[StorageManager] ${provider.name} failed (${durationMs}ms): ${msg}`);
+        attempts.push({ provider: provider.name, status: 'failed', durationMs, error: msg });
       }
     }
 
     if (!primaryResult) {
-      throw new Error(`All storage providers failed:\n${errors.join('\n')}`);
+      const failedList = attempts
+        .filter((a) => a.status === 'failed')
+        .map((a) => `  ${a.provider}: ${a.error}`)
+        .join('\n');
+      throw new Error(`All storage providers failed:\n${failedList}`);
     }
 
-    // Build manifest
+    const trace: UploadTrace = {
+      contentHash,
+      attempts,
+      primaryProvider: primaryResult.provider,
+      totalDurationMs: Date.now() - uploadStart,
+      verified: attempts.some((a) => a.status === 'success' && a.verified),
+      fromCache: false,
+    };
+
+    // Build manifest (trace stored in Firestore too)
     const manifest: StorageManifest = {
       contentHash,
       uploads: results,
@@ -105,25 +203,32 @@ export class StorageManager {
       mimeType: resolvedMime,
       size: buffer.length,
       createdAt: Date.now(),
+      trace,
     };
 
-    // Save manifest to Firestore
     await this.saveManifest(manifest);
 
     // Background: upload to remaining providers for redundancy
     const remaining = available.filter((p) => !results.some((r) => r.provider === p.name));
     if (remaining.length > 0) {
-      this.uploadToRemainingProviders(buffer, filename, resolvedMime, contentHash, remaining);
+      this.uploadToRemainingProviders(
+        buffer,
+        filename,
+        resolvedMime,
+        contentHash,
+        remaining,
+        userId
+      );
     }
 
     return manifest;
   }
 
-  async uploadFromUrl(url: string, filename?: string): Promise<StorageManifest> {
+  async uploadFromUrl(url: string, filename?: string, userId?: string): Promise<StorageManifest> {
     const { buffer, contentType } = await fetchToBuffer(url);
     const resolvedFilename =
       filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
-    return this.upload(buffer, resolvedFilename, contentType);
+    return this.upload(buffer, resolvedFilename, contentType, userId);
   }
 
   // ─── Firebase-Only Upload (for gallery/dashboard content) ──
@@ -136,7 +241,8 @@ export class StorageManager {
   async uploadToGallery(
     buffer: Buffer,
     filename: string,
-    mimeType?: string
+    mimeType?: string,
+    userId?: string
   ): Promise<StorageManifest> {
     const contentHash = computeSha256(buffer);
     const resolvedMime = mimeType || getMimeType(filename);
@@ -151,6 +257,13 @@ export class StorageManager {
 
     const result = await firebase.upload(buffer, filename, resolvedMime);
 
+    void getCostLedger().recordUpload({
+      provider: 'firebase',
+      bytes: buffer.length,
+      contentHash,
+      userId,
+    });
+
     const manifest: StorageManifest = {
       contentHash,
       uploads: [result],
@@ -164,11 +277,15 @@ export class StorageManager {
     return manifest;
   }
 
-  async uploadToGalleryFromUrl(url: string, filename?: string): Promise<StorageManifest> {
+  async uploadToGalleryFromUrl(
+    url: string,
+    filename?: string,
+    userId?: string
+  ): Promise<StorageManifest> {
     const { buffer, contentType } = await fetchToBuffer(url);
     const resolvedFilename =
       filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
-    return this.uploadToGallery(buffer, resolvedFilename, contentType);
+    return this.uploadToGallery(buffer, resolvedFilename, contentType, userId);
   }
 
   // ─── Pin to IPFS (for NFT minting) ─────────────────────────
@@ -179,7 +296,8 @@ export class StorageManager {
    * Returns the IPFS CID and updated manifest.
    */
   async pinToIPFS(
-    contentHash: string
+    contentHash: string,
+    userId?: string
   ): Promise<{ cid: string; url: string; manifest: StorageManifest }> {
     const manifest = await this.findManifest(contentHash);
     if (!manifest) {
@@ -205,6 +323,18 @@ export class StorageManager {
       manifest.originalFilename || `nft-${contentHash.slice(0, 12)}`,
       manifest.mimeType
     );
+
+    void getCostLedger().record({
+      userId,
+      contentHash,
+      operation: 'pin_ipfs',
+      provider: 'pinata',
+      bytes: buffer.length,
+      estimatedUploadCostUsd: 0,
+      estimatedMonthlyCostUsd: (0.000195 * buffer.length) / (1024 * 1024),
+      totalCostUsd: (0.000195 * buffer.length) / (1024 * 1024),
+      createdAt: Date.now(),
+    });
 
     // Append IPFS upload to manifest
     manifest.uploads.push(result);
@@ -248,7 +378,6 @@ export class StorageManager {
   async findManifest(contentHash: string): Promise<StorageManifest | null> {
     try {
       const doc = await db.collection(MANIFESTS_COLLECTION).doc(contentHash).get();
-
       if (!doc.exists) return null;
       return doc.data() as StorageManifest;
     } catch {
@@ -278,16 +407,24 @@ export class StorageManager {
     filename: string,
     mimeType: string,
     contentHash: string,
-    remaining: StorageProvider[]
+    remaining: StorageProvider[],
+    userId?: string
   ): void {
-    // Fire-and-forget background uploads
     for (const provider of remaining) {
-      provider
-        .upload(buffer, filename, mimeType)
+      this.uploadWithRetry(provider, buffer, filename, mimeType, BG_MAX_RETRIES)
         .then(async (result) => {
-          console.log(`[StorageManager] Background upload to ${provider.name} succeeded`);
+          console.log(
+            `[StorageManager] Background upload to ${provider.name} succeeded (contentId=${result.contentId})`
+          );
 
-          // Append to manifest
+          void getCostLedger().recordUpload({
+            provider: provider.name,
+            bytes: buffer.length,
+            contentHash,
+            userId,
+            metadata: { background: true },
+          });
+
           try {
             const manifest = await this.findManifest(contentHash);
             if (manifest) {
@@ -295,16 +432,54 @@ export class StorageManager {
               await this.saveManifest(manifest);
             }
           } catch {
-            // Non-critical
+            // Non-critical — manifest update best-effort
           }
         })
         .catch((err) => {
           console.error(
-            `[StorageManager] Background upload to ${provider.name} failed:`,
-            err instanceof Error ? err.message : err
+            `[StorageManager] Background upload to ${provider.name} permanently failed: ${
+              err instanceof Error ? err.message : err
+            }`
           );
         });
     }
+  }
+
+  /**
+   * Upload to a single provider with exponential backoff retry.
+   * Used for background redundancy uploads.
+   */
+  private async uploadWithRetry(
+    provider: StorageProvider,
+    buffer: Buffer,
+    filename: string,
+    mimeType: string,
+    maxRetries: number
+  ): Promise<UploadResult> {
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        const delay = BG_RETRY_DELAYS[attempt - 1] ?? 15_000;
+        console.log(
+          `[StorageManager] Retrying ${provider.name} background upload in ${delay}ms (attempt ${attempt}/${maxRetries})`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      try {
+        return await provider.upload(buffer, filename, mimeType);
+      } catch (err) {
+        lastErr = err;
+        console.warn(
+          `[StorageManager] ${provider.name} background attempt ${attempt + 1} failed: ${
+            err instanceof Error ? err.message : err
+          }`
+        );
+      }
+    }
+
+    throw lastErr;
   }
 }
 
