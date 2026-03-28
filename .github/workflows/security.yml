@@ -5,6 +5,24 @@ on:
   push:
     branches: [main, 'release/**']
 
+# STRICT controls whether Slither failures block the workflow.
+# - Blocking on: any push, or PRs targeting main/release/* (the launch gate)
+# - Informational on: PRs targeting feature branches (allows WIP audit fixes)
+#
+# pnpm audit is ALWAYS blocking (no condition) — dependency vulns are cheap to check.
+#
+# Known contract patterns that may produce Slither warnings:
+#   arbitrary-send-eth: pull-payment claim() functions send to msg.sender — intentional.
+#   These are behind nonReentrant guards and require earned balance. Not attack surface.
+#   unchecked-transfer: Fixed in UniverseTokenDeployer.sol and LoarLpLockerMultiple.sol.
+env:
+  STRICT: >-
+    ${{
+      github.event_name == 'push' ||
+      github.base_ref == 'main' ||
+      startsWith(github.base_ref, 'release/')
+    }}
+
 jobs:
   contracts-security:
     name: Contract Security (Slither)
@@ -32,6 +50,7 @@ jobs:
           slither-config: apps/contracts/slither.config.json
           fail-on: high
           sarif: results.sarif
+        continue-on-error: ${{ env.STRICT != 'true' }}
 
       - name: Upload Slither SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
