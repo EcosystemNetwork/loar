@@ -290,6 +290,32 @@ function CreatorEarnings() {
   );
 }
 
+function UploadSection() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section className="mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Upload Content</h2>
+        </div>
+        <Button
+          variant={open ? 'secondary' : 'default'}
+          size="sm"
+          className="gap-2"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Upload className="h-4 w-4" />
+          {open ? 'Close' : 'Upload New'}
+          {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+      {open && <UploadForm onSuccess={() => setOpen(false)} onCancel={() => setOpen(false)} />}
+    </section>
+  );
+}
+
 type Classification = 'all' | 'fan' | 'original' | 'licensed';
 
 const VISIBILITY_ICONS: Record<string, React.ReactNode> = {
@@ -312,12 +338,12 @@ function MyWorksSection() {
   const [classFilter, setClassFilter] = useState<Classification>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const { data, isLoading } = useInfiniteQuery({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
     queryKey: ['my-content-dashboard', classFilter],
     queryFn: ({ pageParam }: { pageParam?: string }) =>
       trpcClient.content.myContent.query({
         classification: classFilter === 'all' ? undefined : classFilter,
-        limit: 12,
+        limit: 24,
         cursor: pageParam,
       }),
     initialPageParam: undefined as string | undefined,
@@ -361,11 +387,6 @@ function MyWorksSection() {
             </p>
           )}
         </div>
-        <Button asChild variant="ghost" size="sm" className="gap-1 text-muted-foreground">
-          <Link to="/my-works">
-            View All <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
       </div>
 
       {/* Controls */}
@@ -430,14 +451,6 @@ function MyWorksSection() {
               ? 'Upload your first video or image to get started'
               : 'Try a different search or filter'}
           </p>
-          {allItems.length === 0 && (
-            <Button asChild size="sm" className="gap-2">
-              <Link to="/upload">
-                <Upload className="h-4 w-4" />
-                Upload Content
-              </Link>
-            </Button>
-          )}
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -460,6 +473,20 @@ function MyWorksSection() {
               deleting={deleteMutation.isPending && deleteMutation.variables === item.id}
             />
           ))}
+        </div>
+      )}
+
+      {hasNextPage && (
+        <div className="flex justify-center mt-6">
+          <Button
+            variant="outline"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="gap-2"
+          >
+            {isFetchingNextPage && <Loader2 className="h-4 w-4 animate-spin" />}
+            Load More
+          </Button>
         </div>
       )}
     </section>

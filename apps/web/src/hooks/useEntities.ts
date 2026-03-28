@@ -8,8 +8,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc, trpcClient } from '../utils/trpc';
 
-/** Entity kinds matching the server-side ontology. */
+/** All entity kinds — creator-facing + structural. */
 export const ENTITY_KINDS = [
+  // Creator-facing kinds
+  'person',
+  'place',
+  'thing',
+  'faction',
+  'event',
+  'lore',
+  'species',
+  'vehicle',
+  'technology',
+  'organization',
+  // Structural/ontology kinds
   'timeline',
   'reality',
   'dimension',
@@ -20,10 +32,24 @@ export const ENTITY_KINDS = [
 
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
-/** Top-level entity kinds shown as first-class in the UI. */
+/** Creator-facing kinds shown in the Create hub and Wiki. */
+export const CREATOR_KINDS: EntityKind[] = [
+  'person',
+  'place',
+  'thing',
+  'faction',
+  'event',
+  'lore',
+  'species',
+  'vehicle',
+  'technology',
+  'organization',
+];
+
+/** Top-level structural kinds shown as first-class in the universe editor. */
 export const PRIMARY_KINDS: EntityKind[] = ['timeline', 'realm'];
 
-/** Secondary/advanced entity kinds. */
+/** Secondary/advanced structural kinds. */
 export const SECONDARY_KINDS: EntityKind[] = ['reality', 'dimension', 'plane', 'domain'];
 
 /** Display labels for each entity kind. */
@@ -51,7 +77,7 @@ export interface Entity {
   name: string;
   description: string;
   kind: EntityKind;
-  universeAddress: string;
+  universeAddress: string | null;
   parentId: string | null;
   nodeIds: number[];
   imageUrl: string | null;
