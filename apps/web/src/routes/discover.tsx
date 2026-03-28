@@ -33,7 +33,7 @@ export const Route = createFileRoute('/discover')({
 function DiscoverPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('creators');
-  const [contentFilter, setContentFilter] = useState<'all' | 'fun' | 'monetized'>('all');
+  const [contentFilter, setContentFilter] = useState<'all' | 'fan' | 'monetized'>('all');
   const [mediaFilter, setMediaFilter] = useState<string | undefined>();
 
   const { data: profilesData, isLoading: profilesLoading } = useQuery({
@@ -46,7 +46,8 @@ function DiscoverPage() {
     queryFn: () =>
       trpcClient.content.feed.query({
         search: search || undefined,
-        classification: contentFilter === 'all' ? undefined : contentFilter,
+        classification:
+          contentFilter === 'all' || contentFilter === 'monetized' ? undefined : contentFilter,
         mediaType: mediaFilter as any,
         limit: 30,
       }),
@@ -57,15 +58,13 @@ function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-background">
-
-
       {/* Hero */}
       <div className="border-b bg-gradient-to-r from-primary/5 to-purple-500/5">
         <div className="container mx-auto px-6 py-12 text-center">
           <h1 className="text-4xl font-bold mb-3">Discover Creators</h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-            Explore portfolios from AI video creators. Find inspiration, follow your favorites,
-            and see the difference between fun projects and commercial work.
+            Explore portfolios from AI video creators. Find inspiration, follow your favorites, and
+            see the difference between fun projects and commercial work.
           </p>
 
           {/* Search */}
@@ -96,7 +95,7 @@ function DiscoverPage() {
             {/* Content sub-filters */}
             {activeTab === 'content' && (
               <div className="flex gap-2 flex-wrap">
-                {(['all', 'fun', 'monetized'] as const).map((f) => (
+                {(['all', 'fan', 'monetized'] as const).map((f) => (
                   <Button
                     key={f}
                     variant={contentFilter === f ? 'default' : 'outline'}
@@ -104,7 +103,7 @@ function DiscoverPage() {
                     onClick={() => setContentFilter(f)}
                     className="gap-1"
                   >
-                    {f === 'fun' && <Sparkles className="h-3 w-3" />}
+                    {f === 'fan' && <Sparkles className="h-3 w-3" />}
                     {f === 'monetized' && <DollarSign className="h-3 w-3" />}
                     {f.charAt(0).toUpperCase() + f.slice(1)}
                   </Button>
@@ -142,7 +141,9 @@ function DiscoverPage() {
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">No creators found</h3>
                 <p className="text-muted-foreground">
-                  {search ? `No results for "${search}"` : 'Be the first to create a public profile!'}
+                  {search
+                    ? `No results for "${search}"`
+                    : 'Be the first to create a public profile!'}
                 </p>
               </div>
             ) : (
@@ -195,11 +196,13 @@ function CreatorCard({ profile }: { profile: any }) {
             style={{ background: `linear-gradient(135deg, ${accentColor}60, ${accentColor}20)` }}
           >
             <div className="absolute -bottom-6 left-4">
-              <div
-                className="w-12 h-12 rounded-full border-2 border-background bg-muted flex items-center justify-center text-lg font-bold overflow-hidden"
-              >
+              <div className="w-12 h-12 rounded-full border-2 border-background bg-muted flex items-center justify-center text-lg font-bold overflow-hidden">
                 {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
+                  <img
+                    src={profile.avatarUrl}
+                    alt={profile.displayName}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   profile.displayName.charAt(0).toUpperCase()
                 )}
@@ -221,7 +224,9 @@ function CreatorCard({ profile }: { profile: any }) {
 
             <div className="flex flex-wrap gap-1 mt-3">
               {profile.tags?.slice(0, 4).map((tag: string) => (
-                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
               ))}
             </div>
 
@@ -229,7 +234,11 @@ function CreatorCard({ profile }: { profile: any }) {
               <span className="text-xs text-muted-foreground">
                 {profile.contentCount || 0} works
               </span>
-              <Badge variant="secondary" className="text-xs" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
+              <Badge
+                variant="secondary"
+                className="text-xs"
+                style={{ backgroundColor: `${accentColor}20`, color: accentColor }}
+              >
                 {profile.layout?.theme || 'default'}
               </Badge>
             </div>
@@ -250,7 +259,12 @@ function ContentFeedCard({ item }: { item: any }) {
           {item.thumbnailUrl ? (
             <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
           ) : isVideo ? (
-            <video src={item.mediaUrl} className="w-full h-full object-cover" muted preload="metadata" />
+            <video
+              src={item.mediaUrl}
+              className="w-full h-full object-cover"
+              muted
+              preload="metadata"
+            />
           ) : (
             <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
           )}
@@ -265,15 +279,23 @@ function ContentFeedCard({ item }: { item: any }) {
               className="text-xs"
             >
               {item.classification === 'monetized' ? (
-                <><DollarSign className="h-3 w-3 mr-0.5" /> Monetized</>
+                <>
+                  <DollarSign className="h-3 w-3 mr-0.5" /> Monetized
+                </>
               ) : (
-                <><Sparkles className="h-3 w-3 mr-0.5" /> Fun</>
+                <>
+                  <Sparkles className="h-3 w-3 mr-0.5" /> Fun
+                </>
               )}
             </Badge>
           </div>
           <div className="absolute bottom-2 left-2">
             <Badge variant="outline" className="text-xs bg-black/40 text-white border-0">
-              {item.mediaType === 'ai-video' ? 'AI Video' : item.mediaType === 'ai-image' ? 'AI Image' : item.mediaType}
+              {item.mediaType === 'ai-video'
+                ? 'AI Video'
+                : item.mediaType === 'ai-image'
+                  ? 'AI Image'
+                  : item.mediaType}
             </Badge>
           </div>
         </div>
@@ -286,7 +308,9 @@ function ContentFeedCard({ item }: { item: any }) {
           <div className="flex items-center justify-between mt-2">
             <div className="flex gap-1">
               {item.tags?.slice(0, 2).map((tag: string) => (
-                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
               ))}
             </div>
             <span className="text-xs text-muted-foreground">{item.views} views</span>

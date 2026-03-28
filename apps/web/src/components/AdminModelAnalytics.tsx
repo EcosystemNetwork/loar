@@ -50,7 +50,7 @@ interface AdminModel {
   speedTier: string;
   priceTier: string;
   providerCostUsd: number;
-  userPriceUsd: number;
+  fiatPriceUsd: number;
   creditCost: number;
   isEnabled: boolean;
   isVisibleToUsers: boolean;
@@ -252,7 +252,7 @@ export function AdminModelAnalytics() {
                 />
                 <span className="text-white text-[11px]">{m.displayName}</span>
                 <span className="text-zinc-500 text-[10px]">
-                  {formatUsd(m.providerCostUsd)} {'\u2192'} {formatUsd(m.userPriceUsd)}
+                  {formatUsd(m.providerCostUsd)} {'\u2192'} {formatUsd(m.fiatPriceUsd)}
                 </span>
                 <span className="text-amber-400 text-[10px]">{m.creditCost} $LOAR</span>
               </div>

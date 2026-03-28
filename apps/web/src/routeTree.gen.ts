@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DocsRouteImport } from './routes/docs'
@@ -27,6 +29,16 @@ import { Route as EventUniverseEventRouteImport } from './routes/event.$universe
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SandboxRoute = SandboxRouteImport.update({
+  id: '/sandbox',
+  path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyWorksRoute = MyWorksRouteImport.update({
+  id: '/my-works',
+  path: '/my-works',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketRoute = MarketRouteImport.update({
@@ -103,6 +115,8 @@ export interface FileRoutesByFullPath {
   '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/my-works': typeof MyWorksRoute
+  '/sandbox': typeof SandboxRoute
   '/upload': typeof UploadRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -119,6 +133,8 @@ export interface FileRoutesByTo {
   '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/my-works': typeof MyWorksRoute
+  '/sandbox': typeof SandboxRoute
   '/upload': typeof UploadRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -136,6 +152,8 @@ export interface FileRoutesById {
   '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/my-works': typeof MyWorksRoute
+  '/sandbox': typeof SandboxRoute
   '/upload': typeof UploadRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -154,6 +172,8 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/market'
+    | '/my-works'
+    | '/sandbox'
     | '/upload'
     | '/profile/$username'
     | '/profile/edit'
@@ -170,6 +190,8 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/market'
+    | '/my-works'
+    | '/sandbox'
     | '/upload'
     | '/profile/$username'
     | '/profile/edit'
@@ -186,6 +208,8 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/market'
+    | '/my-works'
+    | '/sandbox'
     | '/upload'
     | '/profile/$username'
     | '/profile/edit'
@@ -203,6 +227,8 @@ export interface RootRouteChildren {
   DocsRoute: typeof DocsRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
+  MyWorksRoute: typeof MyWorksRoute
+  SandboxRoute: typeof SandboxRoute
   UploadRoute: typeof UploadRoute
   ProfileUsernameRoute: typeof ProfileUsernameRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -312,6 +338,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventUniverseEventRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-works': {
+      id: '/my-works'
+      path: '/my-works'
+      fullPath: '/my-works'
+      preLoaderRoute: typeof MyWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sandbox': {
+      id: '/sandbox'
+      path: '/sandbox'
+      fullPath: '/sandbox'
+      preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -323,6 +363,8 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRoute: DocsRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
+  MyWorksRoute: MyWorksRoute,
+  SandboxRoute: SandboxRoute,
   UploadRoute: UploadRoute,
   ProfileUsernameRoute: ProfileUsernameRoute,
   ProfileEditRoute: ProfileEditRoute,
