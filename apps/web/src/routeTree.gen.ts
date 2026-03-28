@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as MyWorksRouteImport } from './routes/my-works'
@@ -29,6 +30,11 @@ import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
+const VideosRoute = VideosRouteImport.update({
+  id: '/videos',
+  path: '/videos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/my-works': typeof MyWorksRoute
   '/sandbox': typeof SandboxRoute
   '/upload': typeof UploadRoute
+  '/videos': typeof VideosRoute
   '/create/$kind': typeof CreateKindRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/my-works': typeof MyWorksRoute
   '/sandbox': typeof SandboxRoute
   '/upload': typeof UploadRoute
+  '/videos': typeof VideosRoute
   '/create/$kind': typeof CreateKindRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/my-works': typeof MyWorksRoute
   '/sandbox': typeof SandboxRoute
   '/upload': typeof UploadRoute
+  '/videos': typeof VideosRoute
   '/create/$kind': typeof CreateKindRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/my-works'
     | '/sandbox'
     | '/upload'
+    | '/videos'
     | '/create/$kind'
     | '/profile/$username'
     | '/profile/edit'
@@ -223,6 +233,7 @@ export interface FileRouteTypes {
     | '/my-works'
     | '/sandbox'
     | '/upload'
+    | '/videos'
     | '/create/$kind'
     | '/profile/$username'
     | '/profile/edit'
@@ -244,6 +255,7 @@ export interface FileRouteTypes {
     | '/my-works'
     | '/sandbox'
     | '/upload'
+    | '/videos'
     | '/create/$kind'
     | '/profile/$username'
     | '/profile/edit'
@@ -266,6 +278,7 @@ export interface RootRouteChildren {
   MyWorksRoute: typeof MyWorksRoute
   SandboxRoute: typeof SandboxRoute
   UploadRoute: typeof UploadRoute
+  VideosRoute: typeof VideosRoute
   CreateKindRoute: typeof CreateKindRoute
   ProfileUsernameRoute: typeof ProfileUsernameRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -284,6 +297,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/videos': {
+      id: '/videos'
+      path: '/videos'
+      fullPath: '/videos'
+      preLoaderRoute: typeof VideosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sandbox': {
@@ -426,6 +446,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyWorksRoute: MyWorksRoute,
   SandboxRoute: SandboxRoute,
   UploadRoute: UploadRoute,
+  VideosRoute: VideosRoute,
   CreateKindRoute: CreateKindRoute,
   ProfileUsernameRoute: ProfileUsernameRoute,
   ProfileEditRoute: ProfileEditRoute,

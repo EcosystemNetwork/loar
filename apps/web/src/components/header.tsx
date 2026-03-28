@@ -18,11 +18,9 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
-    { to: '/' as const, label: 'Home' },
     { to: '/dashboard' as const, label: 'Dashboard' },
+    { to: '/videos' as const, label: 'Videos' },
     { to: '/discover' as const, label: 'Discover' },
-    { to: '/upload' as const, label: 'Upload' },
-    { to: '/my-works' as const, label: 'My Works' },
     { to: '/create' as const, label: 'Create' },
     { to: '/wiki' as const, label: 'Wiki' },
     { to: '/market' as const, label: 'Slop Market' },
@@ -40,7 +38,7 @@ export default function Header() {
             </Link>
             <nav className="hidden md:flex items-center gap-1">
               {links.map(({ to, label }) => {
-                const isActive = matchRoute({ to, fuzzy: to !== '/' });
+                const isActive = matchRoute({ to, fuzzy: true });
                 return (
                   <Link
                     key={to}
@@ -79,7 +77,7 @@ export default function Header() {
         {mobileOpen && (
           <nav className="md:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3">
             {links.map(({ to, label }) => {
-              const isActive = matchRoute({ to, fuzzy: to !== '/' });
+              const isActive = matchRoute({ to, fuzzy: true });
               return (
                 <Link
                   key={to}

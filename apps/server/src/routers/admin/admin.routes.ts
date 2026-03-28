@@ -16,8 +16,14 @@ import {
   DEFAULT_PLATFORM_CONFIG,
 } from '../../services/platformConfig';
 
-const configCol = db.collection('platformConfig');
-const configAuditCol = db.collection('platformConfigAudit');
+const configCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('platformConfig');
+};
+const configAuditCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('platformConfigAudit');
+};
 
 // ── Admin guard ───────────────────────────────────────────────────────────
 
@@ -76,10 +82,10 @@ export const adminRouter = router({
     const current = await getPlatformConfig();
     const updated = { ...current, ...input, updatedAt: new Date(), updatedBy: ctx.user.uid };
 
-    await configCol.doc('fees').set(updated, { merge: true });
+    await configCol().doc('fees').set(updated, { merge: true });
 
     // Audit trail
-    await configAuditCol.add({
+    await configAuditCol().add({
       changes: input,
       previousValues: Object.fromEntries(Object.keys(input).map((k) => [k, (current as any)[k]])),
       changedBy: ctx.user.uid,
@@ -99,9 +105,9 @@ export const adminRouter = router({
     const current = await getPlatformConfig();
     const reset = { ...DEFAULT_PLATFORM_CONFIG, updatedAt: new Date(), updatedBy: ctx.user.uid };
 
-    await configCol.doc('fees').set(reset);
+    await configCol().doc('fees').set(reset);
 
-    await configAuditCol.add({
+    await configAuditCol().add({
       changes: DEFAULT_PLATFORM_CONFIG,
       previousValues: current,
       action: 'reset_to_defaults',
@@ -121,7 +127,7 @@ export const adminRouter = router({
     .query(async ({ input, ctx }) => {
       requireAdmin(ctx.user.uid);
 
-      const snapshot = await configAuditCol.orderBy('changedAt', 'desc').limit(input.limit).get();
+      const snapshot = await configAuditCol().orderBy('changedAt', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     }),

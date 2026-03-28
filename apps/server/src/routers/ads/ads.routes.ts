@@ -5,9 +5,18 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
-const adSlotsCol = db.collection('adSlots');
-const sponsorshipsCol = db.collection('sponsorships');
-const adBidsCol = db.collection('adBids');
+const adSlotsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('adSlots');
+};
+const sponsorshipsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('sponsorships');
+};
+const adBidsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('adBids');
+};
 
 const placementTypeEnum = z.enum(['BILLBOARD', 'PRODUCT', 'SPONSORED_CHARACTER', 'AUDIO_MENTION']);
 
@@ -36,7 +45,7 @@ export const adsRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await adSlotsCol.add(slot);
+      const ref = await adSlotsCol().add(slot);
       return { id: ref.id, ...slot };
     }),
 
@@ -53,7 +62,7 @@ export const adsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const slotRef = adSlotsCol.doc(input.slotId);
+      const slotRef = adSlotsCol().doc(input.slotId);
       const slotDoc = await slotRef.get();
       if (!slotDoc.exists) throw new Error('Slot not found');
       const slot = slotDoc.data()!;
@@ -67,7 +76,7 @@ export const adsRouter = router({
       }
 
       // Record bid
-      await adBidsCol.add({
+      await adBidsCol().add({
         slotId: input.slotId,
         bidderUid: ctx.user.uid,
         bidderAddress: ctx.user.address || null,
@@ -90,7 +99,7 @@ export const adsRouter = router({
   acceptBid: protectedProcedure
     .input(z.object({ slotId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const slotRef = adSlotsCol.doc(input.slotId);
+      const slotRef = adSlotsCol().doc(input.slotId);
       const slotDoc = await slotRef.get();
       if (!slotDoc.exists) throw new Error('Slot not found');
       const slot = slotDoc.data()!;
@@ -109,7 +118,7 @@ export const adsRouter = router({
         createdAt: new Date(),
       };
 
-      const ref = await sponsorshipsCol.add(sponsorship);
+      const ref = await sponsorshipsCol().add(sponsorship);
 
       // Reset slot
       await slotRef.update({
@@ -126,7 +135,7 @@ export const adsRouter = router({
   recordImpression: protectedProcedure
     .input(z.object({ sponsorshipId: z.string() }))
     .mutation(async ({ input }) => {
-      const ref = sponsorshipsCol.doc(input.sponsorshipId);
+      const ref = sponsorshipsCol().doc(input.sponsorshipId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Sponsorship not found');
 
@@ -169,18 +178,16 @@ export const adsRouter = router({
     }),
 
   mySponsorships: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await sponsorshipsCol.where('sponsorUid', '==', ctx.user.uid).get();
+    const snapshot = await sponsorshipsCol().where('sponsorUid', '==', ctx.user.uid).get();
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }),
 
-  getBids: publicProcedure
-    .input(z.object({ slotId: z.string() }))
-    .query(async ({ input }) => {
-      const snapshot = await adBidsCol
-        .where('slotId', '==', input.slotId)
-        .orderBy('createdAt', 'desc')
-        .get();
+  getBids: publicProcedure.input(z.object({ slotId: z.string() })).query(async ({ input }) => {
+    const snapshot = await adBidsCol
+      .where('slotId', '==', input.slotId)
+      .orderBy('createdAt', 'desc')
+      .get();
 
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    }),
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }),
 });

@@ -15,10 +15,22 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 
-const questProgressCol = db.collection('questProgress');
-const questRewardsCol = db.collection('questRewards');
-const affiliatesCol = db.collection('affiliates');
-const affiliateRewardsCol = db.collection('affiliateRewards');
+const questProgressCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('questProgress');
+};
+const questRewardsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('questRewards');
+};
+const affiliatesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('affiliates');
+};
+const affiliateRewardsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('affiliateRewards');
+};
 
 // ── Quest Definitions ─────────────────────────────────────────────────
 
@@ -220,7 +232,7 @@ export const questsRouter = router({
    */
   list: protectedProcedure.query(async ({ ctx }) => {
     // Fetch user's quest progress
-    const progressSnap = await questProgressCol.where('userId', '==', ctx.user.uid).get();
+    const progressSnap = await questProgressCol().where('userId', '==', ctx.user.uid).get();
 
     const progressMap = new Map<
       string,
@@ -272,7 +284,7 @@ export const questsRouter = router({
       const quest = questsById.get(input.questId);
       if (!quest) throw new Error('Quest not found');
 
-      const progressRef = questProgressCol.doc(`${ctx.user.uid}_${input.questId}`);
+      const progressRef = questProgressCol().doc(`${ctx.user.uid}_${input.questId}`);
       const progressDoc = await progressRef.get();
 
       const currentCount = progressDoc.exists ? progressDoc.data()?.currentCount || 0 : 0;
@@ -306,7 +318,7 @@ export const questsRouter = router({
       const quest = questsById.get(input.questId);
       if (!quest) throw new Error('Quest not found');
 
-      const progressRef = questProgressCol.doc(`${ctx.user.uid}_${input.questId}`);
+      const progressRef = questProgressCol().doc(`${ctx.user.uid}_${input.questId}`);
       const progressDoc = await progressRef.get();
 
       if (!progressDoc.exists) throw new Error('Quest not started');
@@ -356,7 +368,7 @@ export const questsRouter = router({
       }
 
       // Record reward
-      await questRewardsCol.add({
+      await questRewardsCol().add({
         userId: ctx.user.uid,
         questId: input.questId,
         loarTokens: quest.loarReward,
@@ -383,7 +395,7 @@ export const questsRouter = router({
    * Get or create affiliate referral code.
    */
   getAffiliateCode: protectedProcedure.query(async ({ ctx }) => {
-    const affiliateRef = affiliatesCol.doc(ctx.user.uid);
+    const affiliateRef = affiliatesCol().doc(ctx.user.uid);
     const affiliateDoc = await affiliateRef.get();
 
     if (affiliateDoc.exists) {
@@ -513,7 +525,7 @@ export const questsRouter = router({
       });
 
       // Record referral
-      await affiliateRewardsCol.add({
+      await affiliateRewardsCol().add({
         referrerUserId: referrerUid,
         referredUserId: ctx.user.uid,
         referralCode: input.referralCode,
@@ -523,7 +535,7 @@ export const questsRouter = router({
       });
 
       // Track quest progress for referrer
-      const referrerProgressRef = questProgressCol.doc(`${referrerUid}_invite_friend`);
+      const referrerProgressRef = questProgressCol().doc(`${referrerUid}_invite_friend`);
       const referrerProgress = await referrerProgressRef.get();
       const currentInvites = referrerProgress.exists
         ? referrerProgress.data()?.currentCount || 0
@@ -540,7 +552,7 @@ export const questsRouter = router({
       );
 
       // Also track invite_5_friends
-      const referrer5Ref = questProgressCol.doc(`${referrerUid}_invite_5_friends`);
+      const referrer5Ref = questProgressCol().doc(`${referrerUid}_invite_5_friends`);
       const referrer5Progress = await referrer5Ref.get();
       const current5 = referrer5Progress.exists ? referrer5Progress.data()?.currentCount || 0 : 0;
 

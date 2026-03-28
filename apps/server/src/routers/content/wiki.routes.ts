@@ -11,14 +11,20 @@ import { throwApiError, wrapError } from '../../lib/errors';
 import { wikiaService } from '../../services/wikia';
 import { geminiService } from '../../services/gemini';
 
-const charactersCol = db.collection('characters');
-const eventWikisCol = db.collection('eventWikis');
+const charactersCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('characters');
+};
+const eventWikisCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('eventWikis');
+};
 
 export const wikiRouter = router({
   /** List all characters from the wiki database. Falls back to JSON file. */
   characters: publicProcedure.query(async () => {
     try {
-      const snapshot = await charactersCol.get();
+      const snapshot = await charactersCol().get();
       const result = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -58,7 +64,7 @@ export const wikiRouter = router({
 
   /** Get a single character by ID. */
   character: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
-    const doc = await charactersCol.doc(input.id).get();
+    const doc = await charactersCol().doc(input.id).get();
     if (!doc.exists) {
       throwApiError('NOT_FOUND', 'Character not found');
     }
@@ -157,7 +163,7 @@ export const wikiRouter = router({
         let characterData = input.characters;
         if (!characterData && input.characterIds && input.characterIds.length > 0) {
           const charDocs = await Promise.all(
-            input.characterIds.map((id) => charactersCol.doc(id).get())
+            input.characterIds.map((id) => charactersCol().doc(id).get())
           );
           characterData = charDocs
             .filter((doc) => doc.exists)
@@ -198,7 +204,7 @@ export const wikiRouter = router({
           updatedAt: new Date(),
         };
 
-        await eventWikisCol.doc(wikiId).set(wikiEntry, { merge: true });
+        await eventWikisCol().doc(wikiId).set(wikiEntry, { merge: true });
 
         return {
           success: true,
@@ -216,7 +222,7 @@ export const wikiRouter = router({
     .input(z.object({ universeId: z.string(), eventId: z.string() }))
     .query(async ({ input }) => {
       const wikiId = `${input.universeId}-${input.eventId}`;
-      const doc = await eventWikisCol.doc(wikiId).get();
+      const doc = await eventWikisCol().doc(wikiId).get();
 
       if (!doc.exists) return null;
 

@@ -8,7 +8,10 @@ import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 
-const profilesCol = db.collection('profiles');
+const profilesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('profiles');
+};
 
 const profileLayoutSchema = z.object({
   theme: z.enum(['default', 'minimal', 'cinematic', 'neon', 'retro']).default('default'),
@@ -50,7 +53,7 @@ const profileSchema = z.object({
 export const profilesRouter = router({
   /** Get the current user's profile */
   me: protectedProcedure.query(async ({ ctx }) => {
-    const doc = await profilesCol.doc(ctx.user.uid).get();
+    const doc = await profilesCol().doc(ctx.user.uid).get();
     if (!doc.exists) return null;
     return { id: doc.id, ...doc.data() };
   }),
@@ -85,7 +88,7 @@ export const profilesRouter = router({
 
   /** Get a profile by uid (public, respects privacy) */
   getByUid: publicProcedure.input(z.object({ uid: z.string() })).query(async ({ input }) => {
-    const doc = await profilesCol.doc(input.uid).get();
+    const doc = await profilesCol().doc(input.uid).get();
     if (!doc.exists) return null;
 
     const data = doc.data()!;
@@ -106,14 +109,14 @@ export const profilesRouter = router({
     const usernameLower = input.username.toLowerCase();
 
     // Check username uniqueness (excluding current user)
-    const existing = await profilesCol.where('username', '==', usernameLower).limit(1).get();
+    const existing = await profilesCol().where('username', '==', usernameLower).limit(1).get();
 
     if (!existing.empty && existing.docs[0].id !== ctx.user.uid) {
       throw new Error('Username is already taken');
     }
 
     const now = new Date();
-    const ref = profilesCol.doc(ctx.user.uid);
+    const ref = profilesCol().doc(ctx.user.uid);
     const doc = await ref.get();
 
     const profileData = {
@@ -130,7 +133,7 @@ export const profilesRouter = router({
 
   /** Update just the layout/theme settings */
   updateLayout: protectedProcedure.input(profileLayoutSchema).mutation(async ({ ctx, input }) => {
-    const ref = profilesCol.doc(ctx.user.uid);
+    const ref = profilesCol().doc(ctx.user.uid);
     await ref.update({ layout: input, updatedAt: new Date() });
     return { ok: true };
   }),
@@ -139,7 +142,7 @@ export const profilesRouter = router({
   setVisibility: protectedProcedure
     .input(z.object({ visibility: z.enum(['public', 'private']) }))
     .mutation(async ({ ctx, input }) => {
-      await profilesCol.doc(ctx.user.uid).update({
+      await profilesCol().doc(ctx.user.uid).update({
         visibility: input.visibility,
         updatedAt: new Date(),
       });
@@ -174,7 +177,7 @@ export const profilesRouter = router({
         .limit(input.limit + 1);
 
       if (input.cursor) {
-        const cursorDoc = await profilesCol.doc(input.cursor).get();
+        const cursorDoc = await profilesCol().doc(input.cursor).get();
         if (cursorDoc.exists) {
           query = query.startAfter(cursorDoc);
         }

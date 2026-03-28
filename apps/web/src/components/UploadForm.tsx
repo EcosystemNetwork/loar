@@ -61,6 +61,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
   const [mediaType, setMediaType] = useState<'video' | 'image' | 'ai-video' | 'ai-image'>(
     'ai-video'
   );
+  const [format, setFormat] = useState<'short' | 'long'>('short');
 
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -196,6 +197,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
       mediaUrl,
       thumbnailUrl: thumbnailUrl || undefined,
       mediaType,
+      format: mediaType === 'video' || mediaType === 'ai-video' ? format : undefined,
       classification,
       visibility,
       tags,
@@ -519,6 +521,43 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
               </Select>
             </div>
           </div>
+
+          {/* Video format: short vs long */}
+          {(mediaType === 'video' || mediaType === 'ai-video') && (
+            <div className="space-y-2">
+              <Label>Video Format</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  onClick={() => setFormat('short')}
+                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${
+                    format === 'short'
+                      ? 'border-pink-500 bg-pink-500/5'
+                      : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <div className="text-lg mb-1">▶</div>
+                  <p className="text-sm font-semibold">Short-Form</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Clips · Reels · Under ~3 min
+                  </p>
+                </div>
+                <div
+                  onClick={() => setFormat('long')}
+                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${
+                    format === 'long'
+                      ? 'border-blue-500 bg-blue-500/5'
+                      : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <div className="text-lg mb-1">🎬</div>
+                  <p className="text-sm font-semibold">Long-Form</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Episodes · Features · Full cuts
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Tags (up to 15)</Label>
             <div className="flex gap-2">
