@@ -1,0 +1,175 @@
+/**
+ * Layer 6 — chain
+ * Checks:
+ *   - Sepolia RPC reachable + current block
+ *   - UniverseManager contract deployed at expected address
+ *   - (optional) createNode on a target Universe contract
+ *
+ * On-chain write requires both SMOKE_PRIVATE_KEY and SMOKE_UNIVERSE_ADDRESS.
+ * Without them the write checks are skipped — the harness still confirms RPC
+ * and contract reachability.
+ *
+ * Identifies: RPC endpoint down, wrong contract address, insufficient gas,
+ *             contract logic regressions.
+ */
+import { createPublicClient, createWalletClient, http, parseAbi } from 'viem';
+import { sepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import type { SmokeConfig } from '../config.ts';
+import { DEMO_CONTENT_PACK } from '../fixtures.ts';
+import { check, skipped, type CheckResult } from '../reporter.ts';
+
+// Contract addresses (Sepolia mainnet deployments)
+const UNIVERSE_MANAGER_ADDRESS = '0x7af142BbD14CaEECdA68f948F467Da0257f6B114' as const;
+
+const UNIVERSE_MANAGER_ABI = parseAbi([
+  'function universeCount() view returns (uint256)',
+  'function getUniverse(uint256 id) view returns (address)',
+]);
+
+const UNIVERSE_ABI = parseAbi([
+  'function universeName() view returns (string)',
+  'function latestNodeId() view returns (uint256)',
+  'function createNode(bytes32 _contentHash, bytes32 _plotHash, uint256 _previous, string calldata _link, string calldata _plot) returns (uint256)',
+]);
+
+export interface ChainResult {
+  blockNumber: bigint | undefined;
+  nodeId: bigint | undefined;
+  checks: CheckResult[];
+}
+
+export async function runChainLayer(cfg: SmokeConfig): Promise<ChainResult> {
+  const results: CheckResult[] = [];
+  let blockNumber: bigint | undefined;
+  let nodeId: bigint | undefined;
+
+  const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(cfg.rpcUrl),
+  });
+
+  // 1. RPC reachable — get latest block
+  results.push(
+    await check('Sepolia RPC reachable → block number', async () => {
+      blockNumber = await publicClient.getBlockNumber();
+      if (!blockNumber || blockNumber === 0n) throw new Error('block number is 0 or missing');
+      return `block #${blockNumber.toLocaleString()}`;
+    })
+  );
+
+  // 2. UniverseManager contract code present
+  results.push(
+    await check('UniverseManager contract deployed', async () => {
+      const code = await publicClient.getCode({ address: UNIVERSE_MANAGER_ADDRESS });
+      if (!code || code === '0x') {
+        throw new Error(
+          `no code at ${UNIVERSE_MANAGER_ADDRESS} — contract not deployed on this RPC`
+        );
+      }
+      return `${UNIVERSE_MANAGER_ADDRESS.slice(0, 10)}… code=${code.slice(0, 10)}…`;
+    })
+  );
+
+  // 3. Read universe count from UniverseManager
+  results.push(
+    await check('UniverseManager.universeCount() readable', async () => {
+      const count = await publicClient.readContract({
+        address: UNIVERSE_MANAGER_ADDRESS,
+        abi: UNIVERSE_MANAGER_ABI,
+        functionName: 'universeCount',
+      });
+      return `${count} universe(s) on-chain`;
+    })
+  );
+
+  // 4. Read target Universe if SMOKE_UNIVERSE_ADDRESS is set
+  if (cfg.universeAddress) {
+    results.push(
+      await check(`Universe(${cfg.universeAddress.slice(0, 10)}…).universeName()`, async () => {
+        const name = await publicClient.readContract({
+          address: cfg.universeAddress!,
+          abi: UNIVERSE_ABI,
+          functionName: 'universeName',
+        });
+        return String(name).slice(0, 60);
+      })
+    );
+
+    results.push(
+      await check(`Universe.latestNodeId() readable`, async () => {
+        const id = await publicClient.readContract({
+          address: cfg.universeAddress!,
+          abi: UNIVERSE_ABI,
+          functionName: 'latestNodeId',
+        });
+        return `latestNodeId=${id}`;
+      })
+    );
+  } else {
+    results.push(
+      skipped('Universe.universeName() / latestNodeId()', 'set SMOKE_UNIVERSE_ADDRESS to enable')
+    );
+  }
+
+  // 5. Write test node (requires SMOKE_PRIVATE_KEY + SMOKE_UNIVERSE_ADDRESS)
+  if (cfg.privateKey && cfg.universeAddress) {
+    results.push(
+      await check('Universe.createNode() — write smoke node', async () => {
+        const account = privateKeyToAccount(cfg.privateKey!);
+        const walletClient = createWalletClient({
+          account,
+          chain: sepolia,
+          transport: http(cfg.rpcUrl),
+        });
+
+        // Read current nodeId so we can verify it increments
+        const beforeId = await publicClient.readContract({
+          address: cfg.universeAddress!,
+          abi: UNIVERSE_ABI,
+          functionName: 'latestNodeId',
+        });
+
+        const txHash = await walletClient.writeContract({
+          address: cfg.universeAddress!,
+          abi: UNIVERSE_ABI,
+          functionName: 'createNode',
+          args: [
+            DEMO_CONTENT_PACK.contentHashBytes32,
+            DEMO_CONTENT_PACK.plotHashBytes32,
+            0n, // previous = 0 (root node)
+            DEMO_CONTENT_PACK.contentUrl,
+            DEMO_CONTENT_PACK.plot.slice(0, 200),
+          ],
+        });
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        if (receipt.status !== 'success') {
+          throw new Error(`tx reverted: ${txHash}`);
+        }
+
+        const afterId = await publicClient.readContract({
+          address: cfg.universeAddress!,
+          abi: UNIVERSE_ABI,
+          functionName: 'latestNodeId',
+        });
+
+        if (afterId <= beforeId) {
+          throw new Error(`nodeId did not increment: before=${beforeId} after=${afterId}`);
+        }
+
+        nodeId = afterId;
+        return `nodeId=${afterId} tx=${txHash.slice(0, 10)}…`;
+      })
+    );
+  } else {
+    results.push(
+      skipped(
+        'Universe.createNode() — write smoke node',
+        'set SMOKE_PRIVATE_KEY + SMOKE_UNIVERSE_ADDRESS to enable on-chain write tests'
+      )
+    );
+  }
+
+  return { blockNumber, nodeId, checks: results };
+}
