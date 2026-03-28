@@ -6,8 +6,53 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useAccount,
+  useSendTransaction,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from 'wagmi';
+import { parseEther, parseUnits, type Address } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
+
+// $LOAR token contract address (update after deployment)
+const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as Address;
+// Platform treasury address
+const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as Address;
+
+// Minimal ERC20 ABI for approve + transfer
+const ERC20_ABI = [
+  {
+    name: 'approve',
+    type: 'function' as const,
+    stateMutability: 'nonpayable' as const,
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'transfer',
+    type: 'function' as const,
+    stateMutability: 'nonpayable' as const,
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'balanceOf',
+    type: 'function' as const,
+    stateMutability: 'view' as const,
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 type PaymentTab = 'loar' | 'card' | 'crypto';
 

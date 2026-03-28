@@ -26,6 +26,7 @@ import { analyticsRouter } from './analytics/analytics.routes';
 import { entitiesRouter } from './entities/entities.index';
 import { generationRouter } from './generation/generation.routes';
 import { questsRouter } from './quests/quests.routes';
+import { sandboxRouter } from './sandbox/sandbox.routes';
 import { getSynapseService } from '../services/synapse';
 import { wikiaService } from '../services/wikia';
 import { firebaseStorageService } from '../services/firebase-storage';
@@ -110,6 +111,7 @@ export const appRouter = router({
   entities: entitiesRouter,
   generation: generationRouter,
   quests: questsRouter,
+  sandbox: sandboxRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {

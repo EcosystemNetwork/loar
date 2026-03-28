@@ -562,6 +562,130 @@ export const questsRouter = router({
       };
     }),
 
+  // ── Daily Check-in ──────────────────────────────────────────────
+
+  /**
+   * Get today's check-in status and current streak.
+   */
+  getCheckinStatus: protectedProcedure.query(async ({ ctx }) => {
+    const DAY_REWARDS = [5, 10, 20, 35, 50, 75, 150];
+    const streakRef = db.collection('dailyCheckins').doc(ctx.user.uid);
+    const streakDoc = await streakRef.get();
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (!streakDoc.exists) {
+      return {
+        currentStreak: 0,
+        longestStreak: 0,
+        totalCheckins: 0,
+        checkedInToday: false,
+        nextReward: DAY_REWARDS[0],
+        dayIndex: 0,
+        dayRewards: DAY_REWARDS,
+      };
+    }
+
+    const data = streakDoc.data()!;
+    const checkedInToday = data.lastCheckinDate === todayStr;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    const streakAlive = data.lastCheckinDate === todayStr || data.lastCheckinDate === yesterdayStr;
+    const currentStreak = streakAlive ? (data.currentStreak as number) || 0 : 0;
+    const dayIndex = Math.min(currentStreak, 6);
+
+    return {
+      currentStreak,
+      longestStreak: (data.longestStreak as number) || 0,
+      totalCheckins: (data.totalCheckins as number) || 0,
+      checkedInToday,
+      nextReward: DAY_REWARDS[dayIndex],
+      dayIndex,
+      dayRewards: DAY_REWARDS,
+    };
+  }),
+
+  /**
+   * Claim daily check-in reward. Streak resets if a day was missed.
+   */
+  dailyCheckin: protectedProcedure.mutation(async ({ ctx }) => {
+    const DAY_REWARDS = [5, 10, 20, 35, 50, 75, 150];
+    const streakRef = db.collection('dailyCheckins').doc(ctx.user.uid);
+    const streakDoc = await streakRef.get();
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    let currentStreak = 1;
+
+    if (streakDoc.exists) {
+      const data = streakDoc.data()!;
+
+      if (data.lastCheckinDate === todayStr) {
+        throw new Error('Already checked in today');
+      }
+
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().slice(0, 10);
+      const isStreak = data.lastCheckinDate === yesterdayStr;
+
+      currentStreak = isStreak ? ((data.currentStreak as number) || 0) + 1 : 1;
+
+      await streakRef.update({
+        lastCheckinDate: todayStr,
+        currentStreak,
+        longestStreak: Math.max((data.longestStreak as number) || 0, currentStreak),
+        totalCheckins: ((data.totalCheckins as number) || 0) + 1,
+        updatedAt: now,
+      });
+    } else {
+      await streakRef.set({
+        userId: ctx.user.uid,
+        lastCheckinDate: todayStr,
+        currentStreak: 1,
+        longestStreak: 1,
+        totalCheckins: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const dayIndex = Math.min(currentStreak - 1, 6);
+    const reward = DAY_REWARDS[dayIndex];
+
+    // Grant $LOAR tokens
+    const creditsCol = db.collection('userCredits');
+    const userRef = creditsCol.doc(ctx.user.uid);
+    const userDoc = await userRef.get();
+
+    if (userDoc.exists) {
+      const d = userDoc.data()!;
+      await userRef.update({
+        balance: (d.balance || 0) + reward,
+        totalBonusReceived: (d.totalBonusReceived || 0) + reward,
+        updatedAt: now,
+      });
+    } else {
+      await userRef.set({
+        uid: ctx.user.uid,
+        balance: reward,
+        totalPurchased: 0,
+        totalSpent: 0,
+        totalBonusReceived: reward,
+        totalLoarPurchases: 0,
+        totalFiatPurchases: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { ok: true, reward, currentStreak, dayIndex };
+  }),
+
   /**
    * Get affiliate leaderboard.
    */
