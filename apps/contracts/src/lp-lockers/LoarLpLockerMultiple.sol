@@ -24,6 +24,7 @@ import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmo
 ///      LP NFTs are locked forever — only accrued fees can be collected and distributed via the FeeLocker.
 contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable {
     using TickMath for int24;
+    using SafeERC20 for IERC20;
 
     string public constant version = "1";
 
@@ -125,7 +126,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         }
 
         // pull in the token and mint liquidity
-        IERC20(token).transferFrom(msg.sender, address(this), poolSupply);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), poolSupply);
 
         positionId = _mintLiquidity(poolConfig, lockerConfig, poolKey, poolSupply, token);
 

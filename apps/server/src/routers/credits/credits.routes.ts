@@ -30,6 +30,49 @@ const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '') as `0x${string}`;
 const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
+/**
+ * Verify an ETH or native-crypto payment by checking that the tx:
+ * 1. Has not already been used (deduplication against creditTransactions)
+ * 2. Exists on Sepolia and was not reverted
+ * 3. Was sent to TREASURY_ADDRESS
+ * Amount is not checked here because pkg.ethPriceWei defaults to '0' until
+ * admin sets live prices — callers should add amount verification when ethPriceWei is set.
+ */
+async function verifyEthPayment(paymentRef: string): Promise<void> {
+  if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
+    throw new Error('TREASURY_ADDRESS is not configured on the server');
+  }
+
+  const existing = await db
+    .collection('creditTransactions')
+    .where('paymentRef', '==', paymentRef)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    throw new Error('This transaction has already been used to purchase credits');
+  }
+
+  let tx: Awaited<ReturnType<typeof sepoliaClient.getTransaction>>;
+  try {
+    tx = await sepoliaClient.getTransaction({ hash: paymentRef as Hash });
+  } catch {
+    throw new Error(
+      'Transaction not found on Sepolia. Confirm it has been broadcast and included in a block.'
+    );
+  }
+
+  const receipt = await sepoliaClient.getTransactionReceipt({ hash: paymentRef as Hash });
+  if (receipt.status !== 'success') {
+    throw new Error('Transaction was reverted on-chain. No credits will be issued.');
+  }
+
+  if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
+    throw new Error(
+      'Transaction recipient does not match the platform treasury address. Ensure you sent funds to the correct address.'
+    );
+  }
+}
+
 async function verifyLoarPayment(txHash: string, expectedLoarWei: bigint): Promise<void> {
   if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
     throw new Error('LOAR_TOKEN_ADDRESS is not configured on the server');
@@ -252,7 +295,7 @@ export const creditsRouter = router({
   getPackages: publicProcedure.query(async () => {
     // Admin-configured overrides in Firestore take priority
     try {
-      const snapshot = await creditPackagesCol
+      const snapshot = await creditPackagesCol()
         .where('active', '==', true)
         .orderBy('credits', 'asc')
         .get();
@@ -283,6 +326,21 @@ export const creditsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
+
+      if (input.paymentMethod === 'eth' || input.paymentMethod === 'crypto') {
+        // Verify on-chain: tx exists, confirmed, sent to treasury
+        await verifyEthPayment(input.paymentRef);
+      } else {
+        // card: Stripe not yet integrated — deduplicate only to prevent double-spend
+        const existing = await db
+          .collection('creditTransactions')
+          .where('paymentRef', '==', input.paymentRef)
+          .limit(1)
+          .get();
+        if (!existing.empty) {
+          throw new Error('This payment reference has already been used');
+        }
+      }
 
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
@@ -614,7 +672,7 @@ export const creditsRouter = router({
   getHistory: protectedProcedure
     .input(z.object({ limit: z.number().min(1).max(100).default(20) }))
     .query(async ({ input, ctx }) => {
-      const snapshot = await creditTxCol
+      const snapshot = await creditTxCol()
         .where('uid', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
         .limit(input.limit)

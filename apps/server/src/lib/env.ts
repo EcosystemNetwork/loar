@@ -33,6 +33,19 @@ const envSchema = z.object({
     .regex(/^[0-9a-fA-F]{64}$/, 'PRIVATE_KEY must be 64 hex characters without 0x prefix')
     .optional(),
 
+  // ── On-chain payment verification ─────────────────────────────────────────
+  // Falls back to PONDER_RPC_URL_2 in credits.routes.ts if unset, but setting
+  // this separately is recommended so server and indexer use independent RPCs.
+  RPC_URL: z.string().url('RPC_URL must be a valid URL').optional(),
+  LOAR_TOKEN_ADDRESS: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'LOAR_TOKEN_ADDRESS must be a valid Ethereum address')
+    .optional(),
+  TREASURY_ADDRESS: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'TREASURY_ADDRESS must be a valid Ethereum address')
+    .optional(),
+
   // ── Platform config ───────────────────────────────────────────────────────
   UNIVERSE_MINT_CREDITS: z
     .string()
@@ -98,6 +111,24 @@ export function validateEnv(): Env {
     if (!env.FIREBASE_SERVICE_ACCOUNT && !env.FIREBASE_SERVICE_ACCOUNT_PATH) {
       prodErrors.push(
         'Either FIREBASE_SERVICE_ACCOUNT (JSON string) or FIREBASE_SERVICE_ACCOUNT_PATH (file path) is required in production'
+      );
+    }
+
+    if (!env.LOAR_TOKEN_ADDRESS) {
+      prodErrors.push(
+        'LOAR_TOKEN_ADDRESS is required in production for on-chain payment verification'
+      );
+    }
+
+    if (!env.TREASURY_ADDRESS) {
+      prodErrors.push(
+        'TREASURY_ADDRESS is required in production for on-chain payment verification'
+      );
+    }
+
+    if (!env.RPC_URL) {
+      prodErrors.push(
+        'RPC_URL is required in production (fallback to PONDER_RPC_URL_2 is not reliable for payment verification)'
       );
     }
 
