@@ -1,0 +1,398 @@
+/**
+ * Video Model Registry — Central source of truth for all supported video generation models.
+ *
+ * Dual-margin pricing model:
+ * - providerCostUsd = what we pay the AI provider (FAL) per generation
+ * - userPriceUsd = providerCostUsd * 1.35 (35% margin for card/crypto)
+ * - loarPriceUsd = providerCostUsd * 1.25 (25% margin for $LOAR payments)
+ * - creditCost = internal credits (1 credit ≈ provider cost, margin on purchase)
+ *
+ * Users buy credits with either:
+ *   Card / ETH / other crypto → 35% margin
+ *   $LOAR token → 25% margin (+ 10% bonus credits)
+ */
+import type { VideoModelConfig, VideoGenerationMode } from './types';
+
+/** Margin for credit card / ETH / other crypto purchases */
+export const FIAT_MARGIN = 1.35;
+
+/** Margin for $LOAR token purchases (incentivized) */
+export const LOAR_MARGIN = 1.25;
+
+/** $LOAR token to USD conversion rate (1 $LOAR = $0.01) */
+export const LOAR_TO_USD = 0.01;
+
+/** Calculate user price from provider cost at fiat margin */
+function withFiatMargin(providerCost: number): number {
+  return Math.round(providerCost * FIAT_MARGIN * 100) / 100;
+}
+
+/** Calculate user price from provider cost at $LOAR margin */
+function withLoarMargin(providerCost: number): number {
+  return Math.round(providerCost * LOAR_MARGIN * 100) / 100;
+}
+
+/** Calculate $LOAR tokens from USD price */
+function usdToLoar(usd: number): number {
+  return Math.ceil(usd / LOAR_TO_USD);
+}
+
+export const VIDEO_MODELS: VideoModelConfig[] = [
+  // ── Draft / Fast / Cheap ────────────────────────────────────────────
+  {
+    id: 'ltx-video',
+    provider: 'fal',
+    displayName: 'LTX Video',
+    shortDescription: 'Cheapest drafts, fast previews',
+    falModelId: 'fal-ai/ltx-video',
+    mode: ['text_to_video'],
+    qualityTier: 'draft',
+    speedTier: 'fast',
+    priceTier: 'low',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 5,
+    supportedDurations: [5],
+    supportedAspectRatios: ['16:9'],
+    supportedResolutions: ['512p'],
+    creditCost: usdToLoar(withFiatMargin(0.02)),
+    providerCostUsd: 0.02,
+    fiatPriceUsd: withFiatMargin(0.02),
+    loarPriceUsd: withLoarMargin(0.02), // $0.03
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['draft', 'fast', 'cheap', 'preview'],
+    bestFor: 'Quick previews and drafts',
+  },
+  {
+    id: 'hunyuan',
+    provider: 'fal',
+    displayName: 'HunYuan Video',
+    shortDescription: 'Budget text-to-video',
+    falModelId: 'fal-ai/hunyuan-video',
+    mode: ['text_to_video'],
+    qualityTier: 'draft',
+    speedTier: 'medium',
+    priceTier: 'low',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 5,
+    supportedDurations: [5],
+    supportedAspectRatios: ['16:9'],
+    supportedResolutions: ['512p'],
+    creditCost: usdToLoar(withFiatMargin(0.04)),
+    providerCostUsd: 0.04,
+    fiatPriceUsd: withFiatMargin(0.04),
+    loarPriceUsd: withLoarMargin(0.04),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['draft', 'budget'],
+    bestFor: 'Budget text-to-video generation',
+  },
+
+  // ── Standard / Balanced ─────────────────────────────────────────────
+  {
+    id: 'wan25-t2v',
+    provider: 'fal',
+    displayName: 'Wan 2.5',
+    shortDescription: 'Good quality, prompt expansion',
+    falModelId: 'fal-ai/wan-25-preview/text-to-video',
+    mode: ['text_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'medium',
+    priceTier: 'medium',
+    supportsAudio: false,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 10,
+    supportedDurations: [5, 10],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.08)),
+    providerCostUsd: 0.08,
+    fiatPriceUsd: withFiatMargin(0.08),
+    loarPriceUsd: withLoarMargin(0.08),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['standard', 'balanced', 'prompt-expansion'],
+    bestFor: 'Balanced quality with prompt expansion',
+  },
+  {
+    id: 'wan25-i2v',
+    provider: 'fal',
+    displayName: 'Wan 2.5',
+    shortDescription: 'Good quality image animation',
+    falModelId: 'fal-ai/wan-25-preview/image-to-video',
+    mode: ['image_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'medium',
+    priceTier: 'medium',
+    supportsAudio: false,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 10,
+    supportedDurations: [5, 10],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.08)),
+    providerCostUsd: 0.08,
+    fiatPriceUsd: withFiatMargin(0.08),
+    loarPriceUsd: withLoarMargin(0.08),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['standard', 'balanced', 'image-animation'],
+    bestFor: 'Balanced quality image animation',
+  },
+  {
+    id: 'kling-t2v',
+    provider: 'fal',
+    displayName: 'Kling 2.5 Turbo',
+    shortDescription: 'Fast, balanced quality and speed',
+    falModelId: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+    mode: ['text_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'fast',
+    priceTier: 'medium',
+    supportsAudio: false,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 10,
+    supportedDurations: [5, 10],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.1)),
+    providerCostUsd: 0.1,
+    fiatPriceUsd: withFiatMargin(0.1),
+    loarPriceUsd: withLoarMargin(0.1),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['standard', 'fast', 'turbo'],
+    bestFor: 'Fast, balanced quality and speed',
+  },
+  {
+    id: 'kling-i2v',
+    provider: 'fal',
+    displayName: 'Kling 2.5 Turbo',
+    shortDescription: 'Fast image-to-video animation',
+    falModelId: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+    mode: ['image_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'fast',
+    priceTier: 'medium',
+    supportsAudio: false,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 10,
+    supportedDurations: [5, 10],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.1)),
+    providerCostUsd: 0.1,
+    fiatPriceUsd: withFiatMargin(0.1),
+    loarPriceUsd: withLoarMargin(0.1),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['standard', 'fast', 'turbo', 'image-animation'],
+    bestFor: 'Fast image-to-video animation',
+  },
+  {
+    id: 'cogvideox',
+    provider: 'fal',
+    displayName: 'CogVideoX-5B',
+    shortDescription: 'Open-source standard model',
+    falModelId: 'fal-ai/cogvideox-5b',
+    mode: ['text_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'medium',
+    priceTier: 'low',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 5,
+    supportedDurations: [5],
+    supportedAspectRatios: ['16:9'],
+    supportedResolutions: ['512p'],
+    creditCost: usdToLoar(withFiatMargin(0.05)),
+    providerCostUsd: 0.05,
+    fiatPriceUsd: withFiatMargin(0.05),
+    loarPriceUsd: withLoarMargin(0.05),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['standard', 'open-source'],
+    bestFor: 'Open-source standard quality',
+  },
+
+  // ── Premium / High Quality ──────────────────────────────────────────
+  {
+    id: 'veo31-t2v',
+    provider: 'fal',
+    displayName: 'Veo 3.1 Fast',
+    shortDescription: 'Premium cinematic with audio',
+    falModelId: 'fal-ai/veo3.1/fast',
+    mode: ['text_to_video'],
+    qualityTier: 'premium',
+    speedTier: 'medium',
+    priceTier: 'high',
+    supportsAudio: true,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 8,
+    supportedDurations: [8],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.25)),
+    providerCostUsd: 0.25,
+    fiatPriceUsd: withFiatMargin(0.25),
+    loarPriceUsd: withLoarMargin(0.25),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['premium', 'cinematic', 'audio', 'google'],
+    bestFor: 'Premium cinematic video with audio',
+  },
+  {
+    id: 'veo31-i2v',
+    provider: 'fal',
+    displayName: 'Veo 3.1 Fast',
+    shortDescription: 'Premium image animation with audio',
+    falModelId: 'fal-ai/veo3.1/fast/image-to-video',
+    mode: ['image_to_video'],
+    qualityTier: 'premium',
+    speedTier: 'medium',
+    priceTier: 'high',
+    supportsAudio: true,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 8,
+    supportedDurations: [8],
+    supportedAspectRatios: ['16:9', '9:16', '1:1', 'auto'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.25)),
+    providerCostUsd: 0.25,
+    fiatPriceUsd: withFiatMargin(0.25),
+    loarPriceUsd: withLoarMargin(0.25),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['premium', 'cinematic', 'audio', 'google', 'image-animation'],
+    bestFor: 'Premium image animation with audio',
+  },
+  {
+    id: 'sora2-t2v',
+    provider: 'fal',
+    displayName: 'Sora 2',
+    shortDescription: 'OpenAI premium, strict aspect ratios',
+    falModelId: 'fal-ai/sora-2/text-to-video',
+    mode: ['text_to_video'],
+    qualityTier: 'premium',
+    speedTier: 'slow',
+    priceTier: 'high',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 12,
+    supportedDurations: [4, 8, 12],
+    supportedAspectRatios: ['16:9', '9:16'],
+    supportedResolutions: ['720p'],
+    creditCost: usdToLoar(withFiatMargin(0.3)),
+    providerCostUsd: 0.3,
+    fiatPriceUsd: withFiatMargin(0.3),
+    loarPriceUsd: withLoarMargin(0.3),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['premium', 'openai', 'strict-aspect-ratio'],
+    bestFor: 'OpenAI premium quality (16:9 or 9:16 only)',
+  },
+  {
+    id: 'sora2-i2v',
+    provider: 'fal',
+    displayName: 'Sora 2',
+    shortDescription: 'OpenAI premium image animation',
+    falModelId: 'fal-ai/sora-2/image-to-video',
+    mode: ['image_to_video'],
+    qualityTier: 'premium',
+    speedTier: 'slow',
+    priceTier: 'high',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 12,
+    supportedDurations: [4, 8, 12],
+    supportedAspectRatios: ['16:9', '9:16', 'auto'],
+    supportedResolutions: ['720p', 'auto'],
+    creditCost: usdToLoar(withFiatMargin(0.3)),
+    providerCostUsd: 0.3,
+    fiatPriceUsd: withFiatMargin(0.3),
+    loarPriceUsd: withLoarMargin(0.3),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['premium', 'openai', 'image-animation'],
+    bestFor: 'OpenAI premium image animation',
+  },
+  {
+    id: 'runway-gen3',
+    provider: 'fal',
+    displayName: 'Runway Gen-3',
+    shortDescription: 'Runway premium generation',
+    falModelId: 'fal-ai/runway-gen3',
+    mode: ['text_to_video'],
+    qualityTier: 'premium',
+    speedTier: 'medium',
+    priceTier: 'high',
+    supportsAudio: false,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 10,
+    supportedDurations: [5, 10],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.25)),
+    providerCostUsd: 0.25,
+    fiatPriceUsd: withFiatMargin(0.25),
+    loarPriceUsd: withLoarMargin(0.25),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['premium', 'runway'],
+    bestFor: 'Runway premium text-to-video',
+  },
+];
+
+// ── Lookup Helpers ────────────────────────────────────────────────────
+
+const modelsById = new Map(VIDEO_MODELS.map((m) => [m.id, m]));
+
+export function getModelById(id: string): VideoModelConfig | undefined {
+  return modelsById.get(id);
+}
+
+export function getModelByFalId(falModelId: string): VideoModelConfig | undefined {
+  return VIDEO_MODELS.find((m) => m.falModelId === falModelId);
+}
+
+export function getEnabledModels(): VideoModelConfig[] {
+  return VIDEO_MODELS.filter((m) => m.isEnabled);
+}
+
+export function getVisibleModels(): VideoModelConfig[] {
+  return VIDEO_MODELS.filter((m) => m.isEnabled && m.isVisibleToUsers);
+}
+
+export function getModelsForMode(mode: VideoGenerationMode): VideoModelConfig[] {
+  return getVisibleModels().filter((m) => m.mode.includes(mode));
+}
+
+export function getModelIds(): string[] {
+  return VIDEO_MODELS.map((m) => m.id);
+}

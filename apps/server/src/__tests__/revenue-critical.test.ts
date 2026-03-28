@@ -132,9 +132,9 @@ describe('subscriptions router', () => {
 // credits
 // ---------------------------------------------------------------------------
 describe('credits router', () => {
-  it('getTiers is public', async () => {
+  it('getPackages is public', async () => {
     const caller = createPublicCaller();
-    const result = await caller.credits.getTiers();
+    const result = await caller.credits.getPackages();
     expect(Array.isArray(result)).toBe(true);
   });
 
@@ -149,13 +149,13 @@ describe('credits router', () => {
     await expect(caller.credits.getBalance()).rejects.toThrow(TRPCError);
   });
 
-  it('purchase rejects unauthenticated callers', async () => {
+  it('purchaseWithFiat rejects unauthenticated callers', async () => {
     const caller = createPublicCaller();
     await expect(
-      caller.credits.purchase({
-        tierId: 'starter',
-        txHash: '0xabc',
-        amount: '10',
+      caller.credits.purchaseWithFiat({
+        packageId: 'starter',
+        paymentMethod: 'card',
+        paymentRef: 'test_ref',
       })
     ).rejects.toThrow(TRPCError);
   });
