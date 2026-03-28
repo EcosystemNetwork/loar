@@ -34,6 +34,7 @@ import { imageRouter } from './generation/image.routes';
 import { falRouter } from './fal/fal.routes'; // @deprecated — use generation.* + image.*
 import { marketplaceRouter } from './marketplace/marketplace.routes';
 import { nftRouter } from './nft/nft.routes';
+import { listingsRouter } from './listings/listings.routes';
 import { creditsRouter } from './credits/credits.routes';
 import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
@@ -50,6 +51,7 @@ import { collabsRouter } from './collabs/collabs.routes';
 import { universeTeamRouter } from './universeTeam/universeTeam.routes';
 import { universeTreasuryRouter } from './universeTreasury/universeTreasury.routes';
 import { adminRouter } from './admin/admin.routes';
+import { portfolioRouter } from './portfolio/portfolio.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const walletLoginsCol = firebaseAvailable ? db.collection('walletLogins') : null;
@@ -131,6 +133,7 @@ export const appRouter = router({
   // ── Marketplace domain ──────────────────────────────────────────────
   marketplace: marketplaceRouter,
   nft: nftRouter,
+  listings: listingsRouter,
 
   // ── Monetization ────────────────────────────────────────────────────
   credits: creditsRouter,
@@ -153,6 +156,9 @@ export const appRouter = router({
 
   // ── Admin ───────────────────────────────────────────────────────────
   admin: adminRouter,
+
+  // ── Portfolio BFF (mobile vault aggregation) ────────────────────────
+  portfolio: portfolioRouter,
 });
 
 export type AppRouter = typeof appRouter;

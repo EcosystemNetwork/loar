@@ -24,7 +24,25 @@ interface DirectUploadProps {
   label?: string;
 }
 
-const DEFAULT_TYPES = ['video/mp4', 'video/webm', 'image/png', 'image/jpeg', 'image/gif'];
+const DEFAULT_TYPES = [
+  // Video
+  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+  // Raster images
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff', 'image/bmp',
+  'image/avif', 'image/heic', 'image/heif', 'image/svg+xml',
+  // Design formats
+  'image/vnd.adobe.photoshop', 'image/x-xcf', 'application/postscript',
+  // 3D models
+  'model/gltf+json', 'model/gltf-binary', 'model/obj', 'model/stl',
+  // Audio
+  'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/aac',
+  // Documents
+  'application/pdf',
+  // Proprietary art app formats (reported as application/octet-stream by browsers)
+  '.blend', '.fbx', '.ma', '.mb', '.c4d', '.zpr', '.ztl', '.dae', '.abc', '.3ds', '.lwo',
+  '.psd', '.psb', '.kra', '.clip', '.procreate', '.sketch', '.afdesign', '.afphoto', '.afpub', '.cdr',
+  '.exr', '.hdr', '.tga', '.dds',
+];
 
 export function DirectUpload({
   onUploadComplete,
@@ -44,9 +62,13 @@ export function DirectUpload({
 
   const uploadFile = useCallback(
     async (file: File) => {
-      if (!acceptedTypes.includes(file.type)) {
+      const fileExt = '.' + (file.name.split('.').pop()?.toLowerCase() ?? '');
+      const isOctetStream = file.type === 'application/octet-stream' || file.type === '';
+      const mimeAccepted = acceptedTypes.includes(file.type);
+      const extAccepted = isOctetStream && acceptedTypes.includes(fileExt);
+      if (!mimeAccepted && !extAccepted) {
         toast.error('Unsupported file type', {
-          description: `Allowed: ${acceptedTypes.map((t) => t.split('/')[1]).join(', ')}`,
+          description: `File type not allowed for upload`,
         });
         return;
       }

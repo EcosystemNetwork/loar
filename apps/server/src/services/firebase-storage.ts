@@ -103,16 +103,28 @@ class StorageService {
   private getContentType(filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase();
     const mimeTypes: Record<string, string> = {
-      mp4: 'video/mp4',
-      webm: 'video/webm',
-      mov: 'video/quicktime',
-      avi: 'video/x-msvideo',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      gif: 'image/gif',
-      json: 'application/json',
-      txt: 'text/plain',
+      // Video
+      mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+      avi: 'video/x-msvideo', mkv: 'video/x-matroska', m4v: 'video/mp4',
+      // Raster images
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+      webp: 'image/webp', tiff: 'image/tiff', tif: 'image/tiff', bmp: 'image/bmp',
+      avif: 'image/avif', heic: 'image/heic', heif: 'image/heif', svg: 'image/svg+xml',
+      // Texture / HDR
+      exr: 'image/x-exr', hdr: 'image/vnd.radiance', tga: 'image/x-tga', dds: 'image/vnd.ms-dds',
+      // Design app native
+      psd: 'image/vnd.adobe.photoshop', psb: 'image/vnd.adobe.photoshop',
+      xcf: 'image/x-xcf', ai: 'application/postscript', eps: 'application/postscript',
+      kra: 'application/octet-stream', blend: 'application/octet-stream',
+      fbx: 'application/octet-stream', c4d: 'application/octet-stream',
+      // 3D models
+      gltf: 'model/gltf+json', glb: 'model/gltf-binary',
+      obj: 'model/obj', stl: 'model/stl', dae: 'model/vnd.collada+xml',
+      // Audio
+      mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+      flac: 'audio/flac', aac: 'audio/aac', m4a: 'audio/mp4', aiff: 'audio/aiff',
+      // Documents
+      pdf: 'application/pdf', json: 'application/json', txt: 'text/plain',
     };
     return mimeTypes[ext || ''] || 'application/octet-stream';
   }

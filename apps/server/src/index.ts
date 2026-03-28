@@ -137,13 +137,35 @@ app.post('/api/upload', async (c) => {
       return c.json({ code: 'BAD_REQUEST', message: 'No file provided' }, 400);
     }
 
-    const allowedTypes = ['video/mp4', 'video/webm', 'image/png', 'image/jpeg', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
+    const allowedMimeTypes = new Set([
+      // Video
+      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+      // Raster images
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff', 'image/bmp',
+      'image/avif', 'image/heic', 'image/heif', 'image/svg+xml',
+      // Design formats with standard MIME types
+      'image/vnd.adobe.photoshop', 'image/x-xcf', 'application/postscript',
+      // 3D models
+      'model/gltf+json', 'model/gltf-binary', 'model/obj', 'model/stl',
+      // Audio
+      'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/aac', 'audio/mp4',
+      // Documents / reference
+      'application/pdf',
+    ]);
+    // Extensions for proprietary art formats browsers report as application/octet-stream
+    const allowedBinaryExtensions = new Set([
+      // 3D / animation
+      'blend', 'fbx', 'ma', 'mb', 'max', 'c4d', 'zpr', 'ztl', 'dae', 'abc', '3ds', 'lwo',
+      // Design app native
+      'psd', 'psb', 'kra', 'clip', 'procreate', 'sketch', 'afdesign', 'afphoto', 'afpub', 'cdr',
+      // Texture / HDR
+      'exr', 'hdr', 'tga', 'dds',
+    ]);
+    const fileExt = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isOctetStream = file.type === 'application/octet-stream' || file.type === '';
+    if (!allowedMimeTypes.has(file.type) && !(isOctetStream && allowedBinaryExtensions.has(fileExt))) {
       return c.json(
-        {
-          code: 'BAD_REQUEST',
-          message: `Unsupported file type: ${file.type}. Allowed: ${allowedTypes.join(', ')}`,
-        },
+        { code: 'BAD_REQUEST', message: `Unsupported file type: ${file.type || fileExt}` },
         400
       );
     }
