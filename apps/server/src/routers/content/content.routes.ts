@@ -119,6 +119,22 @@ export const contentRouter = router({
     if (doc.data()!.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
 
     const existing = doc.data()!;
+
+    // Canon-locked content cannot be edited — changes require governance vote
+    if (existing.canonLocked) {
+      throw new Error(
+        'This content is canon-locked. Changes to canon content require a community governance vote.'
+      );
+    }
+
+    // Minted NFT content — media URL is immutable, but metadata can be updated
+    if (existing.mintedAsNft && (input.classification || input.ipDeclaration)) {
+      // Allow title/description/tags changes but not reclassification
+      throw new Error(
+        'Minted content cannot change classification or IP declaration. The media is permanently stored on IPFS.'
+      );
+    }
+
     const newClassification = input.classification || existing.classification;
     const newIp = input.ipDeclaration || existing.ipDeclaration;
 
@@ -149,6 +165,18 @@ export const contentRouter = router({
 
       if (!doc.exists) throw new Error('Content not found');
       if (doc.data()!.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
+
+      const data = doc.data()!;
+      if (data.canonLocked) {
+        throw new Error(
+          'Canon-locked content cannot be deleted. It is part of the permanent universe narrative.'
+        );
+      }
+      if (data.mintedAsNft) {
+        throw new Error(
+          'Minted NFT content cannot be deleted. The media is permanently stored on IPFS.'
+        );
+      }
 
       await ref.delete();
 
