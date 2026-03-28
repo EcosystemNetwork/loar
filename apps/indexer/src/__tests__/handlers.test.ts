@@ -24,8 +24,8 @@ function handler(event: string) {
 // ─── UniverseManager:UniverseCreated ─────────────────────────────────────────
 
 describe('UniverseManager:UniverseCreated', () => {
-  const UNIVERSE = '0xaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaA';
-  const CREATOR = '0xbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBb';
+  const UNIVERSE = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const CREATOR = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
   it('inserts a universe record with metadata from readContract', async () => {
     const ctx = createMockContext();
@@ -68,7 +68,7 @@ describe('UniverseManager:UniverseCreated', () => {
     const ctx = createMockContext();
     ctx.client.readContract.mockResolvedValue('');
 
-    const lowercaseCreator = CREATOR.toLowerCase();
+    const lowercaseCreator = CREATOR; // already lowercase
     await handler('UniverseManager:UniverseCreated')({
       event: { args: { universe: UNIVERSE, creator: lowercaseCreator }, block: mockBlock() },
       context: ctx,
