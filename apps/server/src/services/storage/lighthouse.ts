@@ -1,32 +1,31 @@
 /**
- * IPFS storage provider via Pinata — pins files to IPFS and serves them through a Pinata gateway.
- * Priority 2 in the storage fallback chain. Requires PINATA_JWT env var.
+ * Lighthouse storage provider — permanent Filecoin+IPFS storage with encryption
+ * and token-gated access control. Priority 2 (permanent source-of-truth).
+ * Requires LIGHTHOUSE_API_KEY env var.
  */
 import type { StorageProvider, UploadResult } from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
 
-const DEFAULT_GATEWAY = 'https://gateway.pinata.cloud';
+const UPLOAD_URL = 'https://node.lighthouse.storage/api/v0/add';
+const GATEWAY = 'https://gateway.lighthouse.storage';
 
-// Circuit breaker
 const MAX_CONSECUTIVE_FAILURES = 3;
 const CIRCUIT_BREAKER_RESET_MS = 60_000;
 
-export class PinataProvider implements StorageProvider {
-  readonly name = 'pinata';
-  readonly priority = 1;
+export class LighthouseProvider implements StorageProvider {
+  readonly name = 'lighthouse';
+  readonly priority = 2;
 
-  private jwt: string;
-  private gatewayUrl: string;
+  private apiKey: string;
   private consecutiveFailures = 0;
   private lastFailureTime = 0;
 
   constructor() {
-    this.jwt = process.env.PINATA_JWT || '';
-    this.gatewayUrl = process.env.PINATA_GATEWAY_URL || DEFAULT_GATEWAY;
+    this.apiKey = process.env.LIGHTHOUSE_API_KEY || '';
   }
 
   isAvailable(): boolean {
-    if (!this.jwt) return false;
+    if (!this.apiKey) return false;
     if (
       this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES &&
       Date.now() - this.lastFailureTime < CIRCUIT_BREAKER_RESET_MS
@@ -41,41 +40,31 @@ export class PinataProvider implements StorageProvider {
       const contentHash = computeSha256(buffer);
       const resolvedMime = mimeType || getMimeType(filename);
 
-      // Pinata v2 pinning API
       const formData = new FormData();
       const blob = new Blob([new Uint8Array(buffer)], { type: resolvedMime });
       formData.append('file', blob, filename);
 
-      const metadata = JSON.stringify({ name: filename });
-      formData.append('pinataMetadata', metadata);
-
-      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      const response = await fetch(UPLOAD_URL, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.jwt}`,
-        },
+        headers: { Authorization: `Bearer ${this.apiKey}` },
         body: formData,
       });
 
       if (!response.ok) {
         const body = await response.text();
-        throw new Error(`Pinata upload failed: HTTP ${response.status} — ${body}`);
+        throw new Error(`Lighthouse upload failed: HTTP ${response.status} — ${body}`);
       }
 
-      const result = (await response.json()) as {
-        IpfsHash: string;
-        PinSize: number;
-      };
+      const result = (await response.json()) as { Hash: string; Size: number };
 
-      // Reset circuit breaker on success
       this.consecutiveFailures = 0;
 
       return {
         provider: this.name,
-        contentId: result.IpfsHash,
+        contentId: result.Hash,
         contentHash,
-        url: this.getPublicUrl(result.IpfsHash),
-        size: result.PinSize,
+        url: this.getPublicUrl(result.Hash),
+        size: result.Size,
       };
     } catch (error) {
       this.consecutiveFailures++;
@@ -92,16 +81,14 @@ export class PinataProvider implements StorageProvider {
   }
 
   async download(cid: string): Promise<Uint8Array> {
-    const response = await fetch(`${this.gatewayUrl}/ipfs/${cid}`);
-
+    const response = await fetch(`${GATEWAY}/ipfs/${cid}`);
     if (!response.ok) {
-      throw new Error(`IPFS download failed: HTTP ${response.status}`);
+      throw new Error(`Lighthouse download failed: HTTP ${response.status}`);
     }
-
     return new Uint8Array(await response.arrayBuffer());
   }
 
   getPublicUrl(cid: string): string {
-    return `${this.gatewayUrl}/ipfs/${cid}`;
+    return `${GATEWAY}/ipfs/${cid}`;
   }
 }
