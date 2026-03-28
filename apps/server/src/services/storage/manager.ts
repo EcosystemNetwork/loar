@@ -1,9 +1,9 @@
 import { db } from '../../lib/firebase';
 import type { StorageProvider, StorageManifest, UploadResult } from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
-import { WalrusProvider } from './walrus';
-import { IpfsProvider } from './ipfs';
-import { SynapseAdapter } from './synapse-adapter';
+import { PinataProvider } from './ipfs';
+import { LighthouseProvider } from './lighthouse';
+import { StorachaProvider } from './storacha';
 import { FirebaseAdapter } from './firebase-adapter';
 
 const MANIFESTS_COLLECTION = 'storageManifests';
@@ -11,13 +11,13 @@ const MANIFESTS_COLLECTION = 'storageManifests';
 /** Default provider priority order. Can be overridden via STORAGE_PROVIDER_PRIORITY env. */
 function buildProviders(): StorageProvider[] {
   const all: StorageProvider[] = [
-    new WalrusProvider(),
-    new IpfsProvider(),
-    new SynapseAdapter(),
+    new PinataProvider(),
+    new LighthouseProvider(),
+    new StorachaProvider(),
     new FirebaseAdapter(),
   ];
 
-  // Allow reordering via env: "walrus,ipfs,synapse,firebase"
+  // Allow reordering via env: "pinata,lighthouse,storacha,firebase"
   const order = process.env.STORAGE_PROVIDER_PRIORITY?.split(',').map((s) =>
     s.trim().toLowerCase()
   );
@@ -187,13 +187,13 @@ export class StorageManager {
     }
 
     // Check if already pinned to IPFS
-    const existingIpfs = manifest.uploads.find((u) => u.provider === 'ipfs');
+    const existingIpfs = manifest.uploads.find((u) => u.provider === 'pinata');
     if (existingIpfs) {
       return { cid: existingIpfs.contentId, url: existingIpfs.url, manifest };
     }
 
     // Download from existing provider and re-upload to IPFS
-    const ipfs = this.providers.find((p) => p.name === 'ipfs');
+    const ipfs = this.providers.find((p) => p.name === 'pinata');
     if (!ipfs?.isAvailable()) {
       throw new Error('IPFS provider is not available');
     }
