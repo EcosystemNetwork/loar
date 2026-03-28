@@ -9,11 +9,26 @@ import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig'
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
 
-const submissionsCol = db.collection('canonSubmissions');
-const canonVotesCol = db.collection('canonVotes');
-const canonLicensesCol = db.collection('canonLicenses');
-const marketplaceSalesCol = db.collection('marketplaceSales');
-const contentCol = db.collection('content');
+const submissionsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('canonSubmissions');
+};
+const canonVotesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('canonVotes');
+};
+const canonLicensesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('canonLicenses');
+};
+const marketplaceSalesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('marketplaceSales');
+};
+const contentCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('content');
+};
 
 const submissionTypeEnum = z.enum(['CHARACTER', 'PLOT_ARC', 'LOCATION', 'LORE_RULE']);
 
@@ -48,7 +63,7 @@ export const marketplaceRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await submissionsCol.add(submission);
+      const ref = await submissionsCol().add(submission);
       return { id: ref.id, ...submission };
     }),
 
@@ -81,10 +96,10 @@ export const marketplaceRouter = router({
         votedAt: new Date(),
       };
 
-      await canonVotesCol.add(voteData);
+      await canonVotesCol().add(voteData);
 
       // Update submission tallies
-      const subRef = submissionsCol.doc(input.submissionId);
+      const subRef = submissionsCol().doc(input.submissionId);
       const subDoc = await subRef.get();
       if (!subDoc.exists) throw new Error('Submission not found');
 
@@ -103,7 +118,7 @@ export const marketplaceRouter = router({
   finalize: protectedProcedure
     .input(z.object({ submissionId: z.string() }))
     .mutation(async ({ input }) => {
-      const ref = submissionsCol.doc(input.submissionId);
+      const ref = submissionsCol().doc(input.submissionId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Submission not found');
 
@@ -173,7 +188,7 @@ export const marketplaceRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query: FirebaseFirestore.Query = submissionsCol.where(
+      let query: FirebaseFirestore.Query = submissionsCol().where(
         'universeId',
         '==',
         input.universeId
@@ -192,7 +207,7 @@ export const marketplaceRouter = router({
     }),
 
   getSubmission: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
-    const doc = await submissionsCol.doc(input.id).get();
+    const doc = await submissionsCol().doc(input.id).get();
     if (!doc.exists) return null;
     return { id: doc.id, ...doc.data() };
   }),
@@ -229,7 +244,7 @@ export const marketplaceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const subDoc = await submissionsCol.doc(input.submissionId).get();
+      const subDoc = await submissionsCol().doc(input.submissionId).get();
       if (!subDoc.exists) throw new Error('Submission not found');
       const sub = subDoc.data()!;
       if (sub.status !== 'ACCEPTED') throw new Error('Not accepted canon');
@@ -255,9 +270,9 @@ export const marketplaceRouter = router({
       };
 
       const [licenseRef] = await Promise.all([
-        canonLicensesCol.add(license),
+        canonLicensesCol().add(license),
         // Record the sale for platform revenue tracking
-        marketplaceSalesCol.add({
+        marketplaceSalesCol().add({
           id: randomUUID(),
           type: 'canon_license',
           submissionId: input.submissionId,

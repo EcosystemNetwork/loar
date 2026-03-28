@@ -15,7 +15,10 @@ import { db } from '../../lib/firebase';
 import { geminiService } from '../../services/gemini';
 import { wrapError } from '../../lib/errors';
 
-const charactersCol = db.collection('characters');
+const charactersCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('characters');
+};
 
 export const imageRouter = router({
   /** Generate an image using FAL models. */
@@ -147,23 +150,25 @@ export const imageRouter = router({
         localImageUrl = imageResult.imageUrl;
         characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
-        await charactersCol.doc(characterId).set({
-          character_name: input.name,
-          collection: 'Nano Banana AI',
-          token_id: characterId,
-          traits: {
-            style: input.style || 'cute',
-            generated_with: 'nano-banana',
-            seed: imageResult.seed?.toString() || 'random',
-          },
-          rarity_rank: 0,
-          rarity_percentage: null,
-          image_url: localImageUrl,
-          description: input.description,
-          detailed_visual_description: input.detailedVisualDescription || null,
-          created_at: new Date(),
-          updated_at: new Date(),
-        });
+        await charactersCol()
+          .doc(characterId)
+          .set({
+            character_name: input.name,
+            collection: 'Nano Banana AI',
+            token_id: characterId,
+            traits: {
+              style: input.style || 'cute',
+              generated_with: 'nano-banana',
+              seed: imageResult.seed?.toString() || 'random',
+            },
+            rarity_rank: 0,
+            rarity_percentage: null,
+            image_url: localImageUrl,
+            description: input.description,
+            detailed_visual_description: input.detailedVisualDescription || null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
       }
 
       return {
@@ -217,22 +222,24 @@ export const imageRouter = router({
     .mutation(async ({ input }) => {
       const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
-      await charactersCol.doc(characterId).set({
-        character_name: input.name,
-        collection: 'Nano Banana AI',
-        token_id: characterId,
-        traits: {
-          style: input.style,
-          generated_with: 'nano-banana',
-        },
-        rarity_rank: 0,
-        rarity_percentage: null,
-        image_url: input.imageUrl,
-        description: input.description,
-        detailed_visual_description: input.detailedVisualDescription || null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
+      await charactersCol()
+        .doc(characterId)
+        .set({
+          character_name: input.name,
+          collection: 'Nano Banana AI',
+          token_id: characterId,
+          traits: {
+            style: input.style,
+            generated_with: 'nano-banana',
+          },
+          rarity_rank: 0,
+          rarity_percentage: null,
+          image_url: input.imageUrl,
+          description: input.description,
+          detailed_visual_description: input.detailedVisualDescription || null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
 
       return {
         success: true,

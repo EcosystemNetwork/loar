@@ -6,10 +6,22 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
-const analyticsCol = db.collection('analytics');
-const viewsCol = db.collection('episodeViews');
-const engagementCol = db.collection('engagement');
-const trendingCol = db.collection('trending');
+const analyticsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('analytics');
+};
+const viewsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('episodeViews');
+};
+const engagementCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('engagement');
+};
+const trendingCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('trending');
+};
 
 export const analyticsRouter = router({
   // ---- Record Events ----
@@ -24,13 +36,13 @@ export const analyticsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      await viewsCol.add({
+      await viewsCol().add({
         ...input,
         viewedAt: new Date(),
       });
 
       // Update universe metrics
-      const metricsRef = analyticsCol.doc(input.universeId);
+      const metricsRef = analyticsCol().doc(input.universeId);
       const metricsDoc = await metricsRef.get();
 
       if (metricsDoc.exists) {
@@ -65,7 +77,7 @@ export const analyticsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      await engagementCol.add({
+      await engagementCol().add({
         ...input,
         createdAt: new Date(),
       });
@@ -78,7 +90,7 @@ export const analyticsRouter = router({
   getUniverseMetrics: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const doc = await analyticsCol.doc(input.universeId).get();
+      const doc = await analyticsCol().doc(input.universeId).get();
       if (!doc.exists) {
         return {
           universeId: input.universeId,
@@ -134,10 +146,7 @@ export const analyticsRouter = router({
   getTrending: publicProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
-      const snapshot = await analyticsCol
-        .orderBy('totalViews', 'desc')
-        .limit(input.limit)
-        .get();
+      const snapshot = await analyticsCol.orderBy('totalViews', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
@@ -145,10 +154,7 @@ export const analyticsRouter = router({
   getRecentActivity: publicProcedure
     .input(z.object({ limit: z.number().min(1).max(100).default(20) }))
     .query(async ({ input }) => {
-      const snapshot = await viewsCol
-        .orderBy('viewedAt', 'desc')
-        .limit(input.limit)
-        .get();
+      const snapshot = await viewsCol.orderBy('viewedAt', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
@@ -175,7 +181,7 @@ export const analyticsRouter = router({
       };
 
       // Metrics
-      const metricsDoc = await analyticsCol.doc(input.universeId).get();
+      const metricsDoc = await analyticsCol().doc(input.universeId).get();
       results.metrics = metricsDoc.exists ? metricsDoc.data() : null;
 
       if (input.includeViews) {
@@ -210,7 +216,7 @@ export const analyticsRouter = router({
   // ---- Platform-wide Stats ----
 
   getPlatformStats: publicProcedure.query(async () => {
-    const snapshot = await analyticsCol.get();
+    const snapshot = await analyticsCol().get();
 
     let totalViews = 0;
     let totalMints = 0;

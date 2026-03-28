@@ -6,9 +6,18 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
-const licensesCol = db.collection('licenses');
-const merchCol = db.collection('merchandise');
-const merchOrdersCol = db.collection('merchOrders');
+const licensesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('licenses');
+};
+const merchCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('merchandise');
+};
+const merchOrdersCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('merchOrders');
+};
 
 const licenseTypeEnum = z.enum(['STREAMING', 'MERCH', 'GAMING', 'COMIC', 'AUDIO', 'OTHER']);
 
@@ -43,7 +52,7 @@ export const licensingRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await licensesCol.add(license);
+      const ref = await licensesCol().add(license);
       return { id: ref.id, ...license };
     }),
 
@@ -55,7 +64,7 @@ export const licensingRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const ref = licensesCol.doc(input.licenseId);
+      const ref = licensesCol().doc(input.licenseId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('License not found');
       const data = doc.data()!;
@@ -85,7 +94,7 @@ export const licensingRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const ref = licensesCol.doc(input.licenseId);
+      const ref = licensesCol().doc(input.licenseId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('License not found');
 
@@ -101,7 +110,7 @@ export const licensingRouter = router({
   revokeLicense: protectedProcedure
     .input(z.object({ licenseId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ref = licensesCol.doc(input.licenseId);
+      const ref = licensesCol().doc(input.licenseId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('License not found');
       if (doc.data()?.licensorUid !== ctx.user.uid) throw new Error('Not authorized');
@@ -146,7 +155,7 @@ export const licensingRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await merchCol.add(merch);
+      const ref = await merchCol().add(merch);
       return { id: ref.id, ...merch };
     }),
 
@@ -160,7 +169,7 @@ export const licensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const merchRef = merchCol.doc(input.merchId);
+      const merchRef = merchCol().doc(input.merchId);
       const merchDoc = await merchRef.get();
       if (!merchDoc.exists) throw new Error('Merch not found');
 
@@ -187,21 +196,19 @@ export const licensingRouter = router({
         createdAt: new Date(),
       };
 
-      const ref = await merchOrdersCol.add(order);
+      const ref = await merchOrdersCol().add(order);
       return { id: ref.id, ...order };
     }),
 
-  getMerch: publicProcedure
-    .input(z.object({ universeId: z.string() }))
-    .query(async ({ input }) => {
-      const snapshot = await merchCol
-        .where('universeId', '==', input.universeId)
-        .where('active', '==', true)
-        .orderBy('createdAt', 'desc')
-        .get();
+  getMerch: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
+    const snapshot = await merchCol
+      .where('universeId', '==', input.universeId)
+      .where('active', '==', true)
+      .orderBy('createdAt', 'desc')
+      .get();
 
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    }),
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }),
 
   getOrders: protectedProcedure
     .input(z.object({ limit: z.number().default(20) }))

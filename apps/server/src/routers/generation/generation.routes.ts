@@ -29,8 +29,14 @@ import type {
   VideoGenerationMode,
 } from '../../services/video-models/types';
 
-const generationsCol = db.collection('videoGenerations');
-const modelOverridesCol = db.collection('modelOverrides');
+const generationsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('videoGenerations');
+};
+const modelOverridesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('modelOverrides');
+};
 
 // ── Zod Schemas ───────────────────────────────────────────────────────
 
@@ -92,11 +98,13 @@ function buildFalInput(
 }
 
 async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void> {
-  await generationsCol.doc(record.id).set({
-    ...record,
-    createdAt: record.createdAt,
-    completedAt: record.completedAt || null,
-  });
+  await generationsCol()
+    .doc(record.id)
+    .set({
+      ...record,
+      createdAt: record.createdAt,
+      completedAt: record.completedAt || null,
+    });
 }
 
 // ── Router ────────────────────────────────────────────────────────────
@@ -118,7 +126,7 @@ export const generationRouter = router({
       // Check for admin overrides in Firestore
       const overrides = new Map<string, { isEnabled: boolean; isVisibleToUsers: boolean }>();
       try {
-        const snapshot = await modelOverridesCol.get();
+        const snapshot = await modelOverridesCol().get();
         snapshot.docs.forEach((doc) => {
           overrides.set(doc.id, doc.data() as any);
         });
@@ -351,18 +359,20 @@ export const generationRouter = router({
         });
       });
     } catch (creditErr) {
-      await generationsCol.doc(generationId).update({
-        status: 'failed',
-        failureReason: creditErr instanceof Error ? creditErr.message : 'Credit deduction failed',
-        completedAt: new Date(),
-      });
+      await generationsCol()
+        .doc(generationId)
+        .update({
+          status: 'failed',
+          failureReason: creditErr instanceof Error ? creditErr.message : 'Credit deduction failed',
+          completedAt: new Date(),
+        });
       throw creditErr;
     }
 
     // ── Generate ────────────────────────────────────────────────────
     try {
       record.status = 'running';
-      await generationsCol.doc(generationId).update({ status: 'running' });
+      await generationsCol().doc(generationId).update({ status: 'running' });
 
       const falInput = buildFalInput(model, input);
       const result = await falService.generateVideo(falInput);
@@ -378,13 +388,15 @@ export const generationRouter = router({
           const fallbackResult = await attemptFallback(input, model.id, generationId);
           if (fallbackResult) {
             // Update record with fallback info
-            await generationsCol.doc(generationId).update({
-              status: 'completed',
-              fallbackModelId: fallbackResult.fallbackModelId,
-              videoUrl: fallbackResult.videoUrl,
-              latencyMs: Date.now() - startTime,
-              completedAt: new Date(),
-            });
+            await generationsCol()
+              .doc(generationId)
+              .update({
+                status: 'completed',
+                fallbackModelId: fallbackResult.fallbackModelId,
+                videoUrl: fallbackResult.videoUrl,
+                latencyMs: Date.now() - startTime,
+                completedAt: new Date(),
+              });
 
             return {
               generationId,
@@ -404,7 +416,7 @@ export const generationRouter = router({
         }
 
         // No fallback or manual mode — fail
-        await generationsCol.doc(generationId).update({
+        await generationsCol().doc(generationId).update({
           status: 'failed',
           failureReason: result.error,
           latencyMs,
@@ -427,7 +439,7 @@ export const generationRouter = router({
       ]);
       trackModelUsage(ctx.user.uid, finalModelId);
 
-      await generationsCol.doc(generationId).update({
+      await generationsCol().doc(generationId).update({
         status: 'completed',
         videoUrl: result.videoUrl,
         latencyMs,
@@ -467,7 +479,7 @@ export const generationRouter = router({
         );
       }
 
-      await generationsCol.doc(generationId).update({
+      await generationsCol().doc(generationId).update({
         status: 'failed',
         failureReason: errorMessage,
         latencyMs,
@@ -484,7 +496,7 @@ export const generationRouter = router({
   getRecord: protectedProcedure
     .input(z.object({ generationId: z.string() }))
     .query(async ({ input }) => {
-      const doc = await generationsCol.doc(input.generationId).get();
+      const doc = await generationsCol().doc(input.generationId).get();
       if (!doc.exists) return null;
       return { id: doc.id, ...doc.data() };
     }),
@@ -525,7 +537,7 @@ export const generationRouter = router({
   adminListModels: adminProcedure.query(async () => {
     const overrides = new Map<string, Record<string, any>>();
     try {
-      const snapshot = await modelOverridesCol.get();
+      const snapshot = await modelOverridesCol().get();
       snapshot.docs.forEach((doc) => {
         overrides.set(doc.id, doc.data());
       });
@@ -563,7 +575,7 @@ export const generationRouter = router({
       if (input.isEnabled !== undefined) update.isEnabled = input.isEnabled;
       if (input.isVisibleToUsers !== undefined) update.isVisibleToUsers = input.isVisibleToUsers;
 
-      await modelOverridesCol.doc(input.modelId).set(update, { merge: true });
+      await modelOverridesCol().doc(input.modelId).set(update, { merge: true });
 
       return { ok: true, modelId: input.modelId, applied: update };
     }),

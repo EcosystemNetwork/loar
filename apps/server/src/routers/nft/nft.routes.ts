@@ -13,10 +13,22 @@ import { z } from 'zod';
 import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 
-const episodesCol = db.collection('episodeNFTs');
-const characterNFTsCol = db.collection('characterNFTs');
-const nftMintsCol = db.collection('nftMints');
-const contentCol = db.collection('content');
+const episodesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('episodeNFTs');
+};
+const characterNFTsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('characterNFTs');
+};
+const nftMintsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('nftMints');
+};
+const contentCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('content');
+};
 
 export const nftRouter = router({
   // ---- Mint Content as NFT (Firebase → IPFS → Listing) ----
@@ -44,7 +56,7 @@ export const nftRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // 1. Load the content from gallery
-      const contentRef = contentCol.doc(input.contentId);
+      const contentRef = contentCol().doc(input.contentId);
       const contentDoc = await contentRef.get();
       if (!contentDoc.exists) throwApiError('NOT_FOUND', 'Content not found in gallery');
       const content = contentDoc.data()!;
@@ -112,7 +124,7 @@ export const nftRouter = router({
         updatedAt: now,
       };
 
-      const nftRef = await episodesCol.add(nftData);
+      const nftRef = await episodesCol().add(nftData);
 
       // 5. Mark the gallery content as minted (media becomes immutable)
       await contentRef.update({
@@ -159,7 +171,7 @@ export const nftRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await episodesCol.add(episodeData);
+      const ref = await episodesCol().add(episodeData);
       return { id: ref.id, ...episodeData };
     }),
 
@@ -180,10 +192,10 @@ export const nftRouter = router({
         mintedAt: new Date(),
       };
 
-      await nftMintsCol.add(mintData);
+      await nftMintsCol().add(mintData);
 
       // Increment minted count
-      const epRef = episodesCol.doc(input.episodeId);
+      const epRef = episodesCol().doc(input.episodeId);
       const epDoc = await epRef.get();
       if (epDoc.exists) {
         await epRef.update({
@@ -208,7 +220,7 @@ export const nftRouter = router({
     }),
 
   getEpisode: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
-    const doc = await episodesCol.doc(input.id).get();
+    const doc = await episodesCol().doc(input.id).get();
     if (!doc.exists) return null;
     return { id: doc.id, ...doc.data() };
   }),
@@ -216,7 +228,7 @@ export const nftRouter = router({
   deactivateEpisode: protectedProcedure
     .input(z.object({ episodeId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ref = episodesCol.doc(input.episodeId);
+      const ref = episodesCol().doc(input.episodeId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Episode not found');
       if (doc.data()?.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
@@ -259,7 +271,7 @@ export const nftRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await characterNFTsCol.add(characterData);
+      const ref = await characterNFTsCol().add(characterData);
       return { id: ref.id, ...characterData };
     }),
 
@@ -272,7 +284,7 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const ref = characterNFTsCol.doc(input.characterId);
+      const ref = characterNFTsCol().doc(input.characterId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Character not found');
 
@@ -302,9 +314,9 @@ export const nftRouter = router({
 
   getMyNFTs: protectedProcedure.query(async ({ ctx }) => {
     const [episodes, characters, mints] = await Promise.all([
-      episodesCol.where('creatorUid', '==', ctx.user.uid).get(),
-      characterNFTsCol.where('creatorUid', '==', ctx.user.uid).get(),
-      nftMintsCol.where('buyerUid', '==', ctx.user.uid).get(),
+      episodesCol().where('creatorUid', '==', ctx.user.uid).get(),
+      characterNFTsCol().where('creatorUid', '==', ctx.user.uid).get(),
+      nftMintsCol().where('buyerUid', '==', ctx.user.uid).get(),
     ]);
 
     return {

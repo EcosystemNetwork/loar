@@ -9,9 +9,18 @@ import { z } from 'zod';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const sandboxCol = db.collection('sandboxDrafts');
-const contentCol = db.collection('content');
-const profilesCol = db.collection('profiles');
+const sandboxCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('sandboxDrafts');
+};
+const contentCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('content');
+};
+const profilesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('profiles');
+};
 
 export const sandboxRouter = router({
   // Save a draft item (image + optional video) to Firestore
@@ -28,7 +37,7 @@ export const sandboxRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
-      const doc = await sandboxCol.add({
+      const doc = await sandboxCol().add({
         creatorAddress: ctx.user.address,
         title: input.title,
         prompt: input.prompt,
@@ -55,7 +64,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const ref = sandboxCol.doc(input.id);
+      const ref = sandboxCol().doc(input.id);
       const snap = await ref.get();
       if (!snap.exists) throw new Error('Draft not found');
       if (snap.data()?.creatorAddress !== ctx.user.address) throw new Error('Unauthorized');
@@ -74,7 +83,7 @@ export const sandboxRouter = router({
   deleteDraft: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const ref = sandboxCol.doc(input.id);
+      const ref = sandboxCol().doc(input.id);
       const snap = await ref.get();
       if (!snap.exists) throw new Error('Draft not found');
       if (snap.data()?.creatorAddress !== ctx.user.address) throw new Error('Unauthorized');
@@ -122,7 +131,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const ref = sandboxCol.doc(input.draftId);
+      const ref = sandboxCol().doc(input.draftId);
       const snap = await ref.get();
       if (!snap.exists) throw new Error('Draft not found');
 
@@ -159,7 +168,7 @@ export const sandboxRouter = router({
         generationModel: draft.model || null,
       };
 
-      const contentRef = await contentCol.add(contentData);
+      const contentRef = await contentCol().add(contentData);
 
       // Mark draft as promoted
       await ref.update({
@@ -170,7 +179,7 @@ export const sandboxRouter = router({
       });
 
       // Update profile content count
-      const profileRef = profilesCol.doc(ctx.user.uid);
+      const profileRef = profilesCol().doc(ctx.user.uid);
       const profileDoc = await profileRef.get();
       if (profileDoc.exists) {
         await profileRef.update({ contentCount: FieldValue.increment(1) });
@@ -181,7 +190,7 @@ export const sandboxRouter = router({
 
   // Get a single draft
   getDraft: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
-    const snap = await sandboxCol.doc(input.id).get();
+    const snap = await sandboxCol().doc(input.id).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
     return {

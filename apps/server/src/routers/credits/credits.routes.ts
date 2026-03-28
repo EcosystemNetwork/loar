@@ -15,9 +15,18 @@ import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 import { getPlatformConfig } from '../../services/platformConfig';
 
-const creditsCol = db.collection('userCredits');
-const creditTxCol = db.collection('creditTransactions');
-const creditPackagesCol = db.collection('creditPackages');
+const creditsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('userCredits');
+};
+const creditTxCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('creditTransactions');
+};
+const creditPackagesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('creditPackages');
+};
 
 // ── Payment Methods ───────────────────────────────────────────────────
 
@@ -144,7 +153,7 @@ export const creditsRouter = router({
   // ── Balance ─────────────────────────────────────────────────────
 
   getBalance: protectedProcedure.query(async ({ ctx }) => {
-    const doc = await creditsCol.doc(ctx.user.uid).get();
+    const doc = await creditsCol().doc(ctx.user.uid).get();
     if (!doc.exists) {
       return {
         balance: 0,
@@ -206,7 +215,7 @@ export const creditsRouter = router({
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
       // Update user balance
-      const userRef = creditsCol.doc(ctx.user.uid);
+      const userRef = creditsCol().doc(ctx.user.uid);
       const userDoc = await userRef.get();
 
       const updateData: Record<string, any> = {
@@ -230,7 +239,7 @@ export const creditsRouter = router({
       }
 
       // Record transaction
-      await creditTxCol.add({
+      await creditTxCol().add({
         id: randomUUID(),
         uid: ctx.user.uid,
         type: 'purchase',
@@ -276,7 +285,7 @@ export const creditsRouter = router({
       const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;
 
       // Update user balance
-      const userRef = creditsCol.doc(ctx.user.uid);
+      const userRef = creditsCol().doc(ctx.user.uid);
       const userDoc = await userRef.get();
 
       const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
@@ -301,7 +310,7 @@ export const creditsRouter = router({
       }
 
       // Record transaction
-      await creditTxCol.add({
+      await creditTxCol().add({
         id: randomUUID(),
         uid: ctx.user.uid,
         type: 'purchase',
@@ -438,7 +447,7 @@ export const creditsRouter = router({
       }
 
       // ── Personal balance path (default) ──────────────────────────
-      const userRef = creditsCol.doc(ctx.user.uid);
+      const userRef = creditsCol().doc(ctx.user.uid);
       const userDoc = await userRef.get();
 
       if (!userDoc.exists) throw new Error('No credits available. Purchase credits first.');
@@ -456,7 +465,7 @@ export const creditsRouter = router({
       });
 
       // Record transaction
-      await creditTxCol.add({
+      await creditTxCol().add({
         uid: ctx.user.uid,
         type: 'spend',
         generationType: input.generationType,
@@ -488,7 +497,7 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const userRef = creditsCol.doc(input.targetUid);
+      const userRef = creditsCol().doc(input.targetUid);
       const userDoc = await userRef.get();
 
       if (userDoc.exists) {
@@ -512,7 +521,7 @@ export const creditsRouter = router({
         });
       }
 
-      await creditTxCol.add({
+      await creditTxCol().add({
         uid: input.targetUid,
         type: 'grant',
         source: input.source,

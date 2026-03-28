@@ -6,9 +6,18 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
-const subscriptionsCol = db.collection('subscriptions');
-const subTiersCol = db.collection('subscriptionTiers');
-const subRevenueCol = db.collection('subscriptionRevenue');
+const subscriptionsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('subscriptions');
+};
+const subTiersCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('subscriptionTiers');
+};
+const subRevenueCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('subscriptionRevenue');
+};
 
 const tierEnum = z.enum(['FREE', 'BASIC', 'PREMIUM', 'VIP']);
 
@@ -38,20 +47,18 @@ export const subscriptionsRouter = router({
         updatedAt: new Date(),
       };
 
-      await subTiersCol.doc(tierId).set(tierData, { merge: true });
+      await subTiersCol().doc(tierId).set(tierData, { merge: true });
       return { id: tierId, ...tierData };
     }),
 
-  getTiers: publicProcedure
-    .input(z.object({ universeId: z.string() }))
-    .query(async ({ input }) => {
-      const snapshot = await subTiersCol
-        .where('universeId', '==', input.universeId)
-        .where('active', '==', true)
-        .get();
+  getTiers: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
+    const snapshot = await subTiersCol
+      .where('universeId', '==', input.universeId)
+      .where('active', '==', true)
+      .get();
 
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    }),
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  }),
 
   // ---- Subscribe ----
 
@@ -67,7 +74,7 @@ export const subscriptionsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const subId = `${ctx.user.uid}-${input.universeId}`;
-      const subRef = subscriptionsCol.doc(subId);
+      const subRef = subscriptionsCol().doc(subId);
       const existing = await subRef.get();
 
       let startTime = new Date();
@@ -96,7 +103,7 @@ export const subscriptionsRouter = router({
       await subRef.set(subData, { merge: true });
 
       // Track revenue
-      await subRevenueCol.add({
+      await subRevenueCol().add({
         universeId: input.universeId,
         subscriberUid: ctx.user.uid,
         tier: input.tier,
@@ -115,7 +122,7 @@ export const subscriptionsRouter = router({
     .input(z.object({ universeId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const subId = `${ctx.user.uid}-${input.universeId}`;
-      const ref = subscriptionsCol.doc(subId);
+      const ref = subscriptionsCol().doc(subId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('No subscription found');
 
@@ -135,7 +142,7 @@ export const subscriptionsRouter = router({
     )
     .query(async ({ input }) => {
       const subId = `${input.uid}-${input.universeId}`;
-      const doc = await subscriptionsCol.doc(subId).get();
+      const doc = await subscriptionsCol().doc(subId).get();
 
       if (!doc.exists) return { hasAccess: false, tier: null, expiresAt: null };
 
@@ -156,9 +163,7 @@ export const subscriptionsRouter = router({
   // ---- My Subscriptions ----
 
   mySubscriptions: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await subscriptionsCol
-      .where('uid', '==', ctx.user.uid)
-      .get();
+    const snapshot = await subscriptionsCol.where('uid', '==', ctx.user.uid).get();
 
     return snapshot.docs.map((doc) => {
       const data = doc.data();
@@ -178,8 +183,8 @@ export const subscriptionsRouter = router({
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
       const [tiers, subs] = await Promise.all([
-        subTiersCol.where('universeId', '==', input.universeId).where('active', '==', true).get(),
-        subscriptionsCol.where('universeId', '==', input.universeId).get(),
+        subTiersCol().where('universeId', '==', input.universeId).where('active', '==', true).get(),
+        subscriptionsCol().where('universeId', '==', input.universeId).get(),
       ]);
 
       const now = new Date();

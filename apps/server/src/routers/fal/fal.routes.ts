@@ -9,7 +9,10 @@ import { falService } from '../../services/fal';
 import { db } from '../../lib/firebase';
 import { geminiService } from '../../services/gemini';
 
-const charactersCol = db.collection('characters');
+const charactersCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('characters');
+};
 
 export const falRouter = router({
   testConnection: publicProcedure.query(async () => {
@@ -158,23 +161,25 @@ export const falRouter = router({
         localImageUrl = imageResult.imageUrl;
         characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
-        await charactersCol.doc(characterId).set({
-          character_name: input.name,
-          collection: 'Nano Banana AI',
-          token_id: characterId,
-          traits: {
-            style: input.style || 'cute',
-            generated_with: 'nano-banana',
-            seed: imageResult.seed?.toString() || 'random',
-          },
-          rarity_rank: 0,
-          rarity_percentage: null,
-          image_url: localImageUrl,
-          description: input.description,
-          detailed_visual_description: input.detailedVisualDescription || null,
-          created_at: new Date(),
-          updated_at: new Date(),
-        });
+        await charactersCol()
+          .doc(characterId)
+          .set({
+            character_name: input.name,
+            collection: 'Nano Banana AI',
+            token_id: characterId,
+            traits: {
+              style: input.style || 'cute',
+              generated_with: 'nano-banana',
+              seed: imageResult.seed?.toString() || 'random',
+            },
+            rarity_rank: 0,
+            rarity_percentage: null,
+            image_url: localImageUrl,
+            description: input.description,
+            detailed_visual_description: input.detailedVisualDescription || null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
       }
 
       return {
@@ -231,22 +236,24 @@ export const falRouter = router({
       const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
       try {
-        await charactersCol.doc(characterId).set({
-          character_name: input.name,
-          collection: 'Nano Banana AI',
-          token_id: characterId,
-          traits: {
-            style: input.style,
-            generated_with: 'nano-banana',
-          },
-          rarity_rank: 0,
-          rarity_percentage: null,
-          image_url: input.imageUrl,
-          description: input.description,
-          detailed_visual_description: input.detailedVisualDescription || null,
-          created_at: new Date(),
-          updated_at: new Date(),
-        });
+        await charactersCol()
+          .doc(characterId)
+          .set({
+            character_name: input.name,
+            collection: 'Nano Banana AI',
+            token_id: characterId,
+            traits: {
+              style: input.style,
+              generated_with: 'nano-banana',
+            },
+            rarity_rank: 0,
+            rarity_percentage: null,
+            image_url: input.imageUrl,
+            description: input.description,
+            detailed_visual_description: input.detailedVisualDescription || null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
 
         return {
           success: true,
@@ -300,22 +307,24 @@ export const falRouter = router({
       const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
       const localImageUrl = imageResult.imageUrl;
 
-      await charactersCol.doc(characterId).set({
-        character_name: input.characterName,
-        collection: 'Nano Banana AI',
-        token_id: characterId,
-        traits: {
-          style: input.characterStyle || 'cute',
-          generated_with: 'nano-banana',
-          seed: imageResult.seed?.toString() || 'random',
-        },
-        rarity_rank: 0,
-        rarity_percentage: null,
-        image_url: localImageUrl,
-        description: input.characterDescription,
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
+      await charactersCol()
+        .doc(characterId)
+        .set({
+          character_name: input.characterName,
+          collection: 'Nano Banana AI',
+          token_id: characterId,
+          traits: {
+            style: input.characterStyle || 'cute',
+            generated_with: 'nano-banana',
+            seed: imageResult.seed?.toString() || 'random',
+          },
+          rarity_rank: 0,
+          rarity_percentage: null,
+          image_url: localImageUrl,
+          description: input.characterDescription,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
 
       const videoResult = await falService.generateVideo({
         prompt: input.videoPrompt,

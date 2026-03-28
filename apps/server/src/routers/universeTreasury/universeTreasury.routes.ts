@@ -20,8 +20,14 @@ import { randomUUID } from 'crypto';
 import { DEFAULT_PACKAGES } from '../credits/credits.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
 
-const universeCreditCol = db.collection('universeCredits');
-const universeCreditTxCol = db.collection('universeCreditTransactions');
+const universeCreditCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('universeCredits');
+};
+const universeCreditTxCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('universeCreditTransactions');
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -33,7 +39,7 @@ async function getUniverseAdminUid(universeId: string): Promise<string | null> {
 
 /** Read or initialise the universe credit pool document */
 async function getPoolData(universeId: string) {
-  const doc = await universeCreditCol.doc(universeId.toLowerCase()).get();
+  const doc = await universeCreditCol().doc(universeId.toLowerCase()).get();
   if (!doc.exists) {
     return { balance: 0, totalPurchased: 0, totalSpent: 0 };
   }
@@ -89,7 +95,7 @@ export const universeTreasuryRouter = router({
         : pkg.credits + pkg.bonusCredits;
 
       const universeId = input.universeId.toLowerCase();
-      const poolRef = universeCreditCol.doc(universeId);
+      const poolRef = universeCreditCol().doc(universeId);
       const poolData = await getPoolData(universeId);
 
       await poolRef.set(
@@ -104,7 +110,7 @@ export const universeTreasuryRouter = router({
         { merge: true }
       );
 
-      await universeCreditTxCol.add({
+      await universeCreditTxCol().add({
         id: randomUUID(),
         universeId,
         type: 'fund',
@@ -184,7 +190,7 @@ export const universeTreasuryRouter = router({
       }
 
       // Deduct from pool
-      const poolRef = universeCreditCol.doc(universeId);
+      const poolRef = universeCreditCol().doc(universeId);
       const poolData = await getPoolData(universeId);
 
       if (poolData.balance < input.cost) {
@@ -199,7 +205,7 @@ export const universeTreasuryRouter = router({
         updatedAt: new Date(),
       });
 
-      await universeCreditTxCol.add({
+      await universeCreditTxCol().add({
         id: randomUUID(),
         universeId,
         type: 'spend',
@@ -250,11 +256,13 @@ export const universeTreasuryRouter = router({
       const memberUid = input.memberUid.toLowerCase();
 
       // Deduct from pool
-      await universeCreditCol.doc(universeId).update({
-        balance: poolData.balance - input.credits,
-        totalSpent: poolData.totalSpent + input.credits,
-        updatedAt: new Date(),
-      });
+      await universeCreditCol()
+        .doc(universeId)
+        .update({
+          balance: poolData.balance - input.credits,
+          totalSpent: poolData.totalSpent + input.credits,
+          updatedAt: new Date(),
+        });
 
       // Credit the member's personal balance
       const memberRef = db.collection('userCredits').doc(memberUid);
@@ -282,7 +290,7 @@ export const universeTreasuryRouter = router({
       }
 
       // Audit log on the universe side
-      await universeCreditTxCol.add({
+      await universeCreditTxCol().add({
         id: randomUUID(),
         universeId,
         type: 'allocate',

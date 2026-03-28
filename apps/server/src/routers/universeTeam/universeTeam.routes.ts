@@ -12,7 +12,10 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
-const teamCol = db.collection('universeTeamMembers');
+const teamCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('universeTeamMembers');
+};
 
 const roleEnum = z.enum(['admin', 'contributor', 'moderator']);
 
@@ -29,7 +32,7 @@ async function getUniverseAdminUid(universeId: string): Promise<string | null> {
 /** Returns the membership doc for a given universe + uid, or null */
 async function getMembership(universeId: string, uid: string) {
   const docId = `${universeId.toLowerCase()}-${uid.toLowerCase()}`;
-  const doc = await teamCol.doc(docId).get();
+  const doc = await teamCol().doc(docId).get();
   return doc.exists ? { id: doc.id, ...doc.data() } : null;
 }
 
@@ -57,7 +60,7 @@ export const universeTeamRouter = router({
       const docId = `${input.universeId.toLowerCase()}-${input.memberUid.toLowerCase()}`;
       const now = new Date();
 
-      await teamCol.doc(docId).set(
+      await teamCol().doc(docId).set(
         {
           universeId: input.universeId.toLowerCase(),
           memberUid: input.memberUid.toLowerCase(),
@@ -87,7 +90,7 @@ export const universeTeamRouter = router({
       }
 
       const docId = `${input.universeId.toLowerCase()}-${input.memberUid.toLowerCase()}`;
-      await teamCol.doc(docId).update({ status: 'removed', updatedAt: new Date() });
+      await teamCol().doc(docId).update({ status: 'removed', updatedAt: new Date() });
 
       return { ok: true };
     }),
@@ -114,7 +117,7 @@ export const universeTeamRouter = router({
       if (input.role !== undefined) updates.role = input.role;
       if (input.monthlyAllowance !== undefined) updates.monthlyAllowance = input.monthlyAllowance;
 
-      await teamCol.doc(docId).update(updates);
+      await teamCol().doc(docId).update(updates);
       return { ok: true };
     }),
 

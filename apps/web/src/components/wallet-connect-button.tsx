@@ -21,27 +21,17 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
 }) => {
   const { chain } = useAccount();
   const { connectors, connect, isPending: isConnecting } = useConnect();
-  const {
-    address,
-    isConnected,
-    isAuthenticated,
-    isAuthenticating,
-    error,
-    signIn,
-    signOut,
-  } = useWalletAuth();
+  const { address, isConnected, isAuthenticated, isAuthenticating, error, signIn, signOut } =
+    useWalletAuth();
 
-  const truncateAddress = (addr: string) =>
-    `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  const truncateAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   // Fully authenticated — show address + disconnect
   if (isAuthenticated && address) {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         {chain && (
-          <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium">
-            {chain.name}
-          </span>
+          <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium">{chain.name}</span>
         )}
         <span
           className={`px-3 py-2 rounded-md bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 font-mono flex items-center gap-1.5 ${
@@ -76,11 +66,9 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
           } ${isAuthenticating ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <Shield className="h-4 w-4" />
-          {isAuthenticating ? 'Verifying...' : 'Verify Wallet'}
+          {isAuthenticating ? 'Verifying...' : 'Login'}
         </button>
-        {error && (
-          <p className="text-xs text-destructive max-w-48 text-center">{error}</p>
-        )}
+        {error && <p className="text-xs text-destructive max-w-48 text-center">{error}</p>}
       </div>
     );
   }

@@ -6,14 +6,17 @@
  */
 import { db } from '../lib/firebase';
 
-const questProgressCol = db.collection('questProgress');
+const questProgressCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('questProgress');
+};
 
 /**
  * Increment quest progress for a user. Fire-and-forget.
  */
 export function trackQuest(userId: string, questId: string, increment = 1): void {
   const docId = `${userId}_${questId}`;
-  const ref = questProgressCol.doc(docId);
+  const ref = questProgressCol().doc(docId);
 
   ref
     .get()
@@ -64,16 +67,18 @@ export async function trackModelUsage(userId: string, modelId: string): Promise<
       await ref.set({ models: usedModels, updatedAt: new Date() }, { merge: true });
 
       // Update quest progress with total unique models
-      await questProgressCol.doc(`${userId}_try_5_models`).set(
-        {
-          userId,
-          questId: 'try_5_models',
-          currentCount: usedModels.length,
-          completedAt: usedModels.length >= 5 ? new Date() : null,
-          updatedAt: new Date(),
-        },
-        { merge: true }
-      );
+      await questProgressCol()
+        .doc(`${userId}_try_5_models`)
+        .set(
+          {
+            userId,
+            questId: 'try_5_models',
+            currentCount: usedModels.length,
+            completedAt: usedModels.length >= 5 ? new Date() : null,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
     }
   } catch (err) {
     console.error('Model usage tracking failed:', err);

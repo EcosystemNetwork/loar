@@ -6,8 +6,14 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
-const collabsCol = db.collection('collabs');
-const collabEpisodesCol = db.collection('collabEpisodes');
+const collabsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('collabs');
+};
+const collabEpisodesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('collabEpisodes');
+};
 
 export const collabsRouter = router({
   propose: protectedProcedure
@@ -38,14 +44,14 @@ export const collabsRouter = router({
         updatedAt: new Date(),
       };
 
-      const ref = await collabsCol.add(collab);
+      const ref = await collabsCol().add(collab);
       return { id: ref.id, ...collab };
     }),
 
   accept: protectedProcedure
     .input(z.object({ collabId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ref = collabsCol.doc(input.collabId);
+      const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
       if (doc.data()?.status !== 'PROPOSED') throw new Error('Not in proposed status');
@@ -63,7 +69,7 @@ export const collabsRouter = router({
   activate: protectedProcedure
     .input(z.object({ collabId: z.string(), txHash: z.string().optional() }))
     .mutation(async ({ input }) => {
-      const ref = collabsCol.doc(input.collabId);
+      const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
       if (doc.data()?.status !== 'ACCEPTED') throw new Error('Not accepted');
@@ -93,7 +99,7 @@ export const collabsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const collabRef = collabsCol.doc(input.collabId);
+      const collabRef = collabsCol().doc(input.collabId);
       const collabDoc = await collabRef.get();
       if (!collabDoc.exists) throw new Error('Collab not found');
       if (collabDoc.data()?.status !== 'ACTIVE') throw new Error('Collab not active');
@@ -108,7 +114,7 @@ export const collabsRouter = router({
         createdAt: new Date(),
       };
 
-      await collabEpisodesCol.add(episode);
+      await collabEpisodesCol().add(episode);
 
       const data = collabDoc.data()!;
       await collabRef.update({
@@ -123,7 +129,7 @@ export const collabsRouter = router({
   complete: protectedProcedure
     .input(z.object({ collabId: z.string() }))
     .mutation(async ({ input }) => {
-      const ref = collabsCol.doc(input.collabId);
+      const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
       if (doc.data()?.status !== 'ACTIVE') throw new Error('Not active');
@@ -135,7 +141,7 @@ export const collabsRouter = router({
   cancel: protectedProcedure
     .input(z.object({ collabId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ref = collabsCol.doc(input.collabId);
+      const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
       if (doc.data()?.proposerUid !== ctx.user.uid) throw new Error('Not authorized');
@@ -153,21 +159,21 @@ export const collabsRouter = router({
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
       const [asA, asB] = await Promise.all([
-        collabsCol.where('universeA', '==', input.universeId).get(),
-        collabsCol.where('universeB', '==', input.universeId).get(),
+        collabsCol().where('universeA', '==', input.universeId).get(),
+        collabsCol().where('universeB', '==', input.universeId).get(),
       ]);
 
       const all = [...asA.docs, ...asB.docs].map((d) => ({ id: d.id, ...d.data() }));
-      return all.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+      return all.sort(
+        (a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)
+      );
     }),
 
-  getCollab: publicProcedure
-    .input(z.object({ collabId: z.string() }))
-    .query(async ({ input }) => {
-      const doc = await collabsCol.doc(input.collabId).get();
-      if (!doc.exists) return null;
-      return { id: doc.id, ...doc.data() };
-    }),
+  getCollab: publicProcedure.input(z.object({ collabId: z.string() })).query(async ({ input }) => {
+    const doc = await collabsCol().doc(input.collabId).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
+  }),
 
   getEpisodes: publicProcedure
     .input(z.object({ collabId: z.string() }))
@@ -182,8 +188,8 @@ export const collabsRouter = router({
 
   myCollabs: protectedProcedure.query(async ({ ctx }) => {
     const [asProposer, asAcceptor] = await Promise.all([
-      collabsCol.where('proposerUid', '==', ctx.user.uid).get(),
-      collabsCol.where('acceptorUid', '==', ctx.user.uid).get(),
+      collabsCol().where('proposerUid', '==', ctx.user.uid).get(),
+      collabsCol().where('acceptorUid', '==', ctx.user.uid).get(),
     ]);
 
     const all = [...asProposer.docs, ...asAcceptor.docs].map((d) => ({ id: d.id, ...d.data() }));

@@ -10,8 +10,14 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const contentCol = db.collection('content');
-const profilesCol = db.collection('profiles');
+const contentCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('content');
+};
+const profilesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('profiles');
+};
 
 const contentClassification = z.enum(['fan', 'original', 'licensed']);
 
@@ -41,6 +47,7 @@ const createContentSchema = z.object({
   mediaUrl: z.string().url(),
   thumbnailUrl: z.string().url().optional(),
   mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']),
+  format: z.enum(['short', 'long']).optional(),
   classification: contentClassification,
   tags: z.array(z.string().max(30)).max(15).default([]),
   ipDeclaration: ipDeclarationSchema,
@@ -54,6 +61,7 @@ const updateContentSchema = z.object({
   title: z.string().min(1).max(100).optional(),
   description: z.string().max(2000).optional(),
   thumbnailUrl: z.string().url().optional(),
+  format: z.enum(['short', 'long']).optional(),
   classification: contentClassification.optional(),
   tags: z.array(z.string().max(30)).max(15).optional(),
   ipDeclaration: ipDeclarationSchema.optional(),
@@ -98,10 +106,10 @@ export const contentRouter = router({
       reviewStatus,
     };
 
-    const ref = await contentCol.add(contentData);
+    const ref = await contentCol().add(contentData);
 
     // Increment content count on profile
-    const profileRef = profilesCol.doc(ctx.user.uid);
+    const profileRef = profilesCol().doc(ctx.user.uid);
     const profileDoc = await profileRef.get();
     if (profileDoc.exists) {
       await profileRef.update({ contentCount: FieldValue.increment(1) });
@@ -112,7 +120,7 @@ export const contentRouter = router({
 
   /** Update an existing content item (owner only) */
   update: protectedProcedure.input(updateContentSchema).mutation(async ({ ctx, input }) => {
-    const ref = contentCol.doc(input.id);
+    const ref = contentCol().doc(input.id);
     const doc = await ref.get();
 
     if (!doc.exists) throw new Error('Content not found');
@@ -160,7 +168,7 @@ export const contentRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const ref = contentCol.doc(input.id);
+      const ref = contentCol().doc(input.id);
       const doc = await ref.get();
 
       if (!doc.exists) throw new Error('Content not found');
@@ -181,7 +189,7 @@ export const contentRouter = router({
       await ref.delete();
 
       // Decrement content count on profile
-      const profileRef = profilesCol.doc(ctx.user.uid);
+      const profileRef = profilesCol().doc(ctx.user.uid);
       const profileDoc = await profileRef.get();
       if (profileDoc.exists) {
         await profileRef.update({ contentCount: FieldValue.increment(-1) });
@@ -192,7 +200,7 @@ export const contentRouter = router({
 
   /** Get a single content item by ID */
   get: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
-    const doc = await contentCol.doc(input.id).get();
+    const doc = await contentCol().doc(input.id).get();
     if (!doc.exists) return null;
 
     const data = doc.data()!;
@@ -242,7 +250,7 @@ export const contentRouter = router({
       }
 
       if (input.cursor) {
-        const cursorDoc = await contentCol.doc(input.cursor).get();
+        const cursorDoc = await contentCol().doc(input.cursor).get();
         if (cursorDoc.exists) {
           query = query.startAfter(cursorDoc);
         }
@@ -297,7 +305,7 @@ export const contentRouter = router({
       }
 
       if (input.cursor) {
-        const cursorDoc = await contentCol.doc(input.cursor).get();
+        const cursorDoc = await contentCol().doc(input.cursor).get();
         if (cursorDoc.exists) {
           query = query.startAfter(cursorDoc);
         }
@@ -336,6 +344,7 @@ export const contentRouter = router({
       z.object({
         classification: contentClassification.optional(),
         mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']).optional(),
+        format: z.enum(['short', 'long']).optional(),
         search: z.string().optional(),
         limit: z.number().min(1).max(50).default(20),
         cursor: z.string().optional(),
@@ -356,7 +365,7 @@ export const contentRouter = router({
       }
 
       if (input.cursor) {
-        const cursorDoc = await contentCol.doc(input.cursor).get();
+        const cursorDoc = await contentCol().doc(input.cursor).get();
         if (cursorDoc.exists) {
           query = query.startAfter(cursorDoc);
         }
@@ -375,6 +384,7 @@ export const contentRouter = router({
           mediaUrl: data.mediaUrl,
           thumbnailUrl: data.thumbnailUrl || null,
           mediaType: data.mediaType,
+          format: (data.format as 'short' | 'long') || null,
           classification: data.classification,
           tags: data.tags || [],
           creatorUid: data.creatorUid,
@@ -387,6 +397,9 @@ export const contentRouter = router({
       // Client-side filters for fields Firestore can't compound-query easily
       if (input.mediaType) {
         items = items.filter((i) => i.mediaType === input.mediaType);
+      }
+      if (input.format) {
+        items = items.filter((i) => i.format === input.format);
       }
       if (input.search) {
         const s = input.search.toLowerCase();
