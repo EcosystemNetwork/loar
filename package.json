@@ -20,7 +20,11 @@
     "sc:test:integration": "turbo run sc:test:integration",
     "deploy:sepolia": "bash scripts/deploy-sepolia.sh",
     "sync:addresses": "tsx scripts/sync-deployments.ts",
-    "check:addresses": "tsx scripts/check-addresses.ts"
+    "check:addresses": "tsx scripts/check-addresses.ts",
+    "smoke": "tsx scripts/smoke/index.ts",
+    "smoke:chain": "SMOKE_LAYER=chain tsx scripts/smoke/index.ts",
+    "smoke:server": "SMOKE_LAYER=server tsx scripts/smoke/index.ts",
+    "smoke:ci": "tsx scripts/smoke/index.ts --json"
   },
   "devDependencies": {
     "@wagmi/cli": "^0.0.0-canary-20251023193249",
