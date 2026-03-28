@@ -14,6 +14,78 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { createPublicClient, http, parseUnits, type Hash } from 'viem';
+import { sepolia } from 'viem/chains';
+
+// ── Sepolia client for on-chain tx verification ───────────────────────
+const sepoliaClient = createPublicClient({
+  chain: sepolia,
+  transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
+});
+
+const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS ?? '') as `0x${string}`;
+const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '') as `0x${string}`;
+
+// ERC20 Transfer event topic
+const TRANSFER_TOPIC =
+  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
+
+async function verifyLoarPayment(txHash: string, expectedLoarWei: bigint): Promise<void> {
+  if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
+    throw new Error('LOAR_TOKEN_ADDRESS is not configured on the server');
+  }
+  if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
+    throw new Error('TREASURY_ADDRESS is not configured on the server');
+  }
+
+  // Deduplicate: reject if this tx hash was already used
+  const existing = await db
+    .collection('creditTransactions')
+    .where('txHash', '==', txHash)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    throw new Error('This transaction has already been used to purchase credits');
+  }
+
+  let receipt: Awaited<ReturnType<typeof sepoliaClient.getTransactionReceipt>>;
+  try {
+    receipt = await sepoliaClient.getTransactionReceipt({ hash: txHash as Hash });
+  } catch {
+    throw new Error(
+      'Transaction not found on Sepolia. Confirm it has been broadcast and wait for it to be included in a block.'
+    );
+  }
+
+  if (receipt.status !== 'success') {
+    throw new Error('Transaction was reverted on-chain. No credits will be issued.');
+  }
+
+  // Find a Transfer(from, to, amount) log from the $LOAR contract to the treasury
+  const transferLog = receipt.logs.find(
+    (log) =>
+      log.address.toLowerCase() === LOAR_TOKEN_ADDRESS.toLowerCase() &&
+      log.topics[0] === TRANSFER_TOPIC &&
+      log.topics[2] &&
+      `0x${log.topics[2].slice(26)}`.toLowerCase() === TREASURY_ADDRESS.toLowerCase()
+  );
+
+  if (!transferLog) {
+    throw new Error(
+      'Transaction does not contain a $LOAR Transfer to the platform treasury. Ensure you sent $LOAR to the correct address.'
+    );
+  }
+
+  // Decode the transfer amount from the log data
+  const transferredWei = BigInt(transferLog.data);
+  // Allow up to 1% underpayment to tolerate minor price drift
+  const minRequired = (expectedLoarWei * 99n) / 100n;
+  if (transferredWei < minRequired) {
+    throw new Error(
+      `Insufficient $LOAR transferred. Expected ~${expectedLoarWei.toString()} wei, got ${transferredWei.toString()} wei.`
+    );
+  }
+}
 
 const creditsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -280,6 +352,10 @@ export const creditsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
+
+      // Verify the on-chain transfer before issuing any credits
+      const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
+      await verifyLoarPayment(input.txHash, expectedWei);
 
       // $LOAR buyers get: base credits + package bonus + 10% LOAR bonus
       const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;

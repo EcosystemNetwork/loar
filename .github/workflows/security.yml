@@ -5,19 +5,6 @@ on:
   push:
     branches: [main, 'release/**']
 
-# Strict mode: jobs are BLOCKING when merging into main or a release branch.
-# On feature-branch PRs they are informational (continue-on-error: true).
-# The expression evaluates to `false` (blocking) when:
-#   - This is a push to main/release (github.event_name == 'push'), or
-#   - This is a PR whose target is main or a release/* branch.
-env:
-  STRICT: >-
-    ${{
-      github.event_name == 'push' ||
-      github.base_ref == 'main' ||
-      startsWith(github.base_ref, 'release/')
-    }}
-
 jobs:
   contracts-security:
     name: Contract Security (Slither)
@@ -45,7 +32,6 @@ jobs:
           slither-config: apps/contracts/slither.config.json
           fail-on: high
           sarif: results.sarif
-        continue-on-error: ${{ env.STRICT != 'true' }}
 
       - name: Upload Slither SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -81,4 +67,3 @@ jobs:
 
       - name: Audit dependencies (high severity)
         run: pnpm audit --audit-level=high
-        continue-on-error: ${{ env.STRICT != 'true' }}

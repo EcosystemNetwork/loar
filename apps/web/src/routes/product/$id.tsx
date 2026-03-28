@@ -24,8 +24,8 @@ import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
-import { useWriteContract } from 'wagmi';
-import { parseUnits, type Address } from 'viem';
+import { useWriteContract, useSendTransaction } from 'wagmi';
+import { parseEther, parseUnits, type Address } from 'viem';
 
 const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
   '0x0000000000000000000000000000000000000000') as Address;
@@ -64,6 +64,7 @@ function ProductDetailPage() {
   const { data: listing, isLoading } = useListing(id);
   const [buying, setBuying] = useState(false);
   const { writeContractAsync } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
 
   if (isLoading) {
     return (
@@ -98,6 +99,17 @@ function ProductDetailPage() {
     setBuying(true);
     try {
       let txHash: string | undefined;
+
+      // For ETH listings, send ETH on-chain to seller before recording the order
+      if (l.currency === 'ETH' && l.price !== '0') {
+        const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+        toast.info('Confirm ETH payment in your wallet…');
+        txHash = await sendTransactionAsync({
+          to: recipient,
+          value: parseEther(l.price as string),
+        });
+        toast.info('ETH sent! Recording order…');
+      }
 
       // For $LOAR listings, transfer tokens on-chain before recording the order
       if (l.currency === 'LOAR' && l.price !== '0') {
@@ -264,7 +276,11 @@ function ProductDetailPage() {
               ) : (
                 <CheckCircle className="w-4 h-4 mr-2" />
               )}
-              {l.price === '0' ? 'Claim Free' : `Buy for ${l.price} ${l.currency}`}
+              {l.price === '0'
+                ? 'Claim Free'
+                : l.currency === 'ETH'
+                  ? `Pay ${l.price} ETH`
+                  : `Buy for ${l.price} ${l.currency}`}
             </Button>
           )}
         </div>
