@@ -13,13 +13,21 @@ import {
   Store,
   Loader2,
   ExternalLink,
+  Megaphone,
+  TrendingUp,
+  Tv2,
+  Volume2,
+  User,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUniverseStorefront } from '@/hooks/useListings';
-import { useSubscriptionTiers } from '@/hooks/useRevenue';
+import { useSubscriptionTiers, useAdSlots } from '@/hooks/useRevenue';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { formatEther } from 'viem';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 
