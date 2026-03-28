@@ -401,7 +401,7 @@ function DocsPage() {
 
             <h3 className="text-foreground font-semibold mt-4">tRPC Routers</h3>
 
-            <h4 className="text-foreground font-medium mt-3">cinematicUniverses</h4>
+            <h4 className="text-foreground font-medium mt-3">universes</h4>
             <Table
               headers={['Procedure', 'Type', 'Description']}
               rows={[
@@ -1701,10 +1701,10 @@ const { universes } = await ponderGql(\`{
             <CodeBlock title="tRPC Client Usage">{`import { trpcClient } from '@/utils/trpc';
 
 // Query
-const universes = await trpcClient.cinematicUniverses.getAll.query();
+const universes = await trpcClient.universes.getAll.query();
 
-// Mutation
-const result = await trpcClient.fal.generateImage.mutate({
+// Mutation (image generation)
+const result = await trpcClient.image.generateImage.mutate({
   prompt: "A cyberpunk cityscape",
   model: "flux",
 });`}</CodeBlock>
