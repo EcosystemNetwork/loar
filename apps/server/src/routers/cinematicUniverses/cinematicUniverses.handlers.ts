@@ -30,13 +30,16 @@ interface CreateCinematicUniverseInput {
   mintTxHash?: string;
 }
 
-const collection = db.collection('cinematicUniverses');
+const collection = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('cinematicUniverses');
+};
 
 export async function createCinematicUniverse(input: CreateCinematicUniverseInput) {
   try {
     const id = input.address.toLowerCase();
 
-    const existing = await collection.doc(id).get();
+    const existing = await collection().doc(id).get();
     if (existing.exists) {
       throw new Error('A cinematic universe with this timeline contract address already exists');
     }
@@ -54,7 +57,7 @@ export async function createCinematicUniverse(input: CreateCinematicUniverseInpu
       updated_at: new Date(),
     };
 
-    await collection.doc(id).set(data);
+    await collection().doc(id).set(data);
 
     // ── Seed the universe credit pool from the mint fee ───────────────
     // The on-chain UniverseManager held 0.025 ETH (credit portion) when
@@ -80,7 +83,7 @@ export async function createCinematicUniverse(input: CreateCinematicUniverseInpu
 
 export async function getCinematicUniverse(id: string) {
   try {
-    const doc = await collection.doc(id).get();
+    const doc = await collection().doc(id).get();
 
     if (!doc.exists) {
       throw new Error('Cinematic universe not found');
@@ -98,7 +101,7 @@ export async function getCinematicUniverse(id: string) {
 
 export async function getAllCinematicUniverses() {
   try {
-    const snapshot = await collection.orderBy('created_at').get();
+    const snapshot = await collection().orderBy('created_at').get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {
@@ -114,7 +117,7 @@ export async function getAllCinematicUniverses() {
 
 export async function getCinematicUniversesByCreator(creator: string) {
   try {
-    const snapshot = await collection.where('creator', '==', creator).orderBy('created_at').get();
+    const snapshot = await collection().where('creator', '==', creator).orderBy('created_at').get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {

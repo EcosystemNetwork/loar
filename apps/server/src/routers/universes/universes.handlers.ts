@@ -23,13 +23,16 @@ interface CreateUniverseInput {
 }
 
 /** Firestore collection name kept as 'cinematicUniverses' for data continuity. */
-const collection = db.collection('cinematicUniverses');
+const collection = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('cinematicUniverses');
+};
 
 export async function createUniverse(input: CreateUniverseInput) {
   try {
     const id = input.address.toLowerCase();
 
-    const existing = await collection.doc(id).get();
+    const existing = await collection().doc(id).get();
     if (existing.exists) {
       throw new Error('A universe with this timeline contract address already exists');
     }
@@ -47,7 +50,7 @@ export async function createUniverse(input: CreateUniverseInput) {
       updated_at: new Date(),
     };
 
-    await collection.doc(id).set(data);
+    await collection().doc(id).set(data);
 
     await seedUniverseCreditPool(id, input.creator, input.mintTxHash);
 
@@ -68,7 +71,7 @@ export async function createUniverse(input: CreateUniverseInput) {
 
 export async function getUniverse(id: string) {
   try {
-    const doc = await collection.doc(id).get();
+    const doc = await collection().doc(id).get();
 
     if (!doc.exists) {
       throw new Error('Universe not found');
@@ -86,7 +89,7 @@ export async function getUniverse(id: string) {
 
 export async function getAllUniverses() {
   try {
-    const snapshot = await collection.orderBy('created_at').get();
+    const snapshot = await collection().orderBy('created_at').get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {
@@ -102,7 +105,7 @@ export async function getAllUniverses() {
 
 export async function getUniversesByCreator(creator: string) {
   try {
-    const snapshot = await collection.where('creator', '==', creator).orderBy('created_at').get();
+    const snapshot = await collection().where('creator', '==', creator).orderBy('created_at').get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {
