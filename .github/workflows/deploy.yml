@@ -12,6 +12,21 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Security audit (blocks deploy on high-severity findings)
+        run: pnpm audit --audit-level=high
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -100,9 +115,9 @@ jobs:
             echo "  Deploy Summary"
             echo "========================================"
             echo "  Commit  : $CURRENT_SHA"
-            echo "  App     : https://loartech.xyz"
-            echo "  API     : https://api.loartech.xyz"
-            echo "  Indexer : https://idx.loartech.xyz"
+            echo "  App     : https://loar.fun"
+            echo "  API     : https://api.loar.fun"
+            echo "  Indexer : https://idx.loar.fun"
             echo "  Smoke   : PASSED"
             echo "  Time    : $DEPLOY_TIME"
             echo "========================================"

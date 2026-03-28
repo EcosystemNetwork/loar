@@ -33,7 +33,7 @@ jobs:
         run: |
           if grep -rn "loartech\.xyz\|loar-one\.vercel\.app" \
             --include="*.ts" --include="*.tsx" \
-            --include="*.json" --include="*.yaml" \
+            --include="*.json" --include="*.yaml" --include="*.yml" \
             --include="*.html" --include="*.env*" \
             --exclude-dir=".git" --exclude-dir="node_modules" \
             --exclude-dir="dist" --exclude-dir=".next" \
@@ -77,6 +77,7 @@ jobs:
 
   web:
     name: Web App
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +113,7 @@ jobs:
 
   server-tests:
     name: Server Tests
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,6 +143,7 @@ jobs:
 
   address-registry:
     name: Address Registry
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -162,6 +165,7 @@ jobs:
 
   indexer-validate:
     name: Indexer Validation
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -188,6 +192,7 @@ jobs:
 
   contracts:
     name: Smart Contracts
+    needs: [quality]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -216,3 +221,21 @@ jobs:
           name: forge-test-results-${{ github.run_id }}
           path: apps/contracts/forge-test-output.txt
           retention-days: 30
+
+  # Single required status check — require this in branch protection settings.
+  # It only passes when every parallel job above passes.
+  ci-gate:
+    name: CI Gate
+    needs: [build, web, server-tests, address-registry, indexer-validate, contracts]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          results='${{ toJSON(needs.*.result) }}'
+          echo "Job results: $results"
+          if echo "$results" | grep -q '"failure"\|"cancelled"'; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
+          echo "All required jobs passed."

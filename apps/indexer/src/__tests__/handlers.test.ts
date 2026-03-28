@@ -82,8 +82,8 @@ describe('UniverseManager:UniverseCreated', () => {
 // ─── Universe:NodeCreated ─────────────────────────────────────────────────────
 
 describe('Universe:NodeCreated', () => {
-  const UNIVERSE = '0xCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCc';
-  const CREATOR = '0xdDdDdDdDdDdDdDdDdDdDdDdDdDdDdDdDdDdDdDd';
+  const UNIVERSE = '0xcccccccccccccccccccccccccccccccccccccccc';
+  const CREATOR = '0xdddddddddddddddddddddddddddddddddddddddd';
 
   const baseEvent = {
     args: {
@@ -120,7 +120,7 @@ describe('Universe:NodeCreated', () => {
 
     await handler('Universe:NodeCreated')({ event: baseEvent, context: ctx });
 
-    const expectedId = `${UNIVERSE.toLowerCase()}:7`;
+    const expectedId = `${UNIVERSE}:7`;
     expect(insertedIds).toContain(expectedId);
   });
 
@@ -147,8 +147,8 @@ describe('Universe:NodeCreated', () => {
 describe('Universe:NodeCanonized', () => {
   it('inserts a nodeCanonization with composite ID', async () => {
     const ctx = createMockContext();
-    const UNIVERSE = '0xEeEeEeEeEeEeEeEeEeEeEeEeEeEeEeEeEeEeEeEe';
-    const CANONIZER = '0xFfFfFfFfFfFfFfFfFfFfFfFfFfFfFfFfFfFfFfFf';
+    const UNIVERSE = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    const CANONIZER = '0xffffffffffffffffffffffffffffffffffffffff';
 
     await handler('Universe:NodeCanonized')({
       event: {
@@ -174,14 +174,14 @@ describe('UniverseGovernor:ProposalCreated', () => {
   it('JSON-serializes targets, values, and calldatas arrays', async () => {
     const insertedData: any[] = [];
     const ctx = createMockContext({ select: [] });
-    ctx.db.insert.mockImplementation((table: string) => ({
+    ctx.db.insert.mockImplementation(() => ({
       values: (data: any) => {
         insertedData.push(data);
         return { onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) };
       },
     }));
 
-    const targets = ['0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'];
+    const targets = ['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'];
     const values = [1000n];
     const calldatas = ['0xdeadbeef'];
 
@@ -256,7 +256,7 @@ describe('UniverseGovernor:ProposalExecuted', () => {
         id: 'exec-event-1',
         args: { proposalId: 5n },
         block: mockBlock(),
-        log: mockLog('0x3333333333333333333333333333333333333333'),
+        log: mockLog('0x3333333333333333333333333333333333333333'), // 40 hex chars ✓
       },
       context: ctx,
     });
@@ -294,8 +294,8 @@ describe('UniverseGovernor:ProposalCanceled', () => {
 describe('UniverseGovernor:VoteCast', () => {
   it('inserts vote with composite ID proposalId:voter', async () => {
     const insertedData: any[] = [];
-    const GOVERNOR = '0x4444444444444444444444444444444444444444';
-    const VOTER = '0x5555555555555555555555555555555555555555';
+    const GOVERNOR = '0x4444444444444444444444444444444444444444'; // 40 hex ✓
+    const VOTER = '0x5555555555555555555555555555555555555555'; // 40 hex ✓
     const ctx = createMockContext();
     ctx.db.insert.mockImplementation(() => ({
       values: (data: any) => {
@@ -359,10 +359,10 @@ describe('UniverseGovernor:VoteCast', () => {
 // ─── GovernanceToken:Transfer ─────────────────────────────────────────────────
 
 describe('GovernanceToken:Transfer', () => {
-  const TOKEN = '0x6666666666666666666666666666666666666666';
-  const ALICE = '0x7777777777777777777777777777777777777777';
-  const BOB = '0x8888888888888888888888888888888888888888';
-  const ZERO = '0x0000000000000000000000000000000000000000';
+  const TOKEN = '0x6666666666666666666666666666666666666666'; // 40 hex ✓
+  const ALICE = '0x7777777777777777777777777777777777777777'; // 40 hex ✓
+  const BOB = '0x8888888888888888888888888888888888888888'; // 40 hex ✓
+  const ZERO = '0x0000000000000000000000000000000000000000'; // 40 hex ✓
 
   it('records transfer and upserts recipient balance on normal transfer', async () => {
     const ctx = createMockContext({ find: { id: `${TOKEN}:${ALICE}`, balance: '1000' } });
@@ -484,11 +484,11 @@ describe('PoolManager:Initialize', () => {
       event: {
         args: {
           id: '0xpool123',
-          currency0: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-          currency1: '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+          currency0: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          currency1: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           fee: 3000,
           tickSpacing: 60,
-          hooks: '0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC',
+          hooks: '0xcccccccccccccccccccccccccccccccccccccccc',
           sqrtPriceX96: 79228162514264337593543950336n,
           tick: 0,
         },
@@ -522,7 +522,7 @@ describe('PoolManager:Swap', () => {
         id: 'swap-event-1',
         args: {
           id: '0xpool123',
-          sender: '0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',
+          sender: '0xdddddddddddddddddddddddddddddddddddddddd',
           amount0: -1000n,
           amount1: 999n,
           sqrtPriceX96: 79228162514264337593543950336n,
