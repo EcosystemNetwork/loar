@@ -32,25 +32,25 @@ Creators who ship universes should feel like they are running a small studio wit
 
 ## Users
 
-| Persona | Primary need |
-|---|---|
-| **Solo creator** | See royalty income and credit burn in one view; know when to recharge |
-| **Universe team member** | Check treasury balance and pending allocations without asking the owner |
-| **Collector** | Browse owned episode and character NFTs with mint provenance and floor context |
-| **Affiliate/quester** | Track quest progress and unclaimed rewards without opening the web app |
+| Persona                  | Primary need                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| **Solo creator**         | See royalty income and credit burn in one view; know when to recharge          |
+| **Universe team member** | Check treasury balance and pending allocations without asking the owner        |
+| **Collector**            | Browse owned episode and character NFTs with mint provenance and floor context |
+| **Affiliate/quester**    | Track quest progress and unclaimed rewards without opening the web app         |
 
 ---
 
 ## Success Metrics
 
-| Metric | Target at 60 days post-launch |
-|---|---|
-| Portfolio screen D1 retention | ≥ 55% of users who open the app return to Portfolio the next day |
-| Time-to-balance | < 3 s from cold launch to credit balance visible on screen |
-| Push opt-in rate | ≥ 65% of users who complete wallet link accept push notifications |
-| Earnings surface rate | ≥ 40% of creators with royalty history view the Earnings tab within first week |
-| Credit top-up conversion | ≥ 12% of users who see a low-credit nudge tap through to purchase |
-| Crash-free sessions | ≥ 99.2% |
+| Metric                        | Target at 60 days post-launch                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| Portfolio screen D1 retention | ≥ 55% of users who open the app return to Portfolio the next day               |
+| Time-to-balance               | < 3 s from cold launch to credit balance visible on screen                     |
+| Push opt-in rate              | ≥ 65% of users who complete wallet link accept push notifications              |
+| Earnings surface rate         | ≥ 40% of creators with royalty history view the Earnings tab within first week |
+| Credit top-up conversion      | ≥ 12% of users who see a low-credit nudge tap through to purchase              |
+| Crash-free sessions           | ≥ 99.2%                                                                        |
 
 ---
 
@@ -94,6 +94,7 @@ The screen has three zones stacked vertically:
 **Zone 1 — Balance card (sticky header, ~180pt tall)**
 
 Full-width card with frosted-glass treatment over a gradient derived from the user's primary universe color (or a default purple/black). Shows:
+
 - Truncated wallet address with copy affordance and an external-link to Sepolia Etherscan
 - $LOAR credit balance (large numeral) with a "Top Up" ghost button
 - "Est. value" line in USD — sum of credit balance converted at current $LOAR price + floor-price estimate of held NFTs if available
@@ -104,6 +105,7 @@ Tapping the card opens the Wallet Management sheet.
 **Zone 2 — Summary strip**
 
 Three pill-shaped stat chips in a horizontal scroll:
+
 - NFTs owned (total count)
 - Royalties this month (USD or $LOAR, user toggles)
 - Active quests (count with check-mark icon when all complete)
@@ -123,6 +125,7 @@ Bottom sub-section: **Episodes** — vertical list. Each row: episode thumbnail,
 Empty state: illustration + "You don't own any NFTs yet. Explore universes to collect episodes." with a link to the Feed tab.
 
 **Character Detail sheet (modal)**
+
 - Full-width header image
 - Name, universe, token ID, contract address
 - Mint date and minting wallet
@@ -130,6 +133,7 @@ Empty state: illustration + "You don't own any NFTs yet. Explore universes to co
 - "View on Etherscan" link
 
 **Episode Detail sheet (modal)**
+
 - Thumbnail or video preview (if cached from Workstream 1 player)
 - Title, universe, collab tag
 - Token ID, contract address, mint date
@@ -140,12 +144,12 @@ Empty state: illustration + "You don't own any NFTs yet. Explore universes to co
 
 Earnings is a chronological timeline view with section headers by month. Each event is one of four types, visually distinguished by a left-border accent color:
 
-| Type | Color | Source endpoint |
-|---|---|---|
-| Royalty received | Green | `licensing.getRoyaltyHistory` (new) |
-| Treasury allocation | Teal | `universeTreasury.getPoolHistory` |
-| Collab payout | Blue | `collabs.getEpisodes` payout fields |
-| Affiliate reward | Purple | `quests.affiliateLeaderboard` + new `quests.getRewardHistory` |
+| Type                | Color  | Source endpoint                                               |
+| ------------------- | ------ | ------------------------------------------------------------- |
+| Royalty received    | Green  | `licensing.getRoyaltyHistory` (new)                           |
+| Treasury allocation | Teal   | `universeTreasury.getPoolHistory`                             |
+| Collab payout       | Blue   | `collabs.getEpisodes` payout fields                           |
+| Affiliate reward    | Purple | `quests.affiliateLeaderboard` + new `quests.getRewardHistory` |
 
 Each row: icon, description, amount in $LOAR, fiat equivalent, date, status chip (Pending / Confirmed / Claimed).
 
@@ -163,21 +167,24 @@ Each row: operation icon, description, amount (red for spend, green for earn), r
 
 A "Load more" button at the bottom (explicit pagination to keep memory flat on low-end devices).
 
-Export nudge: "Need the full export? Open loartech.xyz/portfolio" — defers CSV export to web.
+Export nudge: "Need the full export? Open loar.fun/portfolio" — defers CSV export to web.
 
 ### Wallet Management sheet
 
 Bottom sheet, draggable. Three sections:
 
 **Connected wallet**
+
 - Address, network badge ("Sepolia"), disconnect button with confirmation dialog
 - "Copy address" and "View on Etherscan" affordances
 
 **Link another wallet**
+
 - "Connect via WalletConnect" button — opens Reown AppKit modal
 - This links a second wallet for receiving royalties; it does not replace the auth wallet
 
 **Session**
+
 - "Sign out" button — clears JWT + local cache
 
 ### Credit purchase flow
@@ -193,6 +200,7 @@ Triggered from the "Top Up" button or the low-credit nudge notification.
 ### Quest tracker
 
 Full-screen sheet with:
+
 - Daily check-in card at top — current streak, check-in button (calls `quests.dailyCheckin`), shows disabled/checked state if already done today
 - Quest list from `quests.list` — each quest has a progress ring and a "Claim" button that calls `quests.claimReward` when `completed && !claimed`
 - Affiliate section at bottom: affiliate code display + copy button, referral count, leaderboard rank
@@ -203,13 +211,13 @@ Users are prompted to enable push after completing wallet link (not at first lau
 
 Notification types and tap-through destinations:
 
-| Notification | Destination |
-|---|---|
-| "Your credit balance is low (X remaining)" | Credit purchase flow |
-| "Royalty received: +X $LOAR from [universe]" | Earnings tab, scrolled to event |
-| "Quest complete: [quest name]. Claim your reward." | Quest tracker |
-| "Collab status changed: [collab] is now Active" | Collab detail |
-| "Treasury allocation: +X $LOAR from [universe] pool" | Earnings tab |
+| Notification                                         | Destination                     |
+| ---------------------------------------------------- | ------------------------------- |
+| "Your credit balance is low (X remaining)"           | Credit purchase flow            |
+| "Royalty received: +X $LOAR from [universe]"         | Earnings tab, scrolled to event |
+| "Quest complete: [quest name]. Claim your reward."   | Quest tracker                   |
+| "Collab status changed: [collab] is now Active"      | Collab detail                   |
+| "Treasury allocation: +X $LOAR from [universe] pool" | Earnings tab                    |
 
 ---
 
@@ -376,9 +384,9 @@ New procedure in `apps/server/src/routers/quests/quests.routes.ts`. Returns all 
 New router at `apps/server/src/routers/notifications/notifications.routes.ts`:
 
 ```typescript
-notifications.register({ expoPushToken: string, platform: 'ios' | 'android' })
-notifications.getPreferences()
-notifications.updatePreferences({ preferences: NotificationPreferences })
+notifications.register({ expoPushToken: string, platform: 'ios' | 'android' });
+notifications.getPreferences();
+notifications.updatePreferences({ preferences: NotificationPreferences });
 ```
 
 Push tokens stored in Firestore under `users/{uid}/pushTokens`. Notification dispatch service at `apps/server/src/services/push-notifications.ts` wraps Expo Push Notifications API. All sends are fire-and-forget.
@@ -387,55 +395,56 @@ Push tokens stored in Firestore under `users/{uid}/pushTokens`. Notification dis
 
 **Firestore additions (non-breaking):**
 
-| Collection | New fields |
-|---|---|
-| `users/{uid}` | `pushTokens: string[]`, `secondaryWalletAddress: string \| null` |
-| `users/{uid}/notificationPreferences` | subcollection doc with per-type booleans |
-| `questRewards` | New collection: `{ uid, questId, questName, amount, claimedAt }` |
+| Collection                            | New fields                                                       |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| `users/{uid}`                         | `pushTokens: string[]`, `secondaryWalletAddress: string \| null` |
+| `users/{uid}/notificationPreferences` | subcollection doc with per-type booleans                         |
+| `questRewards`                        | New collection: `{ uid, questId, questName, amount, claimedAt }` |
 
 ---
 
 ## Screens List
 
-| Screen | Route | Primary endpoints |
-|---|---|---|
-| Portfolio Home | `/(tabs)/portfolio/index` | `portfolio.getSummary` |
-| Assets — Characters | `/(tabs)/portfolio/assets/characters` | `nft.getMyNFTs` |
-| Assets — Episodes | `/(tabs)/portfolio/assets/episodes` | `nft.getMyNFTs` |
-| Character Detail | `/(tabs)/portfolio/assets/character/[tokenId]` | `nft.getEpisode` |
-| Episode Detail | `/(tabs)/portfolio/assets/episode/[tokenId]` | `nft.getEpisode` |
-| Earnings Timeline | `/(tabs)/portfolio/earnings` | `licensing.getRoyaltyHistory`, `universeTreasury.getPoolHistory`, `collabs.getEpisodes`, `quests.getRewardHistory` |
-| Activity Ledger | `/(tabs)/portfolio/activity` | `credits.getHistory` |
-| Wallet Management | `/(tabs)/portfolio/wallet` (sheet) | `profiles.me`, `profiles.upsert` |
-| Credit Packages | `/(tabs)/portfolio/credits/packages` | `credits.getPackages` |
-| Credit Purchase — Fiat | `/(tabs)/portfolio/credits/fiat` | `credits.purchaseWithFiat` |
-| Credit Purchase — $LOAR | `/(tabs)/portfolio/credits/loar` | `credits.purchaseWithLoar` |
-| Credit Purchase — Success | `/(tabs)/portfolio/credits/success` | `credits.getBalance` (re-fetch) |
-| Quest Tracker | `/(tabs)/portfolio/quests` | `quests.list`, `quests.dailyCheckin`, `quests.claimReward` |
-| Notification Settings | `/(tabs)/portfolio/settings/notifications` | `notifications.getPreferences`, `notifications.updatePreferences` |
+| Screen                    | Route                                          | Primary endpoints                                                                                                  |
+| ------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Portfolio Home            | `/(tabs)/portfolio/index`                      | `portfolio.getSummary`                                                                                             |
+| Assets — Characters       | `/(tabs)/portfolio/assets/characters`          | `nft.getMyNFTs`                                                                                                    |
+| Assets — Episodes         | `/(tabs)/portfolio/assets/episodes`            | `nft.getMyNFTs`                                                                                                    |
+| Character Detail          | `/(tabs)/portfolio/assets/character/[tokenId]` | `nft.getEpisode`                                                                                                   |
+| Episode Detail            | `/(tabs)/portfolio/assets/episode/[tokenId]`   | `nft.getEpisode`                                                                                                   |
+| Earnings Timeline         | `/(tabs)/portfolio/earnings`                   | `licensing.getRoyaltyHistory`, `universeTreasury.getPoolHistory`, `collabs.getEpisodes`, `quests.getRewardHistory` |
+| Activity Ledger           | `/(tabs)/portfolio/activity`                   | `credits.getHistory`                                                                                               |
+| Wallet Management         | `/(tabs)/portfolio/wallet` (sheet)             | `profiles.me`, `profiles.upsert`                                                                                   |
+| Credit Packages           | `/(tabs)/portfolio/credits/packages`           | `credits.getPackages`                                                                                              |
+| Credit Purchase — Fiat    | `/(tabs)/portfolio/credits/fiat`               | `credits.purchaseWithFiat`                                                                                         |
+| Credit Purchase — $LOAR   | `/(tabs)/portfolio/credits/loar`               | `credits.purchaseWithLoar`                                                                                         |
+| Credit Purchase — Success | `/(tabs)/portfolio/credits/success`            | `credits.getBalance` (re-fetch)                                                                                    |
+| Quest Tracker             | `/(tabs)/portfolio/quests`                     | `quests.list`, `quests.dailyCheckin`, `quests.claimReward`                                                         |
+| Notification Settings     | `/(tabs)/portfolio/settings/notifications`     | `notifications.getPreferences`, `notifications.updatePreferences`                                                  |
 
 ---
 
 ## Dependencies
 
-| Dependency | Status | Notes |
-|---|---|---|
-| `apps/server` tRPC router | Exists | New procedures added non-breaking |
-| `packages/abis` | Exists | NFT token IDs resolved through Ponder indexer |
-| `apps/indexer` (Ponder) | Exists | Floor price data via GraphQL |
-| Reown AppKit React Native | External | `@reown/appkit-react-native` |
-| Expo Notifications | External | Requires APNs cert (iOS) + FCM key (Android) in EAS secrets |
-| Expo SecureStore | External | Replaces `localStorage` on native |
-| `@stripe/stripe-react-native` | External | Publishable key from `.env` |
-| Expo Router | External | SDK 52+ |
-| TanStack Query v5 | External | Same as web |
-| EAS Build + EAS Submit | External | New `eas.json` in `apps/mobile/` |
+| Dependency                    | Status   | Notes                                                       |
+| ----------------------------- | -------- | ----------------------------------------------------------- |
+| `apps/server` tRPC router     | Exists   | New procedures added non-breaking                           |
+| `packages/abis`               | Exists   | NFT token IDs resolved through Ponder indexer               |
+| `apps/indexer` (Ponder)       | Exists   | Floor price data via GraphQL                                |
+| Reown AppKit React Native     | External | `@reown/appkit-react-native`                                |
+| Expo Notifications            | External | Requires APNs cert (iOS) + FCM key (Android) in EAS secrets |
+| Expo SecureStore              | External | Replaces `localStorage` on native                           |
+| `@stripe/stripe-react-native` | External | Publishable key from `.env`                                 |
+| Expo Router                   | External | SDK 52+                                                     |
+| TanStack Query v5             | External | Same as web                                                 |
+| EAS Build + EAS Submit        | External | New `eas.json` in `apps/mobile/`                            |
 
 ---
 
 ## Milestones
 
 ### M1 — Foundation (Weeks 1–2)
+
 - Expo project scaffolded with Expo Router, TanStack Query, tRPC client
 - Auth flow: SIWE JWT stored in SecureStore; session restore on cold launch
 - Portfolio Home renders with live balance and NFT count
@@ -445,6 +454,7 @@ Push tokens stored in Firestore under `users/{uid}/pushTokens`. Notification dis
 **Acceptance:** Logged-in user sees credit balance and NFT count within 3 seconds on a real device.
 
 ### M2 — Earnings + Activity (Weeks 3–4)
+
 - `licensing.getRoyaltyHistory` backend procedure live
 - `quests.getRewardHistory` backend procedure live
 - Earnings tab: all four event types merged and rendered
@@ -454,6 +464,7 @@ Push tokens stored in Firestore under `users/{uid}/pushTokens`. Notification dis
 **Acceptance:** A creator with existing royalty and credit history can see all events correctly categorized.
 
 ### M3 — Wallet + Credits (Weeks 5–6)
+
 - Wallet Management sheet with display, copy, Etherscan link
 - Reown AppKit integration: WalletConnect flow for secondary wallet link
 - Credit purchase flow: Stripe fiat path end-to-end
@@ -463,6 +474,7 @@ Push tokens stored in Firestore under `users/{uid}/pushTokens`. Notification dis
 **Acceptance:** A user can top up credits with a test Stripe card and see the balance increment within 2 seconds.
 
 ### M4 — Push + Polish (Weeks 7–8)
+
 - Notifications infrastructure: `notifications.register`, `getPreferences`, `updatePreferences` live
 - Push opt-in prompt after wallet link
 - All five notification types wired and verified on physical device
@@ -472,6 +484,7 @@ Push tokens stored in Firestore under `users/{uid}/pushTokens`. Notification dis
 **Acceptance:** End-to-end: spend credits below threshold → receive push → tap → land on credit purchase flow.
 
 ### M5 — Launch readiness (Weeks 9–10)
+
 - EAS Build config; TestFlight + Play Store internal track distribution
 - Sentry Expo crash reporting integrated
 - Analytics events for key funnel steps
@@ -505,21 +518,21 @@ A feature in this workstream is done when:
 
 #### Hard SLAs
 
-| Operation | Target | Notes |
-|---|---|---|
-| Cold launch → Portfolio Home (cached data rendered) | ≤ 1,200 ms | Balance card visible with last-cached credits value; skeleton replaced by real data |
-| Cold launch → Balance card with LIVE data | ≤ 2,800 ms | `portfolio.getSummary` p50 response + React hydration |
-| `portfolio.getSummary` p50 | ≤ 400 ms | Fan-out with parallel sub-calls, all on warm Firestore connections |
-| `portfolio.getSummary` p95 | ≤ 1,200 ms | Acceptable upper bound before partial-data fallback triggers |
-| `portfolio.getSummary` p99 | ≤ 2,500 ms | Individual slow sub-call still resolves; timeout kicks in before this |
-| Earnings tab mount (4 parallel fetches merged) | ≤ 1,800 ms | All four sub-calls dispatched simultaneously; UI renders as each resolves |
-| NFT image load p95 (IPFS/Walrus CDN) | ≤ 2,000 ms | Requires client-side CDN URL rewriting through a caching proxy; see strategy below |
-| Credit purchase: "Top Up" tap → Stripe payment sheet visible | ≤ 1,500 ms | Includes `credits.purchaseWithFiat` round-trip + Stripe SDK initialization |
-| Push notification delivery p50 | ≤ 3 s from server trigger | Expo Push API + APNs/FCM relay |
-| Push notification delivery p95 | ≤ 15 s from server trigger | Network and platform variance; above 60 s is a delivery failure |
-| Quest tracker open | ≤ 800 ms | `quests.list` + render; data often cached |
-| Balance card update after credit purchase | ≤ 2,000 ms from purchase confirmation | Re-fetch `credits.getBalance` after webhook confirms; client polls at 500 ms intervals, max 3 attempts |
-| Offline cold launch → cached portfolio visible | ≤ 800 ms | AsyncStorage read only; no network call |
+| Operation                                                    | Target                                | Notes                                                                                                  |
+| ------------------------------------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Cold launch → Portfolio Home (cached data rendered)          | ≤ 1,200 ms                            | Balance card visible with last-cached credits value; skeleton replaced by real data                    |
+| Cold launch → Balance card with LIVE data                    | ≤ 2,800 ms                            | `portfolio.getSummary` p50 response + React hydration                                                  |
+| `portfolio.getSummary` p50                                   | ≤ 400 ms                              | Fan-out with parallel sub-calls, all on warm Firestore connections                                     |
+| `portfolio.getSummary` p95                                   | ≤ 1,200 ms                            | Acceptable upper bound before partial-data fallback triggers                                           |
+| `portfolio.getSummary` p99                                   | ≤ 2,500 ms                            | Individual slow sub-call still resolves; timeout kicks in before this                                  |
+| Earnings tab mount (4 parallel fetches merged)               | ≤ 1,800 ms                            | All four sub-calls dispatched simultaneously; UI renders as each resolves                              |
+| NFT image load p95 (IPFS/Walrus CDN)                         | ≤ 2,000 ms                            | Requires client-side CDN URL rewriting through a caching proxy; see strategy below                     |
+| Credit purchase: "Top Up" tap → Stripe payment sheet visible | ≤ 1,500 ms                            | Includes `credits.purchaseWithFiat` round-trip + Stripe SDK initialization                             |
+| Push notification delivery p50                               | ≤ 3 s from server trigger             | Expo Push API + APNs/FCM relay                                                                         |
+| Push notification delivery p95                               | ≤ 15 s from server trigger            | Network and platform variance; above 60 s is a delivery failure                                        |
+| Quest tracker open                                           | ≤ 800 ms                              | `quests.list` + render; data often cached                                                              |
+| Balance card update after credit purchase                    | ≤ 2,000 ms from purchase confirmation | Re-fetch `credits.getBalance` after webhook confirms; client polls at 500 ms intervals, max 3 attempts |
+| Offline cold launch → cached portfolio visible               | ≤ 800 ms                              | AsyncStorage read only; no network call                                                                |
 
 #### Balance Card Credit Counter Animation
 
@@ -545,8 +558,8 @@ async function withTimeout<T>(
 ): Promise<{ data: T; timedOut: boolean }> {
   let timedOut = false;
   const result = await Promise.race([
-    promise.then(data => ({ data, timedOut: false })),
-    new Promise<{ data: T; timedOut: true }>(resolve =>
+    promise.then((data) => ({ data, timedOut: false })),
+    new Promise<{ data: T; timedOut: true }>((resolve) =>
       setTimeout(() => {
         timedOut = true;
         resolve({ data: fallback, timedOut: true });
@@ -556,7 +569,10 @@ async function withTimeout<T>(
   return result;
 }
 
-export async function getPortfolioSummary(uid: string, walletAddress: string): Promise<PortfolioSummaryResponse> {
+export async function getPortfolioSummary(
+  uid: string,
+  walletAddress: string
+): Promise<PortfolioSummaryResponse> {
   const [credits, nftCount, royalties, quests] = await Promise.all([
     withTimeout(getCreditsBalance(uid), SUBCALL_TIMEOUT_MS, null),
     withTimeout(getNFTCount(walletAddress), SUBCALL_TIMEOUT_MS, null),
@@ -585,13 +601,13 @@ export async function getPortfolioSummary(uid: string, walletAddress: string): P
 
 ```typescript
 type PortfolioSummaryResponse = {
-  credits: number | null;           // null if sub-call timed out
+  credits: number | null; // null if sub-call timed out
   nftCount: number | null;
   royalties30d: { loar: number; usd: number | null } | null;
   activeQuestCount: number | null;
   walletAddress: string;
-  partial: boolean;                 // true if ANY sub-call timed out
-  timedOutFields: string[];         // which specific fields are missing
+  partial: boolean; // true if ANY sub-call timed out
+  timedOutFields: string[]; // which specific fields are missing
 };
 ```
 
@@ -628,7 +644,7 @@ The tRPC client link that implements this lives in `apps/mobile/src/lib/trpc.ts`
 
 ```typescript
 const silentReAuthLink = new TRPCLink(({ next, op }) => {
-  return observable(observer => {
+  return observable((observer) => {
     const unsubscribe = next(op).subscribe({
       next: observer.next,
       error: async (err) => {
@@ -659,15 +675,15 @@ const silentReAuthLink = new TRPCLink(({ next, op }) => {
 
 #### Expo SecureStore vs. AsyncStorage — What Lives Where
 
-| Data | Storage location | Rationale |
-|---|---|---|
-| JWT (SIWE session token) | `Expo SecureStore` | Encrypted at rest using platform keychain (iOS Keychain / Android Keystore). Never in AsyncStorage. |
-| Wallet address (primary) | `Expo SecureStore` | Required for silent re-auth; treated as sensitive identity anchor |
-| Expo push token | `Expo SecureStore` | Not a secret, but stored securely to prevent accidental exposure in logs or crash reports |
-| Portfolio cache (`portfolio.getSummary` last result) | `AsyncStorage` | Non-sensitive display cache; acceptable in unencrypted storage |
-| NFT list cache | `AsyncStorage` | Non-sensitive |
-| TanStack Query persisted cache (non-auth) | `AsyncStorage` via `@tanstack/query-async-storage-persister` | Standard TanStack Query offline persistence |
-| Private keys | NEVER stored on device | CDP Embedded Wallet manages key material in the CDP cloud enclave. This app NEVER has access to private keys and MUST NOT request or store them. |
+| Data                                                 | Storage location                                             | Rationale                                                                                                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| JWT (SIWE session token)                             | `Expo SecureStore`                                           | Encrypted at rest using platform keychain (iOS Keychain / Android Keystore). Never in AsyncStorage.                                              |
+| Wallet address (primary)                             | `Expo SecureStore`                                           | Required for silent re-auth; treated as sensitive identity anchor                                                                                |
+| Expo push token                                      | `Expo SecureStore`                                           | Not a secret, but stored securely to prevent accidental exposure in logs or crash reports                                                        |
+| Portfolio cache (`portfolio.getSummary` last result) | `AsyncStorage`                                               | Non-sensitive display cache; acceptable in unencrypted storage                                                                                   |
+| NFT list cache                                       | `AsyncStorage`                                               | Non-sensitive                                                                                                                                    |
+| TanStack Query persisted cache (non-auth)            | `AsyncStorage` via `@tanstack/query-async-storage-persister` | Standard TanStack Query offline persistence                                                                                                      |
+| Private keys                                         | NEVER stored on device                                       | CDP Embedded Wallet manages key material in the CDP cloud enclave. This app NEVER has access to private keys and MUST NOT request or store them. |
 
 #### Credit Purchase Security — Stripe Webhook Verification
 
@@ -750,6 +766,7 @@ The NFT list in the portfolio is populated from Firestore records written by the
 #### Rate Limiting on Purchase Endpoints
 
 `credits.purchaseWithFiat` and `credits.purchaseWithLoar` are both rate-limited per user:
+
 - **Burst:** 3 calls per minute per UID.
 - **Sustained:** 10 calls per hour per UID.
 
@@ -763,21 +780,21 @@ Implementation: via the shared `rateLimit` utility (see Section 9).
 
 #### Complete Error Table
 
-| Error | Examples | Client behavior | User message | Retry? |
-|---|---|---|---|---|
-| `portfolio.getSummary` partial failure | Royalties sub-call times out after 1,500 ms | Render all available data; show an amber "some data unavailable" chip on the affected section (e.g., earnings strip chip shows "—"); `timedOutFields` array indicates which section is affected | "Some data couldn't load. Tap to refresh." | Auto-retry in background at 30-second intervals, max 3 times. Manual pull-to-refresh always available. |
-| `portfolio.getSummary` total failure | All sub-calls time out, or server returns 500 | Render full cached state from AsyncStorage with an "Offline or service error" banner at top | "Couldn't load your portfolio. Showing saved data." | Manual retry via banner CTA and pull-to-refresh. Auto-retry after 60 s. |
-| Credit purchase — Stripe card declined | Stripe returns `card_declined`, `insufficient_funds`, `do_not_honor` | Dismiss Stripe sheet; navigate back to package selection; show inline error banner on the payment method section | "Your card was declined. Please try a different payment method." | User-initiated only. Do not auto-retry. Show a "Try another card" CTA. |
-| Credit purchase — Stripe 3DS failure | 3DS authentication timed out or user cancelled | Stripe sheet handles the 3DS UI; on cancellation return to package selection with inline error | "Payment authentication failed or was cancelled. Please try again." | User-initiated. |
-| Credit purchase — $LOAR insufficient balance | `purchaseWithLoar` returns `PRECONDITION_FAILED` | Disable the $LOAR payment tab; show a tooltip on the disabled "Buy" button | "You don't have enough $LOAR. Your balance: X $LOAR. Required: Y $LOAR." | No retry — user must acquire more $LOAR. Show a "Learn how to get $LOAR" link. |
-| NFT image load failure | IPFS/Walrus gateway returns 404 or times out after 8 s | Replace image with a generated placeholder avatar (deterministic color + initials from NFT name); do not show a broken-image icon | No user-facing message on individual card; if more than 3 images fail, show a banner "Some NFT images are unavailable" | `expo-image` auto-retries once. After second failure, show placeholder permanently for that session. |
-| Push notification permission denied | User taps "Don't Allow" on the OS prompt | Store `pushPermissionDenied: true` in AsyncStorage; do not re-prompt for 30 days; show a subtle settings nudge in Notification Settings screen | "Enable notifications in Settings to get alerts for new royalties and quest completions." (settings nudge, not a modal) | No automatic re-prompt. Show deep-link to iOS/Android notification settings in the Notification Settings screen. |
-| WalletConnect pairing failure — QR timeout | Reown AppKit QR scan session expires (default: 5 minutes) | Close the modal; return to Wallet Management sheet with an error state on the "Connect via WalletConnect" button | "Connection timed out. Please try again." | Tap to retry generates a new QR code. |
-| WalletConnect pairing failure — wallet app not installed | Reown AppKit deep-link fails on iOS/Android | Modal shows "No compatible wallet found"; offer a "Get a wallet" link to Reown's wallet discovery page | "No wallet app found. Install a compatible wallet to continue." | N/A. |
-| Transaction confirmation timeout | Sepolia block time variance; `credits.purchaseWithLoar` polled for 2+ minutes without confirmation | After 120 s of waiting, surface a "Taking longer than expected" non-blocking sheet. Do not cancel the purchase — the transaction may still confirm. | "Your transaction is taking longer than expected. We'll update your balance when it confirms. You can close this screen." | No server-side retry. Server webhook will process the grant when the transaction eventually confirms. User can close the screen safely. |
-| Quest claim race condition | Two devices submit `quests.claimReward` for the same quest simultaneously | Server uses a Firestore transaction to atomically check `claimed` before setting it. The second request receives `CONFLICT` (HTTP 409). The first device shows success; the second device's optimistic update is reverted, and the row shows "Already claimed." | "This reward was already claimed." (second device only) | No retry. |
-| JWT expired mid-purchase | Token expires between PaymentIntent creation and Stripe sheet completion | The Stripe sheet operates independently of tRPC after receiving the `clientSecret`. JWT expiry does not affect the Stripe payment itself. After sheet closes, the client's next call (`credits.getBalance`) will trigger silent re-auth (Section 2). The PaymentIntent and webhook flow complete regardless of JWT state. | No visible impact to user if silent re-auth succeeds within 2 s. If re-auth fails, show "Session expired — please sign in to see your updated balance." | Silent re-auth is automatic. |
-| Offline during credit purchase — PaymentIntent created, network drops before Stripe sheet | Client has `clientSecret`, but network is lost before the Stripe SDK can open | Stripe SDK will error on initialization. Store `{ paymentIntentId, packageId, clientSecret }` in SecureStore as a `pendingRecovery` entry. | "You're offline. Your pending purchase has been saved." | On next app foreground with network: detect `pendingRecovery` in SecureStore, re-open the Stripe payment sheet with the saved `clientSecret`. Stripe PaymentIntents are valid for 24 hours — the same intent is reused, so there is zero risk of double-charging. If the PaymentIntent has expired (> 24 h), delete the `pendingRecovery` entry and prompt the user to start a new purchase. |
+| Error                                                                                     | Examples                                                                                           | Client behavior                                                                                                                                                                                                                                                                                                           | User message                                                                                                                                            | Retry?                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `portfolio.getSummary` partial failure                                                    | Royalties sub-call times out after 1,500 ms                                                        | Render all available data; show an amber "some data unavailable" chip on the affected section (e.g., earnings strip chip shows "—"); `timedOutFields` array indicates which section is affected                                                                                                                           | "Some data couldn't load. Tap to refresh."                                                                                                              | Auto-retry in background at 30-second intervals, max 3 times. Manual pull-to-refresh always available.                                                                                                                                                                                                                                                                                       |
+| `portfolio.getSummary` total failure                                                      | All sub-calls time out, or server returns 500                                                      | Render full cached state from AsyncStorage with an "Offline or service error" banner at top                                                                                                                                                                                                                               | "Couldn't load your portfolio. Showing saved data."                                                                                                     | Manual retry via banner CTA and pull-to-refresh. Auto-retry after 60 s.                                                                                                                                                                                                                                                                                                                      |
+| Credit purchase — Stripe card declined                                                    | Stripe returns `card_declined`, `insufficient_funds`, `do_not_honor`                               | Dismiss Stripe sheet; navigate back to package selection; show inline error banner on the payment method section                                                                                                                                                                                                          | "Your card was declined. Please try a different payment method."                                                                                        | User-initiated only. Do not auto-retry. Show a "Try another card" CTA.                                                                                                                                                                                                                                                                                                                       |
+| Credit purchase — Stripe 3DS failure                                                      | 3DS authentication timed out or user cancelled                                                     | Stripe sheet handles the 3DS UI; on cancellation return to package selection with inline error                                                                                                                                                                                                                            | "Payment authentication failed or was cancelled. Please try again."                                                                                     | User-initiated.                                                                                                                                                                                                                                                                                                                                                                              |
+| Credit purchase — $LOAR insufficient balance                                              | `purchaseWithLoar` returns `PRECONDITION_FAILED`                                                   | Disable the $LOAR payment tab; show a tooltip on the disabled "Buy" button                                                                                                                                                                                                                                                | "You don't have enough $LOAR. Your balance: X $LOAR. Required: Y $LOAR."                                                                                | No retry — user must acquire more $LOAR. Show a "Learn how to get $LOAR" link.                                                                                                                                                                                                                                                                                                               |
+| NFT image load failure                                                                    | IPFS/Walrus gateway returns 404 or times out after 8 s                                             | Replace image with a generated placeholder avatar (deterministic color + initials from NFT name); do not show a broken-image icon                                                                                                                                                                                         | No user-facing message on individual card; if more than 3 images fail, show a banner "Some NFT images are unavailable"                                  | `expo-image` auto-retries once. After second failure, show placeholder permanently for that session.                                                                                                                                                                                                                                                                                         |
+| Push notification permission denied                                                       | User taps "Don't Allow" on the OS prompt                                                           | Store `pushPermissionDenied: true` in AsyncStorage; do not re-prompt for 30 days; show a subtle settings nudge in Notification Settings screen                                                                                                                                                                            | "Enable notifications in Settings to get alerts for new royalties and quest completions." (settings nudge, not a modal)                                 | No automatic re-prompt. Show deep-link to iOS/Android notification settings in the Notification Settings screen.                                                                                                                                                                                                                                                                             |
+| WalletConnect pairing failure — QR timeout                                                | Reown AppKit QR scan session expires (default: 5 minutes)                                          | Close the modal; return to Wallet Management sheet with an error state on the "Connect via WalletConnect" button                                                                                                                                                                                                          | "Connection timed out. Please try again."                                                                                                               | Tap to retry generates a new QR code.                                                                                                                                                                                                                                                                                                                                                        |
+| WalletConnect pairing failure — wallet app not installed                                  | Reown AppKit deep-link fails on iOS/Android                                                        | Modal shows "No compatible wallet found"; offer a "Get a wallet" link to Reown's wallet discovery page                                                                                                                                                                                                                    | "No wallet app found. Install a compatible wallet to continue."                                                                                         | N/A.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Transaction confirmation timeout                                                          | Sepolia block time variance; `credits.purchaseWithLoar` polled for 2+ minutes without confirmation | After 120 s of waiting, surface a "Taking longer than expected" non-blocking sheet. Do not cancel the purchase — the transaction may still confirm.                                                                                                                                                                       | "Your transaction is taking longer than expected. We'll update your balance when it confirms. You can close this screen."                               | No server-side retry. Server webhook will process the grant when the transaction eventually confirms. User can close the screen safely.                                                                                                                                                                                                                                                      |
+| Quest claim race condition                                                                | Two devices submit `quests.claimReward` for the same quest simultaneously                          | Server uses a Firestore transaction to atomically check `claimed` before setting it. The second request receives `CONFLICT` (HTTP 409). The first device shows success; the second device's optimistic update is reverted, and the row shows "Already claimed."                                                           | "This reward was already claimed." (second device only)                                                                                                 | No retry.                                                                                                                                                                                                                                                                                                                                                                                    |
+| JWT expired mid-purchase                                                                  | Token expires between PaymentIntent creation and Stripe sheet completion                           | The Stripe sheet operates independently of tRPC after receiving the `clientSecret`. JWT expiry does not affect the Stripe payment itself. After sheet closes, the client's next call (`credits.getBalance`) will trigger silent re-auth (Section 2). The PaymentIntent and webhook flow complete regardless of JWT state. | No visible impact to user if silent re-auth succeeds within 2 s. If re-auth fails, show "Session expired — please sign in to see your updated balance." | Silent re-auth is automatic.                                                                                                                                                                                                                                                                                                                                                                 |
+| Offline during credit purchase — PaymentIntent created, network drops before Stripe sheet | Client has `clientSecret`, but network is lost before the Stripe SDK can open                      | Stripe SDK will error on initialization. Store `{ paymentIntentId, packageId, clientSecret }` in SecureStore as a `pendingRecovery` entry.                                                                                                                                                                                | "You're offline. Your pending purchase has been saved."                                                                                                 | On next app foreground with network: detect `pendingRecovery` in SecureStore, re-open the Stripe payment sheet with the saved `clientSecret`. Stripe PaymentIntents are valid for 24 hours — the same intent is reused, so there is zero risk of double-charging. If the PaymentIntent has expired (> 24 h), delete the `pendingRecovery` entry and prompt the user to start a new purchase. |
 
 ---
 
@@ -788,6 +805,7 @@ Implementation: via the shared `rateLimit` utility (see Section 9).
 **Coverage target: 80% for all files under `apps/mobile/src/screens/portfolio/`, `apps/mobile/src/screens/credits/`, and `apps/mobile/src/components/portfolio/`.**
 
 **Mocks required:**
+
 - `@stripe/stripe-react-native`: mock `useStripe()` and `presentPaymentSheet()` — control success/failure paths
 - `@reown/appkit-react-native`: mock `useAppKit()` and the modal open/close lifecycle
 - `expo-notifications`: mock `getExpoPushTokenAsync()`, `requestPermissionsAsync()`
@@ -819,6 +837,7 @@ Implementation: via the shared `rateLimit` utility (see Section 9).
 #### Integration Tests (Backend — Vitest + Firestore Emulator)
 
 **Firestore emulator seed data required for all tests:**
+
 - A `users/{uid}` document with `{ walletAddress, credits: 500, pushTokens: [] }`
 - A `questRewards` document with one claimed and one unclaimed reward for the test uid
 - A `royaltyEvents` document with two royalty records for the test uid
@@ -845,11 +864,13 @@ Implementation: via the shared `rateLimit` utility (see Section 9).
 #### E2E Tests (Maestro)
 
 **CI run policy:**
+
 - **On PR:** E2E tests 1, 2, and 3 (smoke path only)
 - **On merge to main:** All 6 E2E tests
 - **On release candidate build:** All 6 E2E tests on physical device gate (1 iOS, 1 Android)
 
 **Device matrix:**
+
 - iOS 16.x simulator (Xcode 15)
 - iOS 17.x simulator
 - Android 13 emulator (API 33)
@@ -873,12 +894,14 @@ Implementation: via the shared `rateLimit` utility (see Section 9).
 #### Load Tests
 
 **`portfolio.getSummary` load test:**
+
 - Baseline: 200 RPS (expected at launch with ~5,000 daily active users with typical session patterns)
 - 3× overload test: 600 RPS — assert p95 remains ≤ 2,500 ms and error rate < 0.1%
 - Degraded sub-call test: inject a 2,000 ms artificial delay on all royalties Firestore reads. Assert at 200 RPS that the endpoint still returns within 1,600 ms (sub-call timeout fires at 1,500 ms) and `partial: true` responses contain correct data for the non-delayed fields. Assert the delay does NOT cause thread pool exhaustion (all other requests continue to process normally).
 - Tool: k6 scripts in `apps/server/tests/load/portfolio-summary.k6.js`
 
 **Push notification batch delivery load test:**
+
 - Simulate 10,000 simultaneous push sends (representing a mass notification event).
 - Expo Push API hard limit: 100 push tokens per request. The `push-notifications.ts` service must chunk token arrays into batches of 100 and process them.
 - Test the batching logic: assert that for 10,000 tokens, exactly 100 batch requests are made to the Expo Push API.
@@ -895,10 +918,12 @@ import { z } from 'zod';
 export const PortfolioSummaryContract = z.object({
   credits: z.number().nullable(),
   nftCount: z.number().nullable(),
-  royalties30d: z.object({
-    loar: z.number(),
-    usd: z.number().nullable(),
-  }).nullable(),
+  royalties30d: z
+    .object({
+      loar: z.number(),
+      usd: z.number().nullable(),
+    })
+    .nullable(),
   activeQuestCount: z.number().nullable(),
   walletAddress: z.string(),
   partial: z.boolean(),
@@ -917,16 +942,19 @@ A contract test in `apps/server/src/routers/portfolio/__tests__/portfolio.contra
 All server metrics are emitted to the LOAR observability backend (Prometheus-compatible, exported via `prom-client`). Dashboards hosted in Grafana.
 
 **`portfolio.getSummary` metrics:**
+
 - `portfolio_get_summary_duration_ms` (histogram, labels: `sub_call: credits|nftCount|royalties30d|activeQuestCount`) — tracks per-sub-call latency separately to identify the slowest component
 - `portfolio_get_summary_partial_total` (counter) — increments each time a response is returned with `partial: true`
 - `portfolio_get_summary_timeout_by_field_total` (counter, labels: `field`) — which sub-call timed out most often
 - `portfolio_get_summary_requests_total` (counter, labels: `status: success|partial|error`) — overall call volume
 
 **`licensing.getRoyaltyHistory` metrics:**
+
 - `licensing_royalty_history_duration_ms` (histogram)
 - `licensing_royalty_history_empty_total` (counter) — tracks calls that returned zero records (useful for detecting indexer lag or missing data)
 
 **Credit purchase funnel (server-side):**
+
 - `credits_purchase_fiat_initiated_total` — PaymentIntent creation attempted
 - `credits_purchase_fiat_intent_created_total` — PaymentIntent created successfully
 - `credits_purchase_stripe_webhook_confirmed_total` — `payment_intent.succeeded` webhook received
@@ -934,11 +962,13 @@ All server metrics are emitted to the LOAR observability backend (Prometheus-com
 - `credits_purchase_fiat_failed_total` (labels: `reason: stripe_error|webhook_timeout|grant_error`) — drop-off tracking
 
 **Push notification metrics:**
+
 - `push_notifications_sent_total` (labels: `type: credit_low|royalty_received|quest_complete|collab_status|treasury_allocation`)
 - `push_notifications_delivered_total` (labels: `type`) — Expo receipt API confirmation
 - `push_notifications_failed_total` (labels: `type, reason: DeviceNotRegistered|MessageRateExceeded|unknown`)
 
 **Secondary wallet link metrics:**
+
 - `wallet_link_attempts_total`
 - `wallet_link_success_total`
 - `wallet_link_failed_total` (labels: `reason: invalid_signature|expired_nonce|nonce_reuse`)
@@ -954,18 +984,19 @@ Client metrics collected via `apps/mobile/src/lib/analytics.ts` (wraps the platf
 
 #### Alerting Rules
 
-| Alert | Severity | Condition | Notification |
-|---|---|---|---|
-| Portfolio summary slow | P1 | `portfolio_get_summary_duration_ms` p95 > 3,000 ms over 5-minute window | PagerDuty on-call rotation |
-| Credit purchase success rate low | P1 | (`credits_purchase_grant_completed_total` / `credits_purchase_stripe_webhook_confirmed_total`) < 0.98 over 10-minute window | PagerDuty on-call rotation |
-| Push delivery rate low | P2 | (`push_notifications_delivered_total` / `push_notifications_sent_total`) < 0.90 over 10-minute window | Slack `#alerts-mobile` |
-| Portfolio partial failure rate high | P2 | (`portfolio_get_summary_partial_total` / `portfolio_get_summary_requests_total`) > 0.10 over 5-minute window | Slack `#alerts-mobile` |
-| Earnings sub-call error rate | P3 | Any individual sub-call error rate > 0.05 over 15-minute window | Slack `#alerts-backend` |
-| Push token registration failures | P3 | `push_notifications_failed_total` with `reason: DeviceNotRegistered` > 100 per hour | Slack `#alerts-mobile` |
+| Alert                               | Severity | Condition                                                                                                                   | Notification               |
+| ----------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| Portfolio summary slow              | P1       | `portfolio_get_summary_duration_ms` p95 > 3,000 ms over 5-minute window                                                     | PagerDuty on-call rotation |
+| Credit purchase success rate low    | P1       | (`credits_purchase_grant_completed_total` / `credits_purchase_stripe_webhook_confirmed_total`) < 0.98 over 10-minute window | PagerDuty on-call rotation |
+| Push delivery rate low              | P2       | (`push_notifications_delivered_total` / `push_notifications_sent_total`) < 0.90 over 10-minute window                       | Slack `#alerts-mobile`     |
+| Portfolio partial failure rate high | P2       | (`portfolio_get_summary_partial_total` / `portfolio_get_summary_requests_total`) > 0.10 over 5-minute window                | Slack `#alerts-mobile`     |
+| Earnings sub-call error rate        | P3       | Any individual sub-call error rate > 0.05 over 15-minute window                                                             | Slack `#alerts-backend`    |
+| Push token registration failures    | P3       | `push_notifications_failed_total` with `reason: DeviceNotRegistered` > 100 per hour                                         | Slack `#alerts-mobile`     |
 
 #### Dashboards
 
 **Portfolio Health Dashboard:**
+
 - Panel 1: `portfolio.getSummary` p50/p95/p99 latency (time series, 1-hour window)
 - Panel 2: Per-sub-call latency breakdown (stacked bar: credits / nftCount / royalties30d / activeQuestCount)
 - Panel 3: Partial failure rate (gauge + time series — turns red above 10%)
@@ -973,6 +1004,7 @@ Client metrics collected via `apps/mobile/src/lib/analytics.ts` (wraps the platf
 - Panel 5: `portfolio.getSummary` request volume (RPS)
 
 **Credit Purchase Funnel Dashboard:**
+
 - Panel 1: Funnel visualization — each step as a bar: initiated → intent created → Stripe confirmed → credits granted
 - Panel 2: Step-by-step conversion rates with daily trend (7-day sparkline per step)
 - Panel 3: Stripe success rate (gauge — turns red below 98%)
@@ -980,6 +1012,7 @@ Client metrics collected via `apps/mobile/src/lib/analytics.ts` (wraps the platf
 - Panel 5: Failed purchase breakdown by reason (pie chart: card_declined, 3ds_fail, insufficient_loar, network_error)
 
 **Notifications Health Dashboard:**
+
 - Panel 1: Send/delivered/failed by notification type (stacked bar, hourly)
 - Panel 2: Delivery latency p50/p95 (time series)
 - Panel 3: `DeviceNotRegistered` error rate (triggers token cleanup)
@@ -997,8 +1030,8 @@ Every analytics event for Workstream 2 with exact trigger and typed properties. 
  * Trigger: user taps Portfolio tab OR app cold-launches directly to Portfolio
  */
 portfolio_opened: {
-  cold_launch: boolean;            // true if this is the first screen after app launch
-  had_cached_data: boolean;        // true if AsyncStorage had a non-expired portfolio cache
+  cold_launch: boolean; // true if this is the first screen after app launch
+  had_cached_data: boolean; // true if AsyncStorage had a non-expired portfolio cache
   balance_loaded_from: 'cache' | 'network'; // which data source rendered first
 }
 
@@ -1008,10 +1041,10 @@ portfolio_opened: {
  * NOT fired while skeleton is showing
  */
 balance_card_viewed: {
-  credits: number;                 // credit balance at render time
-  nft_count: number;               // total NFT count
-  had_estimated_value: boolean;    // true if price feed returned a value
-  render_duration_ms: number;      // time from screen mount to this event
+  credits: number; // credit balance at render time
+  nft_count: number; // total NFT count
+  had_estimated_value: boolean; // true if price feed returned a value
+  render_duration_ms: number; // time from screen mount to this event
 }
 
 /**
@@ -1032,7 +1065,7 @@ package_selected: {
   credits: number;
   price_usd: number;
   payment_method: 'fiat' | 'loar';
-  is_best_value: boolean;          // true if this package has the "Best value" badge
+  is_best_value: boolean; // true if this package has the "Best value" badge
 }
 
 /**
@@ -1053,8 +1086,8 @@ purchase_initiated: {
 purchase_completed: {
   package_id: string;
   payment_method: 'fiat' | 'loar';
-  credits_added: number;           // actual delta from balance poll
-  duration_ms: number;             // time from purchase_initiated to this event
+  credits_added: number; // actual delta from balance poll
+  duration_ms: number; // time from purchase_initiated to this event
 }
 
 /**
@@ -1064,7 +1097,7 @@ purchase_completed: {
 purchase_failed: {
   package_id: string;
   payment_method: 'fiat' | 'loar';
-  error_code: string;              // Stripe error code or tRPC error code
+  error_code: string; // Stripe error code or tRPC error code
 }
 
 /**
@@ -1095,8 +1128,8 @@ earnings_tab_viewed: {
   has_treasury: boolean;
   has_collab: boolean;
   has_affiliate: boolean;
-  merge_duration_ms: number;       // time for all 4 sub-calls to resolve and merge
-  partial: boolean;                // true if any sub-call failed
+  merge_duration_ms: number; // time for all 4 sub-calls to resolve and merge
+  partial: boolean; // true if any sub-call failed
 }
 
 /**
@@ -1115,7 +1148,7 @@ earnings_event_tapped: {
  */
 quest_tracker_opened: {
   completed_count: number;
-  claimable_count: number;         // completed && !claimed
+  claimable_count: number; // completed && !claimed
   streak: number;
 }
 
@@ -1134,7 +1167,7 @@ quest_claimed: {
  * Trigger: quests.dailyCheckin call completes successfully
  */
 daily_checkin_completed: {
-  streak: number;                  // updated streak value returned by server
+  streak: number; // updated streak value returned by server
 }
 
 /**
@@ -1156,7 +1189,7 @@ secondary_wallet_link_initiated: Record<string, never>; // no properties
  * Trigger: secondary wallet address successfully persisted to Firestore
  */
 secondary_wallet_link_completed: {
-  wallet_prefix: string;           // first 6 characters of wallet address ONLY (e.g., "0x1a2b")
+  wallet_prefix: string; // first 6 characters of wallet address ONLY (e.g., "0x1a2b")
 }
 
 /**
@@ -1185,8 +1218,12 @@ push_opt_in_declined: Record<string, never>;
  * Trigger: Expo Notifications listener fires (both foreground and background)
  */
 notification_received: {
-  type: 'credit_low' | 'royalty_received' | 'quest_complete' | 'collab_status' | 'treasury_allocation';
-  foreground: boolean;             // true if app was in foreground when received
+  type: 'credit_low' |
+    'royalty_received' |
+    'quest_complete' |
+    'collab_status' |
+    'treasury_allocation';
+  foreground: boolean; // true if app was in foreground when received
 }
 
 /**
@@ -1194,8 +1231,12 @@ notification_received: {
  * Trigger: user taps a notification from the notification tray or foreground banner
  */
 notification_tapped: {
-  type: 'credit_low' | 'royalty_received' | 'quest_complete' | 'collab_status' | 'treasury_allocation';
-  destination: string;             // the in-app route navigated to (e.g., "/(tabs)/portfolio/credits/packages")
+  type: 'credit_low' |
+    'royalty_received' |
+    'quest_complete' |
+    'collab_status' |
+    'treasury_allocation';
+  destination: string; // the in-app route navigated to (e.g., "/(tabs)/portfolio/credits/packages")
 }
 ```
 
@@ -1207,36 +1248,41 @@ notification_tapped: {
 
 All flags are managed server-side via a `featureFlags/{flag}` Firestore collection. The mobile client fetches active flags at startup via a lightweight `flags.getActive()` tRPC call (not gated behind auth — cached 10 minutes). All flags default to `off` unless specified.
 
-| Flag | Kill switch | Alpha default | Closed beta default | Open beta default | GA default | Notes |
-|---|---|---|---|---|---|---|
-| `portfolio_summary_v1` | Yes | On | On | On | On | Master flag for the entire workstream. Killing this hides the Portfolio tab and falls back to a "coming soon" state. |
-| `fiat_credit_purchase` | Yes | On | On | On | On | Kill-switch for the Stripe purchase path. If Stripe has an outage, disable this flag to show "$LOAR only" mode without a native build. |
-| `loar_credit_purchase` | Yes | On | On | On | On | Kill-switch for the $LOAR on-chain purchase path. Disable if Sepolia is degraded. |
-| `secondary_wallet_link` | Yes | On | On | Off | On | Open beta default is Off — wallet link is a higher-risk feature; enable only after closed beta validation. |
-| `push_notifications_portfolio` | Yes | On | On | On | On | Disabling prevents all push sends for Workstream 2 notification types. Does not affect the opt-in UI (which should still render, just without sends). |
-| `royalty_history` | No | On | On | On | On | Not a kill switch — royalty history is additive. If the endpoint is broken, FR-E-05 degraded mode applies. |
-| `quest_reward_history` | No | On | On | On | On | Additive data endpoint. |
-| `earnings_tab` | Yes | On | On | On | On | Hides the Earnings tab entirely if disabled. |
-| `loar_fiat_toggle` | No | On | On | On | On | The $LOAR ↔ fiat display toggle on Earnings. Not safety-critical. |
-| `offline_portfolio_cache` | No | On | On | On | On | AsyncStorage caching. Disabling causes every cold launch to show skeleton until network resolves. |
+| Flag                           | Kill switch | Alpha default | Closed beta default | Open beta default | GA default | Notes                                                                                                                                                 |
+| ------------------------------ | ----------- | ------------- | ------------------- | ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `portfolio_summary_v1`         | Yes         | On            | On                  | On                | On         | Master flag for the entire workstream. Killing this hides the Portfolio tab and falls back to a "coming soon" state.                                  |
+| `fiat_credit_purchase`         | Yes         | On            | On                  | On                | On         | Kill-switch for the Stripe purchase path. If Stripe has an outage, disable this flag to show "$LOAR only" mode without a native build.                |
+| `loar_credit_purchase`         | Yes         | On            | On                  | On                | On         | Kill-switch for the $LOAR on-chain purchase path. Disable if Sepolia is degraded.                                                                     |
+| `secondary_wallet_link`        | Yes         | On            | On                  | Off               | On         | Open beta default is Off — wallet link is a higher-risk feature; enable only after closed beta validation.                                            |
+| `push_notifications_portfolio` | Yes         | On            | On                  | On                | On         | Disabling prevents all push sends for Workstream 2 notification types. Does not affect the opt-in UI (which should still render, just without sends). |
+| `royalty_history`              | No          | On            | On                  | On                | On         | Not a kill switch — royalty history is additive. If the endpoint is broken, FR-E-05 degraded mode applies.                                            |
+| `quest_reward_history`         | No          | On            | On                  | On                | On         | Additive data endpoint.                                                                                                                               |
+| `earnings_tab`                 | Yes         | On            | On                  | On                | On         | Hides the Earnings tab entirely if disabled.                                                                                                          |
+| `loar_fiat_toggle`             | No          | On            | On                  | On                | On         | The $LOAR ↔ fiat display toggle on Earnings. Not safety-critical.                                                                                     |
+| `offline_portfolio_cache`      | No          | On            | On                  | On                | On         | AsyncStorage caching. Disabling causes every cold launch to show skeleton until network resolves.                                                     |
 
 #### Staged Rollout
 
 **Internal Alpha (team — ~20 users):**
+
 - Minimum bar to advance: zero P0 crashes in 7 days of daily use; `portfolio.getSummary` p95 < 1,200 ms on staging environment; credit purchase end-to-end tested with Stripe test cards on at least 2 iOS and 2 Android devices; push notifications received on at least 1 iOS and 1 Android physical device.
 
 **Closed Beta (~500 users — invited waitlist):**
+
 - Go/no-go criteria: crash-free session rate ≥ 99.0%; portfolio home render time p95 ≤ 2,800 ms (measured from client analytics); Stripe purchase success rate ≥ 99%; no P1 alerts firing for 48 hours before advancement. Test the secondary wallet link with at least 20 real WalletConnect sessions.
 
 **Open Beta (~5,000 users — App Store/Play Store TestFlight/internal track):**
+
 - Go/no-go criteria: crash-free session rate ≥ 99.2%; push opt-in rate ≥ 55% (below target, but acceptable for beta — GA target is 65%); portfolio D1 retention ≥ 45%; no unresolved P1 or P2 bugs; `fiat_credit_purchase` and `loar_credit_purchase` validated at volume; `secondary_wallet_link` enabled and validated.
 
 **GA:**
+
 - Go/no-go criteria: all success metrics from the PRD header met or exceeded over a 7-day measurement window; crash-free ≥ 99.2%; `portfolio.getSummary` p95 ≤ 1,200 ms at production load; App Store review approved; Play Store review approved; no P1 alerts firing in the 72 hours before GA date.
 
 #### A/B Tests
 
 **Test 1: Balance card layout ordering**
+
 - Hypothesis: Showing credit balance prominently first (vs. NFT count first) increases credit top-up conversion.
 - Variant A (control): Credit balance number is the hero element; NFT count chip is in the summary strip below.
 - Variant B: NFT count is displayed as a prominent secondary stat on the balance card itself; credit balance is still present but shares visual weight.
@@ -1246,6 +1292,7 @@ All flags are managed server-side via a `featureFlags/{flag}` Firestore collecti
 - Rollout: 50/50 random assignment on first app open, persisted in AsyncStorage.
 
 **Test 2: Low-credit nudge threshold**
+
 - Hypothesis: A higher nudge threshold (200 credits remaining) triggers more top-up conversions because users aren't yet in a "panic" state and are more receptive to the nudge.
 - Variant A (control): Nudge threshold = 100 credits (progress bar turns amber at 100).
 - Variant B: Nudge threshold = 200 credits.
@@ -1255,6 +1302,7 @@ All flags are managed server-side via a `featureFlags/{flag}` Firestore collecti
 - Rollout: 50/50 assignment. The threshold value is passed down from the feature flag payload (not hard-coded in the client).
 
 **Test 3: Quest tracker placement**
+
 - Hypothesis: A dedicated "Quests" tab in the bottom tab bar increases quest completion vs. a bottom sheet accessible only from a chip on the portfolio home.
 - Variant A (control): Quest tracker is a sheet, accessible from the "Active quests" summary chip.
 - Variant B: Quest tracker is promoted to a fifth tab in the bottom navigation bar.
@@ -1267,19 +1315,23 @@ All flags are managed server-side via a `featureFlags/{flag}` Firestore collecti
 
 **OTA rollback (JS-only changes via Expo Updates):**
 The Expo Updates channel structure:
+
 - `production` — GA releases. Only promoted from `open-beta` after go/no-go sign-off.
 - `open-beta` — Open beta builds. Promoted from `staging`.
 - `staging` — Closed beta and internal alpha builds. Promoted from `canary`.
 - `canary` — Continuous deployment from `main` branch merges.
 
 To OTA rollback: use Expo EAS CLI to re-publish the last known-good JS bundle to the affected channel:
+
 ```bash
 eas update --channel production --message "rollback: revert to build 1.2.3"
 ```
+
 OTA rollback takes effect on the next app foreground (Expo Updates checks for updates in the background on launch). P1 rollbacks should be deployed within 15 minutes of decision.
 
 **Native rollback (requires App Store / Play Store submission):**
 The following features have native module dependencies and CANNOT be OTA rolled back:
+
 - `@stripe/stripe-react-native` — Stripe native payment sheet. A breaking Stripe issue requires a new App Store/Play Store submission. Mitigate with `fiat_credit_purchase` kill switch while the build is in review.
 - `@reown/appkit-react-native` — Reown AppKit uses native WalletConnect transport. Kill with `secondary_wallet_link` flag while a fix is submitted.
 - `expo-secure-store` — Encrypted storage is a native module. If SecureStore is broken, auth is broken — this requires an emergency native build. Cannot be feature-flagged out.
@@ -1287,6 +1339,7 @@ The following features have native module dependencies and CANNOT be OTA rolled 
 
 **Database rollback:**
 The new Firestore collections and fields added in Workstream 2 are entirely additive:
+
 - `users/{uid}.pushTokens` — new field, harmless if empty or missing
 - `users/{uid}.secondaryWalletAddress` — new field, harmless if absent
 - `users/{uid}/notificationPreferences` — new subcollection, harmless if missing (server returns defaults)
@@ -1313,19 +1366,24 @@ The sub-elements inside the balance card (wallet address text, progress bar, "To
 
 **Credit progress bar:**
 The progress bar is a visual-only component and requires explicit screen reader support. Implement as a `View` with:
+
 ```
 accessibilityRole="progressbar"
 accessibilityValue={{ min: 0, max: 100, now: Math.round(percentRemaining) }}
 accessibilityLabel={`Credit budget: ${credits} credits remaining, approximately ${Math.round(percentRemaining)}% of a typical generation run. ${credits < 100 ? 'Low balance.' : ''}`}
 ```
+
 The "approximately X% of a typical generation budget" interpretation must be included — raw numbers alone are meaningless to a creator who doesn't know the cost of a generation.
 
 **Earnings timeline rows:**
 Each row in the earnings timeline must announce all material information in a single swipe. Set `accessibilityLabel` on the row's `Pressable`:
+
 ```
 "{event_type_label}. {direction} {amount} LOAR. {status}. {formatted_date}."
 ```
+
 Examples:
+
 - `"Royalty received. Plus 50 LOAR. Confirmed. March 26th."`
 - `"Treasury allocation. Plus 120 LOAR. Pending. March 24th."`
 - `"Collab payout. Plus 200 LOAR. Claimed. March 20th."`
@@ -1338,9 +1396,11 @@ Focus order within the Characters horizontal carousel: left-to-right, left edge 
 
 **Quest progress rings:**
 SVG-based progress rings are entirely invisible to screen readers. Each quest row must have `accessibilityLabel` on its container:
+
 ```
 "{quest_name}. {progress_percent}% complete. {cta_state}."
 ```
+
 Where `{cta_state}` is one of: `"Claim your reward."` (claimable), `"Claimed."` (done), `"In progress."` (not yet complete). The SVG ring itself must have `accessibilityElementsHidden={true}`.
 
 #### Motor Accessibility
@@ -1350,6 +1410,7 @@ All bottom sheets in Workstream 2 (Wallet Management, Quest Tracker, Character D
 
 **Credit purchase interactive element sizing:**
 All tappable elements in the purchase flow (package cards, payment method tabs, "Buy" button, "Cancel" link) must have a minimum touch target of 44×44 points, per Apple HIG and Android Material Design guidelines. This is enforced by a shared `minTouchTarget` style utility:
+
 ```typescript
 // apps/mobile/src/styles/accessibility.ts
 export const minTouchTarget = {
@@ -1357,6 +1418,7 @@ export const minTouchTarget = {
   minWidth: 44,
 };
 ```
+
 Apply to all interactive elements in the purchase flow. If the visual element is smaller (e.g., a text link), use `hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}` to extend the touch area.
 
 **Quest claim button minimum height:**
@@ -1368,6 +1430,7 @@ In the quest list context, each quest row's "Claim" button must have a minimum h
 The balance card uses a frosted-glass gradient overlay on a dynamic background color. Because the gradient color is user-derived (from universe palette) and can be any hue/luminance, the credit balance number cannot rely on a fixed color for 4.5:1 contrast.
 
 Solution: wrap the credit balance number in a semi-opaque scrim layer:
+
 ```typescript
 // A dark scrim that guarantees contrast on any background
 const creditBalanceScrim = {
@@ -1377,23 +1440,26 @@ const creditBalanceScrim = {
   paddingVertical: 4,
 };
 ```
+
 The text color of the credit number is always `#FFFFFF`. With a 45% black scrim, the effective background luminance is at most 0.55 × any foreground — for the worst case (white gradient background, L=1.0): effective background = 0.55. Contrast = (1.05) / (0.55 × 1.0 + 0.05) = 1.75 — this is insufficient for WCAG AA. Increase scrim opacity to 0.65:
+
 - Worst case white background: effective L = 0.35. Contrast = (1.05) / (0.35 + 0.05) = 2.63 — still insufficient.
 - Solution: use `#000000` text on a white variant scrim when the background is light. Detect background luminance from the universe color using `chroma-js` (or a lightweight luminance function) and switch between white/black text accordingly. Maintain a minimum scrim opacity of 0.55 regardless of direction. This guarantees ≥ 4.5:1 on all backgrounds.
 
 **Earnings timeline — non-color event type differentiation:**
 The left-border accent colors (green for royalty, teal for treasury, blue for collab, purple for affiliate) MUST NOT be the only way to distinguish event types. Each row must also use a distinct icon shape:
 
-| Event type | Color | Icon |
-|---|---|---|
-| Royalty received | Green | Circle with upward arrow (`arrow.up.circle.fill` on iOS, equivalent on Android) |
-| Treasury allocation | Teal | Building/bank icon (`building.columns.fill` on iOS) |
-| Collab payout | Blue | Two-person group icon (`person.2.fill` on iOS) |
-| Affiliate reward | Purple | Link/chain icon (`link` on iOS) |
+| Event type          | Color  | Icon                                                                            |
+| ------------------- | ------ | ------------------------------------------------------------------------------- |
+| Royalty received    | Green  | Circle with upward arrow (`arrow.up.circle.fill` on iOS, equivalent on Android) |
+| Treasury allocation | Teal   | Building/bank icon (`building.columns.fill` on iOS)                             |
+| Collab payout       | Blue   | Two-person group icon (`person.2.fill` on iOS)                                  |
+| Affiliate reward    | Purple | Link/chain icon (`link` on iOS)                                                 |
 
 Icons are drawn from SF Symbols (iOS) and Material Symbols (Android) via `@expo/vector-icons`. The icon shape alone must communicate the event type to a user who cannot distinguish green from teal (deuteranopia) or blue from purple (tritanopia).
 
 **Reduced motion — balance counter:**
+
 ```typescript
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -1436,21 +1502,22 @@ Both testing protocols must be documented as a checklist in the release notes. A
 
 #### Rate Limit Table
 
-| Endpoint | Burst limit | Sustained limit | Rate limit key | Client behavior when limited |
-|---|---|---|---|---|
-| `portfolio.getSummary` | 30 per minute | 120 per hour | per-user (UID) | Silent: use cached data and continue to poll on the standard TTL. Do NOT show an error to the user for this endpoint — it is a background fetch. Log the 429 to analytics as `portfolio_rate_limited`. |
-| `credits.purchaseWithFiat` | 3 per minute | 10 per hour | per-user (UID) | Disable the "Buy" button. Show a countdown timer beneath the button: "Try again in Xs." Timer counts down from `retryAfter` value. After the timer expires, re-enable the button automatically. |
-| `credits.purchaseWithLoar` | 3 per minute | 10 per hour | per-user (UID) | Same as `purchaseWithFiat`: disable button, show countdown. |
-| `licensing.getRoyaltyHistory` | 20 per minute | 200 per hour | per-user (UID) | Silent retry after 5 seconds. Show a subtle "Refresh" button on the Earnings tab if retry fails. Do not block the tab render. |
-| `notifications.register` | 5 per hour | 20 per day | per-user (UID) | Silent failure. The client has already stored the push token locally in SecureStore. The token will be re-registered on next app launch. Do NOT show any error to the user — push registration is a background operation. |
-| `quests.claimReward` | 10 per minute | — (no hourly limit) | per-user (UID) | Show inline error on the quest row: "Too many claims. Please wait a moment." Re-enable after `retryAfter` seconds. Do not revert the optimistic update until the rate limit expires — keep showing "Claiming..." state. |
-| `profiles.upsert` (secondary wallet link) | 5 per hour | — | per-user (UID) | Show error on the wallet link sheet: "Too many link attempts. Please try again later." Do not show a countdown timer (this is an unusual operation — a user who hits this limit is doing something unexpected). |
+| Endpoint                                  | Burst limit   | Sustained limit     | Rate limit key | Client behavior when limited                                                                                                                                                                                              |
+| ----------------------------------------- | ------------- | ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `portfolio.getSummary`                    | 30 per minute | 120 per hour        | per-user (UID) | Silent: use cached data and continue to poll on the standard TTL. Do NOT show an error to the user for this endpoint — it is a background fetch. Log the 429 to analytics as `portfolio_rate_limited`.                    |
+| `credits.purchaseWithFiat`                | 3 per minute  | 10 per hour         | per-user (UID) | Disable the "Buy" button. Show a countdown timer beneath the button: "Try again in Xs." Timer counts down from `retryAfter` value. After the timer expires, re-enable the button automatically.                           |
+| `credits.purchaseWithLoar`                | 3 per minute  | 10 per hour         | per-user (UID) | Same as `purchaseWithFiat`: disable button, show countdown.                                                                                                                                                               |
+| `licensing.getRoyaltyHistory`             | 20 per minute | 200 per hour        | per-user (UID) | Silent retry after 5 seconds. Show a subtle "Refresh" button on the Earnings tab if retry fails. Do not block the tab render.                                                                                             |
+| `notifications.register`                  | 5 per hour    | 20 per day          | per-user (UID) | Silent failure. The client has already stored the push token locally in SecureStore. The token will be re-registered on next app launch. Do NOT show any error to the user — push registration is a background operation. |
+| `quests.claimReward`                      | 10 per minute | — (no hourly limit) | per-user (UID) | Show inline error on the quest row: "Too many claims. Please wait a moment." Re-enable after `retryAfter` seconds. Do not revert the optimistic update until the rate limit expires — keep showing "Claiming..." state.   |
+| `profiles.upsert` (secondary wallet link) | 5 per hour    | —                   | per-user (UID) | Show error on the wallet link sheet: "Too many link attempts. Please try again later." Do not show a countdown timer (this is an unusual operation — a user who hits this limit is doing something unexpected).           |
 
 #### Implementation
 
 Rate limiting is enforced in **tRPC middleware** using a shared `rateLimit` utility. It is NOT implemented in individual handlers — applying it in middleware ensures consistency and prevents accidental omission.
 
 **Middleware:**
+
 ```typescript
 // apps/server/src/middleware/rate-limit.middleware.ts
 export function withRateLimit(config: RateLimitConfig) {
@@ -1483,9 +1550,9 @@ interface RateLimitEntry {
 interface RateLimitConfig {
   endpoint: string;
   burstLimit: number;
-  burstWindowMs: number;           // typically 60_000 (1 minute)
+  burstWindowMs: number; // typically 60_000 (1 minute)
   sustainedLimit?: number;
-  sustainedWindowMs?: number;      // typically 3_600_000 (1 hour)
+  sustainedWindowMs?: number; // typically 3_600_000 (1 hour)
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
@@ -1518,7 +1585,9 @@ export async function rateLimit(key: string, config: RateLimitConfig): Promise<v
     } else {
       sustainedEntry.count++;
       if (sustainedEntry.count > config.sustainedLimit) {
-        const retryAfter = Math.ceil((config.sustainedWindowMs - (now - sustainedEntry.windowStart)) / 1000);
+        const retryAfter = Math.ceil(
+          (config.sustainedWindowMs - (now - sustainedEntry.windowStart)) / 1000
+        );
         throw new TRPCError({
           code: 'TOO_MANY_REQUESTS',
           message: `Hourly rate limit exceeded. Retry after ${retryAfter} seconds.`,
@@ -1537,18 +1606,18 @@ The `TRPCError` with code `TOO_MANY_REQUESTS` maps to HTTP 429. The client reads
 
 #### Full Cache Specification
 
-| Data | Client cache TTL | Server cache TTL | Invalidation trigger | SWR? | Notes |
-|---|---|---|---|---|---|
-| `portfolio.getSummary` | 60 s | 30 s per-user in-memory | Credit purchase confirmed, NFT mint event from Ponder, royalty written | Yes | Most critical. SWR means: show cached value immediately, re-fetch in background. `staleTime: 60_000`, `gcTime: 300_000` in TanStack Query. |
-| `nft.getMyNFTs` | 5 min | 60 s per-user in-memory | NFT mint event from Ponder (Ponder writes to Firestore on Transfer; server cache expires on the next request after a write) | Yes | Ponder indexer lag: up to 15 s after on-chain mint before Firestore record exists. Client SWR means the cache may serve pre-mint data. Acceptable — NFT list staleness is not time-critical. |
-| `licensing.getRoyaltyHistory` | 2 min | 60 s per-user in-memory | New royalty record written via `licensing.recordRoyalty` (server invalidates its own cache on write) | Yes | |
-| `credits.getHistory` | 30 s | Not cached server-side | Any call to `credits.spend`, `credits.grant`, `credits.purchaseWithFiat`, `credits.purchaseWithLoar` | Yes | Credit ledger is high-frequency — server does not cache to avoid serving stale transaction history. Client-side 30 s stale time is a reasonable balance. |
-| `credits.getPackages` | 24 h | 24 h (in-memory or CDN edge cache) | Admin price change (manual cache bust via `admin.invalidatePackagesCache` procedure) | No | Package prices change at most monthly. 24-hour TTL is safe. Cache at CDN edge if possible (this endpoint does not require auth). |
-| `quests.list` | 5 min | 2 min per-user in-memory | Quest completion event, daily reset at UTC midnight (server invalidates all users' quest cache on daily reset job) | Yes | |
-| `universeTreasury.getPoolHistory` | 5 min | 2 min per-universe in-memory | Treasury mutation (deposit, allocation, withdrawal) | Yes | Keyed per universeAddress, not per user. |
-| Push notification preferences | 10 min | Not cached server-side | `notifications.updatePreferences` mutation (TanStack Query mutation `onSuccess` calls `queryClient.invalidateQueries(['notifications.getPreferences'])`) | Yes | |
-| `$LOAR/USD` price feed | 5 min | Not applicable (external poll) | N/A — external endpoint polled on TTL | No | If the price feed returns an error or stale data (last update > 15 min ago), the client falls back to the last known price and marks `had_estimated_value: true` with a visual staleness indicator: a small clock icon next to "Est. value" with tooltip "Price data may be outdated." |
-| `credits.getBalance` (post-purchase polling) | Do not cache during polling | Not cached | Invalidated by any credit mutation | No | During the post-purchase polling loop, bypass cache entirely: `queryClient.fetchQuery({ queryKey, options: { staleTime: 0 } })`. |
+| Data                                         | Client cache TTL            | Server cache TTL                   | Invalidation trigger                                                                                                                                     | SWR? | Notes                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------- | --------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `portfolio.getSummary`                       | 60 s                        | 30 s per-user in-memory            | Credit purchase confirmed, NFT mint event from Ponder, royalty written                                                                                   | Yes  | Most critical. SWR means: show cached value immediately, re-fetch in background. `staleTime: 60_000`, `gcTime: 300_000` in TanStack Query.                                                                                                                                             |
+| `nft.getMyNFTs`                              | 5 min                       | 60 s per-user in-memory            | NFT mint event from Ponder (Ponder writes to Firestore on Transfer; server cache expires on the next request after a write)                              | Yes  | Ponder indexer lag: up to 15 s after on-chain mint before Firestore record exists. Client SWR means the cache may serve pre-mint data. Acceptable — NFT list staleness is not time-critical.                                                                                           |
+| `licensing.getRoyaltyHistory`                | 2 min                       | 60 s per-user in-memory            | New royalty record written via `licensing.recordRoyalty` (server invalidates its own cache on write)                                                     | Yes  |                                                                                                                                                                                                                                                                                        |
+| `credits.getHistory`                         | 30 s                        | Not cached server-side             | Any call to `credits.spend`, `credits.grant`, `credits.purchaseWithFiat`, `credits.purchaseWithLoar`                                                     | Yes  | Credit ledger is high-frequency — server does not cache to avoid serving stale transaction history. Client-side 30 s stale time is a reasonable balance.                                                                                                                               |
+| `credits.getPackages`                        | 24 h                        | 24 h (in-memory or CDN edge cache) | Admin price change (manual cache bust via `admin.invalidatePackagesCache` procedure)                                                                     | No   | Package prices change at most monthly. 24-hour TTL is safe. Cache at CDN edge if possible (this endpoint does not require auth).                                                                                                                                                       |
+| `quests.list`                                | 5 min                       | 2 min per-user in-memory           | Quest completion event, daily reset at UTC midnight (server invalidates all users' quest cache on daily reset job)                                       | Yes  |                                                                                                                                                                                                                                                                                        |
+| `universeTreasury.getPoolHistory`            | 5 min                       | 2 min per-universe in-memory       | Treasury mutation (deposit, allocation, withdrawal)                                                                                                      | Yes  | Keyed per universeAddress, not per user.                                                                                                                                                                                                                                               |
+| Push notification preferences                | 10 min                      | Not cached server-side             | `notifications.updatePreferences` mutation (TanStack Query mutation `onSuccess` calls `queryClient.invalidateQueries(['notifications.getPreferences'])`) | Yes  |                                                                                                                                                                                                                                                                                        |
+| `$LOAR/USD` price feed                       | 5 min                       | Not applicable (external poll)     | N/A — external endpoint polled on TTL                                                                                                                    | No   | If the price feed returns an error or stale data (last update > 15 min ago), the client falls back to the last known price and marks `had_estimated_value: true` with a visual staleness indicator: a small clock icon next to "Est. value" with tooltip "Price data may be outdated." |
+| `credits.getBalance` (post-purchase polling) | Do not cache during polling | Not cached                         | Invalidated by any credit mutation                                                                                                                       | No   | During the post-purchase polling loop, bypass cache entirely: `queryClient.fetchQuery({ queryKey, options: { staleTime: 0 } })`.                                                                                                                                                       |
 
 #### On Sign-Out — Cache Clearing
 
@@ -1568,7 +1637,7 @@ export async function signOut() {
     'earnings_cache',
     'push_permission_denied',
     // Remove all keys with the 'loar_' prefix
-    ...(await AsyncStorage.getAllKeys()).filter(k => k.startsWith('loar_')),
+    ...(await AsyncStorage.getAllKeys()).filter((k) => k.startsWith('loar_')),
   ]);
 
   // 3. Clear SecureStore auth data
@@ -1586,23 +1655,23 @@ export async function signOut() {
 
 When `AppState` changes to `'active'` (app comes to foreground from background or from lock screen):
 
-| Query | Action on foreground |
-|---|---|
-| `portfolio.getSummary` | Refetch immediately, regardless of TTL. This is the most critical freshness requirement — the user expects to see their current balance when they return to the app. |
-| `credits.getBalance` | Refetch immediately. Credit balance is used in the balance card and the purchase flow — must be current. |
-| `quests.list` | Refetch if `staleTime` has elapsed (5 min). If the app was only backgrounded for < 5 minutes, serve cached data. |
-| `nft.getMyNFTs` | Rely on TTL (5 min). No immediate refetch — NFT ownership changes rarely. |
-| `licensing.getRoyaltyHistory` | Rely on TTL (2 min). No immediate refetch. |
-| `universeTreasury.getPoolHistory` | Rely on TTL (5 min). |
-| `credits.getHistory` | Refetch immediately on foreground if the user is on the Activity tab; otherwise rely on TTL (30 s). |
-| Push notification preferences | Rely on TTL (10 min). |
-| `credits.getPackages` | Never refetch on foreground — 24-hour TTL, packages don't change. |
+| Query                             | Action on foreground                                                                                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `portfolio.getSummary`            | Refetch immediately, regardless of TTL. This is the most critical freshness requirement — the user expects to see their current balance when they return to the app. |
+| `credits.getBalance`              | Refetch immediately. Credit balance is used in the balance card and the purchase flow — must be current.                                                             |
+| `quests.list`                     | Refetch if `staleTime` has elapsed (5 min). If the app was only backgrounded for < 5 minutes, serve cached data.                                                     |
+| `nft.getMyNFTs`                   | Rely on TTL (5 min). No immediate refetch — NFT ownership changes rarely.                                                                                            |
+| `licensing.getRoyaltyHistory`     | Rely on TTL (2 min). No immediate refetch.                                                                                                                           |
+| `universeTreasury.getPoolHistory` | Rely on TTL (5 min).                                                                                                                                                 |
+| `credits.getHistory`              | Refetch immediately on foreground if the user is on the Activity tab; otherwise rely on TTL (30 s).                                                                  |
+| Push notification preferences     | Rely on TTL (10 min).                                                                                                                                                |
+| `credits.getPackages`             | Never refetch on foreground — 24-hour TTL, packages don't change.                                                                                                    |
 
 Implementation: TanStack Query's `refetchOnWindowFocus` handles web. For React Native, use `AppState.addEventListener('change', ...)` in the tRPC/query provider:
 
 ```typescript
 useEffect(() => {
-  const subscription = AppState.addEventListener('change', state => {
+  const subscription = AppState.addEventListener('change', (state) => {
     if (state === 'active') {
       queryClient.invalidateQueries({ queryKey: ['portfolio.getSummary'] });
       queryClient.invalidateQueries({ queryKey: ['credits.getBalance'] });
@@ -1616,16 +1685,19 @@ useEffect(() => {
 #### `portfolio.getSummary` Server-Side Cache — Implementation Decision
 
 **Option A: In-memory Map with TTL (single-instance)**
+
 - Pros: zero latency, no external dependency, trivial implementation.
 - Cons: breaks in multi-instance deployments. Each Fly.io machine has its own cache — a user round-robining across 2 machines gets potentially stale data half the time. Cache is lost on restart.
 - Suitable for: pre-mainnet, single-machine deployment.
 
 **Option B: Firestore document cache**
+
 - Pros: consistent across instances, survives restarts, same infrastructure already in use.
 - Cons: adds ~10–30 ms per cache read/write. Requires managing a `portfolioCache/{uid}` Firestore collection with TTL (Firestore TTL policy or manual `expiresAt` field).
 - Suitable for: multi-instance deployments.
 
 **Option C: Redis via Upstash**
+
 - Pros: ~1 ms latency, consistent across instances, built-in TTL, supports atomic operations.
 - Cons: external dependency, monthly cost (~$10–20 at expected scale).
 - Suitable for: post-GA when `portfolio.getSummary` is at high volume.

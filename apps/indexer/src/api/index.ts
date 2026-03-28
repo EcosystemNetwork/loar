@@ -14,11 +14,22 @@ import { universe, node, proposal, token, vote } from 'ponder:schema';
 
 const app = new Hono();
 
-app.get('/health', (c) => {
+app.get('/health', async (c) => {
+  let dbStatus = 'ok';
+  try {
+    await db.select().from(universe).limit(1);
+  } catch {
+    dbStatus = 'degraded';
+  }
+
+  const checks = { db: dbStatus };
+  const status = dbStatus === 'ok' ? 'healthy' : 'degraded';
+
   return c.json({
-    status: 'healthy',
+    status,
     service: 'indexer',
     timestamp: new Date().toISOString(),
+    checks,
   });
 });
 

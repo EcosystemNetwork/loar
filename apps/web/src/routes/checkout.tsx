@@ -51,14 +51,25 @@ function CheckoutPage() {
       toast.error('Connect your wallet first');
       return;
     }
-    if (!isRealListing) {
-      // Subscription / special flow — stub confirmation
-      toast.success('Subscription activated!');
-      navigate({ to: '/market' });
-      return;
-    }
     setProcessing(true);
     try {
+      if (!isRealListing && listingId?.startsWith('sub:')) {
+        // Subscription flow: listingId = "sub:<universeId>:<tier>"
+        const [, universeId, tier] = listingId.split(':');
+        const txHash = `sub-pending-${Date.now()}`;
+        await trpcClient.subscriptions.subscribe.mutate({
+          universeId,
+          tier: tier as 'FREE' | 'BASIC' | 'PREMIUM' | 'VIP',
+          months: 1,
+          txHash,
+          amount: displayPrice === '0' ? '0' : displayPrice,
+        });
+        toast.success('Subscription activated!', {
+          description: `${tier} access to this universe is now active.`,
+        });
+        navigate({ to: '/market' });
+        return;
+      }
       const result = await trpcClient.listings.purchase.mutate({
         listingId: listingId!,
         quantity: 1,
@@ -108,7 +119,9 @@ function CheckoutPage() {
             </div>
             <div className="border-t pt-3 flex justify-between font-semibold">
               <span>Total</span>
-              <span className="text-primary">{isFree ? 'Free' : `${displayPrice} ${displayCurrency}`}</span>
+              <span className="text-primary">
+                {isFree ? 'Free' : `${displayPrice} ${displayCurrency}`}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -128,7 +141,9 @@ function CheckoutPage() {
                     {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '—'}
                   </p>
                 </div>
-                <Badge variant="outline" className="ml-auto text-xs text-green-600">Connected</Badge>
+                <Badge variant="outline" className="ml-auto text-xs text-green-600">
+                  Connected
+                </Badge>
               </div>
             ) : (
               <div className="text-center py-2">
@@ -144,7 +159,9 @@ function CheckoutPage() {
         {/* Trust signals */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
-          <span>Secured by on-chain contract · Creator royalties enforced · Refund via governance</span>
+          <span>
+            Secured by on-chain contract · Creator royalties enforced · Refund via governance
+          </span>
         </div>
       </div>
 

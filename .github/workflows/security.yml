@@ -3,11 +3,27 @@ name: Security Checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
+
+# Strict mode: jobs are BLOCKING when merging into main or a release branch.
+# On feature-branch PRs they are informational (continue-on-error: true).
+# The expression evaluates to `false` (blocking) when:
+#   - This is a push to main/release (github.event_name == 'push'), or
+#   - This is a PR whose target is main or a release/* branch.
+env:
+  STRICT: >-
+    ${{
+      github.event_name == 'push' ||
+      github.base_ref == 'main' ||
+      startsWith(github.base_ref, 'release/')
+    }}
 
 jobs:
   contracts-security:
+    name: Contract Security (Slither)
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
     defaults:
       run:
         working-directory: apps/contracts
@@ -15,28 +31,54 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
       - uses: foundry-rs/foundry-toolchain@v1
-      - name: Run Forge tests
-        run: forge test -vvv
+
+      - name: Forge build (required for Slither)
+        run: forge build
+
       - name: Run Slither
+        id: slither
         uses: crytic/slither-action@v0.4.0
         with:
           target: apps/contracts
           slither-config: apps/contracts/slither.config.json
-        continue-on-error: true
+          fail-on: high
+          sarif: results.sarif
+        continue-on-error: ${{ env.STRICT != 'true' }}
+
+      - name: Upload Slither SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('apps/contracts/results.sarif') != ''
+        with:
+          sarif_file: apps/contracts/results.sarif
+          category: slither
+
+      - name: Upload Slither SARIF artifact
+        if: always() && hashFiles('apps/contracts/results.sarif') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-sarif-${{ github.run_id }}
+          path: apps/contracts/results.sarif
+          retention-days: 30
 
   dependency-audit:
+    name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
-      - name: Audit dependencies
+
+      - name: Audit dependencies (high severity)
         run: pnpm audit --audit-level=high
-        continue-on-error: true
+        continue-on-error: ${{ env.STRICT != 'true' }}

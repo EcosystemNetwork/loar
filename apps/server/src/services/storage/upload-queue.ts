@@ -222,10 +222,26 @@ export class UploadQueue {
       job.updatedAt = Date.now();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      job.status = 'failed';
       job.error = msg;
-      job.updatedAt = Date.now();
-      console.error(`[UploadQueue] Buffer job ${jobId} failed: ${msg}`);
+
+      if (job.retryCount < MAX_RETRIES) {
+        const delay = RETRY_DELAYS[job.retryCount] || 15_000;
+        job.status = 'pending';
+        job.retryCount++;
+        job.updatedAt = Date.now();
+
+        console.log(
+          `[UploadQueue] Buffer job ${jobId} failed, retrying in ${delay}ms (attempt ${job.retryCount}/${MAX_RETRIES})`
+        );
+
+        setTimeout(() => this.processBufferJob(jobId, buffer), delay);
+      } else {
+        job.status = 'failed';
+        job.updatedAt = Date.now();
+        console.error(
+          `[UploadQueue] Buffer job ${jobId} permanently failed after ${MAX_RETRIES} retries: ${msg}`
+        );
+      }
     }
   }
 

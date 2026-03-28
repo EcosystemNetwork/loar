@@ -1885,7 +1885,7 @@ cd packages/abis && pnpm build:ts`}</CodeBlock>
 
           <div className="mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
             <p>LOAR &mdash; Decentralized Narrative Control Suite</p>
-            <p className="mt-1">Sepolia Testnet &middot; loartech.xyz</p>
+            <p className="mt-1">Sepolia Testnet &middot; loar.fun</p>
           </div>
         </main>
       </div>

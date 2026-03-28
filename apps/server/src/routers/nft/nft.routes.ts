@@ -210,7 +210,7 @@ export const nftRouter = router({
   getEpisodesByUniverse: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await episodesCol
+      const snapshot = await episodesCol()
         .where('universeId', '==', input.universeId)
         .where('active', '==', true)
         .orderBy('createdAt', 'desc')
@@ -253,7 +253,7 @@ export const nftRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // Check for duplicate character name in universe
-      const existing = await characterNFTsCol
+      const existing = await characterNFTsCol()
         .where('universeId', '==', input.universeId)
         .where('name', '==', input.name)
         .get();
@@ -303,7 +303,7 @@ export const nftRouter = router({
   getCharactersByUniverse: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await characterNFTsCol
+      const snapshot = await characterNFTsCol()
         .where('universeId', '==', input.universeId)
         .where('active', '==', true)
         .orderBy('appearanceCount', 'desc')

@@ -30,6 +30,23 @@ export function useMyNFTs() {
   });
 }
 
+export function useCharacterNFTs(universeId: string) {
+  return useQuery({
+    queryKey: ['character-nfts', universeId],
+    queryFn: () => trpcClient.nft.getCharactersByUniverse.query({ universeId }),
+    enabled: !!universeId,
+  });
+}
+
+export function useCreateCharacterNFT() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.nft.createCharacterNFT.mutate>[0]) =>
+      trpcClient.nft.createCharacterNFT.mutate(input),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['character-nfts', vars.universeId] }),
+  });
+}
+
 // ---- Canon Marketplace ----
 
 export function useCanonSubmissions(

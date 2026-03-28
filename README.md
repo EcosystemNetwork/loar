@@ -21,7 +21,7 @@ LOAR is a platform where creators deploy cinematic universes as smart contracts,
 
 **One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
 
-**Live testnet demo:** [loartech.xyz](https://loartech.xyz) (Sepolia)
+**Live testnet demo:** [loar.fun](https://loar.fun) (Sepolia)
 
 ---
 
@@ -205,7 +205,7 @@ pnpm -F indexer dev    # indexer only (port 42069)
 ```
                     ┌─────────────────┐
                     │   Vercel (CDN)   │  ← apps/web (static SPA)
-                    │   loartech.xyz   │
+                    │    loar.fun      │
                     └────────┬────────┘
                              │ HTTPS
         ┌────────────────────┼────────────────────┐

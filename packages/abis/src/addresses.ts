@@ -1,9 +1,5 @@
-/**
- * Deployed Contract Addresses
- *
- * Auto-generated from Foundry broadcast output. Keyed by chain ID (Sepolia: 11155111).
- * Update by running `forge build && npx wagmi generate` after contract redeployment.
- */
+// Auto-generated from deployments/sepolia.json — do not edit directly.
+// To update: pnpm sync:addresses
 
 export const UniverseManager = {
   '11155111': '0x7af142BbD14CaEECdA68f948F467Da0257f6B114',

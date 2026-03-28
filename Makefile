@@ -1,6 +1,7 @@
 .PHONY: help setup install dev dev-web dev-server dev-indexer \
        build clean test test-contracts test-coverage lint check-types \
        docker-build docker-up docker-down docker-logs docker-restart \
+       smoke-test rollback \
        codegen codegen-indexer db-seed contracts-build contracts-test
 
 # Default target
@@ -86,6 +87,12 @@ docker-restart: ## Rebuild and restart Docker services
 docker-health: ## Check health of running services
 	@curl -sf http://localhost:3000/health | python3 -m json.tool 2>/dev/null || echo "Server: not running"
 	@curl -sf http://localhost:42069/health | python3 -m json.tool 2>/dev/null || echo "Indexer: not running"
+
+smoke-test: ## Run post-deploy smoke tests against localhost
+	@bash scripts/smoke-test.sh
+
+rollback: ## Roll back to previous deploy (reads .loar-deploy for SHA)
+	@bash scripts/rollback.sh
 
 # ---- Code Generation ----
 

@@ -6,34 +6,19 @@
  * contracts spawned by the UniverseManager factory. Also indexes Uniswap v4
  * PoolManager swap events for token price tracking.
  */
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-
-// Fail fast on missing critical env vars
-const requiredEnv = ['PONDER_RPC_URL_2'] as const;
-const missing = requiredEnv.filter((key) => !process.env[key]);
-if (missing.length > 0) {
-  console.error(`\n❌ Indexer environment validation failed:`);
-  missing.forEach((key) => console.error(`  - ${key} is required`));
-  console.error('\nCheck .env.example for required variables.\n');
-  process.exit(1);
-}
-
+import './env.ts'; // validates env and loads .env files — must be first
+import { env } from './env.ts';
 import { createConfig, factory } from 'ponder';
 import { parseAbiItem } from 'viem';
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
 import { sepolia } from 'viem/chains';
-import UniverseManagerDeploy from '../contracts/broadcast/DeployProtocol.s.sol/11155111/run-latest.json';
-import { getAddress, hexToNumber } from 'viem/utils';
+import { getAddress } from 'viem/utils';
+import deployment from '../../deployments/sepolia.json';
 
-const address = getAddress(UniverseManagerDeploy.transactions[0]!.contractAddress);
-const startBlock = hexToNumber(UniverseManagerDeploy.receipts[0]!.blockNumber);
+const address = getAddress(deployment.contracts.UniverseManager);
+const startBlock = deployment.startBlock;
 
 const universeCreatedEvent = parseAbiItem(
   'event UniverseCreated(address universe, address creator)'
@@ -47,7 +32,7 @@ export default createConfig({
   chains: {
     sepolia: {
       id: 11155111,
-      rpc: process.env.PONDER_RPC_URL_2!,
+      rpc: env.PONDER_RPC_URL,
       maxRequestsPerSecond: 2,
     },
   },

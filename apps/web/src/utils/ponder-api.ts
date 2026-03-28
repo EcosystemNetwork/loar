@@ -27,8 +27,9 @@ export async function ponderGql<T = any>(
       body: JSON.stringify({ query, variables }),
     });
   } catch {
-    // Indexer not running — return empty data silently
-    return {} as T;
+    const err = new Error('Blockchain indexer unreachable') as Error & { code: string };
+    err.code = 'PONDER_OFFLINE';
+    throw err;
   }
 
   if (!res.ok) throw new Error(`Ponder query failed: ${res.statusText}`);
