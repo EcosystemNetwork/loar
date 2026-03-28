@@ -6,11 +6,14 @@
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useAccount } from 'wagmi';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
+import { MediaGallery } from '@/components/MediaGallery';
+import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
@@ -86,6 +89,7 @@ const METADATA_LABELS: Record<string, string> = {
 
 function EntityPage() {
   const { id } = Route.useParams();
+  const { address } = useAccount();
 
   const {
     data: entity,
@@ -120,6 +124,8 @@ function EntityPage() {
 
   const kindLabel = KIND_LABELS[entity.kind] ?? entity.kind;
   const metadataEntries = Object.entries(entity.metadata ?? {}).filter(([, v]) => v);
+  const isOwner = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
+  const { data: mediaAttachments = [] } = useMediaAttachments('entity', id);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -205,6 +211,35 @@ function EntityPage() {
                     <dd className="text-sm leading-relaxed whitespace-pre-wrap">{String(value)}</dd>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {(mediaAttachments.length > 0 || isOwner) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center justify-between">
+                  Media &amp; Assets
+                  {isOwner && (
+                    <Link to="/upload">
+                      <button className="text-xs font-normal text-primary hover:underline">
+                        + Upload &amp; attach
+                      </button>
+                    </Link>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MediaGallery targetType="entity" targetId={id} isOwner={isOwner} />
+                {mediaAttachments.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No media attached yet.{' '}
+                    <Link to="/upload" className="text-primary hover:underline">
+                      Upload a file
+                    </Link>{' '}
+                    to attach artwork, music, sound effects, 3D models, or design files.
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

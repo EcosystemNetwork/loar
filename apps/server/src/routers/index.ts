@@ -52,6 +52,7 @@ import { universeTeamRouter } from './universeTeam/universeTeam.routes';
 import { universeTreasuryRouter } from './universeTreasury/universeTreasury.routes';
 import { adminRouter } from './admin/admin.routes';
 import { portfolioRouter } from './portfolio/portfolio.routes';
+import { mediaRouter } from './media/media.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const walletLoginsCol = firebaseAvailable ? db.collection('walletLogins') : null;
@@ -124,6 +125,7 @@ export const appRouter = router({
   content: contentRouter,
   wiki: wikiRouter,
   entities: entitiesRouter,
+  media: mediaRouter,
 
   // ── Generation domain ───────────────────────────────────────────────
   generation: generationRouter,
