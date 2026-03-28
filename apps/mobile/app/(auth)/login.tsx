@@ -1,26 +1,32 @@
 /**
- * Login screen — wallet connection + SIWE sign-in.
+ * Login screen — CDP wallet connection + SIWE sign-in.
  *
- * Uses Reown AppKit for WalletConnect. The AppKit provider opens a modal
- * showing available wallets (MetaMask, Trust, Coinbase Wallet, etc.).
+ * Uses @coinbase/wallet-mobile-sdk to deep-link into Coinbase Wallet.
+ * Coinbase Wallet supports embedded wallets created via:
+ *   Google / Apple / passkeys / email
  *
- * Once the user connects and signs the SIWE message, they are redirected
- * to the portfolio home.
+ * Flow:
+ *  1. Tap "Connect Wallet" → deep links into Coinbase Wallet
+ *  2. User approves connection (or signs in with Google/Apple/passkeys)
+ *  3. We get the wallet address
+ *  4. We fetch a SIWE nonce from the server
+ *  5. We ask the wallet to sign the SIWE message
+ *  6. We send to /auth/verify → receive JWT
+ *  7. JWT stored in expo-secure-store → redirect to portfolio
  */
-import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit-react-native';
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
-import { Alert, Image, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../src/components/ui/Button';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { connectCDPWallet, getCDPChainId, signWithCDP } from '../../src/lib/cdp';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { open } = useAppKit();
-  const { address, isConnected } = useAppKitAccount();
-  const { walletProvider } = useAppKitProvider('eip155');
   const { signIn, isAuthenticated, isAuthenticating, error, clearError } = useAuth();
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
 
   // Redirect when authenticated
   useEffect(() => {
@@ -29,27 +35,40 @@ export default function LoginScreen() {
     }
   }, [isAuthenticated, router]);
 
-  // Once wallet is connected, trigger SIWE sign-in
-  useEffect(() => {
-    if (isConnected && address && walletProvider && !isAuthenticated && !isAuthenticating) {
-      const signMessage = async (message: string): Promise<string> => {
-        // EIP-1193 personal_sign
-        const sig = await (walletProvider as { request: (args: { method: string; params: [string, string] }) => Promise<string> }).request({
-          method: 'personal_sign',
-          params: [message, address],
-        });
-        return sig;
-      };
-
-      signIn(address, signMessage);
-    }
-  }, [isConnected, address, walletProvider, isAuthenticated, isAuthenticating, signIn]);
-
   useEffect(() => {
     if (error) {
       Alert.alert('Sign-in failed', error, [{ text: 'OK', onPress: clearError }]);
     }
   }, [error, clearError]);
+
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    try {
+      // 1. Connect wallet via CDP (deep-links to Coinbase Wallet)
+      const address = await connectCDPWallet();
+      setConnectedAddress(address);
+
+      // 2. Get chain ID
+      const chainId = await getCDPChainId().catch(() => 11155111); // default Sepolia
+
+      // 3. Sign SIWE message
+      await signIn(address, (message) => signWithCDP(message, address), chainId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Connection failed';
+      const isCancel =
+        msg.toLowerCase().includes('cancel') ||
+        msg.toLowerCase().includes('reject') ||
+        msg.toLowerCase().includes('user denied');
+      if (!isCancel) {
+        Alert.alert('Connection failed', msg);
+      }
+      setConnectedAddress(null);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const loading = isConnecting || isAuthenticating;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -92,15 +111,14 @@ export default function LoginScreen() {
             ))}
           </View>
 
-          {/* Spacer */}
           <View className="flex-1" />
 
           {/* Connect button */}
           <View className="gap-3">
-            {isConnected && !isAuthenticated ? (
+            {connectedAddress && !isAuthenticated ? (
               <View className="bg-zinc-900 rounded-xl p-3 items-center">
                 <Text className="text-text-secondary text-xs">
-                  Connected: {address?.slice(0, 6)}…{address?.slice(-4)}
+                  Connected: {connectedAddress.slice(0, 6)}…{connectedAddress.slice(-4)}
                 </Text>
                 <Text className="text-text-tertiary text-xs mt-1">
                   Waiting for SIWE signature…
@@ -108,17 +126,12 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            <Button
-              onPress={() => open()}
-              loading={isAuthenticating}
-              fullWidth
-              size="lg"
-            >
-              {isConnected ? 'Sign In' : 'Connect Wallet'}
+            <Button onPress={handleConnect} loading={loading} fullWidth size="lg">
+              Connect with Coinbase Wallet
             </Button>
 
             <Text className="text-text-tertiary text-xs text-center">
-              Supports MetaMask, Coinbase Wallet, Trust, Rainbow, and 300+ wallets
+              Sign in with Google, Apple, passkeys, or email via Coinbase Smart Wallet
             </Text>
           </View>
         </View>

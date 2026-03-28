@@ -53,13 +53,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
-      [
-        "@reown/appkit-react-native",
-        {
-          "projectId": "YOUR_REOWN_PROJECT_ID"
-        }
-      ]
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

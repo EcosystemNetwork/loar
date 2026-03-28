@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useState, useRef, useCallback } from 'react';
+import { MediaAttachPanel } from '@/components/MediaAttachPanel';
 import { getSiweToken } from '@/lib/wallet-auth';
 import {
   Upload as UploadIcon,
@@ -68,6 +69,13 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
   const [uploadError, setUploadError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedManifest, setUploadedManifest] = useState<{
+    contentHash: string;
+    originalFilename: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  } | null>(null);
   const [classification, setClassification] = useState<ContentLane>('fan');
   const [visibility, setVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
   const [tagInput, setTagInput] = useState('');
@@ -156,9 +164,16 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
       if (xhr.status === 200) {
         try {
           const { manifest } = JSON.parse(xhr.responseText);
-          const url = manifest?.primaryUrl || manifest?.urls?.[0];
+          const url = manifest?.uploads?.[0]?.url;
           if (url) {
             setMediaUrl(url);
+            setUploadedManifest({
+              contentHash: manifest.contentHash,
+              originalFilename: manifest.originalFilename ?? file.name,
+              mimeType: manifest.mimeType ?? file.type,
+              size: manifest.size ?? file.size,
+              url,
+            });
             setUploadState('done');
           } else {
             setUploadError('Upload succeeded but no URL returned');
@@ -441,7 +456,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
                     <CloudUpload className="h-8 w-8 text-muted-foreground mb-2" />
                     <p className="text-sm font-medium">Drag &amp; drop or click to upload</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      MP4, WebM, PNG, JPEG, GIF — max 200MB
+                      Video, images, audio, 3D models, design files — max 200MB
                     </p>
                   </>
                 )}
@@ -474,6 +489,15 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
               </div>
             </div>
           </div>
+
+          {/* Attach to world — shown after upload completes */}
+          {uploadedManifest && (
+            <MediaAttachPanel
+              {...uploadedManifest}
+              onAttached={() => setUploadedManifest(null)}
+              onSkip={() => setUploadedManifest(null)}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

@@ -1,16 +1,8 @@
 /**
- * Wallet settings screen.
- *
- * Shows:
- *  - Connected wallet address
- *  - Network (Sepolia)
- *  - WalletConnect session info
- *  - Switch network option
- *  - Disconnect
+ * Wallet settings screen — CDP wallet session management.
  */
-import { useAppKit, useAppKitAccount, useAppKitNetwork } from '@reown/appkit-react-native';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AssetRow } from '../src/components/portfolio/AssetRow';
@@ -19,15 +11,22 @@ import { Button } from '../src/components/ui/Button';
 import { Card } from '../src/components/ui/Card';
 import { SectionHeader } from '../src/components/ui/SectionHeader';
 import { useAuth } from '../src/contexts/AuthContext';
+import { connectCDPWallet, disconnectCDP, getCDPChainId } from '../src/lib/cdp';
 
 export default function WalletSettingsScreen() {
   const router = useRouter();
-  const { address: siweAddress, signOut } = useAuth();
-  const { address: wcAddress, isConnected } = useAppKitAccount();
-  const { chainId } = useAppKitNetwork();
-  const { open } = useAppKit();
+  const { address, signOut } = useAuth();
+  const [chainId, setChainId] = useState<number | null>(null);
 
-  const address = wcAddress ?? siweAddress;
+  useEffect(() => {
+    getCDPChainId()
+      .then(setChainId)
+      .catch(() => setChainId(null));
+  }, []);
+
+  const networkName =
+    chainId === 11155111 ? 'Sepolia Testnet' : chainId === 1 ? 'Ethereum Mainnet' : chainId ? `Chain ${chainId}` : 'Unknown';
+  const networkOk = chainId === 11155111;
 
   const handleDisconnect = () => {
     Alert.alert('Disconnect', 'Disconnect your wallet and sign out?', [
@@ -36,6 +35,7 @@ export default function WalletSettingsScreen() {
         text: 'Disconnect',
         style: 'destructive',
         onPress: async () => {
+          await disconnectCDP().catch(() => {});
           await signOut();
           router.replace('/(auth)/login');
         },
@@ -43,8 +43,15 @@ export default function WalletSettingsScreen() {
     ]);
   };
 
-  const networkName = chainId === 11155111 ? 'Sepolia Testnet' : `Chain ${chainId ?? 'Unknown'}`;
-  const networkStatus = chainId === 11155111 ? 'success' : 'warning';
+  const handleReconnect = async () => {
+    try {
+      await connectCDPWallet();
+      const id = await getCDPChainId();
+      setChainId(id);
+    } catch {
+      // user cancelled
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
@@ -57,8 +64,8 @@ export default function WalletSettingsScreen() {
           <View className="gap-4">
             <View className="flex-row items-center justify-between">
               <Text className="text-text-primary font-bold">Connected Wallet</Text>
-              <Badge variant={isConnected ? 'success' : 'error'}>
-                {isConnected ? 'Connected' : 'Disconnected'}
+              <Badge variant={address ? 'success' : 'error'}>
+                {address ? 'Connected' : 'Disconnected'}
               </Badge>
             </View>
 
@@ -73,8 +80,14 @@ export default function WalletSettingsScreen() {
 
             <View className="flex-row items-center justify-between">
               <Text className="text-text-secondary text-sm">Network</Text>
-              <Badge variant={networkStatus as 'success' | 'warning'}>{networkName}</Badge>
+              <Badge variant={networkOk ? 'success' : 'warning'}>{networkName}</Badge>
             </View>
+
+            {!networkOk && chainId !== null ? (
+              <Text className="text-warning text-xs">
+                LOAR runs on Sepolia testnet. Switch your wallet to Sepolia (chain ID 11155111).
+              </Text>
+            ) : null}
           </View>
         </Card>
 
@@ -85,29 +98,29 @@ export default function WalletSettingsScreen() {
             <AssetRow
               icon="🔑"
               label="SIWE Session"
-              subtitle={siweAddress ? `Active for ${siweAddress.slice(0, 6)}…${siweAddress.slice(-4)}` : 'No session'}
-              badge={<Badge variant={siweAddress ? 'success' : 'muted'}>{siweAddress ? 'Active' : 'None'}</Badge>}
+              subtitle={
+                address
+                  ? `Active — ${address.slice(0, 6)}…${address.slice(-4)}`
+                  : 'No active session'
+              }
+              badge={
+                <Badge variant={address ? 'success' : 'muted'}>
+                  {address ? 'Active' : 'None'}
+                </Badge>
+              }
             />
-            {chainId !== 11155111 ? (
-              <AssetRow
-                icon="⚠️"
-                label="Switch to Sepolia"
-                subtitle="LOAR runs on Sepolia testnet"
-                onPress={() => open({ view: 'Networks' })}
-              />
-            ) : null}
           </View>
         </View>
 
-        {/* Change wallet */}
+        {/* Wallet actions */}
         <View>
           <SectionHeader title="Wallet" />
           <View className="bg-card rounded-2xl border border-border px-4">
             <AssetRow
               icon="🔄"
-              label="Switch Wallet"
-              subtitle="Connect a different wallet"
-              onPress={() => open()}
+              label="Reconnect"
+              subtitle="Re-open Coinbase Wallet to reconnect"
+              onPress={handleReconnect}
             />
           </View>
         </View>
@@ -116,13 +129,12 @@ export default function WalletSettingsScreen() {
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
           <Text className="text-text-primary font-semibold text-sm">Security</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            LOAR Vault is non-custodial. Your private keys never leave your wallet. We only
-            store a session JWT tied to your SIWE signature, which expires and can be revoked
-            at any time by disconnecting.
+            LOAR Vault is non-custodial. Your keys are managed by Coinbase Smart Wallet
+            (Google, Apple, passkeys, or email). We only store a SIWE session JWT, which
+            can be revoked at any time by disconnecting.
           </Text>
         </View>
 
-        {/* Disconnect */}
         <Button onPress={handleDisconnect} variant="danger" fullWidth>
           Disconnect Wallet
         </Button>
