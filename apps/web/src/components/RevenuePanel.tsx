@@ -129,7 +129,7 @@ function OverviewTab({ universeId }: { universeId: string }) {
         />
         <MetricCard
           icon={<Film className="w-4 h-4" />}
-          label="NFTs"
+          label="Episodes"
           value={(episodes as any[])?.length ?? 0}
         />
         <MetricCard

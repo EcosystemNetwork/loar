@@ -662,7 +662,7 @@ function EventPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5" /> List Episode as NFT
+              <Tag className="h-5 w-5" /> List Episode
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
