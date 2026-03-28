@@ -1,129 +1,331 @@
 /**
- * Credits Router — AI generation credit management
- * Purchase credits, spend on generation, check balances
+ * Credits Router — $LOAR-powered generation credit system
+ *
+ * Dual-margin pricing:
+ *   Credit card / ETH / other crypto → 35% margin
+ *   $LOAR token payments → 25% margin + 10% bonus credits
+ *
+ * Credits are the internal unit consumed by all generation actions.
+ * Users buy credit packages, then spend credits on generations.
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
+import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 
 const creditsCol = db.collection('userCredits');
-const creditTiersCol = db.collection('creditTiers');
 const creditTxCol = db.collection('creditTransactions');
+const creditPackagesCol = db.collection('creditPackages');
 
-// Generation costs
+// ── Payment Methods ───────────────────────────────────────────────────
+
+type PaymentMethod = 'card' | 'eth' | 'crypto' | 'loar';
+
+function getMarginForMethod(method: PaymentMethod): number {
+  return method === 'loar' ? LOAR_MARGIN : FIAT_MARGIN;
+}
+
+function getMarginLabel(method: PaymentMethod): string {
+  return method === 'loar' ? '25%' : '35%';
+}
+
+// ── Credit Packages (hardcoded defaults, overridable via Firestore) ───
+
+export interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  bonusCredits: number;
+  /** USD price at 35% margin (card/ETH/crypto) */
+  fiatPriceUsd: number;
+  /** USD price at 25% margin ($LOAR) */
+  loarPriceUsd: number;
+  /** $LOAR token amount needed */
+  loarTokenAmount: number;
+  /** ETH price in wei (approximate, updated by admin) */
+  ethPriceWei: string;
+  popular: boolean;
+  active: boolean;
+  /** Extra bonus credits for $LOAR purchases (10% of base) */
+  loarBonusCredits: number;
+}
+
+/** Base cost per credit in USD (what we pay providers on average) */
+const BASE_CREDIT_COST_USD = 0.008;
+
+function buildPackage(
+  id: string,
+  name: string,
+  credits: number,
+  bonusCredits: number,
+  popular: boolean
+): CreditPackage {
+  const baseCostUsd = credits * BASE_CREDIT_COST_USD;
+  const fiatPriceUsd = Math.round(baseCostUsd * FIAT_MARGIN * 100) / 100;
+  const loarPriceUsd = Math.round(baseCostUsd * LOAR_MARGIN * 100) / 100;
+  const loarTokenAmount = Math.ceil(loarPriceUsd / LOAR_TO_USD);
+  const loarBonusCredits = Math.floor(credits * 0.1); // 10% bonus for $LOAR
+
+  return {
+    id,
+    name,
+    credits,
+    bonusCredits,
+    fiatPriceUsd,
+    loarPriceUsd,
+    loarTokenAmount,
+    ethPriceWei: '0', // set by admin based on ETH price
+    popular,
+    active: true,
+    loarBonusCredits,
+  };
+}
+
+const DEFAULT_PACKAGES: CreditPackage[] = [
+  buildPackage('starter', 'Starter', 100, 0, false),
+  buildPackage('creator', 'Creator', 500, 50, true),
+  buildPackage('pro', 'Pro', 1500, 200, false),
+  buildPackage('studio', 'Studio', 5000, 1000, false),
+  buildPackage('enterprise', 'Enterprise', 20000, 5000, false),
+];
+
+// ── Generation Costs (credits per action) ─────────────────────────────
+
 const GENERATION_COSTS: Record<string, number> = {
-  image: 1,
-  video: 5,
-  story: 2,
-  spinoff: 10,
-  character: 3,
-  scene: 8,
+  image: 3,
+  video_draft: 5,
+  video_standard: 13,
+  video_premium: 35,
+  story: 5,
+  spinoff: 20,
+  character: 8,
+  scene: 15,
+  voiceover: 10,
+  caption: 2,
+  // Legacy mappings
+  video: 13,
 };
 
+// ── Router ────────────────────────────────────────────────────────────
+
 export const creditsRouter = router({
-  // ---- Balance ----
+  // ── Balance ─────────────────────────────────────────────────────
 
   getBalance: protectedProcedure.query(async ({ ctx }) => {
     const doc = await creditsCol.doc(ctx.user.uid).get();
     if (!doc.exists) {
-      return { balance: 0, totalPurchased: 0, totalSpent: 0 };
+      return {
+        balance: 0,
+        totalPurchased: 0,
+        totalSpent: 0,
+        totalBonusReceived: 0,
+        totalLoarPurchases: 0,
+        totalFiatPurchases: 0,
+      };
     }
     const data = doc.data()!;
     return {
       balance: data.balance || 0,
       totalPurchased: data.totalPurchased || 0,
       totalSpent: data.totalSpent || 0,
+      totalBonusReceived: data.totalBonusReceived || 0,
+      totalLoarPurchases: data.totalLoarPurchases || 0,
+      totalFiatPurchases: data.totalFiatPurchases || 0,
     };
   }),
 
-  // ---- Tiers ----
+  // ── Packages ────────────────────────────────────────────────────
 
-  getTiers: publicProcedure.query(async () => {
-    const snapshot = await creditTiersCol
-      .where('active', '==', true)
-      .orderBy('credits', 'asc')
-      .get();
+  getPackages: publicProcedure.query(async () => {
+    // Check for admin-configured packages in Firestore
+    try {
+      const snapshot = await creditPackagesCol
+        .where('active', '==', true)
+        .orderBy('credits', 'asc')
+        .get();
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      if (snapshot.docs.length > 0) {
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as CreditPackage[];
+      }
+    } catch {
+      // No custom packages, use defaults
+    }
+
+    return DEFAULT_PACKAGES.filter((p) => p.active);
   }),
 
-  // ---- Purchase ----
+  // ── Purchase with Fiat / ETH / Crypto (35% margin) ─────────────
 
-  purchase: protectedProcedure
+  purchaseWithFiat: protectedProcedure
     .input(
       z.object({
-        tierId: z.string(),
-        txHash: z.string(),
-        amount: z.string(), // wei paid
+        packageId: z.string(),
+        paymentMethod: z.enum(['card', 'eth', 'crypto']),
+        /** For card: Stripe payment intent ID. For ETH/crypto: tx hash */
+        paymentRef: z.string(),
+        amountPaid: z.string().optional(), // wei for ETH, USD cents for card
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const tierDoc = await creditTiersCol.doc(input.tierId).get();
-      if (!tierDoc.exists) throw new Error('Tier not found');
-      const tier = tierDoc.data()!;
-      if (!tier.active) throw new Error('Tier not active');
+      const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+      if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
 
-      const credits = tier.credits as number;
+      const totalCredits = pkg.credits + pkg.bonusCredits;
 
       // Update user balance
       const userRef = creditsCol.doc(ctx.user.uid);
       const userDoc = await userRef.get();
 
+      const updateData: Record<string, any> = {
+        balance: (userDoc.data()?.balance || 0) + totalCredits,
+        totalPurchased: (userDoc.data()?.totalPurchased || 0) + pkg.credits,
+        totalBonusReceived: (userDoc.data()?.totalBonusReceived || 0) + pkg.bonusCredits,
+        totalFiatPurchases: (userDoc.data()?.totalFiatPurchases || 0) + 1,
+        updatedAt: new Date(),
+      };
+
       if (userDoc.exists) {
-        const data = userDoc.data()!;
-        await userRef.update({
-          balance: (data.balance || 0) + credits,
-          totalPurchased: (data.totalPurchased || 0) + credits,
-          updatedAt: new Date(),
-        });
+        await userRef.update(updateData);
       } else {
         await userRef.set({
           uid: ctx.user.uid,
-          balance: credits,
-          totalPurchased: credits,
+          ...updateData,
           totalSpent: 0,
+          totalLoarPurchases: 0,
           createdAt: new Date(),
-          updatedAt: new Date(),
         });
       }
 
       // Record transaction
       await creditTxCol.add({
+        id: randomUUID(),
         uid: ctx.user.uid,
         type: 'purchase',
-        tierId: input.tierId,
-        credits,
-        txHash: input.txHash,
-        amount: input.amount,
+        paymentMethod: input.paymentMethod,
+        packageId: input.packageId,
+        packageName: pkg.name,
+        credits: pkg.credits,
+        bonusCredits: pkg.bonusCredits,
+        totalCredits,
+        pricePaidUsd: pkg.fiatPriceUsd,
+        marginPercent: 35,
+        paymentRef: input.paymentRef,
+        amountPaid: input.amountPaid || null,
         createdAt: new Date(),
       });
 
-      return { ok: true, creditsAdded: credits };
+      return {
+        ok: true,
+        creditsAdded: totalCredits,
+        baseCredits: pkg.credits,
+        bonusCredits: pkg.bonusCredits,
+        pricePaid: pkg.fiatPriceUsd,
+        paymentMethod: input.paymentMethod,
+        margin: '35%',
+      };
     }),
 
-  // ---- Spend ----
+  // ── Purchase with $LOAR (25% margin + 10% bonus) ───────────────
+
+  purchaseWithLoar: protectedProcedure
+    .input(
+      z.object({
+        packageId: z.string(),
+        txHash: z.string(),
+        loarAmount: z.string(), // $LOAR tokens transferred (wei units)
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+      if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
+
+      // $LOAR buyers get: base credits + package bonus + 10% LOAR bonus
+      const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;
+
+      // Update user balance
+      const userRef = creditsCol.doc(ctx.user.uid);
+      const userDoc = await userRef.get();
+
+      const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
+      const updateData: Record<string, any> = {
+        balance: (userDoc.data()?.balance || 0) + totalCredits,
+        totalPurchased: (userDoc.data()?.totalPurchased || 0) + pkg.credits,
+        totalBonusReceived: (userDoc.data()?.totalBonusReceived || 0) + totalBonus,
+        totalLoarPurchases: (userDoc.data()?.totalLoarPurchases || 0) + 1,
+        updatedAt: new Date(),
+      };
+
+      if (userDoc.exists) {
+        await userRef.update(updateData);
+      } else {
+        await userRef.set({
+          uid: ctx.user.uid,
+          ...updateData,
+          totalSpent: 0,
+          totalFiatPurchases: 0,
+          createdAt: new Date(),
+        });
+      }
+
+      // Record transaction
+      await creditTxCol.add({
+        id: randomUUID(),
+        uid: ctx.user.uid,
+        type: 'purchase',
+        paymentMethod: 'loar',
+        packageId: input.packageId,
+        packageName: pkg.name,
+        credits: pkg.credits,
+        bonusCredits: totalBonus,
+        totalCredits,
+        pricePaidUsd: pkg.loarPriceUsd,
+        loarTokensPaid: input.loarAmount,
+        marginPercent: 25,
+        txHash: input.txHash,
+        createdAt: new Date(),
+      });
+
+      return {
+        ok: true,
+        creditsAdded: totalCredits,
+        baseCredits: pkg.credits,
+        bonusCredits: pkg.bonusCredits,
+        loarBonusCredits: pkg.loarBonusCredits,
+        pricePaid: pkg.loarPriceUsd,
+        loarTokensPaid: input.loarAmount,
+        paymentMethod: 'loar' as const,
+        margin: '25%',
+        savings: `You saved $${(pkg.fiatPriceUsd - pkg.loarPriceUsd).toFixed(2)} and got ${pkg.loarBonusCredits} extra credits!`,
+      };
+    }),
+
+  // ── Spend Credits ───────────────────────────────────────────────
 
   spend: protectedProcedure
     .input(
       z.object({
-        generationType: z.enum(['image', 'video', 'story', 'spinoff', 'character', 'scene']),
+        generationType: z.string(),
+        creditOverride: z.number().optional(), // for model-specific costs
         universeId: z.string().optional(),
+        generationId: z.string().optional(),
+        modelId: z.string().optional(),
         metadata: z.record(z.string(), z.string()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const cost = GENERATION_COSTS[input.generationType] || 1;
+      const cost = input.creditOverride || GENERATION_COSTS[input.generationType] || 1;
 
       const userRef = creditsCol.doc(ctx.user.uid);
       const userDoc = await userRef.get();
 
-      if (!userDoc.exists) throw new Error('No credits available');
+      if (!userDoc.exists) throw new Error('No credits available. Purchase credits first.');
       const data = userDoc.data()!;
-      if ((data.balance || 0) < cost)
-        throw new Error(`Insufficient credits. Need ${cost}, have ${data.balance || 0}`);
+      if ((data.balance || 0) < cost) {
+        throw new Error(
+          `Insufficient credits. Need ${cost}, have ${data.balance || 0}. Purchase more credits to continue.`
+        );
+      }
 
       await userRef.update({
         balance: data.balance - cost,
@@ -138,6 +340,8 @@ export const creditsRouter = router({
         generationType: input.generationType,
         credits: -cost,
         universeId: input.universeId || null,
+        generationId: input.generationId || null,
+        modelId: input.modelId || null,
         metadata: input.metadata || null,
         createdAt: new Date(),
       });
@@ -145,7 +349,7 @@ export const creditsRouter = router({
       return { ok: true, creditsSpent: cost, remainingBalance: data.balance - cost };
     }),
 
-  // ---- Grant (platform-side) ----
+  // ── Grant (platform/admin/quests) ───────────────────────────────
 
   grant: protectedProcedure
     .input(
@@ -153,6 +357,7 @@ export const creditsRouter = router({
         targetUid: z.string(),
         credits: z.number().min(1),
         reason: z.string(),
+        source: z.enum(['admin', 'quest', 'affiliate', 'promo']).default('admin'),
       })
     )
     .mutation(async ({ input }) => {
@@ -163,15 +368,18 @@ export const creditsRouter = router({
         const data = userDoc.data()!;
         await userRef.update({
           balance: (data.balance || 0) + input.credits,
-          totalPurchased: (data.totalPurchased || 0) + input.credits,
+          totalBonusReceived: (data.totalBonusReceived || 0) + input.credits,
           updatedAt: new Date(),
         });
       } else {
         await userRef.set({
           uid: input.targetUid,
           balance: input.credits,
-          totalPurchased: input.credits,
+          totalPurchased: 0,
           totalSpent: 0,
+          totalBonusReceived: input.credits,
+          totalLoarPurchases: 0,
+          totalFiatPurchases: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -180,6 +388,7 @@ export const creditsRouter = router({
       await creditTxCol.add({
         uid: input.targetUid,
         type: 'grant',
+        source: input.source,
         credits: input.credits,
         reason: input.reason,
         createdAt: new Date(),
@@ -188,7 +397,7 @@ export const creditsRouter = router({
       return { ok: true };
     }),
 
-  // ---- History ----
+  // ── History ─────────────────────────────────────────────────────
 
   getHistory: protectedProcedure
     .input(z.object({ limit: z.number().min(1).max(100).default(20) }))
@@ -202,7 +411,40 @@ export const creditsRouter = router({
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     }),
 
-  // ---- Costs ----
+  // ── Costs ───────────────────────────────────────────────────────
 
   getCosts: publicProcedure.query(() => GENERATION_COSTS),
+
+  // ── Price Comparison ────────────────────────────────────────────
+
+  comparePricing: publicProcedure.input(z.object({ packageId: z.string() })).query(({ input }) => {
+    const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+    if (!pkg) return null;
+
+    return {
+      packageName: pkg.name,
+      baseCredits: pkg.credits,
+      fiat: {
+        priceUsd: pkg.fiatPriceUsd,
+        bonusCredits: pkg.bonusCredits,
+        totalCredits: pkg.credits + pkg.bonusCredits,
+        margin: '35%',
+        perCreditUsd:
+          Math.round((pkg.fiatPriceUsd / (pkg.credits + pkg.bonusCredits)) * 1000) / 1000,
+      },
+      loar: {
+        priceUsd: pkg.loarPriceUsd,
+        loarTokens: pkg.loarTokenAmount,
+        bonusCredits: pkg.bonusCredits + pkg.loarBonusCredits,
+        totalCredits: pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits,
+        margin: '25%',
+        perCreditUsd:
+          Math.round(
+            (pkg.loarPriceUsd / (pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits)) * 1000
+          ) / 1000,
+        savingsUsd: Math.round((pkg.fiatPriceUsd - pkg.loarPriceUsd) * 100) / 100,
+        extraCredits: pkg.loarBonusCredits,
+      },
+    };
+  }),
 });

@@ -5,14 +5,22 @@ import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 /// @title CreditManager
-/// @notice Manages AI generation credits. Users purchase credits to generate
-///         side stories, spinoffs, and fan episodes within universes.
+/// @notice Manages AI generation credits with dual-margin pricing:
+///         - Credit card / ETH / other crypto: 35% margin
+///         - $LOAR token payments: 25% margin (incentivizes token use)
+///
+///         Credits are the internal unit for all generation actions.
+///         1 credit = 1 unit of generation capacity (costs vary by action type).
 contract CreditManager is ReentrancyGuard {
-    struct CreditTier {
+    // ── Structs ──────────────────────────────────────────────────
+
+    struct CreditPackage {
         uint256 id;
         string name;
         uint256 credits;
-        uint256 priceWei;
+        uint256 priceWei;         // ETH price (35% margin baked in)
+        uint256 priceLoar;        // $LOAR price (25% margin baked in)
+        uint256 bonusCredits;     // extra credits as purchase incentive
         bool active;
     }
 
@@ -20,86 +28,157 @@ contract CreditManager is ReentrancyGuard {
         uint256 balance;
         uint256 totalPurchased;
         uint256 totalSpent;
+        uint256 totalBonusReceived;
     }
 
-    uint256 public nextTierId;
+    // ── State ────────────────────────────────────────────────────
 
-    mapping(uint256 => CreditTier) public tiers;
-    mapping(address => UserCredits) public userCredits;
-
-    // Universe token holders get discount
-    mapping(address => uint16) public holderDiscountBps; // token => discount bps
-
+    IERC20 public loarToken;
     address public platform;
     address public treasury;
 
-    // Credit costs per generation type
-    uint256 public imageGenerationCost = 1;
-    uint256 public videoGenerationCost = 5;
-    uint256 public storyGenerationCost = 2;
-    uint256 public spinoffGenerationCost = 10;
+    uint256 public nextPackageId;
+    mapping(uint256 => CreditPackage) public packages;
+    mapping(address => UserCredits) public userCredits;
 
-    event TierCreated(uint256 indexed tierId, string name, uint256 credits, uint256 priceWei);
-    event CreditsPurchased(address indexed user, uint256 tierId, uint256 credits, uint256 paid);
+    // Holder discount: universe token address => discount in basis points
+    mapping(address => uint16) public holderDiscountBps;
+
+    // Generation costs per type (in credits)
+    mapping(bytes32 => uint256) public generationCosts;
+
+    // ── Margin constants (informational, actual margins baked into package prices) ──
+    uint16 public constant FIAT_MARGIN_BPS = 3500;   // 35%
+    uint16 public constant LOAR_MARGIN_BPS = 2500;    // 25%
+
+    // ── Events ───────────────────────────────────────────────────
+
+    event PackageCreated(uint256 indexed packageId, string name, uint256 credits, uint256 priceWei, uint256 priceLoar);
+    event CreditsPurchasedWithEth(address indexed user, uint256 packageId, uint256 credits, uint256 bonus, uint256 paid);
+    event CreditsPurchasedWithLoar(address indexed user, uint256 packageId, uint256 credits, uint256 bonus, uint256 loarPaid);
     event CreditsSpent(address indexed user, uint256 amount, string generationType, uint256 universeId);
     event CreditsGranted(address indexed user, uint256 amount, string reason);
+    event GenerationCostUpdated(string genType, uint256 newCost);
+
+    // ── Errors ───────────────────────────────────────────────────
 
     error InsufficientCredits();
     error InsufficientPayment();
-    error TierNotActive();
+    error InsufficientLoarBalance();
+    error InsufficientLoarAllowance();
+    error PackageNotActive();
     error NotPlatform();
     error TransferFailed();
+    error ZeroAddress();
 
     modifier onlyPlatform() {
         if (msg.sender != platform) revert NotPlatform();
         _;
     }
 
-    constructor(address _platform, address _treasury) {
+    // ── Constructor ──────────────────────────────────────────────
+
+    constructor(address _loarToken, address _platform, address _treasury) {
+        if (_loarToken == address(0) || _platform == address(0) || _treasury == address(0))
+            revert ZeroAddress();
+
+        loarToken = IERC20(_loarToken);
         platform = _platform;
         treasury = _treasury;
+
+        // Default generation costs (in credits)
+        generationCosts[keccak256("image")] = 3;
+        generationCosts[keccak256("video_draft")] = 5;
+        generationCosts[keccak256("video_standard")] = 13;
+        generationCosts[keccak256("video_premium")] = 35;
+        generationCosts[keccak256("story")] = 5;
+        generationCosts[keccak256("spinoff")] = 20;
+        generationCosts[keccak256("character")] = 8;
+        generationCosts[keccak256("scene")] = 15;
+        generationCosts[keccak256("voiceover")] = 10;
+        generationCosts[keccak256("caption")] = 2;
     }
 
-    /// @notice Create a credit purchase tier
-    function createTier(
+    // ── Package Management ───────────────────────────────────────
+
+    /// @notice Create a credit purchase package with both ETH and $LOAR pricing
+    /// @param name Display name (e.g., "Starter Pack")
+    /// @param credits Base credits included
+    /// @param priceWei ETH price (includes 35% margin)
+    /// @param priceLoar $LOAR price (includes 25% margin)
+    /// @param bonusCredits Additional bonus credits (loyalty incentive)
+    function createPackage(
         string calldata name,
         uint256 credits,
-        uint256 priceWei
-    ) external onlyPlatform returns (uint256 tierId) {
-        tierId = nextTierId++;
-        tiers[tierId] = CreditTier({
-            id: tierId,
+        uint256 priceWei,
+        uint256 priceLoar,
+        uint256 bonusCredits
+    ) external onlyPlatform returns (uint256 packageId) {
+        packageId = nextPackageId++;
+        packages[packageId] = CreditPackage({
+            id: packageId,
             name: name,
             credits: credits,
             priceWei: priceWei,
+            priceLoar: priceLoar,
+            bonusCredits: bonusCredits,
             active: true
         });
-        emit TierCreated(tierId, name, credits, priceWei);
+        emit PackageCreated(packageId, name, credits, priceWei, priceLoar);
     }
 
-    /// @notice Purchase credits from a tier
-    function purchaseCredits(uint256 tierId) external payable nonReentrant {
-        CreditTier storage tier = tiers[tierId];
-        if (!tier.active) revert TierNotActive();
+    // ── Purchase with ETH (35% margin) ───────────────────────────
 
-        uint256 price = tier.priceWei;
+    /// @notice Buy credits with ETH. 35% platform margin.
+    function purchaseWithEth(uint256 packageId) external payable nonReentrant {
+        CreditPackage storage pkg = packages[packageId];
+        if (!pkg.active) revert PackageNotActive();
+        if (msg.value < pkg.priceWei) revert InsufficientPayment();
 
-        // Apply holder discount if applicable
-        // (caller can hold any recognized universe token)
-        // Discount is checked off-chain and applied via discounted tier
+        uint256 totalCredits = pkg.credits + pkg.bonusCredits;
+        userCredits[msg.sender].balance += totalCredits;
+        userCredits[msg.sender].totalPurchased += pkg.credits;
+        userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits;
 
-        if (msg.value < price) revert InsufficientPayment();
-
-        userCredits[msg.sender].balance += tier.credits;
-        userCredits[msg.sender].totalPurchased += tier.credits;
-
+        // Send ETH to treasury
         (bool success,) = treasury.call{value: msg.value}("");
         if (!success) revert TransferFailed();
 
-        emit CreditsPurchased(msg.sender, tierId, tier.credits, msg.value);
+        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits, msg.value);
     }
 
-    /// @notice Spend credits for AI generation (called by platform)
+    // ── Purchase with $LOAR (25% margin) ─────────────────────────
+
+    /// @notice Buy credits with $LOAR tokens. 25% platform margin.
+    ///         User must approve this contract to spend their $LOAR first.
+    function purchaseWithLoar(uint256 packageId) external nonReentrant {
+        CreditPackage storage pkg = packages[packageId];
+        if (!pkg.active) revert PackageNotActive();
+
+        uint256 loarAmount = pkg.priceLoar;
+
+        // Check balance and allowance
+        if (loarToken.balanceOf(msg.sender) < loarAmount) revert InsufficientLoarBalance();
+        if (loarToken.allowance(msg.sender, address(this)) < loarAmount) revert InsufficientLoarAllowance();
+
+        // Transfer $LOAR to treasury
+        bool success = loarToken.transferFrom(msg.sender, treasury, loarAmount);
+        if (!success) revert TransferFailed();
+
+        // $LOAR buyers get a bonus on top of the package bonus
+        uint256 loarBonus = pkg.credits / 10; // Extra 10% credits for $LOAR payments
+        uint256 totalCredits = pkg.credits + pkg.bonusCredits + loarBonus;
+
+        userCredits[msg.sender].balance += totalCredits;
+        userCredits[msg.sender].totalPurchased += pkg.credits;
+        userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits + loarBonus;
+
+        emit CreditsPurchasedWithLoar(msg.sender, packageId, pkg.credits, pkg.bonusCredits + loarBonus, loarAmount);
+    }
+
+    // ── Spend Credits ────────────────────────────────────────────
+
+    /// @notice Spend credits for AI generation (called by platform backend)
     function spendCredits(
         address user,
         uint256 amount,
@@ -114,7 +193,9 @@ contract CreditManager is ReentrancyGuard {
         emit CreditsSpent(user, amount, generationType, universeId);
     }
 
-    /// @notice Grant free credits (rewards, promotions)
+    // ── Grant Credits (quests, affiliates, promotions) ───────────
+
+    /// @notice Grant free credits
     function grantCredits(
         address user,
         uint256 amount,
@@ -126,41 +207,43 @@ contract CreditManager is ReentrancyGuard {
         emit CreditsGranted(user, amount, reason);
     }
 
-    /// @notice Set holder discount for a universe token
+    // ── Admin ────────────────────────────────────────────────────
+
+    function setGenerationCost(string calldata genType, uint256 cost) external onlyPlatform {
+        generationCosts[keccak256(abi.encodePacked(genType))] = cost;
+        emit GenerationCostUpdated(genType, cost);
+    }
+
     function setHolderDiscount(address token, uint16 discountBps) external onlyPlatform {
         holderDiscountBps[token] = discountBps;
     }
 
-    /// @notice Update generation costs
-    function setGenerationCosts(
-        uint256 _image,
-        uint256 _video,
-        uint256 _story,
-        uint256 _spinoff
-    ) external onlyPlatform {
-        imageGenerationCost = _image;
-        videoGenerationCost = _video;
-        storyGenerationCost = _story;
-        spinoffGenerationCost = _spinoff;
+    function deactivatePackage(uint256 packageId) external onlyPlatform {
+        packages[packageId].active = false;
     }
 
-    /// @notice Deactivate a tier
-    function deactivateTier(uint256 tierId) external onlyPlatform {
-        tiers[tierId].active = false;
+    function updateLoarToken(address newToken) external onlyPlatform {
+        if (newToken == address(0)) revert ZeroAddress();
+        loarToken = IERC20(newToken);
     }
 
-    /// @notice Get user credit balance
+    // ── View ─────────────────────────────────────────────────────
+
     function getBalance(address user) external view returns (uint256) {
         return userCredits[user].balance;
     }
 
-    /// @notice Get generation cost by type
     function getGenerationCost(string calldata genType) external view returns (uint256) {
-        bytes32 h = keccak256(abi.encodePacked(genType));
-        if (h == keccak256("image")) return imageGenerationCost;
-        if (h == keccak256("video")) return videoGenerationCost;
-        if (h == keccak256("story")) return storyGenerationCost;
-        if (h == keccak256("spinoff")) return spinoffGenerationCost;
-        return 0;
+        return generationCosts[keccak256(abi.encodePacked(genType))];
+    }
+
+    function getUserStats(address user) external view returns (
+        uint256 balance,
+        uint256 totalPurchased,
+        uint256 totalSpent,
+        uint256 totalBonusReceived
+    ) {
+        UserCredits storage uc = userCredits[user];
+        return (uc.balance, uc.totalPurchased, uc.totalSpent, uc.totalBonusReceived);
     }
 }

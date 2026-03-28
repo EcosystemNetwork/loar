@@ -25,7 +25,9 @@ import {
   BarChart3,
   Eye,
   Zap,
+  Film,
 } from 'lucide-react';
+import { AdminModelAnalytics } from './AdminModelAnalytics';
 import { toast } from 'sonner';
 
 // ── Admin gate ──────────────────────────────────────────────────
@@ -146,7 +148,11 @@ function SectionToggle({
       onClick={() => onToggle(section)}
       className="flex items-center gap-2 w-full text-left text-xs py-1 hover:text-white text-zinc-400"
     >
-      {expanded === section ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      {expanded === section ? (
+        <ChevronUp className="h-3 w-3" />
+      ) : (
+        <ChevronDown className="h-3 w-3" />
+      )}
       <Icon className="h-3 w-3" />
       {label}
       {badge}
@@ -191,7 +197,9 @@ export default function AdminToolbar() {
     if (!open) return;
 
     function collect() {
-      const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+      const nav = performance.getEntriesByType('navigation')[0] as
+        | PerformanceNavigationTiming
+        | undefined;
       const paint = performance.getEntriesByType('paint');
       const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
       const mem = (performance as any).memory;
@@ -242,7 +250,10 @@ export default function AdminToolbar() {
     try {
       const fidObs = new PerformanceObserver((list) => {
         const entry = list.getEntries()[0] as PerformanceEventTiming;
-        if (entry) setPerf((p) => (p ? { ...p, firstInputDelay: entry.processingStart - entry.startTime } : p));
+        if (entry)
+          setPerf((p) =>
+            p ? { ...p, firstInputDelay: entry.processingStart - entry.startTime } : p
+          );
       });
       fidObs.observe({ type: 'first-input', buffered: true });
       observers.push(fidObs);
@@ -425,12 +436,8 @@ export default function AdminToolbar() {
 
           {/* Live stats */}
           <div className="flex items-center gap-3 text-[10px]">
-            <span className={fpsColor}>
-              {fps} FPS
-            </span>
-            <span className="text-zinc-500">
-              {perf?.domNodes ?? '—'} DOM
-            </span>
+            <span className={fpsColor}>{fps} FPS</span>
+            <span className="text-zinc-500">{perf?.domNodes ?? '—'} DOM</span>
             {perf?.jsHeapUsed && (
               <span className="text-zinc-500">{formatBytes(perf.jsHeapUsed)} heap</span>
             )}
@@ -450,7 +457,9 @@ export default function AdminToolbar() {
         <div className="flex items-center gap-1.5">
           <User className="h-3 w-3 text-blue-400" />
           <span className="text-zinc-400">Wallet:</span>
-          <span className="font-mono">{walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'N/A'}</span>
+          <span className="font-mono">
+            {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'N/A'}
+          </span>
           <button
             onClick={() => walletAddress && copyToClipboard(walletAddress, 'Address')}
             className="text-zinc-500 hover:text-zinc-300"
@@ -498,6 +507,25 @@ export default function AdminToolbar() {
       {/* ═══════════ ANALYTICS TAB ═══════════ */}
       {activeTab === 'analytics' && (
         <div className="px-4 py-2 space-y-1">
+          {/* ── AI Generation Economics ── */}
+          <SectionToggle
+            label="AI Generation Economics"
+            icon={Film}
+            section="generation"
+            expanded={expandedSection}
+            onToggle={toggleSection}
+            badge={
+              <Badge variant="outline" className="text-[9px] border-amber-700 text-amber-400 ml-1">
+                $LOAR
+              </Badge>
+            }
+          />
+          {expandedSection === 'generation' && (
+            <div className="ml-5 pb-3">
+              <AdminModelAnalytics />
+            </div>
+          )}
+
           {/* ── Core Web Vitals ── */}
           <SectionToggle
             label="Core Web Vitals"
@@ -512,7 +540,9 @@ export default function AdminToolbar() {
                 {/* LCP */}
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">LCP (Largest Contentful Paint)</div>
-                  <div className={`text-lg font-mono font-bold ${metricColor(perf.largestContentfulPaint, 2500, 4000)}`}>
+                  <div
+                    className={`text-lg font-mono font-bold ${metricColor(perf.largestContentfulPaint, 2500, 4000)}`}
+                  >
                     {perf.largestContentfulPaint !== null
                       ? `${(perf.largestContentfulPaint / 1000).toFixed(2)}s`
                       : '—'}
@@ -522,7 +552,9 @@ export default function AdminToolbar() {
                 {/* FID */}
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">FID (First Input Delay)</div>
-                  <div className={`text-lg font-mono font-bold ${metricColor(perf.firstInputDelay, 100, 300)}`}>
+                  <div
+                    className={`text-lg font-mono font-bold ${metricColor(perf.firstInputDelay, 100, 300)}`}
+                  >
                     {formatMs(perf.firstInputDelay)}
                   </div>
                   <div className="text-zinc-600 text-[10px]">Good &lt; 100ms</div>
@@ -530,15 +562,21 @@ export default function AdminToolbar() {
                 {/* CLS */}
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">CLS (Cumulative Layout Shift)</div>
-                  <div className={`text-lg font-mono font-bold ${clsColor(perf.cumulativeLayoutShift)}`}>
-                    {perf.cumulativeLayoutShift !== null ? perf.cumulativeLayoutShift.toFixed(4) : '—'}
+                  <div
+                    className={`text-lg font-mono font-bold ${clsColor(perf.cumulativeLayoutShift)}`}
+                  >
+                    {perf.cumulativeLayoutShift !== null
+                      ? perf.cumulativeLayoutShift.toFixed(4)
+                      : '—'}
                   </div>
                   <div className="text-zinc-600 text-[10px]">Good &lt; 0.1</div>
                 </div>
                 {/* INP */}
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">INP (Interaction to Next Paint)</div>
-                  <div className={`text-lg font-mono font-bold ${metricColor(perf.interactionToNextPaint, 200, 500)}`}>
+                  <div
+                    className={`text-lg font-mono font-bold ${metricColor(perf.interactionToNextPaint, 200, 500)}`}
+                  >
                     {formatMs(perf.interactionToNextPaint)}
                   </div>
                   <div className="text-zinc-600 text-[10px]">Good &lt; 200ms</div>
@@ -546,14 +584,18 @@ export default function AdminToolbar() {
                 {/* FP */}
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">First Paint</div>
-                  <div className={`text-lg font-mono font-bold ${metricColor(perf.firstPaint, 1000, 3000)}`}>
+                  <div
+                    className={`text-lg font-mono font-bold ${metricColor(perf.firstPaint, 1000, 3000)}`}
+                  >
                     {formatMs(perf.firstPaint)}
                   </div>
                 </div>
                 {/* FCP */}
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">FCP (First Contentful Paint)</div>
-                  <div className={`text-lg font-mono font-bold ${metricColor(perf.firstContentfulPaint, 1800, 3000)}`}>
+                  <div
+                    className={`text-lg font-mono font-bold ${metricColor(perf.firstContentfulPaint, 1800, 3000)}`}
+                  >
                     {formatMs(perf.firstContentfulPaint)}
                   </div>
                   <div className="text-zinc-600 text-[10px]">Good &lt; 1.8s</div>
@@ -577,10 +619,18 @@ export default function AdminToolbar() {
                 <div className="bg-zinc-900 rounded-md p-3">
                   <div className="space-y-1.5">
                     {[
-                      { label: 'DOM Content Loaded', val: perf.domContentLoaded, color: 'bg-blue-500' },
+                      {
+                        label: 'DOM Content Loaded',
+                        val: perf.domContentLoaded,
+                        color: 'bg-blue-500',
+                      },
                       { label: 'Full Page Load', val: perf.fullLoad, color: 'bg-green-500' },
                       { label: 'First Paint', val: perf.firstPaint, color: 'bg-yellow-500' },
-                      { label: 'First Contentful Paint', val: perf.firstContentfulPaint, color: 'bg-purple-500' },
+                      {
+                        label: 'First Contentful Paint',
+                        val: perf.firstContentfulPaint,
+                        color: 'bg-purple-500',
+                      },
                     ].map(({ label, val, color }) => (
                       <div key={label} className="flex items-center gap-2">
                         <span className="text-zinc-500 w-40 shrink-0">{label}</span>
@@ -592,15 +642,24 @@ export default function AdminToolbar() {
                             }}
                           />
                         </div>
-                        <span className="font-mono text-zinc-300 w-16 text-right">{formatMs(val)}</span>
+                        <span className="font-mono text-zinc-300 w-16 text-right">
+                          {formatMs(val)}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div className="flex gap-4 text-zinc-400">
-                  <span>Resources: <strong className="text-zinc-200">{perf.resourceCount}</strong></span>
-                  <span>Transfer: <strong className="text-zinc-200">{formatBytes(perf.transferSize)}</strong></span>
-                  <span>DOM Nodes: <strong className="text-zinc-200">{perf.domNodes}</strong></span>
+                  <span>
+                    Resources: <strong className="text-zinc-200">{perf.resourceCount}</strong>
+                  </span>
+                  <span>
+                    Transfer:{' '}
+                    <strong className="text-zinc-200">{formatBytes(perf.transferSize)}</strong>
+                  </span>
+                  <span>
+                    DOM Nodes: <strong className="text-zinc-200">{perf.domNodes}</strong>
+                  </span>
                 </div>
               </div>
             </div>
@@ -613,9 +672,7 @@ export default function AdminToolbar() {
             section="realtime"
             expanded={expandedSection}
             onToggle={toggleSection}
-            badge={
-              <span className={`text-[10px] ml-1 font-mono ${fpsColor}`}>{fps} FPS</span>
-            }
+            badge={<span className={`text-[10px] ml-1 font-mono ${fpsColor}`}>{fps} FPS</span>}
           />
           {expandedSection === 'realtime' && (
             <div className="ml-5 pb-3">
@@ -626,7 +683,9 @@ export default function AdminToolbar() {
                 </div>
                 <div className="bg-zinc-900 rounded-md p-2 text-center">
                   <div className="text-zinc-500 mb-1">DOM Nodes</div>
-                  <div className="text-2xl font-mono font-bold text-zinc-200">{perf?.domNodes ?? '—'}</div>
+                  <div className="text-2xl font-mono font-bold text-zinc-200">
+                    {perf?.domNodes ?? '—'}
+                  </div>
                 </div>
                 <div className="bg-zinc-900 rounded-md p-2 text-center">
                   <div className="text-zinc-500 mb-1">JS Heap</div>
@@ -649,7 +708,9 @@ export default function AdminToolbar() {
                 </div>
                 <div className="bg-zinc-900 rounded-md p-2 text-center">
                   <div className="text-zinc-500 mb-1">Resources</div>
-                  <div className="text-2xl font-mono font-bold text-zinc-200">{perf?.resourceCount ?? '—'}</div>
+                  <div className="text-2xl font-mono font-bold text-zinc-200">
+                    {perf?.resourceCount ?? '—'}
+                  </div>
                   <div className="text-[10px] text-zinc-600">
                     {perf ? formatBytes(perf.transferSize) : '—'}
                   </div>
@@ -687,7 +748,9 @@ export default function AdminToolbar() {
                     <tr key={`${entry.name}-${i}`} className="border-t border-zinc-900">
                       <td className="py-0.5 pr-2 font-mono truncate max-w-[200px]">{entry.name}</td>
                       <td className="py-0.5 pr-2 text-zinc-500">{entry.type}</td>
-                      <td className="py-0.5 pr-2 text-right text-zinc-400">{entry.size ? formatBytes(entry.size) : '—'}</td>
+                      <td className="py-0.5 pr-2 text-right text-zinc-400">
+                        {entry.size ? formatBytes(entry.size) : '—'}
+                      </td>
                       <td
                         className={`py-0.5 text-right font-mono ${
                           entry.status === 'error'
@@ -725,7 +788,10 @@ export default function AdminToolbar() {
           {expandedSection === 'navhistory' && (
             <div className="ml-5 pb-3 max-h-40 overflow-y-auto">
               {navHistory.map((entry, i) => (
-                <div key={`${entry.timestamp}-${i}`} className="flex items-center gap-2 text-[11px] py-0.5">
+                <div
+                  key={`${entry.timestamp}-${i}`}
+                  className="flex items-center gap-2 text-[11px] py-0.5"
+                >
                   <span className="text-zinc-600 font-mono w-16 shrink-0">
                     {new Date(entry.timestamp).toLocaleTimeString()}
                   </span>
@@ -756,29 +822,39 @@ export default function AdminToolbar() {
               <div className="grid grid-cols-3 gap-3 text-[11px]">
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">localStorage</div>
-                  <div className="font-mono font-bold text-zinc-200">{formatBytes(storage.local)}</div>
+                  <div className="font-mono font-bold text-zinc-200">
+                    {formatBytes(storage.local)}
+                  </div>
                   <div className="text-[10px] text-zinc-600">{localStorage.length} keys</div>
                 </div>
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">sessionStorage</div>
-                  <div className="font-mono font-bold text-zinc-200">{formatBytes(storage.session)}</div>
+                  <div className="font-mono font-bold text-zinc-200">
+                    {formatBytes(storage.session)}
+                  </div>
                   <div className="text-[10px] text-zinc-600">{sessionStorage.length} keys</div>
                 </div>
                 <div className="bg-zinc-900 rounded-md p-2">
                   <div className="text-zinc-500 mb-1">Cookies</div>
-                  <div className="font-mono font-bold text-zinc-200">{formatBytes(storage.cookies)}</div>
+                  <div className="font-mono font-bold text-zinc-200">
+                    {formatBytes(storage.cookies)}
+                  </div>
                 </div>
               </div>
               {/* localStorage keys breakdown */}
               <div className="mt-2 text-[10px]">
                 <div className="text-zinc-500 mb-1">localStorage keys:</div>
                 <div className="max-h-24 overflow-y-auto space-y-0.5">
-                  {Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)!).map((key) => (
-                    <div key={key} className="flex justify-between font-mono">
-                      <span className="text-zinc-400 truncate max-w-[200px]">{key}</span>
-                      <span className="text-zinc-600">{formatBytes((localStorage.getItem(key)?.length ?? 0) * 2)}</span>
-                    </div>
-                  ))}
+                  {Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)!).map(
+                    (key) => (
+                      <div key={key} className="flex justify-between font-mono">
+                        <span className="text-zinc-400 truncate max-w-[200px]">{key}</span>
+                        <span className="text-zinc-600">
+                          {formatBytes((localStorage.getItem(key)?.length ?? 0) * 2)}
+                        </span>
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
             </div>
@@ -1035,7 +1111,12 @@ export default function AdminToolbar() {
           className="h-6 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
           onClick={() => {
             console.log({
-              wallet: { address: walletAddress, authenticated: isAuthenticated, chainId, connector: connector?.name },
+              wallet: {
+                address: walletAddress,
+                authenticated: isAuthenticated,
+                chainId,
+                connector: connector?.name,
+              },
               route: routerState.location,
               env: envVars,
               perf,
