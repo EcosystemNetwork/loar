@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Grid3x3, List, Heart } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 
 interface Event {
   id: string;
@@ -19,6 +20,8 @@ interface Event {
   videoUrl?: string;
   imageUrl?: string;
   timestamp?: number;
+  classification?: 'fan' | 'original' | 'licensed';
+  reviewStatus?: 'not_required' | 'pending' | 'approved' | 'rejected';
 }
 
 interface EventGalleryProps {
@@ -170,6 +173,15 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
                       }`}
                     />
                   </button>
+                  {event.classification && (
+                    <div className="absolute bottom-2 left-2">
+                      <ContentLaneBadge
+                        classification={event.classification}
+                        reviewStatus={event.reviewStatus}
+                        size="sm"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between">
@@ -214,6 +226,13 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
                           <span className="text-xs font-medium text-muted-foreground">
                             Event {event.id}
                           </span>
+                          {event.classification && (
+                            <ContentLaneBadge
+                              classification={event.classification}
+                              reviewStatus={event.reviewStatus}
+                              size="sm"
+                            />
+                          )}
                         </div>
                         <h3 className="font-medium mt-1">{event.title || `Event ${event.id}`}</h3>
                         <p className="text-sm text-muted-foreground line-clamp-2 mt-1">

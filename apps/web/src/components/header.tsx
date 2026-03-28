@@ -22,6 +22,7 @@ export default function Header() {
     { to: '/dashboard' as const, label: 'Dashboard' },
     { to: '/discover' as const, label: 'Discover' },
     { to: '/upload' as const, label: 'Upload' },
+    { to: '/my-works' as const, label: 'My Works' },
     { to: '/sandbox' as const, label: 'Sandbox' },
     { to: '/cinematicUniverseCreate' as const, label: 'Create' },
     { to: '/wiki' as const, label: 'Wiki' },

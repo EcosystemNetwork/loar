@@ -10,6 +10,15 @@ import { createFileRoute, useParams, useNavigate } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   ArrowLeft,
   Loader2,
@@ -19,10 +28,14 @@ import {
   Film,
   ChevronLeft,
   ChevronRight,
+  Tag,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { useGetFullGraph } from '@/hooks/useTimeline';
+import { useCreateEpisodeListing } from '@/hooks/useRevenue';
+import { keccak256, toBytes } from 'viem';
 
 function EventPage() {
   const { universe: universeId, event: eventId } = useParams({ from: '/event/$universe/$event' });
@@ -152,6 +165,14 @@ function EventPage() {
   const wiki = wikiData?.wikiData;
   const isLoading = isLoadingGraph || isLoadingWiki;
 
+  // List as NFT dialog
+  const [listingOpen, setListingOpen] = useState(false);
+  const [mintPrice, setMintPrice] = useState('0.05');
+  const [maxSupply, setMaxSupply] = useState('0');
+  const [listingTitle, setListingTitle] = useState('');
+  const [listingDescription, setListingDescription] = useState('');
+  const createListing = useCreateEpisodeListing();
+
   if (!universeId || !eventId) {
     return (
       <div className="container mx-auto p-6">
@@ -205,11 +226,28 @@ function EventPage() {
                 <p className="text-sm text-muted-foreground">{wiki?.title || eventDescription}</p>
               </div>
             </div>
-            {wiki && (
-              <Badge variant="secondary" className="text-xs">
-                AI Generated
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {wiki && (
+                <Badge variant="secondary" className="text-xs">
+                  AI Generated
+                </Badge>
+              )}
+              {eventVideoUrl && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setListingTitle(wiki?.title || `Event #${eventId}`);
+                    setListingDescription(eventDescription || '');
+                    setListingOpen(true);
+                  }}
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  List as NFT
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -618,6 +656,100 @@ function EventPage() {
           </Card>
         )}
       </div>
+
+      {/* List as NFT Dialog */}
+      <Dialog open={listingOpen} onOpenChange={setListingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5" /> List Episode as NFT
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="listingTitle">Title</Label>
+              <Input
+                id="listingTitle"
+                value={listingTitle}
+                onChange={(e) => setListingTitle(e.target.value)}
+                maxLength={200}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="listingDesc">Description</Label>
+              <Input
+                id="listingDesc"
+                value={listingDescription}
+                onChange={(e) => setListingDescription(e.target.value)}
+                maxLength={500}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="mintPrice">Mint Price (ETH)</Label>
+                <Input
+                  id="mintPrice"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={mintPrice}
+                  onChange={(e) => setMintPrice(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxSupply">Max Supply (0 = unlimited)</Label>
+                <Input
+                  id="maxSupply"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={maxSupply}
+                  onChange={(e) => setMaxSupply(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Listing fee: 5% royalty on secondary sales is set by default. By listing, you confirm
+              this is original content and you have rights to mint it.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setListingOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={createListing.isPending || !listingTitle || !mintPrice}
+              onClick={async () => {
+                const contentHash = keccak256(toBytes(eventVideoUrl));
+                await createListing.mutateAsync({
+                  universeId,
+                  nodeId: parseInt(eventId),
+                  contentHash,
+                  title: listingTitle,
+                  description: listingDescription,
+                  mediaUrl: eventVideoUrl,
+                  mintPrice,
+                  maxSupply: parseInt(maxSupply) || 0,
+                  royaltyBps: 500,
+                  metadataURI: `loar://universe/${universeId}/event/${eventId}`,
+                });
+                setListingOpen(false);
+              }}
+              className="gap-1.5"
+            >
+              {createListing.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Listing...
+                </>
+              ) : (
+                <>
+                  <Tag className="h-3.5 w-3.5" /> Create Listing
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
