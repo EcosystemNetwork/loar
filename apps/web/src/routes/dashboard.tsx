@@ -14,6 +14,8 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { GenerativeMedia } from '@/components/GenerativeMedia';
 import { QuestsPanel } from '@/components/QuestsPanel';
+import { DailyCheckin } from '@/components/DailyCheckin';
+import { MonetizationOverview } from '@/components/MonetizationOverview';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useEffect } from 'react';
@@ -147,6 +149,9 @@ function RouteComponent() {
             </section>
           )}
 
+          {/* Monetization Overview */}
+          <MonetizationOverview />
+
           {/* AI Media Generation Section */}
           <section className="mb-12">
             <div className="flex items-center gap-2 mb-6">
@@ -187,9 +192,10 @@ function RouteComponent() {
           )}
         </div>
 
-        {/* Sidebar — Quests & Rewards */}
+        {/* Sidebar — Check-in + Quests & Rewards */}
         <aside className="hidden lg:block w-80 flex-shrink-0">
-          <div className="sticky top-20">
+          <div className="sticky top-20 space-y-4">
+            <DailyCheckin />
             <QuestsPanel />
           </div>
         </aside>
