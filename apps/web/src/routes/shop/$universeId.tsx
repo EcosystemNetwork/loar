@@ -37,9 +37,11 @@ export const Route = createFileRoute('/shop/$universeId')({
 
 function UniverseShopPage() {
   const { universeId } = useParams({ from: '/shop/$universeId' });
+  const { user } = useWalletAuth();
 
   const { data: storefront, isLoading } = useUniverseStorefront(universeId);
   const { data: subTiers } = useSubscriptionTiers(universeId);
+  const { data: adSlots, isLoading: adsLoading } = useAdSlots(universeId);
   const { data: universe } = useQuery({
     queryKey: ['universe', universeId],
     queryFn: () => trpcClient.universes.get.query({ id: universeId }),
@@ -106,6 +108,12 @@ function UniverseShopPage() {
                 <Badge variant="outline" className="gap-1">
                   <Crown className="w-3 h-3" />
                   {subTiers.length} subscription tiers
+                </Badge>
+              )}
+              {adSlots && adSlots.length > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <Megaphone className="w-3 h-3" />
+                  {adSlots.length} ad slots
                 </Badge>
               )}
             </div>
