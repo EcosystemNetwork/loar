@@ -3,6 +3,19 @@
  * Documents are keyed by the lowercase contract address to ensure uniqueness.
  */
 import { db } from '../../lib/firebase';
+import { randomUUID } from 'crypto';
+
+// ── Mint fee credit conversion ────────────────────────────────────────────
+//
+// The UniverseManager contract charges 0.05 Base ETH to mint a universe:
+//   • 50% (0.025 ETH) → lpRecipient (deepens $LOAR liquidity, earns LP fees for platform)
+//   • 50% (0.025 ETH) → held in contract, claimed by platform treasury
+//
+// The platform converts the 0.025 ETH credit portion into shared credits for
+// the universe's team wallet. The rate is configurable via UNIVERSE_MINT_CREDITS
+// env var (defaults to 5000 credits ≈ $50 at standard pricing).
+//
+const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '5000', 10);
 
 interface CreateCinematicUniverseInput {
   address: string;
@@ -11,6 +24,10 @@ interface CreateCinematicUniverseInput {
   governanceAddress: string;
   imageUrl: string;
   description: string;
+  /** On-chain uint universe ID returned by createUniverse() */
+  onChainUniverseId?: string;
+  /** Transaction hash of the createUniverse() call */
+  mintTxHash?: string;
 }
 
 const collection = db.collection('cinematicUniverses');
@@ -31,16 +48,26 @@ export async function createCinematicUniverse(input: CreateCinematicUniverseInpu
       governanceAddress: input.governanceAddress,
       image_url: input.imageUrl,
       description: input.description,
+      onChainUniverseId: input.onChainUniverseId ?? null,
+      mintTxHash: input.mintTxHash ?? null,
       created_at: new Date(),
       updated_at: new Date(),
     };
 
     await collection.doc(id).set(data);
 
+    // ── Seed the universe credit pool from the mint fee ───────────────
+    // The on-chain UniverseManager held 0.025 ETH (credit portion) when
+    // this universe was minted. We mirror that as platform credits in the
+    // universe's shared team wallet so team members can start generating
+    // immediately without additional top-ups.
+    await seedUniverseCreditPool(id, input.creator, input.mintTxHash);
+
     return {
       success: true,
       data: { id, ...data },
       message: 'Cinematic universe created successfully',
+      mintCreditsAwarded: UNIVERSE_MINT_CREDITS,
     };
   } catch (error) {
     console.error('Error creating cinematic universe:', error);
@@ -98,5 +125,61 @@ export async function getCinematicUniversesByCreator(creator: string) {
   } catch (error) {
     console.error('Error fetching cinematic universes by creator:', error);
     throw new Error('Failed to fetch cinematic universes by creator');
+  }
+}
+
+// ── Internal: seed universe credit pool from mint fee ────────────────────
+
+async function seedUniverseCreditPool(
+  universeId: string,
+  creatorUid: string,
+  mintTxHash?: string | null
+) {
+  try {
+    const poolRef = db.collection('universeCredits').doc(universeId);
+    const existing = await poolRef.get();
+
+    // Idempotency: don't double-seed if already seeded
+    if (
+      existing.exists &&
+      (existing.data()?.seedTxHash === mintTxHash || existing.data()?.balance > 0)
+    ) {
+      return;
+    }
+
+    const now = new Date();
+
+    await poolRef.set(
+      {
+        universeId,
+        balance: UNIVERSE_MINT_CREDITS,
+        totalPurchased: UNIVERSE_MINT_CREDITS,
+        totalSpent: 0,
+        seedTxHash: mintTxHash ?? null,
+        seedSource: 'mint_fee',
+        lastFundedAt: now,
+        updatedAt: now,
+        createdAt: now,
+      },
+      { merge: true }
+    );
+
+    await db.collection('universeCreditTransactions').add({
+      id: randomUUID(),
+      universeId,
+      type: 'fund',
+      fundedByUid: creatorUid.toLowerCase(),
+      paymentMethod: 'eth',
+      paymentRef: mintTxHash ?? 'genesis',
+      credits: UNIVERSE_MINT_CREDITS,
+      /** 0.025 ETH held on-chain; platform converts at UNIVERSE_MINT_CREDITS rate */
+      ethAmountWei: '25000000000000000',
+      source: 'mint_fee',
+      note: '50% of 0.05 ETH universe mint fee converted to team credits',
+      createdAt: now,
+    });
+  } catch (err) {
+    // Non-fatal — log and continue. The universe doc was already created.
+    console.error(`[seedUniverseCreditPool] Failed to seed credits for ${universeId}:`, err);
   }
 }

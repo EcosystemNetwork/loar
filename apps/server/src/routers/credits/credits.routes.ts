@@ -82,7 +82,7 @@ function buildPackage(
   };
 }
 
-const DEFAULT_PACKAGES: CreditPackage[] = [
+export const DEFAULT_PACKAGES: CreditPackage[] = [
   buildPackage('starter', 'Starter', 100, 0, false),
   buildPackage('creator', 'Creator', 500, 50, true),
   buildPackage('pro', 'Pro', 1500, 200, false),
@@ -311,11 +311,101 @@ export const creditsRouter = router({
         generationId: z.string().optional(),
         modelId: z.string().optional(),
         metadata: z.record(z.string(), z.string()).optional(),
+        /**
+         * When true and universeId is set, deduct from the universe's shared
+         * credit pool (funded from the universe treasury) instead of the
+         * caller's personal balance. The caller must be an active team member
+         * or the universe admin.
+         */
+        useUniversePool: z.boolean().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const cost = input.creditOverride || GENERATION_COSTS[input.generationType] || 1;
 
+      // ── Universe pool path ────────────────────────────────────────
+      if (input.useUniversePool && input.universeId) {
+        const universeId = input.universeId.toLowerCase();
+        const callerUid = ctx.user.uid.toLowerCase();
+
+        // Verify the caller is the admin or an active team member
+        const [universeDoc, memberDoc] = await Promise.all([
+          db.collection('cinematicUniverses').doc(universeId).get(),
+          db.collection('universeTeamMembers').doc(`${universeId}-${callerUid}`).get(),
+        ]);
+
+        const adminUid = (universeDoc.data()?.creator as string | undefined)?.toLowerCase();
+        const isAdmin = adminUid === callerUid;
+        const membership = memberDoc.exists ? memberDoc.data()! : null;
+        const isMember = !!membership && membership.status === 'active';
+
+        if (!isAdmin && !isMember) {
+          throw new Error('You are not an active team member of this universe');
+        }
+
+        // Enforce monthly allowance for non-admins
+        if (!isAdmin && membership!.monthlyAllowance > 0) {
+          const periodStart = membership!.allowancePeriodStart?.toDate?.() ?? new Date(0);
+          const now = new Date();
+          const sameMonth =
+            periodStart.getFullYear() === now.getFullYear() &&
+            periodStart.getMonth() === now.getMonth();
+          const usedThisMonth = sameMonth ? membership!.creditsUsedThisMonth || 0 : 0;
+
+          if (usedThisMonth + cost > membership!.monthlyAllowance) {
+            throw new Error(
+              `Monthly credit allowance exceeded. Allowance: ${membership!.monthlyAllowance}, used: ${usedThisMonth}, need: ${cost}`
+            );
+          }
+
+          await db
+            .collection('universeTeamMembers')
+            .doc(`${universeId}-${callerUid}`)
+            .update({
+              creditsUsedThisMonth: usedThisMonth + cost,
+              allowancePeriodStart: sameMonth ? membership!.allowancePeriodStart : now,
+              updatedAt: now,
+            });
+        }
+
+        // Deduct from the universe pool
+        const poolRef = db.collection('universeCredits').doc(universeId);
+        const poolDoc = await poolRef.get();
+        const poolBalance = (poolDoc.data()?.balance as number) || 0;
+        const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
+
+        if (poolBalance < cost) {
+          throw new Error(
+            `Universe credit pool is too low. Need ${cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`
+          );
+        }
+
+        await poolRef.set(
+          { balance: poolBalance - cost, totalSpent: poolSpent + cost, updatedAt: new Date() },
+          { merge: true }
+        );
+
+        await db.collection('universeCreditTransactions').add({
+          universeId,
+          type: 'spend',
+          spentByUid: callerUid,
+          generationType: input.generationType,
+          credits: -cost,
+          generationId: input.generationId ?? null,
+          modelId: input.modelId ?? null,
+          metadata: input.metadata ?? null,
+          createdAt: new Date(),
+        });
+
+        return {
+          ok: true,
+          creditsSpent: cost,
+          remainingBalance: poolBalance - cost,
+          source: 'universe_pool',
+        };
+      }
+
+      // ── Personal balance path (default) ──────────────────────────
       const userRef = creditsCol.doc(ctx.user.uid);
       const userDoc = await userRef.get();
 
@@ -346,7 +436,12 @@ export const creditsRouter = router({
         createdAt: new Date(),
       });
 
-      return { ok: true, creditsSpent: cost, remainingBalance: data.balance - cost };
+      return {
+        ok: true,
+        creditsSpent: cost,
+        remainingBalance: data.balance - cost,
+        source: 'personal',
+      };
     }),
 
   // ── Grant (platform/admin/quests) ───────────────────────────────

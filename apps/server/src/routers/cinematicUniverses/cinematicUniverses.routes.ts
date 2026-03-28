@@ -20,6 +20,13 @@ const createCinematicUniverseSchema = z.object({
   description: z.string().min(1, 'Description is required').max(1000, 'Description too long'),
   signature: z.string().min(1, 'Signature is required'), // Wallet signature for verification
   message: z.string().min(1, 'Message is required'), // Message that was signed
+  /** On-chain uint universe ID returned by createUniverse() */
+  onChainUniverseId: z.string().optional(),
+  /** Transaction hash of the createUniverse() call — used to verify mint fee was paid */
+  mintTxHash: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{64}$/)
+    .optional(),
 });
 
 const getCinematicUniverseSchema = z.object({
@@ -70,6 +77,8 @@ export const cinematicUniversesRouter = router({
         governanceAddress: input.governanceAddress,
         imageUrl: input.imageUrl,
         description: input.description,
+        onChainUniverseId: input.onChainUniverseId,
+        mintTxHash: input.mintTxHash,
       });
     } catch (error) {
       console.error('Wallet signature verification failed:', error);

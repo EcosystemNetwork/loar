@@ -62,6 +62,16 @@ interface IUniverseManager {
         address universe,
         address creator
     );
+    /// @notice Emitted when the 0.05 ETH mint fee is collected on universe creation.
+    ///         lpAmount     → sent to lpRecipient to deepen $LOAR liquidity
+    ///         creditAmount → held by contract; server converts to universe credit pool
+    event UniverseMintFee(
+        uint256 indexed universeId,
+        address indexed creator,
+        uint256 lpAmount,
+        uint256 creditAmount
+    );
+    event SetLpRecipient(address oldLpRecipient, address newLpRecipient);
     event TokenDeployed();
     //event TokenGraduation();
     event SetTeamFeeRecipient(
@@ -94,6 +104,8 @@ interface IUniverseManager {
     event SetHook(address hook, bool enabled);
     error Deprecated();
     error TeamFeeRecipientNotSet();
+    error LpRecipientNotSet();
+    error InsufficientMintFee();
     error DeployerIsNotOwner();
     error HookNotEnabled();
     error InvalidHook();
@@ -110,7 +122,7 @@ interface IUniverseManager {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) external returns (uint _id, address);
+    ) external payable returns (uint _id, address);
 
     function deployUniverseToken(
         DeploymentConfig memory deploymentConfig,

@@ -9,13 +9,26 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from 'lucide-react';
+import {
+  Wallet,
+  Copy,
+  ExternalLink,
+  Play,
+  Users,
+  Calendar,
+  Plus,
+  Wand2,
+  Film,
+  ShoppingBag,
+  TrendingUp,
+} from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { GenerativeMedia } from '@/components/GenerativeMedia';
 import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { MonetizationOverview } from '@/components/MonetizationOverview';
+import { useMyNFTs } from '@/hooks/useRevenue';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useEffect } from 'react';
@@ -152,6 +165,9 @@ function RouteComponent() {
           {/* Monetization Overview */}
           <MonetizationOverview />
 
+          {/* Creator Earnings Summary */}
+          <CreatorEarnings />
+
           {/* AI Media Generation Section */}
           <section className="mb-12">
             <div className="flex items-center gap-2 mb-6">
@@ -201,6 +217,56 @@ function RouteComponent() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function CreatorEarnings() {
+  const { data: myNfts, isLoading } = useMyNFTs();
+
+  const episodesListed = myNfts?.createdEpisodes?.length ?? 0;
+  const totalMinted =
+    myNfts?.createdEpisodes?.reduce((sum: number, ep: any) => sum + (ep.minted || 0), 0) ?? 0;
+  const nftsCollected = myNfts?.mintedEpisodes?.length ?? 0;
+
+  if (isLoading) return null;
+  if (episodesListed === 0 && nftsCollected === 0) return null;
+
+  return (
+    <section className="mb-12">
+      <div className="flex items-center gap-2 mb-4">
+        <TrendingUp className="h-5 w-5" />
+        <h2 className="text-xl font-semibold">Creator Earnings</h2>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Film className="h-4 w-4" />
+              <span className="text-sm">Episodes Listed</span>
+            </div>
+            <p className="text-2xl font-bold">{episodesListed}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <ShoppingBag className="h-4 w-4" />
+              <span className="text-sm">Total Minted</span>
+            </div>
+            <p className="text-2xl font-bold">{totalMinted}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Film className="h-4 w-4" />
+              <span className="text-sm">NFTs Collected</span>
+            </div>
+            <p className="text-2xl font-bold">{nftsCollected}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
   );
 }
 
