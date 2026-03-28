@@ -190,7 +190,14 @@ export const generationRouter = router({
     .query(({ input }) => {
       if (input.routingMode === 'manual' && input.selectedModelId) {
         const model = getModelById(input.selectedModelId);
-        if (!model) return { credits: 0, fiatPriceUsd: 0, loarPriceUsd: 0, modelName: 'Unknown' };
+        if (!model)
+          return {
+            credits: 0,
+            fiatPriceUsd: 0,
+            loarPriceUsd: 0,
+            modelName: 'Unknown',
+            priceTier: undefined as string | undefined,
+          };
         return {
           credits: model.creditCost,
           fiatPriceUsd: model.fiatPriceUsd,
@@ -384,6 +391,9 @@ export const generationRouter = router({
               status: 'completed' as const,
               videoUrl: fallbackResult.videoUrl,
               modelUsed: fallbackResult.fallbackModelId,
+              modelDisplayName:
+                getModelById(fallbackResult.fallbackModelId)?.displayName ||
+                fallbackResult.fallbackModelId,
               routingMode: input.routingMode,
               reasonCode,
               creditsCharged,

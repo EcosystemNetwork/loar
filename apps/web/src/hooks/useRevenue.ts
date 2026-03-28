@@ -81,15 +81,15 @@ export function useCreditBalance() {
 export function useCreditTiers() {
   return useQuery({
     queryKey: ['credit-tiers'],
-    queryFn: () => trpcClient.credits.getTiers.query(),
+    queryFn: () => trpcClient.credits.getPackages.query(),
   });
 }
 
 export function usePurchaseCredits() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.credits.purchase.mutate>[0]) =>
-      trpcClient.credits.purchase.mutate(input),
+    mutationFn: (input: Parameters<typeof trpcClient.credits.purchaseWithFiat.mutate>[0]) =>
+      trpcClient.credits.purchaseWithFiat.mutate(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['credit-balance'] }),
   });
 }

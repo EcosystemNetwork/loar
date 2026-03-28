@@ -902,7 +902,7 @@ function CreditsTab() {
 
   const { data: tiers } = useQuery({
     queryKey: ['credit-tiers'],
-    queryFn: () => trpcClient.credits.getTiers.query(),
+    queryFn: () => trpcClient.credits.getPackages.query(),
   });
 
   const { data: costs } = useQuery({
@@ -918,11 +918,12 @@ function CreditsTab() {
   const [purchasingTier, setPurchasingTier] = useState<string | null>(null);
 
   const purchaseCredits = useMutation({
-    mutationFn: (args: { tierId: string; amount: string }) =>
-      trpcClient.credits.purchase.mutate({
-        tierId: args.tierId,
-        txHash: `0x${Date.now().toString(16)}${'0'.repeat(40)}`.slice(0, 66),
-        amount: args.amount,
+    mutationFn: (args: { packageId: string; amountPaid: string }) =>
+      trpcClient.credits.purchaseWithFiat.mutate({
+        packageId: args.packageId,
+        paymentMethod: 'eth',
+        paymentRef: `0x${Date.now().toString(16)}${'0'.repeat(40)}`.slice(0, 66),
+        amountPaid: args.amountPaid,
       }),
     onSuccess: (data: any) => {
       alert(`Purchased ${data.creditsAdded} credits!`);
@@ -986,14 +987,17 @@ function CreditsTab() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold mb-4">
-                    {tier.priceWei ? formatWei(tier.priceWei) : '0.00'} ETH
+                    {tier.ethPriceWei ? formatWei(tier.ethPriceWei) : '0.00'} ETH
                   </p>
                   <Button
                     className="w-full"
                     disabled={purchaseCredits.isPending && purchasingTier === tier.id}
                     onClick={() => {
                       setPurchasingTier(tier.id);
-                      purchaseCredits.mutate({ tierId: tier.id, amount: tier.priceWei || '0' });
+                      purchaseCredits.mutate({
+                        packageId: tier.id,
+                        amountPaid: tier.ethPriceWei || '0',
+                      });
                     }}
                   >
                     {purchaseCredits.isPending && purchasingTier === tier.id ? (
