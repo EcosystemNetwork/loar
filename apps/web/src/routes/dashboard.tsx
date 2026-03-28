@@ -6,7 +6,7 @@
  * Redirects to /login when unauthenticated.
  */
 
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +30,8 @@ import {
   Globe,
   Image as ImageIcon,
   Loader2,
-  ArrowRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,6 +40,7 @@ import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { MonetizationOverview } from '@/components/MonetizationOverview';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
+import { UploadForm } from '@/components/UploadForm';
 import { useMyNFTs } from '@/hooks/useRevenue';
 import { toast } from 'sonner';
 
@@ -180,30 +182,8 @@ function RouteComponent() {
           {/* Creator Earnings Summary */}
           <CreatorEarnings />
 
-          {/* Upload CTA */}
-          <section className="mb-8">
-            <Card className="border-dashed border-2 hover:border-primary/60 transition-colors">
-              <CardContent className="flex items-center justify-between p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Upload className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Upload Content</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Publish videos, images, or AI-generated media to your profile
-                    </p>
-                  </div>
-                </div>
-                <Button asChild className="gap-2 flex-shrink-0">
-                  <Link to="/upload">
-                    <Upload className="h-4 w-4" />
-                    Upload New
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </section>
+          {/* Upload */}
+          <UploadSection />
 
           {/* My Works */}
           <MyWorksSection />

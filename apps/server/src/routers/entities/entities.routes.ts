@@ -1,16 +1,22 @@
 /**
- * Entities tRPC router — CRUD for narrative hierarchy entities.
+ * Entities tRPC router — CRUD for worldbuilding entities.
  *
- * All mutations require authentication (protectedProcedure).
- * Reads are public so the narrative structure is browsable.
+ * Creator kinds (person, place, thing, faction, event, lore, species, vehicle,
+ * technology, organization) can exist without a universe — universeAddress is
+ * optional for those. Structural kinds (timeline, realm, etc.) retain the old
+ * behaviour.
+ *
+ * All mutations require authentication. Reads are public.
  */
 import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
-import { ENTITY_KINDS } from './entities.types';
+import { ENTITY_KINDS, CREATOR_KINDS } from './entities.types';
 import {
   createEntity,
   getEntity,
   getEntitiesByUniverse,
+  getEntitiesByKind,
+  getEntitiesByCreator,
   getChildEntities,
   updateEntity,
   deleteEntity,
@@ -23,14 +29,14 @@ const entityKindSchema = z.enum(ENTITY_KINDS);
 const ethereumAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address');
 
 export const entitiesRouter = router({
-  /** Create a new entity within a universe. */
+  /** Create a new entity. universeAddress is optional for creator kinds. */
   create: protectedProcedure
     .input(
       z.object({
         name: z.string().min(1).max(200),
-        description: z.string().max(2000).default(''),
+        description: z.string().max(5000).default(''),
         kind: entityKindSchema,
-        universeAddress: ethereumAddress,
+        universeAddress: ethereumAddress.nullish(),
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
@@ -46,7 +52,7 @@ export const entitiesRouter = router({
           name: input.name,
           description: input.description,
           kind: input.kind,
-          universeAddress: input.universeAddress,
+          universeAddress: input.universeAddress ?? null,
           parentId: input.parentId ?? null,
           nodeIds: input.nodeIds,
           imageUrl: input.imageUrl ?? null,
@@ -57,16 +63,17 @@ export const entitiesRouter = router({
       return { success: true, ...result };
     }),
 
-  /** Get a single entity by ID. */
+  /** Get a single entity by ID. universeAddress is no longer required. */
   get: publicProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
         entityId: z.string().min(1),
+        /** @deprecated No longer needed — kept for backwards compatibility. */
+        universeAddress: ethereumAddress.optional(),
       })
     )
     .query(async ({ input }) => {
-      const entity = await getEntity(input.universeAddress, input.entityId);
+      const entity = await getEntity(input.entityId);
       if (!entity) throw new Error('Entity not found');
       return entity;
     }),
@@ -84,16 +91,46 @@ export const entitiesRouter = router({
       return { entities, total: entities.length };
     }),
 
-  /** Get direct children of an entity. */
-  children: publicProcedure
+  /**
+   * List entities globally by kind — used by the wiki to show all people,
+   * places, etc. across all universes.
+   */
+  listByKind: publicProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
-        parentId: z.string().min(1),
+        kind: entityKindSchema,
+        limit: z.number().int().positive().max(200).default(100),
       })
     )
     .query(async ({ input }) => {
-      const children = await getChildEntities(input.universeAddress, input.parentId);
+      const entities = await getEntitiesByKind(input.kind, input.limit);
+      return { entities, total: entities.length };
+    }),
+
+  /** List entities created by a specific address. */
+  listByCreator: publicProcedure
+    .input(
+      z.object({
+        creator: z.string().min(1),
+        kind: entityKindSchema.optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const entities = await getEntitiesByCreator(input.creator, input.kind);
+      return { entities, total: entities.length };
+    }),
+
+  /** Get direct children of an entity. universeAddress no longer required. */
+  children: publicProcedure
+    .input(
+      z.object({
+        parentId: z.string().min(1),
+        /** @deprecated No longer needed — kept for backwards compatibility. */
+        universeAddress: ethereumAddress.optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const children = await getChildEntities(input.parentId);
       return { children, total: children.length };
     }),
 
@@ -101,10 +138,11 @@ export const entitiesRouter = router({
   update: protectedProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
         entityId: z.string().min(1),
+        /** @deprecated Kept for backwards compatibility — no longer used for routing. */
+        universeAddress: ethereumAddress.optional(),
         name: z.string().min(1).max(200).optional(),
-        description: z.string().max(2000).optional(),
+        description: z.string().max(5000).optional(),
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
@@ -112,8 +150,8 @@ export const entitiesRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const { universeAddress, entityId, ...updates } = input;
-      const entity = await updateEntity(universeAddress, entityId, {
+      const { entityId, universeAddress: _unused, ...updates } = input;
+      const entity = await updateEntity(entityId, {
         ...updates,
         parentId: updates.parentId ?? undefined,
         imageUrl: updates.imageUrl ?? undefined,
@@ -125,12 +163,13 @@ export const entitiesRouter = router({
   delete: protectedProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
         entityId: z.string().min(1),
+        /** @deprecated Kept for backwards compatibility. */
+        universeAddress: ethereumAddress.optional(),
       })
     )
     .mutation(async ({ input }) => {
-      await deleteEntity(input.universeAddress, input.entityId);
+      await deleteEntity(input.entityId);
       return { success: true };
     }),
 
@@ -138,13 +177,14 @@ export const entitiesRouter = router({
   addNode: protectedProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
         entityId: z.string().min(1),
         nodeId: z.number().int().nonnegative(),
+        /** @deprecated Kept for backwards compatibility. */
+        universeAddress: ethereumAddress.optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const entity = await addNodeToEntity(input.universeAddress, input.entityId, input.nodeId);
+      const entity = await addNodeToEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
     }),
 
@@ -152,17 +192,14 @@ export const entitiesRouter = router({
   removeNode: protectedProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
         entityId: z.string().min(1),
         nodeId: z.number().int().nonnegative(),
+        /** @deprecated Kept for backwards compatibility. */
+        universeAddress: ethereumAddress.optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const entity = await removeNodeFromEntity(
-        input.universeAddress,
-        input.entityId,
-        input.nodeId
-      );
+      const entity = await removeNodeFromEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
     }),
 });

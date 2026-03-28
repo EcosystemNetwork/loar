@@ -31,40 +31,44 @@ We classify every feature by what actually works end-to-end today, not what has 
 
 ### LIVE (Working end-to-end)
 
-| Feature                       | What Works Today                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------ |
-| **Wallet Auth (SIWE)**        | Connect wallet, sign message, get JWT, access protected routes                       |
-| **Universe Creation**         | Two-step wizard: deploy Universe contract + governance token + Uniswap v4 pool       |
-| **Narrative Timeline Editor** | ReactFlow-based visual story builder. Create, link, and branch narrative nodes       |
-| **AI Video Generation**       | 4 providers (Veo3, Kling, Wan2.5, Sora) via FAL AI. 1-60s duration, configurable     |
-| **AI Image Generation**       | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                  |
-| **AI Wiki Generation**        | Gemini-powered character analysis, storyline generation, video-to-wiki extraction    |
-| **On-Chain Node Storage**     | Content hashes + plot hashes stored in Universe contract, indexed by Ponder          |
-| **Decentralized Storage**     | Multi-provider fallback: Walrus > IPFS/Pinata > Filecoin/Synapse > Firebase          |
-| **Creator Profiles**          | Username, bio, themes (5 options), social links, privacy controls, public portfolios |
-| **Content Upload**            | IP classification (Fun vs Monetized), copyright declarations, license selection      |
-| **Content Discovery**         | Search/filter by classification, media type, tags. Creator gallery + content feed    |
-| **Character Wiki**            | Browse, search, filter characters by collection/traits. Individual character pages   |
-| **Blockchain Indexer**        | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                    |
+| Feature                        | What Works Today                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| **Wallet Auth (SIWE)**         | CDP Embedded Wallet (Google/Apple/passkeys/email) → SIWE signature → JWT. Full social login, no seed phrase required |
+| **Universe Creation**          | Two-step wizard: deploy Universe contract + governance token + Uniswap v4 pool                                       |
+| **Narrative Timeline Editor**  | ReactFlow-based visual story builder. Create, link, and branch narrative nodes                                       |
+| **AI Video Generation**        | 4 providers (Veo3, Kling, Wan2.5, Sora) via FAL AI. 1-60s duration, configurable                                     |
+| **AI Image Generation**        | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                                                  |
+| **Model Routing (Smart Auto)** | Auto-selects best model by quality/speed/cost. Manual override available. 14 models, cost tracked per generation     |
+| **Quest & Affiliate System**   | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards         |
+| **AI Wiki Generation**         | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                    |
+| **On-Chain Node Storage**      | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                          |
+| **Decentralized Storage**      | Multi-provider fallback: Walrus > IPFS/Pinata > Filecoin/Synapse > Firebase                                          |
+| **Creator Profiles**           | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                 |
+| **Content Upload**             | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                |
+| **Content Discovery**          | Search/filter by classification, media type, tags. Creator gallery + content feed                                    |
+| **Character Wiki**             | Browse, search, filter characters by collection/traits. Individual character pages                                   |
+| **Blockchain Indexer**         | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                                                    |
 
 ### PARTIAL (Backend + contracts exist, frontend not fully wired)
 
 These have working smart contracts deployed on Sepolia AND fully implemented backend APIs (tRPC), but the marketplace frontend is informational UI — it shows stats and explains how things work, without interactive buy/sell/bid transaction flows.
 
-| Feature                 | What Exists                                                                          | What's Missing                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| **Episode NFTs**        | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: stats cards | No mint/buy buttons in marketplace. No NFT gallery with purchase flow                 |
-| **Character NFTs**      | Contract: ownership + appearance royalties. API: full CRUD                           | No frontend mint flow. Marketplace tab is explainer text only                         |
-| **Canon Marketplace**   | Contract: submit/vote/finalize/license. API: all operations                          | No submission form or voting UI in marketplace. Tab shows category cards only         |
-| **Credit System**       | API: balance, tiers, purchase, spend, history. Generation costs defined              | Credits tab shows balance + tiers from API, but "purchase" has no payment integration |
-| **Subscriptions**       | API: configure tiers, subscribe, check access. 4-tier model                          | Tab UI exists but no subscribe/payment flow                                           |
-| **Collabs**             | API: propose, accept, activate, record episodes, complete                            | Tab UI placeholder only                                                               |
-| **Ad Marketplace**      | Contract: slots, bidding, impressions. API: full CRUD                                | Tab UI placeholder only                                                               |
-| **IP Licensing**        | Contract: 6 license types, royalty tracking. API: full CRUD + merch                  | Tab UI placeholder only                                                               |
-| **On-Chain Governance** | Contract: OpenZeppelin Governor. Ponder indexes proposals/votes                      | Governance sidebar shows token info, but voting UI is incomplete                      |
-| **Token Trading**       | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live          | No swap UI. Users must use Uniswap directly                                           |
-| **Analytics**           | API: views, engagement, trending, platform stats                                     | Market page queries real stats. No per-universe analytics dashboard                   |
-| **Dashboard**           | Route exists with AI generation tools working                                        | Universe list uses hardcoded dummy data instead of API                                |
+| Feature                   | What Exists                                                                                                   | What's Missing                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: stats cards                          | No mint/buy buttons in marketplace. No NFT gallery with purchase flow                                           |
+| **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD                                                    | No frontend mint flow. Marketplace tab is explainer text only                                                   |
+| **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations                                                   | No submission form or voting UI in marketplace. Tab shows category cards only                                   |
+| **Credit System**         | API: balance, tiers, purchase, spend, history. Generation costs defined                                       | Credits tab shows balance + tiers from API, but "purchase" has no payment integration                           |
+| **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model                                                   | Tab UI exists but no subscribe/payment flow                                                                     |
+| **Collabs**               | API: propose, accept, activate, record episodes, complete                                                     | Tab UI placeholder only                                                                                         |
+| **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD                                                         | Tab UI placeholder only                                                                                         |
+| **IP Licensing**          | Contract: 6 license types, royalty tracking. API: full CRUD + merch                                           | Tab UI placeholder only                                                                                         |
+| **On-Chain Governance**   | Contract: OpenZeppelin Governor. Ponder indexes proposals/votes                                               | Governance sidebar shows token info, but voting UI is incomplete                                                |
+| **Token Trading**         | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live                                   | No swap UI. Users must use Uniswap directly                                                                     |
+| **Analytics**             | API: views, engagement, trending, platform stats                                                              | Market page queries real stats. No per-universe analytics dashboard                                             |
+| **Dashboard**             | Route exists with AI generation tools working                                                                 | Universe list uses hardcoded dummy data instead of API                                                          |
+| **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus` | Frontend still uses old `fun`/`monetized` labels. UI badges not yet migrated                                    |
+| **Worldbuilding Studio**  | `entities` router: full CRUD, 10+ entity kinds (person, place, faction, event, lore…). Wiki route exists      | No `/create` hub. Wiki shows NFT characters only, not entity-system entries. `/wiki/$kind/$id` routes not built |
 
 ### PLANNED (Not implemented)
 
@@ -117,7 +121,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 
 ### Key Flows
 
-**Auth:** Wallet Connect > SIWE Signature > Server JWT > Bearer Token > protectedProcedure
+**Auth:** CDP Embedded Wallet (Google/Apple/passkeys/email) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure
 
 **Content Creation:** AI Generate > Decentralized Storage (SHA-256 dedup) > On-Chain Hash > Ponder Index
 

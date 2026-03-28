@@ -1,10 +1,13 @@
 /**
- * Firestore handlers for narrative entities (Timeline, Reality, Dimension, Plane, Realm, Domain).
+ * Firestore handlers for worldbuilding entities.
  *
- * Entities are stored as a subcollection under each universe:
- *   cinematicUniverses/{universeAddress}/entities/{entityId}
+ * Entities are stored in the top-level `entities` collection:
+ *   entities/{entityId}
  *
- * This keeps queries scoped to a single universe and avoids cross-universe leakage.
+ * universeAddress is an optional field on each entity — creator kinds
+ * (person, place, thing, etc.) can exist without a universe assignment.
+ * Structural kinds (timeline, realm, etc.) continue to work with or
+ * without a universe.
  */
 import { db } from '../../lib/firebase';
 import {
@@ -14,21 +17,18 @@ import {
   type EntityKind,
   ENTITY_KINDS,
   VALID_PARENTS,
+  STRUCTURAL_KINDS,
 } from './entities.types';
 
-function entitiesCol(universeAddress: string) {
-  return db
-    .collection('cinematicUniverses')
-    .doc(universeAddress.toLowerCase())
-    .collection('entities');
+function entitiesCol() {
+  return db.collection('entities');
 }
 
-/** Validate that the parent relationship is allowed by the ontology. */
-async function validateParent(
-  universeAddress: string,
-  kind: EntityKind,
-  parentId: string | null
-): Promise<void> {
+/** Validate parent-child relationship for structural kinds only. */
+async function validateParent(kind: EntityKind, parentId: string | null): Promise<void> {
+  // Creator kinds can have any or no parent — skip strict validation
+  if (!STRUCTURAL_KINDS.includes(kind as any)) return;
+
   const allowed = VALID_PARENTS[kind];
 
   if (parentId === null || parentId === undefined) {
@@ -40,8 +40,7 @@ async function validateParent(
     return;
   }
 
-  // Fetch the parent entity and check its kind
-  const parentDoc = await entitiesCol(universeAddress).doc(parentId).get();
+  const parentDoc = await entitiesCol().doc(parentId).get();
   if (!parentDoc.exists) {
     throw new Error(`Parent entity "${parentId}" not found`);
   }
@@ -63,9 +62,9 @@ export async function createEntity(
   }
 
   const parentId = input.parentId ?? null;
-  await validateParent(input.universeAddress, input.kind, parentId);
+  await validateParent(input.kind, parentId);
 
-  const col = entitiesCol(input.universeAddress);
+  const col = entitiesCol();
   const ref = col.doc();
   const now = new Date();
 
@@ -74,7 +73,7 @@ export async function createEntity(
     name: input.name,
     description: input.description,
     kind: input.kind,
-    universeAddress: input.universeAddress.toLowerCase(),
+    universeAddress: input.universeAddress ? input.universeAddress.toLowerCase() : null,
     parentId,
     nodeIds: input.nodeIds ?? [],
     imageUrl: input.imageUrl ?? null,
@@ -88,8 +87,16 @@ export async function createEntity(
   return { id: ref.id, data: entity };
 }
 
-export async function getEntity(universeAddress: string, entityId: string): Promise<Entity | null> {
-  const doc = await entitiesCol(universeAddress).doc(entityId).get();
+export async function getEntity(entityId: string): Promise<Entity | null>;
+/** @deprecated Pass only entityId — universeAddress is no longer needed. */
+export async function getEntity(
+  universeAddressOrId: string,
+  entityId?: string
+): Promise<Entity | null>;
+export async function getEntity(first: string, second?: string): Promise<Entity | null> {
+  // Support legacy call signature: getEntity(universeAddress, entityId)
+  const entityId = second ?? first;
+  const doc = await entitiesCol().doc(entityId).get();
   if (!doc.exists) return null;
   return { id: doc.id, ...doc.data() } as Entity;
 }
@@ -98,36 +105,86 @@ export async function getEntitiesByUniverse(
   universeAddress: string,
   kind?: EntityKind
 ): Promise<Entity[]> {
-  const col = entitiesCol(universeAddress);
-  let query: FirebaseFirestore.Query = col.orderBy('createdAt');
+  const col = entitiesCol();
+  let query: FirebaseFirestore.Query = col
+    .where('universeAddress', '==', universeAddress.toLowerCase())
+    .orderBy('createdAt');
 
   if (kind) {
-    query = col.where('kind', '==', kind).orderBy('createdAt');
+    query = col
+      .where('universeAddress', '==', universeAddress.toLowerCase())
+      .where('kind', '==', kind)
+      .orderBy('createdAt');
   }
 
   const snapshot = await query.get();
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
-export async function getChildEntities(
-  universeAddress: string,
-  parentId: string
-): Promise<Entity[]> {
-  const snapshot = await entitiesCol(universeAddress)
-    .where('parentId', '==', parentId)
-    .orderBy('createdAt')
+export async function getEntitiesByKind(kind: EntityKind, limit = 100): Promise<Entity[]> {
+  const snapshot = await entitiesCol()
+    .where('kind', '==', kind)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
     .get();
 
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
+export async function getEntitiesByCreator(creator: string, kind?: EntityKind): Promise<Entity[]> {
+  let query: FirebaseFirestore.Query = entitiesCol()
+    .where('creator', '==', creator)
+    .orderBy('createdAt', 'desc');
+
+  if (kind) {
+    query = entitiesCol()
+      .where('creator', '==', creator)
+      .where('kind', '==', kind)
+      .orderBy('createdAt', 'desc');
+  }
+
+  const snapshot = await query.get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+}
+
+export async function getChildEntities(parentId: string): Promise<Entity[]>;
+/** @deprecated universeAddress no longer needed */
+export async function getChildEntities(
+  universeAddress: string,
+  parentId: string
+): Promise<Entity[]>;
+export async function getChildEntities(first: string, second?: string): Promise<Entity[]> {
+  const parentId = second ?? first;
+  const snapshot = await entitiesCol().where('parentId', '==', parentId).orderBy('createdAt').get();
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+}
+
+export async function updateEntity(entityId: string, input: UpdateEntityInput): Promise<Entity>;
+/** @deprecated Pass entityId first — universeAddress is no longer needed. */
 export async function updateEntity(
   universeAddress: string,
   entityId: string,
   input: UpdateEntityInput
+): Promise<Entity>;
+export async function updateEntity(
+  first: string,
+  second: string | UpdateEntityInput,
+  third?: UpdateEntityInput
 ): Promise<Entity> {
-  const col = entitiesCol(universeAddress);
-  const ref = col.doc(entityId);
+  // Support legacy call signature: updateEntity(universeAddress, entityId, input)
+  let entityId: string;
+  let input: UpdateEntityInput;
+
+  if (typeof second === 'string') {
+    entityId = second;
+    input = third!;
+  } else {
+    entityId = first;
+    input = second;
+  }
+
+  const ref = entitiesCol().doc(entityId);
   const doc = await ref.get();
 
   if (!doc.exists) {
@@ -136,14 +193,15 @@ export async function updateEntity(
 
   const existing = doc.data() as Entity;
 
-  // If parentId is changing, validate the new relationship
   if (input.parentId !== undefined && input.parentId !== existing.parentId) {
-    await validateParent(universeAddress, existing.kind, input.parentId ?? null);
+    await validateParent(existing.kind, input.parentId ?? null);
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
+  if (input.universeAddress !== undefined)
+    updates.universeAddress = input.universeAddress ? input.universeAddress.toLowerCase() : null;
   if (input.parentId !== undefined) updates.parentId = input.parentId;
   if (input.nodeIds !== undefined) updates.nodeIds = input.nodeIds;
   if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl;
@@ -154,10 +212,13 @@ export async function updateEntity(
   return { ...existing, ...updates, id: entityId } as Entity;
 }
 
-export async function deleteEntity(universeAddress: string, entityId: string): Promise<void> {
-  const col = entitiesCol(universeAddress);
+export async function deleteEntity(entityId: string): Promise<void>;
+/** @deprecated universeAddress no longer needed */
+export async function deleteEntity(universeAddress: string, entityId: string): Promise<void>;
+export async function deleteEntity(first: string, second?: string): Promise<void> {
+  const entityId = second ?? first;
+  const col = entitiesCol();
 
-  // Check for child entities — prevent orphaning
   const children = await col.where('parentId', '==', entityId).limit(1).get();
   if (!children.empty) {
     throw new Error('Cannot delete entity with children. Remove or reparent children first.');
@@ -172,18 +233,33 @@ export async function deleteEntity(universeAddress: string, entityId: string): P
   await ref.delete();
 }
 
+export async function addNodeToEntity(entityId: string, nodeId: number): Promise<Entity>;
+/** @deprecated universeAddress no longer needed */
 export async function addNodeToEntity(
   universeAddress: string,
   entityId: string,
   nodeId: number
+): Promise<Entity>;
+export async function addNodeToEntity(
+  first: string,
+  second: string | number,
+  third?: number
 ): Promise<Entity> {
-  const col = entitiesCol(universeAddress);
-  const ref = col.doc(entityId);
+  let entityId: string;
+  let nodeId: number;
+
+  if (typeof second === 'number') {
+    entityId = first;
+    nodeId = second;
+  } else {
+    entityId = second;
+    nodeId = third!;
+  }
+
+  const ref = entitiesCol().doc(entityId);
   const doc = await ref.get();
 
-  if (!doc.exists) {
-    throw new Error('Entity not found');
-  }
+  if (!doc.exists) throw new Error('Entity not found');
 
   const existing = doc.data() as Entity;
   const nodeIds = existing.nodeIds || [];
@@ -198,18 +274,33 @@ export async function addNodeToEntity(
   return { ...existing, id: entityId, nodeIds: updatedNodeIds };
 }
 
+export async function removeNodeFromEntity(entityId: string, nodeId: number): Promise<Entity>;
+/** @deprecated universeAddress no longer needed */
 export async function removeNodeFromEntity(
   universeAddress: string,
   entityId: string,
   nodeId: number
+): Promise<Entity>;
+export async function removeNodeFromEntity(
+  first: string,
+  second: string | number,
+  third?: number
 ): Promise<Entity> {
-  const col = entitiesCol(universeAddress);
-  const ref = col.doc(entityId);
+  let entityId: string;
+  let nodeId: number;
+
+  if (typeof second === 'number') {
+    entityId = first;
+    nodeId = second;
+  } else {
+    entityId = second;
+    nodeId = third!;
+  }
+
+  const ref = entitiesCol().doc(entityId);
   const doc = await ref.get();
 
-  if (!doc.exists) {
-    throw new Error('Entity not found');
-  }
+  if (!doc.exists) throw new Error('Entity not found');
 
   const existing = doc.data() as Entity;
   const updatedNodeIds = (existing.nodeIds || []).filter((id) => id !== nodeId);
