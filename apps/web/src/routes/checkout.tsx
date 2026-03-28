@@ -15,6 +15,26 @@ import { useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { useWriteContract } from 'wagmi';
+import { parseUnits, type Address } from 'viem';
+
+const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as Address;
+const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as Address;
+
+const ERC20_ABI = [
+  {
+    name: 'transfer',
+    type: 'function' as const,
+    stateMutability: 'nonpayable' as const,
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const;
 
 export const Route = createFileRoute('/checkout')({
   validateSearch: z.object({
@@ -32,6 +52,7 @@ function CheckoutPage() {
   const search = useSearch({ from: '/checkout' });
   const { isConnected, address } = useWalletAuth();
   const [processing, setProcessing] = useState(false);
+  const { writeContractAsync } = useWriteContract();
 
   const { listingId, productType, title, price, currency } = search;
 
@@ -70,13 +91,34 @@ function CheckoutPage() {
         navigate({ to: '/market' });
         return;
       }
+
+      let txHash: string | undefined;
+
+      // For $LOAR listings, transfer tokens on-chain before recording the order
+      if (displayCurrency === 'LOAR' && displayPrice !== '0' && !isFree) {
+        const recipient =
+          ((listing as any)?.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+        const loarAmount = parseUnits(displayPrice, 18);
+        toast.info('Confirm $LOAR transfer in your wallet…');
+        txHash = await writeContractAsync({
+          address: LOAR_TOKEN_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [recipient, loarAmount],
+        });
+        toast.info('$LOAR sent! Recording order…');
+      }
+
       const result = await trpcClient.listings.purchase.mutate({
         listingId: listingId!,
         quantity: 1,
+        txHash,
       });
       navigate({ to: '/order/$id', params: { id: result.orderId } });
     } catch (e: any) {
-      toast.error(e?.message ?? 'Purchase failed');
+      if (!(e instanceof Error && e.message.includes('rejected'))) {
+        toast.error(e?.message ?? 'Purchase failed');
+      }
     } finally {
       setProcessing(false);
     }
@@ -136,13 +178,18 @@ function CheckoutPage() {
               <div className="flex items-center gap-3">
                 <Wallet className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-sm font-medium">Connected Wallet</p>
+                  <p className="text-sm font-medium">
+                    {displayCurrency === 'LOAR' ? '$LOAR Token' : 'Connected Wallet'}
+                  </p>
                   <p className="text-xs text-muted-foreground font-mono">
                     {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '—'}
                   </p>
                 </div>
-                <Badge variant="outline" className="ml-auto text-xs text-green-600">
-                  Connected
+                <Badge
+                  variant="outline"
+                  className={`ml-auto text-xs ${displayCurrency === 'LOAR' ? 'text-amber-500 border-amber-500/40' : 'text-green-600'}`}
+                >
+                  {displayCurrency === 'LOAR' ? '$LOAR' : 'Connected'}
                 </Badge>
               </div>
             ) : (
@@ -179,7 +226,11 @@ function CheckoutPage() {
             ) : (
               <CheckCircle className="w-4 h-4 mr-2" />
             )}
-            {isFree ? 'Confirm & Claim' : `Confirm Purchase · ${displayPrice} ${displayCurrency}`}
+            {isFree
+              ? 'Confirm & Claim'
+              : displayCurrency === 'LOAR'
+                ? `Pay ${displayPrice} $LOAR`
+                : `Confirm Purchase · ${displayPrice} ${displayCurrency}`}
           </Button>
         </div>
       </div>

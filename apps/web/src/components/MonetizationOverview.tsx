@@ -34,9 +34,9 @@ const STREAMS: Stream[] = [
   {
     id: 'nfts',
     icon: '🎬',
-    label: 'Episode NFTs',
-    desc: 'Mint your episodes as ERC-721 tokens. Set your own price and supply.',
-    potential: 'ERC-2981 royalties',
+    label: 'Own Episodes',
+    desc: 'Tokenize your episodes. Set your own price and supply.',
+    potential: 'Resale royalties',
     status: 'beta',
     ctaLabel: 'Mint Episode',
     ctaAction: 'nfts',
@@ -44,7 +44,7 @@ const STREAMS: Stream[] = [
   {
     id: 'characters',
     icon: '🧬',
-    label: 'Character NFTs',
+    label: 'Own Characters',
     desc: 'Tokenize characters — earn 5% royalty each time they appear in content.',
     potential: '5% appearance royalty',
     status: 'beta',
