@@ -20,8 +20,16 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  DollarSign, Film, Users, Gavel, Coins, Crown,
-  Handshake, Megaphone, ShoppingBag, BarChart3
+  DollarSign,
+  Film,
+  Users,
+  Gavel,
+  Coins,
+  Crown,
+  Handshake,
+  Megaphone,
+  ShoppingBag,
+  BarChart3,
 } from 'lucide-react';
 import {
   useEpisodeNFTs,
@@ -61,11 +69,21 @@ export function RevenuePanel({ universeId, universeName }: RevenuePanelProps) {
 
         <Tabs defaultValue="overview" className="mt-6">
           <TabsList className="grid grid-cols-5 w-full">
-            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-            <TabsTrigger value="nft" className="text-xs">NFTs</TabsTrigger>
-            <TabsTrigger value="canon" className="text-xs">Canon</TabsTrigger>
-            <TabsTrigger value="subs" className="text-xs">Subs</TabsTrigger>
-            <TabsTrigger value="ads" className="text-xs">Ads</TabsTrigger>
+            <TabsTrigger value="overview" className="text-xs">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="nft" className="text-xs">
+              NFTs
+            </TabsTrigger>
+            <TabsTrigger value="canon" className="text-xs">
+              Canon
+            </TabsTrigger>
+            <TabsTrigger value="subs" className="text-xs">
+              Subs
+            </TabsTrigger>
+            <TabsTrigger value="ads" className="text-xs">
+              Ads
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
@@ -104,14 +122,38 @@ function OverviewTab({ universeId }: { universeId: string }) {
     <div className="space-y-4">
       <h3 className="font-semibold text-lg">Revenue Overview</h3>
       <div className="grid grid-cols-2 gap-3">
-        <MetricCard icon={<BarChart3 className="w-4 h-4" />} label="Views" value={(metrics as any)?.totalViews ?? 0} />
-        <MetricCard icon={<Film className="w-4 h-4" />} label="NFTs" value={(episodes as any[])?.length ?? 0} />
-        <MetricCard icon={<Crown className="w-4 h-4" />} label="Subscribers" value={(subStats as any)?.totalSubscribers ?? 0} />
-        <MetricCard icon={<Handshake className="w-4 h-4" />} label="Collabs" value={(collabs as any[])?.length ?? 0} />
+        <MetricCard
+          icon={<BarChart3 className="w-4 h-4" />}
+          label="Views"
+          value={(metrics as any)?.totalViews ?? 0}
+        />
+        <MetricCard
+          icon={<Film className="w-4 h-4" />}
+          label="NFTs"
+          value={(episodes as any[])?.length ?? 0}
+        />
+        <MetricCard
+          icon={<Crown className="w-4 h-4" />}
+          label="Subscribers"
+          value={(subStats as any)?.totalSubscribers ?? 0}
+        />
+        <MetricCard
+          icon={<Handshake className="w-4 h-4" />}
+          label="Collabs"
+          value={(collabs as any[])?.length ?? 0}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <MetricCard icon={<Gavel className="w-4 h-4" />} label="Licenses" value={(licenses as any[])?.length ?? 0} />
-        <MetricCard icon={<Coins className="w-4 h-4" />} label="Total Revenue" value={formatWei((metrics as any)?.totalRevenue ?? '0')} />
+        <MetricCard
+          icon={<Gavel className="w-4 h-4" />}
+          label="Licenses"
+          value={(licenses as any[])?.length ?? 0}
+        />
+        <MetricCard
+          icon={<Coins className="w-4 h-4" />}
+          label="Total Revenue"
+          value={formatWei((metrics as any)?.totalRevenue ?? '0')}
+        />
       </div>
     </div>
   );
@@ -125,7 +167,7 @@ function NFTTab({ universeId }: { universeId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Episode NFTs</h3>
+        <h3 className="font-semibold">Own Episodes</h3>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Cancel' : 'Create Listing'}
         </Button>
@@ -134,23 +176,25 @@ function NFTTab({ universeId }: { universeId: string }) {
       {showForm && (
         <Card>
           <CardContent className="pt-4 space-y-3">
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const form = e.target as HTMLFormElement;
-              const formData = new FormData(form);
-              await createListing.mutateAsync({
-                universeId,
-                nodeId: Number(formData.get('nodeId')),
-                contentHash: formData.get('contentHash') as string,
-                title: formData.get('title') as string,
-                description: formData.get('description') as string,
-                mediaUrl: formData.get('mediaUrl') as string,
-                mintPrice: formData.get('mintPrice') as string,
-                maxSupply: Number(formData.get('maxSupply') || 0),
-                metadataURI: '',
-              });
-              setShowForm(false);
-            }}>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const formData = new FormData(form);
+                await createListing.mutateAsync({
+                  universeId,
+                  nodeId: Number(formData.get('nodeId')),
+                  contentHash: formData.get('contentHash') as string,
+                  title: formData.get('title') as string,
+                  description: formData.get('description') as string,
+                  mediaUrl: formData.get('mediaUrl') as string,
+                  mintPrice: formData.get('mintPrice') as string,
+                  maxSupply: Number(formData.get('maxSupply') || 0),
+                  metadataURI: '',
+                });
+                setShowForm(false);
+              }}
+            >
               <div className="space-y-2">
                 <Input name="title" placeholder="Episode Title" required />
                 <Textarea name="description" placeholder="Description" required />
@@ -211,7 +255,9 @@ function CanonTab({ universeId }: { universeId: string }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-sm">{sub.title}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{sub.submissionType?.toLowerCase()}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {sub.submissionType?.toLowerCase()}
+                    </p>
                   </div>
                   <div className="text-right text-xs">
                     <p className="text-green-500">For: {sub.votesFor}</p>
@@ -236,15 +282,24 @@ function SubsTab({ universeId }: { universeId: string }) {
     <div className="space-y-4">
       <h3 className="font-semibold">Subscriptions</h3>
       <div className="grid grid-cols-2 gap-3">
-        <MetricCard icon={<Crown className="w-4 h-4" />} label="Total Subs" value={(stats as any)?.totalSubscribers ?? 0} />
-        <MetricCard icon={<Users className="w-4 h-4" />} label="Tiers" value={(stats as any)?.availableTiers?.length ?? 0} />
+        <MetricCard
+          icon={<Crown className="w-4 h-4" />}
+          label="Total Subs"
+          value={(stats as any)?.totalSubscribers ?? 0}
+        />
+        <MetricCard
+          icon={<Users className="w-4 h-4" />}
+          label="Tiers"
+          value={(stats as any)?.availableTiers?.length ?? 0}
+        />
       </div>
-      {(stats as any)?.tierCounts && Object.entries((stats as any).tierCounts).map(([tier, count]) => (
-        <div key={tier} className="flex justify-between text-sm">
-          <span>{tier}</span>
-          <span className="font-mono">{count as number}</span>
-        </div>
-      ))}
+      {(stats as any)?.tierCounts &&
+        Object.entries((stats as any).tierCounts).map(([tier, count]) => (
+          <div key={tier} className="flex justify-between text-sm">
+            <span>{tier}</span>
+            <span className="font-mono">{count as number}</span>
+          </div>
+        ))}
     </div>
   );
 }
@@ -262,7 +317,9 @@ function AdsTabPanel({ universeId }: { universeId: string }) {
               <CardContent className="pt-3 pb-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-sm capitalize">{slot.placementType?.toLowerCase()}</p>
+                    <p className="font-medium text-sm capitalize">
+                      {slot.placementType?.toLowerCase()}
+                    </p>
                     <p className="text-xs text-muted-foreground">{slot.episodes} episodes</p>
                   </div>
                   <div className="text-right text-xs">
@@ -283,7 +340,15 @@ function AdsTabPanel({ universeId }: { universeId: string }) {
 
 // ---- Helpers ----
 
-function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+function MetricCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+}) {
   return (
     <Card>
       <CardContent className="pt-3 pb-3">
@@ -291,7 +356,9 @@ function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: stri
           <div className="text-muted-foreground">{icon}</div>
           <div>
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+            <p className="font-bold">
+              {typeof value === 'number' ? value.toLocaleString() : value}
+            </p>
           </div>
         </div>
       </CardContent>
