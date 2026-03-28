@@ -29,6 +29,7 @@ import { questsRouter } from './quests/quests.routes';
 import { sandboxRouter } from './sandbox/sandbox.routes';
 import { universeTeamRouter } from './universeTeam/universeTeam.routes';
 import { universeTreasuryRouter } from './universeTreasury/universeTreasury.routes';
+import { adminRouter } from './admin/admin.routes';
 import { getSynapseService } from '../services/synapse';
 import { wikiaService } from '../services/wikia';
 import { firebaseStorageService } from '../services/firebase-storage';
@@ -116,6 +117,7 @@ export const appRouter = router({
   sandbox: sandboxRouter,
   universeTeam: universeTeamRouter,
   universeTreasury: universeTreasuryRouter,
+  admin: adminRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {

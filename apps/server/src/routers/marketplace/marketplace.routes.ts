@@ -5,10 +5,13 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
+import { randomUUID } from 'crypto';
 
 const submissionsCol = db.collection('canonSubmissions');
 const canonVotesCol = db.collection('canonVotes');
 const canonLicensesCol = db.collection('canonLicenses');
+const marketplaceSalesCol = db.collection('marketplaceSales');
 
 const submissionTypeEnum = z.enum(['CHARACTER', 'PLOT_ARC', 'LOCATION', 'LORE_RULE']);
 
@@ -146,13 +149,11 @@ export const marketplaceRouter = router({
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     }),
 
-  getSubmission: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
-      const doc = await submissionsCol.doc(input.id).get();
-      if (!doc.exists) return null;
-      return { id: doc.id, ...doc.data() };
-    }),
+  getSubmission: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
+    const doc = await submissionsCol.doc(input.id).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
+  }),
 
   getVotes: publicProcedure
     .input(z.object({ submissionId: z.string() }))
@@ -165,17 +166,15 @@ export const marketplaceRouter = router({
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     }),
 
-  getCanon: publicProcedure
-    .input(z.object({ universeId: z.string() }))
-    .query(async ({ input }) => {
-      const snapshot = await submissionsCol
-        .where('universeId', '==', input.universeId)
-        .where('status', '==', 'ACCEPTED')
-        .orderBy('finalizedAt', 'desc')
-        .get();
+  getCanon: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
+    const snapshot = await submissionsCol
+      .where('universeId', '==', input.universeId)
+      .where('status', '==', 'ACCEPTED')
+      .orderBy('finalizedAt', 'desc')
+      .get();
 
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    }),
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  }),
 
   // ---- Licensing ----
 
@@ -183,27 +182,67 @@ export const marketplaceRouter = router({
     .input(
       z.object({
         submissionId: z.string(),
-        fee: z.string(),
+        fee: z.string(), // wei
         txHash: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const subDoc = await submissionsCol.doc(input.submissionId).get();
       if (!subDoc.exists) throw new Error('Submission not found');
-      if (subDoc.data()?.status !== 'ACCEPTED') throw new Error('Not accepted canon');
+      const sub = subDoc.data()!;
+      if (sub.status !== 'ACCEPTED') throw new Error('Not accepted canon');
+
+      const config = await getPlatformConfig();
+      const feeBps = config.marketplacePlatformFeeBps;
+      const feeWei = BigInt(input.fee);
+      const platformFeeWei = (feeWei * BigInt(feeBps)) / BigInt(10_000);
+      const creatorReceivesWei = feeWei - platformFeeWei;
 
       const license = {
         submissionId: input.submissionId,
         licenseeUid: ctx.user.uid,
         licenseeAddress: ctx.user.address || null,
+        creatorUid: sub.creatorUid || null,
+        creatorAddress: sub.creatorAddress || null,
         fee: input.fee,
         txHash: input.txHash,
+        platformFeeBps: feeBps,
+        platformFeeWei: platformFeeWei.toString(),
+        creatorReceivesWei: creatorReceivesWei.toString(),
         grantedAt: new Date(),
       };
 
-      const ref = await canonLicensesCol.add(license);
-      return { id: ref.id, ...license };
+      const [licenseRef] = await Promise.all([
+        canonLicensesCol.add(license),
+        // Record the sale for platform revenue tracking
+        marketplaceSalesCol.add({
+          id: randomUUID(),
+          type: 'canon_license',
+          submissionId: input.submissionId,
+          buyerUid: ctx.user.uid,
+          sellerUid: sub.creatorUid || null,
+          universeId: sub.universeId || null,
+          grossWei: input.fee,
+          platformFeeBps: feeBps,
+          platformFeeWei: platformFeeWei.toString(),
+          sellerReceivesWei: creatorReceivesWei.toString(),
+          txHash: input.txHash,
+          createdAt: new Date(),
+        }),
+      ]);
+
+      return { id: licenseRef.id, ...license };
     }),
+
+  // ---- Platform fee info ----
+
+  getPlatformFee: publicProcedure.query(async () => {
+    const config = await getPlatformConfig();
+    return {
+      feeBps: config.marketplacePlatformFeeBps,
+      feePercent: bpsToFraction(config.marketplacePlatformFeeBps) * 100,
+    };
+  }),
 
   mySubmissions: protectedProcedure.query(async ({ ctx }) => {
     const snapshot = await submissionsCol

@@ -13,6 +13,7 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
+import { getPlatformConfig } from '../../services/platformConfig';
 
 const creditsCol = db.collection('userCredits');
 const creditTxCol = db.collection('creditTransactions');
@@ -54,18 +55,33 @@ export interface CreditPackage {
 /** Base cost per credit in USD (what we pay providers on average) */
 const BASE_CREDIT_COST_USD = 0.008;
 
+// Static package *definitions* — credits and bonuses never change.
+// Prices (fiatPriceUsd, loarPriceUsd, etc.) are computed dynamically
+// from platformConfig so the admin can adjust margins without redeployment.
+const PACKAGE_DEFINITIONS = [
+  { id: 'starter', name: 'Starter', credits: 100, bonusCredits: 0, popular: false },
+  { id: 'creator', name: 'Creator', credits: 500, bonusCredits: 50, popular: true },
+  { id: 'pro', name: 'Pro', credits: 1500, bonusCredits: 200, popular: false },
+  { id: 'studio', name: 'Studio', credits: 5000, bonusCredits: 1000, popular: false },
+  { id: 'enterprise', name: 'Enterprise', credits: 20000, bonusCredits: 5000, popular: false },
+] as const;
+
 function buildPackage(
   id: string,
   name: string,
   credits: number,
   bonusCredits: number,
-  popular: boolean
+  popular: boolean,
+  fiatMargin = FIAT_MARGIN,
+  loarMargin = LOAR_MARGIN,
+  loarBonusFraction = 0.1,
+  baseCreditCostUsd = BASE_CREDIT_COST_USD
 ): CreditPackage {
-  const baseCostUsd = credits * BASE_CREDIT_COST_USD;
-  const fiatPriceUsd = Math.round(baseCostUsd * FIAT_MARGIN * 100) / 100;
-  const loarPriceUsd = Math.round(baseCostUsd * LOAR_MARGIN * 100) / 100;
+  const baseCostUsd = credits * baseCreditCostUsd;
+  const fiatPriceUsd = Math.round(baseCostUsd * fiatMargin * 100) / 100;
+  const loarPriceUsd = Math.round(baseCostUsd * loarMargin * 100) / 100;
   const loarTokenAmount = Math.ceil(loarPriceUsd / LOAR_TO_USD);
-  const loarBonusCredits = Math.floor(credits * 0.1); // 10% bonus for $LOAR
+  const loarBonusCredits = Math.floor(credits * loarBonusFraction);
 
   return {
     id,
@@ -75,20 +91,35 @@ function buildPackage(
     fiatPriceUsd,
     loarPriceUsd,
     loarTokenAmount,
-    ethPriceWei: '0', // set by admin based on ETH price
+    ethPriceWei: '0',
     popular,
     active: true,
     loarBonusCredits,
   };
 }
 
-export const DEFAULT_PACKAGES: CreditPackage[] = [
-  buildPackage('starter', 'Starter', 100, 0, false),
-  buildPackage('creator', 'Creator', 500, 50, true),
-  buildPackage('pro', 'Pro', 1500, 200, false),
-  buildPackage('studio', 'Studio', 5000, 1000, false),
-  buildPackage('enterprise', 'Enterprise', 20000, 5000, false),
-];
+/** Static defaults — used by other routers (e.g. universeTreasury) that don't need live pricing */
+export const DEFAULT_PACKAGES: CreditPackage[] = PACKAGE_DEFINITIONS.map((p) =>
+  buildPackage(p.id, p.name, p.credits, p.bonusCredits, p.popular)
+);
+
+/** Build packages with live margins from platformConfig */
+async function buildPackagesFromConfig(): Promise<CreditPackage[]> {
+  const cfg = await getPlatformConfig();
+  return PACKAGE_DEFINITIONS.map((p) =>
+    buildPackage(
+      p.id,
+      p.name,
+      p.credits,
+      p.bonusCredits,
+      p.popular,
+      cfg.fiatMargin,
+      cfg.loarMargin,
+      cfg.loarCreditBonusFraction,
+      cfg.baseCreditCostUsd
+    )
+  );
+}
 
 // ── Generation Costs (credits per action) ─────────────────────────────
 
@@ -138,7 +169,7 @@ export const creditsRouter = router({
   // ── Packages ────────────────────────────────────────────────────
 
   getPackages: publicProcedure.query(async () => {
-    // Check for admin-configured packages in Firestore
+    // Admin-configured overrides in Firestore take priority
     try {
       const snapshot = await creditPackagesCol
         .where('active', '==', true)
@@ -149,10 +180,11 @@ export const creditsRouter = router({
         return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as CreditPackage[];
       }
     } catch {
-      // No custom packages, use defaults
+      // fall through to dynamic defaults
     }
 
-    return DEFAULT_PACKAGES.filter((p) => p.active);
+    // Build with live margins from platformConfig
+    return (await buildPackagesFromConfig()).filter((p) => p.active);
   }),
 
   // ── Purchase with Fiat / ETH / Crypto (35% margin) ─────────────
@@ -512,34 +544,41 @@ export const creditsRouter = router({
 
   // ── Price Comparison ────────────────────────────────────────────
 
-  comparePricing: publicProcedure.input(z.object({ packageId: z.string() })).query(({ input }) => {
-    const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
-    if (!pkg) return null;
+  comparePricing: publicProcedure
+    .input(z.object({ packageId: z.string() }))
+    .query(async ({ input }) => {
+      const packages = await buildPackagesFromConfig();
+      const pkg = packages.find((p) => p.id === input.packageId);
+      if (!pkg) return null;
 
-    return {
-      packageName: pkg.name,
-      baseCredits: pkg.credits,
-      fiat: {
-        priceUsd: pkg.fiatPriceUsd,
-        bonusCredits: pkg.bonusCredits,
-        totalCredits: pkg.credits + pkg.bonusCredits,
-        margin: '35%',
-        perCreditUsd:
-          Math.round((pkg.fiatPriceUsd / (pkg.credits + pkg.bonusCredits)) * 1000) / 1000,
-      },
-      loar: {
-        priceUsd: pkg.loarPriceUsd,
-        loarTokens: pkg.loarTokenAmount,
-        bonusCredits: pkg.bonusCredits + pkg.loarBonusCredits,
-        totalCredits: pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits,
-        margin: '25%',
-        perCreditUsd:
-          Math.round(
-            (pkg.loarPriceUsd / (pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits)) * 1000
-          ) / 1000,
-        savingsUsd: Math.round((pkg.fiatPriceUsd - pkg.loarPriceUsd) * 100) / 100,
-        extraCredits: pkg.loarBonusCredits,
-      },
-    };
-  }),
+      const cfg = await getPlatformConfig();
+      const fiatMarginPct = Math.round((cfg.fiatMargin - 1) * 100);
+      const loarMarginPct = Math.round((cfg.loarMargin - 1) * 100);
+
+      return {
+        packageName: pkg.name,
+        baseCredits: pkg.credits,
+        fiat: {
+          priceUsd: pkg.fiatPriceUsd,
+          bonusCredits: pkg.bonusCredits,
+          totalCredits: pkg.credits + pkg.bonusCredits,
+          margin: `${fiatMarginPct}%`,
+          perCreditUsd:
+            Math.round((pkg.fiatPriceUsd / (pkg.credits + pkg.bonusCredits)) * 1000) / 1000,
+        },
+        loar: {
+          priceUsd: pkg.loarPriceUsd,
+          loarTokens: pkg.loarTokenAmount,
+          bonusCredits: pkg.bonusCredits + pkg.loarBonusCredits,
+          totalCredits: pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits,
+          margin: `${loarMarginPct}%`,
+          perCreditUsd:
+            Math.round(
+              (pkg.loarPriceUsd / (pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits)) * 1000
+            ) / 1000,
+          savingsUsd: Math.round((pkg.fiatPriceUsd - pkg.loarPriceUsd) * 100) / 100,
+          extraCredits: pkg.loarBonusCredits,
+        },
+      };
+    }),
 });
