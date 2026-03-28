@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.30;
+
+import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
+import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
+import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+
+/// @title EntityEditionNFT
+/// @notice ERC-1155 edition NFTs for world-building entities that can exist
+///         in multiples: things, lore, species, technology.
+///         Each token ID is a unique entity definition; minting copies = edition.
+///         Free or paid — payment routed through PaymentRouter.
+contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
+    enum EntityKind { THING, LORE, SPECIES, TECHNOLOGY }
+
+    struct Edition {
+        uint256 universeId;
+        EntityKind kind;
+        string name;
+        bytes32 contentHash;
+        address creator;
+        uint256 mintPrice;   // ETH per copy (0 = free)
+        uint256 maxSupply;   // 0 = open edition
+        uint256 minted;
+        bool active;
+    }
+
+    uint256 public nextEditionId;
+
+    mapping(uint256 => Edition) public editions;
+    mapping(uint256 => string) private _uris;
+
+    address public platform;
+    IPaymentRouter public paymentRouter;
+    uint16 public platformFeeBps;
+    uint16 public royaltyBps;
+
+    event EditionCreated(
+        uint256 indexed editionId,
+        uint256 indexed universeId,
+        EntityKind kind,
+        string name,
+        address creator,
+        uint256 mintPrice,
+        uint256 maxSupply
+    );
+    event EditionMinted(uint256 indexed editionId, address buyer, uint256 amount, uint256 paid);
+    event EditionDeactivated(uint256 indexed editionId);
+
+    error EditionNotActive();
+    error MaxSupplyReached();
+    error InsufficientPayment();
+    error NotCreatorOrPlatform();
+    error NotPlatform();
+
+    constructor(
+        address _platform,
+        address _paymentRouter,
+        uint16 _platformFeeBps,
+        uint16 _royaltyBps
+    ) ERC1155("") {
+        platform = _platform;
+        paymentRouter = IPaymentRouter(_paymentRouter);
+        platformFeeBps = _platformFeeBps;
+        royaltyBps = _royaltyBps;
+    }
+
+    /// @notice Register a new edition for minting
+    /// @param universeId  Universe this entity belongs to
+    /// @param kind        EntityKind enum value
+    /// @param name        Display name for the entity
+    /// @param contentHash SHA-256 of full entity content
+    /// @param mintPrice   ETH per copy (0 = free)
+    /// @param maxSupply   Edition cap (0 = unlimited)
+    /// @param metadataURI IPFS/Walrus URI for token metadata
+    function createEdition(
+        uint256 universeId,
+        EntityKind kind,
+        string calldata name,
+        bytes32 contentHash,
+        uint256 mintPrice,
+        uint256 maxSupply,
+        string calldata metadataURI
+    ) external returns (uint256 editionId) {
+        editionId = nextEditionId++;
+
+        editions[editionId] = Edition({
+            universeId: universeId,
+            kind: kind,
+            name: name,
+            contentHash: contentHash,
+            creator: msg.sender,
+            mintPrice: mintPrice,
+            maxSupply: maxSupply,
+            minted: 0,
+            active: true
+        });
+        _uris[editionId] = metadataURI;
+        _setTokenRoyalty(editionId, msg.sender, royaltyBps);
+
+        emit EditionCreated(editionId, universeId, kind, name, msg.sender, mintPrice, maxSupply);
+    }
+
+    /// @notice Mint `amount` copies of an edition
+    function mint(uint256 editionId, uint256 amount) external payable nonReentrant {
+        Edition storage ed = editions[editionId];
+        if (!ed.active) revert EditionNotActive();
+        if (ed.maxSupply > 0 && ed.minted + amount > ed.maxSupply) revert MaxSupplyReached();
+
+        uint256 totalPrice = ed.mintPrice * amount;
+        if (msg.value < totalPrice) revert InsufficientPayment();
+
+        ed.minted += amount;
+        _mint(msg.sender, editionId, amount, "");
+
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(ed.creator, platformFeeBps);
+        }
+
+        emit EditionMinted(editionId, msg.sender, amount, msg.value);
+    }
+
+    /// @notice Deactivate an edition — stops new mints, existing tokens unchanged
+    function deactivate(uint256 editionId) external {
+        Edition storage ed = editions[editionId];
+        if (msg.sender != ed.creator && msg.sender != platform) revert NotCreatorOrPlatform();
+        ed.active = false;
+        emit EditionDeactivated(editionId);
+    }
+
+    /// @notice Get editions in a universe filtered by kind (paginated)
+    function getByUniverse(uint256 universeId, EntityKind kind, uint256 startId, uint256 count)
+        external view returns (uint256[] memory ids)
+    {
+        uint256[] memory temp = new uint256[](count);
+        uint256 found = 0;
+        for (uint256 i = startId; i < nextEditionId && found < count; i++) {
+            if (editions[i].universeId == universeId && editions[i].kind == kind) {
+                temp[found++] = i;
+            }
+        }
+        ids = new uint256[](found);
+        for (uint256 j = 0; j < found; j++) ids[j] = temp[j];
+    }
+
+    function uri(uint256 editionId) public view override returns (string memory) {
+        return _uris[editionId];
+    }
+
+    function setPlatformFee(uint16 newFeeBps) external {
+        if (msg.sender != platform) revert NotPlatform();
+        platformFeeBps = newFeeBps;
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public view override(ERC1155, ERC2981) returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+}

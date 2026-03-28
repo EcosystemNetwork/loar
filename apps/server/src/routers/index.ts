@@ -4,7 +4,11 @@
  * Domain structure:
  *   universes      — Universe CRUD, team, treasury, collabs
  *   content        — User content CRUD, wiki/lore generation
- *   generation     — AI video generation (smart routing), image generation
+ *   generation     — AI video generation (smart routing + billing)
+ *   image          — Image generation (smart routing + billing + history)
+ *   voice          — TTS, sound effects, voice design, voice cloning (ElevenLabs)
+ *   threed         — 3D generation text-to-3D / image-to-3D (Meshy)
+ *   studio         — Entity asset pack orchestrator (fan-out across all modalities)
  *   marketplace    — Canon submissions, voting, NFT listings
  *   credits        — Credit packages, balances, spend/purchase
  *   subscriptions  — Universe subscription tiers
@@ -53,6 +57,9 @@ import { universeTreasuryRouter } from './universeTreasury/universeTreasury.rout
 import { adminRouter } from './admin/admin.routes';
 import { portfolioRouter } from './portfolio/portfolio.routes';
 import { mediaRouter } from './media/media.routes';
+import { voiceRouter } from './generation/voice.routes';
+import { threedRouter } from './generation/threed.routes';
+import { studioRouter } from './studio/studio.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const walletLoginsCol = firebaseAvailable ? db.collection('walletLogins') : null;
@@ -130,7 +137,12 @@ export const appRouter = router({
   // ── Generation domain ───────────────────────────────────────────────
   generation: generationRouter,
   image: imageRouter,
+  voice: voiceRouter,
+  threed: threedRouter,
   fal: falRouter, // @deprecated — backward compat; migrate to generation.* + image.*
+
+  // ── Studio OS ────────────────────────────────────────────────────────
+  studio: studioRouter,
 
   // ── Marketplace domain ──────────────────────────────────────────────
   marketplace: marketplaceRouter,

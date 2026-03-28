@@ -157,7 +157,7 @@ export const adsRouter = router({
   getSlotsByUniverse: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await adSlotsCol
+      const snapshot = await adSlotsCol()
         .where('universeId', '==', input.universeId)
         .where('active', '==', true)
         .orderBy('createdAt', 'desc')
@@ -169,7 +169,7 @@ export const adsRouter = router({
   getSponsorships: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await sponsorshipsCol
+      const snapshot = await sponsorshipsCol()
         .where('universeId', '==', input.universeId)
         .where('active', '==', true)
         .get();
@@ -183,7 +183,7 @@ export const adsRouter = router({
   }),
 
   getBids: publicProcedure.input(z.object({ slotId: z.string() })).query(async ({ input }) => {
-    const snapshot = await adBidsCol
+    const snapshot = await adBidsCol()
       .where('slotId', '==', input.slotId)
       .orderBy('createdAt', 'desc')
       .get();

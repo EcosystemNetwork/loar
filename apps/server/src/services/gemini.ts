@@ -521,9 +521,41 @@ Generate the improved prompt now:`;
   }
 }
 
+/**
+ * Generate a lore / wiki card for any entity type.
+ * Used by the Studio orchestrator for the lore_card capability.
+ */
+export async function generateEntityLore(
+  entityName: string,
+  entityKind: string,
+  description: string
+): Promise<string> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const prompt = `You are a worldbuilding writer creating a concise wiki/lore card entry.
+
+ENTITY NAME: ${entityName}
+ENTITY KIND: ${entityKind}
+DESCRIPTION: ${description}
+
+Write a compelling 2–4 paragraph wiki entry for this ${entityKind}. Include:
+- What it is / who they are
+- Key traits, abilities, or notable characteristics
+- Role in the world / narrative significance
+- One memorable detail or hook
+
+Write in a neutral encyclopedic tone. No headers, no lists — flowing paragraphs only.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  if (!text) throw new Error('Gemini returned empty lore card');
+  return text;
+}
+
 export const geminiService = {
   generateWikiFromVideo,
   analyzeCharacterImage,
   improveImagePrompt,
   improveVideoPrompt,
+  generateEntityLore,
 };

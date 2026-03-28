@@ -180,12 +180,53 @@ export function useAdSlots(universeId: string) {
   });
 }
 
+export function useAdBids(slotId: string) {
+  return useQuery({
+    queryKey: ['ad-bids', slotId],
+    queryFn: () => trpcClient.ads.getBids.query({ slotId }),
+    enabled: !!slotId,
+  });
+}
+
+export function useUniverseSponsorships(universeId: string) {
+  return useQuery({
+    queryKey: ['universe-sponsorships', universeId],
+    queryFn: () => trpcClient.ads.getSponsorships.query({ universeId }),
+    enabled: !!universeId,
+  });
+}
+
+export function useCreateAdSlot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.ads.createSlot.mutate>[0]) =>
+      trpcClient.ads.createSlot.mutate(input),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['ad-slots', vars.universeId] }),
+  });
+}
+
 export function usePlaceBid() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<typeof trpcClient.ads.placeBid.mutate>[0]) =>
       trpcClient.ads.placeBid.mutate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['ad-slots'] }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['ad-slots'] });
+      qc.invalidateQueries({ queryKey: ['ad-bids', vars.slotId] });
+    },
+  });
+}
+
+export function useAcceptBid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.ads.acceptBid.mutate>[0]) =>
+      trpcClient.ads.acceptBid.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-slots'] });
+      qc.invalidateQueries({ queryKey: ['ad-bids'] });
+      qc.invalidateQueries({ queryKey: ['universe-sponsorships'] });
+    },
   });
 }
 
