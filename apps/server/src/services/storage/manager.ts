@@ -126,6 +126,93 @@ export class StorageManager {
     return this.upload(buffer, resolvedFilename, contentType);
   }
 
+  // ─── Firebase-Only Upload (for gallery/dashboard content) ──
+
+  /**
+   * Upload content to Firebase only. Used for gallery/dashboard content
+   * that doesn't need permanent on-chain storage yet.
+   * Content stays mutable and cheap until the user decides to mint.
+   */
+  async uploadToGallery(
+    buffer: Buffer,
+    filename: string,
+    mimeType?: string
+  ): Promise<StorageManifest> {
+    const contentHash = computeSha256(buffer);
+    const resolvedMime = mimeType || getMimeType(filename);
+
+    const existing = await this.findManifest(contentHash);
+    if (existing) return existing;
+
+    const firebase = this.providers.find((p) => p.name === 'firebase');
+    if (!firebase?.isAvailable()) {
+      throw new Error('Firebase storage is not available');
+    }
+
+    const result = await firebase.upload(buffer, filename, resolvedMime);
+
+    const manifest: StorageManifest = {
+      contentHash,
+      uploads: [result],
+      originalFilename: filename,
+      mimeType: resolvedMime,
+      size: buffer.length,
+      createdAt: Date.now(),
+    };
+
+    await this.saveManifest(manifest);
+    return manifest;
+  }
+
+  async uploadToGalleryFromUrl(url: string, filename?: string): Promise<StorageManifest> {
+    const { buffer, contentType } = await fetchToBuffer(url);
+    const resolvedFilename =
+      filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
+    return this.uploadToGallery(buffer, resolvedFilename, contentType);
+  }
+
+  // ─── Pin to IPFS (for NFT minting) ─────────────────────────
+
+  /**
+   * Pin existing content to IPFS for permanent on-chain storage.
+   * Called when a user mints their content as an NFT.
+   * Returns the IPFS CID and updated manifest.
+   */
+  async pinToIPFS(
+    contentHash: string
+  ): Promise<{ cid: string; url: string; manifest: StorageManifest }> {
+    const manifest = await this.findManifest(contentHash);
+    if (!manifest) {
+      throw new Error(`No manifest found for contentHash: ${contentHash}`);
+    }
+
+    // Check if already pinned to IPFS
+    const existingIpfs = manifest.uploads.find((u) => u.provider === 'ipfs');
+    if (existingIpfs) {
+      return { cid: existingIpfs.contentId, url: existingIpfs.url, manifest };
+    }
+
+    // Download from existing provider and re-upload to IPFS
+    const ipfs = this.providers.find((p) => p.name === 'ipfs');
+    if (!ipfs?.isAvailable()) {
+      throw new Error('IPFS provider is not available');
+    }
+
+    const data = await this.download(contentHash);
+    const buffer = Buffer.from(data);
+    const result = await ipfs.upload(
+      buffer,
+      manifest.originalFilename || `nft-${contentHash.slice(0, 12)}`,
+      manifest.mimeType
+    );
+
+    // Append IPFS upload to manifest
+    manifest.uploads.push(result);
+    await this.saveManifest(manifest);
+
+    return { cid: result.contentId, url: result.url, manifest };
+  }
+
   // ─── Resolve & Download ───────────────────────────────────
 
   /** Resolve a contentHash to the best available URL. */

@@ -7,11 +7,13 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
 import { randomUUID } from 'crypto';
+import { getStorageManager } from '../../services/storage';
 
 const submissionsCol = db.collection('canonSubmissions');
 const canonVotesCol = db.collection('canonVotes');
 const canonLicensesCol = db.collection('canonLicenses');
 const marketplaceSalesCol = db.collection('marketplaceSales');
+const contentCol = db.collection('content');
 
 const submissionTypeEnum = z.enum(['CHARACTER', 'PLOT_ARC', 'LOCATION', 'LORE_RULE']);
 
@@ -110,11 +112,51 @@ export const marketplaceRouter = router({
       if (new Date() < sub.votingDeadline?.toDate?.()) throw new Error('Voting not ended');
 
       const accepted = (sub.votesFor || 0) > (sub.votesAgainst || 0);
+      const now = new Date();
+
       await ref.update({
         status: accepted ? 'ACCEPTED' : 'REJECTED',
-        finalizedAt: new Date(),
-        updatedAt: new Date(),
+        finalizedAt: now,
+        updatedAt: now,
       });
+
+      // ── On acceptance: pin to IPFS and lock content as canon ──
+      if (accepted && sub.contentHash) {
+        try {
+          const manager = getStorageManager();
+          const pinResult = await manager.pinToIPFS(sub.contentHash);
+
+          // Mark the submission as permanently stored
+          await ref.update({
+            ipfsCid: pinResult.cid,
+            ipfsUrl: pinResult.url,
+            canonLocked: true,
+            canonLockedAt: now,
+          });
+
+          // If there's a linked content doc, lock it too
+          const contentSnap = await contentCol
+            .where('contentHash', '==', sub.contentHash)
+            .limit(1)
+            .get();
+
+          if (!contentSnap.empty) {
+            await contentSnap.docs[0].ref.update({
+              canonLocked: true,
+              canonLockedAt: now,
+              canonUniverseId: sub.universeId,
+              canonSubmissionId: input.submissionId,
+              ipfsCid: pinResult.cid,
+              ipfsUrl: pinResult.url,
+              updatedAt: now,
+            });
+          }
+        } catch (pinErr) {
+          // Non-fatal — canon is accepted even if IPFS pin fails
+          // Can be retried later
+          console.error('[Canon] IPFS pin failed for accepted submission:', pinErr);
+        }
+      }
 
       return { ok: true, accepted };
     }),
