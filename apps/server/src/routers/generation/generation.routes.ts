@@ -21,6 +21,7 @@ import {
   markProviderUnhealthy,
   markProviderHealthy,
 } from '../../services/video-models';
+import { trackQuests, trackModelUsage } from '../../services/quest-tracker';
 import type {
   VideoGenerationRecord,
   RoutingMode,
@@ -403,8 +404,18 @@ export const generationRouter = router({
         throw new Error(result.error || 'Video generation failed');
       }
 
-      // Success — mark provider healthy
+      // Success — mark provider healthy + track quests
       markProviderHealthy(model.provider);
+
+      // Fire-and-forget quest tracking
+      trackQuests(ctx.user.uid, [
+        { questId: 'first_generation' },
+        { questId: 'daily_generation' },
+        { questId: 'generate_5_videos' },
+        { questId: 'generate_100_videos' },
+        ...(input.routingMode === 'auto' ? [{ questId: 'smart_auto_10' }] : []),
+      ]);
+      trackModelUsage(ctx.user.uid, finalModelId);
 
       await generationsCol.doc(generationId).update({
         status: 'completed',

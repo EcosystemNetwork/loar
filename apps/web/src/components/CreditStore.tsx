@@ -71,7 +71,11 @@ interface CreditPackage {
 export function CreditStore({ onClose }: { onClose?: () => void }) {
   const [paymentTab, setPaymentTab] = useState<PaymentTab>('loar');
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
   const queryClient = useQueryClient();
+  const { isConnected } = useAccount();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['creditPackages'],
@@ -92,8 +96,13 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     onSuccess: (data) => {
       toast.success(`Added ${data.creditsAdded} credits!`);
       queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
+      setIsPaying(false);
+      setSelectedPkg(null);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Purchase failed'),
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Purchase failed');
+      setIsPaying(false);
+    },
   });
 
   const purchaseLoarMutation = useMutation({
@@ -102,8 +111,13 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     onSuccess: (data) => {
       toast.success(data.savings);
       queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
+      setIsPaying(false);
+      setSelectedPkg(null);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Purchase failed'),
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Purchase failed');
+      setIsPaying(false);
+    },
   });
 
   const pkgs = (packages || []) as CreditPackage[];
@@ -245,22 +259,47 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       {/* Purchase Button */}
       {selectedPkg && (
         <div className="pt-2">
-          {paymentTab === 'loar' ? (
+          {!isConnected ? (
+            <p className="text-center text-sm text-zinc-400 py-3">
+              Connect your wallet to purchase credits
+            </p>
+          ) : paymentTab === 'loar' ? (
             <button
-              onClick={() => {
-                // In production: trigger wallet $LOAR approval + transfer, get txHash
-                // For now: placeholder
-                toast.info('$LOAR payment: Connect wallet and approve token transfer');
+              disabled={isPaying}
+              onClick={async () => {
+                const pkg = pkgs.find((p) => p.id === selectedPkg);
+                if (!pkg) return;
+                setIsPaying(true);
+                try {
+                  const loarAmount = parseUnits(pkg.loarTokenAmount.toString(), 18);
+                  toast.info('Confirm $LOAR transfer in your wallet...');
+                  const txHash = await writeContractAsync({
+                    address: LOAR_TOKEN_ADDRESS,
+                    abi: ERC20_ABI,
+                    functionName: 'transfer',
+                    args: [TREASURY_ADDRESS, loarAmount],
+                  });
+                  toast.info('$LOAR sent! Confirming credits...');
+                  await purchaseLoarMutation.mutateAsync({
+                    packageId: pkg.id,
+                    txHash,
+                    loarAmount: loarAmount.toString(),
+                  });
+                } catch (err) {
+                  if (err instanceof Error && !err.message.includes('rejected')) {
+                    toast.error('$LOAR payment failed: ' + err.message);
+                  }
+                  setIsPaying(false);
+                }
               }}
-              className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition-colors"
+              className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
             >
-              Pay with $LOAR (25% margin)
+              {isPaying ? 'Processing...' : 'Pay with $LOAR (25% margin)'}
             </button>
           ) : paymentTab === 'card' ? (
             <button
               onClick={() => {
-                // In production: open Stripe checkout
-                toast.info('Credit card checkout coming soon — Stripe integration pending');
+                toast.info('Credit card checkout coming soon via Stripe');
               }}
               className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors"
             >
@@ -268,13 +307,35 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
             </button>
           ) : (
             <button
-              onClick={() => {
-                // In production: trigger ETH transfer via wagmi
-                toast.info('Crypto payment: Connect wallet and send ETH');
+              disabled={isPaying}
+              onClick={async () => {
+                const pkg = pkgs.find((p) => p.id === selectedPkg);
+                if (!pkg) return;
+                setIsPaying(true);
+                try {
+                  const ethPrice = pkg.fiatPriceUsd / 3000;
+                  const ethAmount = parseEther(ethPrice.toFixed(18));
+                  toast.info('Confirm ETH transfer in your wallet...');
+                  const txHash = await sendTransactionAsync({
+                    to: TREASURY_ADDRESS,
+                    value: ethAmount,
+                  });
+                  toast.info('ETH sent! Confirming credits...');
+                  await purchaseFiatMutation.mutateAsync({
+                    packageId: pkg.id,
+                    paymentMethod: 'eth',
+                    paymentRef: txHash,
+                  });
+                } catch (err) {
+                  if (err instanceof Error && !err.message.includes('rejected')) {
+                    toast.error('ETH payment failed: ' + err.message);
+                  }
+                  setIsPaying(false);
+                }
               }}
-              className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
+              className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
             >
-              Pay with ETH / Crypto (35% margin)
+              {isPaying ? 'Processing...' : 'Pay with ETH (35% margin)'}
             </button>
           )}
 

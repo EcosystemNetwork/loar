@@ -13,7 +13,27 @@ import { FieldValue } from 'firebase-admin/firestore';
 const contentCol = db.collection('content');
 const profilesCol = db.collection('profiles');
 
-const contentClassification = z.enum(['fun', 'monetized']);
+const contentClassification = z.enum(['fan', 'original', 'licensed']);
+
+const ipDeclarationSchema = z.object({
+  isOriginal: z.boolean(),
+  usesCopyrightedMaterial: z.boolean().default(false),
+  copyrightNotes: z.string().max(500).optional(),
+  license: z
+    .enum(['all-rights-reserved', 'cc-by', 'cc-by-sa', 'cc-by-nc', 'cc0', 'fan-work'])
+    .default('all-rights-reserved'),
+});
+
+const licensingProofSchema = z.object({
+  licensorName: z.string().min(1).max(200),
+  licenseType: z.enum(['exclusive', 'non-exclusive', 'sublicense']),
+  territory: z.string().max(200),
+  termEnd: z.string().optional(),
+  approvedUses: z.array(z.string()),
+  restrictedUses: z.array(z.string()).default([]),
+  royaltySplit: z.number().min(0).max(100),
+  documentUrl: z.string().url().optional(),
+});
 
 const createContentSchema = z.object({
   title: z.string().min(1).max(100),
@@ -23,16 +43,9 @@ const createContentSchema = z.object({
   mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']),
   classification: contentClassification,
   tags: z.array(z.string().max(30)).max(15).default([]),
-  // IP-related fields
-  ipDeclaration: z.object({
-    isOriginal: z.boolean(),
-    usescopyrightedMaterial: z.boolean().default(false),
-    copyrightNotes: z.string().max(500).optional(),
-    license: z.enum(['all-rights-reserved', 'cc-by', 'cc-by-sa', 'cc-by-nc', 'cc0', 'fan-work']).default('all-rights-reserved'),
-  }),
-  // Optional: link to a universe
+  ipDeclaration: ipDeclarationSchema,
+  licensingProof: licensingProofSchema.optional(),
   universeId: z.string().optional(),
-  // Visibility within the user's profile
   visibility: z.enum(['public', 'private', 'unlisted']).default('public'),
 });
 
@@ -43,86 +56,89 @@ const updateContentSchema = z.object({
   thumbnailUrl: z.string().url().optional(),
   classification: contentClassification.optional(),
   tags: z.array(z.string().max(30)).max(15).optional(),
-  ipDeclaration: z.object({
-    isOriginal: z.boolean(),
-    usescopyrightedMaterial: z.boolean().default(false),
-    copyrightNotes: z.string().max(500).optional(),
-    license: z.enum(['all-rights-reserved', 'cc-by', 'cc-by-sa', 'cc-by-nc', 'cc0', 'fan-work']).default('all-rights-reserved'),
-  }).optional(),
+  ipDeclaration: ipDeclarationSchema.optional(),
+  licensingProof: licensingProofSchema.optional(),
   visibility: z.enum(['public', 'private', 'unlisted']).optional(),
 });
 
 export const contentRouter = router({
   /** Create a new content item */
-  create: protectedProcedure
-    .input(createContentSchema)
-    .mutation(async ({ ctx, input }) => {
-      // Enforce IP rules for monetized content
-      if (input.classification === 'monetized') {
-        if (input.ipDeclaration.usescopyrightedMaterial) {
-          throw new Error('Monetized content cannot use copyrighted materials. Switch to "Fun" classification or remove copyrighted content.');
-        }
-        if (input.ipDeclaration.license === 'fan-work') {
-          throw new Error('Fan works cannot be monetized. Switch to "Fun" classification.');
-        }
-        if (!input.ipDeclaration.isOriginal) {
-          throw new Error('Monetized content must be original work. Confirm originality or switch to "Fun" classification.');
-        }
+  create: protectedProcedure.input(createContentSchema).mutation(async ({ ctx, input }) => {
+    // Enforce IP rules for monetized content
+    if (input.classification === 'original' || input.classification === 'licensed') {
+      if (input.ipDeclaration.usesCopyrightedMaterial) {
+        throw new Error(
+          'Monetized content cannot use third-party copyrighted material. Switch to "Non-Commercial" or use the Rights-Cleared lane with documentation.'
+        );
       }
-
-      const now = new Date();
-      const contentData = {
-        ...input,
-        creatorUid: ctx.user.uid,
-        createdAt: now,
-        updatedAt: now,
-        views: 0,
-        likes: 0,
-      };
-
-      const ref = await contentCol.add(contentData);
-
-      // Increment content count on profile
-      const profileRef = profilesCol.doc(ctx.user.uid);
-      const profileDoc = await profileRef.get();
-      if (profileDoc.exists) {
-        await profileRef.update({ contentCount: FieldValue.increment(1) });
+      if (input.ipDeclaration.license === 'fan-work') {
+        throw new Error('Fan works cannot be monetized. Switch to "Non-Commercial".');
       }
+      if (!input.ipDeclaration.isOriginal) {
+        throw new Error(
+          'Monetized content must be original work. Confirm originality or switch to "Non-Commercial".'
+        );
+      }
+    }
+    if (input.classification === 'licensed' && !input.licensingProof) {
+      throw new Error(
+        'Rights-Cleared content requires licensing details. Complete the licensing proof section.'
+      );
+    }
 
-      return { id: ref.id, ...contentData };
-    }),
+    const now = new Date();
+    const reviewStatus = input.classification === 'licensed' ? 'pending' : 'not_required';
+    const contentData = {
+      ...input,
+      creatorUid: ctx.user.uid,
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+      likes: 0,
+      reviewStatus,
+    };
+
+    const ref = await contentCol.add(contentData);
+
+    // Increment content count on profile
+    const profileRef = profilesCol.doc(ctx.user.uid);
+    const profileDoc = await profileRef.get();
+    if (profileDoc.exists) {
+      await profileRef.update({ contentCount: FieldValue.increment(1) });
+    }
+
+    return { id: ref.id, ...contentData };
+  }),
 
   /** Update an existing content item (owner only) */
-  update: protectedProcedure
-    .input(updateContentSchema)
-    .mutation(async ({ ctx, input }) => {
-      const ref = contentCol.doc(input.id);
-      const doc = await ref.get();
+  update: protectedProcedure.input(updateContentSchema).mutation(async ({ ctx, input }) => {
+    const ref = contentCol.doc(input.id);
+    const doc = await ref.get();
 
-      if (!doc.exists) throw new Error('Content not found');
-      if (doc.data()!.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
+    if (!doc.exists) throw new Error('Content not found');
+    if (doc.data()!.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
 
-      const existing = doc.data()!;
-      const newClassification = input.classification || existing.classification;
-      const newIp = input.ipDeclaration || existing.ipDeclaration;
+    const existing = doc.data()!;
+    const newClassification = input.classification || existing.classification;
+    const newIp = input.ipDeclaration || existing.ipDeclaration;
 
-      // Re-validate IP rules if changing to monetized
-      if (newClassification === 'monetized') {
-        if (newIp.usescopyrightedMaterial) {
-          throw new Error('Monetized content cannot use copyrighted materials.');
-        }
-        if (newIp.license === 'fan-work') {
-          throw new Error('Fan works cannot be monetized.');
-        }
-        if (!newIp.isOriginal) {
-          throw new Error('Monetized content must be original work.');
-        }
+    // Re-validate IP rules if changing to a monetized lane
+    if (newClassification === 'original' || newClassification === 'licensed') {
+      if (newIp.usesCopyrightedMaterial) {
+        throw new Error('Monetized content cannot use copyrighted materials.');
       }
+      if (newIp.license === 'fan-work') {
+        throw new Error('Fan works cannot be monetized.');
+      }
+      if (!newIp.isOriginal) {
+        throw new Error('Monetized content must be original work.');
+      }
+    }
 
-      const { id, ...updates } = input;
-      await ref.update({ ...updates, updatedAt: new Date() });
-      return { ok: true };
-    }),
+    const { id, ...updates } = input;
+    await ref.update({ ...updates, updatedAt: new Date() });
+    return { ok: true };
+  }),
 
   /** Delete a content item (owner only) */
   delete: protectedProcedure
@@ -147,40 +163,40 @@ export const contentRouter = router({
     }),
 
   /** Get a single content item by ID */
-  get: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
-      const doc = await contentCol.doc(input.id).get();
-      if (!doc.exists) return null;
+  get: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
+    const doc = await contentCol.doc(input.id).get();
+    if (!doc.exists) return null;
 
-      const data = doc.data()!;
-      return {
-        id: doc.id,
-        title: data.title,
-        description: data.description,
-        mediaUrl: data.mediaUrl,
-        thumbnailUrl: data.thumbnailUrl || null,
-        mediaType: data.mediaType,
-        classification: data.classification,
-        tags: data.tags || [],
-        ipDeclaration: data.ipDeclaration,
-        creatorUid: data.creatorUid,
-        universeId: data.universeId || null,
-        visibility: data.visibility,
-        views: data.views || 0,
-        likes: data.likes || 0,
-        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
-      };
-    }),
+    const data = doc.data()!;
+    return {
+      id: doc.id,
+      title: data.title,
+      description: data.description,
+      mediaUrl: data.mediaUrl,
+      thumbnailUrl: data.thumbnailUrl || null,
+      mediaType: data.mediaType,
+      classification: data.classification,
+      tags: data.tags || [],
+      ipDeclaration: data.ipDeclaration,
+      creatorUid: data.creatorUid,
+      universeId: data.universeId || null,
+      visibility: data.visibility,
+      views: data.views || 0,
+      likes: data.likes || 0,
+      createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+    };
+  }),
 
   /** Get content by creator UID (respects visibility) */
   getByCreator: publicProcedure
-    .input(z.object({
-      creatorUid: z.string(),
-      classification: contentClassification.optional(),
-      limit: z.number().min(1).max(50).default(20),
-      cursor: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        creatorUid: z.string(),
+        classification: contentClassification.optional(),
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
       let query = contentCol
         .where('creatorUid', '==', input.creatorUid)
@@ -231,11 +247,13 @@ export const contentRouter = router({
 
   /** Get the current user's own content (all visibilities) */
   myContent: protectedProcedure
-    .input(z.object({
-      classification: contentClassification.optional(),
-      limit: z.number().min(1).max(50).default(20),
-      cursor: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        classification: contentClassification.optional(),
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       let query = contentCol
         .where('creatorUid', '==', ctx.user.uid)
@@ -286,13 +304,15 @@ export const contentRouter = router({
 
   /** Browse all public content (gallery feed) */
   feed: publicProcedure
-    .input(z.object({
-      classification: contentClassification.optional(),
-      mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']).optional(),
-      search: z.string().optional(),
-      limit: z.number().min(1).max(50).default(20),
-      cursor: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        classification: contentClassification.optional(),
+        mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']).optional(),
+        search: z.string().optional(),
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
       let query = contentCol
         .where('visibility', '==', 'public')
