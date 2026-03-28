@@ -183,6 +183,9 @@ jobs:
       - name: Type check indexer schema and config
         run: pnpm --filter indexer typecheck
 
+      - name: Run indexer handler tests
+        run: pnpm --filter indexer test
+
   contracts:
     name: Smart Contracts
     runs-on: ubuntu-latest

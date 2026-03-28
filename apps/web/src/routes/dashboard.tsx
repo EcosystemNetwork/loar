@@ -271,7 +271,7 @@ function CreatorEarnings() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <ShoppingBag className="h-4 w-4" />
-              <span className="text-sm">Total Minted</span>
+              <span className="text-sm">Total Tokenized</span>
             </div>
             <p className="text-2xl font-bold">{totalMinted}</p>
           </CardContent>
@@ -280,7 +280,7 @@ function CreatorEarnings() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Film className="h-4 w-4" />
-              <span className="text-sm">NFTs Collected</span>
+              <span className="text-sm">Episodes Owned</span>
             </div>
             <p className="text-2xl font-bold">{nftsCollected}</p>
           </CardContent>

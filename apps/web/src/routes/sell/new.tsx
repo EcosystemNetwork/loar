@@ -37,14 +37,54 @@ export const Route = createFileRoute('/sell/new')({
 });
 
 const PRODUCT_TYPES = [
-  { value: 'EPISODE_NFT', label: 'Episode NFT', description: 'A scene or episode collectible', icon: <Film className="w-6 h-6" /> },
-  { value: 'CHARACTER_NFT', label: 'Character NFT', description: 'A character collectible', icon: <Users className="w-6 h-6" /> },
-  { value: 'ARTIFACT', label: 'Artifact', description: 'Any collectible item', icon: <Package className="w-6 h-6" /> },
-  { value: 'SUBSCRIPTION_TIER', label: 'Subscription', description: 'Access tier for your universe', icon: <Crown className="w-6 h-6" /> },
-  { value: 'CANON_LICENSE', label: 'Canon License', description: 'Contribution rights', icon: <Gavel className="w-6 h-6" /> },
-  { value: 'MERCH', label: 'Merchandise', description: 'Physical or digital merch', icon: <ShoppingBag className="w-6 h-6" /> },
-  { value: 'SPONSORED_SLOT', label: 'Sponsored Slot', description: 'Ad placement inventory', icon: <Megaphone className="w-6 h-6" /> },
-  { value: 'IP_LICENSE', label: 'IP License', description: 'Commercial rights to your IP', icon: <FileText className="w-6 h-6" /> },
+  {
+    value: 'EPISODE_NFT',
+    label: 'Own Episode',
+    description: 'A scene or episode collectible',
+    icon: <Film className="w-6 h-6" />,
+  },
+  {
+    value: 'CHARACTER_NFT',
+    label: 'Own Character',
+    description: 'A character collectible',
+    icon: <Users className="w-6 h-6" />,
+  },
+  {
+    value: 'ARTIFACT',
+    label: 'Artifact',
+    description: 'Any collectible item',
+    icon: <Package className="w-6 h-6" />,
+  },
+  {
+    value: 'SUBSCRIPTION_TIER',
+    label: 'Subscription',
+    description: 'Access tier for your universe',
+    icon: <Crown className="w-6 h-6" />,
+  },
+  {
+    value: 'CANON_LICENSE',
+    label: 'Canon License',
+    description: 'Contribution rights',
+    icon: <Gavel className="w-6 h-6" />,
+  },
+  {
+    value: 'MERCH',
+    label: 'Merchandise',
+    description: 'Physical or digital merch',
+    icon: <ShoppingBag className="w-6 h-6" />,
+  },
+  {
+    value: 'SPONSORED_SLOT',
+    label: 'Sponsored Slot',
+    description: 'Ad placement inventory',
+    icon: <Megaphone className="w-6 h-6" />,
+  },
+  {
+    value: 'IP_LICENSE',
+    label: 'IP License',
+    description: 'Commercial rights to your IP',
+    icon: <FileText className="w-6 h-6" />,
+  },
 ] as const;
 
 type Step = 'type' | 'details' | 'pricing' | 'publish';
@@ -181,7 +221,9 @@ function CreateListingPage() {
                 }`}
                 onClick={() => update('productType', pt.value)}
               >
-                <div className={`text-primary ${form.productType === pt.value ? 'opacity-100' : 'opacity-50'}`}>
+                <div
+                  className={`text-primary ${form.productType === pt.value ? 'opacity-100' : 'opacity-50'}`}
+                >
                   {pt.icon}
                 </div>
                 <div>
@@ -338,7 +380,10 @@ function CreateListingPage() {
               <SummaryRow label="Price" value={`${form.price || '0'} ${form.currency}`} />
               <SummaryRow label="Supply" value={form.supply === '0' ? 'Unlimited' : form.supply} />
               <SummaryRow label="Rights" value={form.rightsLane} />
-              <SummaryRow label="Royalty" value={`${(parseInt(form.royaltyBps) / 100).toFixed(1)}%`} />
+              <SummaryRow
+                label="Royalty"
+                value={`${(parseInt(form.royaltyBps) / 100).toFixed(1)}%`}
+              />
             </div>
 
             <div className="flex flex-col gap-3 pt-2">
@@ -373,12 +418,7 @@ function CreateListingPage() {
       {step !== 'publish' && (
         <div className="sticky bottom-0 bg-background border-t px-4 py-4 safe-area-bottom">
           <div className="max-w-lg mx-auto">
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={advance}
-              disabled={!canAdvance()}
-            >
+            <Button size="lg" className="w-full" onClick={advance} disabled={!canAdvance()}>
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>

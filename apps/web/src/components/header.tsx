@@ -23,6 +23,7 @@ export default function Header() {
     { to: '/create' as const, label: 'Create' },
     { to: '/wiki' as const, label: 'Wiki' },
     { to: '/market' as const, label: 'Slop Market' },
+    { to: '/credits' as const, label: 'Credits' },
     { to: '/docs' as const, label: 'Docs' },
   ];
 

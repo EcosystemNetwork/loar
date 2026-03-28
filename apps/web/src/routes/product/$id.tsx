@@ -24,6 +24,26 @@ import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
+import { useWriteContract } from 'wagmi';
+import { parseUnits, type Address } from 'viem';
+
+const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as Address;
+const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
+  '0x0000000000000000000000000000000000000000') as Address;
+
+const ERC20_ABI = [
+  {
+    name: 'transfer',
+    type: 'function' as const,
+    stateMutability: 'nonpayable' as const,
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const;
 
 export const Route = createFileRoute('/product/$id')({
   component: ProductDetailPage,
@@ -43,6 +63,7 @@ function ProductDetailPage() {
   const { isConnected } = useWalletAuth();
   const { data: listing, isLoading } = useListing(id);
   const [buying, setBuying] = useState(false);
+  const { writeContractAsync } = useWriteContract();
 
   if (isLoading) {
     return (
@@ -57,7 +78,9 @@ function ProductDetailPage() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
         <Package className="w-12 h-12 text-muted-foreground opacity-30" />
         <p className="text-muted-foreground">Listing not found</p>
-        <Link to="/market"><Button variant="outline">Back to Market</Button></Link>
+        <Link to="/market">
+          <Button variant="outline">Back to Market</Button>
+        </Link>
       </div>
     );
   }
@@ -74,10 +97,32 @@ function ProductDetailPage() {
     }
     setBuying(true);
     try {
-      const result = await trpcClient.listings.purchase.mutate({ listingId: id, quantity: 1 });
+      let txHash: string | undefined;
+
+      // For $LOAR listings, transfer tokens on-chain before recording the order
+      if (l.currency === 'LOAR' && l.price !== '0') {
+        const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+        const loarAmount = parseUnits(l.price as string, 18);
+        toast.info('Confirm $LOAR transfer in your wallet…');
+        txHash = await writeContractAsync({
+          address: LOAR_TOKEN_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [recipient, loarAmount],
+        });
+        toast.info('$LOAR sent! Recording order…');
+      }
+
+      const result = await trpcClient.listings.purchase.mutate({
+        listingId: id,
+        quantity: 1,
+        txHash,
+      });
       navigate({ to: '/order/$id', params: { id: result.orderId } });
     } catch (e: any) {
-      toast.error(e?.message ?? 'Purchase failed');
+      if (!(e instanceof Error && e.message.includes('rejected'))) {
+        toast.error(e?.message ?? 'Purchase failed');
+      }
     } finally {
       setBuying(false);
     }
@@ -208,15 +253,12 @@ function ProductDetailPage() {
             </Button>
           ) : !isConnected ? (
             <Link to="/login">
-              <Button className="w-full" size="lg">Connect Wallet to Buy</Button>
+              <Button className="w-full" size="lg">
+                Connect Wallet to Buy
+              </Button>
             </Link>
           ) : (
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={handleBuy}
-              disabled={buying}
-            >
+            <Button className="w-full" size="lg" onClick={handleBuy} disabled={buying}>
               {buying ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
