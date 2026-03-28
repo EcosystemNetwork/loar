@@ -102,9 +102,24 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
   });
 
   const uploadFile = useCallback(async (file: File) => {
-    const ALLOWED = ['video/mp4', 'video/webm', 'image/png', 'image/jpeg', 'image/gif'];
-    if (!ALLOWED.includes(file.type)) {
-      setUploadError(`Unsupported type: ${file.type}`);
+    const ALLOWED_MIME = new Set([
+      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff', 'image/bmp',
+      'image/avif', 'image/heic', 'image/heif', 'image/svg+xml',
+      'image/vnd.adobe.photoshop', 'image/x-xcf', 'application/postscript',
+      'model/gltf+json', 'model/gltf-binary', 'model/obj', 'model/stl',
+      'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/aac',
+      'application/pdf',
+    ]);
+    const ALLOWED_BINARY_EXT = new Set([
+      'blend', 'fbx', 'ma', 'mb', 'c4d', 'zpr', 'ztl', 'dae', 'abc', '3ds', 'lwo',
+      'psd', 'psb', 'kra', 'clip', 'procreate', 'sketch', 'afdesign', 'afphoto', 'afpub', 'cdr',
+      'exr', 'hdr', 'tga', 'dds',
+    ]);
+    const fileExt = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isOctetStream = file.type === 'application/octet-stream' || file.type === '';
+    if (!ALLOWED_MIME.has(file.type) && !(isOctetStream && ALLOWED_BINARY_EXT.has(fileExt))) {
+      setUploadError(`Unsupported type: ${file.type || fileExt}`);
       setUploadState('error');
       return;
     }
@@ -413,7 +428,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="video/mp4,video/webm,image/png,image/jpeg,image/gif"
+                accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,image/jpeg,image/png,image/gif,image/webp,image/tiff,image/bmp,image/avif,image/heic,image/heif,image/svg+xml,image/vnd.adobe.photoshop,image/x-xcf,application/postscript,model/gltf+json,model/gltf-binary,model/obj,model/stl,audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,application/pdf,.blend,.fbx,.ma,.mb,.c4d,.zpr,.ztl,.dae,.abc,.3ds,.lwo,.psd,.psb,.kra,.clip,.procreate,.sketch,.afdesign,.afphoto,.afpub,.cdr,.exr,.hdr,.tga,.dds"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
