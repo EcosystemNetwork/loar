@@ -5,10 +5,23 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 
 /// @title CanonMarketplace
-/// @notice Marketplace for submitting characters, plot arcs, locations, and lore rules.
-///         Token holders vote submissions into canon. Accepted creators earn fees.
+/// @notice Governance-gated marketplace for submitting world-building entities into canon.
+///         Covers all creator entity kinds: characters, plot arcs, locations, lore rules,
+///         items, factions, species, vehicles, technology, and organizations.
+///         Universe token holders vote submissions into canon. Accepted creators earn fees.
 contract CanonMarketplace is ReentrancyGuard {
-    enum SubmissionType { CHARACTER, PLOT_ARC, LOCATION, LORE_RULE }
+    enum SubmissionType {
+        CHARACTER,      // person
+        PLOT_ARC,       // event / narrative arc
+        LOCATION,       // place
+        LORE_RULE,      // lore
+        ITEM,           // thing
+        FACTION,        // faction
+        SPECIES,        // species
+        VEHICLE,        // vehicle
+        TECHNOLOGY,     // technology
+        ORGANIZATION    // organization
+    }
     enum SubmissionStatus { PENDING, VOTING, ACCEPTED, REJECTED, EXPIRED }
 
     struct Submission {

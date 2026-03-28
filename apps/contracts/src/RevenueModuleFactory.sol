@@ -4,13 +4,23 @@ pragma solidity ^0.8.30;
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {EpisodeEditionCollection} from "./revenue/EpisodeEditionCollection.sol";
 import {CharacterNFT} from "./revenue/CharacterNFT.sol";
+import {EntityNFT} from "./revenue/EntityNFT.sol";
+import {EntityEditionNFT} from "./revenue/EntityEditionNFT.sol";
 
 /// @title RevenueModuleFactory
-/// @notice Deploys per-universe revenue modules: EpisodeEditionCollection (ERC-1155)
-///         and CharacterNFT (ERC-721). Called after universe creation to wire up
-///         the monetization layer for a universe.
+/// @notice Deploys per-universe revenue modules. Called after universe creation
+///         to wire up the full monetization layer for a universe.
 ///
-///         This is the missing link between "universe exists" and "universe can earn."
+///         Modules deployed per universe:
+///           EpisodeEditionCollection — ERC-1155 episode editions
+///           CharacterNFT             — ERC-721 character (person) NFTs
+///           EntityNFT                — ERC-721 for place, event, vehicle
+///           EntityEditionNFT         — ERC-1155 for thing, lore, species, technology
+///
+///         Global singletons (shared across universes, deployed separately):
+///           CollectiveTokenFactory   — ERC-20 for factions and organizations
+///           StructuralDeed           — ERC-721 world-layer deeds
+///           SlopMarket               — P2P marketplace for all entity token types
 contract RevenueModuleFactory is Ownable {
     address public platform;
     address public rightsRegistry;
@@ -19,16 +29,24 @@ contract RevenueModuleFactory is Ownable {
     uint16 public episodePlatformFeeBps;
     uint16 public episodeRoyaltyBps;
     uint16 public characterAppearanceFeeBps;
+    uint16 public entityPlatformFeeBps;
+    uint16 public entityRoyaltyBps;
 
     /// @notice universeId => deployed EpisodeEditionCollection
     mapping(uint256 => address) public episodeCollection;
     /// @notice universeId => deployed CharacterNFT
     mapping(uint256 => address) public characterCollection;
+    /// @notice universeId => deployed EntityNFT (place, event, vehicle)
+    mapping(uint256 => address) public entityCollection;
+    /// @notice universeId => deployed EntityEditionNFT (thing, lore, species, technology)
+    mapping(uint256 => address) public entityEditionCollection;
 
     event ModulesDeployed(
         uint256 indexed universeId,
         address episodeCollection,
-        address characterCollection
+        address characterCollection,
+        address entityCollection,
+        address entityEditionCollection
     );
     event PlatformUpdated(address newPlatform);
 
@@ -41,7 +59,9 @@ contract RevenueModuleFactory is Ownable {
         address _paymentRouter,
         uint16 _episodePlatformFeeBps,
         uint16 _episodeRoyaltyBps,
-        uint16 _characterAppearanceFeeBps
+        uint16 _characterAppearanceFeeBps,
+        uint16 _entityPlatformFeeBps,
+        uint16 _entityRoyaltyBps
     ) Ownable(msg.sender) {
         if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0))
             revert ZeroAddress();
@@ -51,13 +71,20 @@ contract RevenueModuleFactory is Ownable {
         episodePlatformFeeBps = _episodePlatformFeeBps;
         episodeRoyaltyBps = _episodeRoyaltyBps;
         characterAppearanceFeeBps = _characterAppearanceFeeBps;
+        entityPlatformFeeBps = _entityPlatformFeeBps;
+        entityRoyaltyBps = _entityRoyaltyBps;
     }
 
-    /// @notice Deploy episode and character modules for a universe.
+    /// @notice Deploy all revenue modules for a universe.
     ///         Can only be called once per universeId.
     function deployModules(uint256 universeId)
         external
-        returns (address episodes, address characters)
+        returns (
+            address episodes,
+            address characters,
+            address entities,
+            address entityEditions
+        )
     {
         if (episodeCollection[universeId] != address(0)) revert AlreadyDeployed();
 
@@ -75,11 +102,39 @@ contract RevenueModuleFactory is Ownable {
             characterAppearanceFeeBps
         );
 
-        episodeCollection[universeId] = address(episodeContract);
-        characterCollection[universeId] = address(characterContract);
+        EntityNFT entityContract = new EntityNFT(
+            platform,
+            paymentRouter,
+            entityPlatformFeeBps,
+            entityRoyaltyBps
+        );
 
-        emit ModulesDeployed(universeId, address(episodeContract), address(characterContract));
-        return (address(episodeContract), address(characterContract));
+        EntityEditionNFT entityEditionContract = new EntityEditionNFT(
+            platform,
+            paymentRouter,
+            entityPlatformFeeBps,
+            entityRoyaltyBps
+        );
+
+        episodeCollection[universeId]       = address(episodeContract);
+        characterCollection[universeId]     = address(characterContract);
+        entityCollection[universeId]        = address(entityContract);
+        entityEditionCollection[universeId] = address(entityEditionContract);
+
+        emit ModulesDeployed(
+            universeId,
+            address(episodeContract),
+            address(characterContract),
+            address(entityContract),
+            address(entityEditionContract)
+        );
+
+        return (
+            address(episodeContract),
+            address(characterContract),
+            address(entityContract),
+            address(entityEditionContract)
+        );
     }
 
     // ── Admin ─────────────────────────────────────────────────────────────────
@@ -107,5 +162,10 @@ contract RevenueModuleFactory is Ownable {
 
     function setCharacterAppearanceFee(uint16 feeBps) external onlyOwner {
         characterAppearanceFeeBps = feeBps;
+    }
+
+    function setEntityFees(uint16 platformFeeBps, uint16 royaltyBps_) external onlyOwner {
+        entityPlatformFeeBps = platformFeeBps;
+        entityRoyaltyBps = royaltyBps_;
     }
 }

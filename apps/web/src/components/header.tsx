@@ -19,7 +19,6 @@ export default function Header() {
 
   const links = [
     { to: '/dashboard' as const, label: 'Dashboard' },
-    { to: '/videos' as const, label: 'Videos' },
     { to: '/discover' as const, label: 'Discover' },
     { to: '/create' as const, label: 'Create' },
     { to: '/wiki' as const, label: 'Wiki' },
