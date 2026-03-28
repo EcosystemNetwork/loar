@@ -7,6 +7,7 @@
 
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
+import { LoarBalance } from './LoarBalance';
 import { ModeToggle } from './mode-toggle';
 import { Button } from './ui/button';
 import { Menu, X } from 'lucide-react';
@@ -21,6 +22,7 @@ export default function Header() {
     { to: '/dashboard' as const, label: 'Dashboard' },
     { to: '/discover' as const, label: 'Discover' },
     { to: '/upload' as const, label: 'Upload' },
+    { to: '/sandbox' as const, label: 'Sandbox' },
     { to: '/cinematicUniverseCreate' as const, label: 'Create' },
     { to: '/wiki' as const, label: 'Wiki' },
     { to: '/market' as const, label: 'Slop Market' },
@@ -58,6 +60,7 @@ export default function Header() {
 
           {/* Right side - Wallet and Theme Toggle */}
           <div className="flex items-center gap-2">
+            <LoarBalance />
             <WalletConnectButton size="sm" />
             <ModeToggle />
             {/* Mobile menu toggle */}

@@ -34,10 +34,13 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      if (!ctx.user.address) {
+        throw new Error('Wallet address required to create entities');
+      }
       const result = await createEntity(
         {
           name: input.name,
@@ -105,7 +108,7 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ input }) => {

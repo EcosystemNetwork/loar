@@ -13,6 +13,7 @@ import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from '
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { GenerativeMedia } from '@/components/GenerativeMedia';
+import { QuestsPanel } from '@/components/QuestsPanel';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useEffect } from 'react';
@@ -109,79 +110,89 @@ function RouteComponent() {
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Featured Universe Section */}
-        {universes.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-xl font-semibold mb-6">Featured Universe</h2>
-            <div className="relative">
-              <Card
-                className="cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden h-64 bg-gradient-to-r from-blue-600 to-purple-600"
-                onClick={() => selectUniverse(universes[0].id)}
-              >
-                <CardContent className="p-0 h-full relative">
-                  <div className="absolute inset-0 bg-black/40" />
-                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                    <h3 className="text-2xl font-bold mb-2">{universes[0].name}</h3>
-                    <p className="text-sm opacity-90 mb-4">
-                      {universes[0].description || 'A captivating narrative universe awaits'}
-                    </p>
-                    <Button
-                      variant="secondary"
-                      className="flex items-center gap-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectUniverse(universes[0].id);
-                      }}
-                    >
-                      <Play className="h-4 w-4" />
-                      Enter Timeline
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-        )}
-
-        {/* AI Media Generation Section */}
-        <section className="mb-12">
-          <div className="flex items-center gap-2 mb-6">
-            <Wand2 className="h-5 w-5" />
-            <h2 className="text-xl font-semibold">AI Media Generation</h2>
-          </div>
-          <GenerativeMedia />
-        </section>
-
-        {/* Your Universes */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-6">Your Universes</h2>
-          {myUniverseList.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mb-4">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground" />
+      <div className="container mx-auto px-6 py-8 flex gap-8">
+        {/* Main Content */}
+        <div className="flex-1 min-w-0">
+          {/* Featured Universe Section */}
+          {universes.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-xl font-semibold mb-6">Featured Universe</h2>
+              <div className="relative">
+                <Card
+                  className="cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden h-64 bg-gradient-to-r from-blue-600 to-purple-600"
+                  onClick={() => selectUniverse(universes[0].id)}
+                >
+                  <CardContent className="p-0 h-full relative">
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                      <h3 className="text-2xl font-bold mb-2">{universes[0].name}</h3>
+                      <p className="text-sm opacity-90 mb-4">
+                        {universes[0].description || 'A captivating narrative universe awaits'}
+                      </p>
+                      <Button
+                        variant="secondary"
+                        className="flex items-center gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectUniverse(universes[0].id);
+                        }}
+                      >
+                        <Play className="h-4 w-4" />
+                        Enter Timeline
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <h3 className="text-lg font-medium mb-2">No universes yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first narrative universe to get started
-              </p>
-              <Button onClick={createNewUniverse} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Create Your First Universe
-              </Button>
-            </div>
-          ) : (
-            <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
+            </section>
           )}
-        </section>
 
-        {/* Other Universes */}
-        {otherUniverses.length > 0 && (
-          <section>
-            <h2 className="text-xl font-semibold mb-6">Explore All Universes</h2>
-            <UniverseGrid universes={otherUniverses} onSelect={selectUniverse} />
+          {/* AI Media Generation Section */}
+          <section className="mb-12">
+            <div className="flex items-center gap-2 mb-6">
+              <Wand2 className="h-5 w-5" />
+              <h2 className="text-xl font-semibold">AI Media Generation</h2>
+            </div>
+            <GenerativeMedia />
           </section>
-        )}
+
+          {/* Your Universes */}
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold mb-6">Your Universes</h2>
+            {myUniverseList.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mb-4">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">No universes yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first narrative universe to get started
+                </p>
+                <Button onClick={createNewUniverse} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create Your First Universe
+                </Button>
+              </div>
+            ) : (
+              <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
+            )}
+          </section>
+
+          {/* Other Universes */}
+          {otherUniverses.length > 0 && (
+            <section>
+              <h2 className="text-xl font-semibold mb-6">Explore All Universes</h2>
+              <UniverseGrid universes={otherUniverses} onSelect={selectUniverse} />
+            </section>
+          )}
+        </div>
+
+        {/* Sidebar — Quests & Rewards */}
+        <aside className="hidden lg:block w-80 flex-shrink-0">
+          <div className="sticky top-20">
+            <QuestsPanel />
+          </div>
+        </aside>
       </div>
     </div>
   );

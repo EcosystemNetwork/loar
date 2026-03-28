@@ -1,0 +1,467 @@
+/**
+ * Sandbox Creator
+ *
+ * A friction-free creative workspace. Generate images and videos from prompts
+ * without needing to set up a universe first. Save drafts, then optionally
+ * publish to a universe when you're ready.
+ */
+
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { WalletConnectButton } from '@/components/wallet-connect-button';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from 'sonner';
+import { useState } from 'react';
+import {
+  Wand2,
+  Video,
+  Save,
+  Trash2,
+  Plus,
+  Sparkles,
+  ArrowRight,
+  ImageIcon,
+  Loader2,
+} from 'lucide-react';
+
+export const Route = createFileRoute('/sandbox')({
+  component: SandboxPage,
+});
+
+type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3';
+
+const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
+  { value: 'fal-kling', label: 'Kling 2.5' },
+  { value: 'fal-wan25', label: 'Wan 2.5' },
+  { value: 'fal-veo3', label: 'Veo 3' },
+];
+
+const IMAGE_SIZES = [
+  { value: 'landscape_16_9', label: '16:9 Landscape' },
+  { value: 'portrait_16_9', label: '9:16 Portrait' },
+  { value: 'square_hd', label: '1:1 Square' },
+] as const;
+
+function SandboxPage() {
+  const { isAuthenticated, isAuthenticating } = useWalletAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Creation state
+  const [prompt, setPrompt] = useState('');
+  const [title, setTitle] = useState('');
+  const [imageSize, setImageSize] = useState<'landscape_16_9' | 'portrait_16_9' | 'square_hd'>(
+    'landscape_16_9'
+  );
+  const [videoModel, setVideoModel] = useState<VideoModel>('fal-kling');
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+
+  // Image generation
+  const generateImageMutation = useMutation({
+    mutationFn: () =>
+      trpcClient.fal.generateImage.mutate({
+        prompt,
+        imageSize,
+        numImages: 1,
+      }),
+    onSuccess: (data) => {
+      const url = data.imageUrl ?? null;
+      setGeneratedImageUrl(url);
+      setGeneratedVideoUrl(null);
+      if (!url) toast.error('No image returned');
+    },
+    onError: (err: any) => toast.error(err.message || 'Image generation failed'),
+  });
+
+  // Video generation from image
+  const generateVideoMutation = useMutation({
+    mutationFn: async () => {
+      if (!generatedImageUrl) throw new Error('Generate an image first');
+
+      if (videoModel === 'fal-veo3') {
+        const r = await trpcClient.fal.generateVideo.mutate({
+          prompt,
+          imageUrl: generatedImageUrl,
+          model: 'fal-ai/veo3.1/fast/image-to-video',
+          duration: 5,
+          aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
+        });
+        return r.videoUrl;
+      } else if (videoModel === 'fal-wan25') {
+        const r = await trpcClient.fal.wan25ImageToVideo.mutate({
+          prompt,
+          imageUrl: generatedImageUrl,
+          duration: 5,
+          resolution: '1080p',
+          enablePromptExpansion: true,
+        });
+        return r.videoUrl;
+      } else {
+        const r = await trpcClient.fal.klingVideo.mutate({
+          prompt,
+          imageUrl: generatedImageUrl,
+          duration: 5,
+          aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
+          cfgScale: 0.5,
+        });
+        return r.videoUrl;
+      }
+    },
+    onSuccess: (url) => {
+      setGeneratedVideoUrl(url ?? null);
+    },
+    onError: (err: any) => toast.error(err.message || 'Video generation failed'),
+  });
+
+  // Save draft
+  const saveDraftMutation = useMutation({
+    mutationFn: () =>
+      trpcClient.sandbox.saveDraft.mutate({
+        title: title || prompt.slice(0, 80),
+        prompt,
+        imageUrl: generatedImageUrl ?? undefined,
+        videoUrl: generatedVideoUrl ?? undefined,
+        model: videoModel,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+      toast.success('Draft saved!');
+      // Reset canvas
+      setPrompt('');
+      setTitle('');
+      setGeneratedImageUrl(null);
+      setGeneratedVideoUrl(null);
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to save draft'),
+  });
+
+  // Delete draft
+  const deleteDraftMutation = useMutation({
+    mutationFn: (id: string) => trpcClient.sandbox.deleteDraft.mutate({ id }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] }),
+    onError: (err: any) => toast.error(err.message || 'Failed to delete draft'),
+  });
+
+  // Load saved drafts
+  const { data: drafts } = useQuery({
+    queryKey: ['sandbox-drafts'],
+    queryFn: () => trpcClient.sandbox.myDrafts.query(),
+    enabled: isAuthenticated,
+  });
+
+  const isGeneratingImage = generateImageMutation.isPending;
+  const isGeneratingVideo = generateVideoMutation.isPending;
+  const hasContent = !!generatedImageUrl || !!generatedVideoUrl;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <h1 className="text-3xl font-bold">Sandbox</h1>
+            <Badge variant="secondary">Beta</Badge>
+          </div>
+          <p className="text-muted-foreground">
+            Create freely. No universe required — generate images and videos, then decide what to do
+            with them.
+          </p>
+        </div>
+
+        {!isAuthenticated && !isAuthenticating ? (
+          <Card className="mb-8">
+            <CardContent className="py-10 flex flex-col items-center gap-4">
+              <Wand2 className="h-10 w-10 text-muted-foreground" />
+              <p className="text-muted-foreground text-center max-w-sm">
+                Connect your wallet to start generating. Your creations are saved to your account.
+              </p>
+              <WalletConnectButton />
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left: Creation Panel */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-lg font-semibold">Create</h2>
+
+              {/* Prompt */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Prompt</label>
+                <Textarea
+                  placeholder="Describe what you want to create… e.g. 'A lone samurai on a neon-lit rooftop in cyberpunk Tokyo'"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+
+              {/* Settings row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Image ratio</label>
+                  <Select
+                    value={imageSize}
+                    onValueChange={(v) => setImageSize(v as typeof imageSize)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IMAGE_SIZES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Video model</label>
+                  <Select value={videoModel} onValueChange={(v) => setVideoModel(v as VideoModel)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VIDEO_MODELS.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => generateImageMutation.mutate()}
+                  disabled={!prompt.trim() || isGeneratingImage || isGeneratingVideo}
+                  className="flex-1"
+                >
+                  {isGeneratingImage ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                  )}
+                  {isGeneratingImage ? 'Generating…' : 'Generate Image'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => generateVideoMutation.mutate()}
+                  disabled={!generatedImageUrl || isGeneratingImage || isGeneratingVideo}
+                >
+                  {isGeneratingVideo ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Video className="h-4 w-4 mr-2" />
+                  )}
+                  {isGeneratingVideo ? 'Animating…' : 'Animate'}
+                </Button>
+              </div>
+
+              {/* Preview */}
+              {(generatedImageUrl ||
+                generatedVideoUrl ||
+                isGeneratingImage ||
+                isGeneratingVideo) && (
+                <div className="rounded-lg overflow-hidden bg-muted aspect-video flex items-center justify-center">
+                  {isGeneratingImage && (
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <p className="text-sm">Generating image…</p>
+                    </div>
+                  )}
+                  {isGeneratingVideo && (
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <p className="text-sm">
+                        Animating with {VIDEO_MODELS.find((m) => m.value === videoModel)?.label}…
+                      </p>
+                    </div>
+                  )}
+                  {!isGeneratingImage && !isGeneratingVideo && generatedVideoUrl && (
+                    <video
+                      src={generatedVideoUrl}
+                      controls
+                      autoPlay
+                      loop
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+                  {!isGeneratingImage &&
+                    !isGeneratingVideo &&
+                    !generatedVideoUrl &&
+                    generatedImageUrl && (
+                      <img
+                        src={generatedImageUrl}
+                        alt="Generated"
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                </div>
+              )}
+
+              {/* Save / publish actions */}
+              {hasContent && (
+                <div className="flex flex-col gap-3 pt-1">
+                  <Input
+                    placeholder="Give it a title (optional)"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => saveDraftMutation.mutate()}
+                      disabled={saveDraftMutation.isPending}
+                    >
+                      {saveDraftMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Save Draft
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Universe
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Drafts Gallery */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-lg font-semibold">Your Drafts</h2>
+
+              {!drafts || drafts.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
+                    <Wand2 className="h-8 w-8 text-muted-foreground/50" />
+                    <p className="text-muted-foreground text-sm">
+                      Nothing saved yet. Generate something and hit Save Draft.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {drafts.map((draft) => (
+                    <DraftCard
+                      key={draft.id}
+                      draft={draft}
+                      onDelete={() => deleteDraftMutation.mutate(draft.id)}
+                      onLoad={() => {
+                        setPrompt(draft.prompt);
+                        setTitle(draft.title);
+                        setGeneratedImageUrl(draft.imageUrl);
+                        setGeneratedVideoUrl(draft.videoUrl);
+                        if (draft.model) setVideoModel(draft.model as VideoModel);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface DraftCardProps {
+  draft: {
+    id: string;
+    title: string;
+    prompt: string;
+    imageUrl: string | null;
+    videoUrl: string | null;
+    createdAt: string | null;
+  };
+  onDelete: () => void;
+  onLoad: () => void;
+}
+
+function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
+  const thumb = draft.videoUrl || draft.imageUrl;
+
+  return (
+    <Card className="overflow-hidden group relative">
+      {/* Thumbnail */}
+      <div className="aspect-video bg-muted relative">
+        {thumb ? (
+          draft.videoUrl ? (
+            <video
+              src={draft.videoUrl}
+              className="w-full h-full object-cover"
+              muted
+              playsInline
+              onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+              onMouseLeave={(e) => {
+                const v = e.currentTarget as HTMLVideoElement;
+                v.pause();
+                v.currentTime = 0;
+              }}
+            />
+          ) : (
+            <img src={draft.imageUrl!} alt={draft.title} className="w-full h-full object-cover" />
+          )
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Wand2 className="h-6 w-6 text-muted-foreground/30" />
+          </div>
+        )}
+        {/* Hover actions */}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <Button size="sm" variant="secondary" onClick={onLoad}>
+            Load
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      <CardContent className="p-3">
+        <p className="text-sm font-medium truncate">{draft.title}</p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{draft.prompt}</p>
+        {draft.videoUrl && (
+          <Badge variant="secondary" className="mt-1.5 text-xs">
+            <Video className="h-2.5 w-2.5 mr-1" />
+            Video
+          </Badge>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
