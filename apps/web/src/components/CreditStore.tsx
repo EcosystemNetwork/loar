@@ -1,8 +1,5 @@
 /**
  * CreditStore — Purchase generation credits with card, ETH, or $LOAR.
- *
- * Shows dual pricing: pay with $LOAR for 25% margin (cheaper + bonus credits)
- * or pay with card/crypto for 35% margin. Displays savings comparison.
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -152,7 +149,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
             <span>$LOAR Token</span>
             <span className="text-[9px] bg-green-600 text-white px-1 rounded">BEST VALUE</span>
           </div>
-          <div className="text-[10px] mt-0.5 opacity-80">25% margin + bonus</div>
+          <div className="text-[10px] mt-0.5 opacity-80">Lower price + bonus credits</div>
         </button>
         <button
           onClick={() => setPaymentTab('card')}
@@ -161,7 +158,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
           }`}
         >
           Credit Card
-          <div className="text-[10px] mt-0.5 opacity-80">35% margin</div>
+          <div className="text-[10px] mt-0.5 opacity-80">Standard price</div>
         </button>
         <button
           onClick={() => setPaymentTab('crypto')}
@@ -170,7 +167,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
           }`}
         >
           ETH / Crypto
-          <div className="text-[10px] mt-0.5 opacity-80">35% margin</div>
+          <div className="text-[10px] mt-0.5 opacity-80">Standard price</div>
         </button>
       </div>
 
@@ -179,7 +176,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
         <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg p-3 text-xs">
           <div className="text-amber-400 font-medium">Pay with $LOAR and save</div>
           <ul className="mt-1 text-zinc-300 space-y-0.5">
-            <li>Lower margin: 25% vs 35% with card/crypto</li>
+            <li>Lower price than card or crypto</li>
             <li>+10% bonus credits on every purchase</li>
             <li>Support the LOAR ecosystem</li>
           </ul>
@@ -294,7 +291,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
               }}
               className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
             >
-              {isPaying ? 'Processing...' : 'Pay with $LOAR (25% margin)'}
+              {isPaying ? 'Processing...' : 'Pay with $LOAR'}
             </button>
           ) : paymentTab === 'card' ? (
             <button
@@ -303,7 +300,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
               }}
               className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors"
             >
-              Pay with Card (35% margin)
+              Pay with Card
             </button>
           ) : (
             <button
@@ -335,14 +332,14 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
               }}
               className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
             >
-              {isPaying ? 'Processing...' : 'Pay with ETH (35% margin)'}
+              {isPaying ? 'Processing...' : 'Pay with ETH'}
             </button>
           )}
 
           <p className="text-center text-[10px] text-zinc-500 mt-2">
             {paymentTab === 'loar'
-              ? 'Best deal! Lower margin + bonus credits when you pay with $LOAR'
-              : 'Save money by switching to $LOAR payments (25% vs 35% margin)'}
+              ? 'Best deal! Lower price + bonus credits when you pay with $LOAR'
+              : 'Switch to $LOAR for a lower price and bonus credits'}
           </p>
         </div>
       )}

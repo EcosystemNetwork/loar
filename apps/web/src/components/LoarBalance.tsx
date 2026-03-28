@@ -5,18 +5,23 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { CreditStore } from './CreditStore';
 
 export function LoarBalance() {
   const [showStore, setShowStore] = useState(false);
+  const { isAuthenticated } = useWalletAuth();
 
   const { data: balance } = useQuery({
     queryKey: ['creditBalance'],
     queryFn: () => trpcClient.credits.getBalance.query(),
     refetchInterval: 30000,
+    enabled: isAuthenticated,
   });
 
-  const credits = balance?.balance || 0;
+  if (!isAuthenticated) return null;
+
+  const credits = balance?.balance ?? 0;
   const isLow = credits < 10;
 
   return (
