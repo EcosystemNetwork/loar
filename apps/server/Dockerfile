@@ -10,10 +10,9 @@ COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
-# Install dependencies (--ignore-scripts: skip husky prepare in Docker)
-RUN pnpm install --frozen-lockfile --ignore-scripts
-# esbuild needs its postinstall to fetch the platform binary
-RUN node node_modules/esbuild/install.js
+# Install dependencies
+# Create a fake .git so husky's prepare script doesn't fail, then clean up
+RUN mkdir -p .git && pnpm install --frozen-lockfile && rm -rf .git
 
 # Copy source code
 COPY apps/server/src ./apps/server/src
