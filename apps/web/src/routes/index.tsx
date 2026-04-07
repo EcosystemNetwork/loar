@@ -1,94 +1,552 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { WalletConnectButton } from "@/components/wallet-connect-button";
+/**
+ * Home / Landing Page — Netflix × Webtoons hybrid
+ *
+ * Full-bleed hero billboard, horizontal scroll content rows,
+ * tall portrait cards, genre discovery, dark cinematic vibe.
+ */
+
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+
 import {
   Play,
   Plus,
   Search,
   TrendingUp,
-  Clock,
-  Sparkles,
   Users,
-  ArrowUpRight,
-  ArrowDownRight,
-  Copy,
-  Check,
   ChevronLeft,
   ChevronRight,
-  Wallet,
-} from "lucide-react";
-import { useAccount } from "wagmi";
-import { usePonderQuery } from "@ponder/react";
-import { desc, eq } from "@ponder/client";
+  Flame,
+  Sparkles,
+  Clock,
+  Star,
+  X,
+  Tv,
+  BookOpen,
+  Zap,
+  Eye,
+} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  universe,
-  token,
-  node,
-  nodeContent,
-  swap,
-  tokenTransfer,
-  tokenHolder,
-  pool,
-} from "../../../indexer/ponder.schema";
-import { useMemo, useState, useEffect, useRef } from "react";
+  ponderGql,
+  ponderQueryDefaults,
+  type Universe,
+  type Token,
+  type Node,
+  type NodeContent,
+  type Swap,
+  type TokenHolder,
+} from '@/utils/ponder-api';
+import { trpc, trpcClient } from '@/utils/trpc';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
   component: HomeComponent,
 });
 
-// Activity Feed Banner
-function ActivityFeedBanner() {
+/* ──────────────────────────────────────────
+ * Utility: horizontal scroll row with arrows
+ * ────────────────────────────────────────── */
+function ScrollRow({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    if (!ref.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = ref.current;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = ref.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll, { passive: true });
+      const ro = new ResizeObserver(checkScroll);
+      ro.observe(el);
+      return () => {
+        el.removeEventListener('scroll', checkScroll);
+        ro.disconnect();
+      };
+    }
+  }, [checkScroll, children]);
+
+  const scroll = (dir: 'left' | 'right') => {
+    if (!ref.current) return;
+    const amount = ref.current.clientWidth * 0.75;
+    ref.current.scrollBy({
+      left: dir === 'left' ? -amount : amount,
+      behavior: 'smooth',
+    });
+  };
+
+  return (
+    <div className="group/row relative">
+      {/* Left arrow */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-r from-background via-background/80 to-transparent flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
+        >
+          <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
+        </button>
+      )}
+
+      <div
+        ref={ref}
+        className={`flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth px-4 md:px-12 ${className}`}
+      >
+        {children}
+      </div>
+
+      {/* Right arrow */}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-l from-background via-background/80 to-transparent flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
+        >
+          <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Section header with optional "See All" link
+ * ────────────────────────────────────────── */
+function SectionHeader({
+  icon: Icon,
+  title,
+  subtitle,
+  action,
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-end justify-between px-4 md:px-12 mb-4">
+      <div className="flex items-center gap-3">
+        <Icon className="h-6 w-6 text-primary" />
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-white">{title}</h2>
+          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Universe Card — tall portrait (Webtoons feel)
+ * ────────────────────────────────────────── */
+function UniverseCard({ universe }: { universe: any }) {
+  const navigate = Route.useNavigate();
+
+  return (
+    <div
+      onClick={() => navigate({ to: `/universe/${universe.id}` })}
+      className="group flex-shrink-0 w-[180px] md:w-[200px] cursor-pointer"
+    >
+      {/* Tall poster image */}
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
+        {universe.imageURL || universe.tokenData?.imageURL ? (
+          <img
+            src={universe.imageURL || universe.tokenData?.imageURL}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+
+        {/* Hover play button */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+            <Play className="h-5 w-5 text-white fill-white ml-0.5" />
+          </div>
+        </div>
+
+        {/* Bottom info overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          {/* Badges */}
+          <div className="flex gap-1.5 mb-2 flex-wrap">
+            {universe.nodeCount > 0 && (
+              <span className="text-[10px] font-semibold bg-green-500/90 text-white px-1.5 py-0.5 rounded">
+                {universe.nodeCount} EP
+              </span>
+            )}
+            {universe.tokenData && (
+              <span className="text-[10px] font-semibold bg-primary/90 text-white px-1.5 py-0.5 rounded">
+                ${universe.tokenData.symbol}
+              </span>
+            )}
+            {universe.holderCount > 0 && (
+              <span className="text-[10px] font-semibold bg-purple-500/90 text-white px-1.5 py-0.5 rounded">
+                <Users className="inline h-2.5 w-2.5 mr-0.5" />
+                {universe.holderCount}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Top-right rank/new badge */}
+        {universe._rank !== undefined && universe._rank < 3 && (
+          <div className="absolute top-2 left-2">
+            <span className="text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              {universe._rank + 1}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Title below card */}
+      <h3 className="font-semibold text-sm text-white truncate group-hover:text-primary transition-colors px-0.5">
+        {universe.name || universe.tokenData?.name || `Universe ${universe.id.slice(0, 8)}`}
+      </h3>
+      <p className="text-xs text-muted-foreground truncate px-0.5">
+        {universe.description || universe.tokenData?.metadata || 'Explore this universe'}
+      </p>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Wide landscape card for featured row
+ * ────────────────────────────────────────── */
+function WideCard({ universe }: { universe: any }) {
+  const navigate = Route.useNavigate();
+
+  return (
+    <div
+      onClick={() => navigate({ to: `/universe/${universe.id}` })}
+      className="group flex-shrink-0 w-[320px] md:w-[400px] cursor-pointer"
+    >
+      <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-primary/20">
+        {universe.imageURL || universe.tokenData?.imageURL ? (
+          <img
+            src={universe.imageURL || universe.tokenData?.imageURL}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+        {/* Hover play */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+          <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+            <Play className="h-6 w-6 text-white fill-white ml-0.5" />
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <h3 className="font-bold text-white text-base mb-1 truncate">
+            {universe.name || universe.tokenData?.name || `Universe ${universe.id.slice(0, 8)}`}
+          </h3>
+          <p className="text-xs text-white/70 line-clamp-2 leading-relaxed mb-2">
+            {universe.description || universe.tokenData?.metadata || ''}
+          </p>
+          <div className="flex gap-2">
+            {universe.nodeCount > 0 && (
+              <Badge className="bg-white/20 text-white text-[10px] backdrop-blur-sm border-0">
+                {universe.nodeCount} Episodes
+              </Badge>
+            )}
+            {universe.holderCount > 0 && (
+              <Badge className="bg-white/20 text-white text-[10px] backdrop-blur-sm border-0">
+                {universe.holderCount} Fans
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Indexer offline / stale banner
+ * ────────────────────────────────────────── */
+function IndexerBanner() {
+  return (
+    <div className="bg-amber-950/40 border-b border-amber-800/40 px-4 md:px-12 py-2 flex items-center gap-2.5 text-sm">
+      <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+      <span className="text-amber-200/80">
+        Blockchain indexer is offline — on-chain universe data is unavailable
+      </span>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Hero skeleton shown during initial load
+ * ────────────────────────────────────────── */
+function HeroSkeleton() {
+  return (
+    <div className="relative h-[70vh] min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+      <div className="w-full px-4 md:px-12 pb-24 md:pb-32 max-w-3xl space-y-4 animate-pulse">
+        <div className="h-4 w-24 rounded bg-white/10" />
+        <div className="h-14 w-80 rounded bg-white/10" />
+        <div className="h-4 w-96 rounded bg-white/10" />
+        <div className="h-4 w-72 rounded bg-white/10" />
+        <div className="flex gap-3 pt-2">
+          <div className="h-11 w-32 rounded-full bg-white/10" />
+          <div className="h-11 w-28 rounded-full bg-white/10" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Hero Billboard (Netflix-style)
+ * ────────────────────────────────────────── */
+function HeroBillboard({ universes }: { universes: any[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const navigate = Route.useNavigate();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  const featured = useMemo(() => {
+    let picks = universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 5);
+    if (picks.length === 0) picks = universes.slice(0, 5);
+    return picks;
+  }, [universes]);
+
+  // Auto-advance every 8 seconds
+  useEffect(() => {
+    if (featured.length <= 1) return;
+    intervalRef.current = setInterval(() => {
+      setCurrentIndex((i) => (i + 1) % featured.length);
+    }, 8000);
+    return () => clearInterval(intervalRef.current);
+  }, [featured.length]);
+
+  const goTo = (i: number) => {
+    setCurrentIndex(i);
+    clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % featured.length);
+    }, 8000);
+  };
+
+  if (featured.length === 0) {
+    return (
+      <div className="relative h-[70vh] min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
+        <div className="text-center px-4">
+          <h1 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight">LOAR</h1>
+          <p className="text-xl text-white/70 mb-8 max-w-lg mx-auto">
+            Create, own, and trade narrative universes on-chain
+          </p>
+          <Button
+            size="lg"
+            className="rounded-full px-8 text-base"
+            onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Create Your First Universe
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const current = featured[currentIndex];
+  if (!current) return null;
+
+  return (
+    <div className="relative h-[70vh] min-h-[500px] max-h-[800px] overflow-hidden">
+      {/* Background image with Ken Burns effect */}
+      {featured.map((u, i) => (
+        <div
+          key={u.id}
+          className="absolute inset-0 transition-opacity duration-1000"
+          style={{ opacity: i === currentIndex ? 1 : 0 }}
+        >
+          {u.imageURL || u.tokenData?.imageURL ? (
+            <img
+              src={u.imageURL || u.tokenData?.imageURL}
+              alt=""
+              className="w-full h-full object-cover scale-105"
+              style={{
+                animation:
+                  i === currentIndex ? 'kenburns 12s ease-in-out infinite alternate' : 'none',
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900" />
+          )}
+        </div>
+      ))}
+
+      {/* Vignette overlays */}
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/30" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
+
+      {/* Content */}
+      <div className="absolute inset-0 flex items-end">
+        <div className="w-full px-4 md:px-12 pb-24 md:pb-32 max-w-3xl">
+          {/* Badges */}
+          <div className="flex items-center gap-2 mb-4">
+            <Badge className="bg-primary text-white border-0 text-xs">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Featured
+            </Badge>
+            {current.nodeCount > 0 && (
+              <Badge className="bg-white/15 text-white border-0 backdrop-blur-sm text-xs">
+                {current.nodeCount} Episodes
+              </Badge>
+            )}
+            {current.holderCount > 0 && (
+              <Badge className="bg-white/15 text-white border-0 backdrop-blur-sm text-xs">
+                <Users className="h-3 w-3 mr-1" />
+                {current.holderCount} Holders
+              </Badge>
+            )}
+          </div>
+
+          {/* Title */}
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white mb-3 tracking-tight leading-none">
+            {current.name || current.tokenData?.name}
+          </h1>
+
+          {/* Description */}
+          <p className="text-base md:text-lg text-white/70 mb-6 max-w-xl line-clamp-3 leading-relaxed">
+            {current.description || current.tokenData?.metadata}
+          </p>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              size="lg"
+              className="rounded-full px-6 bg-white text-black hover:bg-white/90 font-bold"
+              onClick={() => navigate({ to: `/universe/${current.id}` })}
+            >
+              <Play className="h-5 w-5 mr-2 fill-current" />
+              Explore
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="rounded-full px-6 border-white/30 text-white hover:bg-white/10 font-bold"
+              onClick={() => navigate({ to: `/universe/${current.id}` })}
+            >
+              <BookOpen className="h-5 w-5 mr-2" />
+              Details
+            </Button>
+            {current.tokenData && (
+              <div className="hidden sm:flex items-center gap-2 ml-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
+                <Zap className="h-4 w-4 text-primary" />
+                <span className="text-white font-bold">${current.tokenData.symbol}</span>
+                {current.swapVolume > 0 && (
+                  <span className="text-white/50 text-sm">
+                    Vol ${(current.swapVolume / 1e18).toFixed(2)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Dot indicators */}
+      {featured.length > 1 && (
+        <div className="absolute bottom-8 left-4 md:left-12 flex gap-2">
+          {featured.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              className={`h-1 rounded-full transition-all duration-500 ${
+                i === currentIndex ? 'bg-white w-8' : 'bg-white/30 w-4 hover:bg-white/60'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Bottom fade into content */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Live Activity Ticker
+ * ────────────────────────────────────────── */
+function ActivityTicker() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: nodesData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(node as any)
-        .orderBy(desc((node as any).createdAt))
-        .limit(20),
+  const { data: nodesData } = useQuery({
+    queryKey: ['ponder', 'nodes', 'recent-20'],
+    queryFn: () =>
+      ponderGql<{ nodes: { items: Node[] } }>(`{
+        nodes(orderBy: "createdAt", orderDirection: "desc", limit: 20) {
+          items { id universeAddress nodeId previousNodeId creator createdAt }
+        }
+      }`).then((d) => d.nodes.items),
+    ...ponderQueryDefaults,
   });
 
-  const { data: nodeContentData } = usePonderQuery({
-    queryFn: (db) => db.select().from(nodeContent as any),
+  const { data: nodeContentData } = useQuery({
+    queryKey: ['ponder', 'nodeContents'],
+    queryFn: () =>
+      ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
+        nodeContents(limit: 1000) {
+          items { id videoLink plot }
+        }
+      }`).then((d) => d.nodeContents.items),
+    ...ponderQueryDefaults,
   });
 
-  const { data: universesData } = usePonderQuery({
-    queryFn: (db) => db.select().from(universe as any),
+  const { data: universesData } = useQuery({
+    queryKey: ['ponder', 'universes', 'all'],
+    queryFn: () =>
+      ponderGql<{ universes: { items: Universe[] } }>(`{
+        universes(limit: 1000) {
+          items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
+        }
+      }`).then((d) => d.universes.items),
+    ...ponderQueryDefaults,
   });
 
   const activities = useMemo(() => {
-    if (!nodesData || !nodeContentData || !universesData) return [];
+    if (!nodesData || !nodeContentData || !universesData) {
+      return [];
+    }
 
-    type NodeRow = typeof node.$inferSelect;
-    type NodeContentRow = typeof nodeContent.$inferSelect;
-    type UniverseRow = typeof universe.$inferSelect;
+    const contentMap = new Map<string, NodeContent>();
+    nodeContentData.forEach((c) => contentMap.set(c.id, c));
 
-    const contentMap = new Map<string, NodeContentRow>();
-    (nodeContentData as NodeContentRow[]).forEach((c) => {
-      contentMap.set(c.id, c);
-    });
+    const universeMap = new Map<string, Universe>();
+    universesData.forEach((u) => universeMap.set(u.id.toLowerCase(), u));
 
-    const universeMap = new Map<string, UniverseRow>();
-    (universesData as UniverseRow[]).forEach((u) => {
-      universeMap.set(u.id.toLowerCase(), u);
-    });
-
-    return (nodesData as NodeRow[])
+    return nodesData
       .map((n) => {
         const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
         const uni = universeMap.get(n.universeAddress.toLowerCase());
-
         return {
           id: n.id,
           universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
-          action: content?.plot ? "Added Event" : "Created Node",
+          action: content?.plot ? 'New Episode' : 'Created',
           universeId: n.universeAddress,
-          nodeId: n.nodeId,
-          timestamp: new Date(Number(n.createdAt) * 1000),
         };
       })
       .slice(0, 15);
@@ -104,25 +562,25 @@ function ActivityFeedBanner() {
           scrollRef.current.scrollLeft += 1;
         }
       }
-    }, 50);
+    }, 40);
     return () => clearInterval(interval);
   }, []);
 
   if (activities.length === 0) return null;
 
   return (
-    <div className="bg-black border-b border-border/50 overflow-hidden">
-      <div ref={scrollRef} className="flex gap-4 px-4 py-3 overflow-x-hidden whitespace-nowrap">
-        {activities.map((activity, index) => (
+    <div className="border-b border-white/5 bg-white/[0.02]">
+      <div ref={scrollRef} className="flex gap-6 px-4 py-2.5 overflow-x-hidden whitespace-nowrap">
+        {activities.map((a, i) => (
           <Link
-            key={`${activity.id}-${index}`}
+            key={`${a.id}-${i}`}
             to="/universe/$id"
-            params={{ id: activity.universeId }}
-            className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
+            params={{ id: a.universeId }}
+            className="flex items-center gap-2 text-sm flex-shrink-0 hover:text-primary transition-colors"
           >
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm font-medium">{activity.universeName}</span>
-            <span className="text-xs text-muted-foreground">{activity.action}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="font-medium text-white/80">{a.universeName}</span>
+            <span className="text-muted-foreground">{a.action}</span>
           </Link>
         ))}
       </div>
@@ -130,613 +588,688 @@ function ActivityFeedBanner() {
   );
 }
 
-// Featured Universes Carousel
-function FeaturedCarousel({ universes }: { universes: any[] }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const navigate = Route.useNavigate();
-
-  // Show universes with tokens OR events, fallback to all universes
-  let featured = universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 5);
-
-  // If no featured universes, show any universes
-  if (featured.length === 0) {
-    featured = universes.slice(0, 5);
-  }
-
-  if (featured.length === 0) return null;
-
-  // Safety check for current index
-  if (!featured[currentIndex]) return null;
-
-  const current = featured[currentIndex];
-
-  const next = () => {
-    setCurrentIndex((prev) => (prev + 1) % featured.length);
-  };
-
-  const prev = () => {
-    setCurrentIndex((prevState) => (prevState - 1 + featured.length) % featured.length);
-  };
-
-  return (
-    <div className="relative mb-8">
-      <div className="overflow-hidden rounded-2xl shadow-xl">
-        <div className="relative h-[450px] bg-gradient-to-br from-primary/20 via-purple-500/20 to-pink-500/20">
-          {current.imageURL || current.tokenData?.imageURL ? (
-            <img
-              src={current.imageURL || current.tokenData.imageURL}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover opacity-40"
-            />
-          ) : null}
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
-
-          <div className="relative h-full flex flex-col justify-between p-8">
-            <div className="flex items-center gap-3">
-              <Badge className="bg-primary/90 text-white">Featured</Badge>
-              <Badge className="bg-green-500/90 text-white">{current.nodeCount} Events</Badge>
-              {current.holderCount > 0 && (
-                <Badge className="bg-purple-500/90 text-white">
-                  <Users className="h-3 w-3 mr-1" />
-                  {current.holderCount} Holders
-                </Badge>
-              )}
-            </div>
-
-            <div>
-              <h2 className="text-5xl font-bold text-white mb-4">
-                {current.name || current.tokenData?.name}
-              </h2>
-
-              <p className="text-white/80 mb-6 text-lg max-w-xl">
-                {current.description || current.tokenData?.metadata}
-              </p>
-
-              <div className="flex items-center gap-4">
-                <Button size="lg" onClick={() => navigate({ to: `/universe/${current.id}` })}>
-                  <Play className="h-5 w-5 mr-2" />
-                  Explore Universe
-                </Button>
-                {current.tokenData && (
-                  <div className="text-white">
-                    <div className="text-3xl font-bold">${current.tokenData.symbol}</div>
-                    {current.swapVolume > 0 && (
-                      <div className="text-sm text-white/70">24h Vol: ${(current.swapVolume / 1e18).toFixed(2)}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div className="flex gap-2">
-                <Button size="icon" variant="ghost" onClick={prev} className="text-white hover:bg-white/20">
-                  <ChevronLeft className="h-6 w-6" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={next} className="text-white hover:bg-white/20">
-                  <ChevronRight className="h-6 w-6" />
-                </Button>
-              </div>
-
-              {/* Dots indicator */}
-              {featured.length > 1 && (
-                <div className="flex gap-2">
-                  {featured.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentIndex(index)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        index === currentIndex ? "bg-white w-6" : "bg-white/50"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Copy address button
-function CopyAddressButton({ address }: { address: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      onClick={copy}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-muted/50 transition-colors"
-    >
-      <span className="font-mono text-xs">{`${address.slice(0, 6)}...${address.slice(-4)}`}</span>
-      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-    </button>
-  );
-}
-
-// Top Universes Table
-function TopUniversesTable({ universes, swapData, holderData }: { universes: any[]; swapData: any[]; holderData: any[] }) {
-  const navigate = Route.useNavigate();
-
-  if (universes.length === 0) {
-    return (
-      <div className="text-center py-20">
-        <h2 className="text-2xl font-bold mb-4 text-muted-foreground">No Universes Yet</h2>
-        <p className="text-muted-foreground mb-6">Be the first to create a narrative universe</p>
-      </div>
-    );
-  }
-
-  const topUniverses = [...universes]
-    .sort((a, b) => {
-      const aScore = (a.nodeCount || 0) * 100 + (a.tokenData ? 50 : 0) + (a.swapVolume || 0) / 1e18;
-      const bScore = (b.nodeCount || 0) * 100 + (b.tokenData ? 50 : 0) + (b.swapVolume || 0) / 1e18;
-      return bScore - aScore;
-    })
-    .slice(0, 15);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold">Top Universes</h2>
-        <Button variant="outline" size="sm" className="rounded-full" asChild>
-          <Link to="/cinematicUniverseCreate">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Universe
-          </Link>
-        </Button>
-      </div>
-
-      <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border/30 bg-muted/20">
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Universe</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Events</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Volume (24h)</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Holders</th>
-                <th className="text-left p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Token</th>
-                <th className="text-right p-4 font-medium text-muted-foreground uppercase text-xs tracking-wider">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topUniverses.map((u) => {
-                const hasEvents = u.nodeCount > 0;
-                const hasToken = !!u.tokenData;
-                const volume24h = u.swapVolume || 0;
-                const holders = u.holderCount || 0;
-
-                return (
-                  <tr
-                    key={u.id}
-                    className="border-b border-border hover:bg-muted/30 cursor-pointer transition-colors"
-                    onClick={() => navigate({ to: `/universe/${u.id}` })}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-center gap-4">
-                        {u.imageURL || u.tokenData?.imageURL ? (
-                          <img
-                            src={u.imageURL || u.tokenData.imageURL}
-                            alt=""
-                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <div className="font-bold text-base truncate">
-                            {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
-                          </div>
-                          <CopyAddressButton address={u.id} />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-2xl font-bold">{u.nodeCount || 0}</div>
-                      <div className="text-xs text-muted-foreground">events</div>
-                    </td>
-                    <td className="p-4">
-                      {volume24h > 0 ? (
-                        <div>
-                          <div className="text-lg font-bold">${(volume24h / 1e18).toFixed(2)}</div>
-                          <div className="text-xs text-muted-foreground">24h volume</div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      {holders > 0 ? (
-                        <div>
-                          <div className="text-lg font-bold">{holders}</div>
-                          <div className="text-xs text-muted-foreground">holders</div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      {hasToken ? (
-                        <div>
-                          <div className="font-semibold">${u.tokenData.symbol}</div>
-                          <div className="text-xs text-muted-foreground">Launched</div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate({ to: `/universe/${u.id}` });
-                        }}
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Enhanced Right Sidebar with Wallet, Videos, and Trading
-function EnhancedSidebar({ universes }: { universes: any[] }) {
-  const { isConnected } = useAccount();
-
-  // Query recent events with video content
-  const { data: nodesData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(node as any)
-        .orderBy(desc((node as any).createdAt))
-        .limit(10),
+/* ──────────────────────────────────────────
+ * Recent Videos Row (Webtoons episode feed)
+ * ────────────────────────────────────────── */
+function RecentEpisodes({ universes }: { universes: any[] }) {
+  const { data: nodesData } = useQuery({
+    queryKey: ['ponder', 'nodes', 'recent-10'],
+    queryFn: () =>
+      ponderGql<{ nodes: { items: Node[] } }>(`{
+        nodes(orderBy: "createdAt", orderDirection: "desc", limit: 10) {
+          items { id universeAddress nodeId previousNodeId creator createdAt }
+        }
+      }`).then((d) => d.nodes.items),
+    ...ponderQueryDefaults,
   });
 
-  const { data: nodeContentData } = usePonderQuery({
-    queryFn: (db) => db.select().from(nodeContent as any),
+  const { data: nodeContentData } = useQuery({
+    queryKey: ['ponder', 'nodeContents'],
+    queryFn: () =>
+      ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
+        nodeContents(limit: 1000) {
+          items { id videoLink plot }
+        }
+      }`).then((d) => d.nodeContents.items),
+    ...ponderQueryDefaults,
   });
 
-  const eventVideos = useMemo(() => {
-    if (!nodesData || !nodeContentData) return [];
+  const episodes = useMemo(() => {
+    if (!nodesData || !nodeContentData) {
+      return [];
+    }
 
-    type NodeRow = typeof node.$inferSelect;
-    type NodeContentRow = typeof nodeContent.$inferSelect;
+    const contentMap = new Map<string, NodeContent>();
+    nodeContentData.forEach((c) => contentMap.set(c.id, c));
 
-    const contentMap = new Map<string, NodeContentRow>();
-    (nodeContentData as NodeContentRow[]).forEach((c) => {
-      contentMap.set(c.id, c);
-    });
+    const uniMap = new Map<string, any>();
+    universes.forEach((u) => uniMap.set(u.id.toLowerCase(), u));
 
-    const universeMap = new Map<string, any>();
-    universes.forEach((u) => {
-      universeMap.set(u.id.toLowerCase(), u);
-    });
-
-    return (nodesData as NodeRow[])
+    return nodesData
       .map((n) => {
         const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
-        const uni = universeMap.get(n.universeAddress.toLowerCase());
-
-        if (!content?.videoLink) return null;
-
+        const uni = uniMap.get(n.universeAddress.toLowerCase());
+        if (!content?.videoLink && !content?.plot) return null;
         return {
           id: n.id,
-          videoLink: content.videoLink,
-          plot: content.plot,
+          videoLink: content?.videoLink,
+          plot: content?.plot,
           universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
+          universeImage: uni?.imageURL || uni?.tokenData?.imageURL,
           universeId: n.universeAddress,
           nodeId: n.nodeId,
           timestamp: Number(n.createdAt) * 1000,
         };
       })
-      .filter((v) => v !== null)
-      .slice(0, 5);
+      .filter(Boolean)
+      .slice(0, 10);
   }, [nodesData, nodeContentData, universes]);
 
-  const tradableUniverses = universes.filter((u) => u.tokenData).slice(0, 10);
+  if (episodes.length === 0) return null;
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      {/* Wallet Connection - Always Visible */}
-      <div className="flex-shrink-0 bg-gradient-to-br from-primary/10 via-purple-500/10 to-pink-500/10 backdrop-blur-sm rounded-2xl border border-border/30 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 rounded-xl bg-primary/10">
-            <Wallet className="h-5 w-5 text-primary" />
-          </div>
-          <h3 className="font-bold text-lg">Wallet</h3>
-        </div>
-        <WalletConnectButton size="lg" className="w-full rounded-xl" />
-        {isConnected && (
-          <div className="mt-4 p-4 bg-background/50 rounded-xl border border-border/50">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <div className="text-sm font-medium">Connected & Ready</div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Scrollable Section - Recent Events & Token Trading */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin space-y-4 min-h-0">
-        {/* Recent Event Videos */}
-        {eventVideos.length > 0 && (
-        <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
-          <div className="p-4 border-b border-border/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-primary/10">
-                  <Play className="h-4 w-4 text-primary" />
+    <section className="py-6">
+      <SectionHeader icon={Clock} title="New Episodes" subtitle="Latest story updates" />
+      <ScrollRow>
+        {episodes.map((ep: any) => (
+          <Link
+            key={ep.id}
+            to="/event/$universe/$event"
+            params={{ universe: ep.universeId, event: ep.nodeId.toString() }}
+            className="group flex-shrink-0 w-[260px] md:w-[300px]"
+          >
+            {/* Video thumbnail */}
+            <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
+              {ep.videoLink?.includes('walrus') ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30">
+                  <Play className="h-8 w-8 text-white/80 group-hover:scale-110 transition-transform" />
                 </div>
-                <h3 className="font-bold">Recent Events</h3>
+              ) : ep.videoLink ? (
+                <>
+                  <video
+                    src={ep.videoLink}
+                    className="w-full h-full object-cover"
+                    muted
+                    preload="metadata"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                    <Play className="h-8 w-8 text-white fill-white" />
+                  </div>
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
+                  <BookOpen className="h-8 w-8 text-white/60" />
+                </div>
+              )}
+              {/* Timestamp */}
+              <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/70 backdrop-blur-sm rounded text-[10px] text-white font-medium">
+                {new Date(ep.timestamp).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {eventVideos.length}
-              </Badge>
             </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {eventVideos.map((event: any) => (
-              <Link
-                key={event.id}
-                to="/event/$universe/$event"
-                params={{ universe: event.universeId, event: event.nodeId.toString() }}
-                className="block p-3 hover:bg-muted/30 transition-colors group"
-              >
-                <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 rounded-xl overflow-hidden mb-3 group-hover:ring-2 group-hover:ring-primary/50 transition-all">
-                  {event.videoLink.includes("walrus") ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500/20 to-purple-500/20">
-                      <Play className="h-10 w-10 text-white/80 mb-2 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs text-white/60 font-medium">Walrus Storage</span>
-                    </div>
-                  ) : (
-                    <>
-                      <video
-                        src={event.videoLink}
-                        className="w-full h-full object-cover"
-                        muted
-                        preload="metadata"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <Play className="h-10 w-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </>
-                  )}
-                  {/* Time badge */}
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded-md">
-                    <span className="text-xs text-white font-medium">
-                      {new Date(event.timestamp).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-semibold line-clamp-1 group-hover:text-primary transition-colors">
-                      {event.universeName}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                    {event.plot}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Token Trading */}
-      {tradableUniverses.length > 0 && (
-        <div className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden">
-          <div className="p-4 border-b border-border/30">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-primary/10">
-                <TrendingUp className="h-4 w-4 text-primary" />
+            {/* Info */}
+            <div className="flex gap-2 items-start px-0.5">
+              {ep.universeImage ? (
+                <img
+                  src={ep.universeImage}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                  {ep.universeName}
+                </h4>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                  {ep.plot || 'New episode added'}
+                </p>
               </div>
-              <h3 className="font-bold">Token Trading</h3>
             </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {tradableUniverses.map((u) => (
-              <Link
-                key={u.id}
-                to="/universe/$id"
-                params={{ id: u.id }}
-                className="block p-4 hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {u.imageURL || u.tokenData?.imageURL ? (
-                      <img src={u.imageURL || u.tokenData.imageURL} alt="" className="w-8 h-8 rounded" />
-                    ) : (
-                      <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
-                    )}
-                    <div>
-                      <div className="font-bold text-sm">${u.tokenData.symbol}</div>
-                      <div className="text-xs text-muted-foreground truncate max-w-[120px]">
-                        {u.name || u.tokenData.name}
-                      </div>
-                    </div>
-                  </div>
-                  {u.priceChange24h !== undefined && (
-                    <div
-                      className={`flex items-center gap-1 text-sm font-bold ${
-                        u.priceChange24h >= 0 ? "text-green-500" : "text-red-500"
-                      }`}
-                    >
-                      {u.priceChange24h >= 0 ? (
-                        <ArrowUpRight className="h-4 w-4" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4" />
-                      )}
-                      {Math.abs(u.priceChange24h).toFixed(2)}%
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Vol: ${((u.swapVolume || 0) / 1e18).toFixed(2)}</span>
-                  <span>{u.holderCount || 0} holders</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-        )}
-      </div>
-    </div>
+          </Link>
+        ))}
+      </ScrollRow>
+    </section>
   );
 }
 
-// Trending Universes Section
-function TrendingUniverses({ universes }: { universes: any[] }) {
-  const navigate = Route.useNavigate();
+/* ──────────────────────────────────────────
+ * Top 10 Strip — numbered cards (Netflix Top 10)
+ * ────────────────────────────────────────── */
+function Top10Strip({ universes }: { universes: any[] }) {
+  const sorted = useMemo(() => {
+    return [...universes]
+      .sort((a, b) => {
+        const aScore =
+          (a.nodeCount || 0) * 100 + (a.tokenData ? 50 : 0) + (a.swapVolume || 0) / 1e18;
+        const bScore =
+          (b.nodeCount || 0) * 100 + (b.tokenData ? 50 : 0) + (b.swapVolume || 0) / 1e18;
+        return bScore - aScore;
+      })
+      .slice(0, 10)
+      .map((u, i) => ({ ...u, _rank: i }));
+  }, [universes]);
 
-  const trending = [...universes]
-    .filter((u) => u.swapVolume > 0 || u.nodeCount > 0)
-    .sort((a, b) => {
-      const aActivity = (a.swapVolume || 0) + (a.nodeCount || 0) * 1e18;
-      const bActivity = (b.swapVolume || 0) + (b.nodeCount || 0) * 1e18;
-      return bActivity - aActivity;
-    })
-    .slice(0, 6);
+  if (sorted.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
+      <ScrollRow>
+        {sorted.map((u) => (
+          <div key={u.id} className="flex-shrink-0 flex items-end gap-0">
+            {/* Large rank number */}
+            <span
+              className="text-[100px] md:text-[120px] font-black leading-none select-none"
+              style={{
+                WebkitTextStroke: '2px rgba(255,255,255,0.3)',
+                color: 'transparent',
+                marginRight: '-20px',
+                zIndex: 1,
+              }}
+            >
+              {u._rank + 1}
+            </span>
+            <UniverseCard universe={u} />
+          </div>
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Token-Powered Universes Row
+ * ────────────────────────────────────────── */
+function TokenPoweredRow({ universes }: { universes: any[] }) {
+  const withTokens = universes.filter((u) => u.tokenData);
+  if (withTokens.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader
+        icon={Zap}
+        title="Token-Powered"
+        subtitle="Universes with tradable governance tokens"
+      />
+      <ScrollRow>
+        {withTokens.map((u) => (
+          <UniverseCard key={u.id} universe={u} />
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Trending Now — wide landscape cards
+ * ────────────────────────────────────────── */
+function TrendingRow({ universes }: { universes: any[] }) {
+  const trending = useMemo(() => {
+    return [...universes]
+      .filter((u) => u.swapVolume > 0 || u.nodeCount > 0)
+      .sort((a, b) => {
+        const aAct = (a.swapVolume || 0) + (a.nodeCount || 0) * 1e18;
+        const bAct = (b.swapVolume || 0) + (b.nodeCount || 0) * 1e18;
+        return bAct - aAct;
+      })
+      .slice(0, 8);
+  }, [universes]);
 
   if (trending.length === 0) return null;
 
   return (
-    <div className="mt-12">
-      <h2 className="text-3xl font-bold mb-6">Trending Universes</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <section className="py-6">
+      <SectionHeader icon={TrendingUp} title="Trending Now" subtitle="Buzzing with activity" />
+      <ScrollRow>
         {trending.map((u) => (
-          <div
-            key={u.id}
-            className="bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 overflow-hidden hover:border-primary/50 transition-all cursor-pointer group"
-            onClick={() => navigate({ to: `/universe/${u.id}` })}
-          >
-            <div className="relative h-48 bg-muted">
-              {u.imageURL || u.tokenData?.imageURL ? (
-                <img src={u.imageURL || u.tokenData.imageURL} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <h3 className="font-bold text-lg text-white mb-1 truncate">
-                  {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
-                </h3>
-                <div className="flex gap-2">
-                  {u.nodeCount > 0 && (
-                    <Badge className="bg-green-500/90 text-white text-xs">{u.nodeCount} events</Badge>
-                  )}
-                  {u.tokenData && (
-                    <Badge className="bg-primary/90 text-white text-xs">${u.tokenData.symbol}</Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <div className="text-muted-foreground text-xs">24h Volume</div>
-                  <div className="font-bold">${((u.swapVolume || 0) / 1e18).toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-xs">Holders</div>
-                  <div className="font-bold">{u.holderCount || 0}</div>
-                </div>
-                <Button size="sm" variant="outline" className="rounded-full group-hover:bg-primary group-hover:text-white">
-                  <Play className="h-3 w-3 mr-1" />
-                  View
-                </Button>
-              </div>
-            </div>
-          </div>
+          <WideCard key={u.id} universe={u} />
         ))}
-      </div>
-    </div>
+      </ScrollRow>
+    </section>
   );
 }
 
-function HomeComponent() {
-  const { isConnected } = useAccount();
+/* ──────────────────────────────────────────
+ * New Arrivals Row
+ * ────────────────────────────────────────── */
+function NewArrivalsRow({ universes }: { universes: any[] }) {
+  const newest = universes.slice(0, 10); // already sorted by createdAt desc
+  if (newest.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader
+        icon={Sparkles}
+        title="New Arrivals"
+        subtitle="Fresh universes just launched"
+      />
+      <ScrollRow>
+        {newest.map((u) => (
+          <UniverseCard key={u.id} universe={u} />
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Most Episodes Row
+ * ────────────────────────────────────────── */
+function MostEpisodesRow({ universes }: { universes: any[] }) {
+  const byEpisodes = useMemo(() => {
+    return [...universes]
+      .filter((u) => u.nodeCount > 0)
+      .sort((a, b) => (b.nodeCount || 0) - (a.nodeCount || 0))
+      .slice(0, 10);
+  }, [universes]);
+
+  if (byEpisodes.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader icon={Tv} title="Binge-Worthy" subtitle="Universes with the most episodes" />
+      <ScrollRow>
+        {byEpisodes.map((u) => (
+          <UniverseCard key={u.id} universe={u} />
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Community Creations — published off-chain content
+ * ────────────────────────────────────────── */
+function CommunityCreations() {
+  const { data } = useQuery({
+    queryKey: ['content', 'feed', 'landing'],
+    queryFn: () => trpcClient.content.feed.query({ limit: 20 }),
+    staleTime: 60_000,
+  });
+
+  const items = data?.items;
+  if (!items?.length) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader
+        icon={Sparkles}
+        title="Community Creations"
+        subtitle="Published by creators"
+        action={
+          <Link to="/discover">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-white"
+            >
+              See All
+            </Button>
+          </Link>
+        }
+      />
+      <ScrollRow>
+        {items.map((item: any) => (
+          <ContentCard key={item.id} item={item} />
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+function ContentCard({ item }: { item: any }) {
+  const isVideo = item.mediaType === 'ai-video' || item.mediaType === 'video';
+
+  return (
+    <Link to="/discover" className="group flex-shrink-0 w-[180px] md:w-[200px]">
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
+        {item.thumbnailUrl || item.mediaUrl ? (
+          isVideo && item.mediaUrl ? (
+            <video
+              src={item.mediaUrl}
+              poster={item.thumbnailUrl || undefined}
+              className="w-full h-full object-cover"
+              muted
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={item.thumbnailUrl || item.mediaUrl}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          )
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+
+        {/* Hover play for videos */}
+        {isVideo && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+              <Play className="h-5 w-5 text-white fill-white ml-0.5" />
+            </div>
+          </div>
+        )}
+
+        {/* Bottom badges */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <div className="flex gap-1.5 mb-1 flex-wrap">
+            <span className="text-[10px] font-semibold bg-primary/90 text-white px-1.5 py-0.5 rounded capitalize">
+              {item.mediaType?.replace('-', ' ') || 'Content'}
+            </span>
+            {item.classification === 'original' && (
+              <span className="text-[10px] font-semibold bg-green-500/90 text-white px-1.5 py-0.5 rounded">
+                Original
+              </span>
+            )}
+            {(item.views ?? 0) > 0 && (
+              <span className="text-[10px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded">
+                <Eye className="inline h-2.5 w-2.5 mr-0.5" />
+                {item.views}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h3 className="font-semibold text-sm text-white truncate group-hover:text-primary transition-colors px-0.5">
+        {item.title}
+      </h3>
+      <p className="text-xs text-muted-foreground truncate px-0.5">
+        {item.description || 'Community creation'}
+      </p>
+    </Link>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * CTA Banner
+ * ────────────────────────────────────────── */
+function CreateBanner() {
   const navigate = Route.useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
+
+  return (
+    <section className="px-4 md:px-12 py-12">
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 border border-white/5">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(var(--primary),0.15),transparent_70%)]" />
+        <div className="relative px-8 py-12 md:py-16 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">Start Your Universe</h2>
+            <p className="text-white/60 text-lg max-w-md">
+              Create AI-powered narrative worlds. Launch tokens. Build community.
+            </p>
+          </div>
+          <Button
+            size="lg"
+            className="rounded-full px-8 text-base font-bold"
+            onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Create Universe
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Search Overlay
+ * ────────────────────────────────────────── */
+function SearchOverlay({
+  open,
+  onClose,
+  universes,
+}: {
+  open: boolean;
+  onClose: () => void;
+  universes: any[];
+}) {
+  const [query, setQuery] = useState('');
+  const navigate = Route.useNavigate();
+
+  const filtered = useMemo(() => {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    return universes.filter((u: any) => {
+      const name = u.name?.toLowerCase() || '';
+      const tokenName = u.tokenData?.name?.toLowerCase() || '';
+      const tokenSymbol = u.tokenData?.symbol?.toLowerCase() || '';
+      const description = u.description?.toLowerCase() || '';
+      const address = u.id.toLowerCase();
+      return (
+        name.includes(q) ||
+        tokenName.includes(q) ||
+        tokenSymbol.includes(q) ||
+        description.includes(q) ||
+        address.includes(q)
+      );
+    });
+  }, [universes, query]);
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
+
+  // Keyboard shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (open) window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-x-0 top-0 z-[101] flex justify-center pt-20 px-4">
+        <div className="w-full max-w-2xl bg-background/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+          {/* Input */}
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-white/5">
+            <Search className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <Input
+              type="text"
+              placeholder="Search universes, tokens, creators..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-base placeholder:text-muted-foreground/50"
+            />
+            <button
+              onClick={onClose}
+              className="text-muted-foreground hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Results */}
+          <div className="max-h-[60vh] overflow-y-auto">
+            {query ? (
+              filtered.length > 0 ? (
+                <div className="p-2">
+                  {filtered.slice(0, 8).map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        navigate({ to: `/universe/${u.id}` });
+                        onClose();
+                      }}
+                      className="w-full p-3 rounded-xl hover:bg-white/5 transition-colors text-left flex items-center gap-3"
+                    >
+                      <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
+                        {(u.imageURL || u.tokenData?.imageURL) && (
+                          <img
+                            src={u.imageURL || u.tokenData?.imageURL}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-white truncate">
+                          {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
+                        </div>
+                        <div className="text-xs text-muted-foreground line-clamp-1">
+                          {u.description || u.tokenData?.metadata || 'No description'}
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        {u.nodeCount > 0 && (
+                          <span className="text-[10px] bg-white/10 text-white/70 px-1.5 py-0.5 rounded">
+                            {u.nodeCount} EP
+                          </span>
+                        )}
+                        {u.tokenData && (
+                          <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                            ${u.tokenData.symbol}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-12 text-center text-muted-foreground">
+                  No universes found for "{query}"
+                </div>
+              )
+            ) : (
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground px-2 mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  Trending
+                </p>
+                {universes
+                  .filter((u) => u.tokenData || u.nodeCount > 0)
+                  .slice(0, 5)
+                  .map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        navigate({ to: `/universe/${u.id}` });
+                        onClose();
+                      }}
+                      className="w-full p-2.5 rounded-lg hover:bg-white/5 transition-colors text-left flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
+                        {(u.imageURL || u.tokenData?.imageURL) && (
+                          <img
+                            src={u.imageURL || u.tokenData?.imageURL}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-white truncate">
+                        {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Main Home Component
+ * ────────────────────────────────────────── */
+function HomeComponent() {
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Query universes
-  const { data: universesData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(universe as any)
-        .orderBy(desc((universe as any).createdAt))
-        .limit(50),
+  // Keyboard shortcut: Cmd/Ctrl + K to open search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // ─── Primary: Firestore universes (always available) ───
+  const { data: firestoreUniverses, isLoading: universesLoading } = useQuery({
+    queryKey: ['universes', 'all'],
+    queryFn: () => trpcClient.universes.getAll.query().then((r) => r.data as any[]),
+    staleTime: 30_000,
   });
 
-  // Query tokens
-  const { data: tokensData } = usePonderQuery({
-    queryFn: (db) => db.select().from(token as any),
+  // ─── Optional: Ponder blockchain enrichment (silent fail) ───
+  const { data: ponderUniverses } = useQuery({
+    queryKey: ['ponder', 'universes', 'top-50'],
+    queryFn: () =>
+      ponderGql<{ universes: { items: Universe[] } }>(`{
+        universes(orderBy: "createdAt", orderDirection: "desc", limit: 50) {
+          items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
+        }
+      }`).then((d) => d.universes.items),
+    ...ponderQueryDefaults,
   });
 
-  // Query swaps for volume calculation
-  const { data: swapsData } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(swap as any)
-        .orderBy(desc((swap as any).timestamp))
-        .limit(1000),
+  const { data: tokensData } = useQuery({
+    queryKey: ['ponder', 'tokens'],
+    queryFn: () =>
+      ponderGql<{ tokens: { items: Token[] } }>(`{
+        tokens(limit: 1000) {
+          items { id universeAddress deployer tokenAdmin name symbol imageURL metadata context startingTick poolHook poolId pairedToken locker createdAt }
+        }
+      }`).then((d) => d.tokens.items),
+    ...ponderQueryDefaults,
   });
 
-  // Query token holders
-  const { data: holdersData } = usePonderQuery({
-    queryFn: (db) => db.select().from(tokenHolder as any),
+  const { data: swapsData } = useQuery({
+    queryKey: ['ponder', 'swaps'],
+    queryFn: () =>
+      ponderGql<{ swaps: { items: Swap[] } }>(`{
+        swaps(orderBy: "timestamp", orderDirection: "desc", limit: 1000) {
+          items { id poolId sender amount0 amount1 sqrtPriceX96 liquidity tick timestamp blockNumber }
+        }
+      }`).then((d) => d.swaps.items),
+    ...ponderQueryDefaults,
   });
 
-  // Combine all data
+  const { data: holdersData } = useQuery({
+    queryKey: ['ponder', 'tokenHolders'],
+    queryFn: () =>
+      ponderGql<{ tokenHolders: { items: TokenHolder[] } }>(`{
+        tokenHolders(limit: 1000) {
+          items { id tokenAddress holderAddress balance }
+        }
+      }`).then((d) => d.tokenHolders.items),
+    ...ponderQueryDefaults,
+  });
+
+  const ponderOnline = !!ponderUniverses;
+
+  // ─── Merge: Firestore base + optional Ponder enrichment ───
   const universes = useMemo(() => {
-    if (!universesData) return [];
+    // Normalize Firestore docs into the shape UI cards expect
+    const base = (firestoreUniverses || []).map((u: any) => ({
+      id: u.id,
+      name: u.name || u.description?.slice(0, 40) || '',
+      description: u.description || '',
+      imageURL: u.image_url || u.imageURL || '',
+      creator: u.creator || '',
+      tokenAddress: u.tokenAddress || null,
+      governorAddress: u.governanceAddress || null,
+      nodeCount: 0,
+      createdAt: u.created_at?._seconds || 0,
+    }));
 
-    type UniverseRow = typeof universe.$inferSelect;
-    type TokenRow = typeof token.$inferSelect;
-    type SwapRow = typeof swap.$inferSelect;
-    type HolderRow = typeof tokenHolder.$inferSelect;
-
-    const tokenMap = new Map<string, TokenRow>();
-    if (tokensData) {
-      (tokensData as TokenRow[]).forEach((t) => {
-        tokenMap.set(t.universeAddress.toLowerCase(), t);
-      });
+    // Build lookup from Ponder data
+    const ponderMap = new Map<string, Universe>();
+    if (ponderUniverses) {
+      ponderUniverses.forEach((u) => ponderMap.set(u.id.toLowerCase(), u));
     }
 
-    // Calculate 24h volume per token
+    const tokenMap = new Map<string, Token>();
+    if (tokensData) {
+      tokensData.forEach((t) => tokenMap.set(t.universeAddress.toLowerCase(), t));
+    }
+
     const now = Date.now() / 1000;
     const dayAgo = now - 86400;
     const volumeMap = new Map<string, number>();
     if (swapsData) {
-      (swapsData as SwapRow[]).forEach((s) => {
+      swapsData.forEach((s) => {
         if (s.timestamp >= dayAgo) {
           const current = volumeMap.get(s.poolId) || 0;
           volumeMap.set(s.poolId, current + Math.abs(Number(s.amount0)));
@@ -744,272 +1277,101 @@ function HomeComponent() {
       });
     }
 
-    // Count holders per token
     const holderCountMap = new Map<string, number>();
     if (holdersData) {
-      (holdersData as HolderRow[]).forEach((h) => {
+      holdersData.forEach((h) => {
         const current = holderCountMap.get(h.tokenAddress.toLowerCase()) || 0;
         holderCountMap.set(h.tokenAddress.toLowerCase(), current + 1);
       });
     }
 
-    return (universesData as UniverseRow[]).map((u) => {
+    // Enrich base with Ponder data where available
+    const enriched = base.map((u: any) => {
+      const ponder = ponderMap.get(u.id.toLowerCase());
       const tokenData = tokenMap.get(u.id.toLowerCase());
       const poolId = tokenData?.poolId;
       const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
       const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
-
       return {
         ...u,
+        // Override with Ponder fields when available
+        name: ponder?.name || u.name,
+        description: ponder?.description || u.description,
+        imageURL: ponder?.imageURL || u.imageURL,
+        nodeCount: ponder?.nodeCount || u.nodeCount,
         tokenData,
         swapVolume,
         holderCount,
-        priceChange24h: undefined, // Would need historical price data
       };
     });
-  }, [universesData, tokensData, swapsData, holdersData]);
 
-  // Filter universes by search query
-  const filteredUniverses = useMemo(() => {
-    if (!searchQuery) return universes;
-    const query = searchQuery.toLowerCase();
-    return universes.filter((u: any) => {
-      const name = u.name?.toLowerCase() || "";
-      const tokenName = u.tokenData?.name?.toLowerCase() || "";
-      const tokenSymbol = u.tokenData?.symbol?.toLowerCase() || "";
-      const metadata = u.tokenData?.metadata?.toLowerCase() || "";
-      const description = u.description?.toLowerCase() || "";
-      const address = u.id.toLowerCase();
+    // Add any Ponder-only universes not in Firestore
+    if (ponderUniverses) {
+      const baseIds = new Set(base.map((u: any) => u.id.toLowerCase()));
+      ponderUniverses.forEach((pu) => {
+        if (!baseIds.has(pu.id.toLowerCase())) {
+          const tokenData = tokenMap.get(pu.id.toLowerCase());
+          const poolId = tokenData?.poolId;
+          const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
+          const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
+          enriched.push({ ...pu, tokenData, swapVolume, holderCount });
+        }
+      });
+    }
 
-      return (
-        name.includes(query) ||
-        tokenName.includes(query) ||
-        tokenSymbol.includes(query) ||
-        metadata.includes(query) ||
-        description.includes(query) ||
-        address.includes(query)
-      );
-    });
-  }, [universes, searchQuery]);
+    return enriched;
+  }, [firestoreUniverses, ponderUniverses, tokensData, swapsData, holdersData]);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Top Navigation Bar */}
-      <div className={`sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 ${searchOpen ? 'pointer-events-none' : ''}`}>
-        <div className="container mx-auto max-w-[1800px] px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left: Logo */}
-            <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-              <img src="/loarlogo.svg" alt="LOAR" className="h-8 w-auto" />
-            </Link>
+    <div className="min-h-screen bg-background">
+      {/* Ken Burns animation */}
+      <style>{`
+        @keyframes kenburns {
+          0% { transform: scale(1.05) translate(0, 0); }
+          100% { transform: scale(1.12) translate(-1%, -1%); }
+        }
+      `}</style>
 
-            {/* Right: Search + Launch Button */}
-            <div className="flex items-center gap-3">
-              {/* Search Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full w-9 h-9"
-                onClick={() => setSearchOpen(true)}
-              >
-                <Search className="h-4 w-4" />
-              </Button>
+      {ponderOnline && <ActivityTicker />}
 
-              {/* Launch Button */}
-              <Link to="/cinematicUniverseCreate" className="flex-shrink-0">
-                <Button className="rounded-full bg-primary hover:bg-primary/90 font-medium px-6">
-                  Launch Now
-                  <Play className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </div>
+      {/* Floating search button */}
+      <button
+        onClick={() => setSearchOpen(true)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform md:hidden"
+      >
+        <Search className="h-5 w-5" />
+      </button>
+
+      {/* Desktop search shortcut hint in header area */}
+      <button
+        onClick={() => setSearchOpen(true)}
+        className="hidden md:flex fixed top-[18px] right-56 z-50 items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-muted-foreground hover:bg-white/10 hover:text-white transition-all"
+      >
+        <Search className="h-3.5 w-3.5" />
+        <span>Search</span>
+        <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">
+          {navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}K
+        </kbd>
+      </button>
+
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} universes={universes} />
+
+      {/* Hero: skeleton during load, real billboard once data arrives */}
+      {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
+
+      {/* Content Rows — only render once we have real data */}
+      {!universesLoading && (
+        <div className="-mt-16 relative z-10 pb-20 space-y-2">
+          <Top10Strip universes={universes} />
+          <TrendingRow universes={universes} />
+          {ponderOnline && <RecentEpisodes universes={universes} />}
+          <NewArrivalsRow universes={universes} />
+          <MostEpisodesRow universes={universes} />
+          <CommunityCreations />
+          <TokenPoweredRow universes={universes} />
+          <CreateBanner />
         </div>
-      </div>
-
-      {/* Search Modal */}
-      {searchOpen && (
-        <>
-          {/* Backdrop - separate layer */}
-          <div
-            className="fixed inset-0 z-[100] bg-black/60"
-            onClick={() => {
-              setSearchOpen(false);
-              setSearchQuery("");
-            }}
-          />
-
-          {/* Modal Content */}
-          <div className="fixed inset-0 z-[101] flex items-start justify-center pt-20 px-4 pointer-events-none">
-            <div className="relative w-full max-w-2xl bg-background/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden pointer-events-auto">
-            {/* Search Input */}
-            <div className="p-6 border-b border-border/30">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search universes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
-                  className="w-full pl-12 pr-12 h-12 text-base bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full"
-                  onClick={() => {
-                    setSearchOpen(false);
-                    setSearchQuery("");
-                  }}
-                >
-                  <Plus className="h-5 w-5 rotate-45" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Search Results */}
-            <div className="max-h-[60vh] overflow-y-auto">
-              {searchQuery ? (
-                filteredUniverses.length > 0 ? (
-                  <div className="p-2">
-                    {filteredUniverses.slice(0, 8).map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          navigate({ to: `/universe/${u.id}` });
-                          setSearchOpen(false);
-                          setSearchQuery("");
-                        }}
-                        className="w-full p-4 rounded-xl hover:bg-muted/50 transition-colors text-left flex items-center gap-4"
-                      >
-                        {/* Universe Image */}
-                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-                          {u.imageURL || u.tokenData?.imageURL ? (
-                            <img
-                              src={u.imageURL || u.tokenData.imageURL}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : null}
-                        </div>
-
-                        {/* Universe Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm mb-1">
-                            {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
-                          </div>
-                          <div className="text-xs text-muted-foreground line-clamp-1">
-                            {u.description || u.tokenData?.metadata || "No description"}
-                          </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          {u.nodeCount > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              {u.nodeCount} events
-                            </Badge>
-                          )}
-                          {u.tokenData && (
-                            <Badge className="text-xs">
-                              ${u.tokenData.symbol}
-                            </Badge>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-12 text-center text-muted-foreground">
-                    No universes found matching "{searchQuery}"
-                  </div>
-                )
-              ) : (
-                <div className="p-6">
-                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Trending Universes
-                  </h3>
-                  <div className="space-y-1">
-                    {universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 6).map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          navigate({ to: `/universe/${u.id}` });
-                          setSearchOpen(false);
-                        }}
-                        className="w-full p-3 rounded-xl hover:bg-muted/50 transition-colors text-left flex items-center gap-3"
-                      >
-                        <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-                          {u.imageURL || u.tokenData?.imageURL ? (
-                            <img
-                              src={u.imageURL || u.tokenData.imageURL}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : null}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">
-                            {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {u.tokenData?.symbol || `${u.nodeCount} events`}
-                          </div>
-                        </div>
-                        {u.swapVolume > 0 && (
-                          <div className="text-xs text-green-500 font-medium">
-                            ${(u.swapVolume / 1e18).toFixed(2)}
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            </div>
-          </div>
-        </>
       )}
-
-      {/* Main Content */}
-      <main className={`container mx-auto max-w-[1600px] py-8 px-4 transition-all ${searchOpen ? 'pointer-events-none blur-sm' : ''}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 items-start">
-          {/* Left - Main Content */}
-          <div className="min-w-0">
-            {/* Featured Carousel */}
-            <FeaturedCarousel universes={universes} />
-
-            {/* Top Universes Table */}
-            <TopUniversesTable
-              universes={universes}
-              swapData={swapsData || []}
-              holderData={holdersData || []}
-            />
-
-            {/* Trending Universes */}
-            <TrendingUniverses universes={universes} />
-          </div>
-
-          {/* Right - Enhanced Sidebar */}
-          <aside className="hidden lg:block w-[400px]">
-            <div
-              className="fixed w-[400px]"
-              style={{
-                top: '96px',
-                height: 'calc(100vh - 112px)',
-                transform: 'translate3d(0, 0, 0)',
-                backfaceVisibility: 'hidden' as const,
-                perspective: 1000,
-              }}
-            >
-              <EnhancedSidebar universes={universes} />
-            </div>
-          </aside>
-        </div>
-      </main>
     </div>
   );
 }

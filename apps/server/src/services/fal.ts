@@ -1,10 +1,16 @@
-import * as fal from "@fal-ai/serverless-client";
+import * as fal from '@fal-ai/serverless-client';
 
 export interface FalImageGenerationOptions {
   prompt: string;
   model?: 'fal-ai/nano-banana' | 'fal-ai/flux/dev' | 'fal-ai/flux-pro' | 'fal-ai/flux/schnell';
   negativePrompt?: string;
-  imageSize?: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9';
+  imageSize?:
+    | 'square_hd'
+    | 'square'
+    | 'portrait_4_3'
+    | 'portrait_16_9'
+    | 'landscape_4_3'
+    | 'landscape_16_9';
   numInferenceSteps?: number;
   guidanceScale?: number;
   numImages?: number;
@@ -28,7 +34,14 @@ export interface FalImageToImageOptions {
   prompt: string;
   imageUrls: string[];
   negativePrompt?: string;
-  imageSize?: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9' | { width: number; height: number };
+  imageSize?:
+    | 'square_hd'
+    | 'square'
+    | 'portrait_4_3'
+    | 'portrait_16_9'
+    | 'landscape_4_3'
+    | 'landscape_16_9'
+    | { width: number; height: number };
   numImages?: number;
   seed?: number;
 }
@@ -44,8 +57,7 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?:
-    // Text-to-Video models
+  model?: // Text-to-Video models
     | 'fal-ai/hunyuan-video'
     | 'fal-ai/ltx-video'
     | 'fal-ai/cogvideox-5b'
@@ -83,17 +95,24 @@ export interface FalVideoGenerationResult {
 }
 
 export class FalService {
-  constructor() {
-    if (!process.env.FAL_KEY) {
-      throw new Error('FAL_KEY environment variable is required');
-    }
+  private configured = false;
 
-    fal.config({
-      credentials: process.env.FAL_KEY
-    });
+  constructor() {
+    // Defer config check — env vars may not be loaded yet (ESM hoisting)
+  }
+
+  private ensureConfigured() {
+    if (!this.configured && process.env.FAL_KEY) {
+      fal.config({ credentials: process.env.FAL_KEY });
+      this.configured = true;
+    }
+    if (!this.configured) {
+      throw new Error('FAL_KEY environment variable is required for AI generation');
+    }
   }
 
   async generateImage(options: FalImageGenerationOptions): Promise<FalImageGenerationResult> {
+    this.ensureConfigured();
     console.log('🎨 === FAL IMAGE GENERATION ===');
     console.log('Options:', JSON.stringify(options, null, 2));
 
@@ -107,7 +126,8 @@ export class FalService {
       if (options.guidanceScale) input.guidance_scale = options.guidanceScale;
       if (options.numImages) input.num_images = options.numImages;
       if (options.seed) input.seed = options.seed;
-      if (options.enableSafetyChecker !== undefined) input.enable_safety_checker = options.enableSafetyChecker;
+      if (options.enableSafetyChecker !== undefined)
+        input.enable_safety_checker = options.enableSafetyChecker;
 
       console.log(`🚀 Calling FAL API: ${model}`);
       console.log('Input:', JSON.stringify(input, null, 2));
@@ -115,7 +135,7 @@ export class FalService {
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => console.log('📊 FAL Queue Update:', update)
+        onQueueUpdate: (update) => console.log('📊 FAL Queue Update:', update),
       });
 
       console.log('📥 Raw FAL Response:', JSON.stringify(result, null, 2));
@@ -124,10 +144,14 @@ export class FalService {
       let data: any;
       if ((result as any).data) data = (result as any).data;
       else if ((result as any).images || (result as any).image) data = result;
-      else throw new Error(`No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`);
+      else
+        throw new Error(
+          `No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`
+        );
 
       // Extract images
-      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
+      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> =
+        [];
       if (data.images && Array.isArray(data.images)) images = data.images;
       else if (data.image) images = [{ url: data.image }];
       else if (typeof data === 'string') images = [{ url: data }];
@@ -142,19 +166,20 @@ export class FalService {
         status: 'completed',
         imageUrl: images[0].url,
         images,
-        seed: data.seed
+        seed: data.seed,
       };
     } catch (error) {
       console.error('❌ FAL Image Generation Failed:', error);
       return {
         id: Date.now().toString(),
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
   }
 
   async editImage(options: FalImageEditOptions): Promise<FalImageGenerationResult> {
+    this.ensureConfigured();
     console.log('✏️ === FAL IMAGE EDITING ===');
     console.log('Options:', JSON.stringify(options, null, 2));
 
@@ -164,23 +189,28 @@ export class FalService {
         prompt: options.prompt,
         image_urls: options.imageUrls,
         num_images: options.numImages || 1,
-        output_format: "png",
-        sync_mode: false
+        output_format: 'png',
+        sync_mode: false,
       };
 
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => console.log('📊 FAL Edit Queue Update:', update)
+        onQueueUpdate: (update) => console.log('📊 FAL Edit Queue Update:', update),
       });
 
       let responseData: any;
       if ((result as any).data) responseData = (result as any).data;
       else if ((result as any).images) responseData = result;
-      else throw new Error(`Unexpected FAL response structure. Keys: ${Object.keys(result as any).join(', ')}`);
+      else
+        throw new Error(
+          `Unexpected FAL response structure. Keys: ${Object.keys(result as any).join(', ')}`
+        );
 
       if (!responseData.images || !Array.isArray(responseData.images)) {
-        throw new Error(`Expected 'images' array in response. Got keys: ${Object.keys(responseData).join(', ')}`);
+        throw new Error(
+          `Expected 'images' array in response. Got keys: ${Object.keys(responseData).join(', ')}`
+        );
       }
 
       const images = responseData.images;
@@ -193,47 +223,50 @@ export class FalService {
         status: 'completed',
         imageUrl: images[0].url,
         images,
-        seed: responseData.seed
+        seed: responseData.seed,
       };
     } catch (error) {
       console.error('❌ FAL Image Edit Failed:', error);
       return {
         id: Date.now().toString(),
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
   }
 
   async imageToImage(options: FalImageToImageOptions): Promise<FalImageGenerationResult> {
+    this.ensureConfigured();
     console.log('🖼️ === FAL IMAGE TO IMAGE (Nano Banana Edit) ===');
     console.log('Options:', JSON.stringify(options, null, 2));
 
     try {
       const model = 'fal-ai/nano-banana/edit';
-      
+
       // Map image size to aspect ratio for nano banana
-      const mapImageSizeToAspectRatio = (imageSize?: string | { width: number; height: number }): string | undefined => {
+      const mapImageSizeToAspectRatio = (
+        imageSize?: string | { width: number; height: number }
+      ): string | undefined => {
         if (!imageSize || typeof imageSize === 'object') return undefined;
-        
+
         const mapping: Record<string, string> = {
-          'landscape_16_9': '16:9',
-          'portrait_16_9': '9:16',
-          'landscape_4_3': '4:3',
-          'portrait_4_3': '3:4',
-          'landscape_2_3': '2:3',
-          'portrait_2_3': '3:2',
-          'square': '1:1',
-          'square_hd': '1:1',
+          landscape_16_9: '16:9',
+          portrait_16_9: '9:16',
+          landscape_4_3: '4:3',
+          portrait_4_3: '3:4',
+          landscape_2_3: '2:3',
+          portrait_2_3: '3:2',
+          square: '1:1',
+          square_hd: '1:1',
         };
-        
+
         return mapping[imageSize];
       };
 
       // Validate and process image URLs
       console.log('Processing image URLs:', options.imageUrls);
       const validImageUrls: string[] = [];
-      
+
       for (const url of options.imageUrls) {
         if (!url || typeof url !== 'string' || url.trim() === '') {
           console.warn('Skipping empty URL');
@@ -241,14 +274,14 @@ export class FalService {
         }
 
         const trimmedUrl = url.trim();
-        
+
         // Check if it's a data URI (base64)
         if (trimmedUrl.startsWith('data:')) {
           console.log('✅ Data URI detected');
           validImageUrls.push(trimmedUrl);
           continue;
         }
-        
+
         // Check if it's a valid URL
         try {
           new URL(trimmedUrl);
@@ -284,10 +317,10 @@ export class FalService {
         input,
         logs: true,
         onQueueUpdate: (update) => {
-          if (update.status === "IN_PROGRESS") {
+          if (update.status === 'IN_PROGRESS') {
             update.logs.map((log) => log.message).forEach(console.log);
           }
-        }
+        },
       });
 
       console.log('📥 Raw Nano Banana Edit Response:', JSON.stringify(result, null, 2));
@@ -299,11 +332,14 @@ export class FalService {
       } else if ((result as any).images) {
         data = result;
       } else {
-        throw new Error(`No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`);
+        throw new Error(
+          `No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`
+        );
       }
 
       // Extract images using same strategy as generateImage
-      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
+      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> =
+        [];
       if (data.images && Array.isArray(data.images)) {
         images = data.images;
       } else if (data.image) {
@@ -328,19 +364,20 @@ export class FalService {
         status: 'completed',
         imageUrl: images[0].url,
         images,
-        seed: data.seed
+        seed: data.seed,
       };
     } catch (error) {
       console.error('❌ Nano Banana Edit Failed:', error);
       return {
         id: Date.now().toString(),
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
   }
 
   async generateVideo(options: FalVideoGenerationOptions): Promise<FalVideoGenerationResult> {
+    this.ensureConfigured();
     try {
       const model = options.model || 'fal-ai/ltx-video';
       const input: any = { prompt: options.prompt };
@@ -350,11 +387,11 @@ export class FalService {
         console.log('🔧 Building Veo3.1 text-to-video input...');
 
         // Veo3.1 only supports 8s duration
-        input.duration = "8s";
+        input.duration = '8s';
         console.log('Using duration: 8s (Veo3.1 requirement)');
 
         // Aspect ratio
-        if (options.aspectRatio && options.aspectRatio !== "auto") {
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
           input.aspect_ratio = options.aspectRatio;
           console.log(`Using aspect ratio: ${options.aspectRatio}`);
         }
@@ -372,28 +409,28 @@ export class FalService {
         }
 
         console.log('✅ Veo3.1 text-to-video input prepared:', JSON.stringify(input, null, 2));
-
       } else if (model === 'fal-ai/veo3.1/fast/image-to-video') {
         // Image-to-video model (image required)
-        if (!options.imageUrl) throw new Error('Image URL is required for Veo3.1 image-to-video model');
+        if (!options.imageUrl)
+          throw new Error('Image URL is required for Veo3.1 image-to-video model');
 
         console.log('🔧 Building Veo3.1 image-to-video input...');
 
         input.image_url = options.imageUrl;
 
         // Veo3.1 only supports 8s duration
-        input.duration = "8s";
+        input.duration = '8s';
         console.log('Using duration: 8s (Veo3.1 requirement)');
 
         // If aspect_ratio is provided and NOT "auto", use it
         // Otherwise let Veo3.1 auto-detect from image
-        if (options.aspectRatio && options.aspectRatio !== "auto") {
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
           input.aspect_ratio = options.aspectRatio;
           console.log(`Using aspect ratio: ${options.aspectRatio}`);
         } else {
           // For veo3.1, omit aspect_ratio to let it auto-detect
           // or explicitly set to "auto"
-          input.aspect_ratio = "auto";
+          input.aspect_ratio = 'auto';
           console.log('Using auto aspect ratio');
         }
 
@@ -411,36 +448,38 @@ export class FalService {
         }
 
         console.log('✅ Veo3.1 image-to-video input prepared:', JSON.stringify(input, null, 2));
-
       } else if (model === 'fal-ai/wan-25-preview/image-to-video') {
-        if (!options.imageUrl) throw new Error('Image URL is required for wan25 image-to-video model');
+        if (!options.imageUrl)
+          throw new Error('Image URL is required for wan25 image-to-video model');
         input.image_url = options.imageUrl;
         input.duration = String(options.duration || 5);
-        input.resolution = options.resolution || "1080p";
+        input.resolution = options.resolution || '1080p';
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
-        if (options.enablePromptExpansion !== undefined) input.enable_prompt_expansion = options.enablePromptExpansion;
+        if (options.enablePromptExpansion !== undefined)
+          input.enable_prompt_expansion = options.enablePromptExpansion;
       } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
         if (!options.imageUrl) throw new Error('Image URL is required for kling v2.5 turbo model');
         input.image_url = options.imageUrl;
         input.duration = String(options.duration || 5);
-        input.aspect_ratio = options.aspectRatio || "16:9";
+        input.aspect_ratio = options.aspectRatio || '16:9';
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
         if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
       } else if (model === 'fal-ai/sora-2/image-to-video') {
-        if (!options.imageUrl) throw new Error('Image URL is required for Sora 2 image-to-video model');
+        if (!options.imageUrl)
+          throw new Error('Image URL is required for Sora 2 image-to-video model');
         input.image_url = options.imageUrl;
 
         // Sora-specific parameters
         input.duration = options.duration || 4; // Default to 4 seconds as shown in docs
-        if (options.aspectRatio && options.aspectRatio !== "auto") {
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
           input.aspect_ratio = options.aspectRatio;
         } else {
-          input.aspect_ratio = "auto";
+          input.aspect_ratio = 'auto';
         }
-        if (options.resolution && options.resolution !== "auto") {
+        if (options.resolution && options.resolution !== 'auto') {
           input.resolution = options.resolution;
         } else {
-          input.resolution = "auto";
+          input.resolution = 'auto';
         }
         // Sora can generate audio naturally from prompts if needed
       } else if (model === 'fal-ai/sora-2/text-to-video') {
@@ -452,21 +491,21 @@ export class FalService {
         input.duration = validDurations.includes(options.duration || 0) ? options.duration : 4;
 
         // Aspect ratio: Only "16:9" or "9:16" supported (NOT "1:1" or "auto")
-        if (options.aspectRatio === "9:16" || options.aspectRatio === "16:9") {
+        if (options.aspectRatio === '9:16' || options.aspectRatio === '16:9') {
           input.aspect_ratio = options.aspectRatio;
         } else {
-          input.aspect_ratio = "16:9"; // Default to 16:9 if invalid
+          input.aspect_ratio = '16:9'; // Default to 16:9 if invalid
         }
 
         // Resolution: Only "720p" supported
-        input.resolution = "720p";
+        input.resolution = '720p';
 
         console.log('✅ Sora 2 text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video') {
         // Kling text-to-video (no image required)
         console.log('🔧 Building Kling text-to-video input...');
         input.duration = String(options.duration || 5); // 5 or 10 seconds
-        input.aspect_ratio = options.aspectRatio || "16:9";
+        input.aspect_ratio = options.aspectRatio || '16:9';
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
         if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
         console.log('✅ Kling text-to-video input prepared:', JSON.stringify(input, null, 2));
@@ -474,9 +513,10 @@ export class FalService {
         // Wan 2.5 text-to-video (no image required)
         console.log('🔧 Building Wan 2.5 text-to-video input...');
         input.duration = String(options.duration || 5); // 5 or 10 seconds
-        input.resolution = options.resolution || "1080p";
+        input.resolution = options.resolution || '1080p';
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
-        if (options.enablePromptExpansion !== undefined) input.enable_prompt_expansion = options.enablePromptExpansion;
+        if (options.enablePromptExpansion !== undefined)
+          input.enable_prompt_expansion = options.enablePromptExpansion;
         console.log('✅ Wan 2.5 text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else {
         input.duration = options.duration || 5;
@@ -498,22 +538,22 @@ export class FalService {
           logs: true,
           onQueueUpdate: (update) => {
             console.log('📊 Status:', update.status);
-            if (update.status === "IN_PROGRESS" && update.logs) {
+            if (update.status === 'IN_PROGRESS' && update.logs) {
               update.logs.map((log: any) => log.message).forEach(console.log);
             }
-          }
+          },
         });
       } catch (subscribeError: any) {
         console.error('❌ Subscribe error:', subscribeError.constructor.name);
         console.error('Status:', subscribeError.status, subscribeError.statusText);
-        
+
         // Helper to check for binary data
         const hasBinaryData = (str: string): boolean => {
           if (str.length > 500) return true;
           const binaryIndicators = ['iVBOR', 'base64', '/9j/', 'data:image'];
-          return binaryIndicators.some(ind => str.includes(ind));
+          return binaryIndicators.some((ind) => str.includes(ind));
         };
-        
+
         // Extract clean message from detail
         let cleanMessage = '';
         if (subscribeError.body?.detail) {
@@ -530,15 +570,18 @@ export class FalService {
                 return null;
               })
               .filter(Boolean);
-            
+
             if (messages.length > 0) {
               cleanMessage = messages.join('; ');
             }
-          } else if (typeof subscribeError.body.detail === 'string' && !hasBinaryData(subscribeError.body.detail)) {
+          } else if (
+            typeof subscribeError.body.detail === 'string' &&
+            !hasBinaryData(subscribeError.body.detail)
+          ) {
             cleanMessage = subscribeError.body.detail;
           }
         }
-        
+
         // Build enhanced error
         const enhancedError = new Error();
         if (cleanMessage) {
@@ -551,14 +594,14 @@ export class FalService {
           enhancedError.message = subscribeError.message || 'Video generation request failed';
           console.error('Using original message');
         }
-        
+
         // Preserve other error properties
         Object.assign(enhancedError, {
           status: subscribeError.status,
           statusText: subscribeError.statusText,
-          body: subscribeError.body
+          body: subscribeError.body,
         });
-        
+
         throw enhancedError;
       }
 
@@ -570,12 +613,12 @@ export class FalService {
 
       console.log('Response structure:', {
         hasData: !!resultAny.data,
-        dataKeys: Object.keys(data).join(', ')
+        dataKeys: Object.keys(data).join(', '),
       });
 
       // Try different possible video URL locations
       let videoUrl: string | undefined;
-      
+
       if (data.video?.url) {
         videoUrl = data.video.url;
       } else if (data.video_url) {
@@ -597,20 +640,20 @@ export class FalService {
       return {
         id: resultAny.requestId || Date.now().toString(),
         status: 'completed',
-        videoUrl: videoUrl
+        videoUrl: videoUrl,
       };
     } catch (error: any) {
       console.error('❌ Video generation failed');
       console.error('Error type:', error.constructor.name);
-      
+
       // Helper function to check if a string contains base64 or binary data
       const containsBinaryData = (str: string): boolean => {
         if (str.length > 500) return true;
         // Check for common base64/binary indicators
         const binaryIndicators = ['iVBOR', 'base64', '/9j/', 'data:image', 'AAAABmJLR0Q'];
-        return binaryIndicators.some(indicator => str.includes(indicator));
+        return binaryIndicators.some((indicator) => str.includes(indicator));
       };
-      
+
       // Helper function to extract clean error message from validation error object
       const extractCleanMessage = (err: any): string => {
         // Try to get the message field
@@ -626,21 +669,21 @@ export class FalService {
         }
         return 'Invalid input data';
       };
-      
+
       // Extract meaningful error message
       let errorMessage = 'Video generation failed';
-      
+
       // Check for validation errors in error.body.detail
       if (error.body?.detail) {
         console.error('API returned detail field');
-        
+
         // FAL API returns validation errors in various formats
         if (Array.isArray(error.body.detail)) {
           // Array of validation errors - extract clean messages only
           const cleanMessages = error.body.detail
             .map((err: any) => extractCleanMessage(err))
             .filter((msg: string) => msg && msg !== 'Invalid input data');
-          
+
           if (cleanMessages.length > 0) {
             errorMessage = cleanMessages.join('; ');
           } else {
@@ -667,39 +710,50 @@ export class FalService {
           errorMessage = error.message;
         }
       }
-      
+
       // Final check - if error message still contains binary data or is too long, use generic message
       if (containsBinaryData(errorMessage)) {
         console.error('⚠️ Filtered out binary/base64 data from error message');
-        errorMessage = 'Video generation failed due to invalid input data. This may be caused by unlicensed characters, invalid image format, or API limitations. Please verify your inputs and try again.';
+        errorMessage =
+          'Video generation failed due to invalid input data. This may be caused by unlicensed characters, invalid image format, or API limitations. Please verify your inputs and try again.';
       }
-      
+
       // Check for common error patterns and make them user-friendly
       if (errorMessage.toLowerCase().includes('unprocessable entity')) {
-        errorMessage = 'The video generation request could not be processed. This may be due to unlicensed characters, invalid image format, or API limitations. Please check your inputs and try again.';
-      } else if (errorMessage.toLowerCase().includes('unlicensed') || errorMessage.toLowerCase().includes('license')) {
-        errorMessage = 'Video generation failed: The request includes unlicensed characters or content. Please ensure all characters are properly licensed.';
-      } else if (errorMessage.toLowerCase().includes('image') && errorMessage.toLowerCase().includes('url')) {
-        errorMessage = 'Invalid image URL provided. Please check that the image is accessible and in a supported format.';
+        errorMessage =
+          'The video generation request could not be processed. This may be due to unlicensed characters, invalid image format, or API limitations. Please check your inputs and try again.';
+      } else if (
+        errorMessage.toLowerCase().includes('unlicensed') ||
+        errorMessage.toLowerCase().includes('license')
+      ) {
+        errorMessage =
+          'Video generation failed: The request includes unlicensed characters or content. Please ensure all characters are properly licensed.';
+      } else if (
+        errorMessage.toLowerCase().includes('image') &&
+        errorMessage.toLowerCase().includes('url')
+      ) {
+        errorMessage =
+          'Invalid image URL provided. Please check that the image is accessible and in a supported format.';
       }
-      
+
       // Truncate very long error messages as a final safeguard
       if (errorMessage.length > 300) {
         errorMessage = errorMessage.substring(0, 297) + '...';
       }
-      
+
       // Log clean error for debugging
       console.error('📤 Returning error to client:', errorMessage);
-      
+
       return {
         id: '',
         status: 'failed',
-        error: errorMessage
+        error: errorMessage,
       };
     }
   }
 
   async getGenerationStatus(id: string): Promise<FalVideoGenerationResult> {
+    this.ensureConfigured();
     try {
       const result = await fal.queue.status(id, { requestId: id, logs: true });
 
@@ -707,14 +761,14 @@ export class FalService {
         id,
         status: this.mapStatus((result as any).status),
         videoUrl: (result as any).response_url,
-        error: (result as any).status === 'FAILED' ? 'Generation failed' : undefined
+        error: (result as any).status === 'FAILED' ? 'Generation failed' : undefined,
       };
     } catch (error) {
       console.error('Failed to get Fal AI generation status:', error);
       return {
         id,
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }

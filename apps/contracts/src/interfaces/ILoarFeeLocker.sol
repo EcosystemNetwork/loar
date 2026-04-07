@@ -3,6 +3,8 @@ pragma solidity ^0.8.30;
 
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
+/// @title ILoarFeeLocker
+/// @notice Interface for the fee escrow contract that holds protocol fees on behalf of fee owners.
 interface ILoarFeeLocker {
     error NoFeesToClaim();
     error Unauthorized();

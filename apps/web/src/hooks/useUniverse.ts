@@ -1,6 +1,6 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { universeAbi } from '@loar/abis/generated';
-import { sepolia } from 'viem/chains';
+import { keccak256, toBytes } from 'viem';
 
 /**
  * Hook for interacting with a specific Universe contract
@@ -10,6 +10,7 @@ import { sepolia } from 'viem/chains';
  * const { createNode, ... } = useUniverse(universeAddress);
  */
 export function useUniverse(universeAddress: `0x${string}` | undefined) {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -20,21 +21,20 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
    * @param previousNodeId - The ID of the parent node (0 for root)
    * @returns Transaction hash
    */
-  const createNode = async (params: {
-    link: string;
-    plot: string;
-    previousNodeId: bigint;
-  }) => {
+  const createNode = async (params: { link: string; plot: string; previousNodeId: bigint }) => {
     if (!universeAddress) {
       throw new Error('Universe address is required');
     }
+
+    const contentHash = keccak256(toBytes(params.link));
+    const plotHash = keccak256(toBytes(params.plot));
 
     writeContract({
       address: universeAddress,
       abi: universeAbi,
       functionName: 'createNode',
-      args: [params.link, params.plot, params.previousNodeId],
-      chainId: sepolia.id,
+      args: [contentHash, plotHash, params.previousNodeId, params.link, params.plot],
+      chainId,
     });
   };
 
@@ -49,7 +49,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -64,7 +64,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -79,7 +79,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -94,7 +94,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -109,7 +109,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -124,7 +124,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 

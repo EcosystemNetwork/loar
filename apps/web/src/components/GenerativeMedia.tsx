@@ -1,103 +1,137 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { trpcClient } from '../utils/trpc'
+/**
+ * Generative Media Panel
+ *
+ * AI content generation UI for creating images and videos from text prompts.
+ * Uses fal.ai models via tRPC mutations. Supports prompt input, model selection,
+ * aspect ratio configuration, and displays generated results with download links.
+ */
+
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { trpcClient } from '../utils/trpc';
+
+interface ImageResult {
+  status: string;
+  imageUrl?: string;
+  error?: string;
+}
+
+interface VideoResult {
+  id?: string;
+  videoUrl?: string;
+  error?: string;
+}
 
 interface GeneratedContent {
-  imageUrl?: string
-  videoUrl?: string
-  isGenerating: boolean
-  error?: string
-  generationId?: string
+  imageUrl?: string;
+  videoUrl?: string;
+  isGenerating: boolean;
+  error?: string;
+  generationId?: string;
 }
 
 export function GenerativeMedia() {
-  const [imagePrompt, setImagePrompt] = useState('A simple cartoon drawing of a cute orange cat sitting on grass. Clean, minimal illustration with soft pastel colors.')
-  const [videoPrompt, setVideoPrompt] = useState('A cute cat gently swaying in a soft breeze')
-  const [content, setContent] = useState<GeneratedContent>({ isGenerating: false })
+  const [imagePrompt, setImagePrompt] = useState(
+    'A simple cartoon drawing of a cute orange cat sitting on grass. Clean, minimal illustration with soft pastel colors.'
+  );
+  const [videoPrompt, setVideoPrompt] = useState('A cute cat gently swaying in a soft breeze');
+  const [content, setContent] = useState<GeneratedContent>({ isGenerating: false });
 
   const generateImageMutation = useMutation({
     mutationFn: (input: {
       prompt: string;
       model: 'fal-ai/nano-banana' | 'fal-ai/flux/dev' | 'fal-ai/flux-pro' | 'fal-ai/flux/schnell';
-      imageSize: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9';
-      numImages: number
-    }) =>
-      trpcClient.fal.generateImage.mutate(input),
-  })
+      imageSize:
+        | 'square_hd'
+        | 'square'
+        | 'portrait_4_3'
+        | 'portrait_16_9'
+        | 'landscape_4_3'
+        | 'landscape_16_9';
+      numImages: number;
+    }) => trpcClient.fal.generateImage.mutate(input),
+  });
 
   const generateVideoMutation = useMutation({
-    mutationFn: (input: { prompt: string; imageUrl: string; duration: 5 | 10; aspectRatio: '16:9' | '9:16' | '1:1'; motionStrength: number }) =>
-      trpcClient.fal.veo3ImageToVideo.mutate(input),
-  })
+    mutationFn: (input: {
+      prompt: string;
+      imageUrl: string;
+      duration: 5 | 10;
+      aspectRatio: '16:9' | '9:16' | '1:1';
+      motionStrength: number;
+    }) => trpcClient.fal.veo3ImageToVideo.mutate(input),
+  });
 
   const handleGenerate = async () => {
-    setContent({ isGenerating: true })
+    setContent({ isGenerating: true });
 
     try {
       // Step 1: Generate image with Fal AI
-      const imageResult = await generateImageMutation.mutateAsync({
+      const imageResult = (await generateImageMutation.mutateAsync({
         prompt: imagePrompt,
         model: 'fal-ai/nano-banana',
         imageSize: 'landscape_16_9',
         numImages: 1,
-      })
+      })) as ImageResult;
 
       if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
-        throw new Error(imageResult.error || 'Failed to generate image')
+        throw new Error(imageResult.error || 'Failed to generate image');
       }
 
       // Step 2: Generate video with Veo3 using the image
-      const videoResult = await generateVideoMutation.mutateAsync({
+      const videoResult = (await generateVideoMutation.mutateAsync({
         prompt: videoPrompt,
         imageUrl: imageResult.imageUrl,
         duration: 5,
         aspectRatio: '16:9',
         motionStrength: 127,
-      })
+      })) as VideoResult;
 
       setContent({
         isGenerating: false,
         imageUrl: imageResult.imageUrl,
         videoUrl: videoResult.videoUrl,
-        generationId: videoResult.id
-      })
+        generationId: videoResult.id,
+      });
     } catch (error) {
       setContent({
         isGenerating: false,
-        error: error instanceof Error ? error.message : 'An error occurred'
-      })
+        error: error instanceof Error ? error.message : 'An error occurred',
+      });
     }
-  }
+  };
 
   const downloadVideo = async () => {
-    if (!content.videoUrl || !content.generationId) return
-    
+    if (!content.videoUrl || !content.generationId) return;
+
     try {
-      const response = await fetch(content.videoUrl)
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${content.generationId}.mp4`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+      const response = await fetch(content.videoUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${content.generationId}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download video:', error)
+      console.error('Failed to download video:', error);
     }
-  }
+  };
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>AI Media Generation</CardTitle>
-        <p className="text-sm text-gray-600">Generate an image with Fal AI (Nano Banana), then create a video with Veo3</p>
+        <p className="text-sm text-gray-600">
+          Generate an image with Fal AI (Nano Banana), then create a video with Veo3
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -122,7 +156,7 @@ export function GenerativeMedia() {
           />
         </div>
 
-        <Button 
+        <Button
           onClick={handleGenerate}
           disabled={content.isGenerating || !imagePrompt.trim() || !videoPrompt.trim()}
           className="w-full"
@@ -154,8 +188,8 @@ export function GenerativeMedia() {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium mb-2">Generated Image</h3>
-              <img 
-                src={content.imageUrl} 
+              <img
+                src={content.imageUrl}
                 alt="Generated image"
                 className="w-full rounded-lg border max-h-96 object-contain"
               />
@@ -165,15 +199,11 @@ export function GenerativeMedia() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-lg font-medium">Generated Video</h3>
-                  <Button 
-                    onClick={downloadVideo}
-                    variant="outline" 
-                    size="sm"
-                  >
+                  <Button onClick={downloadVideo} variant="outline" size="sm">
                     Download
                   </Button>
                 </div>
-                <video 
+                <video
                   src={content.videoUrl}
                   controls
                   className="w-full rounded-lg border"
@@ -187,5 +217,5 @@ export function GenerativeMedia() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

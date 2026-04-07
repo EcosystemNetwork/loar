@@ -122,28 +122,35 @@ export function AddSegmentDialog({
             <div className="space-y-3">
               <Card
                 className={cn(
-                  "p-4 cursor-pointer transition-all hover:shadow-md",
+                  'p-4 cursor-pointer transition-all hover:shadow-md',
                   mode === 'text-to-video' ? 'ring-2 ring-primary shadow-sm' : ''
                 )}
                 onClick={() => setMode('text-to-video')}
               >
                 <div className="flex items-start gap-3">
-                  <div className={cn(
-                    "h-5 w-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0",
-                    mode === 'text-to-video'
-                      ? 'border-primary bg-primary'
-                      : 'border-muted-foreground'
-                  )}>
-                    {mode === 'text-to-video' && <Check className="h-3 w-3 text-primary-foreground" />}
+                  <div
+                    className={cn(
+                      'h-5 w-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0',
+                      mode === 'text-to-video'
+                        ? 'border-primary bg-primary'
+                        : 'border-muted-foreground'
+                    )}
+                  >
+                    {mode === 'text-to-video' && (
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Zap className="h-4 w-4 text-primary" />
                       <span className="font-semibold">Text-to-Video</span>
-                      <Badge variant="secondary" className="ml-auto">Faster</Badge>
+                      <Badge variant="secondary" className="ml-auto">
+                        Faster
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Generate video directly from text prompt. Faster generation, ideal for scenes without specific characters.
+                      Generate video directly from text prompt. Faster generation, ideal for scenes
+                      without specific characters.
                     </p>
                   </div>
                 </div>
@@ -151,28 +158,35 @@ export function AddSegmentDialog({
 
               <Card
                 className={cn(
-                  "p-4 cursor-pointer transition-all hover:shadow-md",
+                  'p-4 cursor-pointer transition-all hover:shadow-md',
                   mode === 'image-to-video' ? 'ring-2 ring-primary shadow-sm' : ''
                 )}
                 onClick={() => setMode('image-to-video')}
               >
                 <div className="flex items-start gap-3">
-                  <div className={cn(
-                    "h-5 w-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0",
-                    mode === 'image-to-video'
-                      ? 'border-primary bg-primary'
-                      : 'border-muted-foreground'
-                  )}>
-                    {mode === 'image-to-video' && <Check className="h-3 w-3 text-primary-foreground" />}
+                  <div
+                    className={cn(
+                      'h-5 w-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0',
+                      mode === 'image-to-video'
+                        ? 'border-primary bg-primary'
+                        : 'border-muted-foreground'
+                    )}
+                  >
+                    {mode === 'image-to-video' && (
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Image className="h-4 w-4 text-primary" />
                       <span className="font-semibold">Image-to-Video</span>
-                      <Badge variant="secondary" className="ml-auto">With Characters</Badge>
+                      <Badge variant="secondary" className="ml-auto">
+                        With Characters
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Create image first with characters, then animate. More control over composition and character placement.
+                      Create image first with characters, then animate. More control over
+                      composition and character placement.
                     </p>
                   </div>
                 </div>
@@ -290,8 +304,9 @@ export function AddSegmentDialog({
                   <div>
                     <p className="text-sm font-medium mb-1">Character Integration Coming Soon</p>
                     <p className="text-xs text-muted-foreground">
-                      This mode will allow you to select characters and generate an image with them before creating the video.
-                      For now, use Text-to-Video mode or add segments from the main event creation panel.
+                      This mode will allow you to select characters and generate an image with them
+                      before creating the video. For now, use Text-to-Video mode or add segments
+                      from the main event creation panel.
                     </p>
                   </div>
                 </div>

@@ -1,3 +1,11 @@
+/**
+ * Timeline Flow Editor
+ *
+ * ReactFlow-based visual timeline editor for a single universe. Renders
+ * TimelineEventNode custom nodes, supports adding/branching events via a
+ * sidebar panel, and handles edge connections between timeline nodes.
+ */
+
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   Background,
@@ -7,13 +15,9 @@ import ReactFlow, {
   ReactFlowProvider,
   Panel,
   MarkerType,
-  addEdge
+  addEdge,
 } from 'reactflow';
-import type {
-  Node,
-  Edge,
-  Connection
-} from 'reactflow';
+import type { Node, Edge, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { TimelineEventNode } from './TimelineNodes';
 import type { TimelineNodeData } from './TimelineNodes';
@@ -52,10 +56,10 @@ export function TimelineFlowEditor({
   const [eventCounter, setEventCounter] = useState(1);
 
   // Timeline parameters
-  const [timelineTitle, setTimelineTitle] = useState("My Timeline");
-  const [timelineDescription, setTimelineDescription] = useState("A narrative timeline");
-  const [selectedEventTitle, setSelectedEventTitle] = useState("");
-  const [selectedEventDescription, setSelectedEventDescription] = useState("");
+  const [timelineTitle, setTimelineTitle] = useState('My Timeline');
+  const [timelineDescription, setTimelineDescription] = useState('A narrative timeline');
+  const [selectedEventTitle, setSelectedEventTitle] = useState('');
+  const [selectedEventDescription, setSelectedEventDescription] = useState('');
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -76,9 +80,9 @@ export function TimelineFlowEditor({
   const handleAddEvent = useCallback(() => {
     const newEventId = `event-${Date.now()}`;
     const newAddId = `add-${Date.now()}`;
-    
+
     // Find the rightmost position to place new event
-    const rightmostX = nodes.length > 0 ? Math.max(...nodes.map(n => n.position.x)) : 100;
+    const rightmostX = nodes.length > 0 ? Math.max(...nodes.map((n) => n.position.x)) : 100;
     const newEventPosition = { x: rightmostX + 300, y: 200 };
     const newAddPosition = { x: rightmostX + 600, y: 200 };
 
@@ -113,7 +117,7 @@ export function TimelineFlowEditor({
     };
 
     // Create edge connecting to previous event if exists
-    const lastEventNode = nodes.filter(n => n.data.nodeType === 'scene').pop();
+    const lastEventNode = nodes.filter((n) => n.data.nodeType === 'scene').pop();
     const newEdges: Edge[] = [];
 
     if (lastEventNode) {
@@ -141,50 +145,64 @@ export function TimelineFlowEditor({
 
     // Remove old add nodes and their edges
     const filteredNodes = nodes.filter((n: any) => n.data.nodeType !== 'add');
-    const filteredEdges = edges.filter((e: any) => !nodes.some((n: any) => n.data.nodeType === 'add' && (e.source === n.id || e.target === n.id)));
+    const filteredEdges = edges.filter(
+      (e: any) =>
+        !nodes.some(
+          (n: any) => n.data.nodeType === 'add' && (e.source === n.id || e.target === n.id)
+        )
+    );
 
     setNodes([...filteredNodes, newEventNode, newAddNode]);
     setEdges([...filteredEdges, ...newEdges]);
-    setEventCounter(prev => prev + 1);
+    setEventCounter((prev) => prev + 1);
   }, [nodes, edges, eventCounter, timelineId, universeId]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge({
-        ...connection,
-        animated: true,
-        style: { stroke: '#10b981' },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#10b981',
-        },
-      }, eds));
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...connection,
+            animated: true,
+            style: { stroke: '#10b981' },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#10b981',
+            },
+          },
+          eds
+        )
+      );
     },
     [setEdges]
   );
 
   // Handle node selection
-  const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
-    if (readOnly) {
-      // In read-only mode, navigate to the timeline viewer
-      if (node.data.eventId && node.data.universeId) {
-        window.location.href = `/timeline?universe=${node.data.universeId}&event=${node.data.eventId}`;
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: any) => {
+      if (readOnly) {
+        // In read-only mode, navigate to the timeline viewer
+        if (node.data.eventId && node.data.universeId) {
+          window.location.href = `/timeline?universe=${node.data.universeId}&event=${node.data.eventId}`;
+        }
+      } else {
+        // In edit mode, select the node for editing
+        setSelectedNode(node);
+        if (node.data.nodeType === 'scene') {
+          setSelectedEventTitle(node.data.label);
+          // Extract description string from object if needed
+          const rawDesc = node.data.description;
+          const description =
+            rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+              ? String((rawDesc as any).description)
+              : String(rawDesc || '');
+          setSelectedEventDescription(description);
+        }
       }
-    } else {
-      // In edit mode, select the node for editing
-      setSelectedNode(node);
-      if (node.data.nodeType === 'scene') {
-        setSelectedEventTitle(node.data.label);
-        // Extract description string from object if needed
-        const rawDesc = node.data.description;
-        const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-          ? String((rawDesc as any).description)
-          : String(rawDesc || '');
-        setSelectedEventDescription(description);
-      }
-    }
-  }, [readOnly]);
+    },
+    [readOnly]
+  );
 
   // Initialize with start event
   useEffect(() => {
@@ -233,8 +251,8 @@ export function TimelineFlowEditor({
   // Update selected node data
   const updateSelectedNode = useCallback(() => {
     if (selectedNode && selectedNode.data.nodeType === 'scene') {
-      setNodes((nds) => 
-        nds.map((node) => 
+      setNodes((nds) =>
+        nds.map((node) =>
           node.id === selectedNode.id
             ? {
                 ...node,
@@ -352,7 +370,9 @@ export function TimelineFlowEditor({
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Total Events:</span>
-                  <span className="text-sm font-medium">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
+                  <span className="text-sm font-medium">
+                    {nodes.filter((n: any) => n.data.nodeType === 'scene').length}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Timeline ID:</span>
@@ -393,8 +413,11 @@ export function TimelineFlowEditor({
             >
               <Background gap={20} size={1} color="#f1f5f9" />
               <Controls />
-              
-              <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+
+              <Panel
+                position="top-center"
+                className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border"
+              >
                 <h2 className="text-lg font-semibold">{timelineTitle}</h2>
                 <p className="text-sm text-muted-foreground">{timelineDescription}</p>
               </Panel>

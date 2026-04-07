@@ -75,7 +75,7 @@ contract UniverseTokenDeployer is ReentrancyGuard {
             TOKEN_SUPPLY
         );
 
-        IERC20(tokenAddress).transfer(address(universeManager), TOKEN_SUPPLY);
+        IERC20(tokenAddress).safeTransfer(address(universeManager), TOKEN_SUPPLY);
 
         governor = address(_deployGovernance(tokenAddress));
 

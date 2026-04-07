@@ -1,13 +1,21 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowLeft, 
-  Plus, 
-  RefreshCw, 
-  Users, 
-  Film, 
+/**
+ * Universe Sidebar
+ *
+ * Collapsible left sidebar on the timeline editor page. Shows universe metadata,
+ * on-chain contract addresses, event/leaf counts, and action buttons for creating
+ * events, refreshing the timeline, and opening governance. Expands on hover.
+ */
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  ArrowLeft,
+  Plus,
+  RefreshCw,
+  Users,
+  Film,
   Activity,
   ExternalLink,
   Copy,
@@ -16,10 +24,10 @@ import {
   GitBranch,
   ArrowRight,
   Sparkles,
-  Vote
-} from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+  Vote,
+} from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { useState } from 'react';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 
@@ -70,13 +78,13 @@ export function UniverseSidebar({
           <ArrowRight className="h-4 w-4" />
         </div>
         <div className="flex flex-col items-center space-y-2">
-          <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-amber-500 animate-pulse' : nodes.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-          {isBlockchainUniverse && (
-            <Sparkles className="h-3 w-3 text-blue-500" />
-          )}
+          <div
+            className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-amber-500 animate-pulse' : nodes.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`}
+          />
+          {isBlockchainUniverse && <Sparkles className="h-3 w-3 text-blue-500" />}
         </div>
       </div>
-      
+
       <div className="flex-1 p-4 overflow-y-auto min-h-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-150">
         <div className="space-y-4">
           {/* Enhanced Back Button */}
@@ -100,7 +108,9 @@ export function UniverseSidebar({
             <div className="relative space-y-3">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 mt-1">
-                  <div className={`w-3 h-3 rounded-full ${isLoadingAny ? 'bg-amber-500 animate-pulse' : nodes.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'} shadow-lg`} />
+                  <div
+                    className={`w-3 h-3 rounded-full ${isLoadingAny ? 'bg-amber-500 animate-pulse' : nodes.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'} shadow-lg`}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -108,7 +118,10 @@ export function UniverseSidebar({
                       {finalUniverse?.name}
                     </h2>
                     {isBlockchainUniverse && (
-                      <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                      <Badge
+                        variant="secondary"
+                        className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                      >
                         <Sparkles className="h-3 w-3 mr-1" />
                         On-Chain
                       </Badge>
@@ -134,15 +147,13 @@ export function UniverseSidebar({
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20 border-blue-200 dark:border-blue-800 hover:shadow-md transition-shadow duration-300">
               <CardContent className="p-3 text-center">
                 <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-1">
                   {leavesData ? (Array.isArray(leavesData) ? leavesData.length : 0) : 0}
                 </div>
-                <div className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                  Leaves
-                </div>
+                <div className="text-xs font-medium text-blue-600 dark:text-blue-400">Leaves</div>
               </CardContent>
             </Card>
           </div>
@@ -154,7 +165,9 @@ export function UniverseSidebar({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Activity className="h-3 w-3 text-violet-600 dark:text-violet-400" />
-                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">Timeline Contract</span>
+                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+                      Timeline Contract
+                    </span>
                   </div>
                   <Button
                     variant="ghost"
@@ -177,7 +190,12 @@ export function UniverseSidebar({
                     variant="outline"
                     size="sm"
                     className="w-full mt-2 h-7 text-xs border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50"
-                    onClick={() => window.open(`https://sepolia.etherscan.io/address/${finalUniverse.address}`, '_blank')}
+                    onClick={() =>
+                      window.open(
+                        `https://sepolia.etherscan.io/address/${finalUniverse.address}`,
+                        '_blank'
+                      )
+                    }
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
                     View on Etherscan
@@ -194,7 +212,9 @@ export function UniverseSidebar({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Governance Token</span>
+                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      Governance Token
+                    </span>
                   </div>
                   <Button
                     variant="ghost"
@@ -216,7 +236,12 @@ export function UniverseSidebar({
                   variant="outline"
                   size="sm"
                   className="w-full mt-2 h-7 text-xs border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
-                  onClick={() => window.open(`https://sepolia.etherscan.io/address/${finalUniverse.tokenAddress}`, '_blank')}
+                  onClick={() =>
+                    window.open(
+                      `https://sepolia.etherscan.io/address/${finalUniverse.tokenAddress}`,
+                      '_blank'
+                    )
+                  }
                 >
                   <ExternalLink className="h-3 w-3 mr-1" />
                   View on Etherscan
@@ -237,16 +262,19 @@ export function UniverseSidebar({
             </Button>
 
             {/* Govern button - only show for blockchain universes with governance configured */}
-            {isBlockchainUniverse && onOpenGovernance && finalUniverse?.governanceAddress && finalUniverse?.tokenAddress && (
-              <Button
-                onClick={onOpenGovernance}
-                className="w-full bg-gradient-to-r from-violet-600 via-violet-600 to-violet-700 hover:from-violet-700 hover:via-violet-800 hover:to-violet-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
-                size="sm"
-              >
-                <Vote className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-                Govern
-              </Button>
-            )}
+            {isBlockchainUniverse &&
+              onOpenGovernance &&
+              finalUniverse?.governanceAddress &&
+              finalUniverse?.tokenAddress && (
+                <Button
+                  onClick={onOpenGovernance}
+                  className="w-full bg-gradient-to-r from-violet-600 via-violet-600 to-violet-700 hover:from-violet-700 hover:via-violet-800 hover:to-violet-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
+                  size="sm"
+                >
+                  <Vote className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
+                  Govern
+                </Button>
+              )}
 
             <Button
               onClick={handleRefreshTimeline}
@@ -255,7 +283,9 @@ export function UniverseSidebar({
               className="w-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group h-9 border-slate-200 dark:border-slate-700"
               disabled={isLoadingAny}
             >
-              <RefreshCw className={`h-3 w-3 mr-2 group-hover:rotate-180 transition-transform duration-500 ${isLoadingAny ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-3 w-3 mr-2 group-hover:rotate-180 transition-transform duration-500 ${isLoadingAny ? 'animate-spin' : ''}`}
+              />
               {isLoadingAny ? 'Refreshing...' : 'Refresh Timeline'}
             </Button>
           </div>
@@ -275,7 +305,9 @@ export function UniverseSidebar({
                     {selectedNode.data.label}
                   </div>
                   <div className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed line-clamp-3 bg-amber-100/50 dark:bg-amber-900/20 p-2 rounded">
-                    {typeof selectedNode.data.description === 'object' && selectedNode.data.description !== null && 'description' in selectedNode.data.description
+                    {typeof selectedNode.data.description === 'object' &&
+                    selectedNode.data.description !== null &&
+                    'description' in selectedNode.data.description
                       ? String((selectedNode.data.description as any).description)
                       : String(selectedNode.data.description || '')}
                   </div>

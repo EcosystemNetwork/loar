@@ -1,6 +1,14 @@
+/**
+ * Scene Builder Dialog
+ *
+ * Full-screen dialog for composing a scene from multiple video segments.
+ * Supports segment reordering, playback preview, and export/download of
+ * the assembled sequence.
+ */
+
 import { useState, useRef, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Play,
   Pause,
@@ -11,13 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
-} from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface VideoSegment {
   id: string;
@@ -67,7 +70,7 @@ export function SceneBuilder({
 
     const handleEnded = () => {
       if (currentSegmentIndex < segments.length - 1) {
-        setCurrentSegmentIndex(prev => prev + 1);
+        setCurrentSegmentIndex((prev) => prev + 1);
         setIsPlaying(true);
       } else {
         setIsPlaying(false);
@@ -85,7 +88,7 @@ export function SceneBuilder({
     if (!video) return;
 
     if (isPlaying) {
-      video.play().catch(err => console.error('Play error:', err));
+      video.play().catch((err) => console.error('Play error:', err));
     } else {
       video.pause();
     }
@@ -210,10 +213,7 @@ export function SceneBuilder({
 
                 {/* Timeline Scrubber */}
                 <div className="flex-1 relative">
-                  <div
-                    ref={timelineRef}
-                    className="h-16 bg-muted rounded-lg overflow-hidden flex"
-                  >
+                  <div ref={timelineRef} className="h-16 bg-muted rounded-lg overflow-hidden flex">
                     {segments.map((segment, index) => {
                       const widthPercent = (segment.duration / totalDuration) * 100;
                       return (
@@ -277,7 +277,9 @@ export function SceneBuilder({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {/* TODO: Implement arrange */}}
+                    onClick={() => {
+                      /* TODO: Implement arrange */
+                    }}
                     className="h-9 gap-2"
                   >
                     <LayoutGrid className="h-4 w-4" />
@@ -314,7 +316,7 @@ export function SceneBuilder({
                       onClick={() => {
                         if (currentSegmentIndex > 0) {
                           handleReorderSegment(currentSegmentIndex, currentSegmentIndex - 1);
-                          setCurrentSegmentIndex(prev => prev - 1);
+                          setCurrentSegmentIndex((prev) => prev - 1);
                         }
                       }}
                       disabled={currentSegmentIndex === 0}
@@ -328,7 +330,7 @@ export function SceneBuilder({
                       onClick={() => {
                         if (currentSegmentIndex < segments.length - 1) {
                           handleReorderSegment(currentSegmentIndex, currentSegmentIndex + 1);
-                          setCurrentSegmentIndex(prev => prev + 1);
+                          setCurrentSegmentIndex((prev) => prev + 1);
                         }
                       }}
                       disabled={currentSegmentIndex === segments.length - 1}
@@ -346,7 +348,8 @@ export function SceneBuilder({
         {/* Footer */}
         <div className="px-6 py-4 border-t flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {segments.length} segment{segments.length !== 1 ? 's' : ''} • Total duration: {formatTime(totalDuration)}
+            {segments.length} segment{segments.length !== 1 ? 's' : ''} • Total duration:{' '}
+            {formatTime(totalDuration)}
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onClose}>

@@ -1,8 +1,17 @@
+/**
+ * Event Gallery
+ *
+ * Searchable, filterable grid/list view of timeline events. Supports grid
+ * and list view modes, a favorites filter, and text search across event
+ * titles and descriptions.
+ */
+
 import { useState, useMemo } from 'react';
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Grid3x3, List, Heart } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search, Grid3x3, List, Heart } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 
 interface Event {
   id: string;
@@ -11,6 +20,8 @@ interface Event {
   videoUrl?: string;
   imageUrl?: string;
   timestamp?: number;
+  classification?: 'fan' | 'original' | 'licensed';
+  reviewStatus?: 'not_required' | 'pending' | 'approved' | 'rejected';
 }
 
 interface EventGalleryProps {
@@ -19,7 +30,7 @@ interface EventGalleryProps {
 }
 
 export function EventGallery({ events, onEventClick }: EventGalleryProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'favorites'>('grid');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
@@ -29,23 +40,24 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(event =>
-        event.title?.toLowerCase().includes(query) ||
-        event.description?.toLowerCase().includes(query) ||
-        event.id?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (event) =>
+          event.title?.toLowerCase().includes(query) ||
+          event.description?.toLowerCase().includes(query) ||
+          event.id?.toLowerCase().includes(query)
       );
     }
 
     // Favorites filter
     if (viewMode === 'favorites') {
-      filtered = filtered.filter(event => favorites.has(event.id));
+      filtered = filtered.filter((event) => favorites.has(event.id));
     }
 
     return filtered;
   }, [events, searchQuery, viewMode, favorites]);
 
   const toggleFavorite = (eventId: string) => {
-    setFavorites(prev => {
+    setFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(eventId)) {
         next.delete(eventId);
@@ -155,14 +167,27 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
                   >
                     <Heart
                       className={`h-4 w-4 ${
-                        favorites.has(event.id) ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
+                        favorites.has(event.id)
+                          ? 'fill-red-500 text-red-500'
+                          : 'text-muted-foreground'
                       }`}
                     />
                   </button>
+                  {event.classification && (
+                    <div className="absolute bottom-2 left-2">
+                      <ContentLaneBadge
+                        classification={event.classification}
+                        reviewStatus={event.reviewStatus}
+                        size="sm"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Event {event.id}</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Event {event.id}
+                    </span>
                   </div>
                   <h3 className="font-medium text-sm line-clamp-1">
                     {event.title || `Event ${event.id}`}
@@ -185,11 +210,7 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
                 <div className="flex gap-4">
                   <div className="w-32 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
                     {event.videoUrl ? (
-                      <video
-                        src={event.videoUrl}
-                        className="w-full h-full object-cover"
-                        muted
-                      />
+                      <video src={event.videoUrl} className="w-full h-full object-cover" muted />
                     ) : event.imageUrl ? (
                       <img
                         src={event.imageUrl}
@@ -202,7 +223,16 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-muted-foreground">Event {event.id}</span>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Event {event.id}
+                          </span>
+                          {event.classification && (
+                            <ContentLaneBadge
+                              classification={event.classification}
+                              reviewStatus={event.reviewStatus}
+                              size="sm"
+                            />
+                          )}
                         </div>
                         <h3 className="font-medium mt-1">{event.title || `Event ${event.id}`}</h3>
                         <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
@@ -218,7 +248,9 @@ export function EventGallery({ events, onEventClick }: EventGalleryProps) {
                       >
                         <Heart
                           className={`h-4 w-4 ${
-                            favorites.has(event.id) ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
+                            favorites.has(event.id)
+                              ? 'fill-red-500 text-red-500'
+                              : 'text-muted-foreground'
                           }`}
                         />
                       </button>

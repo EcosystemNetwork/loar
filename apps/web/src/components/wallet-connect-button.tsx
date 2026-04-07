@@ -1,122 +1,94 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+/**
+ * Wallet Connect Button
+ *
+ * Primary sign-in component using Coinbase Smart Wallet (v4) with social logins.
+ * After wallet connection, automatically triggers SIWE signature verification.
+ * Shows connected state with address, chain badge, and disconnect option.
+ */
+
+import { useAccount, useConnect } from 'wagmi';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { Wallet, LogOut, Shield } from 'lucide-react';
 
 interface WalletConnectButtonProps {
   size?: 'sm' | 'lg';
   className?: string;
 }
 
-export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ 
-  size = 'sm', 
-  className = '' 
+export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
+  size = 'sm',
+  className = '',
 }) => {
-  const { address, isConnected } = useAccount();
+  const { chain } = useAccount();
+  const { connectors, connect, isPending: isConnecting } = useConnect();
+  const { address, isConnected, isAuthenticated, isAuthenticating, error, signIn, signOut } =
+    useWalletAuth();
+
+  const truncateAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  // Fully authenticated — show address + disconnect
+  if (isAuthenticated && address) {
+    return (
+      <div className={`flex items-center gap-2 ${className}`}>
+        {chain && (
+          <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium">{chain.name}</span>
+        )}
+        <span
+          className={`px-3 py-2 rounded-md bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 font-mono flex items-center gap-1.5 ${
+            size === 'lg' ? 'text-base' : 'text-sm'
+          }`}
+        >
+          <Shield className="h-3 w-3" />
+          {truncateAddress(address)}
+        </span>
+        <button
+          onClick={signOut}
+          type="button"
+          className="p-2 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+          title="Disconnect wallet"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  // Connected but not yet SIWE-verified — prompt to sign
+  if (isConnected && address && !isAuthenticated) {
+    return (
+      <div className={`flex flex-col items-center gap-2 ${className}`}>
+        <button
+          onClick={signIn}
+          disabled={isAuthenticating}
+          type="button"
+          className={`px-4 py-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium ${
+            size === 'lg' ? 'text-lg px-8 py-3' : 'text-sm'
+          } ${isAuthenticating ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <Shield className="h-4 w-4" />
+          {isAuthenticating ? 'Verifying...' : 'Login'}
+        </button>
+        {error && <p className="text-xs text-destructive max-w-48 text-center">{error}</p>}
+      </div>
+    );
+  }
+
+  // Not connected — show sign in button
+  const connector = connectors[0];
 
   return (
     <div className={className}>
-      <ConnectButton.Custom>
-        {({
-          account,
-          chain,
-          openAccountModal,
-          openChainModal,
-          openConnectModal,
-          authenticationStatus,
-          mounted,
-        }) => {
-          const ready = mounted && authenticationStatus !== 'loading';
-          const connected =
-            ready &&
-            account &&
-            chain &&
-            (!authenticationStatus ||
-              authenticationStatus === 'authenticated');
-
-          return (
-            <div
-              {...(!ready && {
-                'aria-hidden': true,
-                style: {
-                  opacity: 0,
-                  pointerEvents: 'none',
-                  userSelect: 'none',
-                },
-              })}
-            >
-              {(() => {
-                if (!connected) {
-                  return (
-                    <button
-                      onClick={openConnectModal}
-                      type="button"
-                      className={`px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${
-                        size === 'lg' ? 'text-lg px-8 py-6' : 'text-sm'
-                      }`}
-                    >
-                      Connect Wallet
-                    </button>
-                  );
-                }
-
-                if (chain.unsupported) {
-                  return (
-                    <button
-                      onClick={openChainModal}
-                      type="button"
-                      className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors"
-                    >
-                      Wrong network
-                    </button>
-                  );
-                }
-
-                return (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={openChainModal}
-                      className="px-3 py-2 rounded-md bg-card border hover:bg-accent transition-colors flex items-center gap-2"
-                      type="button"
-                    >
-                      {chain.hasIcon && (
-                        <div
-                          style={{
-                            background: chain.iconBackground,
-                            width: 12,
-                            height: 12,
-                            borderRadius: 999,
-                            overflow: 'hidden',
-                            marginRight: 4,
-                          }}
-                        >
-                          {chain.iconUrl && (
-                            <img
-                              alt={chain.name ?? 'Chain icon'}
-                              src={chain.iconUrl}
-                              style={{ width: 12, height: 12 }}
-                            />
-                          )}
-                        </div>
-                      )}
-                      {chain.name}
-                    </button>
-
-                    <button
-                      onClick={openAccountModal}
-                      type="button"
-                      className="px-3 py-2 rounded-md bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
-                    >
-                      {account.displayName}
-                      {account.displayBalance
-                        ? ` (${account.displayBalance})`
-                        : ''}
-                    </button>
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        }}
-      </ConnectButton.Custom>
+      <button
+        onClick={() => connector && connect({ connector })}
+        disabled={isConnecting || !connector}
+        type="button"
+        className={`px-4 py-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium ${
+          size === 'lg' ? 'text-lg px-8 py-3' : 'text-sm'
+        } ${isConnecting ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <Wallet className="h-4 w-4" />
+        {isConnecting ? 'Signing in...' : 'Sign In'}
+      </button>
     </div>
   );
 };

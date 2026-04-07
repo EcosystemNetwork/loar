@@ -18,8 +18,13 @@ import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionMa
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
 import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
 
+/// @title LoarLpLockerMultiple
+/// @notice Permanently locks Uniswap v4 LP positions and distributes swap fee rewards to configurable recipients.
+/// @dev Supports multiple tick-range positions per token and up to 7 reward recipients with basis-point splits.
+///      LP NFTs are locked forever — only accrued fees can be collected and distributed via the FeeLocker.
 contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable {
     using TickMath for int24;
+    using SafeERC20 for IERC20;
 
     string public constant version = "1";
 
@@ -121,7 +126,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         }
 
         // pull in the token and mint liquidity
-        IERC20(token).transferFrom(msg.sender, address(this), poolSupply);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), poolSupply);
 
         positionId = _mintLiquidity(poolConfig, lockerConfig, poolKey, poolSupply, token);
 
@@ -363,6 +368,8 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         external
     {
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
+        require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
+        require(newRecipient != address(0), "Cannot set zero address recipient");
 
         // Only admin can replace the reward recipient
         if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
@@ -379,13 +386,15 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     // Replace the reward admin
     function updateRewardAdmin(address token, uint256 rewardIndex, address newAdmin) external {
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
+        require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
+        require(newAdmin != address(0), "Cannot set zero address admin");
 
-        // Only admin can replace the reward recipient
+        // Only admin can replace the reward admin
         if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
             revert Unauthorized();
         }
 
-        // Add the new recipient
+        // Add the new admin
         address oldAdmin = tokenRewardInfo.rewardAdmins[rewardIndex];
         tokenRewardInfo.rewardAdmins[rewardIndex] = newAdmin;
 
@@ -408,7 +417,9 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
     // Withdraw ETH from the contract
     function withdrawETH(address recipient) public onlyOwner nonReentrant {
-        payable(recipient).transfer(address(this).balance);
+        require(recipient != address(0), "Invalid recipient");
+        (bool success, ) = payable(recipient).call{value: address(this).balance}("");
+        require(success, "ETH transfer failed");
     }
 
     // Withdraw ERC20 tokens from the contract

@@ -33,6 +33,16 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     address public tokenDeployer;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
     uint256 public constant BPS = 10_000;
+
+    /// @notice Fee required to mint a universe (0.05 Base ETH).
+    uint256 public constant MINT_FEE = 0.05 ether;
+
+    /// @notice Address that receives the LP half of the mint fee to deepen $LOAR liquidity.
+    address public lpRecipient;
+
+    /// @notice Per-universe credit fund balance (wei) waiting to be converted to credits by the platform.
+    mapping(uint256 => uint256) public universeCreditFund;
+
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) public enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
@@ -41,8 +51,9 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
 
     event SetTokenDeployer(address oldTokenDeployer, address newTokenDeployer);
 
-    constructor(address _teamFeeRecipient) Ownable(msg.sender) {
+    constructor(address _teamFeeRecipient, address _lpRecipient) Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
+        lpRecipient = _lpRecipient;
     }
 
     function setTokenDeployer(address _tokenDeployer) external onlyOwner {
@@ -51,6 +62,26 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         emit SetTokenDeployer(oldTokenDeployer, _tokenDeployer);
     }
 
+    /// @notice Update the address that receives the LP half of the mint fee.
+    function setLpRecipient(address _lpRecipient) external onlyOwner {
+        require(_lpRecipient != address(0), "Zero address");
+        address old = lpRecipient;
+        lpRecipient = _lpRecipient;
+        emit SetLpRecipient(old, _lpRecipient);
+    }
+
+    /// @notice Claim ETH held in the contract (credit fund portions + any accumulated ETH).
+    ///         The platform server converts credited ETH to universe credit pools off-chain.
+    function claimEth(address recipient) external onlyOwner {
+        require(recipient != address(0), "Zero address");
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No ETH to claim");
+        (bool sent,) = recipient.call{value: balance}("");
+        require(sent, "ETH claim failed");
+    }
+
+    receive() external payable {}
+
     function createUniverse(
         string memory name,
         string memory imageURL,
@@ -58,7 +89,23 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) public nonReentrant returns (uint256 _id, address) {
+    ) public payable nonReentrant returns (uint256 _id, address) {
+        if (msg.value < MINT_FEE) revert InsufficientMintFee();
+        if (lpRecipient == address(0)) revert LpRecipientNotSet();
+
+        // ── Fee split: 50 % to LP recipient, 50 % held for universe credit pool ──
+        uint256 lpAmount     = MINT_FEE / 2;           // 0.025 ETH → $LOAR LP
+        uint256 creditAmount = MINT_FEE - lpAmount;    // 0.025 ETH → universe credit pool
+
+        (bool lpSent,) = lpRecipient.call{value: lpAmount}("");
+        require(lpSent, "LP fee transfer failed");
+
+        // Refund any overpayment
+        if (msg.value > MINT_FEE) {
+            (bool refunded,) = msg.sender.call{value: msg.value - MINT_FEE}("");
+            require(refunded, "Refund failed");
+        }
+
         UniverseConfig memory config = UniverseConfig(
             nodeCreationOptions,
             nodeVisibilityOptions,
@@ -76,11 +123,16 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             IHooks(address(0)),
             ILoarLpLocker(address(0))
         );
-        universeDatas[latestId] = data;
-        //add universe created event
-        emit UniverseCreated(address(universe),msg.sender);
-        uint current_id = latestId;
+
+        uint256 current_id = latestId;
+        universeDatas[current_id] = data;
+        universeCreditFund[current_id] = creditAmount;
+
         latestId++;
+
+        emit UniverseCreated(address(universe), msg.sender);
+        emit UniverseMintFee(current_id, msg.sender, lpAmount, creditAmount);
+
         return (current_id, address(universe));
     }
 
@@ -89,7 +141,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint id
     ) public payable nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
-        require(universe.getAdmin() == msg.sender, "Not universe owner");
+        require(address(universe) != address(0), "Universe does not exist");
         if (universe.getAdmin() != msg.sender) {
           revert CallerIsNotOwner();
         }
@@ -111,6 +163,9 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
                 deploymentConfig,
                 id
             );
+
+        require(_tokenAddress != address(0), "Token deployment returned zero address");
+        require(governor != address(0), "Governor deployment returned zero address");
 
         tokenAddress = _tokenAddress;
 

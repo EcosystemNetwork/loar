@@ -1,3 +1,11 @@
+/**
+ * Flow Editor
+ *
+ * General-purpose ReactFlow canvas with custom node types (Character, PlotPoint,
+ * Media, Voting). Provides a MiniMap, controls, and grid background. Primarily
+ * used as a demo/sandbox for the narrative flow graph.
+ */
+
 import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -8,7 +16,13 @@ import ReactFlow, {
   addEdge,
   Panel,
 } from 'reactflow';
-import { type Node, type Edge, type Connection, ConnectionMode, BackgroundVariant } from 'reactflow';
+import {
+  type Node,
+  type Edge,
+  type Connection,
+  ConnectionMode,
+  BackgroundVariant,
+} from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CharacterNode, PlotPointNode, MediaNode, VotingNode } from './CustomNodes';
 
@@ -17,44 +31,44 @@ const initialNodes: Node[] = [
   {
     id: '1',
     type: 'character',
-    data: { 
-      label: 'Hero Character', 
-      emoji: '🦸', 
+    data: {
+      label: 'Hero Character',
+      emoji: '🦸',
       description: 'Main protagonist with NFT ownership',
-      nftId: 'NFT #1234'
+      nftId: 'NFT #1234',
     },
     position: { x: 250, y: 5 },
   },
   {
     id: '2',
     type: 'plotPoint',
-    data: { 
-      label: 'Origin Story', 
+    data: {
+      label: 'Origin Story',
       emoji: '📜',
       description: 'The beginning of the hero journey',
-      canonicity: 'Canon'
+      canonicity: 'Canon',
     },
     position: { x: 100, y: 100 },
   },
   {
     id: '3',
     type: 'media',
-    data: { 
-      label: 'Cinematic Scene', 
+    data: {
+      label: 'Cinematic Scene',
       emoji: '🎬',
       description: 'Key visual moment in the narrative',
-      storageType: 'Walrus Protocol'
+      storageType: 'Walrus Protocol',
     },
     position: { x: 400, y: 100 },
   },
   {
     id: '4',
     type: 'voting',
-    data: { 
-      label: 'Plot Resolution Vote', 
+    data: {
+      label: 'Plot Resolution Vote',
       emoji: '🗳️',
       description: 'Community decides the canonical ending',
-      status: 'Active'
+      status: 'Active',
     },
     position: { x: 250, y: 200 },
   },
@@ -87,23 +101,23 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
       universeAddress,
       universeId,
       hasTimelineData: !!timelineData,
-      timelineDataLength: timelineData?.length || 0
+      timelineDataLength: timelineData?.length || 0,
     });
   }, [timelineData, universeAddress, universeId]);
   // Generate initial nodes from timeline data if provided
   const generatedNodes = useMemo(() => {
     if (!timelineData || timelineData.length === 0) {
       // Add universe context to initial nodes too
-      return initialNodes.map(node => ({
+      return initialNodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
           universeAddress: universeAddress,
           universeId: universeId,
-        }
+        },
       }));
     }
-    
+
     return timelineData.map((node, index) => ({
       id: `timeline-${node.id}`,
       type: 'plotPoint',
@@ -118,35 +132,35 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
         universeAddress: universeAddress,
         universeId: universeId,
       },
-      position: { 
-        x: 100 + (index % 3) * 300, 
-        y: 100 + Math.floor(index / 3) * 150 
+      position: {
+        x: 100 + (index % 3) * 300,
+        y: 100 + Math.floor(index / 3) * 150,
       },
     }));
   }, [timelineData, universeAddress, universeId]);
-  
+
   // Generate edges based on previous node relationships
   const generatedEdges = useMemo(() => {
     if (!timelineData || timelineData.length === 0) return initialEdges;
-    
+
     const edges: Edge[] = [];
-    timelineData.forEach(node => {
+    timelineData.forEach((node) => {
       if (node.previousNode && String(node.previousNode) !== '0') {
         const previousNodeId = parseInt(String(node.previousNode));
-        const previousExists = timelineData.find(n => n.id === previousNodeId);
-        
+        const previousExists = timelineData.find((n) => n.id === previousNodeId);
+
         if (previousExists) {
           edges.push({
             id: `edge-timeline-${previousNodeId}-${node.id}`,
             source: `timeline-${previousNodeId}`,
             target: `timeline-${node.id}`,
             animated: node.isCanon,
-            style: node.isCanon ? { stroke: '#3b82f6', strokeWidth: 3 } : undefined
+            style: node.isCanon ? { stroke: '#3b82f6', strokeWidth: 3 } : undefined,
           });
         }
       }
     });
-    
+
     return edges;
   }, [timelineData]);
 
@@ -164,20 +178,20 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
     (params: Connection) => {
       // Add the edge
       setEdges((eds) => addEdge(params, eds));
-      
+
       // Update target node based on connection type
       if (params.source && params.target) {
         setNodes((nds) => {
           // Find source and target nodes
-          const sourceNode = nds.find(n => n.id === params.source);
-          const targetNode = nds.find(n => n.id === params.target);
-          
+          const sourceNode = nds.find((n) => n.id === params.source);
+          const targetNode = nds.find((n) => n.id === params.target);
+
           if (!sourceNode || !targetNode) return nds;
-          
+
           return nds.map((node) => {
             if (node.id === params.target) {
               let updatedData = { ...node.data };
-              
+
               // Handle different connection types
               if (sourceNode.type === 'character' && targetNode.type === 'plotPoint') {
                 // Character -> PlotPoint: Setup image-to-video generation
@@ -188,41 +202,49 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                   plotData: targetNode.data,
                   characterImage: sourceNode.data.characterImage,
                   characterName: sourceNode.data.characterName,
-                  selectedCharacterId: sourceNode.data.selectedCharacterId
+                  selectedCharacterId: sourceNode.data.selectedCharacterId,
                 });
-                
+
                 // Handle multiple character connections - accumulate into arrays
-                const existingCharacterImages = Array.isArray(updatedData.characterImageUrls) ? updatedData.characterImageUrls : [];
-                const existingCharacterNames = Array.isArray(updatedData.characterNames) ? updatedData.characterNames : [];
-                const existingCharacterIds = Array.isArray(updatedData.characterIds) ? updatedData.characterIds : [];
-                
+                const existingCharacterImages = Array.isArray(updatedData.characterImageUrls)
+                  ? updatedData.characterImageUrls
+                  : [];
+                const existingCharacterNames = Array.isArray(updatedData.characterNames)
+                  ? updatedData.characterNames
+                  : [];
+                const existingCharacterIds = Array.isArray(updatedData.characterIds)
+                  ? updatedData.characterIds
+                  : [];
+
                 console.log('Existing arrays before accumulation:', {
                   existingCharacterImages: existingCharacterImages,
                   existingCharacterNames: existingCharacterNames,
-                  existingCharacterIds: existingCharacterIds
+                  existingCharacterIds: existingCharacterIds,
                 });
-                
+
                 // Only add if not already present (avoid duplicates by ID)
                 const newCharacterImage = sourceNode.data.characterImage;
                 const newCharacterName = sourceNode.data.characterName;
                 const newCharacterId = sourceNode.data.selectedCharacterId;
-                
+
                 const imageExists = existingCharacterImages.includes(newCharacterImage);
                 const idExists = newCharacterId && existingCharacterIds.includes(newCharacterId);
-                
+
                 let finalCharacterImages = existingCharacterImages;
                 let finalCharacterNames = existingCharacterNames;
                 let finalCharacterIds = existingCharacterIds;
-                
+
                 if (!imageExists && !idExists && newCharacterImage) {
                   finalCharacterImages = [...existingCharacterImages, newCharacterImage];
-                  finalCharacterNames = [...existingCharacterNames, newCharacterName].filter(Boolean);
+                  finalCharacterNames = [...existingCharacterNames, newCharacterName].filter(
+                    Boolean
+                  );
                   finalCharacterIds = [...existingCharacterIds, newCharacterId].filter(Boolean);
                   console.log('Added new character to arrays');
                 } else {
                   console.log('Character already exists in arrays, skipping duplicate');
                 }
-                
+
                 updatedData = {
                   ...updatedData,
                   // Single character data (for backwards compatibility with LumaAI)
@@ -235,35 +257,35 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                   characterIds: finalCharacterIds,
                   // Mark as image-to-video instead of text-to-video
                   isImageToVideo: true,
-                  connectionType: 'character-to-plot'
+                  connectionType: 'character-to-plot',
                 };
-                
+
                 console.log('Updated plot data after connection:', {
                   characterImageUrls: updatedData.characterImageUrls,
                   characterNames: updatedData.characterNames,
                   characterIds: updatedData.characterIds,
-                  totalCharacters: updatedData.characterImageUrls?.length || 0
+                  totalCharacters: updatedData.characterImageUrls?.length || 0,
                 });
               } else if (sourceNode.type === 'plotPoint' && targetNode.type === 'plotPoint') {
                 // PlotPoint -> PlotPoint: Setup blockchain timeline connection
                 let previousNodeId = 0;
-                
+
                 // Handle timeline nodes (format: "timeline-X")
                 if (params.source && params.source.startsWith('timeline-')) {
                   previousNodeId = parseInt(params.source.replace('timeline-', ''));
                 }
-                
+
                 updatedData = {
                   ...updatedData,
                   previousNode: previousNodeId,
                   isConnectedToBlockchain: previousNodeId > 0,
-                  connectionType: 'plot-to-plot'
+                  connectionType: 'plot-to-plot',
                 };
               }
-              
+
               return {
                 ...node,
-                data: updatedData
+                data: updatedData,
               };
             }
             return node;
@@ -275,42 +297,58 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
   );
 
   // Register custom node types
-  const nodeTypes = useMemo(() => ({
-    character: CharacterNode,
-    plotPoint: PlotPointNode,
-    media: MediaNode,
-    voting: VotingNode,
-  }), []);
+  const nodeTypes = useMemo(
+    () => ({
+      character: CharacterNode as any,
+      plotPoint: PlotPointNode as any,
+      media: MediaNode as any,
+      voting: VotingNode as any,
+    }),
+    []
+  );
 
   // Add a new node to the flow
-  const addNode = useCallback((type: string) => {
-    const newNode = {
-      id: `node-${Date.now()}`,
-      type,
-      position: {
-        x: Math.random() * 500,
-        y: Math.random() * 300,
-      },
-      data: {
-        label: type === 'character' ? 'New Character' :
-               type === 'plotPoint' ? 'New Plot Point' :
-               type === 'media' ? 'New Media' : 'New Vote',
-        emoji: type === 'character' ? '👤' :
-                type === 'plotPoint' ? '📝' :
-                type === 'media' ? '🎬' : '🗳️',
-        description: 'Add description here...',
-        ...(type === 'character' && { nftId: 'Unassigned' }),
-        ...(type === 'plotPoint' && { canonicity: 'Pending' }),
-        ...(type === 'media' && { storageType: 'Walrus Protocol' }),
-        ...(type === 'voting' && { status: 'Pending' }),
-        // Add universe context for blockchain integration
-        universeAddress: universeAddress,
-        universeId: universeId,
-      },
-    };
+  const addNode = useCallback(
+    (type: string) => {
+      const newNode = {
+        id: `node-${Date.now()}`,
+        type,
+        position: {
+          x: Math.random() * 500,
+          y: Math.random() * 300,
+        },
+        data: {
+          label:
+            type === 'character'
+              ? 'New Character'
+              : type === 'plotPoint'
+                ? 'New Plot Point'
+                : type === 'media'
+                  ? 'New Media'
+                  : 'New Vote',
+          emoji:
+            type === 'character'
+              ? '👤'
+              : type === 'plotPoint'
+                ? '📝'
+                : type === 'media'
+                  ? '🎬'
+                  : '🗳️',
+          description: 'Add description here...',
+          ...(type === 'character' && { nftId: 'Unassigned' }),
+          ...(type === 'plotPoint' && { canonicity: 'Pending' }),
+          ...(type === 'media' && { storageType: 'Walrus Protocol' }),
+          ...(type === 'voting' && { status: 'Pending' }),
+          // Add universe context for blockchain integration
+          universeAddress: universeAddress,
+          universeId: universeId,
+        },
+      };
 
-    setNodes((nds) => nds.concat(newNode));
-  }, [setNodes, universeAddress, universeId]);
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [setNodes, universeAddress, universeId]
+  );
 
   return (
     <div style={{ width: '100%', height: '80vh' }}>
@@ -339,26 +377,26 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
               )}
             </p>
             <div className="flex flex-col gap-2">
-              <button 
-                onClick={() => addNode('character')} 
+              <button
+                onClick={() => addNode('character')}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
                 <span className="mr-1">👤</span> Add Character
               </button>
-              <button 
-                onClick={() => addNode('plotPoint')} 
+              <button
+                onClick={() => addNode('plotPoint')}
                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
                 <span className="mr-1">📝</span> Add Plot Point
               </button>
-              <button 
-                onClick={() => addNode('media')} 
+              <button
+                onClick={() => addNode('media')}
                 className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
                 <span className="mr-1">🎬</span> Add Media
               </button>
-              <button 
-                onClick={() => addNode('voting')} 
+              <button
+                onClick={() => addNode('voting')}
                 className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
                 <span className="mr-1">🗳️</span> Add Voting

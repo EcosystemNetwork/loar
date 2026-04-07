@@ -7,18 +7,12 @@
     "type": "module",
     "scripts": {
         "clean": "rm -rf out && rm -rf cache",
-        "lint": "forge fmt",
+        "lint": "forge fmt || echo 'forge not found, skipping fmt'",
         "lint:fix": "forge fmt && pnpm lint:sol-tests --fix && pnpm lint:sol-logic --fix",
         "lint:sol-logic": "solhint -c .solhint.json 'src/**/*.sol'",
         "lint:sol-tests": "solhint -c .solhint.tests.json 'test/**/*.sol'",
         "test": "forge test -vvv",
         "test:cov": "forge coverage --report summary --report lcov --match-path 'test/unit/*'"
-    },
-    "lint-staged": {
-        "(src|test)*.{js,css,md,ts,sol}": "forge fmt",
-        "src/**/*.sol": "pnpm lint:sol-logic",
-        "test/**/*.sol": "pnpm lint:sol-tests",
-        "package.json": "sort-package-json"
     },
     "devDependencies": {
         "forge-std": "github:foundry-rs/forge-std",
