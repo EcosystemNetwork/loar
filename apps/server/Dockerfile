@@ -18,16 +18,14 @@ RUN mkdir -p .git && pnpm install --frozen-lockfile && rm -rf .git
 COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 
-# Bundle with esbuild for node target
-# Install esbuild directly (it's a transitive dep via tsx, not exposed as a workspace bin)
-# Bundle for node — ESM with CJS require shim for packages that use require()
+# Bundle app code only — all node_modules stay external (firebase-admin needs fs paths)
+# esbuild added explicitly since it's only a transitive dep via tsx
 RUN pnpm add -w -D esbuild && pnpm exec esbuild apps/server/src/index.ts \
   --bundle \
   --platform=node \
   --format=esm \
   --outdir=apps/server/dist \
-  --external:better-sqlite3 \
-  --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+  --packages=external
 
 # Production stage
 FROM node:20-alpine AS production
@@ -43,7 +41,7 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+RUN mkdir -p .git && pnpm install --frozen-lockfile --prod && rm -rf .git
 
 # Copy built application
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
