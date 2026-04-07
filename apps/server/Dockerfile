@@ -41,8 +41,9 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-# Skip husky prepare (devDep not available in prod), but run all other scripts (native addons)
-ENV HUSKY=0
+# Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
+# This preserves all other lifecycle scripts (postinstall for native addons like keccak)
+RUN npm pkg set scripts.prepare="echo skip"
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy built application
