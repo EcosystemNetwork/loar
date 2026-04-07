@@ -19,7 +19,7 @@ COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 
 # Bundle with esbuild for node target
-RUN npx esbuild apps/server/src/index.ts \
+RUN pnpm exec esbuild apps/server/src/index.ts \
   --bundle \
   --platform=node \
   --format=esm \
