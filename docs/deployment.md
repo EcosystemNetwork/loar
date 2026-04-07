@@ -4,10 +4,11 @@
 
 The stack is split across two deployment targets by design:
 
-| Layer                | Platform           | Why                                                                                                |
-| -------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
-| **Web frontend**     | **Vercel**         | Static SPA — global CDN, automatic HTTPS, git-push deploys, `VITE_*` env vars managed in dashboard |
-| **Server + Indexer** | **Docker Compose** | Stateful persistent processes — need direct chain access, Firebase Admin, restart policies         |
+| Layer                | Platform                          | Why                                                                                                |
+| -------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Web frontend**     | **Vercel**                        | Static SPA — global CDN, automatic HTTPS, git-push deploys, `VITE_*` env vars managed in dashboard |
+| **Server + Indexer** | **Railway** or **Docker Compose** | Stateful persistent processes — need direct chain access, Firebase Admin, restart policies         |
+| **Mobile**           | **Expo (EAS)**                    | iOS + Android builds via `eas build` / `eas submit`                                                |
 
 ## Architecture
 
@@ -37,6 +38,58 @@ pnpm dev
 #   make dev-server   (port 3000)
 #   make dev-indexer  (port 42069)
 ```
+
+## Railway Deployment (Recommended)
+
+Railway auto-deploys from GitHub and manages containers, networking, and HTTPS for you.
+
+### Setup
+
+1. Create a [Railway](https://railway.com) project and connect your GitHub repo
+2. Add two services from the same repo:
+
+**Service 1: loar-server**
+
+- Root directory: `apps/server`
+- Railway reads `apps/server/railway.toml` automatically
+- Set env vars in the Railway dashboard:
+
+| Variable                   | Required | Notes                                     |
+| -------------------------- | -------- | ----------------------------------------- |
+| `PORT`                     | Yes      | `3000`                                    |
+| `NODE_ENV`                 | Yes      | `production`                              |
+| `SIWE_JWT_SECRET`          | Yes      | `openssl rand -hex 32`                    |
+| `CORS_ORIGIN`              | Yes      | `https://loar.fun`                        |
+| `FIREBASE_SERVICE_ACCOUNT` | Yes      | JSON string of service account            |
+| `RPC_URL`                  | Yes      | Base / Sepolia RPC URL                    |
+| `LOAR_TOKEN_ADDRESS`       | Yes      | Token contract address                    |
+| `TREASURY_ADDRESS`         | Yes      | Treasury wallet address                   |
+| AI keys, storage keys      | Optional | Features degrade gracefully without these |
+
+**Service 2: loar-indexer**
+
+- Root directory: `apps/indexer`
+- Railway reads `apps/indexer/railway.toml` automatically
+- Set env vars:
+
+| Variable           | Required | Notes                                 |
+| ------------------ | -------- | ------------------------------------- |
+| `PONDER_RPC_URL_2` | Yes      | Your RPC endpoint                     |
+| `PONDER_CHAIN`     | Optional | `sepolia` (default) or `base-sepolia` |
+
+### Custom Domains
+
+In Railway, add custom domains to each service:
+
+- `api.loar.fun` → server service
+- `idx.loar.fun` → indexer service
+
+Then update Vercel env vars:
+
+- `VITE_SERVER_URL` = `https://api.loar.fun`
+- `VITE_PONDER_URL` = `https://idx.loar.fun`
+
+---
 
 ## Docker Deployment (Staging & Production)
 

@@ -2,7 +2,7 @@
 import { defineConfig } from '@wagmi/cli';
 import type { Abi } from 'viem';
 import { etherscan, react, foundry } from '@wagmi/cli/plugins';
-import { mainnet, sepolia } from 'wagmi/chains';
+import { mainnet, sepolia, baseSepolia } from 'wagmi/chains';
 
 import UniverseTokenDeployer from './apps/contracts/out/UniverseTokenDeployer.sol/UniverseTokenDeployer.json';
 import UniverseManagerAbi from './apps/contracts/out/UniverseManager.sol/UniverseManager.json';

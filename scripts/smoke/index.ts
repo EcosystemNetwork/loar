@@ -14,7 +14,7 @@
  *
  * Usage:
  *   pnpm smoke                           # all layers, localhost defaults
- *   SERVER_URL=https://api.loartech.xyz pnpm smoke
+ *   SERVER_URL=https://api.loar.fun pnpm smoke
  *   SMOKE_LAYER=chain pnpm smoke         # single layer
  *   pnpm smoke --json                    # CI output
  *   SMOKE_PRIVATE_KEY=0x... SMOKE_UNIVERSE_ADDRESS=0x... pnpm smoke

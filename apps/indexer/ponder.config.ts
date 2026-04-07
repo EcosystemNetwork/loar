@@ -1,10 +1,12 @@
 /**
  * Ponder Indexer Configuration
  *
- * Configures Ponder to index LOAR protocol contracts on Sepolia testnet.
- * Uses the factory pattern to dynamically track Universe, Governor, and Token
- * contracts spawned by the UniverseManager factory. Also indexes Uniswap v4
+ * Configures Ponder to index LOAR protocol contracts on Sepolia and Base Sepolia
+ * testnets. Uses the factory pattern to dynamically track Universe, Governor, and
+ * Token contracts spawned by the UniverseManager factory. Also indexes Uniswap v4
  * PoolManager swap events for token price tracking.
+ *
+ * Set PONDER_CHAIN env var to "base-sepolia" to index Base Sepolia instead.
  */
 import './env.ts'; // validates env and loads .env files — must be first
 import { env } from './env.ts';
@@ -13,10 +15,44 @@ import { parseAbiItem } from 'viem';
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
-import { sepolia } from 'viem/chains';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { getAddress } from 'viem/utils';
-import deployment from '../../deployments/sepolia.json';
 
+// ── Chain selection ──────────────────────────────────────────────────────────
+const ponderChain = process.env.PONDER_CHAIN ?? 'sepolia';
+
+interface ChainSetup {
+  chainId: number;
+  chainName: string;
+  deploymentFile: string;
+  poolManagerAddress: `0x${string}`;
+}
+
+const CHAIN_CONFIGS: Record<string, ChainSetup> = {
+  sepolia: {
+    chainId: sepolia.id,
+    chainName: 'sepolia',
+    deploymentFile: '../../deployments/sepolia.json',
+    poolManagerAddress: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
+  },
+  'base-sepolia': {
+    chainId: baseSepolia.id,
+    chainName: 'baseSepolia',
+    deploymentFile: '../../deployments/base-sepolia.json',
+    // Base Sepolia Uniswap v4 PoolManager — update after deployment
+    poolManagerAddress: '0x0000000000000000000000000000000000000000',
+  },
+};
+
+const chainSetup = CHAIN_CONFIGS[ponderChain];
+if (!chainSetup) {
+  throw new Error(
+    `Unknown PONDER_CHAIN="${ponderChain}". Valid: ${Object.keys(CHAIN_CONFIGS).join(', ')}`
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const deployment = require(chainSetup.deploymentFile);
 const address = getAddress(deployment.contracts.UniverseManager);
 const startBlock = deployment.startBlock;
 
@@ -30,32 +66,32 @@ const tokenCreatedEvent = parseAbiItem(
 
 export default createConfig({
   chains: {
-    sepolia: {
-      id: 11155111,
+    [chainSetup.chainName]: {
+      id: chainSetup.chainId,
       rpc: env.PONDER_RPC_URL,
       maxRequestsPerSecond: 2,
     },
   },
   contracts: {
     UniverseManager: {
-      chain: 'sepolia',
+      chain: chainSetup.chainName,
       abi: universeManagerAbi,
       address: address,
       startBlock: startBlock,
     },
     Universe: {
-      chain: 'sepolia',
+      chain: chainSetup.chainName,
       abi: universeAbi,
       address: factory({
         address: address,
         event: universeCreatedEvent,
         parameter: 'universe',
-        startBlock: startBlock, // Scan for factory children from this block
+        startBlock: startBlock,
       }),
-      startBlock: startBlock, // Index child contracts from this block
+      startBlock: startBlock,
     },
     UniverseGovernor: {
-      chain: 'sepolia',
+      chain: chainSetup.chainName,
       abi: universeGovernorAbi,
       address: factory({
         address: address,
@@ -66,7 +102,7 @@ export default createConfig({
       startBlock: startBlock,
     },
     GovernanceToken: {
-      chain: 'sepolia',
+      chain: chainSetup.chainName,
       abi: ERC20Abi,
       address: factory({
         address: address,
@@ -77,9 +113,9 @@ export default createConfig({
       startBlock: startBlock,
     },
     PoolManager: {
-      chain: 'sepolia',
+      chain: chainSetup.chainName,
       abi: PoolManagerAbi,
-      address: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
+      address: chainSetup.poolManagerAddress,
       startBlock: startBlock,
     },
   },
