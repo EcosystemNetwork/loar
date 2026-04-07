@@ -20,12 +20,14 @@ COPY apps/server/tsconfig.json ./apps/server/
 
 # Bundle with esbuild for node target
 # Install esbuild directly (it's a transitive dep via tsx, not exposed as a workspace bin)
+# Bundle for node — ESM with CJS require shim for packages that use require()
 RUN pnpm add -w -D esbuild && pnpm exec esbuild apps/server/src/index.ts \
   --bundle \
   --platform=node \
   --format=esm \
   --outdir=apps/server/dist \
-  --external:better-sqlite3
+  --external:better-sqlite3 \
+  --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
 
 # Production stage
 FROM node:20-alpine AS production
