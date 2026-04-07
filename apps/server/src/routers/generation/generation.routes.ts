@@ -512,13 +512,13 @@ export const generationRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      let query = generationsCol
+      let query = generationsCol()
         .where('userId', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
         .limit(input.limit);
 
       if (input.universeId) {
-        query = generationsCol
+        query = generationsCol()
           .where('userId', '==', ctx.user.uid)
           .where('universeId', '==', input.universeId)
           .orderBy('createdAt', 'desc')
@@ -593,7 +593,7 @@ export const generationRouter = router({
       const since = new Date();
       since.setDate(since.getDate() - input.days);
 
-      const snapshot = await generationsCol
+      const snapshot = await generationsCol()
         .where('createdAt', '>=', since)
         .orderBy('createdAt', 'desc')
         .limit(1000)

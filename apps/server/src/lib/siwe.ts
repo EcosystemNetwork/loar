@@ -7,16 +7,19 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { recoverMessageAddress, getAddress } from 'viem';
 import { db, firebaseAvailable } from './firebase';
 
-const noncesCol = firebaseAvailable ? db.collection('siweNonces') : null;
+const getNoncesCol = () => (firebaseAvailable ? db.collection('siweNonces') : null);
 
 // In-memory nonce store fallback
 const memoryNonces = new Map<string, { createdAt: Date; expiresAt: Date; used: boolean }>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, val] of memoryNonces) {
-    if (now > val.expiresAt.getTime()) memoryNonces.delete(key);
-  }
-}, 5 * 60 * 1000);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [key, val] of memoryNonces) {
+      if (now > val.expiresAt.getTime()) memoryNonces.delete(key);
+    }
+  },
+  5 * 60 * 1000
+);
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.SIWE_JWT_SECRET || 'dev-secret-change-in-production'
@@ -38,8 +41,9 @@ export async function generateNonce(): Promise<string> {
   const now = new Date();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  if (noncesCol) {
-    await noncesCol.doc(nonce).set({ createdAt: now, expiresAt, used: false });
+  const col1 = getNoncesCol();
+  if (col1) {
+    await col1.doc(nonce).set({ createdAt: now, expiresAt, used: false });
   } else {
     memoryNonces.set(nonce, { createdAt: now, expiresAt, used: false });
   }
@@ -77,15 +81,16 @@ export async function verifySiweSignature(
 
   const nonce = nonceMatch[1];
 
-  if (noncesCol) {
-    const nonceDoc = await noncesCol.doc(nonce).get();
+  const col2 = getNoncesCol();
+  if (col2) {
+    const nonceDoc = await col2.doc(nonce).get();
     if (!nonceDoc.exists) throw new Error('Unknown nonce');
 
     const nonceData = nonceDoc.data()!;
     if (nonceData.used) throw new Error('Nonce already used');
     if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Nonce expired');
 
-    await noncesCol.doc(nonce).update({ used: true });
+    await col2.doc(nonce).update({ used: true });
   } else {
     const nonceData = memoryNonces.get(nonce);
     if (!nonceData) throw new Error('Unknown nonce');
@@ -109,9 +114,7 @@ export async function issueSessionToken(address: string): Promise<string> {
 }
 
 /** Verify a SIWE session JWT. Returns the payload or null if invalid/expired. */
-export async function verifySessionToken(
-  token: string
-): Promise<SiweSessionPayload | null> {
+export async function verifySessionToken(token: string): Promise<SiweSessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,

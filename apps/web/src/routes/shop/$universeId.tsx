@@ -38,7 +38,7 @@ export const Route = createFileRoute('/shop/$universeId')({
 
 function UniverseShopPage() {
   const { universeId } = useParams({ from: '/shop/$universeId' });
-  const { user } = useWalletAuth();
+  const { address } = useWalletAuth();
 
   const { data: storefront, isLoading } = useUniverseStorefront(universeId);
   const { data: subTiers } = useSubscriptionTiers(universeId);
@@ -192,7 +192,7 @@ function UniverseShopPage() {
                     {votingSubmissions.length !== 1 ? 's' : ''} need your vote
                   </p>
                 )}
-                <Link to="/canon/$universeId" params={{ universeId }}>
+                <Link to="/shop/$universeId" params={{ universeId }}>
                   <Button className="gap-2">
                     <Gavel className="w-4 h-4" />
                     Open Canon Marketplace

@@ -435,7 +435,7 @@ export const questsRouter = router({
     .input(z.object({ referralCode: z.string() }))
     .mutation(async ({ input, ctx }) => {
       // Find the referrer
-      const referrerSnap = await affiliatesCol
+      const referrerSnap = await affiliatesCol()
         .where('code', '==', input.referralCode)
         .limit(1)
         .get();
@@ -454,7 +454,7 @@ export const questsRouter = router({
       }
 
       // Check if this user was already referred
-      const existingReferral = await affiliateRewardsCol
+      const existingReferral = await affiliateRewardsCol()
         .where('referredUserId', '==', ctx.user.uid)
         .limit(1)
         .get();
@@ -704,7 +704,7 @@ export const questsRouter = router({
   affiliateLeaderboard: publicProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
-      const snapshot = await affiliatesCol
+      const snapshot = await affiliatesCol()
         .orderBy('totalReferrals', 'desc')
         .limit(input.limit)
         .get();

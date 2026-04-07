@@ -1,6 +1,5 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { universeGovernorAbi } from '@loar/abis/generated';
-import { sepolia } from 'viem/chains';
 import { encodeAbiParameters } from 'viem';
 import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';
 
@@ -12,6 +11,7 @@ import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';
  * const { propose, castVote, execute, ... } = useUniverseGovernor(governorAddress);
  */
 export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -37,7 +37,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       abi: universeGovernorAbi,
       functionName: 'propose',
       args: [params.targets, params.values, params.calldatas, params.description],
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -56,7 +56,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       abi: universeGovernorAbi,
       functionName: 'castVote',
       args: [params.proposalId, params.support],
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -80,7 +80,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       abi: universeGovernorAbi,
       functionName: 'castVoteWithReason',
       args: [params.proposalId, params.support, params.reason],
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -106,7 +106,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       abi: universeGovernorAbi,
       functionName: 'execute',
       args: [params.targets, params.values, params.calldatas, params.descriptionHash],
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -123,7 +123,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       query: {
         enabled: !!governorAddress && proposalId !== undefined,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -139,7 +139,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       query: {
         enabled: !!governorAddress && !!account && blockNumber !== undefined,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -155,7 +155,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       query: {
         enabled: !!governorAddress && proposalId !== undefined && !!account,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -171,7 +171,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       query: {
         enabled: !!governorAddress && proposalId !== undefined,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -186,7 +186,7 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
       query: {
         enabled: !!governorAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 

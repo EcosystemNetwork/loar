@@ -62,8 +62,8 @@ import { threedRouter } from './generation/threed.routes';
 import { studioRouter } from './studio/studio.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
-const walletLoginsCol = firebaseAvailable ? db.collection('walletLogins') : null;
-const usersCol = firebaseAvailable ? db.collection('users') : null;
+const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
+const getUsersCol = () => (firebaseAvailable ? db.collection('users') : null);
 
 // ── Root router ─────────────────────────────────────────────────────────
 export const appRouter = router({
@@ -84,6 +84,8 @@ export const appRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      const walletLoginsCol = getWalletLoginsCol();
+      const usersCol = getUsersCol();
       if (!walletLoginsCol || !usersCol) {
         return { ok: true };
       }

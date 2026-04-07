@@ -2,11 +2,15 @@
  * Filecoin Synapse service — uploads and downloads files to/from the Filecoin network
  * via the Synapse SDK (Calibration testnet). Includes a circuit breaker (3 failures / 60s)
  * and per-PieceCID failure tracking for download resilience.
+ *
+ * The @filoz/synapse-sdk dependency is optional — if not installed, the service
+ * will be unavailable and getSynapseService() will throw a descriptive error.
  */
-import { Synapse, RPC_URLS } from '@filoz/synapse-sdk';
 import { promises as fs } from 'fs';
-import { Readable } from 'stream';
-import type { PieceCID } from '@filoz/synapse-sdk';
+
+// Dynamic import types — resolved at runtime only if SDK is installed
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SynapseSdk = { Synapse: any; RPC_URLS: any };
 
 export class SynapseService {
   private static instance: SynapseService | null = null;
@@ -14,7 +18,8 @@ export class SynapseService {
   private consecutiveFailures = 0;
   private lastFailureTime = 0;
 
-  private constructor(private synapse: Synapse) {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private constructor(private synapse: any) {}
 
   static async getInstance(): Promise<SynapseService> {
     if (!this.instance) {
@@ -23,9 +28,20 @@ export class SynapseService {
           'PRIVATE_KEY environment variable is required for Filecoin/Synapse operations'
         );
       }
-      const synapse = await Synapse.create({
+
+      let sdk: SynapseSdk;
+      try {
+        // @ts-expect-error — optional dependency, may not be installed
+        sdk = await import('@filoz/synapse-sdk');
+      } catch {
+        throw new Error(
+          '@filoz/synapse-sdk is not installed. Install it with: pnpm add @filoz/synapse-sdk'
+        );
+      }
+
+      const synapse = await sdk.Synapse.create({
         privateKey: `0x${process.env.PRIVATE_KEY}`,
-        rpcURL: RPC_URLS.calibration.http,
+        rpcURL: sdk.RPC_URLS.calibration.http,
       });
       this.instance = new SynapseService(synapse);
     }
@@ -136,11 +152,11 @@ export class SynapseService {
         // Attempt download
         this.synapse.storage
           .download(pieceCid)
-          .then((data) => {
+          .then((data: Uint8Array) => {
             clearTimeout(timeoutId);
             resolve(data);
           })
-          .catch((error) => {
+          .catch((error: Error) => {
             clearTimeout(timeoutId);
             reject(error);
           });
@@ -192,9 +208,7 @@ export class SynapseService {
     }
   }
 }
-if (!process.env.PRIVATE_KEY) {
-  console.warn('PRIVATE_KEY not set — Filecoin/Synapse storage will be unavailable');
-}
+// Note: PRIVATE_KEY check is deferred to getInstance() — env may not be loaded at import time
 
 export function getSynapseService(): Promise<SynapseService> {
   return SynapseService.getInstance();

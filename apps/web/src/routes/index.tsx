@@ -31,6 +31,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import {
   ponderGql,
+  ponderQueryDefaults,
   type Universe,
   type Token,
   type Node,
@@ -38,6 +39,7 @@ import {
   type Swap,
   type TokenHolder,
 } from '@/utils/ponder-api';
+import { trpc, trpcClient } from '@/utils/trpc';
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 
 export const Route = createFileRoute('/')({
@@ -500,6 +502,7 @@ function ActivityTicker() {
           items { id universeAddress nodeId previousNodeId creator createdAt }
         }
       }`).then((d) => d.nodes.items),
+    ...ponderQueryDefaults,
   });
 
   const { data: nodeContentData } = useQuery({
@@ -510,6 +513,7 @@ function ActivityTicker() {
           items { id videoLink plot }
         }
       }`).then((d) => d.nodeContents.items),
+    ...ponderQueryDefaults,
   });
 
   const { data: universesData } = useQuery({
@@ -520,6 +524,7 @@ function ActivityTicker() {
           items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
         }
       }`).then((d) => d.universes.items),
+    ...ponderQueryDefaults,
   });
 
   const activities = useMemo(() => {
@@ -595,6 +600,7 @@ function RecentEpisodes({ universes }: { universes: any[] }) {
           items { id universeAddress nodeId previousNodeId creator createdAt }
         }
       }`).then((d) => d.nodes.items),
+    ...ponderQueryDefaults,
   });
 
   const { data: nodeContentData } = useQuery({
@@ -605,6 +611,7 @@ function RecentEpisodes({ universes }: { universes: any[] }) {
           items { id videoLink plot }
         }
       }`).then((d) => d.nodeContents.items),
+    ...ponderQueryDefaults,
   });
 
   const episodes = useMemo(() => {
@@ -856,6 +863,115 @@ function MostEpisodesRow({ universes }: { universes: any[] }) {
 }
 
 /* ──────────────────────────────────────────
+ * Community Creations — published off-chain content
+ * ────────────────────────────────────────── */
+function CommunityCreations() {
+  const { data } = useQuery({
+    queryKey: ['content', 'feed', 'landing'],
+    queryFn: () => trpcClient.content.feed.query({ limit: 20 }),
+    staleTime: 60_000,
+  });
+
+  const items = data?.items;
+  if (!items?.length) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader
+        icon={Sparkles}
+        title="Community Creations"
+        subtitle="Published by creators"
+        action={
+          <Link to="/discover">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-white"
+            >
+              See All
+            </Button>
+          </Link>
+        }
+      />
+      <ScrollRow>
+        {items.map((item: any) => (
+          <ContentCard key={item.id} item={item} />
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+function ContentCard({ item }: { item: any }) {
+  const isVideo = item.mediaType === 'ai-video' || item.mediaType === 'video';
+
+  return (
+    <Link to="/discover" className="group flex-shrink-0 w-[180px] md:w-[200px]">
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
+        {item.thumbnailUrl || item.mediaUrl ? (
+          isVideo && item.mediaUrl ? (
+            <video
+              src={item.mediaUrl}
+              poster={item.thumbnailUrl || undefined}
+              className="w-full h-full object-cover"
+              muted
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={item.thumbnailUrl || item.mediaUrl}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          )
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+
+        {/* Hover play for videos */}
+        {isVideo && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+              <Play className="h-5 w-5 text-white fill-white ml-0.5" />
+            </div>
+          </div>
+        )}
+
+        {/* Bottom badges */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <div className="flex gap-1.5 mb-1 flex-wrap">
+            <span className="text-[10px] font-semibold bg-primary/90 text-white px-1.5 py-0.5 rounded capitalize">
+              {item.mediaType?.replace('-', ' ') || 'Content'}
+            </span>
+            {item.classification === 'original' && (
+              <span className="text-[10px] font-semibold bg-green-500/90 text-white px-1.5 py-0.5 rounded">
+                Original
+              </span>
+            )}
+            {(item.views ?? 0) > 0 && (
+              <span className="text-[10px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded">
+                <Eye className="inline h-2.5 w-2.5 mr-0.5" />
+                {item.views}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h3 className="font-semibold text-sm text-white truncate group-hover:text-primary transition-colors px-0.5">
+        {item.title}
+      </h3>
+      <p className="text-xs text-muted-foreground truncate px-0.5">
+        {item.description || 'Community creation'}
+      </p>
+    </Link>
+  );
+}
+
+/* ──────────────────────────────────────────
  * CTA Banner
  * ────────────────────────────────────────── */
 function CreateBanner() {
@@ -1069,12 +1185,15 @@ function HomeComponent() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // ─── Data Queries ───
-  const {
-    data: universesData,
-    isLoading: universesLoading,
-    isError: universesError,
-  } = useQuery({
+  // ─── Primary: Firestore universes (always available) ───
+  const { data: firestoreUniverses, isLoading: universesLoading } = useQuery({
+    queryKey: ['universes', 'all'],
+    queryFn: () => trpcClient.universes.getAll.query().then((r) => r.data as any[]),
+    staleTime: 30_000,
+  });
+
+  // ─── Optional: Ponder blockchain enrichment (silent fail) ───
+  const { data: ponderUniverses } = useQuery({
     queryKey: ['ponder', 'universes', 'top-50'],
     queryFn: () =>
       ponderGql<{ universes: { items: Universe[] } }>(`{
@@ -1082,7 +1201,7 @@ function HomeComponent() {
           items { id universeId creator createdAt name description imageURL tokenAddress governorAddress nodeCount }
         }
       }`).then((d) => d.universes.items),
-    retry: 1,
+    ...ponderQueryDefaults,
   });
 
   const { data: tokensData } = useQuery({
@@ -1093,7 +1212,7 @@ function HomeComponent() {
           items { id universeAddress deployer tokenAdmin name symbol imageURL metadata context startingTick poolHook poolId pairedToken locker createdAt }
         }
       }`).then((d) => d.tokens.items),
-    retry: 1,
+    ...ponderQueryDefaults,
   });
 
   const { data: swapsData } = useQuery({
@@ -1104,7 +1223,7 @@ function HomeComponent() {
           items { id poolId sender amount0 amount1 sqrtPriceX96 liquidity tick timestamp blockNumber }
         }
       }`).then((d) => d.swaps.items),
-    retry: 1,
+    ...ponderQueryDefaults,
   });
 
   const { data: holdersData } = useQuery({
@@ -1115,12 +1234,31 @@ function HomeComponent() {
           items { id tokenAddress holderAddress balance }
         }
       }`).then((d) => d.tokenHolders.items),
-    retry: 1,
+    ...ponderQueryDefaults,
   });
 
-  // ─── Combine real on-chain data (no fallback to fake data) ───
+  const ponderOnline = !!ponderUniverses;
+
+  // ─── Merge: Firestore base + optional Ponder enrichment ───
   const universes = useMemo(() => {
-    if (!universesData) return [];
+    // Normalize Firestore docs into the shape UI cards expect
+    const base = (firestoreUniverses || []).map((u: any) => ({
+      id: u.id,
+      name: u.name || u.description?.slice(0, 40) || '',
+      description: u.description || '',
+      imageURL: u.image_url || u.imageURL || '',
+      creator: u.creator || '',
+      tokenAddress: u.tokenAddress || null,
+      governorAddress: u.governanceAddress || null,
+      nodeCount: 0,
+      createdAt: u.created_at?._seconds || 0,
+    }));
+
+    // Build lookup from Ponder data
+    const ponderMap = new Map<string, Universe>();
+    if (ponderUniverses) {
+      ponderUniverses.forEach((u) => ponderMap.set(u.id.toLowerCase(), u));
+    }
 
     const tokenMap = new Map<string, Token>();
     if (tokensData) {
@@ -1147,14 +1285,42 @@ function HomeComponent() {
       });
     }
 
-    return universesData.map((u) => {
+    // Enrich base with Ponder data where available
+    const enriched = base.map((u: any) => {
+      const ponder = ponderMap.get(u.id.toLowerCase());
       const tokenData = tokenMap.get(u.id.toLowerCase());
       const poolId = tokenData?.poolId;
       const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
       const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
-      return { ...u, tokenData, swapVolume, holderCount };
+      return {
+        ...u,
+        // Override with Ponder fields when available
+        name: ponder?.name || u.name,
+        description: ponder?.description || u.description,
+        imageURL: ponder?.imageURL || u.imageURL,
+        nodeCount: ponder?.nodeCount || u.nodeCount,
+        tokenData,
+        swapVolume,
+        holderCount,
+      };
     });
-  }, [universesData, tokensData, swapsData, holdersData]);
+
+    // Add any Ponder-only universes not in Firestore
+    if (ponderUniverses) {
+      const baseIds = new Set(base.map((u: any) => u.id.toLowerCase()));
+      ponderUniverses.forEach((pu) => {
+        if (!baseIds.has(pu.id.toLowerCase())) {
+          const tokenData = tokenMap.get(pu.id.toLowerCase());
+          const poolId = tokenData?.poolId;
+          const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
+          const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
+          enriched.push({ ...pu, tokenData, swapVolume, holderCount });
+        }
+      });
+    }
+
+    return enriched;
+  }, [firestoreUniverses, ponderUniverses, tokensData, swapsData, holdersData]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -1166,8 +1332,7 @@ function HomeComponent() {
         }
       `}</style>
 
-      {universesError && <IndexerBanner />}
-      <ActivityTicker />
+      {ponderOnline && <ActivityTicker />}
 
       {/* Floating search button */}
       <button
@@ -1199,9 +1364,10 @@ function HomeComponent() {
         <div className="-mt-16 relative z-10 pb-20 space-y-2">
           <Top10Strip universes={universes} />
           <TrendingRow universes={universes} />
-          <RecentEpisodes universes={universes} />
+          {ponderOnline && <RecentEpisodes universes={universes} />}
           <NewArrivalsRow universes={universes} />
           <MostEpisodesRow universes={universes} />
+          <CommunityCreations />
           <TokenPoweredRow universes={universes} />
           <CreateBanner />
         </div>

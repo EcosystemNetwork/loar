@@ -122,7 +122,7 @@ export const licensingRouter = router({
   getLicenses: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await licensesCol
+      const snapshot = await licensesCol()
         .where('universeId', '==', input.universeId)
         .orderBy('createdAt', 'desc')
         .get();
@@ -201,7 +201,7 @@ export const licensingRouter = router({
     }),
 
   getMerch: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
-    const snapshot = await merchCol
+    const snapshot = await merchCol()
       .where('universeId', '==', input.universeId)
       .where('active', '==', true)
       .orderBy('createdAt', 'desc')
@@ -213,7 +213,7 @@ export const licensingRouter = router({
   getOrders: protectedProcedure
     .input(z.object({ limit: z.number().default(20) }))
     .query(async ({ input, ctx }) => {
-      const snapshot = await merchOrdersCol
+      const snapshot = await merchOrdersCol()
         .where('buyerUid', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
         .limit(input.limit)
@@ -223,7 +223,7 @@ export const licensingRouter = router({
     }),
 
   myMerch: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await merchCol
+    const snapshot = await merchCol()
       .where('creatorUid', '==', ctx.user.uid)
       .orderBy('createdAt', 'desc')
       .get();

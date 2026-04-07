@@ -144,7 +144,9 @@ function MarketPage() {
             </SelectTrigger>
             <SelectContent>
               {Object.entries(RIGHTS_LABELS).map(([v, l]) => (
-                <SelectItem key={v} value={v}>{l}</SelectItem>
+                <SelectItem key={v} value={v}>
+                  {l}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -162,7 +164,7 @@ function MarketPage() {
         </div>
 
         {/* Trending universes */}
-        {!search && productType === 'ALL' && (trending?.universes?.length ?? 0) > 0 && (
+        {!search && productType === 'ALL' && ((trending as any)?.universes?.length ?? 0) > 0 && (
           <section className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold flex items-center gap-1.5">
@@ -171,12 +173,16 @@ function MarketPage() {
               </h2>
             </div>
             <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-4 px-4">
-              {(trending?.universes ?? []).slice(0, 6).map((u: any) => (
+              {((trending as any)?.universes ?? []).slice(0, 6).map((u: any) => (
                 <Link key={u.id} to="/shop/$universeId" params={{ universeId: u.id }}>
                   <div className="shrink-0 w-28">
                     <div className="w-28 h-28 rounded-xl bg-muted flex items-center justify-center overflow-hidden mb-1.5">
                       {u.thumbnailUrl ? (
-                        <img src={u.thumbnailUrl} alt={u.name} className="w-full h-full object-cover" />
+                        <img
+                          src={u.thumbnailUrl}
+                          alt={u.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <Store className="w-8 h-8 text-muted-foreground" />
                       )}
@@ -244,10 +250,7 @@ function ListingCard({ listing }: { listing: any }) {
           ) : (
             <div className="text-muted-foreground opacity-30">{typeInfo.icon}</div>
           )}
-          <Badge
-            variant="secondary"
-            className="absolute top-1.5 left-1.5 text-xs px-1.5 py-0.5"
-          >
+          <Badge variant="secondary" className="absolute top-1.5 left-1.5 text-xs px-1.5 py-0.5">
             {typeInfo.label}
           </Badge>
         </div>

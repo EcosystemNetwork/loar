@@ -1,7 +1,6 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager } from '@loar/abis/addresses';
-import { sepolia } from 'viem/chains';
 
 /**
  * Hook for interacting with the UniverseManager contract (launchpad)
@@ -11,10 +10,11 @@ import { sepolia } from 'viem/chains';
  * 2. deployUniverseToken() - deploys token, governor, and sets up liquidity pool
  */
 export function useUniverseManager() {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const contractAddress = UniverseManager[String(sepolia.id) as keyof typeof UniverseManager];
+  const contractAddress = UniverseManager[String(chainId) as keyof typeof UniverseManager];
 
   /**
    * Step 1: Create a new Universe contract
@@ -41,7 +41,7 @@ export function useUniverseManager() {
         config.nodeVisibilityOptions,
         config.initialOwner,
       ],
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -97,7 +97,7 @@ export function useUniverseManager() {
         universeId,
       ],
       value,
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -114,7 +114,7 @@ export function useUniverseManager() {
       query: {
         enabled: universeId !== undefined,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -135,8 +135,6 @@ export function useUniverseManager() {
  * Uses the deployed hook, locker, and paired token addresses from packages/abis/addresses
  */
 export function useDefaultDeploymentConfig() {
-  // These should match your deployed contracts on Sepolia
-  // Update these based on packages/abis/src/addresses.ts
   return {
     defaultHook: '0xc3afc04510600b9b69d5cbbe404b6713f3f7a8cc' as `0x${string}`, // LoarHookStaticFee
     defaultLocker: '0x7a8c6162bd525a1011852f3540d3dcfdd776335a' as `0x${string}`, // LoarLpLockerMultiple

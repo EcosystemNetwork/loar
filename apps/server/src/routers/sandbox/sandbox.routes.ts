@@ -93,7 +93,7 @@ export const sandboxRouter = router({
 
   // Get all drafts for the current user
   myDrafts: protectedProcedure.query(async ({ ctx }) => {
-    const snap = await sandboxCol
+    const snap = await sandboxCol()
       .where('creatorAddress', '==', ctx.user.address)
       .orderBy('createdAt', 'desc')
       .limit(100)

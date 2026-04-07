@@ -54,6 +54,16 @@ export const SECONDARY_KINDS: EntityKind[] = ['reality', 'dimension', 'plane', '
 
 /** Display labels for each entity kind. */
 export const ENTITY_LABELS: Record<EntityKind, string> = {
+  person: 'Person',
+  place: 'Place',
+  thing: 'Thing',
+  faction: 'Faction',
+  event: 'Event',
+  lore: 'Lore',
+  species: 'Species',
+  vehicle: 'Vehicle',
+  technology: 'Technology',
+  organization: 'Organization',
   timeline: 'Timeline',
   reality: 'Reality',
   dimension: 'Dimension',
@@ -64,6 +74,16 @@ export const ENTITY_LABELS: Record<EntityKind, string> = {
 
 /** Action labels for creating each entity kind. */
 export const ENTITY_ACTIONS: Record<EntityKind, string> = {
+  person: 'Create Person',
+  place: 'Create Place',
+  thing: 'Create Thing',
+  faction: 'Create Faction',
+  event: 'Create Event',
+  lore: 'Add Lore',
+  species: 'Create Species',
+  vehicle: 'Create Vehicle',
+  technology: 'Create Technology',
+  organization: 'Create Organization',
   timeline: 'Add Timeline',
   reality: 'Create Alternate Reality',
   dimension: 'Open New Dimension',

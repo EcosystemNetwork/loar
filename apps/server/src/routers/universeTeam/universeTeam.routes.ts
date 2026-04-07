@@ -126,7 +126,7 @@ export const universeTeamRouter = router({
   getMembers: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await teamCol
+      const snapshot = await teamCol()
         .where('universeId', '==', input.universeId.toLowerCase())
         .where('status', '==', 'active')
         .get();
@@ -140,7 +140,7 @@ export const universeTeamRouter = router({
   // ── Get universes where the caller is a team member ───────────────
 
   getMyUniverses: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await teamCol
+    const snapshot = await teamCol()
       .where('memberUid', '==', ctx.user.uid.toLowerCase())
       .where('status', '==', 'active')
       .get();

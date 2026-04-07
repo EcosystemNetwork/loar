@@ -1,6 +1,5 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { universeAbi } from '@loar/abis/generated';
-import { sepolia } from 'viem/chains';
 import { keccak256, toBytes } from 'viem';
 
 /**
@@ -11,6 +10,7 @@ import { keccak256, toBytes } from 'viem';
  * const { createNode, ... } = useUniverse(universeAddress);
  */
 export function useUniverse(universeAddress: `0x${string}` | undefined) {
+  const chainId = useChainId();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -34,7 +34,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       abi: universeAbi,
       functionName: 'createNode',
       args: [contentHash, plotHash, params.previousNodeId, params.link, params.plot],
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -49,7 +49,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -64,7 +64,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -79,7 +79,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -94,7 +94,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -109,7 +109,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 
@@ -124,7 +124,7 @@ export function useUniverse(universeAddress: `0x${string}` | undefined) {
       query: {
         enabled: !!universeAddress,
       },
-      chainId: sepolia.id,
+      chainId,
     });
   };
 

@@ -202,33 +202,40 @@ function AffiliateSection() {
             Top Referrers
           </div>
           <div className="space-y-1">
-            {leaderboard.map((entry) => (
-              <div
-                key={entry.rank}
-                className="flex items-center justify-between bg-zinc-900/50 rounded px-2 py-1 text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-5 text-center font-bold ${
-                      entry.rank === 1
-                        ? 'text-amber-400'
-                        : entry.rank === 2
-                          ? 'text-zinc-300'
-                          : entry.rank === 3
-                            ? 'text-orange-400'
-                            : 'text-zinc-500'
-                    }`}
-                  >
-                    #{entry.rank}
-                  </span>
-                  <span className="text-zinc-300 font-mono">{entry.userId}</span>
+            {leaderboard.map(
+              (entry: {
+                rank: number;
+                userId: string;
+                totalReferrals: number;
+                totalEarned: number;
+              }) => (
+                <div
+                  key={entry.rank}
+                  className="flex items-center justify-between bg-zinc-900/50 rounded px-2 py-1 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-5 text-center font-bold ${
+                        entry.rank === 1
+                          ? 'text-amber-400'
+                          : entry.rank === 2
+                            ? 'text-zinc-300'
+                            : entry.rank === 3
+                              ? 'text-orange-400'
+                              : 'text-zinc-500'
+                      }`}
+                    >
+                      #{entry.rank}
+                    </span>
+                    <span className="text-zinc-300 font-mono">{entry.userId}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-zinc-400">{entry.totalReferrals} refs</span>
+                    <span className="text-amber-400 font-bold">{entry.totalEarned} $LOAR</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-zinc-400">{entry.totalReferrals} refs</span>
-                  <span className="text-amber-400 font-bold">{entry.totalEarned} $LOAR</span>
-                </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         </div>
       )}

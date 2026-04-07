@@ -199,7 +199,7 @@ function DiscoverPage() {
 
 function VideosTabContent({ search }: { search: string }) {
   const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     clearTimeout(timerRef.current);
@@ -394,7 +394,7 @@ function MobileShortsGallery({ items }: { items: any[] }) {
           }
         });
       },
-      { root: container, threshold: 0.6 },
+      { root: container, threshold: 0.6 }
     );
     cards.forEach((c) => observer.observe(c));
     return () => observer.disconnect();
@@ -484,7 +484,9 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
 
         {/* Bottom gradient + info */}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-3 pt-10">
-          <p className="text-white text-sm font-semibold line-clamp-2 leading-tight">{item.title}</p>
+          <p className="text-white text-sm font-semibold line-clamp-2 leading-tight">
+            {item.title}
+          </p>
           <p className="text-white/60 text-xs mt-0.5">{item.views ?? 0} views</p>
         </div>
 
@@ -528,7 +530,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
     (dir: 1 | -1) => {
       setIndex((i) => Math.max(0, Math.min(items.length - 1, i + dir)));
     },
-    [items.length],
+    [items.length]
   );
 
   // Restart video on index change
@@ -562,7 +564,8 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
       </button>
 
       {/* Player */}
-      <div className="relative rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/30"
+      <div
+        className="relative rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/30"
         style={{ width: 360, aspectRatio: '9/16' }}
       >
         {isVideo && item.mediaUrl ? (

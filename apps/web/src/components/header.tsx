@@ -17,14 +17,15 @@ export default function Header() {
   const matchRoute = useMatchRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const links = [
-    { to: '/dashboard' as const, label: 'Dashboard' },
-    { to: '/discover' as const, label: 'Discover' },
-    { to: '/create' as const, label: 'Create' },
-    { to: '/wiki' as const, label: 'Wiki' },
-    { to: '/market' as const, label: 'Slop Market' },
-    { to: '/credits' as const, label: 'Credits' },
-    { to: '/docs' as const, label: 'Docs' },
+  const links: Array<{ to: string; label: string }> = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/discover', label: 'Discover' },
+    { to: '/create', label: 'Create' },
+    { to: '/wiki', label: 'Wiki' },
+    { to: '/market', label: 'Slop Market' },
+    { to: '/credits', label: 'Credits' },
+    { to: '/sandbox', label: 'Sandbox' },
+    { to: '/docs', label: 'Docs' },
   ];
 
   return (

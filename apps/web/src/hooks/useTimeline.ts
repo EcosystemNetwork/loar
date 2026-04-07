@@ -6,9 +6,8 @@
  * All read hooks resolve the contract address from the current chain ID.
  */
 
-import { useReadContract, useWriteContract } from 'wagmi';
+import { useReadContract, useWriteContract, useChainId } from 'wagmi';
 import { universeAbi } from '@loar/abis/generated';
-import { useChainId } from 'wagmi';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';
 
@@ -134,10 +133,11 @@ export function useSetCanon() {
 
 /**
  * Returns a function to create a new narrative node on-chain.
- * Hardcoded to Sepolia (chainId 11155111).
+ * Uses the currently connected chain.
  * @returns Object with `writeAsync(contentHash, plotHash, previous, link, plot)`
  */
 export function useCreateNode() {
+  const chainId = useChainId();
   const contract = useWriteContract();
 
   const writeAsync = (
@@ -149,10 +149,10 @@ export function useCreateNode() {
   ) =>
     contract.writeContractAsync({
       abi: universeAbi,
-      address: TIMELINE_ADDRESSES[11155111],
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
       functionName: 'createNode',
       args: [contentHash, plotHash, BigInt(previous), link, plot],
-      chainId: 11155111,
+      chainId,
     });
 
   return { writeAsync };

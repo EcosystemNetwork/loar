@@ -37,6 +37,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { parseEther } from 'viem';
+import {
+  isSupportedChain,
+  getExplorerAddressUrl,
+  CHAIN_NAMES,
+  SUPPORTED_CHAIN_IDS,
+} from '@/configs/chains';
 
 export const Route = createFileRoute('/cinematicUniverseCreate')({
   component: CinematicUniverseCreate,
@@ -85,7 +91,7 @@ function CinematicUniverseCreate() {
 
   const handleSwitchNetwork = async () => {
     try {
-      await switchChain({ chainId: 11155111 });
+      await switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
     } catch (error) {
       console.error('Failed to switch network:', error);
     }
@@ -155,8 +161,8 @@ function CinematicUniverseCreate() {
       return;
     }
 
-    if (chainId !== 11155111) {
-      alert('Wrong Network! Please switch to Sepolia Testnet (Chain ID: 11155111)');
+    if (!isSupportedChain(chainId)) {
+      alert('Wrong Network! Please switch to Sepolia or Base Sepolia.');
       return;
     }
 
@@ -258,22 +264,22 @@ function CinematicUniverseCreate() {
   }
 
   // Wrong network state
-  if (chainId !== 11155111) {
+  if (!isSupportedChain(chainId)) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-700 rounded-lg shadow-2xl">
           <p className="text-yellow-100 font-medium">
-            ⚠️ Wrong Network! Please switch to Sepolia Testnet.
+            Wrong Network! Please switch to Sepolia or Base Sepolia.
           </p>
         </div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
             <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-600" />
             <h2 className="text-2xl font-bold">Wrong Network</h2>
-            <p className="text-muted-foreground">Please switch to Sepolia Testnet</p>
+            <p className="text-muted-foreground">Please switch to Sepolia or Base Sepolia</p>
             <Button size="lg" onClick={handleSwitchNetwork}>
               <Rocket className="h-5 w-5 mr-2" />
-              Switch to Sepolia
+              Switch Network
             </Button>
           </CardContent>
         </Card>
@@ -290,7 +296,9 @@ function CinematicUniverseCreate() {
             <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
             <h2 className="text-3xl font-bold">Universe Launched! 🚀</h2>
             <p className="text-muted-foreground text-lg">
-              Your universe is now deployed on Sepolia with governance token and liquidity pool
+              Your universe is now deployed on{' '}
+              {CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES] ?? 'testnet'} with governance token
+              and liquidity pool
             </p>
 
             <div className="space-y-3">
@@ -305,7 +313,7 @@ function CinematicUniverseCreate() {
                     </code>
                   </div>
                   <a
-                    href={`https://sepolia.etherscan.io/address/${universeAddress}`}
+                    href={getExplorerAddressUrl(chainId, universeAddress)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline text-sm flex items-center gap-1"
@@ -325,7 +333,7 @@ function CinematicUniverseCreate() {
                     </code>
                   </div>
                   <a
-                    href={`https://sepolia.etherscan.io/address/${tokenAddress}`}
+                    href={getExplorerAddressUrl(chainId, tokenAddress)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline text-sm flex items-center gap-1"

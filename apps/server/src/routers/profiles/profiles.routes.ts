@@ -62,7 +62,7 @@ export const profilesRouter = router({
   getByUsername: publicProcedure
     .input(z.object({ username: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await profilesCol
+      const snapshot = await profilesCol()
         .where('username', '==', input.username.toLowerCase())
         .limit(1)
         .get();
@@ -153,7 +153,7 @@ export const profilesRouter = router({
   checkUsername: publicProcedure
     .input(z.object({ username: z.string().min(3).max(30) }))
     .query(async ({ input }) => {
-      const snapshot = await profilesCol
+      const snapshot = await profilesCol()
         .where('username', '==', input.username.toLowerCase())
         .limit(1)
         .get();
@@ -171,7 +171,7 @@ export const profilesRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = profilesCol
+      let query = profilesCol()
         .where('visibility', '==', 'public')
         .orderBy('createdAt', 'desc')
         .limit(input.limit + 1);

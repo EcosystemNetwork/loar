@@ -8,17 +8,27 @@
 
 const PONDER_URL = import.meta.env.VITE_PONDER_URL || 'http://localhost:42069';
 
+/** Circuit breaker: skip requests when indexer is known offline. */
+let _offlineUntil = 0;
+const OFFLINE_COOLDOWN_MS = 30_000; // back off 30s after a connection failure
+
 /**
  * Executes a GraphQL query against the Ponder indexer.
- * @param query - GraphQL query string
- * @param variables - Optional query variables
- * @returns The `data` field from the GraphQL response, typed as `T`
- * @throws On HTTP errors or GraphQL-level errors
+ * Includes a circuit breaker — if the indexer is unreachable, further
+ * requests are short-circuited for 30 seconds to avoid console spam.
  */
 export async function ponderGql<T = any>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
+  if (Date.now() < _offlineUntil) {
+    const err = new Error('Blockchain indexer offline (circuit breaker)') as Error & {
+      code: string;
+    };
+    err.code = 'PONDER_OFFLINE';
+    throw err;
+  }
+
   let res: Response;
   try {
     res = await fetch(`${PONDER_URL}/graphql`, {
@@ -27,10 +37,15 @@ export async function ponderGql<T = any>(
       body: JSON.stringify({ query, variables }),
     });
   } catch {
+    _offlineUntil = Date.now() + OFFLINE_COOLDOWN_MS;
+    console.warn('[ponder] Indexer unreachable — suppressing requests for 30s');
     const err = new Error('Blockchain indexer unreachable') as Error & { code: string };
     err.code = 'PONDER_OFFLINE';
     throw err;
   }
+
+  // Indexer is reachable — reset circuit breaker
+  _offlineUntil = 0;
 
   if (!res.ok) throw new Error(`Ponder query failed: ${res.statusText}`);
 
@@ -40,6 +55,13 @@ export async function ponderGql<T = any>(
   }
   return json.data;
 }
+
+/** Default React Query options for all ponder queries. */
+export const ponderQueryDefaults = {
+  retry: false,
+  staleTime: 30_000,
+  refetchOnWindowFocus: false,
+} as const;
 
 // ---- Types matching the ponder.schema.ts tables ----
 

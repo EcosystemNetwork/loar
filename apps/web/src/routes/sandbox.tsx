@@ -368,7 +368,7 @@ function SandboxPage() {
                 </Card>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  {drafts.map((draft) => (
+                  {drafts.map((draft: any) => (
                     <DraftCard
                       key={draft.id}
                       draft={draft}
