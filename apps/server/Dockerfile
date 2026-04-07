@@ -41,7 +41,9 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-RUN mkdir -p .git && pnpm install --frozen-lockfile --prod && rm -rf .git
+# Skip husky prepare (devDep not available in prod), but run all other scripts (native addons)
+ENV HUSKY=0
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy built application
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
