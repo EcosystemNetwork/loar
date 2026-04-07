@@ -19,7 +19,8 @@ COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 
 # Bundle with esbuild for node target
-RUN pnpm exec esbuild apps/server/src/index.ts \
+# Install esbuild directly (it's a transitive dep via tsx, not exposed as a workspace bin)
+RUN pnpm add -w -D esbuild && pnpm exec esbuild apps/server/src/index.ts \
   --bundle \
   --platform=node \
   --format=esm \
