@@ -12,6 +12,8 @@ COPY packages/abis/package.json ./packages/abis/
 
 # Install dependencies (--ignore-scripts: skip husky prepare in Docker)
 RUN pnpm install --frozen-lockfile --ignore-scripts
+# esbuild needs its postinstall to fetch the platform binary
+RUN node node_modules/esbuild/install.js
 
 # Copy source code
 COPY apps/server/src ./apps/server/src
