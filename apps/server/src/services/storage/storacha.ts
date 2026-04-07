@@ -51,8 +51,7 @@ export class StorachaProvider implements StorageProvider {
     const store = new StoreMemory();
     const client = await create({ principal, store });
 
-    const proofBytes = Buffer.from(this.proof, 'base64');
-    const proof = await Proof.parse(new Uint8Array(proofBytes));
+    const proof = await Proof.parse(this.proof);
     const space = await client.addSpace(proof);
     await client.setCurrentSpace(space.did());
 

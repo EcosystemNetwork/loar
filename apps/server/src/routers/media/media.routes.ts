@@ -40,6 +40,9 @@ export const mediaRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.address) {
+        throw new Error('Wallet address is required to attach media');
+      }
       return createAttachment(ctx.user.address, input);
     }),
 
@@ -47,6 +50,9 @@ export const mediaRouter = router({
   detach: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.address) {
+        throw new Error('Wallet address is required to detach media');
+      }
       await deleteAttachment(ctx.user.address, input.id);
       return { ok: true };
     }),
@@ -83,6 +89,9 @@ export const mediaRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.address) {
+        throw new Error('Wallet address is required to update media');
+      }
       return updateAttachment(ctx.user.address, input);
     }),
 });

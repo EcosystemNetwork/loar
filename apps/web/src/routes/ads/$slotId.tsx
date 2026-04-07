@@ -29,11 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import {
-  useAdBids,
-  usePlaceBid,
-  useAcceptBid,
-} from '@/hooks/useRevenue';
+import { useAdBids, usePlaceBid, useAcceptBid } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
@@ -75,7 +71,7 @@ export function SlotDetailPage() {
   const { slotId } = Route.useParams();
   const search = Route.useSearch() as SlotSearch;
   const navigate = useNavigate();
-  const { user, isConnected } = useWalletAuth();
+  const { address, isConnected } = useWalletAuth();
 
   const { data: bids, isLoading: bidsLoading } = useAdBids(slotId);
   const placeBid = usePlaceBid();
@@ -86,21 +82,27 @@ export function SlotDetailPage() {
   const [creativeUrl, setCreativeUrl] = useState('');
   const [showBidForm, setShowBidForm] = useState(false);
 
-  const isCreator = !!user?.uid && user.uid === search.creatorUid;
+  const isCreator = !!address && address === search.creatorUid;
   const currentBidWei = search.currentBid ?? '0';
   const minBidWei = search.minBid ?? '0';
   const currentBidEth = parseFloat(formatEther(BigInt(currentBidWei)));
   const minBidEth = parseFloat(formatEther(BigInt(minBidWei)));
   const floorEth = Math.max(currentBidEth, minBidEth);
 
-  const sortedBids = [...(bids ?? [])].sort((a, b) =>
+  const sortedBids = [...(bids ?? [])].sort((a: any, b: any) =>
     Number(BigInt(b.amount) - BigInt(a.amount))
   );
-  const topBid = sortedBids[0];
+  const topBid = sortedBids[0] as any;
 
   async function handleBid() {
-    if (!isConnected) { toast.error('Connect your wallet'); return; }
-    if (!brandName.trim()) { toast.error('Enter your brand name'); return; }
+    if (!isConnected) {
+      toast.error('Connect your wallet');
+      return;
+    }
+    if (!brandName.trim()) {
+      toast.error('Enter your brand name');
+      return;
+    }
     const amt = parseFloat(bidEth);
     if (!amt || amt <= floorEth) {
       toast.error(`Bid must be above ${floorEth.toFixed(4)} ETH`);
@@ -126,11 +128,14 @@ export function SlotDetailPage() {
   }
 
   async function handleAccept() {
-    if (!isConnected) { toast.error('Connect your wallet'); return; }
+    if (!isConnected) {
+      toast.error('Connect your wallet');
+      return;
+    }
     try {
       await acceptBid.mutateAsync({ slotId });
       toast.success('Bid accepted — sponsorship is now active!');
-      navigate({ to: '/ads/' });
+      navigate({ to: '/ads' });
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to accept bid');
     }
@@ -140,7 +145,12 @@ export function SlotDetailPage() {
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate({ to: '/ads/' })}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigate({ to: '/ads' })}
+        >
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
@@ -148,14 +158,17 @@ export function SlotDetailPage() {
           <p className="text-xs text-muted-foreground">#{slotId.slice(0, 12)}…</p>
         </div>
         {search.active !== false ? (
-          <Badge variant="default" className="text-xs">Open</Badge>
+          <Badge variant="default" className="text-xs">
+            Open
+          </Badge>
         ) : (
-          <Badge variant="secondary" className="text-xs">Closed</Badge>
+          <Badge variant="secondary" className="text-xs">
+            Closed
+          </Badge>
         )}
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
-
         {/* Placement type banner */}
         <Card>
           <CardContent className="p-4">
@@ -165,7 +178,9 @@ export function SlotDetailPage() {
               </div>
               <div>
                 <p className="font-semibold">
-                  {PLACEMENT_LABELS[search.placementType ?? ''] ?? search.placementType ?? 'Ad Slot'}
+                  {PLACEMENT_LABELS[search.placementType ?? ''] ??
+                    search.placementType ??
+                    'Ad Slot'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Universe #{search.universeId?.slice(0, 10) ?? '—'}
@@ -214,8 +229,10 @@ export function SlotDetailPage() {
           <h2 className="font-semibold mb-3 flex items-center gap-1.5">
             <Gavel className="w-4 h-4" />
             Bids
-            {(sortedBids.length > 0) && (
-              <Badge variant="secondary" className="text-xs ml-1">{sortedBids.length}</Badge>
+            {sortedBids.length > 0 && (
+              <Badge variant="secondary" className="text-xs ml-1">
+                {sortedBids.length}
+              </Badge>
             )}
           </h2>
 
@@ -346,11 +363,7 @@ export function SlotDetailPage() {
                     >
                       Cancel
                     </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={handleBid}
-                      disabled={placeBid.isPending}
-                    >
+                    <Button className="flex-1" onClick={handleBid} disabled={placeBid.isPending}>
                       {placeBid.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
@@ -380,15 +393,7 @@ export function SlotDetailPage() {
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <Card>
       <CardContent className="p-3 text-center">
@@ -438,7 +443,11 @@ function BidRow({
           onClick={onAccept}
           disabled={accepting}
         >
-          {accepting ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+          {accepting ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <CheckCircle className="w-3 h-3" />
+          )}
           Accept
         </Button>
       )}

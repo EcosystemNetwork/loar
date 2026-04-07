@@ -105,7 +105,7 @@ describe('content router', () => {
         title: 'Test',
         mediaUrl: 'https://example.com/video.mp4',
         mediaType: 'video',
-        classification: 'fun',
+        classification: 'fan',
         ipDeclaration: { isOriginal: true, license: 'all-rights-reserved' },
       })
     ).rejects.toThrow(TRPCError);

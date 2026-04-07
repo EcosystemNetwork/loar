@@ -98,17 +98,14 @@ export class FalService {
   private configured = false;
 
   constructor() {
-    if (process.env.FAL_KEY) {
-      fal.config({
-        credentials: process.env.FAL_KEY,
-      });
-      this.configured = true;
-    } else {
-      console.warn('FAL_KEY not set — AI image/video generation will be unavailable');
-    }
+    // Defer config check — env vars may not be loaded yet (ESM hoisting)
   }
 
   private ensureConfigured() {
+    if (!this.configured && process.env.FAL_KEY) {
+      fal.config({ credentials: process.env.FAL_KEY });
+      this.configured = true;
+    }
     if (!this.configured) {
       throw new Error('FAL_KEY environment variable is required for AI generation');
     }

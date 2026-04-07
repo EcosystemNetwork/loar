@@ -115,11 +115,11 @@ export const analyticsRouter = router({
     )
     .query(async ({ input }) => {
       const [views, engagement] = await Promise.all([
-        viewsCol
+        viewsCol()
           .where('universeId', '==', input.universeId)
           .where('episodeId', '==', input.episodeId)
           .get(),
-        engagementCol
+        engagementCol()
           .where('universeId', '==', input.universeId)
           .where('episodeId', '==', input.episodeId)
           .get(),
@@ -146,7 +146,7 @@ export const analyticsRouter = router({
   getTrending: publicProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
-      const snapshot = await analyticsCol.orderBy('totalViews', 'desc').limit(input.limit).get();
+      const snapshot = await analyticsCol().orderBy('totalViews', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
@@ -154,7 +154,7 @@ export const analyticsRouter = router({
   getRecentActivity: publicProcedure
     .input(z.object({ limit: z.number().min(1).max(100).default(20) }))
     .query(async ({ input }) => {
-      const snapshot = await viewsCol.orderBy('viewedAt', 'desc').limit(input.limit).get();
+      const snapshot = await viewsCol().orderBy('viewedAt', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
@@ -185,7 +185,7 @@ export const analyticsRouter = router({
       results.metrics = metricsDoc.exists ? metricsDoc.data() : null;
 
       if (input.includeViews) {
-        const views = await viewsCol
+        const views = await viewsCol()
           .where('universeId', '==', input.universeId)
           .where('viewedAt', '>=', dateFrom)
           .where('viewedAt', '<=', dateTo)
@@ -198,7 +198,7 @@ export const analyticsRouter = router({
       }
 
       if (input.includeEngagement) {
-        const engagement = await engagementCol
+        const engagement = await engagementCol()
           .where('universeId', '==', input.universeId)
           .where('createdAt', '>=', dateFrom)
           .where('createdAt', '<=', dateTo)

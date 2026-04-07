@@ -234,14 +234,14 @@ export const contentRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = contentCol
+      let query = contentCol()
         .where('creatorUid', '==', input.creatorUid)
         .where('visibility', '==', 'public')
         .orderBy('createdAt', 'desc')
         .limit(input.limit + 1);
 
       if (input.classification) {
-        query = contentCol
+        query = contentCol()
           .where('creatorUid', '==', input.creatorUid)
           .where('visibility', '==', 'public')
           .where('classification', '==', input.classification)
@@ -291,13 +291,13 @@ export const contentRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      let query = contentCol
+      let query = contentCol()
         .where('creatorUid', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
         .limit(input.limit + 1);
 
       if (input.classification) {
-        query = contentCol
+        query = contentCol()
           .where('creatorUid', '==', ctx.user.uid)
           .where('classification', '==', input.classification)
           .orderBy('createdAt', 'desc')
@@ -351,13 +351,13 @@ export const contentRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = contentCol
+      let query = contentCol()
         .where('visibility', '==', 'public')
         .orderBy('createdAt', 'desc')
         .limit(input.limit + 1);
 
       if (input.classification) {
-        query = contentCol
+        query = contentCol()
           .where('visibility', '==', 'public')
           .where('classification', '==', input.classification)
           .orderBy('createdAt', 'desc')

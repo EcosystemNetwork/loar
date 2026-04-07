@@ -52,7 +52,7 @@ const PLACEMENT_TYPES = [
     value: 'SPONSORED_CHARACTER' as const,
     label: 'Sponsored Character',
     icon: <User className="w-6 h-6" />,
-    description: 'A recurring character co-created with the sponsor\'s brand identity',
+    description: "A recurring character co-created with the sponsor's brand identity",
     example: 'A hero whose tech gear is branded by your company',
   },
   {
@@ -117,7 +117,7 @@ export function CreateAdSlotPage() {
   function back() {
     const prev = STEPS[stepIdx - 1];
     if (prev) setStep(prev);
-    else navigate({ to: '/ads/' });
+    else navigate({ to: '/ads' });
   }
 
   async function handleCreate() {
@@ -136,7 +136,7 @@ export function CreateAdSlotPage() {
         constraints: form.constraints || undefined,
       });
       toast.success('Ad slot created! Advertisers can now bid.');
-      navigate({ to: '/ads/' });
+      navigate({ to: '/ads' });
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to create slot');
     }
@@ -168,7 +168,6 @@ export function CreateAdSlotPage() {
       </div>
 
       <div className="flex-1 max-w-lg mx-auto w-full px-4 py-6">
-
         {/* Step 1: Placement type */}
         {step === 'placement' && (
           <div className="space-y-3">
@@ -289,16 +288,17 @@ export function CreateAdSlotPage() {
                 onChange={(e) => set('episodes', e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                How many episodes the sponsorship runs across. One impression is counted per episode.
+                How many episodes the sponsorship runs across. One impression is counted per
+                episode.
               </p>
             </div>
 
             <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 flex gap-2.5">
               <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-300">
-                When you accept a bid, the platform takes a small fee and the remainder goes directly
-                to your wallet. Impressions are recorded automatically each time an episode is
-                generated.
+                When you accept a bid, the platform takes a small fee and the remainder goes
+                directly to your wallet. Impressions are recorded automatically each time an episode
+                is generated.
               </p>
             </div>
           </div>
@@ -357,12 +357,7 @@ export function CreateAdSlotPage() {
       {step !== 'confirm' && (
         <div className="sticky bottom-0 bg-background border-t px-4 py-4">
           <div className="max-w-lg mx-auto">
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={advance}
-              disabled={!canAdvance()}
-            >
+            <Button size="lg" className="w-full" onClick={advance} disabled={!canAdvance()}>
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>

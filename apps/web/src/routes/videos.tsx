@@ -31,7 +31,7 @@ export const Route = createFileRoute('/videos')({
 function VideosPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   function handleSearch(val: string) {
     setSearch(val);

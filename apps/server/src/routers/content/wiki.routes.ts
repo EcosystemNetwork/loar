@@ -250,7 +250,7 @@ export const wikiRouter = router({
   getUniverseWikis: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await eventWikisCol
+      const snapshot = await eventWikisCol()
         .where('universeId', '==', input.universeId)
         .orderBy('generatedAt')
         .get();

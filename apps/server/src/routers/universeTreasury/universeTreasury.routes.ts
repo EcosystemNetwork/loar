@@ -341,7 +341,7 @@ export const universeTreasuryRouter = router({
         throw new Error('Only universe admins and team members can view pool history');
       }
 
-      const snapshot = await universeCreditTxCol
+      const snapshot = await universeCreditTxCol()
         .where('universeId', '==', universeId)
         .orderBy('createdAt', 'desc')
         .limit(input.limit)

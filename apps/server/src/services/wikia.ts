@@ -4,12 +4,19 @@
  */
 import OpenAI from 'openai';
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+let _openai: OpenAI | null = null;
+let _openaiChecked = false;
 
-if (!openai) {
-  console.warn('OPENAI_API_KEY not set — wikia generation will be unavailable');
+function getOpenAI(): OpenAI | null {
+  if (!_openaiChecked) {
+    _openaiChecked = true;
+    if (process.env.OPENAI_API_KEY) {
+      _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    } else {
+      console.warn('OPENAI_API_KEY not set — wikia generation will be unavailable');
+    }
+  }
+  return _openai;
 }
 
 export interface WikiaEntry {
@@ -76,6 +83,7 @@ Generate a wikia entry with the following structure (respond in JSON format):
 IMPORTANT: The "plot" field should be the heart of this wikia - a complete, engaging storyline that tells readers exactly what happens in this event from beginning to end. Write it like you're narrating a movie scene.`;
 
   try {
+    const openai = getOpenAI();
     if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -195,6 +203,7 @@ Respond in JSON format:
 }`;
 
   try {
+    const openai = getOpenAI();
     if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -238,6 +247,7 @@ Description: ${description}
 Return only the summary sentence, no additional text.`;
 
   try {
+    const openai = getOpenAI();
     if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

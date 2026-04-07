@@ -299,10 +299,10 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
   // Register custom node types
   const nodeTypes = useMemo(
     () => ({
-      character: CharacterNode,
-      plotPoint: PlotPointNode,
-      media: MediaNode,
-      voting: VotingNode,
+      character: CharacterNode as any,
+      plotPoint: PlotPointNode as any,
+      media: MediaNode as any,
+      voting: VotingNode as any,
     }),
     []
   );

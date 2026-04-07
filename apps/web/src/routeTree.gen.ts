@@ -18,6 +18,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as IndexRouteImport } from './routes/index'
@@ -34,6 +35,7 @@ import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
 import { Route as ProductIdRouteImport } from './routes/product/$id'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
+import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
 import { Route as AdsNewRouteImport } from './routes/ads/new'
 import { Route as AdsSlotIdRouteImport } from './routes/ads/$slotId'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
@@ -83,6 +85,11 @@ const DiscoverRoute = DiscoverRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreditsRoute = CreditsRouteImport.update({
+  id: '/credits',
+  path: '/credits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CinematicUniverseCreateRoute = CinematicUniverseCreateRouteImport.update({
@@ -165,6 +172,11 @@ const CreateKindRoute = CreateKindRouteImport.update({
   path: '/create/$kind',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
+  id: '/canon/$universeId',
+  path: '/canon/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdsNewRoute = AdsNewRouteImport.update({
   id: '/ads/new',
   path: '/ads/new',
@@ -195,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/docs': typeof DocsRoute
@@ -206,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/videos': typeof VideosRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
+  '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/order/$id': typeof OrderIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -227,6 +241,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/docs': typeof DocsRoute
@@ -238,6 +253,7 @@ export interface FileRoutesByTo {
   '/videos': typeof VideosRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
+  '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/order/$id': typeof OrderIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -260,6 +276,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/docs': typeof DocsRoute
@@ -271,6 +288,7 @@ export interface FileRoutesById {
   '/videos': typeof VideosRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
+  '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/order/$id': typeof OrderIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -294,6 +312,7 @@ export interface FileRouteTypes {
     | '/'
     | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/credits'
     | '/dashboard'
     | '/discover'
     | '/docs'
@@ -305,6 +324,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/ads/$slotId'
     | '/ads/new'
+    | '/canon/$universeId'
     | '/create/$kind'
     | '/order/$id'
     | '/product/$id'
@@ -326,6 +346,7 @@ export interface FileRouteTypes {
     | '/'
     | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/credits'
     | '/dashboard'
     | '/discover'
     | '/docs'
@@ -337,6 +358,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/ads/$slotId'
     | '/ads/new'
+    | '/canon/$universeId'
     | '/create/$kind'
     | '/order/$id'
     | '/product/$id'
@@ -358,6 +380,7 @@ export interface FileRouteTypes {
     | '/'
     | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/credits'
     | '/dashboard'
     | '/discover'
     | '/docs'
@@ -369,6 +392,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/ads/$slotId'
     | '/ads/new'
+    | '/canon/$universeId'
     | '/create/$kind'
     | '/order/$id'
     | '/product/$id'
@@ -391,6 +415,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
+  CreditsRoute: typeof CreditsRoute
   DashboardRoute: typeof DashboardRoute
   DiscoverRoute: typeof DiscoverRoute
   DocsRoute: typeof DocsRoute
@@ -402,6 +427,7 @@ export interface RootRouteChildren {
   VideosRoute: typeof VideosRoute
   AdsSlotIdRoute: typeof AdsSlotIdRoute
   AdsNewRoute: typeof AdsNewRoute
+  CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
   OrderIdRoute: typeof OrderIdRoute
   ProductIdRoute: typeof ProductIdRoute
@@ -483,6 +509,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/credits': {
+      id: '/credits'
+      path: '/credits'
+      fullPath: '/credits'
+      preLoaderRoute: typeof CreditsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cinematicUniverseCreate': {
@@ -597,6 +630,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateKindRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/canon/$universeId': {
+      id: '/canon/$universeId'
+      path: '/canon/$universeId'
+      fullPath: '/canon/$universeId'
+      preLoaderRoute: typeof CanonUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ads/new': {
       id: '/ads/new'
       path: '/ads/new'
@@ -639,6 +679,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
+  CreditsRoute: CreditsRoute,
   DashboardRoute: DashboardRoute,
   DiscoverRoute: DiscoverRoute,
   DocsRoute: DocsRoute,
@@ -650,6 +691,7 @@ const rootRouteChildren: RootRouteChildren = {
   VideosRoute: VideosRoute,
   AdsSlotIdRoute: AdsSlotIdRoute,
   AdsNewRoute: AdsNewRoute,
+  CanonUniverseIdRoute: CanonUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
   OrderIdRoute: OrderIdRoute,
   ProductIdRoute: ProductIdRoute,

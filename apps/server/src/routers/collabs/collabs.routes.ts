@@ -178,7 +178,7 @@ export const collabsRouter = router({
   getEpisodes: publicProcedure
     .input(z.object({ collabId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await collabEpisodesCol
+      const snapshot = await collabEpisodesCol()
         .where('collabId', '==', input.collabId)
         .orderBy('createdAt', 'desc')
         .get();
