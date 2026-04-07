@@ -1,4 +1,10 @@
-import { Loader2 } from "lucide-react";
+/**
+ * Full-page Loader
+ *
+ * Centered spinning indicator used during route transitions and data fetching.
+ */
+
+import { Loader2 } from 'lucide-react';
 
 export default function Loader() {
   return (

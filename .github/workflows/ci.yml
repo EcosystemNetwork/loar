@@ -1,0 +1,241 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for legacy domains
+        run: |
+          if grep -rn "loartech\.xyz\|loar-one\.vercel\.app" \
+            --include="*.ts" --include="*.tsx" \
+            --include="*.json" --include="*.yaml" --include="*.yml" \
+            --include="*.html" --include="*.env*" \
+            --exclude-dir=".git" --exclude-dir="node_modules" \
+            --exclude-dir="dist" --exclude-dir=".next" \
+            .; then
+            echo ""
+            echo "ERROR: Legacy domain reference found. Update to loar.fun."
+            exit 1
+          fi
+          echo "No legacy domain references found."
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm check-types
+
+  build:
+    name: Build
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+  web:
+    name: Web App
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check (server — needed for AppRouter types)
+        run: pnpm --filter server check-types
+
+      - name: Type check (web)
+        run: pnpm --filter web check-types
+
+      - name: Build web
+        run: pnpm --filter web build
+
+      - name: "Verify no node: imports in bundle"
+        run: |
+          if grep -rP 'require\("node:|from "node:|from '\''node:' apps/web/dist/assets/*.js 2>/dev/null; then
+            echo "ERROR: node: module imports found in browser bundle"
+            exit 1
+          fi
+          echo "No node: module imports in bundle"
+
+  server-tests:
+    name: Server Tests
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run server tests
+        run: pnpm --filter server run test -- --reporter=verbose --reporter=junit --outputFile=test-results/junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-test-results-${{ github.run_id }}
+          path: apps/server/test-results/junit.xml
+          retention-days: 30
+
+  address-registry:
+    name: Address Registry
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify addresses.ts matches deployments/sepolia.json
+        run: pnpm check:addresses
+
+  indexer-validate:
+    name: Indexer Validation
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check indexer schema and config
+        run: pnpm --filter indexer typecheck
+
+      - name: Run indexer handler tests
+        run: pnpm --filter indexer test
+
+  contracts:
+    name: Smart Contracts
+    needs: [quality]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Forge fmt
+        run: forge fmt --check
+
+      - name: Forge build
+        run: forge build --sizes
+
+      - name: Forge test
+        run: forge test -vvv 2>&1 | tee forge-test-output.txt
+
+      - name: Upload forge test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-test-results-${{ github.run_id }}
+          path: apps/contracts/forge-test-output.txt
+          retention-days: 30
+
+  # Single required status check — require this in branch protection settings.
+  # It only passes when every parallel job above passes.
+  ci-gate:
+    name: CI Gate
+    needs: [build, web, server-tests, address-registry, indexer-validate, contracts]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          results='${{ toJSON(needs.*.result) }}'
+          echo "Job results: $results"
+          if echo "$results" | grep -q '"failure"\|"cancelled"'; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
+          echo "All required jobs passed."

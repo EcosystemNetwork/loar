@@ -9,14 +9,59 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VideosRouteImport } from './routes/videos'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DocsRouteImport } from './routes/docs'
+import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
+import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WikiIndexRouteImport } from './routes/wiki/index'
+import { Route as SellIndexRouteImport } from './routes/sell/index'
+import { Route as CreateIndexRouteImport } from './routes/create/index'
+import { Route as AdsIndexRouteImport } from './routes/ads/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
+import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
+import { Route as SellNewRouteImport } from './routes/sell/new'
+import { Route as SellEarningsRouteImport } from './routes/sell/earnings'
+import { Route as ProfileEditRouteImport } from './routes/profile/edit'
+import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
+import { Route as ProductIdRouteImport } from './routes/product/$id'
+import { Route as OrderIdRouteImport } from './routes/order/$id'
+import { Route as CreateKindRouteImport } from './routes/create/$kind'
+import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
+import { Route as AdsNewRouteImport } from './routes/ads/new'
+import { Route as AdsSlotIdRouteImport } from './routes/ads/$slotId'
+import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
+import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
+const VideosRoute = VideosRouteImport.update({
+  id: '/videos',
+  path: '/videos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SandboxRoute = SandboxRouteImport.update({
+  id: '/sandbox',
+  path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyWorksRoute = MyWorksRouteImport.update({
+  id: '/my-works',
+  path: '/my-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketRoute = MarketRouteImport.update({
   id: '/market',
   path: '/market',
@@ -27,9 +72,24 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiscoverRoute = DiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreditsRoute = CreditsRouteImport.update({
+  id: '/credits',
+  path: '/credits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CinematicUniverseCreateRoute = CinematicUniverseCreateRouteImport.update({
@@ -37,14 +97,104 @@ const CinematicUniverseCreateRoute = CinematicUniverseCreateRouteImport.update({
   path: '/cinematicUniverseCreate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WikiIndexRoute = WikiIndexRouteImport.update({
+  id: '/wiki/',
+  path: '/wiki/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellIndexRoute = SellIndexRouteImport.update({
+  id: '/sell/',
+  path: '/sell/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateIndexRoute = CreateIndexRouteImport.update({
+  id: '/create/',
+  path: '/create/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsIndexRoute = AdsIndexRouteImport.update({
+  id: '/ads/',
+  path: '/ads/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UniverseIdRoute = UniverseIdRouteImport.update({
   id: '/universe/$id',
   path: '/universe/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopUniverseIdRoute = ShopUniverseIdRouteImport.update({
+  id: '/shop/$universeId',
+  path: '/shop/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellNewRoute = SellNewRouteImport.update({
+  id: '/sell/new',
+  path: '/sell/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellEarningsRoute = SellEarningsRouteImport.update({
+  id: '/sell/earnings',
+  path: '/sell/earnings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileEditRoute = ProfileEditRouteImport.update({
+  id: '/profile/edit',
+  path: '/profile/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileUsernameRoute = ProfileUsernameRouteImport.update({
+  id: '/profile/$username',
+  path: '/profile/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductIdRoute = ProductIdRouteImport.update({
+  id: '/product/$id',
+  path: '/product/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrderIdRoute = OrderIdRouteImport.update({
+  id: '/order/$id',
+  path: '/order/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateKindRoute = CreateKindRouteImport.update({
+  id: '/create/$kind',
+  path: '/create/$kind',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
+  id: '/canon/$universeId',
+  path: '/canon/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsNewRoute = AdsNewRouteImport.update({
+  id: '/ads/new',
+  path: '/ads/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsSlotIdRoute = AdsSlotIdRouteImport.update({
+  id: '/ads/$slotId',
+  path: '/ads/$slotId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiEntityIdRoute = WikiEntityIdRouteImport.update({
+  id: '/wiki/entity/$id',
+  path: '/wiki/entity/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
+  id: '/wiki/character/$id',
+  path: '/wiki/character/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
@@ -55,74 +205,277 @@ const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
+  '/discover': typeof DiscoverRoute
+  '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/my-works': typeof MyWorksRoute
+  '/sandbox': typeof SandboxRoute
+  '/upload': typeof UploadRoute
+  '/videos': typeof VideosRoute
+  '/ads/$slotId': typeof AdsSlotIdRoute
+  '/ads/new': typeof AdsNewRoute
+  '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/create/$kind': typeof CreateKindRoute
+  '/order/$id': typeof OrderIdRoute
+  '/product/$id': typeof ProductIdRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/profile/edit': typeof ProfileEditRoute
+  '/sell/earnings': typeof SellEarningsRoute
+  '/sell/new': typeof SellNewRoute
+  '/shop/$universeId': typeof ShopUniverseIdRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/ads/': typeof AdsIndexRoute
+  '/create/': typeof CreateIndexRoute
+  '/sell/': typeof SellIndexRoute
+  '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
+  '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
+  '/discover': typeof DiscoverRoute
+  '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/my-works': typeof MyWorksRoute
+  '/sandbox': typeof SandboxRoute
+  '/upload': typeof UploadRoute
+  '/videos': typeof VideosRoute
+  '/ads/$slotId': typeof AdsSlotIdRoute
+  '/ads/new': typeof AdsNewRoute
+  '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/create/$kind': typeof CreateKindRoute
+  '/order/$id': typeof OrderIdRoute
+  '/product/$id': typeof ProductIdRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/profile/edit': typeof ProfileEditRoute
+  '/sell/earnings': typeof SellEarningsRoute
+  '/sell/new': typeof SellNewRoute
+  '/shop/$universeId': typeof ShopUniverseIdRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/ads': typeof AdsIndexRoute
+  '/create': typeof CreateIndexRoute
+  '/sell': typeof SellIndexRoute
+  '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
+  '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
+  '/discover': typeof DiscoverRoute
+  '/docs': typeof DocsRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/my-works': typeof MyWorksRoute
+  '/sandbox': typeof SandboxRoute
+  '/upload': typeof UploadRoute
+  '/videos': typeof VideosRoute
+  '/ads/$slotId': typeof AdsSlotIdRoute
+  '/ads/new': typeof AdsNewRoute
+  '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/create/$kind': typeof CreateKindRoute
+  '/order/$id': typeof OrderIdRoute
+  '/product/$id': typeof ProductIdRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/profile/edit': typeof ProfileEditRoute
+  '/sell/earnings': typeof SellEarningsRoute
+  '/sell/new': typeof SellNewRoute
+  '/shop/$universeId': typeof ShopUniverseIdRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/ads/': typeof AdsIndexRoute
+  '/create/': typeof CreateIndexRoute
+  '/sell/': typeof SellIndexRoute
+  '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
+  '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/credits'
     | '/dashboard'
+    | '/discover'
+    | '/docs'
     | '/login'
     | '/market'
+    | '/my-works'
+    | '/sandbox'
+    | '/upload'
+    | '/videos'
+    | '/ads/$slotId'
+    | '/ads/new'
+    | '/canon/$universeId'
+    | '/create/$kind'
+    | '/order/$id'
+    | '/product/$id'
+    | '/profile/$username'
+    | '/profile/edit'
+    | '/sell/earnings'
+    | '/sell/new'
+    | '/shop/$universeId'
     | '/universe/$id'
+    | '/ads/'
+    | '/create/'
+    | '/sell/'
+    | '/wiki/'
     | '/event/$universe/$event'
+    | '/wiki/character/$id'
+    | '/wiki/entity/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/credits'
     | '/dashboard'
+    | '/discover'
+    | '/docs'
     | '/login'
     | '/market'
+    | '/my-works'
+    | '/sandbox'
+    | '/upload'
+    | '/videos'
+    | '/ads/$slotId'
+    | '/ads/new'
+    | '/canon/$universeId'
+    | '/create/$kind'
+    | '/order/$id'
+    | '/product/$id'
+    | '/profile/$username'
+    | '/profile/edit'
+    | '/sell/earnings'
+    | '/sell/new'
+    | '/shop/$universeId'
     | '/universe/$id'
+    | '/ads'
+    | '/create'
+    | '/sell'
+    | '/wiki'
     | '/event/$universe/$event'
+    | '/wiki/character/$id'
+    | '/wiki/entity/$id'
   id:
     | '__root__'
     | '/'
+    | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/credits'
     | '/dashboard'
+    | '/discover'
+    | '/docs'
     | '/login'
     | '/market'
+    | '/my-works'
+    | '/sandbox'
+    | '/upload'
+    | '/videos'
+    | '/ads/$slotId'
+    | '/ads/new'
+    | '/canon/$universeId'
+    | '/create/$kind'
+    | '/order/$id'
+    | '/product/$id'
+    | '/profile/$username'
+    | '/profile/edit'
+    | '/sell/earnings'
+    | '/sell/new'
+    | '/shop/$universeId'
     | '/universe/$id'
+    | '/ads/'
+    | '/create/'
+    | '/sell/'
+    | '/wiki/'
     | '/event/$universe/$event'
+    | '/wiki/character/$id'
+    | '/wiki/entity/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
+  CreditsRoute: typeof CreditsRoute
   DashboardRoute: typeof DashboardRoute
+  DiscoverRoute: typeof DiscoverRoute
+  DocsRoute: typeof DocsRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
+  MyWorksRoute: typeof MyWorksRoute
+  SandboxRoute: typeof SandboxRoute
+  UploadRoute: typeof UploadRoute
+  VideosRoute: typeof VideosRoute
+  AdsSlotIdRoute: typeof AdsSlotIdRoute
+  AdsNewRoute: typeof AdsNewRoute
+  CanonUniverseIdRoute: typeof CanonUniverseIdRoute
+  CreateKindRoute: typeof CreateKindRoute
+  OrderIdRoute: typeof OrderIdRoute
+  ProductIdRoute: typeof ProductIdRoute
+  ProfileUsernameRoute: typeof ProfileUsernameRoute
+  ProfileEditRoute: typeof ProfileEditRoute
+  SellEarningsRoute: typeof SellEarningsRoute
+  SellNewRoute: typeof SellNewRoute
+  ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   UniverseIdRoute: typeof UniverseIdRoute
+  AdsIndexRoute: typeof AdsIndexRoute
+  CreateIndexRoute: typeof CreateIndexRoute
+  SellIndexRoute: typeof SellIndexRoute
+  WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
+  WikiCharacterIdRoute: typeof WikiCharacterIdRoute
+  WikiEntityIdRoute: typeof WikiEntityIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/videos': {
+      id: '/videos'
+      path: '/videos'
+      fullPath: '/videos'
+      preLoaderRoute: typeof VideosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sandbox': {
+      id: '/sandbox'
+      path: '/sandbox'
+      fullPath: '/sandbox'
+      preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-works': {
+      id: '/my-works'
+      path: '/my-works'
+      fullPath: '/my-works'
+      preLoaderRoute: typeof MyWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/market': {
       id: '/market'
       path: '/market'
@@ -137,11 +490,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discover': {
+      id: '/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof DiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/credits': {
+      id: '/credits'
+      path: '/credits'
+      fullPath: '/credits'
+      preLoaderRoute: typeof CreditsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cinematicUniverseCreate': {
@@ -151,6 +525,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CinematicUniverseCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -158,11 +539,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wiki/': {
+      id: '/wiki/'
+      path: '/wiki'
+      fullPath: '/wiki/'
+      preLoaderRoute: typeof WikiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sell/': {
+      id: '/sell/'
+      path: '/sell'
+      fullPath: '/sell/'
+      preLoaderRoute: typeof SellIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create/': {
+      id: '/create/'
+      path: '/create'
+      fullPath: '/create/'
+      preLoaderRoute: typeof CreateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/': {
+      id: '/ads/'
+      path: '/ads'
+      fullPath: '/ads/'
+      preLoaderRoute: typeof AdsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/universe/$id': {
       id: '/universe/$id'
       path: '/universe/$id'
       fullPath: '/universe/$id'
       preLoaderRoute: typeof UniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop/$universeId': {
+      id: '/shop/$universeId'
+      path: '/shop/$universeId'
+      fullPath: '/shop/$universeId'
+      preLoaderRoute: typeof ShopUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sell/new': {
+      id: '/sell/new'
+      path: '/sell/new'
+      fullPath: '/sell/new'
+      preLoaderRoute: typeof SellNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sell/earnings': {
+      id: '/sell/earnings'
+      path: '/sell/earnings'
+      fullPath: '/sell/earnings'
+      preLoaderRoute: typeof SellEarningsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/edit': {
+      id: '/profile/edit'
+      path: '/profile/edit'
+      fullPath: '/profile/edit'
+      preLoaderRoute: typeof ProfileEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/$username': {
+      id: '/profile/$username'
+      path: '/profile/$username'
+      fullPath: '/profile/$username'
+      preLoaderRoute: typeof ProfileUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product/$id': {
+      id: '/product/$id'
+      path: '/product/$id'
+      fullPath: '/product/$id'
+      preLoaderRoute: typeof ProductIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/order/$id': {
+      id: '/order/$id'
+      path: '/order/$id'
+      fullPath: '/order/$id'
+      preLoaderRoute: typeof OrderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create/$kind': {
+      id: '/create/$kind'
+      path: '/create/$kind'
+      fullPath: '/create/$kind'
+      preLoaderRoute: typeof CreateKindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/canon/$universeId': {
+      id: '/canon/$universeId'
+      path: '/canon/$universeId'
+      fullPath: '/canon/$universeId'
+      preLoaderRoute: typeof CanonUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/new': {
+      id: '/ads/new'
+      path: '/ads/new'
+      fullPath: '/ads/new'
+      preLoaderRoute: typeof AdsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/$slotId': {
+      id: '/ads/$slotId'
+      path: '/ads/$slotId'
+      fullPath: '/ads/$slotId'
+      preLoaderRoute: typeof AdsSlotIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki/entity/$id': {
+      id: '/wiki/entity/$id'
+      path: '/wiki/entity/$id'
+      fullPath: '/wiki/entity/$id'
+      preLoaderRoute: typeof WikiEntityIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki/character/$id': {
+      id: '/wiki/character/$id'
+      path: '/wiki/character/$id'
+      fullPath: '/wiki/character/$id'
+      preLoaderRoute: typeof WikiCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/event/$universe/$event': {
@@ -177,12 +677,37 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
+  CreditsRoute: CreditsRoute,
   DashboardRoute: DashboardRoute,
+  DiscoverRoute: DiscoverRoute,
+  DocsRoute: DocsRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
+  MyWorksRoute: MyWorksRoute,
+  SandboxRoute: SandboxRoute,
+  UploadRoute: UploadRoute,
+  VideosRoute: VideosRoute,
+  AdsSlotIdRoute: AdsSlotIdRoute,
+  AdsNewRoute: AdsNewRoute,
+  CanonUniverseIdRoute: CanonUniverseIdRoute,
+  CreateKindRoute: CreateKindRoute,
+  OrderIdRoute: OrderIdRoute,
+  ProductIdRoute: ProductIdRoute,
+  ProfileUsernameRoute: ProfileUsernameRoute,
+  ProfileEditRoute: ProfileEditRoute,
+  SellEarningsRoute: SellEarningsRoute,
+  SellNewRoute: SellNewRoute,
+  ShopUniverseIdRoute: ShopUniverseIdRoute,
   UniverseIdRoute: UniverseIdRoute,
+  AdsIndexRoute: AdsIndexRoute,
+  CreateIndexRoute: CreateIndexRoute,
+  SellIndexRoute: SellIndexRoute,
+  WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
+  WikiCharacterIdRoute: WikiCharacterIdRoute,
+  WikiEntityIdRoute: WikiEntityIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

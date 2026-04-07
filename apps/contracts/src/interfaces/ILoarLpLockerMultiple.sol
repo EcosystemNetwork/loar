@@ -4,6 +4,8 @@ pragma solidity ^0.8.28;
 import {ILoarLpLocker} from "./ILoarLpLocker.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
+/// @title ILoarLpLockerMultiple
+/// @notice Extended LP locker interface supporting multiple tick-range positions and admin-managed reward recipients.
 interface ILoarLpLockerMultiple is ILoarLpLocker {
     error Unauthorized();
     error MismatchedRewardArrays();

@@ -17,7 +17,7 @@ import {
   Volume2,
   VolumeX,
   Maximize,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
 
@@ -122,13 +122,16 @@ export function SegmentPlayer({
   }, []);
 
   // Handle seek
-  const handleSeek = useCallback((value: number) => {
-    if (!videoRef.current) return;
+  const handleSeek = useCallback(
+    (value: number) => {
+      if (!videoRef.current) return;
 
-    const newTime = (value / 100) * duration;
-    videoRef.current.currentTime = newTime;
-    setProgress(value);
-  }, [duration]);
+      const newTime = (value / 100) * duration;
+      videoRef.current.currentTime = newTime;
+      setProgress(value);
+    },
+    [duration]
+  );
 
   // Load new segment
   useEffect(() => {
@@ -244,68 +247,35 @@ export function SegmentPlayer({
           </div>
 
           {/* Segment description */}
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {currentSegment.description}
-          </p>
+          <p className="text-sm text-muted-foreground line-clamp-2">{currentSegment.description}</p>
 
           {/* Control buttons */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               {/* Previous */}
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={goToPrevious}
-                disabled={!hasPrevious}
-              >
+              <Button size="icon" variant="outline" onClick={goToPrevious} disabled={!hasPrevious}>
                 <SkipBack className="h-4 w-4" />
               </Button>
 
               {/* Play/Pause */}
-              <Button
-                size="icon"
-                variant="default"
-                onClick={togglePlay}
-                disabled={isLoading}
-              >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
+              <Button size="icon" variant="default" onClick={togglePlay} disabled={isLoading}>
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
 
               {/* Next */}
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={goToNext}
-                disabled={!hasNext}
-              >
+              <Button size="icon" variant="outline" onClick={goToNext} disabled={!hasNext}>
                 <SkipForward className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="flex items-center gap-2">
               {/* Mute */}
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={toggleMute}
-              >
-                {isMuted ? (
-                  <VolumeX className="h-4 w-4" />
-                ) : (
-                  <Volume2 className="h-4 w-4" />
-                )}
+              <Button size="icon" variant="ghost" onClick={toggleMute}>
+                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </Button>
 
               {/* Fullscreen */}
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={toggleFullscreen}
-              >
+              <Button size="icon" variant="ghost" onClick={toggleFullscreen}>
                 <Maximize className="h-4 w-4" />
               </Button>
             </div>
@@ -321,8 +291,8 @@ export function SegmentPlayer({
                     idx === currentIndex
                       ? 'bg-primary'
                       : idx < currentIndex
-                      ? 'bg-primary/50'
-                      : 'bg-muted'
+                        ? 'bg-primary/50'
+                        : 'bg-muted'
                   }`}
                 />
               ))}

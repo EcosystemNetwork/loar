@@ -1,0 +1,9 @@
+{
+  "filter_paths": ["lib/", "dependencies/", "test/"],
+  "exclude_informational": true,
+  "exclude_low": false,
+  "solc_remaps": [
+    "@openzeppelin/=dependencies/@openzeppelin-contracts-5.0.2/",
+    "solady/=dependencies/solady-0.1.26/"
+  ]
+}

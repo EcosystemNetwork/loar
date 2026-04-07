@@ -1,0 +1,712 @@
+/**
+ * Image Generation Router
+ *
+ * Provides two API surfaces:
+ *
+ *   image.generate      — Routed, billed, tracked generation. Uses the image
+ *                         model registry for smart auto-routing or manual model
+ *                         selection. Deducts credits, falls back on failure,
+ *                         saves provenance to Firestore, and tracks quests.
+ *                         This is the recommended endpoint for all new clients.
+ *
+ *   image.estimateCost  — Pre-flight cost estimate (no credit deduction).
+ *   image.listModels    — Model catalog for UI display.
+ *   image.history       — User's generation history.
+ *
+ *   image.generateImage   — Raw fal call (backward compat, no billing).
+ *   image.editImage       — Raw fal edit (backward compat).
+ *   image.imageToImage    — Raw fal img2img (backward compat).
+ *   image.generateCharacter / analyzeCharacter / saveCharacter — character tools.
+ */
+import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { z } from 'zod';
+import { randomUUID } from 'crypto';
+import { falService } from '../../services/fal';
+import { db } from '../../lib/firebase';
+import { geminiService } from '../../services/gemini';
+import { wrapError } from '../../lib/errors';
+import {
+  routeImageModel,
+  validateImageModelSelection,
+  getImageModelById,
+  getVisibleImageModels,
+  markImageProviderUnhealthy,
+  markImageProviderHealthy,
+  IMAGE_MODELS,
+} from '../../services/image-models';
+import { trackQuests } from '../../services/quest-tracker';
+import type { ImageGenerationRecord } from '../../services/image-models/types';
+
+// ── Collections ───────────────────────────────────────────────────────
+
+const imageGenerationsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('imageGenerations');
+};
+const imageModelOverridesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('imageModelOverrides');
+};
+const charactersCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('characters');
+};
+
+// ── Schemas ───────────────────────────────────────────────────────────
+
+const imageSizeSchema = z.enum([
+  'square_hd',
+  'square',
+  'portrait_4_3',
+  'portrait_16_9',
+  'landscape_4_3',
+  'landscape_16_9',
+]);
+
+const generateSchema = z.object({
+  prompt: z.string().min(1, 'Prompt is required'),
+  task: z.enum(['text_to_image', 'image_to_image']).default('text_to_image'),
+  imageUrls: z.array(z.string().url()).optional(), // required for image_to_image
+  imageSize: imageSizeSchema.default('square_hd'),
+  numImages: z.number().min(1).max(4).default(1),
+  negativePrompt: z.string().optional(),
+  seed: z.number().optional(),
+
+  routingMode: z.enum(['auto', 'manual']).default('auto'),
+  selectedModelId: z.string().optional(),
+  allowFallback: z.boolean().default(true),
+  entityId: z.string().optional(),
+  universeId: z.string().optional(),
+
+  qualityTarget: z.enum(['draft', 'standard', 'premium']).optional(),
+  costBudget: z.enum(['low', 'medium', 'any']).optional(),
+  latencyPreference: z.enum(['fast', 'balanced', 'quality']).optional(),
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+async function saveRecord(record: ImageGenerationRecord): Promise<void> {
+  await imageGenerationsCol()
+    .doc(record.id)
+    .set({ ...record, completedAt: record.completedAt || null });
+}
+
+async function attemptFallback(
+  input: z.infer<typeof generateSchema>,
+  failedModelId: string
+): Promise<{ imageUrls: string[]; fallbackModelId: string } | null> {
+  const candidates = getVisibleImageModels()
+    .filter((m) => m.id !== failedModelId && m.isEnabled && m.tasks.includes(input.task))
+    .sort((a, b) => {
+      const qDiff =
+        ({ draft: 1, standard: 2, premium: 3 }[b.qualityTier] || 0) -
+        ({ draft: 1, standard: 2, premium: 3 }[a.qualityTier] || 0);
+      return qDiff !== 0 ? qDiff : a.creditCostPerImage - b.creditCostPerImage;
+    });
+
+  for (const candidate of candidates.slice(0, 2)) {
+    try {
+      const result = await falService.generateImage({
+        prompt: input.prompt,
+        model: candidate.falModelId as any,
+        negativePrompt: input.negativePrompt,
+        imageSize: input.imageSize,
+        numImages: input.numImages,
+        seed: input.seed,
+      });
+      if (result.status === 'completed' && result.images?.length) {
+        markImageProviderHealthy(candidate.provider);
+        return {
+          imageUrls: result.images.map((img) => img.url),
+          fallbackModelId: candidate.id,
+        };
+      }
+    } catch {
+      markImageProviderUnhealthy(candidate.provider);
+    }
+  }
+  return null;
+}
+
+// ── Router ────────────────────────────────────────────────────────────
+
+export const imageRouter = router({
+  // ── Routed generation (new primary endpoint) ─────────────────────────
+
+  generate: protectedProcedure.input(generateSchema).mutation(async ({ input, ctx }) => {
+    const genId = randomUUID();
+    const startTime = Date.now();
+
+    // ── Validate image_to_image inputs ──────────────────────────────
+    if (input.task === 'image_to_image' && (!input.imageUrls || input.imageUrls.length === 0)) {
+      throw new Error('imageUrls is required for image_to_image task');
+    }
+
+    // ── Resolve model ────────────────────────────────────────────────
+    let finalModelId: string;
+    let reasonCode: ImageGenerationRecord['routingReasonCode'];
+    let providerCostUsd: number;
+    let fiatPriceUsd: number;
+    let loarPriceUsd: number;
+    let creditCostPerImage: number;
+    let requestedModelId: string | undefined;
+
+    if (input.routingMode === 'manual' && input.selectedModelId) {
+      requestedModelId = input.selectedModelId;
+      const validation = validateImageModelSelection(input.selectedModelId, { task: input.task });
+      if (!validation.valid) {
+        throw new Error(
+          `Cannot use selected model: ${validation.reason}` +
+            (validation.suggestion ? `. Try "${validation.suggestion}" instead.` : '')
+        );
+      }
+      const model = getImageModelById(input.selectedModelId)!;
+      finalModelId = model.id;
+      reasonCode = 'manual_user_selection';
+      providerCostUsd = model.providerCostUsd;
+      fiatPriceUsd = model.fiatPriceUsd;
+      loarPriceUsd = model.loarPriceUsd;
+      creditCostPerImage = model.creditCostPerImage;
+    } else {
+      const decision = routeImageModel({
+        task: input.task,
+        numImages: input.numImages,
+        qualityTarget: input.qualityTarget,
+        costBudget: input.costBudget,
+        latencyPreference: input.latencyPreference,
+      });
+      finalModelId = decision.chosenModelId;
+      reasonCode = decision.reasonCode;
+      providerCostUsd = decision.providerCostUsd;
+      fiatPriceUsd = decision.fiatPriceUsd;
+      loarPriceUsd = decision.loarPriceUsd;
+      creditCostPerImage = decision.creditCostPerImage;
+    }
+
+    const model = getImageModelById(finalModelId);
+    if (!model) throw new Error(`Model ${finalModelId} not found`);
+
+    const totalCredits = creditCostPerImage * input.numImages;
+    const totalFiat = fiatPriceUsd * input.numImages;
+    const totalLoar = loarPriceUsd * input.numImages;
+    const totalProvider = providerCostUsd * input.numImages;
+
+    // ── Save initial record ──────────────────────────────────────────
+    const record: ImageGenerationRecord = {
+      id: genId,
+      userId: ctx.user.uid,
+      entityId: input.entityId,
+      universeId: input.universeId,
+      routingMode: input.routingMode,
+      requestedModelId,
+      finalModelId,
+      provider: model.provider,
+      status: 'queued',
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      task: input.task,
+      imageSize: input.imageSize,
+      numImages: input.numImages,
+      seed: input.seed,
+      providerCostUsd: totalProvider,
+      fiatPriceUsd: totalFiat,
+      loarPriceUsd: totalLoar,
+      creditsCharged: totalCredits,
+      marginUsd: totalFiat - totalProvider,
+      routingReasonCode: reasonCode,
+      createdAt: new Date(),
+    };
+    await saveRecord(record);
+
+    // ── Deduct credits ───────────────────────────────────────────────
+    const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
+    try {
+      await db.runTransaction(async (tx) => {
+        const doc = await tx.get(userCreditsRef);
+        const balance = doc.exists ? doc.data()?.balance || 0 : 0;
+        if (balance < totalCredits) {
+          throw new Error(
+            `Insufficient credits. Need ${totalCredits}, have ${balance}. Purchase more credits to continue.`
+          );
+        }
+        tx.update(userCreditsRef, {
+          balance: balance - totalCredits,
+          totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
+          updatedAt: new Date(),
+        });
+      });
+    } catch (err) {
+      await imageGenerationsCol().doc(genId).update({
+        status: 'failed',
+        failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
+        completedAt: new Date(),
+      });
+      throw err;
+    }
+
+    // ── Generate ─────────────────────────────────────────────────────
+    try {
+      await imageGenerationsCol().doc(genId).update({ status: 'running' });
+
+      const result = await falService.generateImage({
+        prompt: input.prompt,
+        model: model.falModelId as any,
+        negativePrompt: input.negativePrompt,
+        imageSize: input.imageSize,
+        numImages: input.numImages,
+        seed: input.seed,
+      });
+
+      if (result.status !== 'completed' || !result.images?.length) {
+        markImageProviderUnhealthy(model.provider);
+
+        if (input.allowFallback) {
+          const fallback = await attemptFallback(input, model.id);
+          if (fallback) {
+            const latencyMs = Date.now() - startTime;
+            await imageGenerationsCol().doc(genId).update({
+              status: 'completed',
+              fallbackModelId: fallback.fallbackModelId,
+              imageUrls: fallback.imageUrls,
+              latencyMs,
+              completedAt: new Date(),
+            });
+            return {
+              generationId: genId,
+              status: 'completed' as const,
+              imageUrls: fallback.imageUrls,
+              modelUsed: fallback.fallbackModelId,
+              modelDisplayName:
+                getImageModelById(fallback.fallbackModelId)?.displayName || fallback.fallbackModelId,
+              routingMode: input.routingMode,
+              reasonCode,
+              creditsCharged: totalCredits,
+              fiatPriceUsd: totalFiat,
+              wasFallback: true,
+            };
+          }
+        }
+
+        await imageGenerationsCol().doc(genId).update({
+          status: 'failed',
+          failureReason: result.error || 'Image generation failed',
+          latencyMs: Date.now() - startTime,
+          completedAt: new Date(),
+        });
+        throw new Error(result.error || 'Image generation failed');
+      }
+
+      markImageProviderHealthy(model.provider);
+      const latencyMs = Date.now() - startTime;
+      const imageUrls = result.images.map((img) => img.url);
+
+      // Fire-and-forget quest tracking
+      trackQuests(ctx.user.uid, [
+        { questId: 'first_image_generation' },
+        { questId: 'daily_generation' },
+        { questId: 'generate_10_images' },
+      ]);
+
+      await imageGenerationsCol().doc(genId).update({
+        status: 'completed',
+        imageUrls,
+        seed: result.seed,
+        latencyMs,
+        completedAt: new Date(),
+      });
+
+      return {
+        generationId: genId,
+        status: 'completed' as const,
+        imageUrls,
+        seed: result.seed,
+        modelUsed: finalModelId,
+        modelDisplayName: model.displayName,
+        routingMode: input.routingMode,
+        reasonCode,
+        creditsCharged: totalCredits,
+        fiatPriceUsd: totalFiat,
+        wasFallback: false,
+      };
+    } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Refund credits
+      try {
+        const refundDoc = await userCreditsRef.get();
+        if (refundDoc.exists) {
+          await userCreditsRef.update({
+            balance: (refundDoc.data()?.balance || 0) + totalCredits,
+            updatedAt: new Date(),
+          });
+        }
+      } catch (refundErr) {
+        console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
+      }
+
+      await imageGenerationsCol().doc(genId).update({
+        status: 'failed',
+        failureReason: errorMessage,
+        latencyMs,
+        completedAt: new Date(),
+      });
+      throw error;
+    }
+  }),
+
+  estimateCost: publicProcedure
+    .input(
+      z.object({
+        task: z.enum(['text_to_image', 'image_to_image']).default('text_to_image'),
+        numImages: z.number().min(1).max(4).default(1),
+        routingMode: z.enum(['auto', 'manual']).default('auto'),
+        selectedModelId: z.string().optional(),
+        qualityTarget: z.enum(['draft', 'standard', 'premium']).optional(),
+        costBudget: z.enum(['low', 'medium', 'any']).optional(),
+        latencyPreference: z.enum(['fast', 'balanced', 'quality']).optional(),
+      })
+    )
+    .query(({ input }) => {
+      let model;
+      let reasonCode;
+
+      if (input.routingMode === 'manual' && input.selectedModelId) {
+        model = getImageModelById(input.selectedModelId);
+        reasonCode = 'manual_user_selection';
+      } else {
+        const decision = routeImageModel({
+          task: input.task,
+          numImages: input.numImages,
+          qualityTarget: input.qualityTarget,
+          costBudget: input.costBudget,
+          latencyPreference: input.latencyPreference,
+        });
+        model = getImageModelById(decision.chosenModelId);
+        reasonCode = decision.reasonCode;
+      }
+
+      if (!model)
+        return { credits: 0, fiatPriceUsd: 0, loarPriceUsd: 0, modelName: 'Unknown' };
+
+      return {
+        credits: model.creditCostPerImage * input.numImages,
+        fiatPriceUsd: model.fiatPriceUsd * input.numImages,
+        loarPriceUsd: model.loarPriceUsd * input.numImages,
+        providerCostUsd: model.providerCostUsd * input.numImages,
+        modelName: model.displayName,
+        modelId: model.id,
+        reasonCode,
+        priceTier: model.priceTier,
+        qualityTier: model.qualityTier,
+      };
+    }),
+
+  listModels: publicProcedure
+    .input(
+      z
+        .object({
+          task: z.enum(['text_to_image', 'image_to_image']).optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      // Check admin overrides
+      const overrides = new Map<string, { isEnabled: boolean; isVisibleToUsers: boolean }>();
+      try {
+        const snapshot = await imageModelOverridesCol().get();
+        snapshot.docs.forEach((doc) => overrides.set(doc.id, doc.data() as any));
+      } catch {
+        // no overrides yet
+      }
+
+      let models = getVisibleImageModels()
+        .map((m) => {
+          const override = overrides.get(m.id);
+          return override ? { ...m, ...override } : m;
+        })
+        .filter((m) => m.isEnabled && m.isVisibleToUsers);
+
+      if (input?.task) {
+        models = models.filter((m) => m.tasks.includes(input.task!));
+      }
+
+      return models.map((m) => ({
+        id: m.id,
+        provider: m.provider,
+        displayName: m.displayName,
+        shortDescription: m.shortDescription,
+        tasks: m.tasks,
+        qualityTier: m.qualityTier,
+        speedTier: m.speedTier,
+        priceTier: m.priceTier,
+        maxImages: m.maxImages,
+        supportsNegativePrompt: m.supportsNegativePrompt,
+        supportsSeed: m.supportsSeed,
+        creditCostPerImage: m.creditCostPerImage,
+        fiatPriceUsd: m.fiatPriceUsd,
+        loarPriceUsd: m.loarPriceUsd,
+        tags: m.tags,
+        bestFor: m.bestFor,
+      }));
+    }),
+
+  history: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        entityId: z.string().optional(),
+        universeId: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      let query = imageGenerationsCol()
+        .where('userId', '==', ctx.user.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit);
+
+      if (input.entityId) {
+        query = imageGenerationsCol()
+          .where('userId', '==', ctx.user.uid)
+          .where('entityId', '==', input.entityId)
+          .orderBy('createdAt', 'desc')
+          .limit(input.limit);
+      } else if (input.universeId) {
+        query = imageGenerationsCol()
+          .where('userId', '==', ctx.user.uid)
+          .where('universeId', '==', input.universeId)
+          .orderBy('createdAt', 'desc')
+          .limit(input.limit);
+      }
+
+      const snapshot = await query.get();
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }),
+
+  getRecord: protectedProcedure
+    .input(z.object({ generationId: z.string() }))
+    .query(async ({ input }) => {
+      const doc = await imageGenerationsCol().doc(input.generationId).get();
+      if (!doc.exists) return null;
+      return { id: doc.id, ...doc.data() };
+    }),
+
+  // ── Admin ─────────────────────────────────────────────────────────────
+
+  adminListModels: protectedProcedure.query(async () => {
+    const overrides = new Map<string, Record<string, any>>();
+    try {
+      const snapshot = await imageModelOverridesCol().get();
+      snapshot.docs.forEach((doc) => overrides.set(doc.id, doc.data()));
+    } catch {
+      // no overrides
+    }
+    return IMAGE_MODELS.map((m) => {
+      const override = overrides.get(m.id);
+      return { ...m, ...(override || {}), hasOverride: !!override };
+    });
+  }),
+
+  adminUpdateModel: protectedProcedure
+    .input(
+      z.object({
+        modelId: z.string(),
+        isEnabled: z.boolean().optional(),
+        isVisibleToUsers: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const model = getImageModelById(input.modelId);
+      if (!model) throw new Error(`Model "${input.modelId}" not found`);
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (input.isEnabled !== undefined) update.isEnabled = input.isEnabled;
+      if (input.isVisibleToUsers !== undefined) update.isVisibleToUsers = input.isVisibleToUsers;
+      await imageModelOverridesCol().doc(input.modelId).set(update, { merge: true });
+      return { ok: true, modelId: input.modelId, applied: update };
+    }),
+
+  // ── Backward-compat raw endpoints ────────────────────────────────────
+
+  generateImage: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        model: z
+          .enum(['fal-ai/nano-banana', 'fal-ai/flux/dev', 'fal-ai/flux-pro', 'fal-ai/flux/schnell'])
+          .optional(),
+        negativePrompt: z.string().optional(),
+        imageSize: imageSizeSchema.optional(),
+        numInferenceSteps: z.number().min(1).max(50).optional(),
+        guidanceScale: z.number().min(1).max(20).optional(),
+        numImages: z.number().min(1).max(4).optional(),
+        seed: z.number().optional(),
+        enableSafetyChecker: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateImage(input);
+    }),
+
+  editImage: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1, 'Edit prompt is required'),
+        imageUrls: z.array(z.string().url()).min(1),
+        numImages: z.number().min(1).max(4).optional(),
+        strength: z.number().min(0.1).max(1.0).optional(),
+        negativePrompt: z.string().optional(),
+        numInferenceSteps: z.number().min(1).max(50).optional(),
+        guidanceScale: z.number().min(1).max(20).optional(),
+        seed: z.number().optional(),
+        enableSafetyChecker: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await falService.editImage(input);
+      } catch (error) {
+        throw wrapError(error, 'Image editing failed');
+      }
+    }),
+
+  imageToImage: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1).max(2000),
+        imageUrls: z.array(z.string().url()).min(1).max(2),
+        negativePrompt: z.string().max(500).optional(),
+        imageSize: z
+          .union([
+            imageSizeSchema,
+            z.object({ width: z.number().min(384).max(5000), height: z.number().min(384).max(5000) }),
+          ])
+          .optional(),
+        numImages: z.number().min(1).max(4).optional().default(1),
+        seed: z.number().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await falService.imageToImage(input);
+      } catch (error) {
+        throw wrapError(error, 'Image-to-image transform failed');
+      }
+    }),
+
+  generateCharacter: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        description: z.string().min(1),
+        style: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']).optional(),
+        saveToDatabase: z.boolean().optional().default(true),
+        detailedVisualDescription: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const stylePrompts: Record<string, string> = {
+        cute: 'cute kawaii style, adorable, soft colors',
+        realistic: 'photorealistic, detailed, cinematic lighting',
+        anime: 'anime style, manga aesthetic, vibrant',
+        fantasy: 'fantasy art, magical, ethereal',
+        cyberpunk: 'cyberpunk style, neon, futuristic',
+      };
+      const stylePrompt = input.style ? stylePrompts[input.style] : stylePrompts.cute;
+      const fullPrompt = `Character portrait of ${input.name}, ${input.description}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
+
+      const imageResult = await falService.generateImage({
+        prompt: fullPrompt,
+        model: 'fal-ai/nano-banana',
+        imageSize: 'square_hd',
+        numImages: 1,
+      });
+
+      if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
+        throw new Error(imageResult.error || 'Failed to generate character image');
+      }
+
+      let characterId: string | undefined;
+      if (input.saveToDatabase) {
+        characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
+        await charactersCol().doc(characterId).set({
+          character_name: input.name,
+          collection: 'Nano Banana AI',
+          token_id: characterId,
+          traits: {
+            style: input.style || 'cute',
+            generated_with: 'nano-banana',
+            seed: imageResult.seed?.toString() || 'random',
+          },
+          rarity_rank: 0,
+          rarity_percentage: null,
+          image_url: imageResult.imageUrl,
+          description: input.description,
+          detailed_visual_description: input.detailedVisualDescription || null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+      }
+
+      return {
+        success: true,
+        characterId,
+        characterName: input.name,
+        imageUrl: imageResult.imageUrl,
+        seed: imageResult.seed,
+        prompt: fullPrompt,
+      };
+    }),
+
+  analyzeCharacter: protectedProcedure
+    .input(
+      z.object({
+        imageUrl: z.string().min(1, 'Image URL is required'),
+        characterName: z.string().min(1, 'Character name is required'),
+        userDescription: z.string().min(1, 'Description is required'),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const detailedDescription = await geminiService.analyzeCharacterImage(
+          input.imageUrl,
+          input.userDescription,
+          input.characterName
+        );
+        return {
+          success: true,
+          characterName: input.characterName,
+          detailedVisualDescription: detailedDescription,
+        };
+      } catch (error) {
+        throw wrapError(error, 'Failed to analyze character image');
+      }
+    }),
+
+  saveCharacter: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, 'Character name is required'),
+        description: z.string().min(1, 'Description is required'),
+        imageUrl: z.string().min(1, 'Image URL is required'),
+        style: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']),
+        detailedVisualDescription: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
+      await charactersCol().doc(characterId).set({
+        character_name: input.name,
+        collection: 'Nano Banana AI',
+        token_id: characterId,
+        traits: { style: input.style, generated_with: 'nano-banana' },
+        rarity_rank: 0,
+        rarity_percentage: null,
+        image_url: input.imageUrl,
+        description: input.description,
+        detailed_visual_description: input.detailedVisualDescription || null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      return { success: true, characterId, characterName: input.name, imageUrl: input.imageUrl };
+    }),
+});

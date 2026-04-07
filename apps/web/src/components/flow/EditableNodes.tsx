@@ -1,28 +1,36 @@
+/**
+ * Editable ReactFlow Nodes
+ *
+ * Variants of the custom nodes (Character, PlotPoint, Media) that expose
+ * inline-editable description fields. Used in edit mode so users can
+ * modify node content directly on the canvas.
+ */
+
 import { memo, useState, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 
 // Character Node with editable description
 export const EditableCharacterNode = memo(({ data, isConnectable, selected }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
-  
+
   // Update the node data when description changes
   useEffect(() => {
     if (data.description !== description) {
       data.description = description;
     }
   }, [description, data]);
-  
+
   return (
-    <div className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-blue-700 ring-2 ring-blue-300' : 'border-blue-500'} dark:bg-slate-800`}>
+    <div
+      className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-blue-700 ring-2 ring-blue-300' : 'border-blue-500'} dark:bg-slate-800`}
+    >
       <div className="flex items-center">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-blue-100 dark:bg-blue-900">
           {data.emoji || '👤'}
         </div>
         <div className="ml-2">
           <div className="text-lg font-bold">{data.label}</div>
-          {data.nftId && (
-            <div className="text-xs text-muted-foreground">NFT: {data.nftId}</div>
-          )}
+          {data.nftId && <div className="text-xs text-muted-foreground">NFT: {data.nftId}</div>}
         </div>
       </div>
       <div className="mt-2">
@@ -34,16 +42,8 @@ export const EditableCharacterNode = memo(({ data, isConnectable, selected }: No
           rows={2}
         />
       </div>
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={isConnectable}
-      />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
     </div>
   );
 });
@@ -51,16 +51,18 @@ export const EditableCharacterNode = memo(({ data, isConnectable, selected }: No
 // Plot Point Node with editable description
 export const EditablePlotPointNode = memo(({ data, isConnectable, selected }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
-  
+
   // Update the node data when description changes
   useEffect(() => {
     if (data.description !== description) {
       data.description = description;
     }
   }, [description, data]);
-  
+
   return (
-    <div className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-green-700 ring-2 ring-green-300' : 'border-green-500'} dark:bg-slate-800`}>
+    <div
+      className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-green-700 ring-2 ring-green-300' : 'border-green-500'} dark:bg-slate-800`}
+    >
       <div className="flex">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-green-100 dark:bg-green-900">
           {data.emoji || '📝'}
@@ -69,7 +71,7 @@ export const EditablePlotPointNode = memo(({ data, isConnectable, selected }: No
           <div className="text-lg font-bold">{data.label}</div>
           {data.canonicity && (
             <div className="text-xs">
-              Canonicity: 
+              Canonicity:
               <span className={data.canonicity === 'Canon' ? 'text-green-500' : 'text-amber-500'}>
                 {data.canonicity}
               </span>
@@ -86,16 +88,8 @@ export const EditablePlotPointNode = memo(({ data, isConnectable, selected }: No
           rows={2}
         />
       </div>
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={isConnectable}
-      />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
     </div>
   );
 });
@@ -104,7 +98,7 @@ export const EditablePlotPointNode = memo(({ data, isConnectable, selected }: No
 export const EditableMediaNode = memo(({ data, isConnectable, selected }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
   const [mediaUrl, setMediaUrl] = useState(data.mediaUrl || '');
-  
+
   // Update the node data when description or mediaUrl changes
   useEffect(() => {
     if (data.description !== description) {
@@ -114,9 +108,11 @@ export const EditableMediaNode = memo(({ data, isConnectable, selected }: NodePr
       data.mediaUrl = mediaUrl;
     }
   }, [description, mediaUrl, data]);
-  
+
   return (
-    <div className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-purple-700 ring-2 ring-purple-300' : 'border-purple-500'} dark:bg-slate-800`}>
+    <div
+      className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-purple-700 ring-2 ring-purple-300' : 'border-purple-500'} dark:bg-slate-800`}
+    >
       <div className="flex">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-purple-100 dark:bg-purple-900">
           {data.emoji || '🎬'}
@@ -124,9 +120,7 @@ export const EditableMediaNode = memo(({ data, isConnectable, selected }: NodePr
         <div className="ml-2">
           <div className="text-lg font-bold">{data.label}</div>
           {data.storageType && (
-            <div className="text-xs text-muted-foreground">
-              Storage: {data.storageType}
-            </div>
+            <div className="text-xs text-muted-foreground">Storage: {data.storageType}</div>
           )}
         </div>
       </div>
@@ -146,16 +140,8 @@ export const EditableMediaNode = memo(({ data, isConnectable, selected }: NodePr
           rows={2}
         />
       </div>
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={isConnectable}
-      />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
     </div>
   );
 });
@@ -163,16 +149,18 @@ export const EditableMediaNode = memo(({ data, isConnectable, selected }: NodePr
 // Voting Node with editable description
 export const EditableVotingNode = memo(({ data, isConnectable, selected }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
-  
+
   // Update the node data when description changes
   useEffect(() => {
     if (data.description !== description) {
       data.description = description;
     }
   }, [description, data]);
-  
+
   return (
-    <div className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-amber-700 ring-2 ring-amber-300' : 'border-amber-500'} dark:bg-slate-800`}>
+    <div
+      className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${selected ? 'border-amber-700 ring-2 ring-amber-300' : 'border-amber-500'} dark:bg-slate-800`}
+    >
       <div className="flex">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-amber-100 dark:bg-amber-900">
           {data.emoji || '🗳️'}
@@ -181,7 +169,7 @@ export const EditableVotingNode = memo(({ data, isConnectable, selected }: NodeP
           <div className="text-lg font-bold">{data.label}</div>
           {data.status && (
             <div className="text-xs">
-              Status: 
+              Status:
               <span className={data.status === 'Active' ? 'text-green-500' : 'text-gray-500'}>
                 {data.status}
               </span>
@@ -198,16 +186,8 @@ export const EditableVotingNode = memo(({ data, isConnectable, selected }: NodeP
           rows={2}
         />
       </div>
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={isConnectable}
-      />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
     </div>
   );
 });

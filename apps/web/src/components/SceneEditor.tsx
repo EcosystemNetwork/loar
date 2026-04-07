@@ -1,7 +1,15 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+/**
+ * Scene Editor Dialog
+ *
+ * Advanced video scene editing interface with segment-level controls:
+ * text overlays, transitions, AI regeneration, trim/split, and per-segment
+ * settings. Used within the timeline editor for fine-grained scene composition.
+ */
+
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Film,
   Sparkles,
@@ -20,15 +28,15 @@ import {
   ArrowRight,
   Wand2,
   Trash2,
-} from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+} from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 
 interface VideoSegment {
   id: string;
@@ -65,13 +73,17 @@ export function SceneEditor({
   const [selectedSegmentIndex, setSelectedSegmentIndex] = useState<number | null>(null);
 
   // Creation state
-  const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>('text-to-video');
-  const [videoDescription, setVideoDescription] = useState("");
+  const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>(
+    'text-to-video'
+  );
+  const [videoDescription, setVideoDescription] = useState('');
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'>('fal-veo3');
-  const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [selectedVideoModel, setSelectedVideoModel] = useState<
+    'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'
+  >('fal-veo3');
+  const [videoRatio, setVideoRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [selectedVideoDuration, setSelectedVideoDuration] = useState(8);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -142,7 +154,7 @@ export function SceneEditor({
     // For now, just a placeholder
     const newSegment: VideoSegment = {
       id: `seg-${Date.now()}`,
-      videoUrl: "placeholder",
+      videoUrl: 'placeholder',
       imageUrl: selectedImageUrl || undefined,
       prompt: videoDescription,
       duration: selectedVideoDuration,
@@ -150,34 +162,38 @@ export function SceneEditor({
       order: segments.length,
     };
     setSegments([...segments, newSegment]);
-    setVideoDescription("");
+    setVideoDescription('');
     setSelectedImageUrl(null);
   };
 
   // Remove segment
   const handleRemoveSegment = (index: number) => {
-    setSegments(segments.filter((_, i) => i !== index).map((seg, idx) => ({
-      ...seg,
-      order: idx
-    })));
+    setSegments(
+      segments
+        .filter((_, i) => i !== index)
+        .map((seg, idx) => ({
+          ...seg,
+          order: idx,
+        }))
+    );
   };
 
   // Download merged video
   const handleDownload = () => {
     // Implementation for downloading the merged scene
-    console.log("Download scene");
+    console.log('Download scene');
   };
 
   // Organize segments
   const handleOrganize = () => {
-    console.log("Organize segments");
+    console.log('Organize segments');
   };
 
   const modelNames: Record<string, string> = {
     'fal-veo3': 'Veo 3.1 - Fast',
     'fal-kling': 'Kling 2.5',
     'fal-wan25': 'Wan 2.5',
-    'fal-sora': 'Sora 2'
+    'fal-sora': 'Sora 2',
   };
 
   if (!isOpen) return null;
@@ -188,22 +204,16 @@ export function SceneEditor({
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-background/95">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold">Scene Editor</h1>
-          <span className="text-sm text-muted-foreground">{segments.length} clips • {formatTime(totalDuration)}</span>
+          <span className="text-sm text-muted-foreground">
+            {segments.length} clips • {formatTime(totalDuration)}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleOrganize}
-          >
+          <Button variant="outline" size="sm" onClick={handleOrganize}>
             <LayoutGrid className="h-4 w-4 mr-2" />
             Organize
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownload}
-          >
+          <Button variant="outline" size="sm" onClick={handleDownload}>
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
@@ -243,7 +253,8 @@ export function SceneEditor({
               onEnded={() => {
                 // Auto-advance to next segment
                 if (currentSegmentInfo.index < segments.length - 1) {
-                  const nextSegmentStart = currentSegmentInfo.segmentStartTime + currentSegmentInfo.segment.duration;
+                  const nextSegmentStart =
+                    currentSegmentInfo.segmentStartTime + currentSegmentInfo.segment.duration;
                   setCurrentTime(nextSegmentStart);
                 } else {
                   setIsPlaying(false);
@@ -271,7 +282,7 @@ export function SceneEditor({
             {/* Segment Info Overlay */}
             <div className="absolute bottom-4 left-4 px-3 py-2 bg-black/80 rounded-lg backdrop-blur-sm">
               <p className="text-white text-sm font-medium">
-                Clip {(currentSegmentInfo.index + 1)} of {segments.length}
+                Clip {currentSegmentInfo.index + 1} of {segments.length}
               </p>
               <p className="text-white/70 text-xs line-clamp-1">
                 {currentSegmentInfo.segment.prompt}
@@ -293,16 +304,8 @@ export function SceneEditor({
           <div className="w-full max-w-4xl mt-6 space-y-3">
             {/* Playback Controls */}
             <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={togglePlayPause}
-              >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4 mr-2" />
-                ) : (
-                  <Play className="h-4 w-4 mr-2" />
-                )}
+              <Button variant="ghost" size="sm" onClick={togglePlayPause}>
+                {isPlaying ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
                 {isPlaying ? 'Pause' : 'Play'}
               </Button>
               <span className="text-sm font-mono text-muted-foreground">
@@ -319,7 +322,9 @@ export function SceneEditor({
               <div className="flex h-full">
                 {segments.map((segment, index) => {
                   const widthPercent = (segment.duration / totalDuration) * 100;
-                  const segmentStartTime = segments.slice(0, index).reduce((acc, s) => acc + s.duration, 0);
+                  const segmentStartTime = segments
+                    .slice(0, index)
+                    .reduce((acc, s) => acc + s.duration, 0);
                   const isActive = currentSegmentInfo?.index === index;
 
                   return (
@@ -370,7 +375,7 @@ export function SceneEditor({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log("Extend segment", index);
+                          console.log('Extend segment', index);
                         }}
                         className="absolute top-1/2 -right-3 transform -translate-y-1/2 p-1 bg-primary hover:bg-primary/80 text-primary-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
                       >
@@ -399,7 +404,7 @@ export function SceneEditor({
                 size="sm"
                 onClick={() => {
                   // Scroll to creation panel
-                  setVideoDescription("");
+                  setVideoDescription('');
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -418,17 +423,15 @@ export function SceneEditor({
               {/* Mode Selector */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-2"
-                  >
+                  <Button variant="outline" size="sm" className="h-8 gap-2">
                     {generationMode === 'text-to-video' ? (
                       <Type className="h-4 w-4" />
                     ) : (
                       <ImageIcon className="h-4 w-4" />
                     )}
-                    <span>{generationMode === 'text-to-video' ? 'Text to Video' : 'Image to Video'}</span>
+                    <span>
+                      {generationMode === 'text-to-video' ? 'Text to Video' : 'Image to Video'}
+                    </span>
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 gap-2">
@@ -510,8 +513,8 @@ export function SceneEditor({
                     onClick={() => setSelectedVideoModel(model)}
                     className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${
                       selectedVideoModel === model
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background hover:bg-muted'
                     }`}
                   >
                     {modelNames[model]}
@@ -530,8 +533,8 @@ export function SceneEditor({
                     onClick={() => setVideoRatio(ratio)}
                     className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
                       videoRatio === ratio
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background hover:bg-muted'
                     }`}
                   >
                     {ratio}

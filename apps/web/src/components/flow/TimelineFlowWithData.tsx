@@ -1,3 +1,11 @@
+/**
+ * Timeline Flow With Data
+ *
+ * Data-fetching wrapper around TimelineFlowEditor. Loads the full graph from
+ * the blockchain via useGetFullGraph, converts raw contract data into ReactFlow
+ * nodes and edges, then passes them to the editor component.
+ */
+
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { Loader2 } from 'lucide-react';
@@ -14,7 +22,7 @@ export function TimelineFlowWithData({
   isCreateDialogOpen = false,
   setIsCreateDialogOpen = () => {},
   timelineAddress,
-  readOnly = false
+  readOnly = false,
 }: {
   universeId: string;
   timelineId: string;
@@ -28,29 +36,31 @@ export function TimelineFlowWithData({
   const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { isConnected } = useAccount();
-  
+
   // Use the hook to get the full graph data from the blockchain
   // Pass the timeline address if it's a blockchain universe
-  const { data: graphData, isLoading: isLoadingGraph, isError } = useGetFullGraph(
-    universeId?.startsWith('0x') ? universeId : timelineAddress
-  );
-  
+  const {
+    data: graphData,
+    isLoading: isLoadingGraph,
+    isError,
+  } = useGetFullGraph(universeId?.startsWith('0x') ? universeId : timelineAddress);
+
   // Process the graph data from the blockchain into ReactFlow nodes and edges
   useEffect(() => {
     if (!isConnected || isLoadingGraph || !graphData) {
       return;
     }
-    
+
     try {
       setIsLoading(true);
-      
+
       // Extract data from the blockchain response
       const [ids, links, plots, previousIds, nextIds, canonFlags] = graphData;
-      
+
       // Create nodes for ReactFlow
       const nodes: Node<TimelineNodeData>[] = [];
       const edges: Edge[] = [];
-      
+
       // Process each node from the blockchain data
       for (let i = 0; i < ids.length; i++) {
         const id = Number(ids[i]);
@@ -58,10 +68,10 @@ export function TimelineFlowWithData({
         const plot = String(plots[i]);
         const previousId = Number(previousIds[i]);
         const isCanon = Boolean(canonFlags[i]);
-        
+
         // Skip empty nodes (id === 0)
         if (id === 0) continue;
-        
+
         // Create a node for the graph
         const newNode: Node<TimelineNodeData> = {
           id: `node-${id}`,
@@ -82,9 +92,9 @@ export function TimelineFlowWithData({
             isCanon: isCanon,
           },
         };
-        
+
         nodes.push(newNode);
-        
+
         // Create an edge if this node has a previous node
         if (previousId > 0) {
           const newEdge: Edge = {
@@ -101,7 +111,7 @@ export function TimelineFlowWithData({
           edges.push(newEdge);
         }
       }
-      
+
       setInitialNodes(nodes);
       setInitialEdges(edges);
     } catch (error) {
@@ -110,19 +120,21 @@ export function TimelineFlowWithData({
       setIsLoading(false);
     }
   }, [graphData, isConnected, isLoadingGraph, timelineId, universeId]);
-  
+
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-semibold">Narrative Timeline Editor</h2>
       <p className="text-muted-foreground">
-        Create and connect narrative elements to build your story's timeline. 
-        Each node represents a plot point that can be connected to form a coherent narrative.
+        Create and connect narrative elements to build your story's timeline. Each node represents a
+        plot point that can be connected to form a coherent narrative.
       </p>
-      
+
       {!isConnected ? (
         <div className="h-[600px] w-full border rounded-lg flex flex-col items-center justify-center gap-4">
           <p className="text-lg">Connect your wallet to view and edit the timeline</p>
-          <p className="text-sm text-muted-foreground">You need to connect a wallet to interact with the blockchain</p>
+          <p className="text-sm text-muted-foreground">
+            You need to connect a wallet to interact with the blockchain
+          </p>
         </div>
       ) : isLoading || isLoadingGraph ? (
         <div className="h-[600px] w-full border rounded-lg flex items-center justify-center">

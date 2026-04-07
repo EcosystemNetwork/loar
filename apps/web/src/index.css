@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -143,17 +143,9 @@
     z-index: 9999 !important;
   }
 
-  /* Ensure CDP components have proper stacking context */
-  .cdp-auth-button,
-  [data-cdp-auth-button],
-  [class*="cdp-auth"] {
-    position: relative;
-    z-index: 50;
-  }
-
   /* Fix any backdrop/overlay issues */
   [data-backdrop],
-  [class*="backdrop"] {
+  [class*='backdrop'] {
     z-index: 9998 !important;
   }
 }

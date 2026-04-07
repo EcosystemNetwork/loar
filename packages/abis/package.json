@@ -5,18 +5,25 @@
   "main": "src/generated.ts",
   "types": "src/generated.ts",
   "scripts": {
-    "generate": "bunx wagmi generate",
-    "build:ts": "bunx tsc --build",
-    "generate:all":"bun run generate && bun run build:ts"
+    "generate": "pnpm exec wagmi generate",
+    "build:ts": "pnpm exec tsc --build",
+    "generate:all": "pnpm run generate && pnpm run build:ts"
   },
   "typesVersions": {
     "*": {
-      "addresses": ["src/addresses.ts"],
-      "generated": ["src/generated.ts"]
+      "addresses": [
+        "src/addresses.ts"
+      ],
+      "generated": [
+        "src/generated.ts"
+      ]
     }
   },
   "exports": {
     "./addresses": "./dist/addresses.js",
     "./generated": "./dist/generated.js"
+  },
+  "devDependencies": {
+    "wagmi": "^2.16.3"
   }
 }

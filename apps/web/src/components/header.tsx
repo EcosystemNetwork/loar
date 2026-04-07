@@ -1,29 +1,54 @@
-import { Link } from "@tanstack/react-router";
-import { WalletConnectButton } from "@/components/wallet-connect-button";
-import { ModeToggle } from "./mode-toggle";
+/**
+ * Site Header
+ *
+ * Sticky top navigation bar with logo, page links, wallet connect button,
+ * sign-out action, and theme toggle. Collapses nav links on mobile.
+ */
+
+import { Link, useMatchRoute } from '@tanstack/react-router';
+import { WalletConnectButton } from '@/components/wallet-connect-button';
+import { LoarBalance } from './LoarBalance';
+import { ModeToggle } from './mode-toggle';
+import { Button } from './ui/button';
+import { Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
 export default function Header() {
-  const links = [
-    { to: "/", label: "Home" },
-    { to: "/cinematicUniverseCreate", label: "Create Universe" },
+  const matchRoute = useMatchRoute();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const links: Array<{ to: string; label: string }> = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/discover', label: 'Discover' },
+    { to: '/create', label: 'Create' },
+    { to: '/wiki', label: 'Wiki' },
+    { to: '/market', label: 'Slop Market' },
+    { to: '/credits', label: 'Credits' },
+    { to: '/sandbox', label: 'Sandbox' },
+    { to: '/docs', label: 'Docs' },
   ];
 
   return (
-    <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
+    <header className="border-b bg-card/50 backdrop-blur-xl sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Left side - Logo and Navigation */}
           <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <img src="/loarlogo.svg" alt="LOAR Logo" className="h-10 w-auto object-contain" />
-            </div>
-            <nav className="hidden md:flex items-center gap-6">
+            <Link to="/" className="flex items-center gap-3">
+              <img src="/loarlogo.svg" alt="LOAR Logo" className="h-9 w-auto object-contain" />
+            </Link>
+            <nav className="hidden md:flex items-center gap-1">
               {links.map(({ to, label }) => {
+                const isActive = matchRoute({ to, fuzzy: true });
                 return (
                   <Link
                     key={to}
                     to={to}
-                    className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
                   >
                     {label}
                   </Link>
@@ -33,26 +58,44 @@ export default function Header() {
           </div>
 
           {/* Right side - Wallet and Theme Toggle */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <LoarBalance />
             <WalletConnectButton size="sm" />
             <ModeToggle />
+            {/* Mobile menu toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
 
         {/* Mobile Navigation */}
-        <div className="md:hidden mt-4 flex flex-wrap gap-4">
-          {links.map(({ to, label }) => {
-            return (
-              <Link
-                key={to}
-                to={to}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </div>
+        {mobileOpen && (
+          <nav className="md:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3">
+            {links.map(({ to, label }) => {
+              const isActive = matchRoute({ to, fuzzy: true });
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  onClick={() => setMobileOpen(false)}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </div>
     </header>
   );

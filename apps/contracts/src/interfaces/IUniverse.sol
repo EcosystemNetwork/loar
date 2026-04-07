@@ -11,10 +11,19 @@ interface IUniverse {
     error CallerNotAdmin(address caller);
 
     event NodeCanonized(uint id, address canonizer);
-    event NodeCreated(uint id, uint previous, address creator);
+    event NodeCreated(
+        uint indexed id,
+        uint indexed previous,
+        address indexed creator,
+        bytes32 contentHash,
+        bytes32 plotHash,
+        string link,
+        string plot
+    );
     event NodeVisibilityOptionUpdated(NodeVisibilityOptions option);
     event NodeCreationOptionUpdated(NodeCreationOptions option);
-    event MediaUpdated(address updater, string link);
+    event MediaUpdated(address updater, bytes32 contentHash, string link);
+
     function setAdmin(address newAdmin) external;
     function setToken(address) external;
     function getAdmin() external returns (address);

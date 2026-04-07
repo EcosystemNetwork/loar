@@ -1,320 +1,306 @@
-# 🌌 LOAR: Decentralized Narrative Control Suite
+# LOAR: Decentralized Narrative Control Suite
 
 <div align="center">
 
 ![LOAR Banner](https://fungerbil.com/LOARLOGO.png)
 
-### *Empowering Creators to Build Collaborative Cinematic Universes*
+### _Create AI-powered cinematic universes. Own them on-chain. Monetize them._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Powered by Walrus](https://img.shields.io/badge/Powered%20by-Walrus-blue)](https://www.walrus.xyz/)
-[![OpenSea Integration](https://img.shields.io/badge/OpenSea-Integration-blue)](https://opensea.io)
-[![Dynamic Auth](https://img.shields.io/badge/Auth%20by-Dynamic-purple)](https://www.dynamic.xyz/)
+[![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
+[![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
+[![Sepolia Testnet](https://img.shields.io/badge/Network-Sepolia-blue)](https://sepolia.etherscan.io/)
 
 </div>
-
-## 🔮 Vision
-
-LOAR revolutionizes narrative creation by putting the power of storytelling in the hands of communities. Our platform enables collaborative cinematic universe development with decentralized governance, censorship-resistant content hosting, and blockchain-based ownership.
-
-Our current reference product would be something like Naver Webtoons mixed with TikTok. 
-The average Webtoons user uses the app for 30 minutes a day. 
-We believe that LOAR has the potential for even higher amounts of usage through a four pronged strategy.
-
-- **Consumption** - Consuming AI generated video content.
-
-- **Production** - Providing the best and most accessible tooling for creating AI generated videos, Using crypto markets to incentivize quality content creation.
-
-- **Discussion** - Having the space to discuss over storylines and canons
-
-- **Speculation** - trading with individual cinematic universe tokens which will control which nodes are 'official' in a given timeline.
-
-
-
-
-## 🚀 Core Features
-
-### 🧩 Narrative Flow Editor
-- **Interactive Node-Based Editor** - Create and visualize complex narrative structures
-- **Character-Plot Connections** - Link characters to storylines with visual relationships
-- **Canonicity Management** - Track and vote on official universe canon
-
-### 🛡️ Censorship-Resistant Content (Powered by Walrus Protocol)
-- **Decentralized Video Storage** - Content that can't be taken down or censored
-- **Trustless Distribution** - No central authority controls your narrative
-
-### 🏛️ Decentralized Governance
-- **Token-Based Voting** - Community decides on canonical content
-- **Proposal System** - Submit narrative elements for community approval
-- **Stake-Weighted Influence** - Greater stake means greater say in universe direction
-- **Transparent Decision Making** - All votes recorded on-chain
-
-## 🛠️ Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
-- **Bun** (recommended) - [Install here](https://bun.sh/)
-- **PostgreSQL** - [Install here](https://www.postgresql.org/download/)
-- **Foundry** (for smart contracts) - [Install here](https://book.getfoundry.sh/getting-started/installation)
-- **Ethereum wallet** (MetaMask recommended)
-
-## 📦 Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url>
-   cd Loar-Fullstack
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   # Install dependencies for the entire monorepo
-   bun install
-   
-   # If you encounter missing dependencies, install them specifically for the web app
-   cd apps/web
-   bun install
-   bun add reactflow  # Required for the narrative flow editor
-   ```
-     ```
-3.  **Configure your environment:**
-   - Update `apps/server/.env`, refer to apps/server/.env.example
-   - Copy `apps/web/.env.example` to `apps/web/.env` and update as needed
-
-4. **Building the application**
-```bash 
-    #in root directory
-    bun run build
-    docker compose up -d
-``` 
-
-5. **Set up the database:**
-   ```bash
-   # From the root directory
-   bun db:push
-   # Or if you prefer to run migrations
-   cd apps/server
-   bun run db:generate
-   bun run db:migrate
-   ```
-
-## 🚀 Running the Application
-
-1. **Launch the platform:**
-   ```bash
-   # Run the full stack:
-   bun dev
-   
-   # Or run just the frontend:
-   bun dev:web
-   
-   # Or run just the backend:
-   bun dev:server
-   ```
-
-2. **Access the application:**
-   - Web App: [http://localhost:3001](http://localhost:3001) or [http://localhost:3002](http://localhost:3002) (port may vary if 3001 is already in use)
-   - API endpoints: [http://localhost:3000](http://localhost:3000)
-
-### Troubleshooting
-
-If you encounter dependency issues:
-
-1. **Missing packages**: Some dependencies might not be installed automatically. If you see errors about missing packages, install them individually:
-   ```bash
-   cd apps/web
-   bun add reactflow @tailwindcss/postcss autoprefixer
-   ```
-
-2. **Port conflicts**: If port 3001 is already in use, the application will automatically use port 3002 or another available port.
-
-3. **Database connection issues**: Ensure PostgreSQL is running and your connection details in `apps/server/.env` are correct.
-
-4. **Workspace warnings**: You may see warnings about missing workspace directories like "packages/" or "contracts/". These can be safely ignored if you're only working on the web and server applications.
-
-3. **Deploy smart contracts (optional):**
-   ```bash
-   cd apps/contracts
-   forge build
-   forge test
-   ```
-
-## 🌐 Access the Application
-
-- **Web App:** http://localhost:3001
-- **Server:** http://localhost:3000
-- **API Documentation:** http://localhost:3000/trpc
-
-- **Multi-Wallet Support** - MetaMask, WalletConnect, Coinbase Wallet, and more
-
-## 📁 Project Structure
-
-```
-Loar-Fullstack/
-├── apps/
-│   ├── web/                 # React frontend with Dynamic auth
-│   │   ├── src/
-│   │   │   ├── components/
-│   │   │   │   ├── flow/       # ReactFlow narrative editor components
-│   │   │   │   ├── ui/         # shadcn/ui components
-│   │   │   │   └── wiki/       # Character wiki components
-│   │   │   ├── lib/          # Utility functions
-│   │   │   ├── routes/       # TanStack Router routes
-│   │   │   └── utils/        # Helper utilities
-│   │   └── public/         # Static assets
-│   ├── server/              # tRPC backend
-│   │   ├── src/
-│   │   │   ├── db/          # Database schema and migrations
-│   │   │   ├── routers/      # tRPC route handlers
-│   │   │   ├── services/     # Business logic services
-│   │   │   └── utils/        # Helper utilities
-│   │   └── test/           # Test files
-│   ├── character-wiki/      # Character wiki generator
-│   └── contracts/           # Solidity smart contracts
-├── lib/                     # Shared libraries
-└── package.json            # Root package.json
-```
-
-## 🌟 Why LOAR? (For Hackathon Judges)
-
-### 💡 The Problem We're Solving
-Traditional media creation is centralized, controlled by studios and platforms that can censor content, restrict creator freedom, and limit community involvement. When communities do participate, there's no reliable way to track canonical content or ensure fair governance.
-
-### 🛠️ Our Solution
-LOAR creates a decentralized ecosystem where:
-
-1. **Communities Own Their Narratives** - Not corporations or platforms
-2. **Content Cannot Be Censored** - Thanks to Filecoin Protocol's decentralized storage
-3. **Ownership Is Verifiable** - Through blockchain authentication and NFTs
-4. **Governance Is Democratic** - With on-chain voting and proposals
-5. **Creation Is Collaborative** - With our visual narrative flow editor
-
-### 💸 Market Potential
-- **$300B+** global entertainment market
-- **80M+** NFT owners seeking utility for their digital assets
-- **Growing demand** for decentralized content platforms resistant to censorship
-- **Expanding creator economy** looking for new monetization models
-
-### 📊 Technical Innovation
-1. **First-of-its-kind integration** between narrative creation tools and decentralized storage
-3. **Unique visual editor** for managing narrative canonicity with blockchain verification
-4. **Censorship-resistant media pipeline** from creation to distribution
-
-## 📍 Technical Architecture
-
-```mermaid
-graph TD
-    A[User Interface] --> B[Narrative Flow Editor]
-    A --> C[Character Wiki]
-    A --> D[Governance Portal]
-    
-    B --> E[ReactFlow Engine]
-    E --> F[Narrative State Manager]
-    F --> G[tRPC API Layer]
-    
-    H --> I[NFT Metadata Parser]
-    I --> J[Character Generator]
-    J --> G
-    
-    D --> K[Voting Contract]
-    K --> L[On-Chain Governance]
-    L --> G
-    
-    G --> M[PostgreSQL Database]
-    G --> N[Filecoin Storage Layer]
-    
-```
-
-### Key Components
-
-1. **Frontend Layer**
-   - React 19 with TanStack Router
-   - ReactFlow for narrative visualization
-
-2. **API Layer**
-   - tRPC for type-safe API calls
-   - Hono for high-performance endpoints
-   - WebSocket for real-time updates
-
-3. **Storage Layer**
-   - PostgreSQL with Drizzle ORM for structured data
-
-4. **Blockchain Layer**
-   - Smart contracts for governance
-
-
-## 🔧 Development
-
-### Adding New Routes
-1. Create a new file in `apps/web/src/routes/`
-2. Export a `Route` using `createFileRoute`
-3. The route will be automatically included
-
-### Adding New API Endpoints
-1. Add new procedures in `apps/server/src/routers/`
-2. Export them from `apps/server/src/routers/index.ts`
-3. Use them in the frontend with tRPC
-
-### Smart Contract Development
-1. Add contracts in `apps/contracts/src/`
-2. Write tests in `apps/contracts/test/`
-3. Deploy scripts in `apps/contracts/script/`
-
-## Filecoin Integration plan
-Currently we have our SynapseSDK/WarmStorage implementation in apps/server/src/services/synapse.ts.
-
-For the sake of the MVP deployments are currently being handled by a backend service that pays for uploads to filecoin.
-
-However in the future we will explore ways to make uploads to filecoin more economically feasible, using specific providers and CDNs to speed up U/Ds and implementing storage callback methods for better UX.
-
-## 🔑 Key Technologies & Technical Implementation
-
-### 🧠 Core Stack
-- **TypeScript** - End-to-end type safety across the entire application
-- **React 19 & TanStack Router** - Latest React features with optimized routing
-- **Hono & tRPC** - High-performance API layer with end-to-end typesafety
-- **Tailwind & shadcn/ui** - Beautiful, responsive UI components
-- **Drizzle ORM** - Type-safe database access with PostgreSQL
-
-### 🌊 Filecoin Integration
-- **Synapse SDK** uploads and downloads handled through funded synapse integration on backend
-
-### 🔗 Blockchain Features
-- **Smart Contract Governance** - On-chain voting and proposal systems
-- **Token-Gated Access** - Exclusive features for token holders
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 🌐 The Future of LOAR
-
-Our roadmap includes:
-
-- **AI-Generated Content** - Narrative expansion using AI models
-- **Cross-Universe Collaborations** - Connect multiple cinematic universes
-- **Mobile Apps** - Take your universe creation on the go
-- **Creator Monetization** - Direct revenue streams for contributors
-- **Expanded Blockchain Support** - Integration with more chains and L2s
-
-
-## 📚 License
-
-This project is licensed under the MIT License.
-
-## 👨‍💻 Team
-
-LOAR was created by a team of passionate developers, designers, and storytellers who believe in the power of decentralized narrative creation.
 
 ---
 
-<div align="center">
+## What is LOAR?
 
-# 🔥 Decentralize Storytelling. Empower Communities. Build Universes. 🔥
+LOAR is a platform where creators deploy cinematic universes as smart contracts, generate AI video/image content, build branching narratives, and set up multiple revenue streams — all governed by token holders.
 
-</div>
+**One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
+
+**Live testnet demo:** [loar.fun](https://loar.fun) (Sepolia)
+
+---
+
+## Honest Feature Status
+
+We classify every feature by what actually works end-to-end today, not what has backend code or UI shells.
+
+### LIVE (Working end-to-end)
+
+| Feature                        | What Works Today                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| **Wallet Auth (SIWE)**         | CDP Embedded Wallet (Google/Apple/passkeys/email) → SIWE signature → JWT. Full social login, no seed phrase required |
+| **Universe Creation**          | Two-step wizard: deploy Universe contract + governance token + Uniswap v4 pool                                       |
+| **Narrative Timeline Editor**  | ReactFlow-based visual story builder. Create, link, and branch narrative nodes                                       |
+| **AI Video Generation**        | 4 providers (Veo3, Kling, Wan2.5, Sora) via FAL AI. 1-60s duration, configurable                                     |
+| **AI Image Generation**        | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                                                  |
+| **Model Routing (Smart Auto)** | Auto-selects best model by quality/speed/cost. Manual override available. 14 models, cost tracked per generation     |
+| **Quest & Affiliate System**   | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards         |
+| **AI Wiki Generation**         | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                    |
+| **On-Chain Node Storage**      | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                          |
+| **Decentralized Storage**      | Multi-provider fallback: Walrus > IPFS/Pinata > Filecoin/Synapse > Firebase                                          |
+| **Creator Profiles**           | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                 |
+| **Content Upload**             | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                |
+| **Content Discovery**          | Search/filter by classification, media type, tags. Creator gallery + content feed                                    |
+| **Character Wiki**             | Browse, search, filter characters by collection/traits. Individual character pages                                   |
+| **Blockchain Indexer**         | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                                                    |
+| **ETH Purchase Flow**          | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order         |
+
+### PARTIAL (Backend + contracts exist, frontend not fully wired)
+
+These have working smart contracts deployed on Sepolia AND fully implemented backend APIs (tRPC), but the marketplace frontend is informational UI — it shows stats and explains how things work, without interactive buy/sell/bid transaction flows.
+
+| Feature                   | What Exists                                                                                                                         | What's Missing                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: product detail + ETH buy button                            | No creator mint form. Purchases record in Firestore; on-chain contract not yet deployed                  |
+| **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD                                                                          | No frontend mint flow. Marketplace tab is explainer text only                                            |
+| **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations. Full submit form + For/Against voting UI                               | On-chain finalize/license call not yet wired from frontend                                               |
+| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. $LOAR tab wired with on-chain tx verification | Card tab has no Stripe integration. Fiat purchase records without payment processor validation           |
+| **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model                                                                         | Tab UI exists but no subscribe/payment flow                                                              |
+| **Collabs**               | API: propose, accept, activate, record episodes, complete                                                                           | Tab UI placeholder only                                                                                  |
+| **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD                                                                               | Tab UI placeholder only                                                                                  |
+| **IP Licensing**          | Contract: 6 license types, royalty tracking. API: full CRUD + merch                                                                 | Tab UI placeholder only                                                                                  |
+| **On-Chain Governance**   | Contract: OpenZeppelin Governor. Ponder indexes proposals/votes                                                                     | Governance sidebar shows token info, but voting UI is incomplete                                         |
+| **Token Trading**         | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live                                                         | No swap UI. Users must use Uniswap directly                                                              |
+| **Analytics**             | API: views, engagement, trending, platform stats                                                                                    | Market page queries real stats. No per-universe analytics dashboard                                      |
+| **Dashboard**             | AI generation tools + universe list wired to live tRPC API                                                                          | No per-universe analytics breakdown                                                                      |
+| **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus`                       | Frontend still uses old `fun`/`monetized` labels. UI badges not yet migrated                             |
+| **Worldbuilding Studio**  | `/create` hub + per-kind forms. Wiki at `/wiki` with tabbed entity browsing + detail pages (`/wiki/entity/$id`)                     | No `/wiki/$kind` filter routes                                                                           |
+| **Content Moderation**    | Flag system, admin review queue, DMCA intake (`/dmca`), immutable audit log. `contentStatus` gates commercial transactions          | Admin UI at `/admin/moderation`. No auto-flag threshold, no counter-notice workflow (manual review only) |
+
+### PLANNED (Not implemented)
+
+| Feature                | Notes                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Mainnet Deployment** | All contracts on Sepolia testnet only. Needs audit first                                                                       |
+| **Fiat On-Ramp**       | No credit card payments. Card tab in CreditStore has no Stripe integration. Fiat purchase records without processor validation |
+| **Mobile App**         | Web-only. Not responsive on all pages                                                                                          |
+| **Social Features**    | No follows, comments, activity feed, or notifications                                                                          |
+| **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders                                                                   |
+| **Creator Analytics**  | No per-universe P&L, subscriber funnels, or retention data                                                                     |
+
+---
+
+## Architecture
+
+```
+                 ┌─────────────────────────────────────────────────┐
+                 │                    Frontend                      │
+                 │  React 18 + Vite + TanStack Router + wagmi      │
+                 │  Port 3001                                       │
+                 └──────────┬──────────────────┬───────────────────┘
+                            │ tRPC              │ wagmi
+                            ▼                   ▼
+              ┌─────────────────────┐  ┌──────────────────────┐
+              │   API Server        │  │  Sepolia Contracts   │
+              │   Hono + tRPC       │  │  8 core + per-       │
+              │   14 routers        │  │  universe children   │
+              │   150+ procedures   │  └──────────┬───────────┘
+              │   Port 3000         │             │ events
+              └──────────┬──────────┘             ▼
+                         │               ┌──────────────────┐
+                         ▼               │  Ponder Indexer   │
+              ┌──────────────────┐       │  37+ tables       │
+              │  Firestore       │       │  GraphQL API      │
+              │  (user data,     │       │  Port 42069       │
+              │   content meta,  │       └──────────────────┘
+              │   analytics)     │
+              └──────────────────┘
+```
+
+| App              | Stack                                                    | Description                              |
+| ---------------- | -------------------------------------------------------- | ---------------------------------------- |
+| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | Frontend SPA                             |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (14 routers, 150+ procedures) |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37+ tables)    |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (deployed on Sepolia)    |
+| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                 |
+
+### Key Flows
+
+**Auth:** CDP Embedded Wallet (Google/Apple/passkeys/email) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure
+
+**Content Creation:** AI Generate > Decentralized Storage (SHA-256 dedup) > On-Chain Hash > Ponder Index
+
+**Universe Deployment:** UniverseManager.createUniverse() > Deploy GovernanceERC20 + Governor > Initialize Uniswap v4 Pool > Lock LP
+
+---
+
+## Smart Contracts (Sepolia)
+
+| Contract                  | Address         | Purpose                             |
+| ------------------------- | --------------- | ----------------------------------- |
+| **UniverseManager**       | `0x7af1...8114` | Factory: deploys universes + tokens |
+| **UniverseTokenDeployer** | `0xE34D...8d8B` | Token + Governor + pool deployment  |
+| **LoarFeeLocker**         | `0xEB2B...38f`  | Fee escrow and creator payouts      |
+| **LoarLpLockerMultiple**  | `0x3E66...ca6`  | LP token locking (anti-rug)         |
+| **LoarHookStaticFee**     | `0xa664...A8cC` | Uniswap v4 fee collection hook      |
+
+Plus per-universe: Universe, GovernanceERC20, UniverseGovernor contracts.
+
+Revenue contracts (not yet deployed separately — logic in backend + planned for on-chain):
+EpisodeNFT, CharacterNFT, CanonMarketplace, CreditManager, SubscriptionManager, CollabManager, AdPlacement, LicensingRegistry
+
+---
+
+## How to Run Locally
+
+### Prerequisites
+
+| Tool              | Required | Notes                                  |
+| ----------------- | -------- | -------------------------------------- |
+| **Node.js** >= 18 | Yes      | [nodejs.org](https://nodejs.org/)      |
+| **pnpm** 9.15.0   | Yes      | Auto-installed via `corepack`          |
+| **Foundry**       | Optional | For smart contract dev                 |
+| **Docker**        | Optional | Only for production-like local testing |
+
+### Quick Start
+
+```bash
+git clone <repo-url>
+cd loar
+bash setup.sh          # checks prereqs, copies .env.example → .env, installs deps
+# Edit .env — at minimum set SIWE_JWT_SECRET and FIREBASE_SERVICE_ACCOUNT
+pnpm dev               # starts web (3001) + server (3000) + indexer (42069)
+```
+
+### Environment
+
+All apps read from a single `.env` at the repo root. Copy `.env.example` and fill in values.
+
+**Required for server:**
+
+- `SIWE_JWT_SECRET` — JWT signing (`openssl rand -hex 32`)
+- `FIREBASE_SERVICE_ACCOUNT` — Firestore access (JSON string or file path)
+
+**Required for indexer:**
+
+- `PONDER_RPC_URL_2` — Sepolia RPC endpoint
+
+**Optional (server starts without these):**
+
+- `FAL_KEY` — AI generation
+- `GOOGLE_API_KEY` — Gemini wiki generation
+- `OPENAI_API_KEY` — GPT-4o-mini storyline generation
+
+See [docs/environment.md](docs/environment.md) for the full reference.
+
+### Individual Services
+
+```bash
+pnpm dev:web           # web only (port 3001)
+pnpm dev:server        # server only (port 3000)
+pnpm -F indexer dev    # indexer only (port 42069)
+```
+
+---
+
+## How to Deploy
+
+### Architecture
+
+```
+                    ┌─────────────────┐
+                    │   Vercel (CDN)   │  ← apps/web (static SPA)
+                    │    loar.fun      │
+                    └────────┬────────┘
+                             │ HTTPS
+        ┌────────────────────┼────────────────────┐
+        │                    │                     │
+┌───────▼────────┐   ┌──────▼───────┐   ┌────────▼────────┐
+│  loar-server   │   │ loar-indexer │   │    Firebase      │
+│  Docker :3000  │   │ Docker :42069│   │    Firestore     │
+│  Hono + tRPC   │   │ Ponder v0.15 │   │   (data store)   │
+└───────┬────────┘   └──────┬───────┘   └─────────────────┘
+        │                    │
+  Storage providers    Sepolia RPC
+```
+
+| Service              | Deployed To          | Trigger                                                 |
+| -------------------- | -------------------- | ------------------------------------------------------- |
+| **Web**              | Vercel               | Push to `main` (Vercel Git integration)                 |
+| **Server + Indexer** | VPS (Docker Compose) | Push to `main` (`.github/workflows/deploy.yml` via SSH) |
+
+### Web → Vercel
+
+1. Connect the repo to Vercel
+2. Set env vars in Vercel dashboard: `VITE_SERVER_URL`, `VITE_PONDER_URL`
+3. Build config is in `vercel.json` — SPA rewrites included
+
+### Server + Indexer → VPS (Docker)
+
+```bash
+# On the VPS:
+git clone <repo-url> && cd loar
+cp .env.example .env   # fill in production values (CORS_ORIGIN = your Vercel URL)
+docker compose build
+docker compose up -d
+```
+
+**CI/CD:** `deploy.yml` SSHs to VPS on push to `main` and runs `docker compose build && up -d`.
+Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
+
+### Health Checks
+
+| Service | Endpoint      | Response                                        |
+| ------- | ------------- | ----------------------------------------------- |
+| Server  | `GET /health` | `{ status, checks: { firebase }, uptime, env }` |
+| Indexer | `GET /health` | Ponder built-in                                 |
+
+---
+
+## Documentation
+
+| Document                                     | Description                                          |
+| -------------------------------------------- | ---------------------------------------------------- |
+| [MVP Scope](docs/mvp.md)                     | What's in the MVP, what's deferred, success criteria |
+| [Roadmap](docs/roadmap.md)                   | 3 milestones with concrete deliverables              |
+| [Creator Journey](docs/creator-journey.md)   | Step-by-step from wallet connect to revenue          |
+| [IP & Content Policy](docs/ip-policy.md)     | Copyright rules, licensing, compliance               |
+| [Monetization Map](docs/monetization-map.md) | How money flows, who pays, what's owned              |
+| [Product Loops](docs/product-loops.md)       | Core loops with status assessment                    |
+| [Architecture](docs/architecture.md)         | System design, auth flow, service connections        |
+| [Environment](docs/environment.md)           | All env vars, Firebase setup guide                   |
+| [API Reference](docs/api.md)                 | REST + tRPC + GraphQL endpoints                      |
+| [Smart Contracts](docs/contracts.md)         | Contract guide, ABI generation                       |
+| [Database](docs/database.md)                 | Firestore + Ponder schema reference                  |
+| [Deployment](docs/deployment.md)             | Docker, CI/CD, manual deploy                         |
+
+---
+
+## Project Structure
+
+```
+loar/
+├── apps/
+│   ├── web/             # React 18 SPA (Vite + TanStack Router)
+│   ├── server/          # Hono + tRPC API (14 routers, 150+ procedures)
+│   ├── indexer/         # Ponder v0.15 blockchain indexer (37+ tables)
+│   └── contracts/       # Foundry/Solidity (8 core contracts on Sepolia)
+├── packages/
+│   └── abis/            # Generated wagmi hooks + contract ABIs
+├── docs/                # Product + technical documentation
+├── .env.example         # Environment variable template
+├── setup.sh             # First-time setup script
+├── Makefile             # Command shortcuts
+└── turbo.json           # Turbo build config
+```
+
+## Common Commands
+
+| Command           | Description                                 |
+| ----------------- | ------------------------------------------- |
+| `make dev`        | Start all services (web + server + indexer) |
+| `make dev-web`    | Start web app only (port 3001)              |
+| `make dev-server` | Start server only (port 3000)               |
+| `make build`      | Build all apps                              |
+| `make test`       | Run smart contract tests                    |
+| `make codegen`    | Generate wagmi hooks from ABIs              |
+
+## License
+
+MIT

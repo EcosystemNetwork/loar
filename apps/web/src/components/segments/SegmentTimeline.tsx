@@ -9,15 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Play,
-  Edit,
-  Trash2,
-  Plus,
-  GripVertical,
-  Clock,
-  Sparkles
-} from 'lucide-react';
+import { Play, Edit, Trash2, Plus, GripVertical, Clock, Sparkles } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
 import { cn } from '@/lib/utils';
 
@@ -184,19 +176,24 @@ function SegmentCard({
   // Get model badge color
   const getModelColor = (model: string) => {
     switch (model) {
-      case 'fal-veo3': return 'bg-blue-500';
-      case 'fal-kling': return 'bg-purple-500';
-      case 'fal-wan25': return 'bg-green-500';
-      case 'fal-sora': return 'bg-orange-500';
-      default: return 'bg-gray-500';
+      case 'fal-veo3':
+        return 'bg-blue-500';
+      case 'fal-kling':
+        return 'bg-purple-500';
+      case 'fal-wan25':
+        return 'bg-green-500';
+      case 'fal-sora':
+        return 'bg-orange-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
   return (
     <Card
       className={cn(
-        "flex-shrink-0 w-64 cursor-pointer transition-all hover:shadow-lg",
-        isSelected && "ring-2 ring-primary shadow-lg"
+        'flex-shrink-0 w-64 cursor-pointer transition-all hover:shadow-lg',
+        isSelected && 'ring-2 ring-primary shadow-lg'
       )}
       onClick={onSelect}
     >
@@ -211,9 +208,7 @@ function SegmentCard({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <div className="animate-pulse text-muted-foreground">
-                Loading...
-              </div>
+              <div className="animate-pulse text-muted-foreground">Loading...</div>
             </div>
           )}
 
@@ -256,15 +251,18 @@ function SegmentCard({
 
           {/* Model badge */}
           <div className="flex items-center gap-2">
-            <div className={cn("w-2 h-2 rounded-full", getModelColor(segment.model))} />
+            <div className={cn('w-2 h-2 rounded-full', getModelColor(segment.model))} />
             <span className="text-xs text-muted-foreground capitalize">
               {segment.model.replace('fal-', '')}
             </span>
-            {segment.generationMode === 'image-to-video' && segment.characterIds && segment.characterIds.length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                {segment.characterIds.length} character{segment.characterIds.length > 1 ? 's' : ''}
-              </Badge>
-            )}
+            {segment.generationMode === 'image-to-video' &&
+              segment.characterIds &&
+              segment.characterIds.length > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {segment.characterIds.length} character
+                  {segment.characterIds.length > 1 ? 's' : ''}
+                </Badge>
+              )}
           </div>
         </div>
 

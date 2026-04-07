@@ -2,11 +2,10 @@ node_modules
 .turbo
 
 .env
-CLAUDE.md
-bun.lock
-bun.lockb
+.env.local
 .playwright-mcp
 .claude
-
-
-.env.local
+CLAUDE.md
+firebase-service-account.json
+build.log
+.gitnexus

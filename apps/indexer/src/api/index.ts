@@ -1,77 +1,109 @@
-import { db } from "ponder:api";
-import schema from "ponder:schema";
-import { Hono } from "hono";
-import { client, graphql } from "ponder";
-import { getAddress } from "viem";
-import {
-  universe,
-  node,
-  proposal,
-  token,
-  vote,
-} from "ponder:schema";
+/**
+ * Ponder API Layer
+ *
+ * Exposes REST endpoints and a GraphQL API for querying indexed blockchain data.
+ * Includes custom Hono routes for universe, node, proposal, and token queries
+ * alongside Ponder's built-in SQL client and GraphQL middleware.
+ */
+import { db } from 'ponder:api';
+import schema from 'ponder:schema';
+import { Hono } from 'hono';
+import { client, graphql } from 'ponder';
+import { getAddress } from 'viem';
+import { universe, node, proposal, token, vote } from 'ponder:schema';
 
 const app = new Hono();
 
-app.use("/sql/*", client({ db, schema }));
+app.get('/health', async (c) => {
+  let dbStatus = 'ok';
+  try {
+    await db.select().from(universe).limit(1);
+  } catch {
+    dbStatus = 'degraded';
+  }
+
+  const checks = { db: dbStatus };
+  const status = dbStatus === 'ok' ? 'healthy' : 'degraded';
+
+  return c.json({
+    status,
+    service: 'indexer',
+    timestamp: new Date().toISOString(),
+    checks,
+  });
+});
+
+app.use('/sql/*', client({ db, schema }));
 
 // Custom REST endpoints
-app.get("/creator/:address/universes", async (c) => {
-  const address = getAddress(c.req.param("address"));
+app.get('/creator/:address/universes', async (c) => {
+  const address = getAddress(c.req.param('address'));
 
   const universes = await db
     .select()
     .from(universe)
     .where((u) => u.creator === address)
-    .orderBy((u) => u.createdAt, "desc");
+    .orderBy((u) => u.createdAt, 'desc');
 
   return c.json({ universes });
 });
 
-app.get("/creator/:address/nodes", async (c) => {
-  const address = getAddress(c.req.param("address"));
+app.get('/creator/:address/nodes', async (c) => {
+  const address = getAddress(c.req.param('address'));
 
   const nodes = await db
     .select()
     .from(node)
     .where((n) => n.creator === address)
-    .orderBy((n) => n.createdAt, "desc");
+    .orderBy((n) => n.createdAt, 'desc');
 
   return c.json({ nodes });
 });
 
-app.get("/creator/:address/proposals", async (c) => {
-  const address = getAddress(c.req.param("address"));
+app.get('/creator/:address/proposals', async (c) => {
+  const address = getAddress(c.req.param('address'));
 
   const proposals = await db
     .select()
     .from(proposal)
     .where((p) => p.proposer === address)
-    .orderBy((p) => p.createdAt, "desc");
+    .orderBy((p) => p.createdAt, 'desc');
 
   return c.json({ proposals });
 });
 
-app.get("/creator/:address/votes", async (c) => {
-  const address = getAddress(c.req.param("address"));
+app.get('/creator/:address/votes', async (c) => {
+  const address = getAddress(c.req.param('address'));
 
   const votes = await db
     .select()
     .from(vote)
     .where((v) => v.voter === address)
-    .orderBy((v) => v.timestamp, "desc");
+    .orderBy((v) => v.timestamp, 'desc');
 
   return c.json({ votes });
 });
 
-app.get("/creator/:address/summary", async (c) => {
-  const address = getAddress(c.req.param("address"));
+app.get('/creator/:address/summary', async (c) => {
+  const address = getAddress(c.req.param('address'));
 
   const [universes, nodes, proposals, votes] = await Promise.all([
-    db.select().from(universe).where((u) => u.creator === address),
-    db.select().from(node).where((n) => n.creator === address),
-    db.select().from(proposal).where((p) => p.proposer === address),
-    db.select().from(vote).where((v) => v.voter === address),
+    db
+      .select()
+      .from(universe)
+      .where((u) => u.creator === address),
+    db
+      .select()
+      .from(node)
+      .where((n) => n.creator === address),
+    db
+      .select()
+      .from(proposal)
+      .where((p) => p.proposer === address),
+    db
+      .select()
+      .from(vote)
+      .where((v) => v.voter === address),
   ]);
 
   return c.json({
@@ -89,8 +121,8 @@ app.get("/creator/:address/summary", async (c) => {
   });
 });
 
-app.get("/universe/:address", async (c) => {
-  const address = c.req.param("address").toLowerCase();
+app.get('/universe/:address', async (c) => {
+  const address = c.req.param('address').toLowerCase();
 
   const [allUniverses, allNodes, allTokens] = await Promise.all([
     db.select().from(universe),
@@ -98,12 +130,14 @@ app.get("/universe/:address", async (c) => {
     db.select().from(token),
   ]);
 
-  const universeData = allUniverses.filter(u => u.id.toLowerCase() === address);
-  const nodes = allNodes.filter(n => n.universeAddress.toLowerCase() === address).sort((a, b) => a.createdAt - b.createdAt);
-  const tokenData = allTokens.filter(t => t.universeAddress.toLowerCase() === address);
+  const universeData = allUniverses.filter((u) => u.id.toLowerCase() === address);
+  const nodes = allNodes
+    .filter((n) => n.universeAddress.toLowerCase() === address)
+    .sort((a, b) => a.createdAt - b.createdAt);
+  const tokenData = allTokens.filter((t) => t.universeAddress.toLowerCase() === address);
 
   if (universeData.length === 0) {
-    return c.json({ error: "Universe not found" }, 404);
+    return c.json({ error: 'Universe not found' }, 404);
   }
 
   return c.json({
@@ -113,19 +147,19 @@ app.get("/universe/:address", async (c) => {
   });
 });
 
-app.get("/universe/:address/proposals", async (c) => {
-  const address = getAddress(c.req.param("address"));
+app.get('/universe/:address/proposals', async (c) => {
+  const address = getAddress(c.req.param('address'));
 
   const proposals = await db
     .select()
     .from(proposal)
     .where((p) => p.universeAddress === address)
-    .orderBy((p) => p.createdAt, "desc");
+    .orderBy((p) => p.createdAt, 'desc');
 
   return c.json({ proposals });
 });
 
-app.use("/", graphql({ db, schema }));
-app.use("/graphql", graphql({ db, schema }));
+app.use('/', graphql({ db, schema }));
+app.use('/graphql', graphql({ db, schema }));
 
 export default app;

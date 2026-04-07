@@ -31,6 +31,11 @@ import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmo
 import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
 import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
+/// @title LoarHook
+/// @notice Abstract Uniswap v4 hook that collects protocol fees on swaps involving governance tokens.
+/// @dev Implements a dual before/after swap fee strategy: fees are taken on the non-governance-token
+///      side of the swap. The protocol fee is 20% of the LP fee. Only the UniverseManager factory
+///      can initialize new pools through this hook.
 abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     using TickMath for int24;
     using BeforeSwapDeltaLibrary for BeforeSwapDelta;

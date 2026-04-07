@@ -1,9 +1,16 @@
-import { index, onchainTable, relations } from "ponder";
+/**
+ * Ponder On-Chain Schema
+ *
+ * Defines the indexed database tables and their relationships for all
+ * LOAR protocol entities: universes, tokens, nodes, proposals, votes,
+ * swaps, token holders, and hook events. Maps directly to on-chain events.
+ */
+import { index, onchainTable, relations } from 'ponder';
 
 // ============= UniverseManager Events =============
 
 export const universe = onchainTable(
-  "universe",
+  'universe',
   (t) => ({
     id: t.text().primaryKey(), // universe address
     universeId: t.integer(), // universe ID from UniverseManager (if trackable)
@@ -17,12 +24,12 @@ export const universe = onchainTable(
     nodeCount: t.integer().notNull().default(0), // track number of nodes
   }),
   (table) => ({
-    creatorIdx: index("universe_creator_idx").on(table.creator),
+    creatorIdx: index('universe_creator_idx').on(table.creator),
   })
 );
 
 export const token = onchainTable(
-  "token",
+  'token',
   (t) => ({
     id: t.text().primaryKey(), // token address
     universeAddress: t.hex().notNull(),
@@ -41,25 +48,22 @@ export const token = onchainTable(
     createdAt: t.integer().notNull(),
   }),
   (table) => ({
-    deployerIdx: index("token_deployer_idx").on(table.deployer),
-    universeIdx: index("token_universe_idx").on(table.universeAddress),
+    deployerIdx: index('token_deployer_idx').on(table.deployer),
+    universeIdx: index('token_universe_idx').on(table.universeAddress),
   })
 );
 
-export const hookEvent = onchainTable(
-  "hook_event",
-  (t) => ({
-    id: t.text().primaryKey(),
-    timestamp: t.integer().notNull(),
-    hook_address: t.hex().notNull(),
-    enabled: t.boolean().notNull(),
-  })
-);
+export const hookEvent = onchainTable('hook_event', (t) => ({
+  id: t.text().primaryKey(),
+  timestamp: t.integer().notNull(),
+  hook_address: t.hex().notNull(),
+  enabled: t.boolean().notNull(),
+}));
 
 // ============= Universe (dynamic) Events =============
 
 export const node = onchainTable(
-  "node",
+  'node',
   (t) => ({
     id: t.text().primaryKey(), // universe_address:node_id
     universeAddress: t.hex().notNull(),
@@ -67,15 +71,17 @@ export const node = onchainTable(
     previousNodeId: t.integer().notNull(),
     creator: t.hex().notNull(),
     createdAt: t.integer().notNull(),
+    contentHash: t.hex(), // bytes32 SHA-256 of media file
+    plotHash: t.hex(), // bytes32 SHA-256 of plot text
   }),
   (table) => ({
-    universeIdx: index("node_universe_idx").on(table.universeAddress),
-    creatorIdx: index("node_creator_idx").on(table.creator),
+    universeIdx: index('node_universe_idx').on(table.universeAddress),
+    creatorIdx: index('node_creator_idx').on(table.creator),
   })
 );
 
 export const nodeCanonization = onchainTable(
-  "node_canonization",
+  'node_canonization',
   (t) => ({
     id: t.text().primaryKey(),
     universeAddress: t.hex().notNull(),
@@ -84,23 +90,22 @@ export const nodeCanonization = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    universeIdx: index("canon_universe_idx").on(table.universeAddress),
+    universeIdx: index('canon_universe_idx').on(table.universeAddress),
   })
 );
 
-export const nodeContent = onchainTable(
-  "node_content",
-  (t) => ({
-    id: t.text().primaryKey(), // universe:nodeId
-    videoLink: t.text().notNull(),
-    plot: t.text().notNull(),
-  })
-);
+export const nodeContent = onchainTable('node_content', (t) => ({
+  id: t.text().primaryKey(), // universe:nodeId
+  contentHash: t.hex(), // bytes32 content hash
+  plotHash: t.hex(), // bytes32 plot hash
+  videoLink: t.text().notNull(), // Full URL from event
+  plot: t.text().notNull(), // Full plot text from event
+}));
 
 // ============= Token Transfer Tracking =============
 
 export const tokenTransfer = onchainTable(
-  "token_transfer",
+  'token_transfer',
   (t) => ({
     id: t.text().primaryKey(),
     tokenAddress: t.hex().notNull(),
@@ -111,14 +116,14 @@ export const tokenTransfer = onchainTable(
     blockNumber: t.integer().notNull(),
   }),
   (table) => ({
-    tokenIdx: index("transfer_token_idx").on(table.tokenAddress),
-    fromIdx: index("transfer_from_idx").on(table.from),
-    toIdx: index("transfer_to_idx").on(table.to),
+    tokenIdx: index('transfer_token_idx').on(table.tokenAddress),
+    fromIdx: index('transfer_from_idx').on(table.from),
+    toIdx: index('transfer_to_idx').on(table.to),
   })
 );
 
 export const tokenHolder = onchainTable(
-  "token_holder",
+  'token_holder',
   (t) => ({
     id: t.text().primaryKey(), // tokenAddress:holderAddress
     tokenAddress: t.hex().notNull(),
@@ -126,15 +131,15 @@ export const tokenHolder = onchainTable(
     balance: t.text().notNull(), // bigint as string
   }),
   (table) => ({
-    tokenIdx: index("holder_token_idx").on(table.tokenAddress),
-    holderIdx: index("holder_address_idx").on(table.holderAddress),
+    tokenIdx: index('holder_token_idx').on(table.tokenAddress),
+    holderIdx: index('holder_address_idx').on(table.holderAddress),
   })
 );
 
 // ============= Uniswap v4 Pool Tracking =============
 
 export const pool = onchainTable(
-  "pool",
+  'pool',
   (t) => ({
     poolId: t.hex().primaryKey(),
     currency0: t.hex().notNull(),
@@ -147,14 +152,14 @@ export const pool = onchainTable(
     creationBlock: t.integer().notNull(),
   }),
   (table) => ({
-    currency0Idx: index("pool_currency0_idx").on(table.currency0),
-    currency1Idx: index("pool_currency1_idx").on(table.currency1),
-    hooksIdx: index("pool_hooks_idx").on(table.hooks),
+    currency0Idx: index('pool_currency0_idx').on(table.currency0),
+    currency1Idx: index('pool_currency1_idx').on(table.currency1),
+    hooksIdx: index('pool_hooks_idx').on(table.hooks),
   })
 );
 
 export const swap = onchainTable(
-  "swap",
+  'swap',
   (t) => ({
     id: t.text().primaryKey(),
     poolId: t.hex().notNull(),
@@ -168,16 +173,16 @@ export const swap = onchainTable(
     blockNumber: t.integer().notNull(),
   }),
   (table) => ({
-    poolIdIdx: index("swap_pool_idx").on(table.poolId),
-    senderIdx: index("swap_sender_idx").on(table.sender),
-    blockIdx: index("swap_block_idx").on(table.blockNumber),
+    poolIdIdx: index('swap_pool_idx').on(table.poolId),
+    senderIdx: index('swap_sender_idx').on(table.sender),
+    blockIdx: index('swap_block_idx').on(table.blockNumber),
   })
 );
 
 // ============= UniverseGovernor Events =============
 
 export const proposal = onchainTable(
-  "proposal",
+  'proposal',
   (t) => ({
     id: t.text().primaryKey(), // proposalId
     governorAddress: t.hex().notNull(),
@@ -194,14 +199,14 @@ export const proposal = onchainTable(
     cancelled: t.boolean().notNull().default(false),
   }),
   (table) => ({
-    governorIdx: index("proposal_governor_idx").on(table.governorAddress),
-    proposerIdx: index("proposal_proposer_idx").on(table.proposer),
-    universeIdx: index("proposal_universe_idx").on(table.universeAddress),
+    governorIdx: index('proposal_governor_idx').on(table.governorAddress),
+    proposerIdx: index('proposal_proposer_idx').on(table.proposer),
+    universeIdx: index('proposal_universe_idx').on(table.universeAddress),
   })
 );
 
 export const proposalExecution = onchainTable(
-  "proposal_execution",
+  'proposal_execution',
   (t) => ({
     id: t.text().primaryKey(),
     proposalId: t.text().notNull(),
@@ -209,12 +214,12 @@ export const proposalExecution = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    proposalIdx: index("execution_proposal_idx").on(table.proposalId),
+    proposalIdx: index('execution_proposal_idx').on(table.proposalId),
   })
 );
 
 export const proposalCancellation = onchainTable(
-  "proposal_cancellation",
+  'proposal_cancellation',
   (t) => ({
     id: t.text().primaryKey(),
     proposalId: t.text().notNull(),
@@ -222,12 +227,12 @@ export const proposalCancellation = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    proposalIdx: index("cancellation_proposal_idx").on(table.proposalId),
+    proposalIdx: index('cancellation_proposal_idx').on(table.proposalId),
   })
 );
 
 export const vote = onchainTable(
-  "vote",
+  'vote',
   (t) => ({
     id: t.text().primaryKey(), // proposalId:voter
     proposalId: t.text().notNull(),
@@ -239,8 +244,301 @@ export const vote = onchainTable(
     timestamp: t.integer().notNull(),
   }),
   (table) => ({
-    proposalIdx: index("vote_proposal_idx").on(table.proposalId),
-    voterIdx: index("vote_voter_idx").on(table.voter),
+    proposalIdx: index('vote_proposal_idx').on(table.proposalId),
+    voterIdx: index('vote_voter_idx').on(table.voter),
+  })
+);
+
+// ============= Revenue Stream Events =============
+
+// Episode NFTs
+export const episodeMint = onchainTable(
+  'episode_mint',
+  (t) => ({
+    id: t.text().primaryKey(), // tx hash or event id
+    episodeId: t.integer().notNull(),
+    tokenId: t.integer().notNull(),
+    universeId: t.integer().notNull(),
+    nodeId: t.integer().notNull(),
+    creator: t.hex().notNull(),
+    buyer: t.hex().notNull(),
+    price: t.text().notNull(), // bigint as string
+    contentHash: t.hex().notNull(),
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    episodeIdx: index('emint_episode_idx').on(table.episodeId),
+    universeIdx: index('emint_universe_idx').on(table.universeId),
+    buyerIdx: index('emint_buyer_idx').on(table.buyer),
+    creatorIdx: index('emint_creator_idx').on(table.creator),
+  })
+);
+
+export const episodeListing = onchainTable(
+  'episode_listing',
+  (t) => ({
+    id: t.text().primaryKey(), // episodeId
+    universeId: t.integer().notNull(),
+    nodeId: t.integer().notNull(),
+    contentHash: t.hex().notNull(),
+    creator: t.hex().notNull(),
+    mintPrice: t.text().notNull(),
+    maxSupply: t.integer().notNull(),
+    minted: t.integer().notNull().default(0),
+    active: t.boolean().notNull().default(true),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeIdx: index('elisting_universe_idx').on(table.universeId),
+    creatorIdx: index('elisting_creator_idx').on(table.creator),
+  })
+);
+
+// Character NFTs
+export const characterNft = onchainTable(
+  'character_nft',
+  (t) => ({
+    id: t.text().primaryKey(), // characterId
+    universeId: t.integer().notNull(),
+    name: t.text().notNull(),
+    visualHash: t.hex().notNull(),
+    creator: t.hex().notNull(),
+    owner: t.hex().notNull(),
+    appearanceCount: t.integer().notNull().default(0),
+    accumulatedRoyalties: t.text().notNull().default('0'),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeIdx: index('cnft_universe_idx').on(table.universeId),
+    ownerIdx: index('cnft_owner_idx').on(table.owner),
+  })
+);
+
+export const characterAppearance = onchainTable(
+  'character_appearance',
+  (t) => ({
+    id: t.text().primaryKey(),
+    characterId: t.integer().notNull(),
+    episodeId: t.integer().notNull(),
+    reward: t.text().notNull(),
+    timestamp: t.integer().notNull(),
+  }),
+  (table) => ({
+    characterIdx: index('capp_character_idx').on(table.characterId),
+    episodeIdx: index('capp_episode_idx').on(table.episodeId),
+  })
+);
+
+// Canon Marketplace
+export const canonSubmission = onchainTable(
+  'canon_submission',
+  (t) => ({
+    id: t.text().primaryKey(), // submissionId
+    universeId: t.integer().notNull(),
+    universeToken: t.hex().notNull(),
+    submissionType: t.integer().notNull(), // 0=CHARACTER, 1=PLOT_ARC, 2=LOCATION, 3=LORE_RULE
+    status: t.integer().notNull(), // 0=PENDING, 1=VOTING, 2=ACCEPTED, 3=REJECTED
+    creator: t.hex().notNull(),
+    contentHash: t.hex().notNull(),
+    metadataURI: t.text().notNull(),
+    submissionFee: t.text().notNull(),
+    votesFor: t.text().notNull().default('0'),
+    votesAgainst: t.text().notNull().default('0'),
+    votingDeadline: t.integer().notNull(),
+    createdAt: t.integer().notNull(),
+    finalizedAt: t.integer(),
+  }),
+  (table) => ({
+    universeIdx: index('csub_universe_idx').on(table.universeId),
+    creatorIdx: index('csub_creator_idx').on(table.creator),
+    statusIdx: index('csub_status_idx').on(table.status),
+  })
+);
+
+export const canonVote = onchainTable(
+  'canon_vote',
+  (t) => ({
+    id: t.text().primaryKey(), // submissionId:voter
+    submissionId: t.integer().notNull(),
+    voter: t.hex().notNull(),
+    support: t.boolean().notNull(),
+    weight: t.text().notNull(),
+    timestamp: t.integer().notNull(),
+  }),
+  (table) => ({
+    submissionIdx: index('cvote_submission_idx').on(table.submissionId),
+    voterIdx: index('cvote_voter_idx').on(table.voter),
+  })
+);
+
+// Credit Purchases
+export const creditPurchase = onchainTable(
+  'credit_purchase',
+  (t) => ({
+    id: t.text().primaryKey(),
+    buyer: t.hex().notNull(),
+    tierId: t.integer().notNull(),
+    credits: t.integer().notNull(),
+    paid: t.text().notNull(),
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    buyerIdx: index('cpurchase_buyer_idx').on(table.buyer),
+  })
+);
+
+export const creditSpend = onchainTable(
+  'credit_spend',
+  (t) => ({
+    id: t.text().primaryKey(),
+    user: t.hex().notNull(),
+    amount: t.integer().notNull(),
+    generationType: t.text().notNull(),
+    universeId: t.integer().notNull(),
+    timestamp: t.integer().notNull(),
+  }),
+  (table) => ({
+    userIdx: index('cspend_user_idx').on(table.user),
+    universeIdx: index('cspend_universe_idx').on(table.universeId),
+  })
+);
+
+// Subscriptions
+export const subscription = onchainTable(
+  'subscription',
+  (t) => ({
+    id: t.text().primaryKey(), // user:universeId
+    user: t.hex().notNull(),
+    universeId: t.integer().notNull(),
+    tier: t.integer().notNull(), // 0=FREE, 1=BASIC, 2=PREMIUM, 3=VIP
+    startedAt: t.integer().notNull(),
+    expiresAt: t.integer().notNull(),
+    totalPaid: t.text().notNull().default('0'),
+    timestamp: t.integer().notNull(),
+  }),
+  (table) => ({
+    userIdx: index('sub_user_idx').on(table.user),
+    universeIdx: index('sub_universe_idx').on(table.universeId),
+  })
+);
+
+// Collaborations
+export const collab = onchainTable(
+  'collab',
+  (t) => ({
+    id: t.text().primaryKey(), // collabId
+    universeA: t.integer().notNull(),
+    universeB: t.integer().notNull(),
+    proposer: t.hex().notNull(),
+    acceptor: t.hex(),
+    status: t.integer().notNull(), // 0=PROPOSED, 1=ACCEPTED, 2=ACTIVE, 3=COMPLETED, 4=CANCELLED
+    revenueShareBps: t.integer().notNull(),
+    totalRevenue: t.text().notNull().default('0'),
+    episodeCount: t.integer().notNull().default(0),
+    startTime: t.integer(),
+    endTime: t.integer(),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeAIdx: index('collab_ua_idx').on(table.universeA),
+    universeBIdx: index('collab_ub_idx').on(table.universeB),
+    proposerIdx: index('collab_proposer_idx').on(table.proposer),
+  })
+);
+
+// Ad Placements
+export const adSlot = onchainTable(
+  'ad_slot',
+  (t) => ({
+    id: t.text().primaryKey(), // slotId
+    universeId: t.integer().notNull(),
+    placementType: t.integer().notNull(), // 0=BILLBOARD, 1=PRODUCT, 2=SPONSORED_CHARACTER, 3=AUDIO_MENTION
+    minBid: t.text().notNull(),
+    currentBid: t.text().notNull().default('0'),
+    currentBidder: t.hex(),
+    episodesRemaining: t.integer().notNull(),
+    active: t.boolean().notNull().default(true),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeIdx: index('adslot_universe_idx').on(table.universeId),
+  })
+);
+
+export const sponsorship = onchainTable(
+  'sponsorship',
+  (t) => ({
+    id: t.text().primaryKey(),
+    adSlotId: t.integer().notNull(),
+    sponsor: t.hex().notNull(),
+    totalPaid: t.text().notNull(),
+    impressions: t.integer().notNull().default(0),
+    active: t.boolean().notNull().default(true),
+    startedAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    sponsorIdx: index('spon_sponsor_idx').on(table.sponsor),
+    slotIdx: index('spon_slot_idx').on(table.adSlotId),
+  })
+);
+
+// Licensing
+export const license = onchainTable(
+  'license',
+  (t) => ({
+    id: t.text().primaryKey(), // licenseId
+    universeId: t.integer().notNull(),
+    licenseType: t.integer().notNull(), // 0=STREAMING, 1=MERCH, 2=GAMING, 3=COMIC, 4=AUDIO, 5=OTHER
+    status: t.integer().notNull(), // 0=PROPOSED, 1=ACTIVE, 2=EXPIRED, 3=REVOKED
+    licensor: t.hex().notNull(),
+    licensee: t.hex().notNull(),
+    upfrontFee: t.text().notNull(),
+    royaltyBps: t.integer().notNull(),
+    totalRoyalties: t.text().notNull().default('0'),
+    startTime: t.integer(),
+    endTime: t.integer(),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeIdx: index('lic_universe_idx').on(table.universeId),
+    licensorIdx: index('lic_licensor_idx').on(table.licensor),
+    licenseeIdx: index('lic_licensee_idx').on(table.licensee),
+  })
+);
+
+// Merch Sales
+export const merchSale = onchainTable(
+  'merch_sale',
+  (t) => ({
+    id: t.text().primaryKey(),
+    merchId: t.integer().notNull(),
+    universeId: t.integer().notNull(),
+    buyer: t.hex().notNull(),
+    price: t.text().notNull(),
+    timestamp: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeIdx: index('merch_universe_idx').on(table.universeId),
+    buyerIdx: index('merch_buyer_idx').on(table.buyer),
+  })
+);
+
+// Analytics (on-chain metrics)
+export const universeAnalytics = onchainTable(
+  'universe_analytics',
+  (t) => ({
+    id: t.text().primaryKey(), // universeId
+    totalViews: t.integer().notNull().default(0),
+    totalMints: t.integer().notNull().default(0),
+    totalVotes: t.integer().notNull().default(0),
+    totalSubscribers: t.integer().notNull().default(0),
+    totalRevenue: t.text().notNull().default('0'),
+    lastUpdated: t.integer().notNull(),
+  }),
+  (table) => ({
+    revenueIdx: index('ua_revenue_idx').on(table.totalRevenue),
   })
 );
 

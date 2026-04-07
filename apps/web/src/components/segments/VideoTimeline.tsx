@@ -12,15 +12,7 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Play,
-  Pause,
-  Plus,
-  Trash2,
-  GripVertical,
-  Clock,
-  Maximize2,
-} from 'lucide-react';
+import { Play, Pause, Plus, Trash2, GripVertical, Clock, Maximize2 } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
 import { cn } from '@/lib/utils';
 
@@ -83,8 +75,8 @@ export function VideoTimeline({
     e.preventDefault();
     if (!draggedSegment || draggedSegment === targetSegmentId) return;
 
-    const draggedIndex = segments.findIndex(s => s.id === draggedSegment);
-    const targetIndex = segments.findIndex(s => s.id === targetSegmentId);
+    const draggedIndex = segments.findIndex((s) => s.id === draggedSegment);
+    const targetIndex = segments.findIndex((s) => s.id === targetSegmentId);
 
     if (draggedIndex === -1 || targetIndex === -1) return;
 
@@ -92,7 +84,7 @@ export function VideoTimeline({
     const [removed] = newSegments.splice(draggedIndex, 1);
     newSegments.splice(targetIndex, 0, removed);
 
-    onSegmentsReorder(newSegments.map(s => s.id));
+    onSegmentsReorder(newSegments.map((s) => s.id));
     setDraggedSegment(null);
     setHoveredSegment(null);
   };
@@ -148,7 +140,9 @@ export function VideoTimeline({
             {/* Minimal overlay */}
             <div className="absolute top-1 left-1 flex gap-1 z-10">
               <Badge className="bg-black/70 backdrop-blur-sm border-white/10 text-[9px] px-1 py-0.5">
-                <span className="text-white/90">{currentSegmentIndex + 1}/{segments.length}</span>
+                <span className="text-white/90">
+                  {currentSegmentIndex + 1}/{segments.length}
+                </span>
               </Badge>
               {currentSegment && (
                 <Badge className="bg-gradient-to-r from-primary/90 to-primary/70 backdrop-blur-sm border-white/10 capitalize text-[9px] px-1 py-0.5">
@@ -176,7 +170,7 @@ export function VideoTimeline({
               <div className="flex items-center gap-1.5">
                 <Button
                   size="sm"
-                  variant={isPlaying ? "secondary" : "default"}
+                  variant={isPlaying ? 'secondary' : 'default'}
                   onClick={onPlaySegments}
                   className="h-7 px-2"
                 >
@@ -195,7 +189,9 @@ export function VideoTimeline({
 
                 <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px] font-mono">
                   <Clock className="h-2.5 w-2.5 text-muted-foreground" />
-                  <span>{formatTime(currentTime)}/{formatTime(totalDuration)}</span>
+                  <span>
+                    {formatTime(currentTime)}/{formatTime(totalDuration)}
+                  </span>
                 </div>
 
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
@@ -203,7 +199,12 @@ export function VideoTimeline({
                 </Badge>
               </div>
 
-              <Button onClick={onAddSegment} variant="outline" size="sm" className="h-7 px-2 text-xs">
+              <Button
+                onClick={onAddSegment}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+              >
                 <Plus className="h-3 w-3 mr-1" />
                 Add
               </Button>
@@ -250,7 +251,7 @@ export function VideoTimeline({
                     className="absolute top-0 bottom-0 w-0.5 bg-primary z-10 pointer-events-none shadow-lg"
                     style={{
                       left: `${(currentTime / totalDuration) * 100}%`,
-                      transition: 'left 0.1s linear'
+                      transition: 'left 0.1s linear',
                     }}
                   >
                     <div className="absolute -top-1 -left-1 w-2 h-2 bg-primary rounded-full shadow-lg ring-1 ring-background" />
@@ -266,14 +267,14 @@ export function VideoTimeline({
       {selectedSegment && (
         <Card className="p-1.5 bg-primary/5 border-primary/20">
           {(() => {
-            const segment = segments.find(s => s.id === selectedSegment);
+            const segment = segments.find((s) => s.id === selectedSegment);
             if (!segment) return null;
 
             return (
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
                   <Badge variant="outline" className="text-[9px] px-1 py-0 flex-shrink-0">
-                    #{segments.findIndex(s => s.id === selectedSegment) + 1}
+                    #{segments.findIndex((s) => s.id === selectedSegment) + 1}
                   </Badge>
                   <span className="text-[10px] font-medium truncate">
                     {segment.description || 'Untitled'}
@@ -286,9 +287,7 @@ export function VideoTimeline({
                     <span className="px-1 py-0 bg-background rounded">
                       {segment.model.replace('fal-', '')}
                     </span>
-                    <span className="px-1 py-0 bg-background rounded">
-                      {segment.aspectRatio}
-                    </span>
+                    <span className="px-1 py-0 bg-background rounded">{segment.aspectRatio}</span>
                   </div>
                 </div>
                 <Button
@@ -344,21 +343,31 @@ function SegmentBlock({
   // Color gradient based on model
   const getModelGradient = (model: string) => {
     switch (model) {
-      case 'fal-veo3': return 'from-blue-500 to-blue-600';
-      case 'fal-kling': return 'from-purple-500 to-purple-600';
-      case 'fal-wan25': return 'from-green-500 to-green-600';
-      case 'fal-sora': return 'from-orange-500 to-orange-600';
-      default: return 'from-gray-500 to-gray-600';
+      case 'fal-veo3':
+        return 'from-blue-500 to-blue-600';
+      case 'fal-kling':
+        return 'from-purple-500 to-purple-600';
+      case 'fal-wan25':
+        return 'from-green-500 to-green-600';
+      case 'fal-sora':
+        return 'from-orange-500 to-orange-600';
+      default:
+        return 'from-gray-500 to-gray-600';
     }
   };
 
   const getModelAccent = (model: string) => {
     switch (model) {
-      case 'fal-veo3': return 'border-blue-400';
-      case 'fal-kling': return 'border-purple-400';
-      case 'fal-wan25': return 'border-green-400';
-      case 'fal-sora': return 'border-orange-400';
-      default: return 'border-gray-400';
+      case 'fal-veo3':
+        return 'border-blue-400';
+      case 'fal-kling':
+        return 'border-purple-400';
+      case 'fal-wan25':
+        return 'border-green-400';
+      case 'fal-sora':
+        return 'border-orange-400';
+      default:
+        return 'border-gray-400';
     }
   };
 
@@ -370,15 +379,15 @@ function SegmentBlock({
       onDrop={(e) => onDrop(e, segment.id)}
       onClick={onSelect}
       className={cn(
-        "relative h-full rounded cursor-move transition-all group flex-shrink-0 overflow-hidden",
-        "bg-gradient-to-br shadow-sm",
+        'relative h-full rounded cursor-move transition-all group flex-shrink-0 overflow-hidden',
+        'bg-gradient-to-br shadow-sm',
         getModelGradient(segment.model),
-        isSelected && "ring-2 ring-primary shadow-md scale-[1.02]",
-        isCurrent && "ring-2 ring-white/90 shadow-sm",
-        isDragging && "opacity-40 scale-95",
-        isHovered && "ring-2 ring-white/60",
-        "hover:shadow-md hover:brightness-110 active:scale-95",
-        "border border-white/20"
+        isSelected && 'ring-2 ring-primary shadow-md scale-[1.02]',
+        isCurrent && 'ring-2 ring-white/90 shadow-sm',
+        isDragging && 'opacity-40 scale-95',
+        isHovered && 'ring-2 ring-white/60',
+        'hover:shadow-md hover:brightness-110 active:scale-95',
+        'border border-white/20'
       )}
       style={{ width: `${widthPercent}%`, minWidth: '50px' }}
     >
@@ -393,9 +402,7 @@ function SegmentBlock({
       {/* Segment info */}
       <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-white font-bold drop-shadow">
-            {index + 1}
-          </span>
+          <span className="text-[10px] text-white font-bold drop-shadow">{index + 1}</span>
           <span className="text-[9px] text-white/90 font-medium bg-black/40 px-1 py-0.5 rounded">
             {segment.duration}s
           </span>
@@ -408,10 +415,13 @@ function SegmentBlock({
       </div>
 
       {/* Model indicator */}
-      <div className={cn(
-        "absolute top-1 right-1 w-1 h-1 rounded-full shadow ring-1 ring-white/40",
-        getModelAccent(segment.model).replace('border-', 'bg-')
-      )} title={segment.model.replace('fal-', '')} />
+      <div
+        className={cn(
+          'absolute top-1 right-1 w-1 h-1 rounded-full shadow ring-1 ring-white/40',
+          getModelAccent(segment.model).replace('border-', 'bg-')
+        )}
+        title={segment.model.replace('fal-', '')}
+      />
 
       {/* Delete button (on hover) */}
       <button
