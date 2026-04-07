@@ -10,8 +10,8 @@ COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (--ignore-scripts: skip husky prepare in Docker)
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY apps/server/src ./apps/server/src
@@ -39,7 +39,7 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # Copy built application
 COPY --from=builder /app/apps/server/dist ./apps/server/dist

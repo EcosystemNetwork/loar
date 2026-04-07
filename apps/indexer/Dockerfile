@@ -11,8 +11,8 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/abis/package.json ./packages/abis/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (--ignore-scripts: skip husky prepare in Docker)
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy indexer source
 COPY apps/indexer/ ./apps/indexer/
