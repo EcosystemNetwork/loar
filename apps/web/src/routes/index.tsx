@@ -302,12 +302,12 @@ function IndexerBanner() {
  * ────────────────────────────────────────── */
 function HeroSkeleton() {
   return (
-    <div className="relative h-[70vh] min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+    <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
       <div className="w-full px-4 md:px-12 pb-24 md:pb-32 max-w-3xl space-y-4 animate-pulse">
         <div className="h-4 w-24 rounded bg-white/10" />
-        <div className="h-14 w-80 rounded bg-white/10" />
-        <div className="h-4 w-96 rounded bg-white/10" />
-        <div className="h-4 w-72 rounded bg-white/10" />
+        <div className="h-14 w-3/4 max-w-80 rounded bg-white/10" />
+        <div className="h-4 w-full max-w-96 rounded bg-white/10" />
+        <div className="h-4 w-2/3 max-w-72 rounded bg-white/10" />
         <div className="flex gap-3 pt-2">
           <div className="h-11 w-32 rounded-full bg-white/10" />
           <div className="h-11 w-28 rounded-full bg-white/10" />
@@ -350,10 +350,12 @@ function HeroBillboard({ universes }: { universes: any[] }) {
 
   if (featured.length === 0) {
     return (
-      <div className="relative h-[70vh] min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
+      <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
         <div className="text-center px-4">
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight">LOAR</h1>
-          <p className="text-xl text-white/70 mb-8 max-w-lg mx-auto">
+          <h1 className="text-4xl md:text-5xl lg:text-7xl font-black text-white mb-4 tracking-tight">
+            LOAR
+          </h1>
+          <p className="text-lg md:text-xl text-white/70 mb-8 max-w-lg mx-auto px-4">
             Create, own, and trade narrative universes on-chain
           </p>
           <Button
@@ -373,7 +375,7 @@ function HeroBillboard({ universes }: { universes: any[] }) {
   if (!current) return null;
 
   return (
-    <div className="relative h-[70vh] min-h-[500px] max-h-[800px] overflow-hidden">
+    <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] overflow-hidden">
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div
@@ -981,10 +983,12 @@ function CreateBanner() {
     <section className="px-4 md:px-12 py-12">
       <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 border border-white/5">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(var(--primary),0.15),transparent_70%)]" />
-        <div className="relative px-8 py-12 md:py-16 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="relative px-6 md:px-8 py-10 md:py-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
           <div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">Start Your Universe</h2>
-            <p className="text-white/60 text-lg max-w-md">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-white mb-2">
+              Start Your Universe
+            </h2>
+            <p className="text-white/60 text-base md:text-lg max-w-md">
               Create AI-powered narrative worlds. Launch tokens. Build community.
             </p>
           </div>

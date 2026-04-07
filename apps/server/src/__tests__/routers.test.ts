@@ -32,7 +32,7 @@ describe('Top-level procedures', () => {
     const caller = createPublicCaller();
     const result = await caller.trackWalletLogin({
       address: '0x1234567890abcdef1234567890abcdef12345678',
-      chainId: 11155111,
+      chainId: 84532,
       connector: 'injected',
     });
     expect(result).toEqual({ ok: true });

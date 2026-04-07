@@ -108,7 +108,7 @@ contract CanonMarketplace is ReentrancyGuard {
         SubmissionType subType,
         bytes32 contentHash,
         string calldata metadataURI
-    ) external payable returns (uint256 submissionId) {
+    ) external payable nonReentrant returns (uint256 submissionId) {
         if (msg.value < minSubmissionFee) revert InsufficientFee();
 
         submissionId = nextSubmissionId++;
@@ -184,7 +184,7 @@ contract CanonMarketplace is ReentrancyGuard {
     }
 
     /// @notice License accepted canon content for use within the universe
-    function licenseCanon(uint256 submissionId) external payable returns (uint256 licenseId) {
+    function licenseCanon(uint256 submissionId) external payable nonReentrant returns (uint256 licenseId) {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.ACCEPTED) revert InvalidStatus();
 

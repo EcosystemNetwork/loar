@@ -15,13 +15,30 @@ import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 import { getPlatformConfig } from '../../services/platformConfig';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
-import { sepolia } from 'viem/chains';
+import { sepolia, baseSepolia } from 'viem/chains';
 
-// ── Sepolia client for on-chain tx verification ───────────────────────
+// ── Chain clients for on-chain tx verification ───────────────────────
 const sepoliaClient = createPublicClient({
   chain: sepolia,
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
+
+const baseSepoliaClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+});
+
+/** Get the appropriate chain client based on chain ID. */
+function getChainClient(chainId?: number) {
+  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  return sepoliaClient; // default
+}
+
+/** Chain name for error messages. */
+function getChainName(chainId?: number) {
+  if (chainId === baseSepolia.id) return 'Base Sepolia';
+  return 'Sepolia';
+}
 
 const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS ?? '') as `0x${string}`;
 const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '') as `0x${string}`;
@@ -38,7 +55,7 @@ const TRANSFER_TOPIC =
  * Amount is not checked here because pkg.ethPriceWei defaults to '0' until
  * admin sets live prices — callers should add amount verification when ethPriceWei is set.
  */
-async function verifyEthPayment(paymentRef: string): Promise<void> {
+async function verifyEthPayment(paymentRef: string, chainId?: number): Promise<void> {
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
     throw new Error('TREASURY_ADDRESS is not configured on the server');
   }
@@ -52,16 +69,19 @@ async function verifyEthPayment(paymentRef: string): Promise<void> {
     throw new Error('This transaction has already been used to purchase credits');
   }
 
-  let tx: Awaited<ReturnType<typeof sepoliaClient.getTransaction>>;
+  const client = getChainClient(chainId);
+  const chainName = getChainName(chainId);
+
+  let tx: Awaited<ReturnType<typeof client.getTransaction>>;
   try {
-    tx = await sepoliaClient.getTransaction({ hash: paymentRef as Hash });
+    tx = await client.getTransaction({ hash: paymentRef as Hash });
   } catch {
     throw new Error(
-      'Transaction not found on Sepolia. Confirm it has been broadcast and included in a block.'
+      `Transaction not found on ${chainName}. Confirm it has been broadcast and included in a block.`
     );
   }
 
-  const receipt = await sepoliaClient.getTransactionReceipt({ hash: paymentRef as Hash });
+  const receipt = await client.getTransactionReceipt({ hash: paymentRef as Hash });
   if (receipt.status !== 'success') {
     throw new Error('Transaction was reverted on-chain. No credits will be issued.');
   }
@@ -73,7 +93,11 @@ async function verifyEthPayment(paymentRef: string): Promise<void> {
   }
 }
 
-async function verifyLoarPayment(txHash: string, expectedLoarWei: bigint): Promise<void> {
+async function verifyLoarPayment(
+  txHash: string,
+  expectedLoarWei: bigint,
+  chainId?: number
+): Promise<void> {
   if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
     throw new Error('LOAR_TOKEN_ADDRESS is not configured on the server');
   }
@@ -91,12 +115,15 @@ async function verifyLoarPayment(txHash: string, expectedLoarWei: bigint): Promi
     throw new Error('This transaction has already been used to purchase credits');
   }
 
-  let receipt: Awaited<ReturnType<typeof sepoliaClient.getTransactionReceipt>>;
+  const client = getChainClient(chainId);
+  const chainName = getChainName(chainId);
+
+  let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>>;
   try {
-    receipt = await sepoliaClient.getTransactionReceipt({ hash: txHash as Hash });
+    receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
   } catch {
     throw new Error(
-      'Transaction not found on Sepolia. Confirm it has been broadcast and wait for it to be included in a block.'
+      `Transaction not found on ${chainName}. Confirm it has been broadcast and wait for it to be included in a block.`
     );
   }
 

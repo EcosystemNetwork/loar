@@ -1,7 +1,7 @@
 /**
  * Layer 6 — chain
  * Checks:
- *   - Sepolia RPC reachable + current block
+ *   - RPC reachable + current block (Sepolia or Base Sepolia)
  *   - UniverseManager contract deployed at expected address
  *   - (optional) createNode on a target Universe contract
  *
@@ -13,14 +13,23 @@
  *             contract logic regressions.
  */
 import { createPublicClient, createWalletClient, http, parseAbi } from 'viem';
-import { sepolia } from 'viem/chains';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { SmokeConfig } from '../config.ts';
 import { DEMO_CONTENT_PACK } from '../fixtures.ts';
 import { check, skipped, type CheckResult } from '../reporter.ts';
 
-// Contract addresses (Sepolia mainnet deployments)
-const UNIVERSE_MANAGER_ADDRESS = '0x7af142BbD14CaEECdA68f948F467Da0257f6B114' as const;
+// Chain lookup by ID
+const CHAINS: Record<number, typeof sepolia> = {
+  [sepolia.id]: sepolia,
+  [baseSepolia.id]: baseSepolia,
+};
+
+// Contract addresses per chain — update after deployments
+const UNIVERSE_MANAGER_ADDRESSES: Record<number, `0x${string}`> = {
+  [sepolia.id]: '0x7af142BbD14CaEECdA68f948F467Da0257f6B114',
+  [baseSepolia.id]: '0x0000000000000000000000000000000000000000', // TODO: deploy to Base Sepolia
+};
 
 const UNIVERSE_MANAGER_ABI = parseAbi([
   'function universeCount() view returns (uint256)',
@@ -44,14 +53,19 @@ export async function runChainLayer(cfg: SmokeConfig): Promise<ChainResult> {
   let blockNumber: bigint | undefined;
   let nodeId: bigint | undefined;
 
+  const chain = CHAINS[cfg.chainId] ?? sepolia;
+  const chainName = chain.name;
+  const UNIVERSE_MANAGER_ADDRESS =
+    UNIVERSE_MANAGER_ADDRESSES[cfg.chainId] ?? UNIVERSE_MANAGER_ADDRESSES[sepolia.id];
+
   const publicClient = createPublicClient({
-    chain: sepolia,
+    chain,
     transport: http(cfg.rpcUrl),
   });
 
   // 1. RPC reachable — get latest block
   results.push(
-    await check('Sepolia RPC reachable → block number', async () => {
+    await check(`${chainName} RPC reachable → block number`, async () => {
       blockNumber = await publicClient.getBlockNumber();
       if (!blockNumber || blockNumber === 0n) throw new Error('block number is 0 or missing');
       return `block #${blockNumber.toLocaleString()}`;
@@ -119,7 +133,7 @@ export async function runChainLayer(cfg: SmokeConfig): Promise<ChainResult> {
         const account = privateKeyToAccount(cfg.privateKey!);
         const walletClient = createWalletClient({
           account,
-          chain: sepolia,
+          chain,
           transport: http(cfg.rpcUrl),
         });
 

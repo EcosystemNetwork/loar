@@ -1039,7 +1039,7 @@ function UniverseTimelineEditor() {
   }
 
   return (
-    <div className="flex h-full bg-background overflow-hidden">
+    <div className="flex h-[calc(100svh-57px)] bg-background overflow-hidden">
       {/* Left Sidebar Component */}
       <UniverseSidebar
         finalUniverse={finalUniverse}

@@ -37,14 +37,14 @@ export default function Header() {
             <Link to="/" className="flex items-center gap-3">
               <img src="/loarlogo.svg" alt="LOAR Logo" className="h-9 w-auto object-contain" />
             </Link>
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1">
               {links.map(({ to, label }) => {
                 const isActive = matchRoute({ to, fuzzy: true });
                 return (
                   <Link
                     key={to}
                     to={to}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                       isActive
                         ? 'bg-primary/10 text-primary'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -66,7 +66,7 @@ export default function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="lg:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -76,7 +76,7 @@ export default function Header() {
 
         {/* Mobile Navigation */}
         {mobileOpen && (
-          <nav className="md:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3">
+          <nav className="lg:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3">
             {links.map(({ to, label }) => {
               const isActive = matchRoute({ to, fuzzy: true });
               return (
