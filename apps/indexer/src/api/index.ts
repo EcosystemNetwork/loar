@@ -14,7 +14,7 @@ import { universe, node, proposal, token, vote } from 'ponder:schema';
 
 const app = new Hono();
 
-app.get('/health', async (c) => {
+app.get('/status', async (c) => {
   let dbStatus = 'ok';
   try {
     await db.select().from(universe).limit(1);

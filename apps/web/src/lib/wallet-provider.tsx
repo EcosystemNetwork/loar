@@ -1,7 +1,7 @@
 /**
  * Wallet Provider Wrapper
  *
- * Uses Dynamic Labs for multi-chain wallet connection (EVM, Solana, SUI).
+ * Uses Dynamic Labs for EVM wallet connection (Sepolia).
  * DynamicWagmiConnector bridges Dynamic's wallet state into wagmi hooks
  * so existing useAccount / useSignMessage / etc. calls keep working.
  */
@@ -9,8 +9,6 @@
 import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
 import { DynamicWagmiConnector } from '@dynamic-labs/wagmi-connector';
 import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
-import { SolanaWalletConnectors } from '@dynamic-labs/solana';
-import { SuiWalletConnectors } from '@dynamic-labs/sui';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from '../../config';
@@ -32,7 +30,7 @@ export function WalletWrapper({ children }: WalletProviderProps) {
     <DynamicContextProvider
       settings={{
         environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID || '',
-        walletConnectors: [EthereumWalletConnectors, SolanaWalletConnectors, SuiWalletConnectors],
+        walletConnectors: [EthereumWalletConnectors],
       }}
     >
       <WagmiProvider config={config}>

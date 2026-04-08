@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CollabManager
 /// @notice Manages cross-universe collaborations ("collisions").
 ///         Two universes can merge for special event episodes, joint NFTs,
 ///         and shared liquidity events.
-contract CollabManager is ReentrancyGuard {
+contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     enum CollabStatus { PROPOSED, ACCEPTED, ACTIVE, COMPLETED, CANCELLED }
 
     struct Collab {
@@ -62,13 +65,21 @@ contract CollabManager is ReentrancyGuard {
 
     error ZeroAddress();
 
-    constructor(address _platform, address _paymentRouter, uint16 _platformFeeBps) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Propose a cross-universe collaboration
     function proposeCollab(

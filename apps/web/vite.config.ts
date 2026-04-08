@@ -50,7 +50,30 @@ export default defineConfig({
     },
     dedupe: ['wagmi', 'viem', '@tanstack/react-query', 'react', 'react-dom'],
   },
-  // Remove external wagmi/codegen - let it be bundled properly
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-router': ['@tanstack/react-router', '@tanstack/react-query'],
+          'vendor-web3': [
+            'wagmi',
+            'viem',
+            '@dynamic-labs/sdk-react-core',
+            '@dynamic-labs/ethereum',
+            '@dynamic-labs/wagmi-connector',
+          ],
+          'vendor-ui': [
+            'lucide-react',
+            'radix-ui',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 3001,
     hmr: {
