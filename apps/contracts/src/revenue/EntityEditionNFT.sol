@@ -87,7 +87,7 @@ contract EntityEditionNFT is Initializable, ERC1155, ERC2981, ReentrancyGuardUpg
     }
 
     /// @notice Register a new edition for minting
-    /// @param universeId  Universe this entity belongs to
+    /// @param _universeId Universe this entity belongs to
     /// @param kind        EntityKind enum value
     /// @param name        Display name for the entity
     /// @param contentHash SHA-256 of full entity content

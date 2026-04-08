@@ -113,8 +113,8 @@ contract RevenueModuleFactory is Ownable {
 
         episodeNfts = address(new BeaconProxy(address(episodeNftBeacon),
             abi.encodeCall(EpisodeNFT.initialize, (
-                universeId, platform, rightsRegistry, paymentRouter,
-                episodePlatformFeeBps))));
+                platform, rightsRegistry, paymentRouter,
+                episodePlatformFeeBps, episodeRoyaltyBps))));
 
         episodeCollection[universeId] = episodes;
         characterCollection[universeId] = characters;
