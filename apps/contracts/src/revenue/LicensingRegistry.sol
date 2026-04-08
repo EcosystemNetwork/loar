@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title LicensingRegistry
 /// @notice Manages IP licensing for original universes. When a universe gains traction,
 ///         creators can register licensing deals with external platforms (Netflix, Amazon, etc).
 ///         Also handles merch licensing for original IP (shirts, posters, figurines, comics).
-contract LicensingRegistry is ReentrancyGuard {
+contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     enum LicenseType { STREAMING, MERCH, GAMING, COMIC, AUDIO, OTHER }
     enum LicenseStatus { PROPOSED, ACTIVE, EXPIRED, REVOKED }
 
@@ -78,13 +81,21 @@ contract LicensingRegistry is ReentrancyGuard {
 
     error ZeroAddress();
 
-    constructor(address _platform, address _paymentRouter, uint16 _platformFeeBps) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ---- Licensing ----
 

@@ -3,7 +3,8 @@ pragma solidity ^0.8.30;
 
 import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -14,7 +15,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Checks RightsRegistry before creating an edition — FUN and FROZEN content
 ///         cannot be monetized. Routes all payments through PaymentRouter.
-contract EpisodeEditionCollection is ERC1155, ERC2981, ReentrancyGuard {
+contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, ReentrancyGuardUpgradeable {
     struct Edition {
         uint256 nodeId;
         bytes32 contentHash;
@@ -26,7 +27,7 @@ contract EpisodeEditionCollection is ERC1155, ERC2981, ReentrancyGuard {
     }
 
     /// @notice The universe this collection belongs to
-    uint256 public immutable universeId;
+    uint256 public universeId;
 
     address public platform;
     IRightsRegistry public rightsRegistry;
@@ -65,14 +66,18 @@ contract EpisodeEditionCollection is ERC1155, ERC2981, ReentrancyGuard {
         _;
     }
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() ERC1155("") { _disableInitializers(); }
+
+    function initialize(
         uint256 _universeId,
         address _platform,
         address _rightsRegistry,
         address _paymentRouter,
         uint16 _platformFeeBps,
         uint16 _royaltyBps
-    ) ERC1155("") {
+    ) external initializer {
+        __ReentrancyGuard_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;

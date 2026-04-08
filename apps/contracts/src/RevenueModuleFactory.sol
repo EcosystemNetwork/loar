@@ -2,53 +2,52 @@
 pragma solidity ^0.8.30;
 
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/proxy/beacon/BeaconProxy.sol";
 import {EpisodeEditionCollection} from "./revenue/EpisodeEditionCollection.sol";
 import {CharacterNFT} from "./revenue/CharacterNFT.sol";
 import {EntityNFT} from "./revenue/EntityNFT.sol";
 import {EntityEditionNFT} from "./revenue/EntityEditionNFT.sol";
+import {EpisodeNFT} from "./revenue/EpisodeNFT.sol";
 
 /// @title RevenueModuleFactory
-/// @notice Deploys per-universe revenue modules. Called after universe creation
-///         to wire up the full monetization layer for a universe.
-///
-///         Modules deployed per universe:
-///           EpisodeEditionCollection — ERC-1155 episode editions
-///           CharacterNFT             — ERC-721 character (person) NFTs
-///           EntityNFT                — ERC-721 for place, event, vehicle
-///           EntityEditionNFT         — ERC-1155 for thing, lore, species, technology
-///
-///         Global singletons (shared across universes, deployed separately):
-///           CollectiveTokenFactory   — ERC-20 for factions and organizations
-///           StructuralDeed           — ERC-721 world-layer deeds
-///           SlopMarket               — P2P marketplace for all entity token types
+/// @notice Deploys per-universe revenue modules as BeaconProxy instances.
+///         Each NFT type has an UpgradeableBeacon — upgrade the beacon
+///         and ALL universe instances upgrade instantly.
 contract RevenueModuleFactory is Ownable {
     address public platform;
     address public rightsRegistry;
     address public paymentRouter;
 
+    // ── Beacons (shared, upgradeable) ──
+    UpgradeableBeacon public episodeBeacon;
+    UpgradeableBeacon public characterBeacon;
+    UpgradeableBeacon public entityBeacon;
+    UpgradeableBeacon public entityEdBeacon;
+    UpgradeableBeacon public episodeNftBeacon;
+
+    // ── Fee defaults ──
     uint16 public episodePlatformFeeBps;
     uint16 public episodeRoyaltyBps;
     uint16 public characterAppearanceFeeBps;
     uint16 public entityPlatformFeeBps;
     uint16 public entityRoyaltyBps;
 
-    /// @notice universeId => deployed EpisodeEditionCollection
+    // ── Per-universe proxies ──
     mapping(uint256 => address) public episodeCollection;
-    /// @notice universeId => deployed CharacterNFT
     mapping(uint256 => address) public characterCollection;
-    /// @notice universeId => deployed EntityNFT (place, event, vehicle)
     mapping(uint256 => address) public entityCollection;
-    /// @notice universeId => deployed EntityEditionNFT (thing, lore, species, technology)
     mapping(uint256 => address) public entityEditionCollection;
+    mapping(uint256 => address) public episodeNftCollection;
 
     event ModulesDeployed(
         uint256 indexed universeId,
         address episodeCollection,
         address characterCollection,
         address entityCollection,
-        address entityEditionCollection
+        address entityEditionCollection,
+        address episodeNftCollection
     );
-    event PlatformUpdated(address newPlatform);
 
     error AlreadyDeployed();
     error ZeroAddress();
@@ -64,7 +63,12 @@ contract RevenueModuleFactory is Ownable {
         uint16 _episodeRoyaltyBps,
         uint16 _characterAppearanceFeeBps,
         uint16 _entityPlatformFeeBps,
-        uint16 _entityRoyaltyBps
+        uint16 _entityRoyaltyBps,
+        address _episodeBeacon,
+        address _characterBeacon,
+        address _entityBeacon,
+        address _entityEdBeacon,
+        address _episodeNftBeacon
     ) Ownable(msg.sender) {
         if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0))
             revert ZeroAddress();
@@ -76,100 +80,65 @@ contract RevenueModuleFactory is Ownable {
         characterAppearanceFeeBps = _characterAppearanceFeeBps;
         entityPlatformFeeBps = _entityPlatformFeeBps;
         entityRoyaltyBps = _entityRoyaltyBps;
+
+        // Beacons deployed externally and passed in (avoids initcode size limit)
+        episodeBeacon = UpgradeableBeacon(_episodeBeacon);
+        characterBeacon = UpgradeableBeacon(_characterBeacon);
+        entityBeacon = UpgradeableBeacon(_entityBeacon);
+        entityEdBeacon = UpgradeableBeacon(_entityEdBeacon);
+        episodeNftBeacon = UpgradeableBeacon(_episodeNftBeacon);
     }
 
-    /// @notice Deploy all revenue modules for a universe.
-    ///         Can only be called once per universeId.
+    /// @notice Deploy all revenue modules for a universe as BeaconProxy instances.
     function deployModules(uint256 universeId)
         external
-        returns (
-            address episodes,
-            address characters,
-            address entities,
-            address entityEditions
-        )
+        returns (address episodes, address characters, address entities, address entityEditions, address episodeNfts)
     {
         if (episodeCollection[universeId] != address(0)) revert AlreadyDeployed();
 
-        EpisodeEditionCollection episodeContract = new EpisodeEditionCollection(
-            universeId,
-            platform,
-            rightsRegistry,
-            paymentRouter,
-            episodePlatformFeeBps,
-            episodeRoyaltyBps
-        );
+        episodes = address(new BeaconProxy(address(episodeBeacon),
+            abi.encodeCall(EpisodeEditionCollection.initialize, (
+                universeId, platform, rightsRegistry, paymentRouter,
+                episodePlatformFeeBps, episodeRoyaltyBps))));
 
-        CharacterNFT characterContract = new CharacterNFT(
-            universeId,
-            platform,
-            rightsRegistry,
-            paymentRouter,
-            characterAppearanceFeeBps
-        );
+        characters = address(new BeaconProxy(address(characterBeacon),
+            abi.encodeCall(CharacterNFT.initialize, (
+                universeId, platform, rightsRegistry, paymentRouter,
+                characterAppearanceFeeBps))));
 
-        EntityNFT entityContract = new EntityNFT(
-            universeId,
-            platform,
-            paymentRouter,
-            rightsRegistry,
-            entityPlatformFeeBps,
-            entityRoyaltyBps
-        );
+        entities = address(new BeaconProxy(address(entityBeacon),
+            abi.encodeCall(EntityNFT.initialize, (
+                universeId, platform, paymentRouter, rightsRegistry,
+                entityPlatformFeeBps, entityRoyaltyBps))));
 
-        EntityEditionNFT entityEditionContract = new EntityEditionNFT(
-            universeId,
-            platform,
-            paymentRouter,
-            rightsRegistry,
-            entityPlatformFeeBps,
-            entityRoyaltyBps
-        );
+        entityEditions = address(new BeaconProxy(address(entityEdBeacon),
+            abi.encodeCall(EntityEditionNFT.initialize, (
+                universeId, platform, paymentRouter, rightsRegistry,
+                entityPlatformFeeBps, entityRoyaltyBps))));
 
-        episodeCollection[universeId]       = address(episodeContract);
-        characterCollection[universeId]     = address(characterContract);
-        entityCollection[universeId]        = address(entityContract);
-        entityEditionCollection[universeId] = address(entityEditionContract);
+        episodeNfts = address(new BeaconProxy(address(episodeNftBeacon),
+            abi.encodeCall(EpisodeNFT.initialize, (
+                platform, rightsRegistry, paymentRouter,
+                episodePlatformFeeBps, episodeRoyaltyBps))));
 
-        emit ModulesDeployed(
-            universeId,
-            address(episodeContract),
-            address(characterContract),
-            address(entityContract),
-            address(entityEditionContract)
-        );
+        episodeCollection[universeId] = episodes;
+        characterCollection[universeId] = characters;
+        entityCollection[universeId] = entities;
+        entityEditionCollection[universeId] = entityEditions;
+        episodeNftCollection[universeId] = episodeNfts;
 
-        return (
-            address(episodeContract),
-            address(characterContract),
-            address(entityContract),
-            address(entityEditionContract)
-        );
+        emit ModulesDeployed(universeId, episodes, characters, entities, entityEditions, episodeNfts);
     }
 
-    // ── Admin ─────────────────────────────────────────────────────────────────
+    // ── Admin ──
 
-    function setPlatform(address newPlatform) external onlyOwner {
-        if (newPlatform == address(0)) revert ZeroAddress();
-        platform = newPlatform;
-        emit PlatformUpdated(newPlatform);
-    }
+    function setPlatform(address p) external onlyOwner { if (p == address(0)) revert ZeroAddress(); platform = p; }
+    function setRightsRegistry(address r) external onlyOwner { if (r == address(0)) revert ZeroAddress(); rightsRegistry = r; }
+    function setPaymentRouter(address r) external onlyOwner { if (r == address(0)) revert ZeroAddress(); paymentRouter = r; }
 
-    function setRightsRegistry(address newRegistry) external onlyOwner {
-        if (newRegistry == address(0)) revert ZeroAddress();
-        rightsRegistry = newRegistry;
-    }
-
-    function setPaymentRouter(address newRouter) external onlyOwner {
-        if (newRouter == address(0)) revert ZeroAddress();
-        paymentRouter = newRouter;
-    }
-
-    function setEpisodeFees(uint16 platformFeeBps, uint16 royaltyBps_) external onlyOwner {
-        if (platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
-        if (royaltyBps_ > MAX_FEE_BPS) revert FeeTooHigh();
-        episodePlatformFeeBps = platformFeeBps;
-        episodeRoyaltyBps = royaltyBps_;
+    function setEpisodeFees(uint16 pfBps, uint16 rBps) external onlyOwner {
+        if (pfBps > MAX_FEE_BPS || rBps > MAX_FEE_BPS) revert FeeTooHigh();
+        episodePlatformFeeBps = pfBps; episodeRoyaltyBps = rBps;
     }
 
     function setCharacterAppearanceFee(uint16 feeBps) external onlyOwner {
@@ -177,10 +146,8 @@ contract RevenueModuleFactory is Ownable {
         characterAppearanceFeeBps = feeBps;
     }
 
-    function setEntityFees(uint16 platformFeeBps, uint16 royaltyBps_) external onlyOwner {
-        if (platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
-        if (royaltyBps_ > MAX_FEE_BPS) revert FeeTooHigh();
-        entityPlatformFeeBps = platformFeeBps;
-        entityRoyaltyBps = royaltyBps_;
+    function setEntityFees(uint16 pfBps, uint16 rBps) external onlyOwner {
+        if (pfBps > MAX_FEE_BPS || rBps > MAX_FEE_BPS) revert FeeTooHigh();
+        entityPlatformFeeBps = pfBps; entityRoyaltyBps = rBps;
     }
 }

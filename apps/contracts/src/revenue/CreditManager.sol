@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -12,7 +15,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Credits are the internal unit for all generation actions.
 ///         1 credit = 1 unit of generation capacity (costs vary by action type).
-contract CreditManager is ReentrancyGuard {
+contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     // ── Structs ──────────────────────────────────────────────────
 
     struct CreditPackage {
@@ -81,8 +84,15 @@ contract CreditManager is ReentrancyGuard {
 
     // ── Constructor ──────────────────────────────────────────────
 
-    constructor(address _loarToken, address _platform, address _treasury, address _paymentRouter) {
-        if (_loarToken == address(0) || _platform == address(0) || _treasury == address(0) || _paymentRouter == address(0))
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    function initialize(address _loarToken, address _platform, address _treasury, address _paymentRouter) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+        // loarToken can be address(0) initially — set later via updateLoarToken()
+        if (_platform == address(0) || _treasury == address(0))
             revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
@@ -102,6 +112,8 @@ contract CreditManager is ReentrancyGuard {
         generationCosts[keccak256("voiceover")] = 10;
         generationCosts[keccak256("caption")] = 2;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ── Package Management ───────────────────────────────────────
 

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+
 /// @title AnalyticsRegistry
 /// @notice On-chain analytics for story engagement data. Records what stories
 ///         people like, trending characters, and engaging arcs. This data is
 ///         valuable for training story AIs and for studios.
-contract AnalyticsRegistry {
+contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     struct UniverseMetrics {
         uint256 totalViews;
         uint256 totalMints;
@@ -52,9 +56,16 @@ contract AnalyticsRegistry {
         _;
     }
 
-    constructor(address _platform) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    function initialize(address _platform) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
         platform = _platform;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Record a view on an episode
     function recordView(uint256 universeId, uint256 episodeId) external onlyPlatform {

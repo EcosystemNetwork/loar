@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
-import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 
 /// @title PaymentRouter
@@ -13,7 +15,7 @@ import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 ///
 ///         Replaces the scattered platform.call + creator.call patterns in each
 ///         revenue contract, giving a single place to adjust fees and routing.
-contract PaymentRouter is IPaymentRouter, ReentrancyGuard, Ownable {
+contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address public treasury;
     uint16 public defaultPlatformFeeBps;
 
@@ -35,14 +37,22 @@ contract PaymentRouter is IPaymentRouter, ReentrancyGuard, Ownable {
     error TransferFailed();
     error FeeTooHigh();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
     /// @param _treasury Receives the platform's fee cut immediately on each route()
     /// @param _defaultPlatformFeeBps Default fee in basis points (e.g. 1000 = 10%)
-    constructor(address _treasury, uint16 _defaultPlatformFeeBps) Ownable(msg.sender) {
+    function initialize(address _treasury, uint16 _defaultPlatformFeeBps) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         if (_treasury == address(0)) revert ZeroAddress();
         if (_defaultPlatformFeeBps > 5000) revert FeeTooHigh();
         treasury = _treasury;
         defaultPlatformFeeBps = _defaultPlatformFeeBps;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Route a payment: send platform cut to treasury, accrue creator's cut
     /// @param creator Address that will be able to claim the creator portion

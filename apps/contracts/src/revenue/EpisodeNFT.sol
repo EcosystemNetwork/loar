@@ -5,7 +5,8 @@ import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {ERC721Enumerable} from "@openzeppelin/token/ERC721/extensions/ERC721Enumerable.sol";
 import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIStorage.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -13,7 +14,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 /// @title EpisodeNFT
 /// @notice Mints AI-generated episodes as NFTs with ERC2981 royalties.
 ///         Each episode is tied to a universe node and earns royalties on resale.
-contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuard {
+contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable {
     struct Episode {
         uint256 universeId;
         uint256 nodeId;
@@ -56,13 +57,17 @@ contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGu
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() ERC721("LOAR Episodes", "EPISODE") { _disableInitializers(); }
+
+    function initialize(
         address _platform,
         address _rightsRegistry,
         address _paymentRouter,
         uint16 _platformFeeBps,
         uint16 _defaultRoyaltyBps
-    ) ERC721("LOAR Episodes", "EPISODE") {
+    ) external initializer {
+        __ReentrancyGuard_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         rightsRegistry = IRightsRegistry(_rightsRegistry);
