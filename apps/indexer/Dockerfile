@@ -15,10 +15,13 @@ COPY packages/abis/package.json ./packages/abis/
 RUN npm pkg set scripts.prepare="echo skip"
 RUN pnpm install --frozen-lockfile
 # Remove vitest — it conflicts with Ponder's internal vite-node at runtime
-RUN rm -rf node_modules/.pnpm/vitest@* node_modules/.pnpm/@vitest*
+RUN find node_modules -path "*/vitest*" -prune -exec rm -rf {} + 2>/dev/null; \
+    find node_modules -path "*/@vitest*" -prune -exec rm -rf {} + 2>/dev/null; \
+    true
 
-# Copy indexer source + shared packages it imports
+# Copy indexer source + shared packages it imports (exclude tests)
 COPY apps/indexer/ ./apps/indexer/
+RUN rm -rf apps/indexer/src/__tests__
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
