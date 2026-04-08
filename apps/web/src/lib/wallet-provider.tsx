@@ -1,12 +1,21 @@
 /**
  * Wallet Provider Wrapper
  *
- * Wraps the application in WagmiProvider, supplying the shared wagmi config
- * (chains, connectors, transports) to all descendant hooks and components.
+ * Uses Dynamic Labs for multi-chain wallet connection (EVM, Solana, SUI).
+ * DynamicWagmiConnector bridges Dynamic's wallet state into wagmi hooks
+ * so existing useAccount / useSignMessage / etc. calls keep working.
  */
 
+import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
+import { DynamicWagmiConnector } from '@dynamic-labs/wagmi-connector';
+import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
+import { SolanaWalletConnectors } from '@dynamic-labs/solana';
+import { SuiWalletConnectors } from '@dynamic-labs/sui';
 import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from '../../config';
+
+const dynamicQueryClient = new QueryClient();
 
 interface WalletProviderProps {
   children: React.ReactNode;
@@ -14,8 +23,23 @@ interface WalletProviderProps {
 
 /**
  * Top-level wallet context provider.
- * @param props.children - React children to render within the wagmi context
+ *
+ * Nesting order (outermost → innermost):
+ *   DynamicContextProvider → WagmiProvider → QueryClientProvider → DynamicWagmiConnector
  */
 export function WalletWrapper({ children }: WalletProviderProps) {
-  return <WagmiProvider config={config}>{children}</WagmiProvider>;
+  return (
+    <DynamicContextProvider
+      settings={{
+        environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID || '',
+        walletConnectors: [EthereumWalletConnectors, SolanaWalletConnectors, SuiWalletConnectors],
+      }}
+    >
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={dynamicQueryClient}>
+          <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </DynamicContextProvider>
+  );
 }

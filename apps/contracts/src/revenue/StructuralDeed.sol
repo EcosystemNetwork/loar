@@ -7,6 +7,7 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
 /// @title StructuralDeed
 /// @notice ERC-721 "world real estate" for the ontology hierarchy:
@@ -57,6 +58,7 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
 
     address public platform;
     IPaymentRouter public paymentRouter;
+    IRightsRegistry public rightsRegistry;
     uint16 public platformFeeBps;
     uint16 public royaltyBps;
 
@@ -74,17 +76,26 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     error InsufficientPayment();
     error DeedExists();
     error NotPlatform();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+    error InvalidParent();
+    error ParentRequired();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
         address _platform,
         address _paymentRouter,
+        address _rightsRegistry,
         uint16 _platformFeeBps,
         uint16 _royaltyBps,
         uint256[6] memory _layerMintPrices,
         uint256[6] memory _layerMaxSupply
     ) ERC721("LOAR World Deeds", "DEED") {
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
         platformFeeBps = _platformFeeBps;
         royaltyBps = _royaltyBps;
         layerMintPrices = _layerMintPrices;
@@ -106,9 +117,22 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         uint256 parentTokenId,
         string calldata metadataURI
     ) external payable nonReentrant returns (uint256 tokenId) {
+        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         uint8 l = uint8(layer);
         if (msg.value < layerMintPrices[l]) revert InsufficientPayment();
         if (layerMaxSupply[l] > 0 && layerMinted[l] >= layerMaxSupply[l]) revert LayerSoldOut();
+
+        // Hierarchy validation: DOMAIN (layer 0) has no parent, all others require one
+        if (layer == Layer.DOMAIN) {
+            // DOMAIN is root — parentTokenId must be 0
+            if (parentTokenId != 0) revert InvalidParent();
+        } else {
+            // All other layers require a parent that is exactly one layer above
+            if (parentTokenId == 0) revert ParentRequired();
+            Deed storage parent = deeds[parentTokenId];
+            if (parent.universeId != universeId) revert InvalidParent();
+            if (uint8(parent.layer) + 1 != l) revert InvalidParent();
+        }
 
         bytes32 nameHash = keccak256(abi.encodePacked(name));
         if (deedByName[universeId][l][nameHash] != 0) revert DeedExists();

@@ -24,6 +24,11 @@ contract LoarFeeLocker is ILoarFeeLocker, ReentrancyGuard, Ownable {
         emit AddDepositor(depositor);
     }
 
+    function removeDepositor(address depositor) external onlyOwner {
+        allowedDepositors[depositor] = false;
+        emit RemoveDepositor(depositor);
+    }
+
     function storeFees(address feeOwner, address token, uint256 amount) external nonReentrant {
         if (!allowedDepositors[msg.sender]) revert Unauthorized();
 
@@ -43,18 +48,18 @@ contract LoarFeeLocker is ILoarFeeLocker, ReentrancyGuard, Ownable {
         return feesToClaim[feeOwner][token];
     }
 
-    // claim fees on behalf of a feeOwner
-    function claim(address feeOwner, address token) external nonReentrant {
-        uint256 balance = feesToClaim[feeOwner][token];
+    // claim fees — only the fee owner themselves can trigger withdrawal
+    function claim(address token) external nonReentrant {
+        uint256 balance = feesToClaim[msg.sender][token];
         if (balance == 0) revert NoFeesToClaim();
 
         // debit account
-        feesToClaim[feeOwner][token] = 0;
+        feesToClaim[msg.sender][token] = 0;
 
         // transfer funds
-        SafeERC20.safeTransfer(IERC20(token), feeOwner, balance);
+        SafeERC20.safeTransfer(IERC20(token), msg.sender, balance);
 
-        emit ClaimTokens(feeOwner, token, balance);
+        emit ClaimTokens(msg.sender, token, balance);
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {

@@ -6,6 +6,8 @@ import {ERC721Enumerable} from "@openzeppelin/token/ERC721/extensions/ERC721Enum
 import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIStorage.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CharacterNFT
 /// @notice Characters as ownable NFTs. Owners earn when their character appears in episodes.
@@ -20,6 +22,9 @@ contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentrancy
         uint256 accumulatedRoyalties;
     }
 
+    /// @notice The universe this collection belongs to
+    uint256 public immutable universeId;
+
     uint256 public nextCharacterId;
 
     mapping(uint256 => Character) public characters;
@@ -27,10 +32,9 @@ contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentrancy
     mapping(uint256 => mapping(bytes32 => uint256)) public characterByName;
 
     address public platform;
+    IRightsRegistry public rightsRegistry;
+    IPaymentRouter public paymentRouter;
     uint16 public appearanceFeeBps;    // fee taken from episode mint when character appears
-
-    // Accumulated ETH for character owners to claim
-    mapping(uint256 => uint256) public claimable;
 
     event CharacterCreated(uint256 indexed characterId, uint256 universeId, string name, address creator);
     event CharacterAppearance(uint256 indexed characterId, uint256 indexed episodeId, uint256 reward);
@@ -40,24 +44,38 @@ contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentrancy
     error CharacterExists();
     error NothingToClaim();
     error TransferFailed();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+    error WrongUniverse();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
+        uint256 _universeId,
         address _platform,
+        address _rightsRegistry,
+        address _paymentRouter,
         uint16 _appearanceFeeBps
     ) ERC721("LOAR Characters", "CHARACTER") {
+        if (_appearanceFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        universeId = _universeId;
         platform = _platform;
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
+        paymentRouter = IPaymentRouter(_paymentRouter);
         appearanceFeeBps = _appearanceFeeBps;
     }
 
     /// @notice Mint a new character NFT
     function createCharacter(
-        uint256 universeId,
+        uint256 _universeId,
         string calldata name,
         bytes32 visualHash,
         string calldata metadataURI
     ) external returns (uint256 characterId) {
+        if (_universeId != universeId) revert WrongUniverse();
+        if (!rightsRegistry.isMonetizable(visualHash)) revert ContentNotMonetizable();
         bytes32 nameHash = keccak256(abi.encodePacked(name));
-        if (characterByName[universeId][nameHash] != 0) revert CharacterExists();
+        if (characterByName[_universeId][nameHash] != 0) revert CharacterExists();
 
         characterId = ++nextCharacterId;
         characterByName[universeId][nameHash] = characterId;
@@ -85,22 +103,13 @@ contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentrancy
         Character storage c = characters[characterId];
         c.appearanceCount++;
         c.accumulatedRoyalties += msg.value;
-        claimable[characterId] += msg.value;
+
+        // Route reward to character owner via PaymentRouter (0 fee — platform already took its cut)
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(ownerOf(characterId), 0);
+        }
 
         emit CharacterAppearance(characterId, episodeId, msg.value);
-    }
-
-    /// @notice Character owner claims accumulated appearance royalties
-    function claimRoyalties(uint256 characterId) external nonReentrant {
-        if (ownerOf(characterId) != msg.sender) revert NotOwner();
-        uint256 amount = claimable[characterId];
-        if (amount == 0) revert NothingToClaim();
-
-        claimable[characterId] = 0;
-        (bool success,) = msg.sender.call{value: amount}("");
-        if (!success) revert TransferFailed();
-
-        emit RoyaltyClaimed(characterId, msg.sender, amount);
     }
 
     /// @notice Get all characters in a universe

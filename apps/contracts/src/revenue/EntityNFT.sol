@@ -7,6 +7,7 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
 /// @title EntityNFT
 /// @notice ERC-721 for unique world-building entities: places, events, vehicles.
@@ -24,6 +25,9 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
         uint256 mintPrice;
     }
 
+    /// @notice The universe this collection belongs to
+    uint256 public immutable universeId;
+
     uint256 public nextTokenId;
 
     mapping(uint256 => Entity) public entities;
@@ -33,6 +37,7 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
 
     address public platform;
     IPaymentRouter public paymentRouter;
+    IRightsRegistry public rightsRegistry;
     uint16 public platformFeeBps;
     uint16 public royaltyBps;
 
@@ -48,15 +53,25 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
     error EntityExists();
     error InsufficientPayment();
     error NotPlatform();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+    error WrongUniverse();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
+        uint256 _universeId,
         address _platform,
         address _paymentRouter,
+        address _rightsRegistry,
         uint16 _platformFeeBps,
         uint16 _royaltyBps
     ) ERC721("LOAR Entities", "ENTITY") {
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        universeId = _universeId;
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
         platformFeeBps = _platformFeeBps;
         royaltyBps = _royaltyBps;
     }
@@ -69,13 +84,15 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
     /// @param mintPrice   ETH price caller must send (0 = free)
     /// @param metadataURI IPFS/Walrus URI for NFT metadata
     function mint(
-        uint256 universeId,
+        uint256 _universeId,
         EntityKind kind,
         string calldata name,
         bytes32 contentHash,
         uint256 mintPrice,
         string calldata metadataURI
     ) external payable nonReentrant returns (uint256 tokenId) {
+        if (_universeId != universeId) revert WrongUniverse();
+        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         if (msg.value < mintPrice) revert InsufficientPayment();
 
         bytes32 nameHash = keccak256(abi.encodePacked(name));
@@ -121,6 +138,7 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
 
     function setPlatformFee(uint16 newFeeBps) external {
         if (msg.sender != platform) revert NotPlatform();
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platformFeeBps = newFeeBps;
     }
 
