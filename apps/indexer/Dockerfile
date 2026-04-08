@@ -11,9 +11,10 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/abis/package.json ./packages/abis/
 
-# Install only indexer + abis deps using pnpm deploy (creates isolated node_modules)
+# Strip devDeps (vitest conflicts with Ponder's vite-node) and skip husky
 RUN npm pkg set scripts.prepare="echo skip"
-RUN pnpm install --frozen-lockfile --filter indexer --filter @loar/abis
+RUN node -e "const p=require('./apps/indexer/package.json');delete p.devDependencies;require('fs').writeFileSync('./apps/indexer/package.json',JSON.stringify(p,null,2))"
+RUN pnpm install --no-frozen-lockfile
 
 # Copy indexer source + shared packages (exclude tests)
 COPY apps/indexer/ ./apps/indexer/
