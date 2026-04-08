@@ -11,12 +11,13 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/abis/package.json ./packages/abis/
 
-# Strip ALL devDeps from every package.json (vitest in indexer conflicts with Ponder)
+# Remove vitest from indexer devDeps (conflicts with Ponder's vite-node) and skip husky
 RUN npm pkg set scripts.prepare="echo skip"
 RUN node -e "\
   const fs=require('fs'); \
-  const files=['./apps/indexer/package.json','./apps/server/package.json','./apps/web/package.json','./packages/abis/package.json','./package.json']; \
-  files.forEach(f=>{try{const p=JSON.parse(fs.readFileSync(f));delete p.devDependencies;fs.writeFileSync(f,JSON.stringify(p,null,2))}catch(e){}})"
+  const p=JSON.parse(fs.readFileSync('./apps/indexer/package.json')); \
+  if(p.devDependencies)delete p.devDependencies.vitest; \
+  fs.writeFileSync('./apps/indexer/package.json',JSON.stringify(p,null,2))"
 RUN pnpm install --no-frozen-lockfile
 
 # Copy indexer source (selective — no vitest.config.ts, no __tests__)
