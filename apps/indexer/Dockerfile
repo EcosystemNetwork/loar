@@ -14,8 +14,10 @@ COPY packages/abis/package.json ./packages/abis/
 # Install dependencies (--ignore-scripts: skip husky prepare in Docker)
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Copy indexer source
+# Copy indexer source + shared packages it imports
 COPY apps/indexer/ ./apps/indexer/
+COPY packages/abis/ ./packages/abis/
+COPY deployments/ ./deployments/
 
 WORKDIR /app/apps/indexer
 
