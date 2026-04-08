@@ -11,8 +11,11 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/abis/package.json ./packages/abis/
 
-# Install dependencies (--ignore-scripts: skip husky prepare in Docker)
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Install all deps (workspace links needed for @loar/abis), skip husky
+RUN npm pkg set scripts.prepare="echo skip"
+RUN pnpm install --frozen-lockfile
+# Remove vitest — it conflicts with Ponder's internal vite-node at runtime
+RUN rm -rf node_modules/.pnpm/vitest@* node_modules/.pnpm/@vitest*
 
 # Copy indexer source + shared packages it imports
 COPY apps/indexer/ ./apps/indexer/
