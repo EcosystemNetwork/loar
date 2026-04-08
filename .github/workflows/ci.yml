@@ -160,7 +160,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify addresses.ts matches deployments/sepolia.json
+      - name: Verify addresses.ts matches deployment manifests
         run: pnpm check:addresses
 
   indexer-validate:

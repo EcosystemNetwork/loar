@@ -49,7 +49,7 @@ export default function LoginScreen() {
       setConnectedAddress(address);
 
       // 2. Get chain ID
-      const chainId = await getCDPChainId().catch(() => 11155111); // default Sepolia
+      const chainId = await getCDPChainId().catch(() => 84532); // default Base Sepolia
 
       // 3. Sign SIWE message
       await signIn(address, (message) => signWithCDP(message, address), chainId);
@@ -94,10 +94,26 @@ export default function LoginScreen() {
           {/* Features */}
           <View className="gap-4">
             {[
-              { icon: '🌌', title: 'Owned Universes', desc: 'Track all your tokenized story universes' },
-              { icon: '🎬', title: 'Collectibles & NFTs', desc: 'Episode and character collections in one place' },
-              { icon: '💎', title: 'Credits & Earnings', desc: 'Monitor credits, royalties, and pending payouts' },
-              { icon: '🔐', title: 'Secure & On-Chain', desc: 'Non-custodial — your keys, your assets' },
+              {
+                icon: '🌌',
+                title: 'Owned Universes',
+                desc: 'Track all your tokenized story universes',
+              },
+              {
+                icon: '🎬',
+                title: 'Collectibles & NFTs',
+                desc: 'Episode and character collections in one place',
+              },
+              {
+                icon: '💎',
+                title: 'Credits & Earnings',
+                desc: 'Monitor credits, royalties, and pending payouts',
+              },
+              {
+                icon: '🔐',
+                title: 'Secure & On-Chain',
+                desc: 'Non-custodial — your keys, your assets',
+              },
             ].map((f) => (
               <View key={f.title} className="flex-row items-start gap-3">
                 <View className="w-10 h-10 rounded-xl bg-zinc-900 items-center justify-center mt-0.5">
@@ -120,9 +136,7 @@ export default function LoginScreen() {
                 <Text className="text-text-secondary text-xs">
                   Connected: {connectedAddress.slice(0, 6)}…{connectedAddress.slice(-4)}
                 </Text>
-                <Text className="text-text-tertiary text-xs mt-1">
-                  Waiting for SIWE signature…
-                </Text>
+                <Text className="text-text-tertiary text-xs mt-1">Waiting for SIWE signature…</Text>
               </View>
             ) : null}
 

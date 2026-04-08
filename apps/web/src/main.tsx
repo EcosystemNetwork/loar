@@ -22,6 +22,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient, trpc } from './utils/trpc';
 
 import { WalletWrapper } from './lib/wallet-provider';
+import { Web3ModeProvider } from './lib/web3-mode';
 
 const router = createRouter({
   routeTree,
@@ -30,9 +31,11 @@ const router = createRouter({
   context: { trpc, queryClient },
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <WalletWrapper>{children}</WalletWrapper>
-      </QueryClientProvider>
+      <WalletWrapper>
+        <QueryClientProvider client={queryClient}>
+          <Web3ModeProvider>{children}</Web3ModeProvider>
+        </QueryClientProvider>
+      </WalletWrapper>
     );
   },
 });

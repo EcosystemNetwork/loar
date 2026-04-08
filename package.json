@@ -19,6 +19,7 @@
     "sc:test:cov": "turbo run sc:test:cov",
     "sc:test:integration": "turbo run sc:test:integration",
     "deploy:sepolia": "bash scripts/deploy-sepolia.sh",
+    "deploy:base-sepolia": "bash scripts/deploy-base-sepolia.sh",
     "sync:addresses": "tsx scripts/sync-deployments.ts",
     "check:addresses": "tsx scripts/check-addresses.ts",
     "smoke": "tsx scripts/smoke/index.ts",

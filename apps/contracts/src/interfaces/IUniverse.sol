@@ -22,7 +22,7 @@ interface IUniverse {
     );
     event NodeVisibilityOptionUpdated(NodeVisibilityOptions option);
     event NodeCreationOptionUpdated(NodeCreationOptions option);
-    event MediaUpdated(address updater, bytes32 contentHash, string link);
+    event MediaUpdated(uint indexed nodeId, address updater, bytes32 contentHash, string link);
 
     function setAdmin(address newAdmin) external;
     function setToken(address) external;

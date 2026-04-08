@@ -7,6 +7,8 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title EpisodeNFT
 /// @notice Mints AI-generated episodes as NFTs with ERC2981 royalties.
@@ -32,6 +34,8 @@ contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGu
     mapping(uint256 => uint256) public tokenEpisode;
 
     address public platform;
+    IRightsRegistry public rightsRegistry;
+    IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;       // basis points on primary sales
     uint16 public defaultRoyaltyBps;    // secondary sale royalty
 
@@ -47,13 +51,22 @@ contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGu
     error MaxSupplyReached();
     error InsufficientPayment();
     error TransferFailed();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
         address _platform,
+        address _rightsRegistry,
+        address _paymentRouter,
         uint16 _platformFeeBps,
         uint16 _defaultRoyaltyBps
     ) ERC721("LOAR Episodes", "EPISODE") {
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
+        paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
         defaultRoyaltyBps = _defaultRoyaltyBps;
     }
@@ -67,6 +80,7 @@ contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGu
         uint256 maxSupply,
         string calldata metadataURI
     ) external returns (uint256 episodeId) {
+        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         episodeId = nextEpisodeId++;
 
         episodes[episodeId] = Episode({
@@ -98,14 +112,10 @@ contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGu
         _setTokenURI(tokenId, tokenURI_);
         _setTokenRoyalty(tokenId, ep.creator, defaultRoyaltyBps);
 
-        // Split payment: platform fee + creator
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
-        uint256 creatorCut = msg.value - platformCut;
-
-        (bool s1,) = platform.call{value: platformCut}("");
-        if (!s1) revert TransferFailed();
-        (bool s2,) = ep.creator.call{value: creatorCut}("");
-        if (!s2) revert TransferFailed();
+        // Route payment through PaymentRouter
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(ep.creator, platformFeeBps);
+        }
 
         emit EpisodeMinted(tokenId, episodeId, msg.sender, msg.value);
     }
@@ -120,6 +130,7 @@ contract EpisodeNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGu
     /// @notice Update platform fee (only platform admin)
     function setPlatformFee(uint16 newFeeBps) external {
         require(msg.sender == platform, "Not platform");
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platformFeeBps = newFeeBps;
     }
 

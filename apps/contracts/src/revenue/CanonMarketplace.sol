@@ -3,6 +3,9 @@ pragma solidity ^0.8.30;
 
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CanonMarketplace
 /// @notice Governance-gated marketplace for submitting world-building entities into canon.
@@ -38,6 +41,7 @@ contract CanonMarketplace is ReentrancyGuard {
         uint256 votesAgainst;
         uint256 votingDeadline;
         uint256 createdAt;
+        uint256 snapshotBlock;       // block number for vote weight snapshot (flash loan protection)
     }
 
     struct CanonLicense {
@@ -62,20 +66,19 @@ contract CanonMarketplace is ReentrancyGuard {
     mapping(uint256 => uint256[]) public canonSubmissions;
 
     address public platform;
+    IRightsRegistry public rightsRegistry;
+    IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;         // platform cut on submission fees
     uint16 public canonLicenseFeeBps;     // platform cut on license fees
     uint256 public minSubmissionFee;
     uint256 public votingDuration;        // seconds
-
-    // Creator earnings
-    mapping(address => uint256) public creatorEarnings;
 
     event SubmissionCreated(uint256 indexed id, uint256 universeId, SubmissionType subType, address creator, bytes32 contentHash);
     event VoteCast(uint256 indexed submissionId, address voter, bool support, uint256 weight);
     event SubmissionAccepted(uint256 indexed submissionId, uint256 universeId);
     event SubmissionRejected(uint256 indexed submissionId);
     event CanonLicensed(uint256 indexed licenseId, uint256 submissionId, address licensee, uint256 fee);
-    event EarningsClaimed(address indexed creator, uint256 amount);
+    event CanonSubmissionAccepted(uint256 indexed universeId, uint256 indexed submissionId, bytes32 contentHash);
 
     error AlreadyVoted();
     error VotingNotActive();
@@ -86,30 +89,50 @@ contract CanonMarketplace is ReentrancyGuard {
     error NoBalance();
     error TransferFailed();
     error NoVotingPower();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
+
+    error ZeroAddress();
 
     constructor(
         address _platform,
+        address _rightsRegistry,
+        address _paymentRouter,
         uint16 _platformFeeBps,
         uint16 _canonLicenseFeeBps,
         uint256 _minSubmissionFee,
         uint256 _votingDuration
     ) {
+        if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        if (_canonLicenseFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
+        paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
         canonLicenseFeeBps = _canonLicenseFeeBps;
         minSubmissionFee = _minSubmissionFee;
         votingDuration = _votingDuration;
     }
 
+    error InvalidToken();
+
     /// @notice Submit content for canon consideration
+    /// @param universeToken Must be a valid IVotes token (governance token for the universe)
     function submit(
         uint256 universeId,
         address universeToken,
         SubmissionType subType,
         bytes32 contentHash,
         string calldata metadataURI
-    ) external payable returns (uint256 submissionId) {
+    ) external payable nonReentrant returns (uint256 submissionId) {
+        if (universeToken == address(0)) revert InvalidToken();
+        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         if (msg.value < minSubmissionFee) revert InsufficientFee();
+        // Validate the token implements IVotes (will revert if not)
+        try IVotes(universeToken).getPastTotalSupply(block.number - 1) {} catch { revert InvalidToken(); }
 
         submissionId = nextSubmissionId++;
 
@@ -126,27 +149,29 @@ contract CanonMarketplace is ReentrancyGuard {
             votesFor: 0,
             votesAgainst: 0,
             votingDeadline: block.timestamp + votingDuration,
-            createdAt: block.timestamp
+            createdAt: block.timestamp,
+            snapshotBlock: block.number - 1
         });
 
-        // Platform takes cut of submission fee
+        // Platform takes cut of submission fee via PaymentRouter
         uint256 platformCut = (msg.value * platformFeeBps) / 10000;
         if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+            paymentRouter.routeToTreasury{value: platformCut}();
         }
 
         emit SubmissionCreated(submissionId, universeId, subType, msg.sender, contentHash);
     }
 
-    /// @notice Vote on a submission (weighted by governance token balance)
+    /// @notice Vote on a submission (weighted by governance token snapshot at submission time)
+    /// @dev Uses getPastVotes() for flash-loan protection — vote weight is locked at snapshotBlock
     function vote(uint256 submissionId, bool support) external {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert VotingNotActive();
         if (block.timestamp > sub.votingDeadline) revert VotingNotActive();
         if (hasVoted[submissionId][msg.sender]) revert AlreadyVoted();
 
-        uint256 weight = IERC20(sub.universeToken).balanceOf(msg.sender);
+        // Use snapshot voting power (block before submission) — immune to flash loans
+        uint256 weight = IVotes(sub.universeToken).getPastVotes(msg.sender, sub.snapshotBlock);
         if (weight == 0) revert NoVotingPower();
 
         hasVoted[submissionId][msg.sender] = true;
@@ -171,12 +196,15 @@ contract CanonMarketplace is ReentrancyGuard {
             sub.status = SubmissionStatus.ACCEPTED;
             canonSubmissions[sub.universeId].push(submissionId);
 
-            // Creator earns the remaining submission fee
+            // Creator earns the remaining submission fee via PaymentRouter
             uint256 platformCut = (sub.submissionFee * platformFeeBps) / 10000;
             uint256 creatorReward = sub.submissionFee - platformCut;
-            creatorEarnings[sub.creator] += creatorReward;
+            if (creatorReward > 0) {
+                paymentRouter.route{value: creatorReward}(sub.creator, 0);
+            }
 
             emit SubmissionAccepted(submissionId, sub.universeId);
+            emit CanonSubmissionAccepted(sub.universeId, submissionId, sub.contentHash);
         } else {
             sub.status = SubmissionStatus.REJECTED;
             emit SubmissionRejected(submissionId);
@@ -184,7 +212,7 @@ contract CanonMarketplace is ReentrancyGuard {
     }
 
     /// @notice License accepted canon content for use within the universe
-    function licenseCanon(uint256 submissionId) external payable returns (uint256 licenseId) {
+    function licenseCanon(uint256 submissionId) external payable nonReentrant returns (uint256 licenseId) {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.ACCEPTED) revert InvalidStatus();
 
@@ -196,29 +224,12 @@ contract CanonMarketplace is ReentrancyGuard {
             grantedAt: block.timestamp
         });
 
-        // Split license fee
-        uint256 platformCut = (msg.value * canonLicenseFeeBps) / 10000;
-        uint256 creatorCut = msg.value - platformCut;
-
-        creatorEarnings[sub.creator] += creatorCut;
-        if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+        // Route license fee through PaymentRouter
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(sub.creator, canonLicenseFeeBps);
         }
 
         emit CanonLicensed(licenseId, submissionId, msg.sender, msg.value);
-    }
-
-    /// @notice Creator claims accumulated earnings
-    function claimEarnings() external nonReentrant {
-        uint256 amount = creatorEarnings[msg.sender];
-        if (amount == 0) revert NoBalance();
-
-        creatorEarnings[msg.sender] = 0;
-        (bool success,) = msg.sender.call{value: amount}("");
-        if (!success) revert TransferFailed();
-
-        emit EarningsClaimed(msg.sender, amount);
     }
 
     /// @notice Get canon submissions for a universe

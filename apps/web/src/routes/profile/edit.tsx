@@ -26,7 +26,21 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { User, Palette, Globe, Lock, Eye, Save, Check, X, Plus, Link2 } from 'lucide-react';
+import {
+  User,
+  Palette,
+  Globe,
+  Lock,
+  Eye,
+  Save,
+  Check,
+  X,
+  Plus,
+  Link2,
+  Blocks,
+  Trash2,
+} from 'lucide-react';
+import { useWeb3Mode } from '@/lib/web3-mode';
 
 export const Route = createFileRoute('/profile/edit')({
   component: ProfileEditor,
@@ -48,6 +62,7 @@ const GRID_OPTIONS = [
 
 function ProfileEditor() {
   const { isAuthenticated, isAuthenticating, address } = useWalletAuth();
+  const { web3Mode, setWeb3Mode } = useWeb3Mode();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -72,6 +87,20 @@ function ProfileEditor() {
   const [twitter, setTwitter] = useState('');
   const [youtube, setYoutube] = useState('');
   const [discord, setDiscord] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [github, setGithub] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [twitch, setTwitch] = useState('');
+  const [farcaster, setFarcaster] = useState('');
+  const [lens, setLens] = useState('');
+  const [telegram, setTelegram] = useState('');
+  const [bluesky, setBluesky] = useState('');
+  const [spotify, setSpotify] = useState('');
+  const [soundcloud, setSoundcloud] = useState('');
+  const [customLinks, setCustomLinks] = useState<{ label: string; url: string }[]>([]);
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
   const [theme, setTheme] = useState('default');
   const [accentColor, setAccentColor] = useState('#8b5cf6');
   const [bannerUrl, setBannerUrl] = useState('');
@@ -98,6 +127,18 @@ function ProfileEditor() {
       setTwitter(p.socialLinks?.twitter || '');
       setYoutube(p.socialLinks?.youtube || '');
       setDiscord(p.socialLinks?.discord || '');
+      setInstagram(p.socialLinks?.instagram || '');
+      setTiktok(p.socialLinks?.tiktok || '');
+      setGithub(p.socialLinks?.github || '');
+      setLinkedin(p.socialLinks?.linkedin || '');
+      setTwitch(p.socialLinks?.twitch || '');
+      setFarcaster(p.socialLinks?.farcaster || '');
+      setLens(p.socialLinks?.lens || '');
+      setTelegram(p.socialLinks?.telegram || '');
+      setBluesky(p.socialLinks?.bluesky || '');
+      setSpotify(p.socialLinks?.spotify || '');
+      setSoundcloud(p.socialLinks?.soundcloud || '');
+      setCustomLinks(p.customLinks || []);
       setTheme(p.layout?.theme || 'default');
       setAccentColor(p.layout?.accentColor || '#8b5cf6');
       setBannerUrl(p.layout?.bannerUrl || '');
@@ -171,7 +212,19 @@ function ProfileEditor() {
         twitter: twitter || undefined,
         youtube: youtube || undefined,
         discord: discord || undefined,
+        instagram: instagram || undefined,
+        tiktok: tiktok || undefined,
+        github: github || undefined,
+        linkedin: linkedin || undefined,
+        twitch: twitch || undefined,
+        farcaster: farcaster || undefined,
+        lens: lens || undefined,
+        telegram: telegram || undefined,
+        bluesky: bluesky || undefined,
+        spotify: spotify || undefined,
+        soundcloud: soundcloud || undefined,
       },
+      customLinks,
       layout: {
         theme,
         accentColor,
@@ -255,6 +308,9 @@ function ProfileEditor() {
             </TabsTrigger>
             <TabsTrigger value="privacy" className="gap-1">
               <Lock className="h-4 w-4" /> Privacy
+            </TabsTrigger>
+            <TabsTrigger value="web3" className="gap-1">
+              <Blocks className="h-4 w-4" /> Web3
             </TabsTrigger>
           </TabsList>
 
@@ -462,11 +518,14 @@ function ProfileEditor() {
           </TabsContent>
 
           {/* Social */}
-          <TabsContent value="social">
+          <TabsContent value="social" className="space-y-6">
+            {/* Main Platforms */}
             <Card>
               <CardHeader>
-                <CardTitle>Social Links</CardTitle>
-                <CardDescription>Connect your other platforms</CardDescription>
+                <CardTitle>Social Accounts</CardTitle>
+                <CardDescription>
+                  Connect your social profiles so fans and collaborators can find you everywhere
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -478,33 +537,258 @@ function ProfileEditor() {
                     placeholder="https://yoursite.com"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="twitter">X / Twitter handle</Label>
-                  <Input
-                    id="twitter"
-                    value={twitter}
-                    onChange={(e) => setTwitter(e.target.value)}
-                    placeholder="username"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="twitter">X / Twitter</Label>
+                    <Input
+                      id="twitter"
+                      value={twitter}
+                      onChange={(e) => setTwitter(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="instagram">Instagram</Label>
+                    <Input
+                      id="instagram"
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tiktok">TikTok</Label>
+                    <Input
+                      id="tiktok"
+                      value={tiktok}
+                      onChange={(e) => setTiktok(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="youtube">YouTube</Label>
+                    <Input
+                      id="youtube"
+                      value={youtube}
+                      onChange={(e) => setYoutube(e.target.value)}
+                      placeholder="https://youtube.com/@channel"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twitch">Twitch</Label>
+                    <Input
+                      id="twitch"
+                      value={twitch}
+                      onChange={(e) => setTwitch(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discord">Discord</Label>
+                    <Input
+                      id="discord"
+                      value={discord}
+                      onChange={(e) => setDiscord(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telegram">Telegram</Label>
+                    <Input
+                      id="telegram"
+                      value={telegram}
+                      onChange={(e) => setTelegram(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bluesky">Bluesky</Label>
+                    <Input
+                      id="bluesky"
+                      value={bluesky}
+                      onChange={(e) => setBluesky(e.target.value)}
+                      placeholder="user.bsky.social"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="youtube">YouTube</Label>
-                  <Input
-                    id="youtube"
-                    value={youtube}
-                    onChange={(e) => setYoutube(e.target.value)}
-                    placeholder="https://youtube.com/@channel"
-                  />
+              </CardContent>
+            </Card>
+
+            {/* Web3 Social */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Web3 Social</CardTitle>
+                <CardDescription>Decentralized social identities</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="farcaster">Farcaster</Label>
+                    <Input
+                      id="farcaster"
+                      value={farcaster}
+                      onChange={(e) => setFarcaster(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lens">Lens Protocol</Label>
+                    <Input
+                      id="lens"
+                      value={lens}
+                      onChange={(e) => setLens(e.target.value)}
+                      placeholder="username.lens"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discord">Discord</Label>
-                  <Input
-                    id="discord"
-                    value={discord}
-                    onChange={(e) => setDiscord(e.target.value)}
-                    placeholder="username#1234"
-                  />
+              </CardContent>
+            </Card>
+
+            {/* Developer / Creative */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Developer & Creative</CardTitle>
+                <CardDescription>Portfolio and professional links</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="github">GitHub</Label>
+                    <Input
+                      id="github"
+                      value={github}
+                      onChange={(e) => setGithub(e.target.value)}
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin">LinkedIn</Label>
+                    <Input
+                      id="linkedin"
+                      value={linkedin}
+                      onChange={(e) => setLinkedin(e.target.value)}
+                      placeholder="https://linkedin.com/in/yourname"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="spotify">Spotify</Label>
+                    <Input
+                      id="spotify"
+                      value={spotify}
+                      onChange={(e) => setSpotify(e.target.value)}
+                      placeholder="https://open.spotify.com/artist/..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="soundcloud">SoundCloud</Label>
+                    <Input
+                      id="soundcloud"
+                      value={soundcloud}
+                      onChange={(e) => setSoundcloud(e.target.value)}
+                      placeholder="https://soundcloud.com/yourname"
+                    />
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Custom Links */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom Links</CardTitle>
+                <CardDescription>
+                  Add up to 10 custom links — portfolio, merch store, Patreon, anything
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {customLinks.map((link, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      value={link.label}
+                      onChange={(e) => {
+                        const updated = [...customLinks];
+                        updated[i] = { ...updated[i], label: e.target.value };
+                        setCustomLinks(updated);
+                      }}
+                      placeholder="Label"
+                      className="w-32 flex-shrink-0"
+                      maxLength={30}
+                    />
+                    <Input
+                      value={link.url}
+                      onChange={(e) => {
+                        const updated = [...customLinks];
+                        updated[i] = { ...updated[i], url: e.target.value };
+                        setCustomLinks(updated);
+                      }}
+                      placeholder="https://..."
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setCustomLinks(customLinks.filter((_, j) => j !== i))}
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ))}
+
+                {customLinks.length < 10 && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newLinkLabel}
+                      onChange={(e) => setNewLinkLabel(e.target.value)}
+                      placeholder="Label (e.g. Patreon)"
+                      className="w-32 flex-shrink-0"
+                      maxLength={30}
+                    />
+                    <Input
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newLinkLabel.trim() && newLinkUrl.trim()) {
+                            setCustomLinks([
+                              ...customLinks,
+                              { label: newLinkLabel.trim(), url: newLinkUrl.trim() },
+                            ]);
+                            setNewLinkLabel('');
+                            setNewLinkUrl('');
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        if (newLinkLabel.trim() && newLinkUrl.trim()) {
+                          setCustomLinks([
+                            ...customLinks,
+                            { label: newLinkLabel.trim(), url: newLinkUrl.trim() },
+                          ]);
+                          setNewLinkLabel('');
+                          setNewLinkUrl('');
+                        }
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {customLinks.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No custom links yet. Add a label and URL above.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -553,6 +837,63 @@ function ProfileEditor() {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Web3 Mode */}
+          <TabsContent value="web3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Web3 Features</CardTitle>
+                <CardDescription>
+                  Toggle blockchain details on or off. Everything works the same either way — this
+                  just controls what you see.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div
+                    onClick={() => setWeb3Mode(false)}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      !web3Mode
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Eye className="h-5 w-5" />
+                      <h3 className="font-semibold">Standard</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Clean, simple experience. No wallet addresses, chain names, or gas fees
+                      visible. Actions like "Publish" and "Collect" just work.
+                    </p>
+                  </div>
+                  <div
+                    onClick={() => setWeb3Mode(true)}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      web3Mode
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Blocks className="h-5 w-5" />
+                      <h3 className="font-semibold">Web3</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      See blockchain details: chain badge, wallet address, gas costs, explorer
+                      links, and on-chain terminology like "Mint" and "NFT".
+                    </p>
+                  </div>
+                </div>
+                {web3Mode && (
+                  <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                    Web3 mode is active. You'll see a chain badge in the header, transaction details
+                    on actions, and blockchain-native terminology throughout the app.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

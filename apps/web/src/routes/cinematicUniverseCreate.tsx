@@ -356,18 +356,18 @@ function CinematicUniverseCreate() {
 
   // Main form
   return (
-    <div className="h-full bg-background overflow-hidden">
-      <div className="h-full max-w-6xl mx-auto p-8 flex flex-col">
+    <div className="min-h-screen md:h-full bg-background md:overflow-hidden">
+      <div className="h-full max-w-6xl mx-auto px-4 py-6 md:p-8 flex flex-col">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-4xl font-bold mb-2">Launch Your Universe</h1>
-          <p className="text-muted-foreground text-lg">
+          <h1 className="text-2xl md:text-4xl font-bold mb-2">Launch Your Universe</h1>
+          <p className="text-muted-foreground text-sm md:text-lg">
             Deploy a new cinematic universe with governance token and liquidity pool
           </p>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-h-0">
           {/* Form Panel */}
           <Card className="flex flex-col overflow-hidden">
             <CardContent className="p-6 flex-1 overflow-y-auto space-y-4">

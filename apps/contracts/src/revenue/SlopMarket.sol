@@ -7,6 +7,7 @@ import {IERC165} from "@openzeppelin/interfaces/IERC165.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
 /// @title SlopMarket
 /// @notice Direct peer-to-peer marketplace for all LOAR entity tokens.
@@ -51,6 +52,7 @@ contract SlopMarket is ReentrancyGuard, Ownable {
 
     address public platform;
     IPaymentRouter public paymentRouter;
+    IRightsRegistry public rightsRegistry;
     uint16 public platformFeeBps;
 
     event Listed(
@@ -81,14 +83,21 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     error NotTokenOwner();
     error NotApproved();
     error RefundFailed();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
         address _platform,
         address _paymentRouter,
+        address _rightsRegistry,
         uint16 _platformFeeBps
     ) Ownable(msg.sender) {
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
         platformFeeBps = _platformFeeBps;
     }
 
@@ -99,13 +108,19 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     /// @param tokenId       Token ID to sell
     /// @param amount        Units to sell (must be 1 for ERC-721)
     /// @param pricePerUnit  ETH price per single unit
+    /// @param contentHash   Content hash for rights check (required if pricePerUnit > 0)
     function list(
         address tokenContract,
         uint256 tokenId,
         uint256 amount,
-        uint256 pricePerUnit
+        uint256 pricePerUnit,
+        bytes32 contentHash
     ) external returns (uint256 listingId) {
         if (amount == 0) revert InvalidAmount();
+        // Paid listings require monetizable content; free transfers always allowed
+        if (pricePerUnit > 0 && contentHash != bytes32(0)) {
+            if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
+        }
 
         TokenStandard std = _detectStandard(tokenContract);
 
@@ -217,6 +232,7 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     // ---- Admin ----
 
     function setPlatformFee(uint16 newFeeBps) external onlyOwner {
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platformFeeBps = newFeeBps;
         emit PlatformFeeUpdated(newFeeBps);
     }

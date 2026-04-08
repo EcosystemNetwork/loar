@@ -40,7 +40,7 @@ export async function runServerLayer(cfg: SmokeConfig): Promise<CheckResult[]> {
       const id = setTimeout(() => controller.abort(), cfg.timeout);
       try {
         const res = await fetch(url, {
-          headers: { Origin: 'https://loartech.xyz' },
+          headers: { Origin: 'https://loar.fun' },
           signal: controller.signal,
         });
         const header = res.headers.get('access-control-allow-origin');

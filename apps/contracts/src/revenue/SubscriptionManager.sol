@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title SubscriptionManager
 /// @notice Manages subscriptions to universes. Subscribers get early episodes,
@@ -33,10 +34,8 @@ contract SubscriptionManager is ReentrancyGuard {
     mapping(address => mapping(uint256 => Subscription)) public subscriptions;
     // universeId => subscriber count per tier
     mapping(uint256 => mapping(SubscriptionTier => uint256)) public subscriberCount;
-    // universeId => total revenue
-    mapping(uint256 => uint256) public universeRevenue;
-
     address public platform;
+    IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
 
     // Universe creator receives revenue
@@ -46,7 +45,6 @@ contract SubscriptionManager is ReentrancyGuard {
     event Subscribed(address indexed user, uint256 indexed universeId, SubscriptionTier tier, uint256 expiresAt);
     event SubscriptionRenewed(address indexed user, uint256 indexed universeId, uint256 newExpiry);
     event SubscriptionCancelled(address indexed user, uint256 indexed universeId);
-    event RevenueWithdrawn(uint256 indexed universeId, address creator, uint256 amount);
 
     error InvalidTier();
     error InsufficientPayment();
@@ -57,14 +55,23 @@ contract SubscriptionManager is ReentrancyGuard {
     error NoActiveSubscription();
     error NoRevenue();
     error TransferFailed();
+    error FeeTooHigh();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
         if (msg.sender != platform) revert NotPlatform();
         _;
     }
 
-    constructor(address _platform, uint16 _platformFeeBps) {
+    error ZeroAddress();
+    error MonthsTooHigh();
+
+    constructor(address _platform, address _paymentRouter, uint16 _platformFeeBps) {
+        if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
+        paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
 
@@ -98,13 +105,18 @@ contract SubscriptionManager is ReentrancyGuard {
         emit TierConfigured(universeId, tier, pricePerMonth);
     }
 
+    event UniverseRegistered(uint256 indexed universeId, address creator);
+
     /// @notice Register a universe creator
     function registerUniverse(uint256 universeId, address creator) external onlyPlatform {
+        if (creator == address(0)) revert ZeroAddress();
         universeCreators[universeId] = creator;
+        emit UniverseRegistered(universeId, creator);
     }
 
     /// @notice Subscribe to a universe tier
     function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months) external payable nonReentrant {
+        if (months == 0 || months > 120) revert MonthsTooHigh(); // max 10 years
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();
 
@@ -136,14 +148,10 @@ contract SubscriptionManager is ReentrancyGuard {
             subscriberCount[universeId][tier]++;
         }
 
-        // Revenue split
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
-        uint256 creatorCut = msg.value - platformCut;
-        universeRevenue[universeId] += creatorCut;
-
-        if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+        // Route subscription payment through PaymentRouter
+        address creator = universeCreators[universeId];
+        if (msg.value > 0 && creator != address(0)) {
+            paymentRouter.route{value: msg.value}(creator, platformFeeBps);
         }
 
         emit Subscribed(msg.sender, universeId, tier, expiry);
@@ -155,19 +163,6 @@ contract SubscriptionManager is ReentrancyGuard {
         if (sub.expiresAt == 0) revert NoActiveSubscription();
         sub.autoRenew = false;
         emit SubscriptionCancelled(msg.sender, universeId);
-    }
-
-    /// @notice Universe creator withdraws accumulated revenue
-    function withdrawRevenue(uint256 universeId) external nonReentrant {
-        if (msg.sender != universeCreators[universeId]) revert NotCreator();
-        uint256 amount = universeRevenue[universeId];
-        if (amount == 0) revert NoRevenue();
-
-        universeRevenue[universeId] = 0;
-        (bool success,) = msg.sender.call{value: amount}("");
-        if (!success) revert TransferFailed();
-
-        emit RevenueWithdrawn(universeId, msg.sender, amount);
     }
 
     /// @notice Check if user has active subscription at or above a tier

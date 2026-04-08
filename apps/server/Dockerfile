@@ -11,19 +11,21 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+# Create a fake .git so husky's prepare script doesn't fail, then clean up
+RUN mkdir -p .git && pnpm install --frozen-lockfile && rm -rf .git
 
 # Copy source code
 COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 
-# Bundle with esbuild for node target
-RUN npx esbuild apps/server/src/index.ts \
+# Bundle app code only — all node_modules stay external (firebase-admin needs fs paths)
+# esbuild added explicitly since it's only a transitive dep via tsx
+RUN pnpm add -w -D esbuild && pnpm exec esbuild apps/server/src/index.ts \
   --bundle \
   --platform=node \
   --format=esm \
   --outdir=apps/server/dist \
-  --external:better-sqlite3
+  --packages=external
 
 # Production stage
 FROM node:20-alpine AS production
@@ -39,6 +41,9 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY packages/abis/package.json ./packages/abis/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+# Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
+# This preserves all other lifecycle scripts (postinstall for native addons like keccak)
+RUN npm pkg set scripts.prepare="echo skip"
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy built application

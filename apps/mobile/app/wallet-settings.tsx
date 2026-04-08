@@ -24,9 +24,14 @@ export default function WalletSettingsScreen() {
       .catch(() => setChainId(null));
   }, []);
 
-  const networkName =
-    chainId === 11155111 ? 'Sepolia Testnet' : chainId === 1 ? 'Ethereum Mainnet' : chainId ? `Chain ${chainId}` : 'Unknown';
-  const networkOk = chainId === 11155111;
+  const SUPPORTED_CHAINS: Record<number, string> = {
+    11155111: 'Sepolia Testnet',
+    84532: 'Base Sepolia',
+    1: 'Ethereum Mainnet',
+    8453: 'Base',
+  };
+  const networkName = chainId ? (SUPPORTED_CHAINS[chainId] ?? `Chain ${chainId}`) : 'Unknown';
+  const networkOk = chainId === 11155111 || chainId === 84532;
 
   const handleDisconnect = () => {
     Alert.alert('Disconnect', 'Disconnect your wallet and sign out?', [
@@ -57,7 +62,12 @@ export default function WalletSettingsScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 32,
+          gap: 24,
+        }}
       >
         {/* Wallet card */}
         <Card>
@@ -85,7 +95,8 @@ export default function WalletSettingsScreen() {
 
             {!networkOk && chainId !== null ? (
               <Text className="text-warning text-xs">
-                LOAR runs on Sepolia testnet. Switch your wallet to Sepolia (chain ID 11155111).
+                LOAR runs on Sepolia or Base Sepolia testnet. Switch your wallet to a supported
+                network.
               </Text>
             ) : null}
           </View>
@@ -104,9 +115,7 @@ export default function WalletSettingsScreen() {
                   : 'No active session'
               }
               badge={
-                <Badge variant={address ? 'success' : 'muted'}>
-                  {address ? 'Active' : 'None'}
-                </Badge>
+                <Badge variant={address ? 'success' : 'muted'}>{address ? 'Active' : 'None'}</Badge>
               }
             />
           </View>
@@ -129,9 +138,9 @@ export default function WalletSettingsScreen() {
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
           <Text className="text-text-primary font-semibold text-sm">Security</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            LOAR Vault is non-custodial. Your keys are managed by Coinbase Smart Wallet
-            (Google, Apple, passkeys, or email). We only store a SIWE session JWT, which
-            can be revoked at any time by disconnecting.
+            LOAR Vault is non-custodial. Your keys are managed by Coinbase Smart Wallet (Google,
+            Apple, passkeys, or email). We only store a SIWE session JWT, which can be revoked at
+            any time by disconnecting.
           </Text>
         </View>
 

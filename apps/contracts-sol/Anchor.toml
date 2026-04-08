@@ -1,0 +1,37 @@
+[toolchain]
+anchor_version = "0.30.1"
+solana_version = "2.1.0"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+loar_token = "LoarTokenxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+universe_manager = "UniMgrxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+payment_router = "PayRtrxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+credit_manager = "CrdMgrxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+rights_registry = "RghtRgxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nft_episodes = "NftEpxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nft_characters = "NftChxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nft_entities = "NftEnxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[programs.devnet]
+loar_token = "LoarTokenxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+universe_manager = "UniMgrxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+payment_router = "PayRtrxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+credit_manager = "CrdMgrxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+rights_registry = "RghtRgxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nft_episodes = "NftEpxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nft_characters = "NftChxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nft_entities = "NftEnxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

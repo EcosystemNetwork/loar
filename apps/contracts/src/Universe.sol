@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 contract Universe is IUniverse {
 
@@ -45,6 +46,7 @@ contract Universe is IUniverse {
     address public associatedToken;
     IUniverseManager public universeManager;
     address public universeAdmin;
+    uint public currentCanonId;  // tracked canon node (avoids unbounded loop)
 
     modifier onlyAdmin() {
       if (universeAdmin != msg.sender) {
@@ -90,6 +92,13 @@ contract Universe is IUniverse {
     ) public returns (uint) {
         if (nodeCreationOption == NodeCreationOptions.WHITELISTED) {
             require(isWhitelisted[msg.sender], "Not whitelisted");
+        }
+        // Token-gated creation: if visibility is HOLDERS, require token balance
+        if (nodeVisibilityOption == NodeVisibilityOptions.HOLDERS && associatedToken != address(0)) {
+            require(
+                IERC20(associatedToken).balanceOf(msg.sender) > 0,
+                "Must hold universe token"
+            );
         }
         latestNodeId++;
         uint newId = latestNodeId;
@@ -173,8 +182,9 @@ contract Universe is IUniverse {
     }
 
     function setMedia(uint id, bytes32 _contentHash, string calldata _link) public onlyAdmin {
+        require(nodes[id].id != 0, "Node does not exist");
         nodes[id].contentHash = _contentHash;
-        emit MediaUpdated(msg.sender, _contentHash, _link);
+        emit MediaUpdated(id, msg.sender, _contentHash, _link);
     }
 
     function setNodeVisibilityOption(
@@ -237,28 +247,20 @@ contract Universe is IUniverse {
             revert NodeDoesNotExist();
         }
 
-        for (uint i = 1; i <= latestNodeId; i++) {
-            if (nodes[i].canon) {
-                nodes[i].canon = false;
-            }
+        // O(1) — unset previous canon, set new one
+        if (currentCanonId != 0) {
+            nodes[currentCanonId].canon = false;
         }
-
         nodes[id].canon = true;
+        currentCanonId = id;
         emit NodeCanonized(id, msg.sender);
     }
 
     function getCanonChain() public view returns (uint[] memory) {
-        uint canonId = 0;
-        for (uint i = 1; i <= latestNodeId; i++) {
-            if (nodes[i].canon) {
-                canonId = i;
-                break;
-            }
-        }
-        if (canonId == 0) {
+        if (currentCanonId == 0) {
             revert CanonNotSet();
         }
-        return getTimeline(canonId);
+        return getTimeline(currentCanonId);
     }
 
     function getToken() public view returns (address) {

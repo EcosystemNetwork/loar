@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title LicensingRegistry
 /// @notice Manages IP licensing for original universes. When a universe gains traction,
@@ -49,10 +50,8 @@ contract LicensingRegistry is ReentrancyGuard {
     mapping(uint256 => uint256[]) public universeMerch;
 
     address public platform;
+    IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
-
-    // Universe creator => claimable revenue
-    mapping(address => uint256) public claimableRevenue;
 
     event LicenseCreated(uint256 indexed licenseId, uint256 universeId, LicenseType licenseType, address licensee, uint256 upfrontFee);
     event LicenseActivated(uint256 indexed licenseId);
@@ -60,7 +59,6 @@ contract LicensingRegistry is ReentrancyGuard {
     event LicenseRevoked(uint256 indexed licenseId);
     event MerchCreated(uint256 indexed merchId, uint256 universeId, string name, uint256 price);
     event MerchSold(uint256 indexed merchId, address buyer, uint256 price);
-    event RevenueClaimed(address indexed creator, uint256 amount);
 
     error NotPlatform();
     error NotLicensor();
@@ -69,14 +67,22 @@ contract LicensingRegistry is ReentrancyGuard {
     error NoRevenue();
     error MerchNotActive();
     error InsufficientPayment();
+    error FeeTooHigh();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
         if (msg.sender != platform) revert NotPlatform();
         _;
     }
 
-    constructor(address _platform, uint16 _platformFeeBps) {
+    error ZeroAddress();
+
+    constructor(address _platform, address _paymentRouter, uint16 _platformFeeBps) {
+        if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
+        paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
 
@@ -105,12 +111,9 @@ contract LicensingRegistry is ReentrancyGuard {
             royaltyBps: royaltyBps,
             totalRoyalties: 0,
             startTime: 0,
-            endTime: 0,
+            endTime: duration, // stores duration while PROPOSED; becomes actual endTime on activation
             terms: terms
         });
-
-        // Store duration in endTime temporarily
-        licenses[licenseId].endTime = duration;
         universeLicenses[universeId].push(licenseId);
 
         emit LicenseCreated(licenseId, universeId, licenseType, licensee, upfrontFee);
@@ -128,14 +131,9 @@ contract LicensingRegistry is ReentrancyGuard {
         lic.endTime = block.timestamp + duration;
         lic.status = LicenseStatus.ACTIVE;
 
-        // Revenue split on upfront
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
-        uint256 licensorCut = msg.value - platformCut;
-        claimableRevenue[lic.licensor] += licensorCut;
-
-        if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+        // Route upfront fee through PaymentRouter
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(lic.licensor, platformFeeBps);
         }
 
         emit LicenseActivated(licenseId);
@@ -148,13 +146,9 @@ contract LicensingRegistry is ReentrancyGuard {
 
         lic.totalRoyalties += msg.value;
 
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
-        uint256 licensorCut = msg.value - platformCut;
-        claimableRevenue[lic.licensor] += licensorCut;
-
-        if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+        // Route royalty through PaymentRouter
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(lic.licensor, platformFeeBps);
         }
 
         emit RoyaltyPaid(licenseId, msg.value);
@@ -200,28 +194,12 @@ contract LicensingRegistry is ReentrancyGuard {
 
         item.sold++;
 
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
-        uint256 creatorCut = msg.value - platformCut;
-        claimableRevenue[item.creator] += creatorCut;
-
-        if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+        // Route merch payment through PaymentRouter
+        if (msg.value > 0) {
+            paymentRouter.route{value: msg.value}(item.creator, platformFeeBps);
         }
 
         emit MerchSold(merchId, msg.sender, msg.value);
-    }
-
-    /// @notice Claim accumulated revenue
-    function claimRevenue() external nonReentrant {
-        uint256 amount = claimableRevenue[msg.sender];
-        if (amount == 0) revert NoRevenue();
-
-        claimableRevenue[msg.sender] = 0;
-        (bool success,) = msg.sender.call{value: amount}("");
-        if (!success) revert TransferFailed();
-
-        emit RevenueClaimed(msg.sender, amount);
     }
 
     // ---- Views ----

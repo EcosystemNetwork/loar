@@ -21,6 +21,8 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as BridgeRouteImport } from './routes/bridge'
+import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as SellIndexRouteImport } from './routes/sell/index'
@@ -33,7 +35,9 @@ import { Route as SellEarningsRouteImport } from './routes/sell/earnings'
 import { Route as ProfileEditRouteImport } from './routes/profile/edit'
 import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
 import { Route as ProductIdRouteImport } from './routes/product/$id'
+import { Route as PlayUniverseIdRouteImport } from './routes/play/$universeId'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
+import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
 import { Route as AdsNewRouteImport } from './routes/ads/new'
@@ -102,6 +106,16 @@ const CheckoutRoute = CheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BridgeRoute = BridgeRouteImport.update({
+  id: '/bridge',
+  path: '/bridge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivityRoute = ActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -162,9 +176,19 @@ const ProductIdRoute = ProductIdRouteImport.update({
   path: '/product/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayUniverseIdRoute = PlayUniverseIdRouteImport.update({
+  id: '/play/$universeId',
+  path: '/play/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrderIdRoute = OrderIdRouteImport.update({
   id: '/order/$id',
   path: '/order/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
+  id: '/governance/$universeId',
+  path: '/governance/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateKindRoute = CreateKindRouteImport.update({
@@ -205,6 +229,8 @@ const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
+  '/bridge': typeof BridgeRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/credits': typeof CreditsRoute
@@ -221,7 +247,9 @@ export interface FileRoutesByFullPath {
   '/ads/new': typeof AdsNewRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
+  '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/order/$id': typeof OrderIdRoute
+  '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -239,6 +267,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
+  '/bridge': typeof BridgeRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/credits': typeof CreditsRoute
@@ -255,7 +285,9 @@ export interface FileRoutesByTo {
   '/ads/new': typeof AdsNewRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
+  '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/order/$id': typeof OrderIdRoute
+  '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -274,6 +306,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
+  '/bridge': typeof BridgeRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/credits': typeof CreditsRoute
@@ -290,7 +324,9 @@ export interface FileRoutesById {
   '/ads/new': typeof AdsNewRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
+  '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/order/$id': typeof OrderIdRoute
+  '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
   '/profile/$username': typeof ProfileUsernameRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -310,6 +346,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activity'
+    | '/bridge'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/credits'
@@ -326,7 +364,9 @@ export interface FileRouteTypes {
     | '/ads/new'
     | '/canon/$universeId'
     | '/create/$kind'
+    | '/governance/$universeId'
     | '/order/$id'
+    | '/play/$universeId'
     | '/product/$id'
     | '/profile/$username'
     | '/profile/edit'
@@ -344,6 +384,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activity'
+    | '/bridge'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/credits'
@@ -360,7 +402,9 @@ export interface FileRouteTypes {
     | '/ads/new'
     | '/canon/$universeId'
     | '/create/$kind'
+    | '/governance/$universeId'
     | '/order/$id'
+    | '/play/$universeId'
     | '/product/$id'
     | '/profile/$username'
     | '/profile/edit'
@@ -378,6 +422,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/activity'
+    | '/bridge'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/credits'
@@ -394,7 +440,9 @@ export interface FileRouteTypes {
     | '/ads/new'
     | '/canon/$universeId'
     | '/create/$kind'
+    | '/governance/$universeId'
     | '/order/$id'
+    | '/play/$universeId'
     | '/product/$id'
     | '/profile/$username'
     | '/profile/edit'
@@ -413,6 +461,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivityRoute: typeof ActivityRoute
+  BridgeRoute: typeof BridgeRoute
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   CreditsRoute: typeof CreditsRoute
@@ -429,7 +479,9 @@ export interface RootRouteChildren {
   AdsNewRoute: typeof AdsNewRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
+  GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
   OrderIdRoute: typeof OrderIdRoute
+  PlayUniverseIdRoute: typeof PlayUniverseIdRoute
   ProductIdRoute: typeof ProductIdRoute
   ProfileUsernameRoute: typeof ProfileUsernameRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -532,6 +584,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bridge': {
+      id: '/bridge'
+      path: '/bridge'
+      fullPath: '/bridge'
+      preLoaderRoute: typeof BridgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activity': {
+      id: '/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof ActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -616,11 +682,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/play/$universeId': {
+      id: '/play/$universeId'
+      path: '/play/$universeId'
+      fullPath: '/play/$universeId'
+      preLoaderRoute: typeof PlayUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/order/$id': {
       id: '/order/$id'
       path: '/order/$id'
       fullPath: '/order/$id'
       preLoaderRoute: typeof OrderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/governance/$universeId': {
+      id: '/governance/$universeId'
+      path: '/governance/$universeId'
+      fullPath: '/governance/$universeId'
+      preLoaderRoute: typeof GovernanceUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create/$kind': {
@@ -677,6 +757,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivityRoute: ActivityRoute,
+  BridgeRoute: BridgeRoute,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   CreditsRoute: CreditsRoute,
@@ -693,7 +775,9 @@ const rootRouteChildren: RootRouteChildren = {
   AdsNewRoute: AdsNewRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
+  GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
   OrderIdRoute: OrderIdRoute,
+  PlayUniverseIdRoute: PlayUniverseIdRoute,
   ProductIdRoute: ProductIdRoute,
   ProfileUsernameRoute: ProfileUsernameRoute,
   ProfileEditRoute: ProfileEditRoute,

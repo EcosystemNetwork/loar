@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CollabManager
 /// @notice Manages cross-universe collaborations ("collisions").
@@ -33,11 +34,8 @@ contract CollabManager is ReentrancyGuard {
     mapping(uint256 => uint256[]) public universeCollabs;
 
     address public platform;
+    IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
-
-    // Collab revenue tracking
-    mapping(uint256 => uint256) public collabRevenueA;
-    mapping(uint256 => uint256) public collabRevenueB;
 
     event CollabProposed(uint256 indexed collabId, uint256 universeA, uint256 universeB, address proposer);
     event CollabAccepted(uint256 indexed collabId, address acceptor);
@@ -53,14 +51,22 @@ contract CollabManager is ReentrancyGuard {
     error CollabNotActive();
     error NotPlatform();
     error TransferFailed();
+    error FeeTooHigh();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
         if (msg.sender != platform) revert NotPlatform();
         _;
     }
 
-    constructor(address _platform, uint16 _platformFeeBps) {
+    error ZeroAddress();
+
+    constructor(address _platform, address _paymentRouter, uint16 _platformFeeBps) {
+        if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
+        paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
 
@@ -137,16 +143,18 @@ contract CollabManager is ReentrancyGuard {
         uint256 platformCut = (msg.value * platformFeeBps) / 10000;
         uint256 distributable = msg.value - platformCut;
 
-        // Split between universes
+        // Split between universes via PaymentRouter
         uint256 shareA = (distributable * c.revenueShareBps) / 10000;
         uint256 shareB = distributable - shareA;
 
-        collabRevenueA[collabId] += shareA;
-        collabRevenueB[collabId] += shareB;
-
         if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+            paymentRouter.routeToTreasury{value: platformCut}();
+        }
+        if (shareA > 0) {
+            paymentRouter.route{value: shareA}(c.proposer, 0);
+        }
+        if (shareB > 0) {
+            paymentRouter.route{value: shareB}(c.acceptor, 0);
         }
 
         emit CollabEpisodeCreated(collabId, c.episodeCount, msg.value);
@@ -161,26 +169,6 @@ contract CollabManager is ReentrancyGuard {
 
         c.status = CollabStatus.COMPLETED;
         emit CollabCompleted(collabId, c.totalRevenue);
-    }
-
-    /// @notice Claim collab revenue (proposer claims A's share, acceptor claims B's share)
-    function claimCollabRevenue(uint256 collabId) external nonReentrant {
-        Collab storage c = collabs[collabId];
-
-        uint256 amount;
-        if (msg.sender == c.proposer) {
-            amount = collabRevenueA[collabId];
-            collabRevenueA[collabId] = 0;
-        } else if (msg.sender == c.acceptor) {
-            amount = collabRevenueB[collabId];
-            collabRevenueB[collabId] = 0;
-        } else {
-            revert NotProposer();
-        }
-
-        require(amount > 0, "Nothing to claim");
-        (bool success,) = msg.sender.call{value: amount}("");
-        if (!success) revert TransferFailed();
     }
 
     /// @notice Cancel a proposed collab

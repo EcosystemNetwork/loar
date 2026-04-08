@@ -52,6 +52,9 @@ contract RevenueModuleFactory is Ownable {
 
     error AlreadyDeployed();
     error ZeroAddress();
+    error FeeTooHigh();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
         address _platform,
@@ -98,20 +101,27 @@ contract RevenueModuleFactory is Ownable {
         );
 
         CharacterNFT characterContract = new CharacterNFT(
+            universeId,
             platform,
+            rightsRegistry,
+            paymentRouter,
             characterAppearanceFeeBps
         );
 
         EntityNFT entityContract = new EntityNFT(
+            universeId,
             platform,
             paymentRouter,
+            rightsRegistry,
             entityPlatformFeeBps,
             entityRoyaltyBps
         );
 
         EntityEditionNFT entityEditionContract = new EntityEditionNFT(
+            universeId,
             platform,
             paymentRouter,
+            rightsRegistry,
             entityPlatformFeeBps,
             entityRoyaltyBps
         );
@@ -156,15 +166,20 @@ contract RevenueModuleFactory is Ownable {
     }
 
     function setEpisodeFees(uint16 platformFeeBps, uint16 royaltyBps_) external onlyOwner {
+        if (platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        if (royaltyBps_ > MAX_FEE_BPS) revert FeeTooHigh();
         episodePlatformFeeBps = platformFeeBps;
         episodeRoyaltyBps = royaltyBps_;
     }
 
     function setCharacterAppearanceFee(uint16 feeBps) external onlyOwner {
+        if (feeBps > MAX_FEE_BPS) revert FeeTooHigh();
         characterAppearanceFeeBps = feeBps;
     }
 
     function setEntityFees(uint16 platformFeeBps, uint16 royaltyBps_) external onlyOwner {
+        if (platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        if (royaltyBps_ > MAX_FEE_BPS) revert FeeTooHigh();
         entityPlatformFeeBps = platformFeeBps;
         entityRoyaltyBps = royaltyBps_;
     }

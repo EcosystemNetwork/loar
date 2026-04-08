@@ -5,6 +5,7 @@ import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
 /// @title EntityEditionNFT
 /// @notice ERC-1155 edition NFTs for world-building entities that can exist
@@ -26,6 +27,9 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
         bool active;
     }
 
+    /// @notice The universe this collection belongs to
+    uint256 public immutable universeId;
+
     uint256 public nextEditionId;
 
     mapping(uint256 => Edition) public editions;
@@ -33,6 +37,7 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
 
     address public platform;
     IPaymentRouter public paymentRouter;
+    IRightsRegistry public rightsRegistry;
     uint16 public platformFeeBps;
     uint16 public royaltyBps;
 
@@ -53,15 +58,25 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
     error InsufficientPayment();
     error NotCreatorOrPlatform();
     error NotPlatform();
+    error FeeTooHigh();
+    error ContentNotMonetizable();
+    error WrongUniverse();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     constructor(
+        uint256 _universeId,
         address _platform,
         address _paymentRouter,
+        address _rightsRegistry,
         uint16 _platformFeeBps,
         uint16 _royaltyBps
     ) ERC1155("") {
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        universeId = _universeId;
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
         platformFeeBps = _platformFeeBps;
         royaltyBps = _royaltyBps;
     }
@@ -75,7 +90,7 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
     /// @param maxSupply   Edition cap (0 = unlimited)
     /// @param metadataURI IPFS/Walrus URI for token metadata
     function createEdition(
-        uint256 universeId,
+        uint256 _universeId,
         EntityKind kind,
         string calldata name,
         bytes32 contentHash,
@@ -83,6 +98,8 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
         uint256 maxSupply,
         string calldata metadataURI
     ) external returns (uint256 editionId) {
+        if (_universeId != universeId) revert WrongUniverse();
+        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         editionId = nextEditionId++;
 
         editions[editionId] = Edition({
@@ -150,6 +167,7 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
 
     function setPlatformFee(uint16 newFeeBps) external {
         if (msg.sender != platform) revert NotPlatform();
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platformFeeBps = newFeeBps;
     }
 
