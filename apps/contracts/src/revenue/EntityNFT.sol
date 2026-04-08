@@ -82,7 +82,7 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
     }
 
     /// @notice Mint a unique entity NFT (place, event, or vehicle)
-    /// @param universeId  Universe this entity belongs to
+    /// @param _universeId Universe this entity belongs to
     /// @param kind        EntityKind enum value
     /// @param name        Unique name within universe+kind
     /// @param contentHash SHA-256 of full entity content (stored off-chain)
