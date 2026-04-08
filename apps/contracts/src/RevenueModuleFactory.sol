@@ -63,7 +63,12 @@ contract RevenueModuleFactory is Ownable {
         uint16 _episodeRoyaltyBps,
         uint16 _characterAppearanceFeeBps,
         uint16 _entityPlatformFeeBps,
-        uint16 _entityRoyaltyBps
+        uint16 _entityRoyaltyBps,
+        address _episodeBeacon,
+        address _characterBeacon,
+        address _entityBeacon,
+        address _entityEdBeacon,
+        address _episodeNftBeacon
     ) Ownable(msg.sender) {
         if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0))
             revert ZeroAddress();
@@ -76,12 +81,12 @@ contract RevenueModuleFactory is Ownable {
         entityPlatformFeeBps = _entityPlatformFeeBps;
         entityRoyaltyBps = _entityRoyaltyBps;
 
-        // Deploy implementations + beacons (owner = deployer so they can upgrade)
-        episodeBeacon = new UpgradeableBeacon(address(new EpisodeEditionCollection()), msg.sender);
-        characterBeacon = new UpgradeableBeacon(address(new CharacterNFT()), msg.sender);
-        entityBeacon = new UpgradeableBeacon(address(new EntityNFT()), msg.sender);
-        entityEdBeacon = new UpgradeableBeacon(address(new EntityEditionNFT()), msg.sender);
-        episodeNftBeacon = new UpgradeableBeacon(address(new EpisodeNFT()), msg.sender);
+        // Beacons deployed externally and passed in (avoids initcode size limit)
+        episodeBeacon = UpgradeableBeacon(_episodeBeacon);
+        characterBeacon = UpgradeableBeacon(_characterBeacon);
+        entityBeacon = UpgradeableBeacon(_entityBeacon);
+        entityEdBeacon = UpgradeableBeacon(_entityEdBeacon);
+        episodeNftBeacon = UpgradeableBeacon(_episodeNftBeacon);
     }
 
     /// @notice Deploy all revenue modules for a universe as BeaconProxy instances.

@@ -46,18 +46,19 @@ contract UpgradeTest is Test {
 
     function test_UUPS_non_owner_cannot_upgrade() public {
         vm.startPrank(deployer);
+        PaymentRouter impl = new PaymentRouter();
         PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
-            address(new PaymentRouter()),
+            address(impl),
             abi.encodeCall(PaymentRouter.initialize, (treasury, 500))
         )));
+        PaymentRouter newImpl = new PaymentRouter();
         vm.stopPrank();
 
-        // Non-owner tries to upgrade
+        // Non-owner tries to upgrade — should revert with OwnableUnauthorizedAccount
         address attacker = makeAddr("attacker");
-        vm.startPrank(attacker);
+        vm.prank(attacker);
         vm.expectRevert();
-        proxy.upgradeToAndCall(address(new PaymentRouter()), "");
-        vm.stopPrank();
+        proxy.upgradeToAndCall(address(newImpl), "");
     }
 
     function test_UUPS_cannot_reinitialize() public {
@@ -116,13 +117,14 @@ contract UpgradeTest is Test {
 
     function test_Beacon_non_owner_cannot_upgrade() public {
         vm.startPrank(deployer);
-        UpgradeableBeacon beacon = new UpgradeableBeacon(address(new CharacterNFT()), deployer);
+        CharacterNFT impl1 = new CharacterNFT();
+        UpgradeableBeacon beacon = new UpgradeableBeacon(address(impl1), deployer);
+        CharacterNFT impl2 = new CharacterNFT();
         vm.stopPrank();
 
         address attacker = makeAddr("attacker");
-        vm.startPrank(attacker);
+        vm.prank(attacker);
         vm.expectRevert();
-        beacon.upgradeTo(address(new CharacterNFT()));
-        vm.stopPrank();
+        beacon.upgradeTo(address(impl2));
     }
 }

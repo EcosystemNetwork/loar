@@ -91,7 +91,8 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        if (_loarToken == address(0) || _platform == address(0) || _treasury == address(0) || _paymentRouter == address(0))
+        // loarToken can be address(0) initially — set later via updateLoarToken()
+        if (_platform == address(0) || _treasury == address(0))
             revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
