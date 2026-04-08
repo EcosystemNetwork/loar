@@ -18,7 +18,7 @@ RUN pnpm install --no-frozen-lockfile
 
 # Copy indexer source + shared packages (exclude tests)
 COPY apps/indexer/ ./apps/indexer/
-RUN rm -rf apps/indexer/src/__tests__
+RUN rm -rf apps/indexer/src/__tests__ apps/indexer/vitest.config.ts
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
