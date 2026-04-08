@@ -12,7 +12,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import { useMultiChainAuth } from './use-multi-chain-auth';
+import { useWalletAuth } from './wallet-auth';
 
 interface Web3ModeContextValue {
   /** Whether Web3 UI elements are visible */
@@ -32,7 +32,7 @@ const Web3ModeContext = createContext<Web3ModeContextValue>({
 const STORAGE_KEY = 'loar-web3-mode';
 
 export function Web3ModeProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useMultiChainAuth();
+  const { isAuthenticated } = useWalletAuth();
   const queryClient = useQueryClient();
 
   // Local fallback (localStorage)

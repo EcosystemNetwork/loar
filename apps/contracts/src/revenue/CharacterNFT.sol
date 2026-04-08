@@ -5,14 +5,15 @@ import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {ERC721Enumerable} from "@openzeppelin/token/ERC721/extensions/ERC721Enumerable.sol";
 import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIStorage.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CharacterNFT
 /// @notice Characters as ownable NFTs. Owners earn when their character appears in episodes.
 ///         Supports appearance tracking and royalty accumulation.
-contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuard {
+contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable {
     struct Character {
         uint256 universeId;
         string name;
@@ -23,7 +24,7 @@ contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentrancy
     }
 
     /// @notice The universe this collection belongs to
-    uint256 public immutable universeId;
+    uint256 public universeId;
 
     uint256 public nextCharacterId;
 
@@ -50,13 +51,17 @@ contract CharacterNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentrancy
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() ERC721("LOAR Characters", "CHARACTER") { _disableInitializers(); }
+
+    function initialize(
         uint256 _universeId,
         address _platform,
         address _rightsRegistry,
         address _paymentRouter,
         uint16 _appearanceFeeBps
-    ) ERC721("LOAR Characters", "CHARACTER") {
+    ) external initializer {
+        __ReentrancyGuard_init();
         if (_appearanceFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;

@@ -5,7 +5,8 @@ import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {ERC721Enumerable} from "@openzeppelin/token/ERC721/extensions/ERC721Enumerable.sol";
 import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIStorage.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
@@ -13,7 +14,7 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 /// @notice ERC-721 for unique world-building entities: places, events, vehicles.
 ///         Each mint is a 1-of-1 token. Owners earn royalties on secondary sales.
 ///         Free to mint (mintPrice=0) or paid — payment routed through PaymentRouter.
-contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuard {
+contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable {
     enum EntityKind { PLACE, EVENT, VEHICLE }
 
     struct Entity {
@@ -26,7 +27,7 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
     }
 
     /// @notice The universe this collection belongs to
-    uint256 public immutable universeId;
+    uint256 public universeId;
 
     uint256 public nextTokenId;
 
@@ -59,14 +60,18 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() ERC721("LOAR Entities", "ENTITY") { _disableInitializers(); }
+
+    function initialize(
         uint256 _universeId,
         address _platform,
         address _paymentRouter,
         address _rightsRegistry,
         uint16 _platformFeeBps,
         uint16 _royaltyBps
-    ) ERC721("LOAR Entities", "ENTITY") {
+    ) external initializer {
+        __ReentrancyGuard_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;
@@ -77,7 +82,7 @@ contract EntityNFT is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGua
     }
 
     /// @notice Mint a unique entity NFT (place, event, or vehicle)
-    /// @param universeId  Universe this entity belongs to
+    /// @param _universeId Universe this entity belongs to
     /// @param kind        EntityKind enum value
     /// @param name        Unique name within universe+kind
     /// @param contentHash SHA-256 of full entity content (stored off-chain)
