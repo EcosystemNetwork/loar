@@ -38,7 +38,12 @@ contract UniverseTokenDeployer is ReentrancyGuard {
     IUniverseManager public immutable universeManager;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
 
-    error DeployerIsNotOwner();
+    // Token allocation splits (basis points, must sum to 10000)
+    uint16 public constant LP_BPS = 8000;         // 80% → LP locker
+    uint16 public constant CREATOR_BPS = 1000;    // 10% → universe creator
+    uint16 public constant TREASURY_BPS = 500;    // 5%  → protocol treasury
+    uint16 public constant COMMUNITY_BPS = 500;   // 5%  → community rewards
+
     error HookNotEnabled();
     error LockerNotEnabled();
 
@@ -47,6 +52,13 @@ contract UniverseTokenDeployer is ReentrancyGuard {
         address indexed tokenAddress,
         address indexed hook,
         address locker
+    );
+    event TokenAllocation(
+        uint256 indexed universeId,
+        uint256 lpAmount,
+        uint256 creatorAmount,
+        uint256 treasuryAmount,
+        uint256 communityAmount
     );
 
     constructor(address _universeManager) {
@@ -75,11 +87,32 @@ contract UniverseTokenDeployer is ReentrancyGuard {
             TOKEN_SUPPLY
         );
 
-        IERC20(tokenAddress).safeTransfer(address(universeManager), TOKEN_SUPPLY);
+        // Calculate allocation splits
+        uint256 lpAmount = (TOKEN_SUPPLY * LP_BPS) / 10000;
+        uint256 creatorAmount = (TOKEN_SUPPLY * CREATOR_BPS) / 10000;
+        uint256 treasuryAmount = (TOKEN_SUPPLY * TREASURY_BPS) / 10000;
+        uint256 communityAmount = TOKEN_SUPPLY - lpAmount - creatorAmount - treasuryAmount;
+        assert(lpAmount + creatorAmount + treasuryAmount + communityAmount == TOKEN_SUPPLY);
+
+        // LP portion goes to UniverseManager for pool locking
+        IERC20(tokenAddress).safeTransfer(address(universeManager), lpAmount);
+
+        // Creator gets tokens for governance voting power from day 1
+        address creator = deploymentConfig.tokenConfig.tokenAdmin;
+        if (creator != address(0)) {
+            IERC20(tokenAddress).safeTransfer(creator, creatorAmount);
+        } else {
+            IERC20(tokenAddress).safeTransfer(address(universeManager), creatorAmount);
+        }
+
+        // Treasury + community go to team fee recipient on UniverseManager
+        // (community allocation managed off-chain via treasury)
+        IERC20(tokenAddress).safeTransfer(address(universeManager), treasuryAmount + communityAmount);
 
         governor = address(_deployGovernance(tokenAddress));
 
         emit TokenDeployed(universeId, tokenAddress, deploymentConfig.poolConfig.hook, deploymentConfig.lockerConfig.locker);
+        emit TokenAllocation(universeId, lpAmount, creatorAmount, treasuryAmount, communityAmount);
 
         return (tokenAddress, governor);
     }

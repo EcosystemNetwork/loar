@@ -111,13 +111,15 @@ function RootComponent() {
         disableTransitionOnChange
         storageKey="vite-ui-theme"
       >
-        <div className="h-svh">
+        <div className="min-h-svh flex flex-col">
           {isLoading ? (
             <Loader />
           ) : (
             <>
               <Header />
-              <Outlet />
+              <main className="flex-1">
+                <Outlet />
+              </main>
             </>
           )}
         </div>

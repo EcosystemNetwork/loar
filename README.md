@@ -10,6 +10,7 @@
 [![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
 [![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 [![Sepolia Testnet](https://img.shields.io/badge/Network-Sepolia-blue)](https://sepolia.etherscan.io/)
+[![Base Sepolia](https://img.shields.io/badge/Network-Base%20Sepolia-blue)](https://sepolia.basescan.org/)
 
 </div>
 
@@ -42,7 +43,7 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Quest & Affiliate System**   | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards         |
 | **AI Wiki Generation**         | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                    |
 | **On-Chain Node Storage**      | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                          |
-| **Decentralized Storage**      | Multi-provider fallback: Walrus > IPFS/Pinata > Filecoin/Synapse > Firebase                                          |
+| **Decentralized Storage**      | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Storacha > Firebase                                          |
 | **Creator Profiles**           | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                 |
 | **Content Upload**             | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                |
 | **Content Discovery**          | Search/filter by classification, media type, tags. Creator gallery + content feed                                    |
@@ -54,34 +55,34 @@ We classify every feature by what actually works end-to-end today, not what has 
 
 These have working smart contracts deployed on Sepolia AND fully implemented backend APIs (tRPC), but the marketplace frontend is informational UI — it shows stats and explains how things work, without interactive buy/sell/bid transaction flows.
 
-| Feature                   | What Exists                                                                                                                         | What's Missing                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: product detail + ETH buy button                            | No creator mint form. Purchases record in Firestore; on-chain contract not yet deployed                  |
-| **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD                                                                          | No frontend mint flow. Marketplace tab is explainer text only                                            |
-| **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations. Full submit form + For/Against voting UI                               | On-chain finalize/license call not yet wired from frontend                                               |
-| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. $LOAR tab wired with on-chain tx verification | Card tab has no Stripe integration. Fiat purchase records without payment processor validation           |
-| **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model                                                                         | Tab UI exists but no subscribe/payment flow                                                              |
-| **Collabs**               | API: propose, accept, activate, record episodes, complete                                                                           | Tab UI placeholder only                                                                                  |
-| **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD                                                                               | Tab UI placeholder only                                                                                  |
-| **IP Licensing**          | Contract: 6 license types, royalty tracking. API: full CRUD + merch                                                                 | Tab UI placeholder only                                                                                  |
-| **On-Chain Governance**   | Contract: OpenZeppelin Governor. Ponder indexes proposals/votes                                                                     | Governance sidebar shows token info, but voting UI is incomplete                                         |
-| **Token Trading**         | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live                                                         | No swap UI. Users must use Uniswap directly                                                              |
-| **Analytics**             | API: views, engagement, trending, platform stats                                                                                    | Market page queries real stats. No per-universe analytics dashboard                                      |
-| **Dashboard**             | AI generation tools + universe list wired to live tRPC API                                                                          | No per-universe analytics breakdown                                                                      |
-| **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus`                       | Frontend still uses old `fun`/`monetized` labels. UI badges not yet migrated                             |
-| **Worldbuilding Studio**  | `/create` hub + per-kind forms. Wiki at `/wiki` with tabbed entity browsing + detail pages (`/wiki/entity/$id`)                     | No `/wiki/$kind` filter routes                                                                           |
-| **Content Moderation**    | Flag system, admin review queue, DMCA intake (`/dmca`), immutable audit log. `contentStatus` gates commercial transactions          | Admin UI at `/admin/moderation`. No auto-flag threshold, no counter-notice workflow (manual review only) |
+| Feature                   | What Exists                                                                                                                                              | What's Missing                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: product detail + ETH buy button                                                 | No creator mint form. Purchases record in Firestore; on-chain contract not yet deployed                  |
+| **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD                                                                                               | No frontend mint flow. Marketplace tab is explainer text only                                            |
+| **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations. Full submit form + For/Against voting UI                                                    | On-chain finalize/license call not yet wired from frontend                                               |
+| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. On-chain ETH + $LOAR payment verification (Sepolia + Base Sepolia) | Card tab has no Stripe integration                                                                       |
+| **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model                                                                                              | Tab UI exists but no subscribe/payment flow                                                              |
+| **Collabs**               | API: propose, accept, activate, record episodes, complete                                                                                                | Tab UI placeholder only                                                                                  |
+| **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD                                                                                                    | Tab UI placeholder only                                                                                  |
+| **IP Licensing**          | Contract: 6 license types, royalty tracking. API: full CRUD + merch                                                                                      | Tab UI placeholder only                                                                                  |
+| **On-Chain Governance**   | Contract: OpenZeppelin Governor. Ponder indexes proposals/votes                                                                                          | Governance sidebar shows token info, but voting UI is incomplete                                         |
+| **Token Trading**         | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live                                                                              | No swap UI. Users must use Uniswap directly                                                              |
+| **Analytics**             | API: views, engagement, trending, platform stats                                                                                                         | Market page queries real stats. No per-universe analytics dashboard                                      |
+| **Dashboard**             | AI generation tools + universe list wired to live tRPC API                                                                                               | No per-universe analytics breakdown                                                                      |
+| **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus`                                            | Frontend still uses old `fun`/`monetized` labels. UI badges not yet migrated                             |
+| **Worldbuilding Studio**  | `/create` hub + per-kind forms. Wiki at `/wiki` with tabbed entity browsing + detail pages (`/wiki/entity/$id`)                                          | No `/wiki/$kind` filter routes                                                                           |
+| **Content Moderation**    | Flag system, admin review queue, DMCA intake (`/dmca`), immutable audit log. `contentStatus` gates commercial transactions                               | Admin UI at `/admin/moderation`. No auto-flag threshold, no counter-notice workflow (manual review only) |
+| **Mobile App**            | Expo 52 / React Native (iOS + Android). Portfolio, tokens, earnings, collections, profile tabs. CDP wallet auth                                          | Beta — not yet published to App Store / Play Store                                                       |
 
 ### PLANNED (Not implemented)
 
-| Feature                | Notes                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Mainnet Deployment** | All contracts on Sepolia testnet only. Needs audit first                                                                       |
-| **Fiat On-Ramp**       | No credit card payments. Card tab in CreditStore has no Stripe integration. Fiat purchase records without processor validation |
-| **Mobile App**         | Web-only. Not responsive on all pages                                                                                          |
-| **Social Features**    | No follows, comments, activity feed, or notifications                                                                          |
-| **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders                                                                   |
-| **Creator Analytics**  | No per-universe P&L, subscriber funnels, or retention data                                                                     |
+| Feature                | Notes                                                                      |
+| ---------------------- | -------------------------------------------------------------------------- |
+| **Mainnet Deployment** | All contracts on Sepolia + Base Sepolia testnets. Needs audit first        |
+| **Fiat On-Ramp**       | No credit card payments. Card tab in CreditStore has no Stripe integration |
+| **Social Features**    | No follows, comments, activity feed, or notifications                      |
+| **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders               |
+| **Creator Analytics**  | No per-universe P&L, subscriber funnels, or retention data                 |
 
 ---
 
@@ -96,10 +97,11 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
                             │ tRPC              │ wagmi
                             ▼                   ▼
               ┌─────────────────────┐  ┌──────────────────────┐
-              │   API Server        │  │  Sepolia Contracts   │
-              │   Hono + tRPC       │  │  8 core + per-       │
-              │   14 routers        │  │  universe children   │
-              │   150+ procedures   │  └──────────┬───────────┘
+              │   API Server        │  │  Sepolia + Base      │
+              │   Hono + tRPC       │  │  Sepolia Contracts   │
+              │   25+ routers       │  │  8 core + per-       │
+              │   150+ procedures   │  │  universe children   │
+              │   Port 3000         │  └──────────┬───────────┘
               │   Port 3000         │             │ events
               └──────────┬──────────┘             ▼
                          │               ┌──────────────────┐
@@ -112,13 +114,14 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
               └──────────────────┘
 ```
 
-| App              | Stack                                                    | Description                              |
-| ---------------- | -------------------------------------------------------- | ---------------------------------------- |
-| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | Frontend SPA                             |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (14 routers, 150+ procedures) |
-| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37+ tables)    |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (deployed on Sepolia)    |
-| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                 |
+| App              | Stack                                                    | Description                               |
+| ---------------- | -------------------------------------------------------- | ----------------------------------------- |
+| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | Frontend SPA                              |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (25+ routers, 150+ procedures) |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37+ tables)     |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (Sepolia + Base Sepolia)  |
+| `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app (CDP wallet auth)       |
+| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                  |
 
 ### Key Flows
 
@@ -130,7 +133,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 
 ---
 
-## Smart Contracts (Sepolia)
+## Smart Contracts (Sepolia + Base Sepolia)
 
 | Contract                  | Address         | Purpose                             |
 | ------------------------- | --------------- | ----------------------------------- |
@@ -213,17 +216,18 @@ pnpm -F indexer dev    # indexer only (port 42069)
         │                    │                     │
 ┌───────▼────────┐   ┌──────▼───────┐   ┌────────▼────────┐
 │  loar-server   │   │ loar-indexer │   │    Firebase      │
-│  Docker :3000  │   │ Docker :42069│   │    Firestore     │
+│  Railway :3000 │   │ Railway:42069│   │    Firestore     │
 │  Hono + tRPC   │   │ Ponder v0.15 │   │   (data store)   │
 └───────┬────────┘   └──────┬───────┘   └─────────────────┘
         │                    │
-  Storage providers    Sepolia RPC
+  Storage providers   Sepolia / Base RPC
 ```
 
-| Service              | Deployed To          | Trigger                                                 |
-| -------------------- | -------------------- | ------------------------------------------------------- |
-| **Web**              | Vercel               | Push to `main` (Vercel Git integration)                 |
-| **Server + Indexer** | VPS (Docker Compose) | Push to `main` (`.github/workflows/deploy.yml` via SSH) |
+| Service              | Deployed To             | Trigger                                 |
+| -------------------- | ----------------------- | --------------------------------------- |
+| **Web**              | Vercel                  | Push to `main` (Vercel Git integration) |
+| **Server + Indexer** | Railway or VPS (Docker) | Push to `main`                          |
+| **Mobile**           | Expo (iOS + Android)    | `eas build` / `eas submit`              |
 
 ### Web → Vercel
 
@@ -231,7 +235,17 @@ pnpm -F indexer dev    # indexer only (port 42069)
 2. Set env vars in Vercel dashboard: `VITE_SERVER_URL`, `VITE_PONDER_URL`
 3. Build config is in `vercel.json` — SPA rewrites included
 
-### Server + Indexer → VPS (Docker)
+### Server + Indexer → Railway (recommended)
+
+1. Create a Railway project and connect your GitHub repo
+2. Add two services from the same repo:
+   - **loar-server** — root directory: `apps/server` (picks up `railway.toml`)
+   - **loar-indexer** — root directory: `apps/indexer` (picks up `railway.toml`)
+3. Set env vars in each service's Railway dashboard (see [deployment docs](docs/deployment.md))
+4. Add custom domains: `api.loar.fun` → server, `idx.loar.fun` → indexer
+5. Update Vercel env vars: `VITE_SERVER_URL` and `VITE_PONDER_URL` to your Railway URLs
+
+### Server + Indexer → VPS (Docker, alternative)
 
 ```bash
 # On the VPS:
@@ -278,9 +292,10 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 loar/
 ├── apps/
 │   ├── web/             # React 18 SPA (Vite + TanStack Router)
-│   ├── server/          # Hono + tRPC API (14 routers, 150+ procedures)
+│   ├── server/          # Hono + tRPC API (25+ routers, 150+ procedures)
 │   ├── indexer/         # Ponder v0.15 blockchain indexer (37+ tables)
-│   └── contracts/       # Foundry/Solidity (8 core contracts on Sepolia)
+│   ├── mobile/          # Expo 52 / React Native (iOS + Android)
+│   └── contracts/       # Foundry/Solidity (8 core contracts, Sepolia + Base Sepolia)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs
 ├── docs/                # Product + technical documentation

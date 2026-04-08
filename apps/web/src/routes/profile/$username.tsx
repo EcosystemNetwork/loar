@@ -5,27 +5,50 @@
  * Shows different views for fun vs monetized content.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { trpcClient } from '@/utils/trpc';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Globe,
-  Lock,
-  Play,
-  Image as ImageIcon,
-  Sparkles,
-  DollarSign,
-  ExternalLink,
-  ArrowLeft,
-} from 'lucide-react';
+import { Globe, Lock, Play, Sparkles, DollarSign, ExternalLink, Users } from 'lucide-react';
+import { useWalletAuth } from '@/lib/wallet-auth';
 
 export const Route = createFileRoute('/profile/$username')({
   component: ProfilePage,
 });
+
+/** Platform display config: label, URL builder */
+const SOCIAL_PLATFORMS: Record<string, { label: string; url: (v: string) => string }> = {
+  twitter: { label: 'X', url: (v) => `https://x.com/${v}` },
+  instagram: { label: 'Instagram', url: (v) => `https://instagram.com/${v}` },
+  tiktok: { label: 'TikTok', url: (v) => `https://tiktok.com/@${v}` },
+  youtube: {
+    label: 'YouTube',
+    url: (v) => (v.startsWith('http') ? v : `https://youtube.com/@${v}`),
+  },
+  twitch: { label: 'Twitch', url: (v) => `https://twitch.tv/${v}` },
+  discord: { label: 'Discord', url: (v) => `https://discord.com/users/${v}` },
+  telegram: { label: 'Telegram', url: (v) => `https://t.me/${v}` },
+  bluesky: { label: 'Bluesky', url: (v) => `https://bsky.app/profile/${v}` },
+  farcaster: { label: 'Farcaster', url: (v) => `https://warpcast.com/${v}` },
+  lens: { label: 'Lens', url: (v) => `https://hey.xyz/u/${v}` },
+  github: { label: 'GitHub', url: (v) => `https://github.com/${v}` },
+  linkedin: {
+    label: 'LinkedIn',
+    url: (v) => (v.startsWith('http') ? v : `https://linkedin.com/in/${v}`),
+  },
+  spotify: {
+    label: 'Spotify',
+    url: (v) => (v.startsWith('http') ? v : `https://open.spotify.com/artist/${v}`),
+  },
+  soundcloud: {
+    label: 'SoundCloud',
+    url: (v) => (v.startsWith('http') ? v : `https://soundcloud.com/${v}`),
+  },
+};
 
 const THEME_CLASSES: Record<string, string> = {
   default: '',
@@ -37,16 +60,25 @@ const THEME_CLASSES: Record<string, string> = {
 
 function ProfilePage() {
   const { username } = Route.useParams();
+  const { isAuthenticated, address } = useWalletAuth();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', username],
     queryFn: () => trpcClient.profiles.getByUsername.query({ username }) as Promise<any>,
   });
 
-  const { data: contentData, isLoading: contentLoading } = useQuery({
+  const isOwnProfile = !!(address && profile?.id === address.toLowerCase());
+
+  const { data: contentData } = useQuery({
     queryKey: ['profile-content', profile?.id],
     queryFn: () => trpcClient.content.getByCreator.query({ creatorUid: profile!.id, limit: 50 }),
     enabled: !!profile?.id && profile.visibility !== 'private',
+  });
+
+  const { data: followData } = useQuery({
+    queryKey: ['is-following', profile?.id],
+    queryFn: () => trpcClient.social.isFollowing.query({ targetUid: profile!.id }),
+    enabled: isAuthenticated && !!profile?.id && !isOwnProfile,
   });
 
   if (profileLoading) {
@@ -102,8 +134,11 @@ function ProfilePage() {
   const themeClass = THEME_CLASSES[layout.theme || 'default'] || '';
   const accentColor = layout.accentColor || '#8b5cf6';
   const socialLinks = (profile as any).socialLinks || {};
+  const customLinks: { label: string; url: string }[] = (profile as any).customLinks || [];
   const tags = (profile as any).tags || [];
   const bio = (profile as any).bio || '';
+  const followers = (profile as any).followers || 0;
+  const following = (profile as any).following || 0;
   const items = contentData?.items || [];
   const funItems = items.filter((i: any) => i.classification === 'fun');
   const monetizedItems = items.filter((i: any) => i.classification === 'monetized');
@@ -170,55 +205,75 @@ function ProfilePage() {
             )}
 
             {/* Social Links */}
-            <div className="flex gap-3 mt-3">
-              {socialLinks.website && (
-                <a
-                  href={socialLinks.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
-                >
-                  <ExternalLink className="h-3 w-3" /> Website
-                </a>
-              )}
-              {socialLinks.twitter && (
-                <a
-                  href={`https://x.com/${socialLinks.twitter}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  @{socialLinks.twitter}
-                </a>
-              )}
-              {socialLinks.youtube && (
-                <a
-                  href={socialLinks.youtube}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  YouTube
-                </a>
-              )}
-            </div>
+            {(socialLinks.website ||
+              Object.keys(SOCIAL_PLATFORMS).some((k) => socialLinks[k]) ||
+              customLinks.length > 0) && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {socialLinks.website && (
+                  <a
+                    href={socialLinks.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Globe className="h-3.5 w-3.5" /> Website
+                  </a>
+                )}
+                {Object.entries(SOCIAL_PLATFORMS).map(([key, platform]) => {
+                  const value = socialLinks[key];
+                  if (!value) return null;
+                  return (
+                    <a
+                      key={key}
+                      href={platform.url(value)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      {platform.label}
+                    </a>
+                  );
+                })}
+                {customLinks.map((link, i) => (
+                  <a
+                    key={`custom-${i}`}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
 
             {/* Stats */}
             {layout.showStats !== false && (
               <div className="flex gap-6 mt-4 text-sm">
                 <div>
+                  <span className="font-semibold">{followers}</span>
+                  <span className="text-muted-foreground ml-1">followers</span>
+                </div>
+                <div>
+                  <span className="font-semibold">{following}</span>
+                  <span className="text-muted-foreground ml-1">following</span>
+                </div>
+                <div>
                   <span className="font-semibold">{items.length}</span>
                   <span className="text-muted-foreground ml-1">works</span>
                 </div>
-                <div>
-                  <span className="font-semibold">{funItems.length}</span>
-                  <span className="text-muted-foreground ml-1">fun</span>
-                </div>
-                <div>
-                  <span className="font-semibold">{monetizedItems.length}</span>
-                  <span className="text-muted-foreground ml-1">monetized</span>
-                </div>
               </div>
+            )}
+
+            {/* Follow button */}
+            {isAuthenticated && !isOwnProfile && (
+              <FollowButton
+                targetUid={profile.id}
+                isFollowing={followData?.following ?? false}
+                accentColor={accentColor}
+              />
             )}
           </div>
         </div>
@@ -333,5 +388,50 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function FollowButton({
+  targetUid,
+  isFollowing: initialFollowing,
+  accentColor,
+}: {
+  targetUid: string;
+  isFollowing: boolean;
+  accentColor: string;
+}) {
+  const queryClient = useQueryClient();
+  const [optimisticFollowing, setOptimisticFollowing] = useState(initialFollowing);
+
+  useEffect(() => {
+    setOptimisticFollowing(initialFollowing);
+  }, [initialFollowing]);
+
+  const followMutation = useMutation({
+    mutationFn: () =>
+      optimisticFollowing
+        ? trpcClient.social.unfollow.mutate({ targetUid })
+        : trpcClient.social.follow.mutate({ targetUid }),
+    onMutate: () => setOptimisticFollowing(!optimisticFollowing),
+    onError: () => setOptimisticFollowing(optimisticFollowing),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['is-following', targetUid] });
+      queryClient.invalidateQueries({ queryKey: ['followers-count', targetUid] });
+      queryClient.invalidateQueries({ queryKey: ['profile', targetUid] });
+    },
+  });
+
+  return (
+    <Button
+      variant={optimisticFollowing ? 'outline' : 'default'}
+      size="sm"
+      className="mt-3"
+      style={!optimisticFollowing ? { backgroundColor: accentColor } : {}}
+      onClick={() => followMutation.mutate()}
+      disabled={followMutation.isPending}
+    >
+      <Users className="h-4 w-4 mr-1" />
+      {optimisticFollowing ? 'Following' : 'Follow'}
+    </Button>
   );
 }

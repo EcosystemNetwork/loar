@@ -7,13 +7,7 @@
  *  - JWT storage in expo-secure-store
  *  - silent reconnect on app resume
  */
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { clearSession, getStoredAddress, getToken, setSession } from '../lib/storage';
 import { buildSiweMessage, fetchNonce, verifySignature } from '../lib/siwe';
 
@@ -31,7 +25,11 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   /** Connect wallet and sign SIWE message to get JWT. */
-  signIn: (address: string, signMessage: (msg: string) => Promise<string>, chainId?: number) => Promise<void>;
+  signIn: (
+    address: string,
+    signMessage: (msg: string) => Promise<string>,
+    chainId?: number
+  ) => Promise<void>;
   /** Clear session and disconnect. */
   signOut: () => Promise<void>;
   /** Clear any auth error. */
@@ -84,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (
       address: string,
       signMessage: (msg: string) => Promise<string>,
-      chainId = 11155111 // Sepolia
+      chainId = 84532 // Base Sepolia
     ) => {
       setState((s) => ({ ...s, isAuthenticating: true, error: null }));
       try {
@@ -103,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Sign-in failed';
-        const isRejection = msg.toLowerCase().includes('reject') || msg.toLowerCase().includes('cancel');
+        const isRejection =
+          msg.toLowerCase().includes('reject') || msg.toLowerCase().includes('cancel');
         setState((s) => ({
           ...s,
           isAuthenticating: false,

@@ -178,7 +178,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             deploymentConfig.poolConfig.poolData
         );
 
-        uint256 poolSupply = TOKEN_SUPPLY;
+        // Only LP portion (80%) is sent to this contract by UniverseTokenDeployer
+        uint256 poolSupply = (TOKEN_SUPPLY * 8000) / 10000;
         IERC20(tokenAddress).approve(address(deploymentConfig.lockerConfig.locker), poolSupply);
         ILoarLpLocker(deploymentConfig.lockerConfig.locker).placeLiquidity(
             deploymentConfig.lockerConfig,

@@ -21,12 +21,15 @@ interface ILoarFeeLocker {
     );
     event ClaimTokens(address indexed feeOwner, address indexed token, uint256 amountClaimed);
     event AddDepositor(address indexed depositor);
+    event RemoveDepositor(address indexed depositor);
 
     function storeFees(address feeOwner, address token, uint256 amount) external;
 
-    function claim(address feeOwner, address token) external;
+    function claim(address token) external;
 
     function addDepositor(address depositor) external;
+
+    function removeDepositor(address depositor) external;
 
     function availableFees(address feeOwner, address token) external view returns (uint256);
 

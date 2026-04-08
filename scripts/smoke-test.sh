@@ -3,8 +3,8 @@
 #
 # Usage:
 #   ./scripts/smoke-test.sh                            # defaults (localhost)
-#   SERVER_URL=https://api.loartech.xyz ./scripts/smoke-test.sh
-#   INDEXER_URL=https://idx.loartech.xyz ./scripts/smoke-test.sh
+#   SERVER_URL=https://api.loar.fun ./scripts/smoke-test.sh
+#   INDEXER_URL=https://idx.loar.fun ./scripts/smoke-test.sh
 #
 # Exit codes:
 #   0 — all tests passed
@@ -58,13 +58,13 @@ fi
 
 # 3. Server returns CORS header for the production origin
 CORS=$(curl -sf --max-time 10 -I \
-  -H "Origin: https://loartech.xyz" \
+  -H "Origin: https://loar.fun" \
   "$SERVER_URL/health" 2>/dev/null \
   | grep -i "access-control-allow-origin" || true)
 if [ -n "$CORS" ]; then
-  pass "server CORS header present for loartech.xyz"
+  pass "server CORS header present for loar.fun"
 else
-  fail "server CORS header missing for loartech.xyz (check CORS_ORIGIN env var)"
+  fail "server CORS header missing for loar.fun (check CORS_ORIGIN env var)"
 fi
 
 # ── Indexer ───────────────────────────────────────────────────────────────────

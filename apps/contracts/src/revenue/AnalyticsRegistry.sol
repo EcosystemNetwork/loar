@@ -123,8 +123,11 @@ contract AnalyticsRegistry {
         universeMetrics[universeId].totalVotes++;
     }
 
-    /// @notice Set trending universes (computed off-chain, stored on-chain)
+    uint256 public constant MAX_TRENDING = 100;
+
+    /// @notice Set trending universes (computed off-chain, stored on-chain, capped at 100)
     function setTrending(uint256[] calldata universeIds) external onlyPlatform {
+        require(universeIds.length <= MAX_TRENDING, "Too many trending");
         trendingUniverseIds = universeIds;
     }
 

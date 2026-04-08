@@ -56,6 +56,9 @@ contract EpisodeEditionCollection is ERC1155, ERC2981, ReentrancyGuard {
     error InsufficientPayment();
     error ContentNotMonetizable();
     error NotPlatform();
+    error FeeTooHigh();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
         if (msg.sender != platform) revert NotPlatform();
@@ -70,6 +73,7 @@ contract EpisodeEditionCollection is ERC1155, ERC2981, ReentrancyGuard {
         uint16 _platformFeeBps,
         uint16 _royaltyBps
     ) ERC1155("") {
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;
         rightsRegistry = IRightsRegistry(_rightsRegistry);
@@ -137,6 +141,7 @@ contract EpisodeEditionCollection is ERC1155, ERC2981, ReentrancyGuard {
     }
 
     function setPlatformFee(uint16 newFeeBps) external onlyPlatform {
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platformFeeBps = newFeeBps;
     }
 

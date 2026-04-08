@@ -47,8 +47,9 @@ contract PaymentRouter is IPaymentRouter, ReentrancyGuard, Ownable {
     /// @notice Route a payment: send platform cut to treasury, accrue creator's cut
     /// @param creator Address that will be able to claim the creator portion
     /// @param feeBps Platform fee in basis points; pass 0 to use defaultPlatformFeeBps
-    function route(address creator, uint16 feeBps) external payable {
+    function route(address creator, uint16 feeBps) external payable nonReentrant {
         if (msg.value == 0) return;
+        if (feeBps > 5000) revert FeeTooHigh();
         uint16 bps = feeBps == 0 ? defaultPlatformFeeBps : feeBps;
         uint256 platformCut = (msg.value * bps) / 10_000;
         uint256 creatorCut = msg.value - platformCut;
@@ -66,7 +67,7 @@ contract PaymentRouter is IPaymentRouter, ReentrancyGuard, Ownable {
 
     /// @notice Route a payment entirely to treasury (no creator split)
     ///         Used for credit purchases and other platform-only flows.
-    function routeToTreasury() external payable {
+    function routeToTreasury() external payable nonReentrant {
         if (msg.value == 0) return;
         (bool s,) = treasury.call{value: msg.value}("");
         if (!s) revert TransferFailed();

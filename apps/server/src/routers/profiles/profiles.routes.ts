@@ -45,8 +45,28 @@ const profileSchema = z.object({
       twitter: z.string().max(50).optional(),
       youtube: z.string().max(100).optional(),
       discord: z.string().max(50).optional(),
+      instagram: z.string().max(50).optional(),
+      tiktok: z.string().max(50).optional(),
+      github: z.string().max(50).optional(),
+      linkedin: z.string().max(100).optional(),
+      twitch: z.string().max(50).optional(),
+      farcaster: z.string().max(50).optional(),
+      lens: z.string().max(50).optional(),
+      telegram: z.string().max(50).optional(),
+      bluesky: z.string().max(100).optional(),
+      spotify: z.string().max(100).optional(),
+      soundcloud: z.string().max(100).optional(),
     })
     .default({}),
+  customLinks: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(30),
+        url: z.string().url(),
+      })
+    )
+    .max(10)
+    .default([]),
   layout: profileLayoutSchema.optional(),
 });
 
@@ -147,6 +167,17 @@ export const profilesRouter = router({
         updatedAt: new Date(),
       });
       return { ok: true, visibility: input.visibility };
+    }),
+
+  /** Toggle Web3 mode (progressive disclosure) */
+  setWeb3Mode: protectedProcedure
+    .input(z.object({ web3Enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await profilesCol().doc(ctx.user.uid).update({
+        web3Enabled: input.web3Enabled,
+        updatedAt: new Date(),
+      });
+      return { ok: true, web3Enabled: input.web3Enabled };
     }),
 
   /** Check if a username is available */
