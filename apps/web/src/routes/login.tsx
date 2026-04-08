@@ -1,7 +1,7 @@
 /**
  * Login Route
  *
- * Dynamic Labs multi-chain sign-in (EVM, Solana, SUI).
+ * Dynamic Labs EVM sign-in (Sepolia).
  * After wallet connect + SIWE verification, redirects to ?redirect param or /dashboard.
  */
 
@@ -47,7 +47,7 @@ function LoginPage() {
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Sign In</h2>
             <p className="text-sm text-muted-foreground">
-              Connect with any wallet — Ethereum, Solana, SUI, and more
+              Connect your Ethereum wallet to get started
             </p>
           </div>
 
@@ -58,12 +58,11 @@ function LoginPage() {
           <div className="space-y-3 pt-2">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <div className="flex-1 border-t" />
-              <span>Multi-Chain</span>
+              <span>Ethereum (Sepolia)</span>
               <div className="flex-1 border-t" />
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Sign in with any supported wallet across Ethereum, Base, Arbitrum, Optimism, Polygon,
-              Solana, and SUI.
+              Sign in with any Ethereum wallet. Currently on Sepolia testnet.
             </p>
           </div>
         </div>

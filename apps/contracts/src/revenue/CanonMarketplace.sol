@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -12,7 +15,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///         Covers all creator entity kinds: characters, plot arcs, locations, lore rules,
 ///         items, factions, species, vehicles, technology, and organizations.
 ///         Universe token holders vote submissions into canon. Accepted creators earn fees.
-contract CanonMarketplace is ReentrancyGuard {
+contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     enum SubmissionType {
         CHARACTER,      // person
         PLOT_ARC,       // event / narrative arc
@@ -96,7 +99,10 @@ contract CanonMarketplace is ReentrancyGuard {
 
     error ZeroAddress();
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    function initialize(
         address _platform,
         address _rightsRegistry,
         address _paymentRouter,
@@ -104,7 +110,10 @@ contract CanonMarketplace is ReentrancyGuard {
         uint16 _canonLicenseFeeBps,
         uint256 _minSubmissionFee,
         uint256 _votingDuration
-    ) {
+    ) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         if (_canonLicenseFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -116,6 +125,8 @@ contract CanonMarketplace is ReentrancyGuard {
         minSubmissionFee = _minSubmissionFee;
         votingDuration = _votingDuration;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     error InvalidToken();
 

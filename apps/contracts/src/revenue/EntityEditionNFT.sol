@@ -3,7 +3,8 @@ pragma solidity ^0.8.30;
 
 import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
-import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
@@ -12,7 +13,7 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 ///         in multiples: things, lore, species, technology.
 ///         Each token ID is a unique entity definition; minting copies = edition.
 ///         Free or paid — payment routed through PaymentRouter.
-contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
+contract EntityEditionNFT is Initializable, ERC1155, ERC2981, ReentrancyGuardUpgradeable {
     enum EntityKind { THING, LORE, SPECIES, TECHNOLOGY }
 
     struct Edition {
@@ -28,7 +29,7 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
     }
 
     /// @notice The universe this collection belongs to
-    uint256 public immutable universeId;
+    uint256 public universeId;
 
     uint256 public nextEditionId;
 
@@ -64,14 +65,18 @@ contract EntityEditionNFT is ERC1155, ERC2981, ReentrancyGuard {
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() ERC1155("") { _disableInitializers(); }
+
+    function initialize(
         uint256 _universeId,
         address _platform,
         address _paymentRouter,
         address _rightsRegistry,
         uint16 _platformFeeBps,
         uint16 _royaltyBps
-    ) ERC1155("") {
+    ) external initializer {
+        __ReentrancyGuard_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;
