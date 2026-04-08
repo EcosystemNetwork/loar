@@ -21,7 +21,6 @@ COPY apps/indexer/src ./apps/indexer/src
 COPY apps/indexer/ponder.config.ts apps/indexer/ponder.schema.ts apps/indexer/ponder-env.d.ts ./apps/indexer/
 COPY apps/indexer/env.ts apps/indexer/tsconfig.json ./apps/indexer/
 COPY apps/indexer/abis ./apps/indexer/abis
-COPY apps/indexer/generated ./apps/indexer/generated
 RUN rm -rf apps/indexer/src/__tests__
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
