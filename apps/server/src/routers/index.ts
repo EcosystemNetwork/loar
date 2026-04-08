@@ -60,6 +60,12 @@ import { mediaRouter } from './media/media.routes';
 import { voiceRouter } from './generation/voice.routes';
 import { threedRouter } from './generation/threed.routes';
 import { studioRouter } from './studio/studio.routes';
+import { governanceRouter } from './governance/governance.routes';
+import { revenueRouter } from './revenue/revenue.routes';
+import { socialRouter } from './social/social.routes';
+import { feedRouter } from './feed/feed.routes';
+import { playerRouter } from './player/player.routes';
+import { loraRouter } from './generation/lora.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -142,6 +148,7 @@ export const appRouter = router({
   voice: voiceRouter,
   threed: threedRouter,
   fal: falRouter, // @deprecated — backward compat; migrate to generation.* + image.*
+  lora: loraRouter,
 
   // ── Studio OS ────────────────────────────────────────────────────────
   studio: studioRouter,
@@ -169,6 +176,21 @@ export const appRouter = router({
   profiles: profilesRouter,
   quests: questsRouter,
   sandbox: sandboxRouter,
+
+  // ── Governance ──────────────────────────────────────────────────────
+  governance: governanceRouter,
+
+  // ── Revenue Dashboard ──────────────────────────────────────────────
+  revenue: revenueRouter,
+
+  // ── Social ─────────────────────────────────────────────────────────
+  social: socialRouter,
+
+  // ── Feed & Discovery ───────────────────────────────────────────────
+  feed: feedRouter,
+
+  // ── Player ─────────────────────────────────────────────────────────
+  player: playerRouter,
 
   // ── Admin ───────────────────────────────────────────────────────────
   admin: adminRouter,

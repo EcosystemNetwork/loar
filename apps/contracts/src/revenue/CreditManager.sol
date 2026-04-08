@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CreditManager
 /// @notice Manages AI generation credits with dual-margin pricing:
@@ -36,12 +37,14 @@ contract CreditManager is ReentrancyGuard {
     IERC20 public loarToken;
     address public platform;
     address public treasury;
+    IPaymentRouter public paymentRouter;
 
     uint256 public nextPackageId;
     mapping(uint256 => CreditPackage) public packages;
     mapping(address => UserCredits) public userCredits;
 
     // Holder discount: universe token address => discount in basis points
+    // Applied when holder of a universe token purchases credits
     mapping(address => uint16) public holderDiscountBps;
 
     // Generation costs per type (in credits)
@@ -78,13 +81,14 @@ contract CreditManager is ReentrancyGuard {
 
     // ── Constructor ──────────────────────────────────────────────
 
-    constructor(address _loarToken, address _platform, address _treasury) {
-        if (_loarToken == address(0) || _platform == address(0) || _treasury == address(0))
+    constructor(address _loarToken, address _platform, address _treasury, address _paymentRouter) {
+        if (_loarToken == address(0) || _platform == address(0) || _treasury == address(0) || _paymentRouter == address(0))
             revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
         platform = _platform;
         treasury = _treasury;
+        paymentRouter = IPaymentRouter(_paymentRouter);
 
         // Default generation costs (in credits)
         generationCosts[keccak256("image")] = 3;
@@ -130,6 +134,32 @@ contract CreditManager is ReentrancyGuard {
     // ── Purchase with ETH (35% margin) ───────────────────────────
 
     /// @notice Buy credits with ETH. 35% platform margin.
+    ///         If a holderDiscount is configured for a token and buyer holds that token,
+    ///         they receive bonus credits proportional to the discount.
+    function purchaseWithEth(uint256 packageId, address discountToken) external payable nonReentrant {
+        CreditPackage storage pkg = packages[packageId];
+        if (!pkg.active) revert PackageNotActive();
+        if (msg.value < pkg.priceWei) revert InsufficientPayment();
+
+        uint256 bonusFromDiscount = 0;
+        if (discountToken != address(0) && holderDiscountBps[discountToken] > 0) {
+            if (IERC20(discountToken).balanceOf(msg.sender) > 0) {
+                bonusFromDiscount = (pkg.credits * holderDiscountBps[discountToken]) / 10000;
+            }
+        }
+
+        uint256 totalCredits = pkg.credits + pkg.bonusCredits + bonusFromDiscount;
+        userCredits[msg.sender].balance += totalCredits;
+        userCredits[msg.sender].totalPurchased += pkg.credits;
+        userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits + bonusFromDiscount;
+
+        // Route ETH to treasury via PaymentRouter
+        paymentRouter.routeToTreasury{value: msg.value}();
+
+        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits + bonusFromDiscount, msg.value);
+    }
+
+    /// @notice Buy credits with ETH (no holder discount).
     function purchaseWithEth(uint256 packageId) external payable nonReentrant {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
@@ -140,9 +170,7 @@ contract CreditManager is ReentrancyGuard {
         userCredits[msg.sender].totalPurchased += pkg.credits;
         userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits;
 
-        // Send ETH to treasury
-        (bool success,) = treasury.call{value: msg.value}("");
-        if (!success) revert TransferFailed();
+        paymentRouter.routeToTreasury{value: msg.value}();
 
         emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits, msg.value);
     }

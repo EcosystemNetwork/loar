@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title AdPlacement
 /// @notice Manages programmatic product placement and sponsorships inside
@@ -41,17 +42,15 @@ contract AdPlacement is ReentrancyGuard {
     mapping(uint256 => uint256[]) public universeSlots;
 
     address public platform;
+    IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
 
-    // Universe creator revenue from ads
-    mapping(uint256 => uint256) public adRevenue;
     mapping(uint256 => address) public universeCreators;
 
     event AdSlotCreated(uint256 indexed slotId, uint256 universeId, PlacementType placementType, uint256 minBid);
     event BidPlaced(uint256 indexed slotId, address bidder, uint256 amount);
     event SponsorshipActivated(uint256 indexed sponsorshipId, uint256 slotId, address sponsor);
     event ImpressionRecorded(uint256 indexed sponsorshipId, uint256 totalImpressions);
-    event AdRevenueWithdrawn(uint256 indexed universeId, address creator, uint256 amount);
 
     error NotPlatform();
     error NotCreator();
@@ -59,20 +58,32 @@ contract AdPlacement is ReentrancyGuard {
     error SlotNotActive();
     error NoRevenue();
     error TransferFailed();
+    error FeeTooHigh();
+
+    uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
         if (msg.sender != platform) revert NotPlatform();
         _;
     }
 
-    constructor(address _platform, uint16 _platformFeeBps) {
+    error ZeroAddress();
+
+    constructor(address _platform, address _paymentRouter, uint16 _platformFeeBps) {
+        if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
+        paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
 
+    event UniverseRegistered(uint256 indexed universeId, address creator);
+
     /// @notice Register a universe for ad placements
     function registerUniverse(uint256 universeId, address creator) external onlyPlatform {
+        if (creator == address(0)) revert ZeroAddress();
         universeCreators[universeId] = creator;
+        emit UniverseRegistered(universeId, creator);
     }
 
     /// @notice Create an ad placement slot
@@ -83,6 +94,7 @@ contract AdPlacement is ReentrancyGuard {
         uint256 episodes,
         string calldata metadata
     ) external returns (uint256 slotId) {
+        require(universeCreators[universeId] != address(0), "Universe not registered");
         require(
             msg.sender == universeCreators[universeId] || msg.sender == platform,
             "Not authorized"
@@ -105,20 +117,25 @@ contract AdPlacement is ReentrancyGuard {
         emit AdSlotCreated(slotId, universeId, placementType, minBid);
     }
 
-    /// @notice Bid on an ad slot
+    /// @notice Bid on an ad slot (checks-effects-interactions safe)
     function bid(uint256 slotId) external payable nonReentrant {
         AdSlot storage slot = adSlots[slotId];
         if (!slot.active) revert SlotNotActive();
         if (msg.value < slot.minBid || msg.value <= slot.currentBid) revert BidTooLow();
 
-        // Refund previous bidder
-        if (slot.currentBidder != address(0)) {
-            (bool refund,) = slot.currentBidder.call{value: slot.currentBid}("");
-            if (!refund) revert TransferFailed();
-        }
+        // Cache previous bidder for refund (effects before interactions)
+        address previousBidder = slot.currentBidder;
+        uint256 previousBid = slot.currentBid;
 
+        // Update state BEFORE external call
         slot.currentBid = msg.value;
         slot.currentBidder = msg.sender;
+
+        // Refund previous bidder (interaction after state update)
+        if (previousBidder != address(0) && previousBid > 0) {
+            (bool refund,) = previousBidder.call{value: previousBid}("");
+            if (!refund) revert TransferFailed();
+        }
 
         emit BidPlaced(slotId, msg.sender, msg.value);
     }
@@ -143,14 +160,10 @@ contract AdPlacement is ReentrancyGuard {
             active: true
         });
 
-        // Revenue split
-        uint256 platformCut = (slot.currentBid * platformFeeBps) / 10000;
-        uint256 creatorCut = slot.currentBid - platformCut;
-        adRevenue[slot.universeId] += creatorCut;
-
-        if (platformCut > 0) {
-            (bool s,) = platform.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+        // Route revenue through PaymentRouter
+        address creator = universeCreators[slot.universeId];
+        if (slot.currentBid > 0 && creator != address(0)) {
+            paymentRouter.route{value: slot.currentBid}(creator, platformFeeBps);
         }
 
         // Reset slot for next round
@@ -174,19 +187,6 @@ contract AdPlacement is ReentrancyGuard {
         }
 
         emit ImpressionRecorded(sponsorshipId, sp.impressions);
-    }
-
-    /// @notice Universe creator withdraws ad revenue
-    function withdrawAdRevenue(uint256 universeId) external nonReentrant {
-        if (msg.sender != universeCreators[universeId]) revert NotCreator();
-        uint256 amount = adRevenue[universeId];
-        if (amount == 0) revert NoRevenue();
-
-        adRevenue[universeId] = 0;
-        (bool success,) = msg.sender.call{value: amount}("");
-        if (!success) revert TransferFailed();
-
-        emit AdRevenueWithdrawn(universeId, msg.sender, amount);
     }
 
     /// @notice Get ad slots for a universe

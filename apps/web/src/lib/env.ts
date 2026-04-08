@@ -25,8 +25,8 @@ const envSchema = z.object({
   // ── Admin (comma-separated public addresses) ───────────────────────────────
   VITE_ADMIN_ADDRESSES: z.string().optional(),
 
-  // ── Coinbase Developer Platform (project ID only — not API secret) ─────────
-  VITE_CDP_PROJECT_ID: z.string().optional(),
+  // ── Dynamic Labs (environment ID — public, not secret) ─────────────────────
+  VITE_DYNAMIC_ENVIRONMENT_ID: z.string().optional(),
 
   // ── Firebase web client config (public — not admin credentials) ────────────
   VITE_FIREBASE_PROJECT_ID: z.string().optional(),

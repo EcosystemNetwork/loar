@@ -1,7 +1,7 @@
 /**
  * Login Route
  *
- * CDP Smart Wallet sign-in with social logins (Google, passkeys, email).
+ * Dynamic Labs multi-chain sign-in (EVM, Solana, SUI).
  * After wallet connect + SIWE verification, redirects to ?redirect param or /dashboard.
  */
 
@@ -37,17 +37,9 @@ function LoginPage() {
       <div className="max-w-md w-full space-y-8 text-center">
         {/* Logo */}
         <div className="space-y-4">
-          <img
-            src="/loarlogo.svg"
-            alt="LOAR"
-            className="h-16 w-auto mx-auto"
-          />
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome to LOAR
-          </h1>
-          <p className="text-muted-foreground">
-            Decentralized Narrative Control Suite
-          </p>
+          <img src="/loarlogo.svg" alt="LOAR" className="h-16 w-auto mx-auto" />
+          <h1 className="text-2xl font-bold tracking-tight">Welcome to LOAR</h1>
+          <p className="text-muted-foreground">Decentralized Narrative Control Suite</p>
         </div>
 
         {/* Sign In Card */}
@@ -55,7 +47,7 @@ function LoginPage() {
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Sign In</h2>
             <p className="text-sm text-muted-foreground">
-              Continue with Google, Apple, passkeys, or email via Coinbase Smart Wallet
+              Connect with any wallet — Ethereum, Solana, SUI, and more
             </p>
           </div>
 
@@ -66,20 +58,18 @@ function LoginPage() {
           <div className="space-y-3 pt-2">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <div className="flex-1 border-t" />
-              <span>Chain Abstraction</span>
+              <span>Multi-Chain</span>
               <div className="flex-1 border-t" />
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Your Smart Wallet works across Ethereum, Base, Arbitrum, Optimism, and Polygon.
-              No bridging required.
+              Sign in with any supported wallet across Ethereum, Base, Arbitrum, Optimism, Polygon,
+              Solana, and SUI.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <p className="text-xs text-muted-foreground">
-          Powered by Coinbase Developer Platform
-        </p>
+        <p className="text-xs text-muted-foreground">Powered by Dynamic</p>
       </div>
     </div>
   );

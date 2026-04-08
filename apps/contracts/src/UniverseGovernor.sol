@@ -12,7 +12,7 @@ import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction {
     constructor(IVotes _token)
         Governor("UniverseGovernor")
-        GovernorSettings(0 /* 0 day */, 300 /* 1 hour */, 1e18)
+        GovernorSettings(7200 /* ~1 day on Base L2 @ 2s blocks */, 50400 /* ~7 days */, 1_000_000e18 /* 1M tokens */)
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(10)
     {}

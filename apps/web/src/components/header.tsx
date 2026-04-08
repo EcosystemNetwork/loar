@@ -8,7 +8,10 @@
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { LoarBalance } from './LoarBalance';
+import { ChainBadge } from './chain-badge';
+import { Web3ModeToggle } from './web3-mode-toggle';
 import { ModeToggle } from './mode-toggle';
+import { NotificationBell } from './social/NotificationBell';
 import { Button } from './ui/button';
 import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
@@ -24,6 +27,8 @@ export default function Header() {
     { to: '/wiki', label: 'Wiki' },
     { to: '/market', label: 'Slop Market' },
     { to: '/credits', label: 'Credits' },
+    { to: '/activity', label: 'Activity' },
+    { to: '/bridge', label: 'Bridge' },
     { to: '/sandbox', label: 'Sandbox' },
     { to: '/docs', label: 'Docs' },
   ];
@@ -60,7 +65,10 @@ export default function Header() {
           {/* Right side - Wallet and Theme Toggle */}
           <div className="flex items-center gap-2">
             <LoarBalance />
+            <ChainBadge />
+            <NotificationBell />
             <WalletConnectButton size="sm" />
+            <Web3ModeToggle />
             <ModeToggle />
             {/* Mobile menu toggle */}
             <Button

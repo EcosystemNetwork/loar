@@ -1,0 +1,22 @@
+[package]
+name = "loar-token"
+version = "0.1.0"
+description = "$LOAR SPL Token 2022 with 0.05% transfer fee routed to liquidity pool"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "loar_token"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true, features = ["token_2022", "associated_token"] }
+spl-token-2022 = { workspace = true }
