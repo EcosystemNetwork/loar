@@ -13,6 +13,12 @@ import {SubscriptionManager} from "../src/revenue/SubscriptionManager.sol";
 import {LicensingRegistry} from "../src/revenue/LicensingRegistry.sol";
 import {CollabManager} from "../src/revenue/CollabManager.sol";
 import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
+import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.sol";
+import {EpisodeEditionCollection} from "../src/revenue/EpisodeEditionCollection.sol";
+import {CharacterNFT} from "../src/revenue/CharacterNFT.sol";
+import {EntityNFT} from "../src/revenue/EntityNFT.sol";
+import {EntityEditionNFT} from "../src/revenue/EntityEditionNFT.sol";
+import {EpisodeNFT} from "../src/revenue/EpisodeNFT.sol";
 
 /**
  * @title DeployRevenue
@@ -49,9 +55,17 @@ contract DeployRevenueScript is Script {
         )));
         console.log("RightsRegistry:", address(rr));
 
-        // 3. RevenueModuleFactory (Beacon-based, NOT proxied)
+        // 3. Deploy implementations + beacons + factory
+        console.log("Deploying 5 NFT implementations + beacons...");
+        UpgradeableBeacon epBeacon = new UpgradeableBeacon(address(new EpisodeEditionCollection()), d);
+        UpgradeableBeacon chBeacon = new UpgradeableBeacon(address(new CharacterNFT()), d);
+        UpgradeableBeacon enBeacon = new UpgradeableBeacon(address(new EntityNFT()), d);
+        UpgradeableBeacon eeBeacon = new UpgradeableBeacon(address(new EntityEditionNFT()), d);
+        UpgradeableBeacon epNftBeacon = new UpgradeableBeacon(address(new EpisodeNFT()), d);
+
         RevenueModuleFactory rmf = new RevenueModuleFactory(
-            d, address(rr), address(pr), FEE, FEE, 300, FEE, FEE
+            d, address(rr), address(pr), FEE, FEE, 300, FEE, FEE,
+            address(epBeacon), address(chBeacon), address(enBeacon), address(eeBeacon), address(epNftBeacon)
         );
         console.log("RevenueModuleFactory:", address(rmf));
 
