@@ -21,7 +21,10 @@ COPY apps/indexer/src ./apps/indexer/src
 COPY apps/indexer/ponder.config.ts apps/indexer/ponder.schema.ts apps/indexer/ponder-env.d.ts ./apps/indexer/
 COPY apps/indexer/env.ts apps/indexer/tsconfig.json ./apps/indexer/
 COPY apps/indexer/abis ./apps/indexer/abis
-RUN rm -rf apps/indexer/src/__tests__
+RUN rm -rf apps/indexer/src/__tests__ && \
+    echo "=== Verify __tests__ removed ===" && \
+    ls apps/indexer/src/ && \
+    ! test -d apps/indexer/src/__tests__ && echo "CONFIRMED: __tests__ gone"
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
