@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { trpc } from '../../utils/trpc';
 import { ProposalList } from '../../components/governance/ProposalList';
@@ -39,11 +40,13 @@ function GovernancePage() {
     isLoading,
     isError,
     error,
-  } = trpc.governance.listProposals.useQuery({
-    universeId,
-    state: mappedState,
-    limit: 20,
-  });
+  } = useQuery(
+    trpc.governance.listProposals.queryOptions({
+      universeId,
+      state: mappedState,
+      limit: 20,
+    })
+  );
 
   const filters = ['All', 'Active', 'Pending', 'Succeeded', 'Defeated', 'Executed'] as const;
 
@@ -108,7 +111,10 @@ function GovernancePage() {
                 <p className="text-zinc-500 mt-2">Be the first to create a governance proposal</p>
               </div>
             ) : (
-              <ProposalList proposals={proposals?.proposals || []} universeId={universeId} />
+              <ProposalList
+                proposals={(proposals?.proposals || []) as any}
+                universeId={universeId}
+              />
             )}
           </div>
 
