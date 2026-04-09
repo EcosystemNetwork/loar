@@ -1,10 +1,13 @@
+import { useQuery } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
 
 export function BranchStats({ universeId, nodeId }: { universeId: string; nodeId: number }) {
-  const { data } = trpc.player.getBranchAnalytics.useQuery({ universeId, nodeId });
+  const { data } = useQuery(trpc.player.getBranchAnalytics.queryOptions({ universeId, nodeId }));
 
-  const distribution = (data?.choiceDistribution || {}) as Record<string, number>;
-  const totalPlays = (data?.totalPlays || 0) as number;
+  const distribution = (
+    'choiceDistribution' in (data ?? {}) ? (data as any).choiceDistribution : {}
+  ) as Record<string, number>;
+  const totalPlays = ('totalPlays' in (data ?? {}) ? (data as any).totalPlays : 0) as number;
 
   if (totalPlays === 0) return null;
 

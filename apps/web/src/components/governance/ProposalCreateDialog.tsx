@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
+import { useMutation } from '@tanstack/react-query';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { trpc } from '../../utils/trpc';
 import { encodeFunctionData } from 'viem';
@@ -22,7 +23,7 @@ export function ProposalCreateDialog({
   const [customCalldata, setCustomCalldata] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const syncProposal = trpc.governance.syncProposal.useMutation();
+  const syncProposal = useMutation(trpc.governance.syncProposal.mutationOptions());
 
   // TODO: Get governor + universe addresses from universe data
   const governorAddress = undefined as `0x${string}` | undefined;
@@ -57,7 +58,7 @@ export function ProposalCreateDialog({
 
       // Submit proposal on-chain (writeContract is fire-and-forget in wagmi v2)
       // The tx hash is tracked via useWriteContract state, not return value
-      propose?.(targets, values, calldatas, description);
+      await propose?.({ targets, values, calldatas, description });
 
       // Sync to Firestore with a generated proposal ID
       // (actual on-chain proposalId will be synced on tx confirmation)

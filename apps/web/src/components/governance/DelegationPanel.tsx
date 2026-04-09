@@ -2,12 +2,10 @@ import { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { isAddress } from 'viem';
-import { trpc } from '../../utils/trpc';
 
 export function DelegationPanel({ universeId }: { universeId: string }) {
   const { address } = useAccount();
   const [delegatee, setDelegatee] = useState('');
-  const utils = trpc.useUtils();
 
   // TODO: Resolve token address from universe data
   const tokenAddress = undefined as `0x${string}` | undefined;

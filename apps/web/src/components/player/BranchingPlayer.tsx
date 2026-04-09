@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useUniverseBlockchain } from '../../hooks/useUniverseBlockchain';
 import { trpc } from '../../utils/trpc';
 import { ChoiceOverlay } from './ChoiceOverlay';
@@ -27,11 +28,15 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Get the full graph from the blockchain
-  const { fullGraph } = useUniverseBlockchain(undefined as any); // TODO: pass universe address
+  const { graphData: fullGraph } = useUniverseBlockchain({
+    universeId,
+    contractAddress: undefined,
+    isBlockchainUniverse: true,
+  });
 
   // Session management
-  const startSession = trpc.player.startSession.useMutation();
-  const recordChoice = trpc.player.recordChoice.useMutation();
+  const startSession = useMutation(trpc.player.startSession.mutationOptions());
+  const recordChoice = useMutation(trpc.player.recordChoice.mutationOptions());
 
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -66,7 +71,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       {
         onSuccess: (data) => {
           setSessionId(data.sessionId);
-          if (data.resumed && data.currentNodeId) {
+          if (data.resumed && 'currentNodeId' in data && data.currentNodeId) {
             setCurrentNodeId(data.currentNodeId as number);
           }
         },
