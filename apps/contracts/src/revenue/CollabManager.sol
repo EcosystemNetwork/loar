@@ -20,7 +20,8 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         uint256 universeA;
         uint256 universeB;
         address proposer;          // creator of universe A
-        address acceptor;          // creator of universe B
+        address targetAcceptor;    // only this address may accept (universe B creator)
+        address acceptor;          // set when accepted
         CollabStatus status;
         uint256 revenueShareBps;   // universe A's share (rest goes to B)
         uint256 totalRevenue;
@@ -82,14 +83,18 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Propose a cross-universe collaboration
+    /// @param targetAcceptor Address of the universe B creator who is allowed to accept.
+    ///                        Must be non-zero to prevent unauthorized front-running.
     function proposeCollab(
         uint256 universeA,
         uint256 universeB,
+        address targetAcceptor,
         uint256 revenueShareBps,   // A's share in bps
         uint256 duration,           // seconds
         string calldata metadataURI
     ) external returns (uint256 collabId) {
         require(revenueShareBps <= 10000, "Invalid share");
+        if (targetAcceptor == address(0)) revert ZeroAddress();
 
         collabId = nextCollabId++;
 
@@ -98,6 +103,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
             universeA: universeA,
             universeB: universeB,
             proposer: msg.sender,
+            targetAcceptor: targetAcceptor,
             acceptor: address(0),
             status: CollabStatus.PROPOSED,
             revenueShareBps: revenueShareBps,
@@ -115,9 +121,11 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     /// @notice Accept a collaboration proposal
+    /// @dev Only the address specified as targetAcceptor at proposal time may accept.
     function acceptCollab(uint256 collabId) external {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.PROPOSED) revert InvalidStatus();
+        if (msg.sender != c.targetAcceptor) revert NotAcceptor();
 
         c.acceptor = msg.sender;
         c.status = CollabStatus.ACCEPTED;

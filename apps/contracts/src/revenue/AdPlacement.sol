@@ -152,7 +152,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     }
 
     /// @notice Accept winning bid and activate sponsorship
-    function acceptBid(uint256 slotId) external returns (uint256 sponsorshipId) {
+    function acceptBid(uint256 slotId) external nonReentrant returns (uint256 sponsorshipId) {
         AdSlot storage slot = adSlots[slotId];
         require(
             msg.sender == universeCreators[slot.universeId] || msg.sender == platform,
@@ -160,28 +160,32 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         );
         require(slot.currentBidder != address(0), "No bids");
 
+        // Cache values for use after state reset (CEI)
+        address winner = slot.currentBidder;
+        uint256 winningBid = slot.currentBid;
+        address creator = universeCreators[slot.universeId];
+
         sponsorshipId = nextSponsorshipId++;
         sponsorships[sponsorshipId] = Sponsorship({
             id: sponsorshipId,
             adSlotId: slotId,
-            sponsor: slot.currentBidder,
-            totalPaid: slot.currentBid,
+            sponsor: winner,
+            totalPaid: winningBid,
             impressions: 0,
             startedAt: block.timestamp,
             active: true
         });
 
-        // Route revenue through PaymentRouter
-        address creator = universeCreators[slot.universeId];
-        if (slot.currentBid > 0 && creator != address(0)) {
-            paymentRouter.route{value: slot.currentBid}(creator, platformFeeBps);
-        }
-
-        // Reset slot for next round
+        // Reset slot state BEFORE external call (checks-effects-interactions)
         slot.currentBid = 0;
         slot.currentBidder = address(0);
 
-        emit SponsorshipActivated(sponsorshipId, slotId, sponsorships[sponsorshipId].sponsor);
+        // Route revenue through PaymentRouter (external call last)
+        if (winningBid > 0 && creator != address(0)) {
+            paymentRouter.route{value: winningBid}(creator, platformFeeBps);
+        }
+
+        emit SponsorshipActivated(sponsorshipId, slotId, winner);
     }
 
     /// @notice Record an ad impression (called by platform per episode)

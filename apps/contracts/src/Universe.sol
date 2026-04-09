@@ -114,6 +114,7 @@ contract Universe is IUniverse {
         }
 
         if (_previous != 0) {
+            if (nodes[_previous].id == 0) revert NodeDoesNotExist();
             nodes[_previous].next.push(newId);
         }
 

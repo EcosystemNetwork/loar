@@ -85,6 +85,7 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     error RefundFailed();
     error FeeTooHigh();
     error ContentNotMonetizable();
+    error ZeroAddress();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -238,6 +239,7 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     }
 
     function setPaymentRouter(address newRouter) external onlyOwner {
+        if (newRouter == address(0)) revert ZeroAddress();
         paymentRouter = IPaymentRouter(newRouter);
     }
 

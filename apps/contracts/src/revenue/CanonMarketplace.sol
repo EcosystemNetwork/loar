@@ -218,6 +218,13 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             emit CanonSubmissionAccepted(sub.universeId, submissionId, sub.contentHash);
         } else {
             sub.status = SubmissionStatus.REJECTED;
+            // Route the creator portion of the locked fee to treasury (platform cut was
+            // already forwarded to treasury in submit(); only the remainder is still here).
+            uint256 platformCut = (sub.submissionFee * platformFeeBps) / 10000;
+            uint256 lockedRemainder = sub.submissionFee - platformCut;
+            if (lockedRemainder > 0) {
+                paymentRouter.routeToTreasury{value: lockedRemainder}();
+            }
             emit SubmissionRejected(submissionId);
         }
     }

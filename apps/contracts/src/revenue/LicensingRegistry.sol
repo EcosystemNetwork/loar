@@ -108,7 +108,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         uint16 royaltyBps,
         uint256 duration,
         string calldata terms
-    ) external payable returns (uint256 licenseId) {
+    ) external returns (uint256 licenseId) {
         licenseId = nextLicenseId++;
 
         licenses[licenseId] = License({

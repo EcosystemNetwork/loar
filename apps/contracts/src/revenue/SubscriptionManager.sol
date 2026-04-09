@@ -59,6 +59,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     error NoRevenue();
     error TransferFailed();
     error FeeTooHigh();
+    error CreatorNotRegistered();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -161,8 +162,17 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
         // Route subscription payment through PaymentRouter
         address creator = universeCreators[universeId];
-        if (msg.value > 0 && creator != address(0)) {
-            paymentRouter.route{value: msg.value}(creator, platformFeeBps);
+        if (creator == address(0)) revert CreatorNotRegistered();
+
+        if (totalPrice > 0) {
+            paymentRouter.route{value: totalPrice}(creator, platformFeeBps);
+        }
+
+        // Refund any overpayment
+        uint256 overpayment = msg.value - totalPrice;
+        if (overpayment > 0) {
+            (bool refunded,) = msg.sender.call{value: overpayment}("");
+            if (!refunded) revert TransferFailed();
         }
 
         emit Subscribed(msg.sender, universeId, tier, expiry);
