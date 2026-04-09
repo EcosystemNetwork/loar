@@ -168,7 +168,8 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
             paymentRouter.route{value: totalPrice}(creator, platformFeeBps);
         }
 
-        // Refund any overpayment
+        // Refund any overpayment. Safe: msg.value >= totalPrice is guaranteed by the
+        // InsufficientPayment check above, so this subtraction cannot underflow.
         uint256 overpayment = msg.value - totalPrice;
         if (overpayment > 0) {
             (bool refunded,) = msg.sender.call{value: overpayment}("");

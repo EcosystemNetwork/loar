@@ -123,10 +123,28 @@ contract CollabManagerAuthTest is Test {
         vm.prank(targetAcceptor);
         manager.acceptCollab(id);
 
-        // After a successful accept, the proposer should be able to activate the collab.
-        // Activation requires status == ACCEPTED — if the accept failed, this would revert.
-        vm.prank(targetAcceptor);
-        manager.activateCollab(id);
+        // Explicitly verify the collab struct fields.
+        // Note: collabs() getter excludes the string `metadataURI` field, so the tuple has
+        // 12 elements: id, universeA, universeB, proposer, targetAcceptor, acceptor, status,
+        // revenueShareBps, totalRevenue, startTime, endTime, episodeCount.
+        (
+            ,
+            ,
+            ,
+            ,
+            address storedTarget,
+            address storedAcceptor,
+            CollabManager.CollabStatus status_,
+            ,
+            ,
+            ,
+            ,
+
+        ) = manager.collabs(id);
+
+        assertEq(storedTarget, targetAcceptor, "targetAcceptor should be stored");
+        assertEq(storedAcceptor, targetAcceptor, "acceptor should be set to targetAcceptor");
+        assertEq(uint8(status_), uint8(CollabManager.CollabStatus.ACCEPTED), "status should be ACCEPTED");
     }
 
     function test_acceptCollab_byAttacker_reverts() public {
@@ -234,6 +252,9 @@ contract LicensingRegistryPayableTest is Test {
     address treasury = makeAddr("treasury");
     address platform = makeAddr("platform");
 
+    /// @dev Small ETH amount used when testing that ETH is rejected by non-payable functions.
+    uint256 constant TEST_ETH_AMOUNT = 0.1 ether;
+
     function setUp() public {
         PaymentRouter routerImpl = new PaymentRouter();
         router = PaymentRouter(address(new ERC1967Proxy(
@@ -257,7 +278,7 @@ contract LicensingRegistryPayableTest is Test {
             LicensingRegistry.createLicense,
             (1, LicensingRegistry.LicenseType.STREAMING, licensee, 1 ether, 500, 30 days, "ipfs://terms")
         );
-        (bool success,) = address(registry).call{value: 0.1 ether}(callData);
+        (bool success,) = address(registry).call{value: TEST_ETH_AMOUNT}(callData);
         assertFalse(success, "createLicense should revert when ETH is sent");
     }
 

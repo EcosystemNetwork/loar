@@ -130,6 +130,11 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     error InvalidToken();
 
+    /// @dev Compute the platform's cut of a fee amount. Used consistently across submit() and finalize().
+    function _platformCut(uint256 amount) private view returns (uint256) {
+        return (amount * platformFeeBps) / 10000;
+    }
+
     /// @notice Submit content for canon consideration
     /// @param universeToken Must be a valid IVotes token (governance token for the universe)
     function submit(
@@ -165,7 +170,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         });
 
         // Platform takes cut of submission fee via PaymentRouter
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
+        uint256 platformCut = _platformCut(msg.value);
         if (platformCut > 0) {
             paymentRouter.routeToTreasury{value: platformCut}();
         }
@@ -208,7 +213,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             canonSubmissions[sub.universeId].push(submissionId);
 
             // Creator earns the remaining submission fee via PaymentRouter
-            uint256 platformCut = (sub.submissionFee * platformFeeBps) / 10000;
+            uint256 platformCut = _platformCut(sub.submissionFee);
             uint256 creatorReward = sub.submissionFee - platformCut;
             if (creatorReward > 0) {
                 paymentRouter.route{value: creatorReward}(sub.creator, 0);
@@ -220,7 +225,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             sub.status = SubmissionStatus.REJECTED;
             // Route the creator portion of the locked fee to treasury (platform cut was
             // already forwarded to treasury in submit(); only the remainder is still here).
-            uint256 platformCut = (sub.submissionFee * platformFeeBps) / 10000;
+            uint256 platformCut = _platformCut(sub.submissionFee);
             uint256 lockedRemainder = sub.submissionFee - platformCut;
             if (lockedRemainder > 0) {
                 paymentRouter.routeToTreasury{value: lockedRemainder}();
