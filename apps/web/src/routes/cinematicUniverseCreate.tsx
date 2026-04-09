@@ -8,7 +8,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   useAccount,
   useBalance,
@@ -89,6 +89,13 @@ function CinematicUniverseCreate() {
   const defaultConfig = useDefaultDeploymentConfig();
   const { isSuccess: txSuccess, data: txReceipt } = useWaitForTransactionReceipt({ hash });
 
+  // Auto-switch to Sepolia if on wrong network
+  useEffect(() => {
+    if (isConnected && !isSupportedChain(chainId)) {
+      switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
+    }
+  }, [isConnected, chainId, switchChain]);
+
   const handleSwitchNetwork = async () => {
     try {
       await switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
@@ -116,9 +123,10 @@ function CinematicUniverseCreate() {
         setImageUrl(data.imageUrl);
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Cover generation failed:', error);
-      alert('Failed to generate cover. Please try again.');
+      const msg = error?.message || 'Unknown error';
+      alert(`Failed to generate cover: ${msg}`);
     },
   });
 
@@ -162,7 +170,7 @@ function CinematicUniverseCreate() {
     }
 
     if (!isSupportedChain(chainId)) {
-      alert('Wrong Network! Please switch to Sepolia or Base Sepolia.');
+      alert('Wrong Network! Please switch to Sepolia.');
       return;
     }
 
@@ -268,15 +276,13 @@ function CinematicUniverseCreate() {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-700 rounded-lg shadow-2xl">
-          <p className="text-yellow-100 font-medium">
-            Wrong Network! Please switch to Sepolia or Base Sepolia.
-          </p>
+          <p className="text-yellow-100 font-medium">Wrong Network! Please switch to Sepolia.</p>
         </div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
             <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-600" />
             <h2 className="text-2xl font-bold">Wrong Network</h2>
-            <p className="text-muted-foreground">Please switch to Sepolia or Base Sepolia</p>
+            <p className="text-muted-foreground">Please switch to Sepolia</p>
             <Button size="lg" onClick={handleSwitchNetwork}>
               <Rocket className="h-5 w-5 mr-2" />
               Switch Network

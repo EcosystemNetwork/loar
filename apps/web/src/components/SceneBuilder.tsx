@@ -137,7 +137,6 @@ export function SceneBuilder({
 
   const handleDownload = async () => {
     // TODO: Implement video concatenation and download
-    console.log('Downloading scene with segments:', segments);
   };
 
   const formatTime = (seconds: number) => {

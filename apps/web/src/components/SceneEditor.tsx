@@ -180,13 +180,12 @@ export function SceneEditor({
 
   // Download merged video
   const handleDownload = () => {
-    // Implementation for downloading the merged scene
-    console.log('Download scene');
+    // TODO: Implement downloading the merged scene
   };
 
   // Organize segments
   const handleOrganize = () => {
-    console.log('Organize segments');
+    // TODO: Implement segment organization
   };
 
   const modelNames: Record<string, string> = {
@@ -375,7 +374,7 @@ export function SceneEditor({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('Extend segment', index);
+                          // TODO: Implement segment extension
                         }}
                         className="absolute top-1/2 -right-3 transform -translate-y-1/2 p-1 bg-primary hover:bg-primary/80 text-primary-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
                       >

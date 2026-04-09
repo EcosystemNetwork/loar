@@ -25,7 +25,12 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.SIWE_JWT_SECRET || 'dev-secret-change-in-production'
 );
 const JWT_ISSUER = 'loar-server';
-const JWT_EXPIRY = '7d';
+const JWT_EXPIRY = '4h';
+
+/** Allowed SIWE domains. Add production domain when deploying. */
+const ALLOWED_DOMAINS = new Set(
+  (process.env.SIWE_ALLOWED_DOMAINS || 'localhost,loar.fun').split(',').map((d) => d.trim())
+);
 
 export interface SiweSessionPayload extends JWTPayload {
   sub: string; // checksummed wallet address
@@ -56,8 +61,18 @@ export async function verifySiweSignature(
   message: string,
   signature: `0x${string}`
 ): Promise<string> {
-  // Extract address from the SIWE message (line 2)
+  // Extract and validate domain from the SIWE message (line 1)
   const lines = message.split('\n');
+  const domainLine = lines[0]?.trim();
+  const domainMatch = domainLine?.match(/^(.+?) wants you to sign in/);
+  if (domainMatch) {
+    const messageDomain = domainMatch[1];
+    if (!ALLOWED_DOMAINS.has(messageDomain)) {
+      throw new Error(`SIWE domain "${messageDomain}" is not allowed`);
+    }
+  }
+
+  // Extract address from the SIWE message (line 2)
   const rawAddress = lines[1]?.trim();
 
   if (!rawAddress || !rawAddress.startsWith('0x')) {

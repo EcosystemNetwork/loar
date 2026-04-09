@@ -23,6 +23,9 @@ interface IUniverse {
     event NodeVisibilityOptionUpdated(NodeVisibilityOptions option);
     event NodeCreationOptionUpdated(NodeCreationOptions option);
     event MediaUpdated(uint indexed nodeId, address updater, bytes32 contentHash, string link);
+    event WhitelistedUpdated(address indexed user, bool status);
+    event TokenUpdated(address indexed token);
+    event AdminUpdated(address indexed newAdmin);
 
     function setAdmin(address newAdmin) external;
     function setToken(address) external;

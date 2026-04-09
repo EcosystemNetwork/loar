@@ -38,8 +38,14 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (!address) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access requires a wallet address' });
   }
-  // If no admin list configured, allow all authenticated users (dev mode)
-  if (ADMIN_ADDRESSES.length > 0 && !ADMIN_ADDRESSES.includes(address)) {
+  // Require ADMIN_ADDRESSES to be configured — reject all if not set
+  if (ADMIN_ADDRESSES.length === 0) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Admin access not configured. Set ADMIN_ADDRESSES env var.',
+    });
+  }
+  if (!ADMIN_ADDRESSES.includes(address)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
   }
   return next({ ctx });

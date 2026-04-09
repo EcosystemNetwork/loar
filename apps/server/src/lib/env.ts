@@ -70,10 +70,6 @@ const envSchema = z.object({
   STORACHA_KEY: z.string().optional(),
   STORACHA_PROOF: z.string().optional(),
 
-  // ── Storage — legacy Walrus (deprecated) ──────────────────────────────────
-  WALRUS_PUBLISHER_URL: z.string().url('WALRUS_PUBLISHER_URL must be a valid URL').optional(),
-  WALRUS_AGGREGATOR_URL: z.string().url('WALRUS_AGGREGATOR_URL must be a valid URL').optional(),
-
   // ── Storage — priority ────────────────────────────────────────────────────
   STORAGE_PROVIDER_PRIORITY: z
     .string()
