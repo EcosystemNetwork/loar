@@ -6,21 +6,15 @@
  */
 
 import { createConfig, http } from 'wagmi';
-import { base, baseSepolia, sepolia, mainnet, arbitrum, optimism, polygon } from 'wagmi/chains';
+import { sepolia } from 'wagmi/chains';
 
 /** Default chain used for contract interactions and wallet prompts. */
 export const defaultChain = sepolia;
 
 export const config = createConfig({
-  chains: [sepolia, baseSepolia, base, mainnet, arbitrum, optimism, polygon],
+  chains: [sepolia],
   multiInjectedProviderDiscovery: false,
   transports: {
     [sepolia.id]: http(),
-    [baseSepolia.id]: http(),
-    [base.id]: http(),
-    [mainnet.id]: http(),
-    [arbitrum.id]: http(),
-    [optimism.id]: http(),
-    [polygon.id]: http(),
   },
 });

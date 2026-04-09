@@ -21,6 +21,7 @@ import { getSiweToken } from '../lib/wallet-auth';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 30_000, // 30s default — prevents refetch-on-every-mount flickering
       retry: (failureCount, error: any) => {
         if (error?.data?.httpStatus >= 500 && failureCount < 3) {
           return true;

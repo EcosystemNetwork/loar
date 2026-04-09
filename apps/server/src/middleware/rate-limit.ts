@@ -22,7 +22,10 @@ setInterval(
 
 export function rateLimiter(opts: { windowMs: number; max: number }) {
   return async (c: Context, next: Next) => {
-    const key = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'anonymous';
+    // Use the last IP in x-forwarded-for (closest proxy), or fall back to 'anonymous'.
+    // NOTE: In production, configure your reverse proxy to set a trusted header.
+    const xff = c.req.header('x-forwarded-for');
+    const key = xff ? xff.split(',').pop()!.trim() : c.req.header('x-real-ip') || 'anonymous';
     const now = Date.now();
 
     let bucket = buckets.get(key);

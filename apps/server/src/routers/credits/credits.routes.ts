@@ -8,7 +8,7 @@
  * Credits are the internal unit consumed by all generation actions.
  * Users buy credit packages, then spend credits on generations.
  */
-import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { adminProcedure, protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -648,7 +648,7 @@ export const creditsRouter = router({
 
   // ── Grant (platform/admin/quests) ───────────────────────────────
 
-  grant: protectedProcedure
+  grant: adminProcedure
     .input(
       z.object({
         targetUid: z.string(),

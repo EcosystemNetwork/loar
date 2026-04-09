@@ -54,13 +54,17 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    /// @dev Sentinel value: pass type(uint16).max to use defaultPlatformFeeBps.
+    ///      Pass 0 to explicitly route with zero platform fee.
+    uint16 public constant USE_DEFAULT_FEE = type(uint16).max;
+
     /// @notice Route a payment: send platform cut to treasury, accrue creator's cut
     /// @param creator Address that will be able to claim the creator portion
-    /// @param feeBps Platform fee in basis points; pass 0 to use defaultPlatformFeeBps
+    /// @param feeBps Platform fee in basis points; pass USE_DEFAULT_FEE to use defaultPlatformFeeBps, 0 for no fee
     function route(address creator, uint16 feeBps) external payable nonReentrant {
         if (msg.value == 0) return;
-        if (feeBps > 5000) revert FeeTooHigh();
-        uint16 bps = feeBps == 0 ? defaultPlatformFeeBps : feeBps;
+        uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;
+        if (bps > 5000) revert FeeTooHigh();
         uint256 platformCut = (msg.value * bps) / 10_000;
         uint256 creatorCut = msg.value - platformCut;
 

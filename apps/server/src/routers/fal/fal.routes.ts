@@ -3,6 +3,7 @@
  * character creation, image editing, and Gemini-powered character analysis.
  */
 import { router, publicProcedure, protectedProcedure } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
@@ -15,18 +16,15 @@ const charactersCol = () => {
 };
 
 export const falRouter = router({
-  testConnection: publicProcedure.query(async () => {
+  testConnection: protectedProcedure.query(async () => {
     try {
-      const hasKey = !!process.env.FAL_KEY;
       return {
         success: true,
-        hasApiKey: hasKey,
-        message: hasKey ? 'FAL API key is configured' : 'FAL API key is missing',
+        message: 'FAL service is available',
       };
     } catch (error) {
       return {
         success: false,
-        hasApiKey: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -58,7 +56,14 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.generateImage(input);
+      const result = await falService.generateImage(input);
+      if (result.status === 'failed') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: result.error || 'Image generation failed',
+        });
+      }
+      return result;
     }),
 
   editImage: protectedProcedure

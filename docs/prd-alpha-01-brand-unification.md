@@ -10,15 +10,15 @@
 
 LOAR is now branded as **loar.fun**, but the repo still presents three different public identities in different places:
 
-| Surface                                   | Current state                                          | Problem                                            |
-| ----------------------------------------- | ------------------------------------------------------ | -------------------------------------------------- |
-| `README.md` — live demo link              | `loartech.xyz`                                         | Wrong domain, dead link risk                       |
-| `README.md` — About section               | `loar-one.vercel.app`                                  | Old Vercel preview URL                             |
-| `docs/deployment.md` — Environment Matrix | `loartech.xyz`, `api.loartech.xyz`, `idx.loartech.xyz` | Wrong domain in CORS/URL config table              |
-| `apps/contracts/` README                  | Already describes product as `loar.fun`                | Ahead of the rest of the repo                      |
-| Server `CORS_ORIGIN` default              | `loartech.xyz`                                         | Wrong domain hard-coded into deploy config         |
-| SIWE domain expectation                   | Points at old domain                                   | Will silently reject wallet auth on the new domain |
-| Social preview / `<title>` tags           | Unknown; likely unset or old                           | Bad OG card on any share from loar.fun             |
+| Surface                                   | Current state                           | Problem                                            |
+| ----------------------------------------- | --------------------------------------- | -------------------------------------------------- |
+| `README.md` — live demo link              | _(old domain)_                          | Wrong domain, dead link risk                       |
+| `README.md` — About section               | `loar-one.vercel.app`                   | Old Vercel preview URL                             |
+| `docs/deployment.md` — Environment Matrix | _(old domain and subdomains)_           | Wrong domain in CORS/URL config table              |
+| `apps/contracts/` README                  | Already describes product as `loar.fun` | Ahead of the rest of the repo                      |
+| Server `CORS_ORIGIN` default              | _(old domain)_                          | Wrong domain hard-coded into deploy config         |
+| SIWE domain expectation                   | Points at old domain                    | Will silently reject wallet auth on the new domain |
+| Social preview / `<title>` tags           | Unknown; likely unset or old            | Bad OG card on any share from loar.fun             |
 
 This creates trust risk, ops confusion, and wallet auth failures on the new domain. Any outside creator who clicks a link from the new brand lands on either a dead endpoint or a SIWE rejection.
 
@@ -26,7 +26,7 @@ This creates trust risk, ops confusion, and wallet auth failures on the new doma
 
 ## Goal
 
-Make **loar.fun** the single canonical public identity across every surface in the repo: app metadata, docs, deploy config, CORS policy, SIWE session domain, and environment matrices. Remove every reference to `loartech.xyz` and `loar-one.vercel.app` from docs and config. Add a formal staging subdomain (`staging.loar.fun`) so environment drift cannot happen again.
+Make **loar.fun** the single canonical public identity across every surface in the repo: app metadata, docs, deploy config, CORS policy, SIWE session domain, and environment matrices. Remove every reference to legacy domains from docs and config. Add a formal staging subdomain (`staging.loar.fun`) so environment drift cannot happen again.
 
 ---
 
@@ -56,7 +56,7 @@ Make **loar.fun** the single canonical public identity across every surface in t
 
 **`README.md`**
 
-- Replace `loartech.xyz` demo link → `https://loar.fun`
+- Replace old demo link → `https://loar.fun`
 - Replace `loar-one.vercel.app` → `https://loar.fun`
 - Update any badge links or shields pointing at old domain
 
@@ -116,12 +116,12 @@ Add a placeholder `og-image.png` to `apps/web/public/` (even a 1200×630 branded
 
 ### 5. CI environment check
 
-Add a step to `.github/workflows/ci.yml` that greps the codebase for `loartech.xyz` and `loar-one.vercel.app` and fails if either appears outside of `CHANGELOG.md` or git history references. This prevents domain drift from re-entering the codebase.
+Add a step to `.github/workflows/ci.yml` that greps the codebase for legacy domain references and fails if any appear outside of `CHANGELOG.md` or git history references. This prevents domain drift from re-entering the codebase.
 
 ```yaml
 - name: Check for legacy domains
   run: |
-    if grep -r "loartech\.xyz\|loar-one\.vercel\.app" \
+    if grep -r "loar-one\.vercel\.app" \
       --include="*.ts" --include="*.tsx" --include="*.md" \
       --include="*.json" --include="*.env*" \
       --exclude-dir=".git" --exclude-dir="node_modules" .; then
@@ -148,7 +148,7 @@ Staging and prod-testnet both run Sepolia. Mainnet gets its own row when that mi
 
 ## Accept When
 
-- [ ] `grep -r "loartech.xyz" .` returns no results in tracked files
+- [x] No legacy domain references remain in tracked files
 - [ ] `grep -r "loar-one.vercel.app" .` returns no results in tracked files
 - [ ] `loar.fun` wallet auth (SIWE) completes without domain mismatch errors
 - [ ] `https://api.loar.fun/health` returns `200` from the prod server

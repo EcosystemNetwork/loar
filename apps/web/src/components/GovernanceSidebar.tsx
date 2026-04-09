@@ -100,13 +100,6 @@ export function GovernanceSidebar({
   const tokenAddress = finalUniverse?.tokenAddress as Address;
   const timelineAddress = finalUniverse?.address as Address;
 
-  console.log('Governance addresses:', {
-    governanceAddress,
-    tokenAddress,
-    timelineAddress,
-    universe: finalUniverse,
-  });
-
   // Check if governance is properly configured
   const isGovernanceConfigured = governanceAddress && tokenAddress && timelineAddress;
 
@@ -202,7 +195,6 @@ export function GovernanceSidebar({
       }
     });
 
-    console.log('Event ID to Contract ID mapping:', Array.from(mapping.entries()));
     return mapping;
   }, [sceneNodes]);
 
@@ -234,7 +226,6 @@ export function GovernanceSidebar({
         args: [address], // Delegate to self
       });
 
-      console.log('Delegation transaction:', txHash);
       alert(`Successfully delegated tokens! Transaction: ${txHash}`);
     } catch (error) {
       console.error('Error delegating tokens:', error);
@@ -272,8 +263,6 @@ export function GovernanceSidebar({
 
     setIsLoadingProposals(true);
     try {
-      console.log('Fetching ProposalCreated events for governor:', governanceAddress);
-
       // Get current block number
       const currentBlock = await publicClient.getBlockNumber();
       setCurrentBlock(currentBlock);
@@ -287,8 +276,6 @@ export function GovernanceSidebar({
         fromBlock: fromBlock,
         toBlock: 'latest',
       });
-
-      console.log('Found ProposalCreated events:', events);
 
       // Convert events to proposal objects
       const proposals: Proposal[] = await Promise.all(
@@ -333,7 +320,7 @@ export function GovernanceSidebar({
             forVotes = votes[1];
             abstainVotes = votes[2];
           } catch (error) {
-            console.log('Could not fetch proposal state/votes:', error);
+            // Could not fetch proposal state/votes
           }
 
           // Parse description to extract node info
@@ -342,14 +329,6 @@ export function GovernanceSidebar({
 
           // The displayed node ID is the UI event ID (like "2b"), not the contract ID
           const nodeId = displayedNodeId;
-
-          // Debug logging for proposal data
-          console.log('Processing proposal event:', {
-            proposalId: args.proposalId?.toString(),
-            startBlock: args.startBlock?.toString(),
-            endBlock: args.endBlock?.toString(),
-            description: args.description,
-          });
 
           return {
             id: args.proposalId.toString(),
@@ -370,7 +349,6 @@ export function GovernanceSidebar({
         })
       );
 
-      console.log('Processed proposals:', proposals);
       setProposals(proposals.reverse()); // Show newest first
     } catch (error) {
       console.error('Error fetching proposals from events:', error);
@@ -421,13 +399,6 @@ export function GovernanceSidebar({
         throw new Error(`No contract ID found for event ID: ${selectedNode.data.eventId}`);
       }
 
-      console.log('Creating proposal for node:', {
-        selectedNodeId,
-        uiEventId: selectedNode.data.eventId,
-        contractNodeId,
-        mapping: Array.from(eventIdToContractId.entries()),
-      });
-
       // Encode the setCanon function call properly
       const setCanonCalldata = encodeFunctionData({
         abi: universeAbi,
@@ -436,15 +407,6 @@ export function GovernanceSidebar({
       });
 
       const description = `Set Event ${selectedNode.data.displayName || selectedNode.data.eventId} as Canon\n\n${proposalDescription}`;
-
-      console.log('Creating proposal:', {
-        targets: [timelineAddress],
-        values: [0n],
-        calldatas: [setCanonCalldata],
-        description,
-        contractNodeId,
-        uiEventId: selectedNode.data.eventId,
-      });
 
       // Create proposal
       const txHash = await writeContractAsync({
@@ -459,7 +421,6 @@ export function GovernanceSidebar({
         ],
       });
 
-      console.log('Proposal created:', txHash);
       alert(
         `Proposal created successfully! Transaction: ${txHash}\n\nThe proposal will appear once the transaction is confirmed.`
       );
@@ -515,13 +476,6 @@ export function GovernanceSidebar({
           args: [proposalId, support], // 0 = Against, 1 = For, 2 = Abstain
         });
 
-        console.log('Vote cast:', {
-          txHash,
-          proposalId: proposalId.toString(),
-          support,
-          votingPower: votingPower.toString(),
-        });
-
         alert(
           `Vote cast successfully! Transaction: ${txHash}\nYour ${votingPower.toString()} votes have been recorded.\n\nVote counts will update once the transaction is confirmed.`
         );
@@ -554,15 +508,6 @@ export function GovernanceSidebar({
       }
 
       try {
-        console.log('Executing proposal:', {
-          proposalId: proposal.proposalId.toString(),
-          targets: proposal.targets,
-          values: proposal.values,
-          calldatas: proposal.calldatas,
-          fullDescription: proposal.fullDescription,
-          descriptionHash: keccak256(new TextEncoder().encode(proposal.fullDescription)),
-        });
-
         const descriptionHash = keccak256(new TextEncoder().encode(proposal.fullDescription));
 
         const txHash = await writeContractAsync({
@@ -577,7 +522,6 @@ export function GovernanceSidebar({
           ],
         });
 
-        console.log('Proposal executed:', txHash);
         alert(
           `Proposal executed successfully! Transaction: ${txHash}\n\nThe canon node has been updated.`
         );
