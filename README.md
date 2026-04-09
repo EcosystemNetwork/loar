@@ -10,7 +10,6 @@
 [![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
 [![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 [![Sepolia Testnet](https://img.shields.io/badge/Network-Sepolia-blue)](https://sepolia.etherscan.io/)
-[![Base Sepolia](https://img.shields.io/badge/Network-Base%20Sepolia-blue)](https://sepolia.basescan.org/)
 
 </div>
 
@@ -78,7 +77,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 
 | Feature                | Notes                                                                      |
 | ---------------------- | -------------------------------------------------------------------------- |
-| **Mainnet Deployment** | All contracts on Sepolia + Base Sepolia testnets. Needs audit first        |
+| **Mainnet Deployment** | All contracts on Sepolia testnet. Needs audit first                        |
 | **Fiat On-Ramp**       | No credit card payments. Card tab in CreditStore has no Stripe integration |
 | **Social Features**    | No follows, comments, activity feed, or notifications                      |
 | **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders               |
@@ -97,10 +96,10 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
                             │ tRPC              │ wagmi
                             ▼                   ▼
               ┌─────────────────────┐  ┌──────────────────────┐
-              │   API Server        │  │  Sepolia + Base      │
-              │   Hono + tRPC       │  │  Sepolia Contracts   │
-              │   25+ routers       │  │  8 core + per-       │
-              │   150+ procedures   │  │  universe children   │
+              │   API Server        │  │  Sepolia Contracts   │
+              │   Hono + tRPC       │  │  20+ contracts       │
+              │   25+ routers       │  │  (proxied +          │
+              │   150+ procedures   │  │  upgradeable)        │
               │   Port 3000         │  └──────────┬───────────┘
               │   Port 3000         │             │ events
               └──────────┬──────────┘             ▼
@@ -119,7 +118,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 | `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | Frontend SPA                              |
 | `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (25+ routers, 150+ procedures) |
 | `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37+ tables)     |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (Sepolia + Base Sepolia)  |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (Sepolia)                 |
 | `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app (CDP wallet auth)       |
 | `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                  |
 
@@ -133,20 +132,55 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 
 ---
 
-## Smart Contracts (Sepolia + Base Sepolia)
+## Smart Contracts (Sepolia)
 
-| Contract                  | Address         | Purpose                             |
-| ------------------------- | --------------- | ----------------------------------- |
-| **UniverseManager**       | `0x7af1...8114` | Factory: deploys universes + tokens |
-| **UniverseTokenDeployer** | `0xE34D...8d8B` | Token + Governor + pool deployment  |
-| **LoarFeeLocker**         | `0xEB2B...38f`  | Fee escrow and creator payouts      |
-| **LoarLpLockerMultiple**  | `0x3E66...ca6`  | LP token locking (anti-rug)         |
-| **LoarHookStaticFee**     | `0xa664...A8cC` | Uniswap v4 fee collection hook      |
+All contracts are deployed on **Sepolia testnet** (chain ID 11155111). Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
+
+### Core Protocol
+
+| Contract                 | Address                                      | Purpose                             |
+| ------------------------ | -------------------------------------------- | ----------------------------------- |
+| **UniverseManager**      | `0x7af142BbD14CaEECdA68f948F467Da0257f6B114` | Factory: deploys universes + tokens |
+| **LoarHookStaticFee**    | `0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC` | Uniswap v4 fee collection hook      |
+| **LoarLpLockerMultiple** | `0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6` | LP token locking (anti-rug)         |
+| **LoarFeeLocker**        | `0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f` | Fee escrow and creator payouts      |
 
 Plus per-universe: Universe, GovernanceERC20, UniverseGovernor contracts.
 
-Revenue contracts (not yet deployed separately — logic in backend + planned for on-chain):
-EpisodeNFT, CharacterNFT, CanonMarketplace, CreditManager, SubscriptionManager, CollabManager, AdPlacement, LicensingRegistry
+### Revenue Infrastructure (UUPS Proxies)
+
+These are upgradeable singleton contracts behind ERC1967 proxies. Upgrade via `proxy.upgradeToAndCall(newImpl, "")`.
+
+| Contract                | Proxy Address                                | Purpose                                  |
+| ----------------------- | -------------------------------------------- | ---------------------------------------- |
+| **PaymentRouter**       | `0xD8b49c99aDb51575eea4FB795645fc9e1ce4Fa9C` | Fee splits & treasury routing            |
+| **RightsRegistry**      | `0x711eC315392f6f9FFd37e673B35acc63b9999323` | Content rights & ownership tracking      |
+| **CanonMarketplace**    | `0x8e6c09198267B07E3FC8C66F0343759111D63016` | Canon submission, voting & licensing     |
+| **CreditManager**       | `0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240` | AI generation credits & tiers            |
+| **AdPlacement**         | `0xB18db49DFAB0d8B05916260D457574348893601d` | Ad slot bidding & impressions            |
+| **SubscriptionManager** | `0x99562C96389A91b17662ce5f15143f5b07b84090` | Creator subscription tiers               |
+| **LicensingRegistry**   | `0xE64563E0361f26228783e6cBAd3789563A6d5eA7` | IP licensing (6 types) & royalty splits  |
+| **CollabManager**       | `0xD98755fdEA77Aa76b19DD979f9a3134502D18294` | Multi-creator collaboration management   |
+| **AnalyticsRegistry**   | `0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8` | On-chain analytics & engagement tracking |
+
+### NFT Beacons & Factory
+
+Per-universe NFT instances are deployed as **Beacon Proxies**. Upgrading a beacon upgrades ALL universe instances of that NFT type simultaneously.
+
+| Contract                  | Address                                      | Purpose                                   |
+| ------------------------- | -------------------------------------------- | ----------------------------------------- |
+| **RevenueModuleFactory**  | `0x056dDe6c068cE3FE17C2E6eE6cfA8F76eB5A5264` | Deploys all 5 NFT proxies per universe    |
+| **EpisodeEdition Beacon** | `0xd70A0A63d1F80D6f28BeB3e8f3FC2a34dBEC3618` | ERC1155 episode editions (mint + royalty) |
+| **Character Beacon**      | `0xe15D941140e5504AF7C1b56AC14dA236963A99ae` | ERC721 character NFTs (appearance fees)   |
+| **Entity Beacon**         | `0x152ADc8350ee69162989c0C52f5ffb2f8A09E17B` | ERC721 entity NFTs (world objects)        |
+| **EntityEdition Beacon**  | `0x7e62116B9A889150E6D07830a179f3cF803c2908` | ERC1155 entity editions                   |
+| **EpisodeNFT Beacon**     | `0x89c4b520319FDB6cd23cb8DC5E6b023B110F23fC` | ERC721 episode NFTs (per-episode mint)    |
+
+### Upgradeability
+
+- **UUPS Singletons**: Deploy new implementation, call `proxy.upgradeToAndCall(newImpl, "")`. Only the contract owner can upgrade.
+- **Beacon NFTs**: Deploy new implementation, call `beacon.upgradeTo(newImpl)`. All universe instances upgrade at once.
+- All contracts use OpenZeppelin Upgradeable v5.0.2 with `Initializable` + `ReentrancyGuardUpgradeable`.
 
 ---
 
@@ -295,7 +329,7 @@ loar/
 │   ├── server/          # Hono + tRPC API (25+ routers, 150+ procedures)
 │   ├── indexer/         # Ponder v0.15 blockchain indexer (37+ tables)
 │   ├── mobile/          # Expo 52 / React Native (iOS + Android)
-│   └── contracts/       # Foundry/Solidity (8 core contracts, Sepolia + Base Sepolia)
+│   └── contracts/       # Foundry/Solidity (20+ contracts, upgradeable, Sepolia)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs
 ├── docs/                # Product + technical documentation

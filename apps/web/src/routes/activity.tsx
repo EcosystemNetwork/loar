@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { trpc } from '../utils/trpc';
 
 export const Route = createFileRoute('/activity')({
@@ -28,14 +29,12 @@ const EVENT_ICONS: Record<string, string> = {
 function ActivityPage() {
   const [tab, setTab] = useState<'following' | 'global'>('following');
 
-  const followingFeed = trpc.social.getActivityFeed.useQuery(
-    { limit: 30 },
-    { enabled: tab === 'following' }
+  const followingFeed = useQuery(
+    trpc.social.getActivityFeed.queryOptions({ limit: 30 }, { enabled: tab === 'following' })
   );
 
-  const globalFeed = trpc.social.getGlobalFeed.useQuery(
-    { limit: 30 },
-    { enabled: tab === 'global' }
+  const globalFeed = useQuery(
+    trpc.social.getGlobalFeed.queryOptions({ limit: 30 }, { enabled: tab === 'global' })
   );
 
   const feed = tab === 'following' ? followingFeed : globalFeed;

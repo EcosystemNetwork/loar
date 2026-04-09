@@ -1,5 +1,6 @@
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther } from 'viem';
+import { useMutation } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
 
 // PaymentRouter ABI (minimal for claim + claimable)
@@ -41,7 +42,7 @@ export function PendingClaimCard({
     hash: txHash,
   });
 
-  const recordClaim = trpc.revenue.recordClaim.useMutation();
+  const recordClaim = useMutation(trpc.revenue.recordClaim.mutationOptions());
 
   // Record claim after tx confirms
   const onClaimConfirmed = async () => {
