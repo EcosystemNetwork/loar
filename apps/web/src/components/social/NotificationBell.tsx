@@ -1,26 +1,30 @@
 import { useState } from 'react';
 import { Bell } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
-  const utils = trpc.useUtils();
+  const queryClient = useQueryClient();
 
-  const { data: unreadData } = trpc.social.getUnreadCount.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
-
-  const { data: notificationsData } = trpc.social.getNotifications.useQuery(
-    { limit: 10 },
-    { enabled: isOpen }
+  const { data: unreadData } = useQuery(
+    trpc.social.getUnreadCount.queryOptions(undefined, {
+      refetchInterval: 30_000,
+    })
   );
 
-  const markRead = trpc.social.markRead.useMutation({
-    onSuccess: () => {
-      utils.social.getUnreadCount.invalidate();
-      utils.social.getNotifications.invalidate();
-    },
-  });
+  const { data: notificationsData } = useQuery(
+    trpc.social.getNotifications.queryOptions({ limit: 10 }, { enabled: isOpen })
+  );
+
+  const markRead = useMutation(
+    trpc.social.markRead.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [['social', 'getUnreadCount']] });
+        queryClient.invalidateQueries({ queryKey: [['social', 'getNotifications']] });
+      },
+    })
+  );
 
   const unreadCount = unreadData?.count ?? 0;
 

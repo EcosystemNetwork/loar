@@ -35,7 +35,7 @@ export function WalletWrapper({ children }: WalletProviderProps) {
     >
       <WagmiProvider config={config}>
         <QueryClientProvider client={dynamicQueryClient}>
-          <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
+          <DynamicWagmiConnector>{children as any}</DynamicWagmiConnector>
         </QueryClientProvider>
       </WagmiProvider>
     </DynamicContextProvider>

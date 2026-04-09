@@ -43,8 +43,9 @@ export function ProposalList({
         return (
           <Link
             key={proposal.id}
-            to="/governance/$universeId/proposal/$proposalId"
-            params={{ universeId, proposalId: proposal.proposalId }}
+            to="/governance/$universeId"
+            params={{ universeId }}
+            hash={`proposal-${proposal.proposalId}`}
             className="block bg-zinc-900 rounded-xl p-5 hover:bg-zinc-900/80 transition-colors border border-zinc-800 hover:border-zinc-700"
           >
             <div className="flex items-start justify-between gap-4">

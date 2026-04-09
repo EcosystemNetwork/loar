@@ -170,7 +170,7 @@ export const revenueRouter = router({
         amountEth: z.number(),
         amountUsd: z.number().optional(),
         metadata: z
-          .record(z.string().max(200))
+          .record(z.string(), z.string().max(200))
           .optional()
           .refine((m) => !m || Object.keys(m).length <= 10, 'Max 10 metadata fields'),
       })

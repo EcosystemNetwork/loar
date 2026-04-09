@@ -253,18 +253,61 @@ pnpm start
 
 ## Contract Deployment
 
+Contracts are deployed on **Sepolia testnet** using upgradeable proxy patterns (UUPS + Beacon).
+
+### Revenue Infrastructure (Full Deploy)
+
 ```bash
 cd apps/contracts
-export RPC_11155111=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-export VERIFICATION_KEY_1=YOUR_ETHERSCAN_KEY
-forge script script/Deploy.s.sol --rpc-url $RPC_11155111 --broadcast --verify
+source ../../.env && export PRIVATE_KEY="0x$PRIVATE_KEY"
+
+# Deploy all revenue contracts (implementations + beacons + proxies + factory)
+forge script script/DeployRevenue.s.sol \
+  --rpc-url "$RPC_11155111" \
+  --broadcast \
+  --skip "script/Deploy{Protocol,Hook,Locker,Universe}*" \
+  --sender 0x116C28e6DCABCa363f83217C712d79DCE168d90e
 ```
 
-After deployment:
+This deploys 28 contracts:
 
-1. Update contract addresses in the codebase
-2. Run `pnpm exec wagmi generate` to regenerate hooks
-3. Update the indexer's `ponder.config.ts` with new addresses
+- 5 NFT implementations + 5 UpgradeableBeacons
+- 1 RevenueModuleFactory
+- 9 UUPS implementations + 9 ERC1967Proxies (initialized)
+
+Broadcast results are saved to `apps/contracts/broadcast/DeployRevenue.s.sol/11155111/run-latest.json`.
+
+### Core Protocol Deploy
+
+```bash
+forge script script/DeployProtocol.s.sol --rpc-url $RPC_11155111 --broadcast --verify
+```
+
+### After Any Deployment
+
+1. Update `apps/web/src/configs/addresses.ts` with new proxy addresses
+2. Run `cd ../.. && pnpm exec wagmi generate` to regenerate TypeScript hooks
+3. Update `apps/indexer/ponder.config.ts` if new factory or event sources were added
+
+### Upgrading Deployed Contracts
+
+**UUPS Singletons** (PaymentRouter, RightsRegistry, etc.):
+
+```bash
+# Deploy new implementation, then upgrade proxy
+forge create src/PaymentRouter.sol:PaymentRouter --rpc-url $RPC_11155111 --private-key $PRIVATE_KEY
+cast send <PROXY> "upgradeToAndCall(address,bytes)" <NEW_IMPL> 0x --rpc-url $RPC_11155111 --private-key $PRIVATE_KEY
+```
+
+**Beacon NFTs** (CharacterNFT, EpisodeNFT, etc.):
+
+```bash
+# Deploy new implementation, then upgrade beacon (all proxies update at once)
+forge create src/revenue/CharacterNFT.sol:CharacterNFT --rpc-url $RPC_11155111 --private-key $PRIVATE_KEY
+cast send <BEACON> "upgradeTo(address)" <NEW_IMPL> --rpc-url $RPC_11155111 --private-key $PRIVATE_KEY
+```
+
+See [contracts.md](./contracts.md) for the full address table and architecture details.
 
 ## Environment Injection Per Platform
 
