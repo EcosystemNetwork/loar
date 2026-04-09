@@ -35,7 +35,7 @@ const ZERO_ADDR = '0x0000000000000000000000000000000000000000' as `0x${string}`;
 export const EVM_ADDRESSES: Record<SupportedEvmChainId, EvmAddresses> = {
   11155111: {
     universeManager: '0x7af142BbD14CaEECdA68f948F467Da0257f6B114',
-    loarToken: ZERO_ADDR,
+    loarToken: '0x0A647b3b7426Bce958e7C2FE59f0a89191952C17',
     paymentRouter: '0xD8b49c99aDb51575eea4FB795645fc9e1ce4Fa9C',
     creditManager: '0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240',
     rightsRegistry: '0x711eC315392f6f9FFd37e673B35acc63b9999323',

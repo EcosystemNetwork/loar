@@ -27,4 +27,5 @@ if (missing.length > 0) {
 
 export const env = {
   PONDER_RPC_URL: process.env.PONDER_RPC_URL_2 as string,
+  PONDER_RPC_FALLBACKS: (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean),
 } as const;
