@@ -10,19 +10,13 @@
  *   contentAuditLog/{autoId}  — immutable audit trail (no updates/deletes)
  */
 import { z } from 'zod';
-import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 
 const flagsCol = () => (firebaseAvailable ? db.collection('flags') : null);
 const takedownCol = () => (firebaseAvailable ? db.collection('takedownRequests') : null);
 const auditCol = () => (firebaseAvailable ? db.collection('contentAuditLog') : null);
 const contentCol = () => (firebaseAvailable ? db.collection('content') : null);
-
-function requireAdmin(callerUid: string) {
-  const adminWallet = (process.env.ADMIN_WALLET ?? '').toLowerCase();
-  if (!adminWallet) throw new Error('ADMIN_WALLET not set');
-  if (callerUid.toLowerCase() !== adminWallet) throw new Error('Admin only');
-}
 
 // ── Router ────────────────────────────────────────────────────────────────
 
@@ -144,7 +138,7 @@ export const moderationRouter = router({
     }),
 
   // ── Admin: review queue ───────────────────────────────────────
-  reviewQueue: protectedProcedure
+  reviewQueue: adminProcedure
     .input(
       z.object({
         type: z.enum(['flags', 'takedowns']).default('flags'),
@@ -152,9 +146,7 @@ export const moderationRouter = router({
         limit: z.number().min(1).max(100).default(50),
       })
     )
-    .query(async ({ ctx, input }) => {
-      requireAdmin(ctx.user.uid);
-
+    .query(async ({ input }) => {
       if (input.type === 'takedowns') {
         const col = takedownCol();
         if (!col) return [];
@@ -177,7 +169,7 @@ export const moderationRouter = router({
     }),
 
   // ── Admin: update content status ──────────────────────────────
-  updateContentStatus: protectedProcedure
+  updateContentStatus: adminProcedure
     .input(
       z.object({
         contentId: z.string(),
@@ -186,8 +178,6 @@ export const moderationRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      requireAdmin(ctx.user.uid);
-
       const now = new Date();
       const cCol = contentCol();
       if (cCol) {
@@ -226,7 +216,7 @@ export const moderationRouter = router({
     }),
 
   // ── Admin: resolve takedown ───────────────────────────────────
-  resolveTakedown: protectedProcedure
+  resolveTakedown: adminProcedure
     .input(
       z.object({
         takedownId: z.string(),
@@ -235,8 +225,6 @@ export const moderationRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      requireAdmin(ctx.user.uid);
-
       const col = takedownCol();
       if (!col) throw new Error('Not available');
 
@@ -263,15 +251,14 @@ export const moderationRouter = router({
     }),
 
   // ── Admin: audit log ──────────────────────────────────────────
-  auditLog: protectedProcedure
+  auditLog: adminProcedure
     .input(
       z.object({
         contentId: z.string().optional(),
         limit: z.number().min(1).max(200).default(100),
       })
     )
-    .query(async ({ ctx, input }) => {
-      requireAdmin(ctx.user.uid);
+    .query(async ({ input }) => {
       const col = auditCol();
       if (!col) return [];
 

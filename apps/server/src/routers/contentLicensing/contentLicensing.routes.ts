@@ -44,6 +44,16 @@ export const contentLicensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify content is not fan-classified (non-commercial content cannot be licensed)
+      const contentDoc = await db.collection('content').doc(input.contentId).get();
+      if (contentDoc.exists && contentDoc.data()?.classification === 'fan') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Non-commercial (fan) content cannot be registered for licensing. Change content classification to "original" or "licensed" first.',
+        });
+      }
+
       const entityHash = computeEntityHash(input.contentId);
 
       const registration = {

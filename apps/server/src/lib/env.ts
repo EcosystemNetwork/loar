@@ -12,7 +12,8 @@ const envSchema = z.object({
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   SIWE_JWT_SECRET: z.string().min(32, 'SIWE_JWT_SECRET must be at least 32 characters'),
-  CORS_ORIGIN: z.string().url('CORS_ORIGIN must be a valid URL').optional(),
+  /** Single URL or comma-separated list (e.g. "https://loar.fun,https://staging.loar.fun") */
+  CORS_ORIGIN: z.string().optional(),
 
   // ── Firebase ──────────────────────────────────────────────────────────────
   // At least one credential source required in production

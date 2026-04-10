@@ -369,6 +369,8 @@ export const creditsRouter = router({
         /** For card: Stripe payment intent ID. For ETH/crypto: tx hash */
         paymentRef: z.string(),
         amountPaid: z.string().optional(), // wei for ETH, USD cents for card
+        /** Chain ID for on-chain payment verification (required for eth/crypto) */
+        chainId: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -382,7 +384,7 @@ export const creditsRouter = router({
         if (!pkg.ethPriceWei || pkg.ethPriceWei === '0') {
           throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
         }
-        await verifyEthPayment(input.paymentRef, undefined, pkg.ethPriceWei);
+        await verifyEthPayment(input.paymentRef, input.chainId, pkg.ethPriceWei);
       } else {
         // card: Verify Stripe PaymentIntent succeeded with correct package and amount
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
@@ -393,7 +395,8 @@ export const creditsRouter = router({
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
       // Atomic: dedup + balance update + tx record in one Firestore transaction
-      const txDocId = `fiat-${input.paymentRef}`;
+      const chainTag = input.chainId ?? 'default';
+      const txDocId = `fiat-${chainTag}-${input.paymentRef}`;
       await db.runTransaction(async (tx) => {
         const dedupRef = creditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);
@@ -455,6 +458,8 @@ export const creditsRouter = router({
         packageId: z.string(),
         txHash: z.string(),
         loarAmount: z.string(), // $LOAR tokens transferred (wei units)
+        /** Chain ID for on-chain payment verification */
+        chainId: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -464,14 +469,15 @@ export const creditsRouter = router({
 
       // Verify the on-chain transfer before issuing any credits
       const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
-      await verifyLoarPayment(input.txHash, expectedWei);
+      await verifyLoarPayment(input.txHash, expectedWei, input.chainId);
 
       // $LOAR buyers get: base credits + package bonus + 10% LOAR bonus
       const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;
       const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
 
       // Atomic: dedup + balance update + tx record
-      const txDocId = `loar-${input.txHash}`;
+      const chainTag = input.chainId ?? 'default';
+      const txDocId = `loar-${chainTag}-${input.txHash}`;
       await db.runTransaction(async (tx) => {
         const dedupRef = creditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);

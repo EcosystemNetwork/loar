@@ -66,7 +66,7 @@ class RedisStore implements RateLimitStore {
   private async init(redisUrl: string) {
     try {
       // Dynamic import — ioredis is an optional dependency
-      // @ts-expect-error ioredis is an optional peer dep, not always installed
+      // @ts-ignore ioredis is an optional peer dep, not always installed
       const Redis = (await import('ioredis')).default;
       this.client = new Redis(redisUrl, {
         maxRetriesPerRequest: 1,
@@ -168,6 +168,39 @@ export function rateLimiter(opts: { windowMs: number; max: number }) {
     if (result.blocked) {
       c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
       return c.json({ error: 'Too many requests' }, 429);
+    }
+
+    await next();
+  };
+}
+
+/**
+ * Stricter rate limiter for expensive endpoints (AI generation).
+ * Uses a composite key of IP + tRPC procedure path for per-endpoint limits.
+ */
+export function aiRateLimiter(opts: { windowMs: number; max: number }) {
+  return async (c: Context, next: Next) => {
+    const ip = getClientKey(c);
+    // Extract tRPC procedure name from the URL path (e.g. /trpc/generation.generate)
+    const procedurePath = c.req.path.replace('/trpc/', '');
+    const key = `ai:${ip}:${procedurePath}`;
+    const result = await getStore().consume(key, opts.windowMs, opts.max);
+
+    c.header('X-RateLimit-Limit', String(opts.max));
+    c.header('X-RateLimit-Remaining', String(result.remaining));
+
+    if (result.blocked) {
+      c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
+      return c.json(
+        {
+          error: {
+            message: 'AI generation rate limit exceeded. Please wait before trying again.',
+            code: -32029,
+            data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
+          },
+        },
+        429
+      );
     }
 
     await next();

@@ -23,7 +23,7 @@ import { imageRouter } from './routes/image';
 import { authRoutes } from './routes/auth';
 import { verifyAuth } from './lib/auth';
 import { securityHeaders } from './middleware/security-headers';
-import { rateLimiter } from './middleware/rate-limit';
+import { rateLimiter, aiRateLimiter } from './middleware/rate-limit';
 import { errorHandler } from './middleware/error-handler';
 
 const app = new Hono();
@@ -39,10 +39,19 @@ app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 
 app.use(logger());
 
+// Support comma-separated CORS origins (e.g. "https://loar.fun,https://staging.loar.fun")
+const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:3001')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   '/*',
   cors({
-    origin: env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: (origin) => {
+      if (!origin) return allowedOrigins[0]; // non-browser requests
+      return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -177,6 +186,12 @@ app.post('/api/upload', async (c) => {
     );
   }
 });
+
+// Stricter rate limits for AI generation endpoints: 10 requests/min per IP per endpoint
+app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 
 app.use(
   '/trpc/*',
