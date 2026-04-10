@@ -165,6 +165,40 @@ export const universesRouter = router({
         threshold: safeInfo?.threshold ?? 0,
       };
     }),
+
+  /** Update the access model for a universe (admin only). */
+  updateAccessModel: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        accessModel: z.enum(['open', 'subscription', 'token_gate', 'both']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can update access settings');
+      }
+
+      await db.collection('cinematicUniverses').doc(universeId).update({
+        accessModel: input.accessModel,
+        updated_at: new Date(),
+      });
+
+      return { ok: true, accessModel: input.accessModel };
+    }),
+
+  /** Get the access model for a universe (public). */
+  getAccessModel: publicProcedure
+    .input(z.object({ universeId: z.string() }))
+    .query(async ({ input }) => {
+      const doc = await db
+        .collection('cinematicUniverses')
+        .doc(input.universeId.toLowerCase())
+        .get();
+      if (!doc.exists) return { accessModel: 'open' };
+      return { accessModel: doc.data()?.accessModel || 'open' };
+    }),
 });
 
 export type UniversesRouter = typeof universesRouter;

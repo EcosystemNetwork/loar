@@ -95,6 +95,19 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
   ]);
   const [saving, setSaving] = useState(false);
 
+  // Load existing access model
+  const { data: currentAccessModel } = useQuery({
+    queryKey: ['access-model', universeId],
+    queryFn: () => trpcClient.universes.getAccessModel.query({ universeId }),
+  });
+
+  // Sync state when data loads
+  useState(() => {
+    if (currentAccessModel?.accessModel) {
+      setAccessModel(currentAccessModel.accessModel as AccessModel);
+    }
+  });
+
   const { data: existingTiers } = useQuery({
     queryKey: ['subscription-tiers', universeId],
     queryFn: () => trpcClient.subscriptions.getTiers.query({ universeId }),
@@ -113,6 +126,12 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Save the access model choice
+      await trpcClient.universes.updateAccessModel.mutate({
+        universeId,
+        accessModel,
+      });
+
       if (accessModel === 'subscription' || accessModel === 'both') {
         for (const tier of tiers) {
           await configureTierMutation.mutateAsync({
