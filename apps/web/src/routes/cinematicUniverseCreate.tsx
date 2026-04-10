@@ -9,13 +9,9 @@
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import {
-  useAccount,
-  useBalance,
-  useChainId,
-  useSwitchChain,
-  useWaitForTransactionReceipt,
-} from 'wagmi';
+import { useAccount, useBalance, useChainId, useWaitForTransactionReceipt } from 'wagmi';
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import { useSwitchNetwork } from '@dynamic-labs/sdk-react-core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,7 +64,8 @@ function CinematicUniverseCreate() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
-  const { switchChain } = useSwitchChain();
+  const { primaryWallet } = useDynamicContext();
+  const switchNetwork = useSwitchNetwork();
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -147,16 +144,19 @@ function CinematicUniverseCreate() {
   const defaultConfig = useDefaultDeploymentConfig();
   const { isSuccess: txSuccess, data: txReceipt } = useWaitForTransactionReceipt({ hash });
 
-  // Auto-switch to Sepolia if on wrong network
+  // Auto-switch to supported chain if on wrong network
   useEffect(() => {
-    if (isConnected && !isSupportedChain(chainId)) {
-      switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
+    if (isConnected && !isSupportedChain(chainId) && primaryWallet) {
+      switchNetwork({ wallet: primaryWallet, network: SUPPORTED_CHAIN_IDS[0] }).catch((err) =>
+        console.error('Auto network switch failed:', err)
+      );
     }
-  }, [isConnected, chainId, switchChain]);
+  }, [isConnected, chainId, primaryWallet, switchNetwork]);
 
   const handleSwitchNetwork = async () => {
+    if (!primaryWallet) return;
     try {
-      await switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
+      await switchNetwork({ wallet: primaryWallet, network: SUPPORTED_CHAIN_IDS[0] });
     } catch (error) {
       console.error('Failed to switch network:', error);
     }
