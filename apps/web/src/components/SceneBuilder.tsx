@@ -136,8 +136,34 @@ export function SceneBuilder({
   };
 
   const handleDownload = async () => {
-    // TODO: Implement video concatenation and download
-    console.log('Downloading scene with segments:', segments);
+    if (segments.length === 0) return;
+
+    if (segments.length === 1) {
+      const seg = segments[0];
+      if (seg.videoUrl) {
+        const a = document.createElement('a');
+        a.href = seg.videoUrl;
+        a.download = `scene-clip-0.mp4`;
+        a.click();
+      }
+      return;
+    }
+
+    // Multiple clips — download as M3U playlist
+    const playlist = ['#EXTM3U'];
+    segments.forEach((seg, i) => {
+      if (seg.videoUrl) {
+        playlist.push(`#EXTINF:${seg.duration || 5},Clip ${i + 1}`);
+        playlist.push(seg.videoUrl);
+      }
+    });
+    const blob = new Blob([playlist.join('\n')], { type: 'audio/x-mpegurl' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scene-playlist.m3u';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const formatTime = (seconds: number) => {
@@ -278,7 +304,10 @@ export function SceneBuilder({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      /* TODO: Implement arrange */
+                      // Reverse segment order (toggle between original and reversed)
+                      setSegments(
+                        [...segments].reverse().map((seg, idx) => ({ ...seg, order: idx }))
+                      );
                     }}
                     className="h-9 gap-2"
                   >

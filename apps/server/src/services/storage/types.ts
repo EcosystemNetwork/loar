@@ -93,12 +93,43 @@ export function sha256ToBytes32(hex: string): `0x${string}` {
   return `0x${hex}` as `0x${string}`;
 }
 
-/** Fetch a URL into a Buffer with timeout + size limits. */
+/** Blocked URL patterns for SSRF prevention. */
+const SSRF_BLOCKED_PATTERNS = [
+  /^https?:\/\/localhost/i,
+  /^https?:\/\/127\./,
+  /^https?:\/\/0\./,
+  /^https?:\/\/10\./,
+  /^https?:\/\/172\.(1[6-9]|2\d|3[01])\./,
+  /^https?:\/\/192\.168\./,
+  /^https?:\/\/169\.254\./, // AWS/cloud metadata
+  /^https?:\/\/\[::1\]/, // IPv6 loopback
+  /^https?:\/\/\[fc/i, // IPv6 private
+  /^https?:\/\/\[fd/i, // IPv6 private
+  /^https?:\/\/\[fe80:/i, // IPv6 link-local
+  /^file:/i,
+  /^ftp:/i,
+  /^gopher:/i,
+];
+
+function validateUrlForSsrf(url: string): void {
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    throw new Error('Only HTTP(S) URLs are allowed');
+  }
+  for (const pattern of SSRF_BLOCKED_PATTERNS) {
+    if (pattern.test(url)) {
+      throw new Error('URL targets a blocked address range');
+    }
+  }
+}
+
+/** Fetch a URL into a Buffer with timeout + size limits. Validates against SSRF. */
 export async function fetchToBuffer(
   url: string,
   timeoutMs = 30_000,
   maxBytes = 200 * 1024 * 1024
 ): Promise<{ buffer: Buffer; contentType: string }> {
+  validateUrlForSsrf(url);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -107,6 +138,7 @@ export async function fetchToBuffer(
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; LOARStorage/1.0)',
       },
+      redirect: 'error', // Prevent redirect-based SSRF bypass
       signal: controller.signal,
     });
 

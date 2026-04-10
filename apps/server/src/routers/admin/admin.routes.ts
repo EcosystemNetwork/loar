@@ -7,7 +7,7 @@
  * Auth: ADMIN_WALLET env var defines the authorised admin wallet address.
  * Any authenticated user whose address matches ADMIN_WALLET can call these.
  */
-import { protectedProcedure, router } from '../../lib/trpc';
+import { adminProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import {
@@ -24,16 +24,6 @@ const configAuditCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('platformConfigAudit');
 };
-
-// ── Admin guard ───────────────────────────────────────────────────────────
-
-function requireAdmin(callerUid: string) {
-  const adminWallet = (process.env.ADMIN_WALLET ?? '').toLowerCase();
-  if (!adminWallet) throw new Error('ADMIN_WALLET env var is not set');
-  if (callerUid.toLowerCase() !== adminWallet) {
-    throw new Error('Forbidden: admin access only');
-  }
-}
 
 // ── Config update schema — every field optional so admins can patch ───────
 
@@ -62,21 +52,17 @@ const configPatchSchema = z.object({
 export const adminRouter = router({
   // ── Read current config ───────────────────────────────────────────
 
-  getConfig: protectedProcedure.query(async ({ ctx }) => {
-    requireAdmin(ctx.user.uid);
+  getConfig: adminProcedure.query(async () => {
     return getPlatformConfig();
   }),
 
-  getConfigDefaults: protectedProcedure.query(async ({ ctx }) => {
-    requireAdmin(ctx.user.uid);
+  getConfigDefaults: adminProcedure.query(async () => {
     return DEFAULT_PLATFORM_CONFIG;
   }),
 
   // ── Patch individual fields ───────────────────────────────────────
 
-  updateConfig: protectedProcedure.input(configPatchSchema).mutation(async ({ input, ctx }) => {
-    requireAdmin(ctx.user.uid);
-
+  updateConfig: adminProcedure.input(configPatchSchema).mutation(async ({ input, ctx }) => {
     if (Object.keys(input).length === 0) throw new Error('No fields to update');
 
     const current = await getPlatformConfig();
@@ -99,9 +85,7 @@ export const adminRouter = router({
 
   // ── Reset to defaults ─────────────────────────────────────────────
 
-  resetConfig: protectedProcedure.mutation(async ({ ctx }) => {
-    requireAdmin(ctx.user.uid);
-
+  resetConfig: adminProcedure.mutation(async ({ ctx }) => {
     const current = await getPlatformConfig();
     const reset = { ...DEFAULT_PLATFORM_CONFIG, updatedAt: new Date(), updatedBy: ctx.user.uid };
 
@@ -122,11 +106,9 @@ export const adminRouter = router({
 
   // ── Audit history ─────────────────────────────────────────────────
 
-  getConfigAudit: protectedProcedure
+  getConfigAudit: adminProcedure
     .input(z.object({ limit: z.number().min(1).max(100).default(50) }))
-    .query(async ({ input, ctx }) => {
-      requireAdmin(ctx.user.uid);
-
+    .query(async ({ input }) => {
       const snapshot = await configAuditCol().orderBy('changedAt', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));

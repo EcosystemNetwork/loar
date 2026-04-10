@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSellerStats } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/sell/earnings')({
   component: SellerEarningsPage,
@@ -15,13 +16,16 @@ export const Route = createFileRoute('/sell/earnings')({
 
 function SellerEarningsPage() {
   const { isConnected } = useWalletAuth();
+  const v = useVocab();
   const { data: stats, isLoading } = useSellerStats();
 
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
         <p className="text-muted-foreground">Connect your wallet to view earnings</p>
-        <Link to="/login"><Button>Connect Wallet</Button></Link>
+        <Link to="/login">
+          <Button>{v('connect-wallet')}</Button>
+        </Link>
       </div>
     );
   }
@@ -50,7 +54,11 @@ function SellerEarningsPage() {
               <StatCard
                 icon={<Coins className="w-5 h-5 text-primary" />}
                 label="Total Earnings"
-                value={stats?.totalEarnings ? `${parseFloat(stats.totalEarnings).toFixed(4)} ETH` : '0 ETH'}
+                value={
+                  stats?.totalEarnings
+                    ? `${parseFloat(stats.totalEarnings).toFixed(4)} ETH`
+                    : '0 ETH'
+                }
               />
               <StatCard
                 icon={<TrendingUp className="w-5 h-5 text-green-500" />}
@@ -79,11 +87,15 @@ function SellerEarningsPage() {
                   <p className="text-sm text-muted-foreground text-center py-4">No sales yet</p>
                 ) : (
                   <div className="space-y-3">
-                    {(stats?.recentOrders as any[] ?? []).map((order: any) => (
+                    {((stats?.recentOrders as any[]) ?? []).map((order: any) => (
                       <div key={order.id} className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                           {order.thumbnailUrl ? (
-                            <img src={order.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                            <img
+                              src={order.thumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <Package className="w-4 h-4 text-muted-foreground opacity-30" />
                           )}

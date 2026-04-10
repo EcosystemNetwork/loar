@@ -7,6 +7,8 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
+import {IUniverse} from "../interfaces/IUniverse.sol";
 
 /// @title CollabManager
 /// @notice Manages cross-universe collaborations ("collisions").
@@ -38,6 +40,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     address public platform;
     IPaymentRouter public paymentRouter;
+    IUniverseManager public universeManager;
     uint16 public platformFeeBps;
 
     event CollabProposed(uint256 indexed collabId, uint256 universeA, uint256 universeB, address proposer);
@@ -68,14 +71,17 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
-    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps) external initializer {
+    error NotUniverseBAdmin();
+
+    function initialize(address _platform, address _paymentRouter, address _universeManager, uint16 _platformFeeBps) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platform == address(0) || _paymentRouter == address(0) || _universeManager == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
+        universeManager = IUniverseManager(_universeManager);
         platformFeeBps = _platformFeeBps;
     }
 
@@ -114,10 +120,14 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         emit CollabProposed(collabId, universeA, universeB, msg.sender);
     }
 
-    /// @notice Accept a collaboration proposal
+    /// @notice Accept a collaboration proposal (only admin of universe B)
     function acceptCollab(uint256 collabId) external {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.PROPOSED) revert InvalidStatus();
+
+        // Verify msg.sender is the admin/creator of universe B
+        (IUniverse universeB,,,,) = universeManager.getUniverseData(c.universeB);
+        if (universeB.getAdmin() != msg.sender) revert NotUniverseBAdmin();
 
         c.acceptor = msg.sender;
         c.status = CollabStatus.ACCEPTED;

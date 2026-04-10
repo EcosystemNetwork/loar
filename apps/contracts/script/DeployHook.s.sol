@@ -114,7 +114,7 @@ contract DeployHookScript is Script {
         // Register hook with UniverseManager if requested
         if (registerHook) {
             console.log("\nRegistering hook with UniverseManager...");
-            UniverseManager(universeManager).setHook(address(hook), true);
+            UniverseManager(payable(universeManager)).setHook(address(hook), true);
             console.log("Hook registered successfully");
         }
 

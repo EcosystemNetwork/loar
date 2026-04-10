@@ -12,7 +12,8 @@ const envSchema = z.object({
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   SIWE_JWT_SECRET: z.string().min(32, 'SIWE_JWT_SECRET must be at least 32 characters'),
-  CORS_ORIGIN: z.string().url('CORS_ORIGIN must be a valid URL').optional(),
+  /** Single URL or comma-separated list (e.g. "https://loar.fun,https://staging.loar.fun") */
+  CORS_ORIGIN: z.string().optional(),
 
   // ── Firebase ──────────────────────────────────────────────────────────────
   // At least one credential source required in production
@@ -46,6 +47,13 @@ const envSchema = z.object({
     .regex(/^0x[0-9a-fA-F]{40}$/, 'TREASURY_ADDRESS must be a valid Ethereum address')
     .optional(),
 
+  // ── Redis (optional — enables distributed rate limiting) ──────────────────
+  REDIS_URL: z.string().url('REDIS_URL must be a valid URL (redis://...)').optional(),
+
+  // ── Stripe (optional — enables card payments) ────────────────────────────
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
   // ── Platform config ───────────────────────────────────────────────────────
   UNIVERSE_MINT_CREDITS: z
     .string()
@@ -69,10 +77,6 @@ const envSchema = z.object({
   // ── Storage — Storacha ────────────────────────────────────────────────────
   STORACHA_KEY: z.string().optional(),
   STORACHA_PROOF: z.string().optional(),
-
-  // ── Storage — legacy Walrus (deprecated) ──────────────────────────────────
-  WALRUS_PUBLISHER_URL: z.string().url('WALRUS_PUBLISHER_URL must be a valid URL').optional(),
-  WALRUS_AGGREGATOR_URL: z.string().url('WALRUS_AGGREGATOR_URL must be a valid URL').optional(),
 
   // ── Storage — priority ────────────────────────────────────────────────────
   STORAGE_PROVIDER_PRIORITY: z

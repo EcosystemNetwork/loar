@@ -58,6 +58,7 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
     error ContentNotMonetizable();
     error NotPlatform();
     error FeeTooHigh();
+    error RefundFailed();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -126,10 +127,19 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
         ed.minted += amount;
         _mint(msg.sender, editionId, amount, "");
 
-        // Route payment through PaymentRouter
-        paymentRouter.route{value: msg.value}(ed.creator, platformFeeBps);
+        // Route only totalPrice through PaymentRouter
+        if (totalPrice > 0) {
+            paymentRouter.route{value: totalPrice}(ed.creator, platformFeeBps);
+        }
 
-        emit EditionMinted(editionId, msg.sender, amount, msg.value);
+        // Refund excess ETH to buyer
+        uint256 excess = msg.value - totalPrice;
+        if (excess > 0) {
+            (bool refunded,) = msg.sender.call{value: excess}("");
+            if (!refunded) revert RefundFailed();
+        }
+
+        emit EditionMinted(editionId, msg.sender, amount, totalPrice);
     }
 
     /// @notice Deactivate an edition (creator or platform)

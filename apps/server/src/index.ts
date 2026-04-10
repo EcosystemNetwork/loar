@@ -23,7 +23,7 @@ import { imageRouter } from './routes/image';
 import { authRoutes } from './routes/auth';
 import { verifyAuth } from './lib/auth';
 import { securityHeaders } from './middleware/security-headers';
-import { rateLimiter } from './middleware/rate-limit';
+import { rateLimiter, aiRateLimiter } from './middleware/rate-limit';
 import { errorHandler } from './middleware/error-handler';
 
 const app = new Hono();
@@ -39,92 +39,34 @@ app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 
 app.use(logger());
 
+// Support comma-separated CORS origins (e.g. "https://loar.fun,https://staging.loar.fun")
+const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:3001')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   '/*',
   cors({
-    origin: env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: (origin) => {
+      if (!origin) return allowedOrigins[0]; // non-browser requests
+      return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
 );
 
+// Stripe webhook (must be before body-parsing middleware — needs raw body)
+const { stripeWebhookRoutes } = await import('./routes/stripe-webhook');
+app.route('/api/stripe', stripeWebhookRoutes);
+
 // SIWE authentication routes
 app.route('/auth', authRoutes);
 
 // Add image serving routes
 app.route('/images', imageRouter);
-
-// Add Filecoin content serving route
-app.get('/api/filecoin/:pieceCid', async (c) => {
-  // Require authentication
-  const user = await verifyAuth(c.req.raw.headers);
-  if (!user) {
-    return c.json({ code: 'UNAUTHORIZED', message: 'Authentication required' }, 401);
-  }
-
-  let downloadTimeout: NodeJS.Timeout | undefined;
-
-  try {
-    const pieceCid = c.req.param('pieceCid');
-
-    if (!pieceCid || pieceCid.length < 10) {
-      return c.json({ code: 'BAD_REQUEST', message: 'Invalid PieceCID format' }, 400);
-    }
-
-    const { getSynapseService } = await import('./services/synapse');
-    const service = await getSynapseService();
-
-    const downloadPromise = service.download(pieceCid).then((data) => {
-      return data as Uint8Array;
-    });
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      downloadTimeout = setTimeout(() => {
-        reject(new Error('Download timeout after 2 minutes'));
-      }, 120000);
-    });
-
-    const data = await Promise.race([downloadPromise, timeoutPromise]);
-
-    if (downloadTimeout) {
-      clearTimeout(downloadTimeout);
-    }
-
-    if (data.length > 50 * 1024 * 1024) {
-      return c.json(
-        {
-          code: 'PAYLOAD_TOO_LARGE',
-          message: `File too large: ${Math.round(data.length / 1024 / 1024)}MB (max 50MB)`,
-        },
-        413
-      );
-    }
-
-    return new Response(Buffer.from(data), {
-      headers: {
-        'Content-Type': 'video/mp4',
-        'Cache-Control': 'public, max-age=31536000',
-        'Accept-Ranges': 'bytes',
-        'Content-Length': data.length.toString(),
-      },
-    });
-  } catch (error) {
-    if (downloadTimeout) {
-      clearTimeout(downloadTimeout);
-    }
-
-    console.error(`Error serving Filecoin content for ${c.req.param('pieceCid')}:`, error);
-
-    return c.json(
-      {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to retrieve content',
-      },
-      500
-    );
-  }
-});
 
 // Direct file upload endpoint (multipart form, bypasses tRPC for large files)
 app.post('/api/upload', async (c) => {
@@ -244,6 +186,12 @@ app.post('/api/upload', async (c) => {
     );
   }
 });
+
+// Stricter rate limits for AI generation endpoints: 10 requests/min per IP per endpoint
+app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 
 app.use(
   '/trpc/*',

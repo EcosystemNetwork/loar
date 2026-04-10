@@ -11,15 +11,17 @@ graph TD
     subgraph Backend
         SERVER[API Server<br/>Hono + tRPC<br/>:3000]
         INDEXER[Blockchain Indexer<br/>Ponder v0.15<br/>:42069]
+        MCP[MCP Server<br/>AI Agent Gateway<br/>stdio]
     end
 
     subgraph External Services
-        FIREBASE[(Firebase<br/>Firestore + Auth)]
-        FAL[Fal AI<br/>Video Generation]
+        FIREBASE[(Firebase<br/>Firestore Only)]
+        FAL[Fal AI<br/>Video/Image Generation]
         GEMINI[Google Gemini<br/>Wiki Generation]
         OPENAI[OpenAI<br/>Storyline Generation]
-        SYNAPSE[Synapse/Filecoin<br/>Decentralized Storage]
-        FB_STORAGE[Firebase Storage<br/>File Storage]
+        PINATA[Pinata<br/>Hot Storage]
+        LIGHTHOUSE[Lighthouse<br/>Filecoin/IPFS]
+        STORACHA[Storacha<br/>Archive Storage]
     end
 
     subgraph Blockchain
@@ -34,11 +36,27 @@ graph TD
     SERVER --> FAL
     SERVER --> GEMINI
     SERVER --> OPENAI
-    SERVER --> SYNAPSE
-    SERVER --> FB_STORAGE
+    SERVER --> PINATA
+    SERVER --> LIGHTHOUSE
+    SERVER --> STORACHA
 
     INDEXER -->|RPC polling| SEPOLIA
+
+    MCP -->|X-API-Key| SERVER
 ```
+
+### Agent Systems
+
+LOAR supports two agent systems with programmatic access:
+
+| System                 | Type       | Description                                           |
+| ---------------------- | ---------- | ----------------------------------------------------- |
+| **Talent Agents**      | Human      | Represent creators, broker deals, earn commissions    |
+| **AI Agent Pipelines** | Autonomous | Multi-step content creation and universe management   |
+| **API Keys**           | Auth       | Programmatic access via `X-API-Key` header            |
+| **MCP Server**         | Gateway    | Exposes LOAR as 20 tools for MCP-compatible AI agents |
+
+See [docs/agents.md](agents.md) for full documentation.
 
 ## Authentication Flow
 
@@ -46,21 +64,24 @@ graph TD
 sequenceDiagram
     participant User
     participant Web as Web App
-    participant Firebase as Firebase Auth
+    participant Wallet as CDP Embedded Wallet
     participant Server as API Server
 
-    User->>Web: Sign in (email/password)
-    Web->>Firebase: signInWithEmailAndPassword()
-    Firebase-->>Web: UserCredential
-    Web->>Web: onAuthStateChanged() stores user state
+    User->>Web: Sign in (Google/Apple/passkeys/email)
+    Web->>Wallet: Connect via CDP Embedded Wallet
+    Wallet-->>Web: Wallet address (0x...)
+    Web->>Wallet: Sign SIWE message
+    Wallet-->>Web: Signature
+
+    Web->>Server: POST /auth/verify { message, signature }
+    Server->>Server: Verify SIWE signature, issue JWT
+    Server-->>Web: { token (JWT), address, chain: "evm" }
+    Web->>Web: Store token in localStorage
 
     Note over Web,Server: On each tRPC request:
-    Web->>Firebase: currentUser.getIdToken()
-    Firebase-->>Web: ID Token (JWT)
-    Web->>Server: tRPC request + Authorization: Bearer <token>
-    Server->>Firebase: adminAuth.verifyIdToken(token)
-    Firebase-->>Server: DecodedIdToken { uid, email, ... }
-    Server->>Server: ctx.user = DecodedIdToken
+    Web->>Server: tRPC request + Authorization: Bearer <session-token>
+    Server->>Server: verifySessionToken(token) → { sub: address }
+    Server->>Server: ctx.user = { uid: address, address }
     Server-->>Web: Response
 ```
 
@@ -68,18 +89,20 @@ sequenceDiagram
 
 | File                              | Role                                                    |
 | --------------------------------- | ------------------------------------------------------- |
-| `apps/web/src/lib/firebase.ts`    | Firebase client SDK initialization                      |
-| `apps/web/src/lib/auth-client.ts` | `useAuth()` hook, `signIn()`, `signUp()`, `signOut()`   |
+| `apps/web/src/lib/wallet-auth.ts` | `useWalletAuth()` hook — SIWE sign-in/sign-out          |
 | `apps/web/src/utils/trpc.ts`      | Attaches Bearer token to tRPC requests                  |
-| `apps/server/src/lib/firebase.ts` | Firebase Admin SDK init (exports `db`, `adminAuth`)     |
-| `apps/server/src/lib/auth.ts`     | `verifyAuth()` — extracts and verifies Bearer token     |
+| `apps/server/src/lib/siwe.ts`     | SIWE message verification, JWT signing/verification     |
+| `apps/server/src/lib/auth.ts`     | `verifyAuth()` — supports SIWE JWT + API key auth       |
+| `apps/server/src/lib/apiKeys.ts`  | API key generation, verification, rate limiting         |
 | `apps/server/src/lib/context.ts`  | `createContext()` — sets `ctx.user` from verified token |
+| `apps/server/src/lib/firebase.ts` | Firebase Admin SDK init (exports `db` — Firestore only) |
 | `apps/server/src/lib/trpc.ts`     | Defines `publicProcedure` and `protectedProcedure`      |
 
 ### Access Control
 
-- **`publicProcedure`** — No authentication required. Used for read-only queries (characters, health check).
-- **`protectedProcedure`** — Requires valid Firebase ID token. Rejects with UNAUTHORIZED if `ctx.user` is null. Used for private data access.
+- **`publicProcedure`** — No authentication required. Used for read-only queries.
+- **`protectedProcedure`** — Requires SIWE JWT or valid API key. Rejects with UNAUTHORIZED if `ctx.user` is null.
+- **API Key auth** — `X-API-Key: loar_...` header. Keys are SHA-256 hashed, rate-limited, and scoped with permissions. See `apps/server/src/lib/apiKeys.ts`.
 
 ## Server Architecture
 
@@ -146,27 +169,30 @@ _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved
 
 **Entry point:** `apps/web/src/main.tsx`
 
-| Layer         | Technology               | Purpose                                 |
-| ------------- | ------------------------ | --------------------------------------- |
-| Bundler       | Vite                     | Dev server (port 3001), build           |
-| Routing       | TanStack Router          | File-based routing (`src/routes/`)      |
-| Data Fetching | TanStack Query + tRPC    | Server state management                 |
-| Web3          | wagmi + RainbowKit       | Wallet connection, contract interaction |
-| Auth          | Firebase Auth            | Email/password authentication           |
-| UI            | Tailwind CSS + shadcn/ui | Component library                       |
-| Flow Editor   | ReactFlow                | Narrative node visualization            |
+| Layer         | Technology               | Purpose                                    |
+| ------------- | ------------------------ | ------------------------------------------ |
+| Bundler       | Vite                     | Dev server (port 3001), build              |
+| Routing       | TanStack Router          | File-based routing (`src/routes/`)         |
+| Data Fetching | TanStack Query + tRPC    | Server state management                    |
+| Web3          | wagmi + RainbowKit       | Wallet connection, contract interaction    |
+| Auth          | CDP Wallet + SIWE        | Wallet-based authentication (social login) |
+| UI            | Tailwind CSS + shadcn/ui | Component library                          |
+| Flow Editor   | ReactFlow                | Narrative node visualization               |
 
 ### Route Map
 
-| Route                      | Description                        |
-| -------------------------- | ---------------------------------- |
-| `/`                        | Home / landing page                |
-| `/login`                   | Authentication (sign in / sign up) |
-| `/dashboard`               | User dashboard                     |
-| `/market`                  | Token marketplace                  |
-| `/cinematicUniverseCreate` | Create new universe                |
-| `/universe/$id`            | Universe detail view               |
-| `/event.$universe.$event`  | Event detail within universe       |
+| Route                     | Description                     |
+| ------------------------- | ------------------------------- |
+| `/`                       | Home / landing page             |
+| `/login`                  | Authentication (wallet connect) |
+| `/dashboard`              | User dashboard                  |
+| `/market`                 | Token marketplace               |
+| `/create`                 | Create hub (universe, entities) |
+| `/create/$kind`           | Per-kind creation form          |
+| `/universe/$id`           | Universe detail view            |
+| `/wiki`                   | Worldbuilding encyclopedia      |
+| `/wiki/entity/$id`        | Entity detail page              |
+| `/event.$universe.$event` | Event detail within universe    |
 
 ### Environment Variable Loading
 

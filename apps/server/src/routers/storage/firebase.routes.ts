@@ -29,7 +29,7 @@ export const firebaseStorageRouter = router({
     }),
 
   /** Download a file from Firebase Storage (base64, max 5MB). */
-  download: publicProcedure.input(z.object({ key: z.string() })).query(async ({ input }) => {
+  download: protectedProcedure.input(z.object({ key: z.string() })).query(async ({ input }) => {
     try {
       const data = await firebaseStorageService.download(input.key);
 

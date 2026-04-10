@@ -65,6 +65,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // submissionId => voter => vote weight
     mapping(uint256 => mapping(address => uint256)) public voteWeight;
 
+    // submissionId => creator's portion held by contract after platform cut in submit()
+    mapping(uint256 => uint256) public creatorHeldAmount;
+
     // universeId => accepted submission IDs
     mapping(uint256 => uint256[]) public canonSubmissions;
 
@@ -166,6 +169,8 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
         // Platform takes cut of submission fee via PaymentRouter
         uint256 platformCut = (msg.value * platformFeeBps) / 10000;
+        uint256 held = msg.value - platformCut;
+        creatorHeldAmount[submissionId] = held;
         if (platformCut > 0) {
             paymentRouter.routeToTreasury{value: platformCut}();
         }
@@ -207,9 +212,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             sub.status = SubmissionStatus.ACCEPTED;
             canonSubmissions[sub.universeId].push(submissionId);
 
-            // Creator earns the remaining submission fee via PaymentRouter
-            uint256 platformCut = (sub.submissionFee * platformFeeBps) / 10000;
-            uint256 creatorReward = sub.submissionFee - platformCut;
+            // Creator earns the remaining submission fee (platform cut already taken in submit)
+            uint256 creatorReward = creatorHeldAmount[submissionId];
+            creatorHeldAmount[submissionId] = 0;
             if (creatorReward > 0) {
                 paymentRouter.route{value: creatorReward}(sub.creator, 0);
             }

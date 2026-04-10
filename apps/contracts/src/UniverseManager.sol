@@ -43,6 +43,9 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     /// @notice Per-universe credit fund balance (wei) waiting to be converted to credits by the platform.
     mapping(uint256 => uint256) public universeCreditFund;
 
+    /// @notice Total ETH held across all universe credit funds (must not be drained by claimEth).
+    uint256 public totalCreditFundsHeld;
+
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) public enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
@@ -70,14 +73,21 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         emit SetLpRecipient(old, _lpRecipient);
     }
 
-    /// @notice Claim ETH held in the contract (credit fund portions + any accumulated ETH).
-    ///         The platform server converts credited ETH to universe credit pools off-chain.
+    /// @notice Claim ETH held in the contract, excluding credit funds reserved for universes.
     function claimEth(address recipient) external onlyOwner {
         require(recipient != address(0), "Zero address");
         uint256 balance = address(this).balance;
-        require(balance > 0, "No ETH to claim");
-        (bool sent,) = recipient.call{value: balance}("");
+        uint256 claimable = balance - totalCreditFundsHeld;
+        require(claimable > 0, "No ETH to claim");
+        (bool sent,) = recipient.call{value: claimable}("");
         require(sent, "ETH claim failed");
+    }
+
+    /// @notice Consume credit funds for a universe (called by owner after off-chain credit conversion).
+    function consumeCreditFund(uint256 universeId, uint256 amount) external onlyOwner {
+        require(universeCreditFund[universeId] >= amount, "Exceeds credit fund");
+        universeCreditFund[universeId] -= amount;
+        totalCreditFundsHeld -= amount;
     }
 
     receive() external payable {}
@@ -90,6 +100,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
     ) public payable nonReentrant returns (uint256 _id, address) {
+        require(!deprecated, "Manager is deprecated");
         if (msg.value < MINT_FEE) revert InsufficientMintFee();
         if (lpRecipient == address(0)) revert LpRecipientNotSet();
 
@@ -127,6 +138,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint256 current_id = latestId;
         universeDatas[current_id] = data;
         universeCreditFund[current_id] = creditAmount;
+        totalCreditFundsHeld += creditAmount;
 
         latestId++;
 

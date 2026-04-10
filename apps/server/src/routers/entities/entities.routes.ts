@@ -22,7 +22,9 @@ import {
   deleteEntity,
   addNodeToEntity,
   removeNodeFromEntity,
+  assertMintEligible,
 } from './entities.handlers';
+import { geminiService } from '../../services/gemini';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
 
@@ -40,7 +42,11 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z.record(z.string(), z.unknown()).optional(),
+        metadata: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .optional(),
+        monetized: z.boolean().default(false),
+        rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -57,6 +63,8 @@ export const entitiesRouter = router({
           nodeIds: input.nodeIds,
           imageUrl: input.imageUrl ?? null,
           metadata: input.metadata,
+          monetized: input.monetized,
+          rightsDeclaration: input.rightsDeclaration ?? null,
         },
         ctx.user.address
       );
@@ -134,7 +142,7 @@ export const entitiesRouter = router({
       return { children, total: children.length };
     }),
 
-  /** Update an existing entity. */
+  /** Update an existing entity. Only the creator can update. */
   update: protectedProcedure
     .input(
       z.object({
@@ -146,10 +154,19 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z.record(z.string(), z.unknown()).optional(),
+        metadata: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .optional(),
+        monetized: z.boolean().optional(),
+        rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can update it');
+      }
       const { entityId, universeAddress: _unused, ...updates } = input;
       const entity = await updateEntity(entityId, {
         ...updates,
@@ -159,7 +176,7 @@ export const entitiesRouter = router({
       return { success: true, data: entity };
     }),
 
-  /** Delete an entity. Fails if it has children. */
+  /** Delete an entity. Only the creator can delete. Fails if it has children. */
   delete: protectedProcedure
     .input(
       z.object({
@@ -168,7 +185,12 @@ export const entitiesRouter = router({
         universeAddress: ethereumAddress.optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can delete it');
+      }
       await deleteEntity(input.entityId);
       return { success: true };
     }),
@@ -201,6 +223,37 @@ export const entitiesRouter = router({
     .mutation(async ({ input }) => {
       const entity = await removeNodeFromEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
+    }),
+  /** Check if an entity is eligible for NFT minting (monetized + rights declared). */
+  mintEligibility: publicProcedure
+    .input(z.object({ entityId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const entity = await getEntity(input.entityId);
+      if (!entity) throw new Error('Entity not found');
+      return {
+        eligible: entity.monetized && !!entity.rightsDeclaration,
+        monetized: entity.monetized,
+        rightsDeclaration: entity.rightsDeclaration,
+        reason: !entity.monetized
+          ? 'Entity is not marked as monetized'
+          : !entity.rightsDeclaration
+            ? 'No rights declaration on file'
+            : null,
+      };
+    }),
+
+  /** Generate an AI profile (description + metadata) for a new or existing entity. */
+  generateProfile: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        kind: entityKindSchema,
+        hint: z.string().max(1000).default(''),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const profile = await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
+      return profile;
     }),
 });
 

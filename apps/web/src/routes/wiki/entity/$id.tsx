@@ -5,13 +5,15 @@
  * Works for all creator kinds: person, place, thing, faction, event, lore, etc.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useAccount } from 'wagmi';
+import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 
@@ -90,6 +92,8 @@ const METADATA_LABELS: Record<string, string> = {
 function EntityPage() {
   const { id } = Route.useParams();
   const { address } = useAccount();
+  const queryClient = useQueryClient();
+  const [generating, setGenerating] = useState(false);
 
   const {
     data: entity,
@@ -126,6 +130,29 @@ function EntityPage() {
   const metadataEntries = Object.entries(entity.metadata ?? {}).filter(([, v]) => v);
   const isOwner = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
   const { data: mediaAttachments = [] } = useMediaAttachments('entity', id);
+
+  const handleGenerateBio = async () => {
+    setGenerating(true);
+    try {
+      const profile = await trpcClient.entities.generateProfile.mutate({
+        name: entity.name,
+        kind: entity.kind,
+        hint: entity.description || '',
+      });
+      // Update entity with generated profile
+      await trpcClient.entities.update.mutate({
+        entityId: id,
+        description: profile.description,
+        metadata: { ...(entity.metadata ?? {}), ...profile.metadata },
+      });
+      queryClient.invalidateQueries({ queryKey: ['entity', id] });
+      toast.success('AI bio generated and saved!');
+    } catch (err: any) {
+      toast.error(err.message ?? 'AI generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -187,8 +214,24 @@ function EntityPage() {
         {/* Right column — name, description, metadata fields */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
               <CardTitle className="text-2xl">{entity.name}</CardTitle>
+              {isOwner && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateBio}
+                  disabled={generating}
+                  className="shrink-0"
+                >
+                  {generating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  {generating ? 'Generating...' : 'Generate Bio'}
+                </Button>
+              )}
             </CardHeader>
             {entity.description && (
               <CardContent>

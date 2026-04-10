@@ -62,6 +62,7 @@ contract EntityEditionNFT is Initializable, ERC1155, ERC2981, ReentrancyGuardUpg
     error FeeTooHigh();
     error ContentNotMonetizable();
     error WrongUniverse();
+    error RefundFailed();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -136,11 +137,19 @@ contract EntityEditionNFT is Initializable, ERC1155, ERC2981, ReentrancyGuardUpg
         ed.minted += amount;
         _mint(msg.sender, editionId, amount, "");
 
-        if (msg.value > 0) {
-            paymentRouter.route{value: msg.value}(ed.creator, platformFeeBps);
+        // Route only totalPrice through PaymentRouter
+        if (totalPrice > 0) {
+            paymentRouter.route{value: totalPrice}(ed.creator, platformFeeBps);
         }
 
-        emit EditionMinted(editionId, msg.sender, amount, msg.value);
+        // Refund excess ETH to buyer
+        uint256 excess = msg.value - totalPrice;
+        if (excess > 0) {
+            (bool refunded,) = msg.sender.call{value: excess}("");
+            if (!refunded) revert RefundFailed();
+        }
+
+        emit EditionMinted(editionId, msg.sender, amount, totalPrice);
     }
 
     /// @notice Deactivate an edition — stops new mints, existing tokens unchanged

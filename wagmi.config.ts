@@ -13,16 +13,18 @@ import UniverseGovernor from './apps/contracts/out/UniverseGovernor.sol/Universe
 import LoarFeeLocker from './apps/contracts/out/LoarFeeLocker.sol/LoarFeeLocker.json';
 import LoarHookStaticFee from './apps/contracts/out/LoarHookStaticFee.sol/LoarHookStaticFee.json';
 
-// Revenue stream contracts (will be available after `forge build`)
-// import EpisodeNFT from './apps/contracts/out/EpisodeNFT.sol/EpisodeNFT.json';
-// import CharacterNFT from './apps/contracts/out/CharacterNFT.sol/CharacterNFT.json';
-// import CanonMarketplace from './apps/contracts/out/CanonMarketplace.sol/CanonMarketplace.json';
-// import CreditManager from './apps/contracts/out/CreditManager.sol/CreditManager.json';
-// import SubscriptionManager from './apps/contracts/out/SubscriptionManager.sol/SubscriptionManager.json';
-// import CollabManager from './apps/contracts/out/CollabManager.sol/CollabManager.json';
-// import AdPlacement from './apps/contracts/out/AdPlacement.sol/AdPlacement.json';
-// import LicensingRegistry from './apps/contracts/out/LicensingRegistry.sol/LicensingRegistry.json';
-// import AnalyticsRegistry from './apps/contracts/out/AnalyticsRegistry.sol/AnalyticsRegistry.json';
+// Revenue stream contracts
+import PaymentRouter from './apps/contracts/out/PaymentRouter.sol/PaymentRouter.json';
+import EpisodeNFT from './apps/contracts/out/EpisodeNFT.sol/EpisodeNFT.json';
+import CharacterNFT from './apps/contracts/out/CharacterNFT.sol/CharacterNFT.json';
+import CreditManager from './apps/contracts/out/CreditManager.sol/CreditManager.json';
+import LoarBurner from './apps/contracts/out/LoarBurner.sol/LoarBurner.json';
+import StoryBounties from './apps/contracts/out/StoryBounties.sol/StoryBounties.json';
+import LaunchpadStaking from './apps/contracts/out/LaunchpadStaking.sol/LaunchpadStaking.json';
+import RemixFees from './apps/contracts/out/RemixFees.sol/RemixFees.json';
+import SlopMarket from './apps/contracts/out/SlopMarket.sol/SlopMarket.json';
+import SubscriptionManager from './apps/contracts/out/SubscriptionManager.sol/SubscriptionManager.json';
+import LoarToken from './apps/contracts/out/LoarToken.sol/LoarToken.json';
 
 export default defineConfig({
   out: 'packages/abis/src/generated.ts',
@@ -59,16 +61,18 @@ export default defineConfig({
       name: 'LoarHookStaticFee',
       abi: LoarHookStaticFee.abi as Abi,
     },
-    // Revenue stream contracts — uncomment after `forge build`
-    // { name: 'EpisodeNFT', abi: EpisodeNFT.abi as Abi },
-    // { name: 'CharacterNFT', abi: CharacterNFT.abi as Abi },
-    // { name: 'CanonMarketplace', abi: CanonMarketplace.abi as Abi },
-    // { name: 'CreditManager', abi: CreditManager.abi as Abi },
-    // { name: 'SubscriptionManager', abi: SubscriptionManager.abi as Abi },
-    // { name: 'CollabManager', abi: CollabManager.abi as Abi },
-    // { name: 'AdPlacement', abi: AdPlacement.abi as Abi },
-    // { name: 'LicensingRegistry', abi: LicensingRegistry.abi as Abi },
-    // { name: 'AnalyticsRegistry', abi: AnalyticsRegistry.abi as Abi },
+    // Revenue + Token Economy contracts
+    { name: 'PaymentRouter', abi: PaymentRouter.abi as Abi },
+    { name: 'EpisodeNFT', abi: EpisodeNFT.abi as Abi },
+    { name: 'CharacterNFT', abi: CharacterNFT.abi as Abi },
+    { name: 'CreditManager', abi: CreditManager.abi as Abi },
+    { name: 'LoarBurner', abi: LoarBurner.abi as Abi },
+    { name: 'StoryBounties', abi: StoryBounties.abi as Abi },
+    { name: 'LaunchpadStaking', abi: LaunchpadStaking.abi as Abi },
+    { name: 'RemixFees', abi: RemixFees.abi as Abi },
+    { name: 'SlopMarket', abi: SlopMarket.abi as Abi },
+    { name: 'SubscriptionManager', abi: SubscriptionManager.abi as Abi },
+    { name: 'LoarToken', abi: LoarToken.abi as Abi },
   ],
   plugins: [
     react({

@@ -46,6 +46,10 @@ export async function createUniverse(input: CreateUniverseInput) {
       description: input.description,
       onChainUniverseId: input.onChainUniverseId ?? null,
       mintTxHash: input.mintTxHash ?? null,
+      hasPrivateSection: true,
+      isMultiSig: false,
+      multiSigAddress: null,
+      accessModel: 'open', // open | subscription | token_gate | both
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -53,6 +57,7 @@ export async function createUniverse(input: CreateUniverseInput) {
     await collection().doc(id).set(data);
 
     await seedUniverseCreditPool(id, input.creator, input.mintTxHash);
+    await seedPrivateSectionConfig(id);
 
     return {
       success: true,
@@ -116,6 +121,28 @@ export async function getUniversesByCreator(creator: string) {
   } catch (error) {
     console.error('Error fetching universes by creator:', error);
     throw new Error('Failed to fetch universes by creator');
+  }
+}
+
+// ── Internal: seed private section config for Creator's Room ─────────────
+
+async function seedPrivateSectionConfig(universeId: string) {
+  try {
+    const configRef = db.collection('privateSectionConfig').doc(universeId);
+    const existing = await configRef.get();
+    if (existing.exists) return;
+
+    const now = new Date();
+    await configRef.set({
+      universeId,
+      vaultEnabled: true,
+      notesEnabled: true,
+      holderMinPercentage: 1, // default 1% token ownership for vault access
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (err) {
+    console.error(`[seedPrivateSectionConfig] Failed for ${universeId}:`, err);
   }
 }
 

@@ -132,6 +132,9 @@ export const KIND_PLURAL_LABELS: Record<EntityKind, string> = {
   domain: 'Domains',
 };
 
+/** Rights declaration for monetized entities. */
+export type RightsDeclaration = 'original' | 'licensed';
+
 /** Firestore document shape for a narrative entity. */
 export interface Entity {
   id: string;
@@ -145,6 +148,10 @@ export interface Entity {
   imageUrl: string | null;
   metadata: Record<string, unknown>;
   creator: string;
+  /** Whether the creator intends to monetize (sell/license) this entity. */
+  monetized: boolean;
+  /** Rights declaration — required when monetized is true. */
+  rightsDeclaration: RightsDeclaration | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -160,6 +167,10 @@ export interface CreateEntityInput {
   nodeIds?: number[];
   imageUrl?: string | null;
   metadata?: Record<string, unknown>;
+  /** Whether the creator intends to monetize this entity. Defaults to false. */
+  monetized?: boolean;
+  /** Required when monetized is true. Must be 'original' or 'licensed'. */
+  rightsDeclaration?: RightsDeclaration | null;
 }
 
 /** Input for updating an existing entity. */
@@ -171,4 +182,6 @@ export interface UpdateEntityInput {
   nodeIds?: number[];
   imageUrl?: string | null;
   metadata?: Record<string, unknown>;
+  monetized?: boolean;
+  rightsDeclaration?: RightsDeclaration | null;
 }

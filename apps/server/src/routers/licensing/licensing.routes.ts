@@ -5,6 +5,7 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { resolveActingUid } from '../../services/agentAuth';
 
 const licensesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -37,12 +38,16 @@ export const licensingRouter = router({
         terms: z.string(),
         termsURI: z.string().optional(),
         txHash: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...licenseInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'licensing');
+
       const license = {
-        ...input,
-        licensorUid: ctx.user.uid,
+        ...licenseInput,
+        licensorUid: actingUid,
         licensorAddress: ctx.user.address || null,
         status: 'PROPOSED' as const,
         totalRoyalties: '0',

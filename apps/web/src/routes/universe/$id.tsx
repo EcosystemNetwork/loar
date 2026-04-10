@@ -38,6 +38,8 @@ import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGenerati
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
 import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
+import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
+import { PrivateSection } from '@/components/private/PrivateSection';
 
 // Register custom node types
 const nodeTypes = {
@@ -119,6 +121,9 @@ function UniverseTimelineEditor() {
 
   // Governance state
   const [showGovernanceSidebar, setShowGovernanceSidebar] = useState(false);
+
+  // Creator's Room state
+  const [showCreatorsRoom, setShowCreatorsRoom] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -1054,178 +1059,226 @@ function UniverseTimelineEditor() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
-        <ReactFlowProvider>
-          <div className="flex-1 relative overflow-hidden">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              nodeTypes={nodeTypes}
-              fitView
-              className="bg-gradient-to-br from-background via-background/95 to-muted/20"
-              minZoom={0.1}
-              maxZoom={2}
-            >
-              <Background />
-              <Controls />
-
-              <Panel
-                position="top-center"
-                className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border"
+      <TokenGateGuard universeId={id} target="view">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
+          <ReactFlowProvider>
+            <div className="flex-1 relative overflow-hidden">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                nodeTypes={nodeTypes}
+                fitView
+                className="bg-gradient-to-br from-background via-background/95 to-muted/20"
+                minZoom={0.1}
+                maxZoom={2}
               >
-                <h2 className="text-lg font-semibold">{timelineTitle}</h2>
-                <p className="text-sm text-muted-foreground">{timelineDescription}</p>
-              </Panel>
+                <Background />
+                <Controls />
 
-              <Panel position="top-right">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
-                >
-                  <Link to="/">
-                    <Home className="h-4 w-4 mr-2" />
-                    Home
-                  </Link>
-                </Button>
-              </Panel>
-
-              {isLoadingAny && (
                 <Panel
-                  position="bottom-right"
-                  className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4"
+                  position="top-center"
+                  className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border"
                 >
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                    Loading blockchain data...
+                  <h2 className="text-lg font-semibold">{timelineTitle}</h2>
+                  <p className="text-sm text-muted-foreground">{timelineDescription}</p>
+                </Panel>
+
+                <Panel position="top-right">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowCreatorsRoom(!showCreatorsRoom);
+                        if (!showCreatorsRoom) setShowGovernanceSidebar(false);
+                      }}
+                      className="hover:bg-amber-500/10 hover:text-amber-400 transition-all duration-300"
+                    >
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                        />
+                      </svg>
+                      Creator's Room
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                    >
+                      <Link to="/">
+                        <Home className="h-4 w-4 mr-2" />
+                        Home
+                      </Link>
+                    </Button>
                   </div>
                 </Panel>
-              )}
-            </ReactFlow>
+
+                {isLoadingAny && (
+                  <Panel
+                    position="bottom-right"
+                    className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4"
+                  >
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      Loading blockchain data...
+                    </div>
+                  </Panel>
+                )}
+              </ReactFlow>
+            </div>
+          </ReactFlowProvider>
+        </div>
+
+        {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
+        {(() => {
+          // Find previous event's video URL and description - always use the last event or the source node
+          const sourceNode = sourceNodeId
+            ? nodes.find((n) => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
+            : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
+          const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
+
+          // Handle description which might be an object {timestamp, description} or a string
+          const rawDesc = sourceNode?.data.description;
+          const previousEventDescription =
+            rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+              ? String((rawDesc as any).description)
+              : rawDesc
+                ? String(rawDesc)
+                : null;
+
+          const previousEventTitle = sourceNode?.data.label || null;
+
+          // Get previous event wiki data if available
+          const previousEventWiki = sourceNode?.data.wiki
+            ? {
+                title: sourceNode.data.wiki.title || previousEventTitle || '',
+                summary: sourceNode.data.wiki.summary || '',
+                plot: sourceNode.data.wiki.plot,
+              }
+            : null;
+
+          return (
+            <FlowCreationPanel
+              showVideoDialog={showVideoDialog}
+              setShowVideoDialog={setShowVideoDialog}
+              videoTitle={videoTitle}
+              setVideoTitle={setVideoTitle}
+              videoDescription={videoDescription}
+              setVideoDescription={setVideoDescription}
+              additionType={additionType}
+              selectedCharacters={selectedCharacters}
+              setSelectedCharacters={setSelectedCharacters}
+              showCharacterSelector={showCharacterSelector}
+              setShowCharacterSelector={setShowCharacterSelector}
+              showCharacterGenerator={showCharacterGenerator}
+              setShowCharacterGenerator={setShowCharacterGenerator}
+              charactersData={charactersData}
+              isLoadingCharacters={isLoadingCharacters}
+              characterName={characterName}
+              setCharacterName={setCharacterName}
+              characterDescription={characterDescription}
+              setCharacterDescription={setCharacterDescription}
+              characterStyle={characterStyle}
+              setCharacterStyle={setCharacterStyle}
+              isGeneratingCharacter={isGeneratingCharacter}
+              generatedCharacter={generatedCharacter}
+              setGeneratedCharacter={setGeneratedCharacter}
+              generateCharacterMutation={generateCharacterMutation}
+              analyzeCharacterMutation={analyzeCharacterMutation}
+              saveCharacterMutation={saveCharacterMutation}
+              generatedImageUrl={generatedImageUrl}
+              isGeneratingImage={isGeneratingImage}
+              imageFormat={imageFormat}
+              setImageFormat={(format: string) =>
+                setImageFormat(
+                  format as 'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'
+                )
+              }
+              handleGenerateEventImage={handleGenerateEventImage}
+              showVideoStep={showVideoStep}
+              setShowVideoStep={setShowVideoStep}
+              uploadedUrl={uploadedUrl}
+              setUploadedUrl={setUploadedUrl}
+              isUploading={isUploading}
+              uploadToStorage={uploadToStorage}
+              generatedVideoUrl={generatedVideoUrl}
+              setGeneratedVideoUrl={setGeneratedVideoUrl}
+              setGeneratedImageUrl={setGeneratedImageUrl}
+              isGeneratingVideo={isGeneratingVideo}
+              videoPrompt={videoPrompt}
+              setVideoPrompt={setVideoPrompt}
+              videoRatio={videoRatio}
+              setVideoRatio={setVideoRatio}
+              selectedVideoModel={selectedVideoModel}
+              setSelectedVideoModel={setSelectedVideoModel}
+              selectedVideoDuration={selectedVideoDuration}
+              setSelectedVideoDuration={setSelectedVideoDuration}
+              negativePrompt={negativePrompt}
+              setNegativePrompt={setNegativePrompt}
+              handleGenerateVideo={handleGenerateVideo}
+              isSavingToContract={isSavingToContract}
+              contractSaved={contractSaved}
+              isSavingToFilecoin={isSavingToStorage}
+              filecoinSaved={storageSaved}
+              pieceCid={storageKey}
+              handleSaveToContract={handleSaveToContract}
+              handleCreateEvent={handleCreateEvent}
+              previousEventVideoUrl={previousEventVideoUrl}
+              previousEventDescription={previousEventDescription}
+              previousEventTitle={previousEventTitle}
+              previousEventWiki={previousEventWiki}
+              statusMessage={statusMessage}
+              setStatusMessage={setStatusMessage}
+              selectedImageCharacters={selectedImageCharacters}
+              setSelectedImageCharacters={setSelectedImageCharacters}
+              handleGenerateCharacterFrame={handleGenerateCharacterFrame}
+              refetchCharacters={refetchCharacters}
+            />
+          );
+        })()}
+
+        {/* Governance Sidebar */}
+        <GovernanceSidebar
+          isOpen={showGovernanceSidebar}
+          onClose={() => setShowGovernanceSidebar(false)}
+          finalUniverse={finalUniverse}
+          nodes={nodes}
+          onRefresh={handleRefreshTimeline}
+        />
+
+        {/* Creator's Room Sidebar */}
+        {showCreatorsRoom && (
+          <div className="w-[400px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+              <span className="text-sm text-zinc-400">Private Section</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCreatorsRoom(false)}
+                className="text-zinc-500 hover:text-white h-6 w-6 p-0"
+              >
+                x
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <PrivateSection universeId={id} />
+            </div>
           </div>
-        </ReactFlowProvider>
-      </div>
-
-      {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
-      {(() => {
-        // Find previous event's video URL and description - always use the last event or the source node
-        const sourceNode = sourceNodeId
-          ? nodes.find((n) => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
-          : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
-        const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
-
-        // Handle description which might be an object {timestamp, description} or a string
-        const rawDesc = sourceNode?.data.description;
-        const previousEventDescription =
-          rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-            ? String((rawDesc as any).description)
-            : rawDesc
-              ? String(rawDesc)
-              : null;
-
-        const previousEventTitle = sourceNode?.data.label || null;
-
-        // Get previous event wiki data if available
-        const previousEventWiki = sourceNode?.data.wiki
-          ? {
-              title: sourceNode.data.wiki.title || previousEventTitle || '',
-              summary: sourceNode.data.wiki.summary || '',
-              plot: sourceNode.data.wiki.plot,
-            }
-          : null;
-
-        return (
-          <FlowCreationPanel
-            showVideoDialog={showVideoDialog}
-            setShowVideoDialog={setShowVideoDialog}
-            videoTitle={videoTitle}
-            setVideoTitle={setVideoTitle}
-            videoDescription={videoDescription}
-            setVideoDescription={setVideoDescription}
-            additionType={additionType}
-            selectedCharacters={selectedCharacters}
-            setSelectedCharacters={setSelectedCharacters}
-            showCharacterSelector={showCharacterSelector}
-            setShowCharacterSelector={setShowCharacterSelector}
-            showCharacterGenerator={showCharacterGenerator}
-            setShowCharacterGenerator={setShowCharacterGenerator}
-            charactersData={charactersData}
-            isLoadingCharacters={isLoadingCharacters}
-            characterName={characterName}
-            setCharacterName={setCharacterName}
-            characterDescription={characterDescription}
-            setCharacterDescription={setCharacterDescription}
-            characterStyle={characterStyle}
-            setCharacterStyle={setCharacterStyle}
-            isGeneratingCharacter={isGeneratingCharacter}
-            generatedCharacter={generatedCharacter}
-            setGeneratedCharacter={setGeneratedCharacter}
-            generateCharacterMutation={generateCharacterMutation}
-            analyzeCharacterMutation={analyzeCharacterMutation}
-            saveCharacterMutation={saveCharacterMutation}
-            generatedImageUrl={generatedImageUrl}
-            isGeneratingImage={isGeneratingImage}
-            imageFormat={imageFormat}
-            setImageFormat={(format: string) =>
-              setImageFormat(
-                format as 'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'
-              )
-            }
-            handleGenerateEventImage={handleGenerateEventImage}
-            showVideoStep={showVideoStep}
-            setShowVideoStep={setShowVideoStep}
-            uploadedUrl={uploadedUrl}
-            setUploadedUrl={setUploadedUrl}
-            isUploading={isUploading}
-            uploadToStorage={uploadToStorage}
-            generatedVideoUrl={generatedVideoUrl}
-            setGeneratedVideoUrl={setGeneratedVideoUrl}
-            setGeneratedImageUrl={setGeneratedImageUrl}
-            isGeneratingVideo={isGeneratingVideo}
-            videoPrompt={videoPrompt}
-            setVideoPrompt={setVideoPrompt}
-            videoRatio={videoRatio}
-            setVideoRatio={setVideoRatio}
-            selectedVideoModel={selectedVideoModel}
-            setSelectedVideoModel={setSelectedVideoModel}
-            selectedVideoDuration={selectedVideoDuration}
-            setSelectedVideoDuration={setSelectedVideoDuration}
-            negativePrompt={negativePrompt}
-            setNegativePrompt={setNegativePrompt}
-            handleGenerateVideo={handleGenerateVideo}
-            isSavingToContract={isSavingToContract}
-            contractSaved={contractSaved}
-            isSavingToFilecoin={isSavingToStorage}
-            filecoinSaved={storageSaved}
-            pieceCid={storageKey}
-            handleSaveToContract={handleSaveToContract}
-            handleCreateEvent={handleCreateEvent}
-            previousEventVideoUrl={previousEventVideoUrl}
-            previousEventDescription={previousEventDescription}
-            previousEventTitle={previousEventTitle}
-            previousEventWiki={previousEventWiki}
-            statusMessage={statusMessage}
-            setStatusMessage={setStatusMessage}
-            selectedImageCharacters={selectedImageCharacters}
-            setSelectedImageCharacters={setSelectedImageCharacters}
-            handleGenerateCharacterFrame={handleGenerateCharacterFrame}
-            refetchCharacters={refetchCharacters}
-          />
-        );
-      })()}
-
-      {/* Governance Sidebar */}
-      <GovernanceSidebar
-        isOpen={showGovernanceSidebar}
-        onClose={() => setShowGovernanceSidebar(false)}
-        finalUniverse={finalUniverse}
-        nodes={nodes}
-        onRefresh={handleRefreshTimeline}
-      />
+        )}
+      </TokenGateGuard>
     </div>
   );
 }

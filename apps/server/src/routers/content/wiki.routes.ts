@@ -54,7 +54,11 @@ export const wikiRouter = router({
       try {
         const wikiPath = join(process.cwd(), '../character-wiki/simple_character_wiki.json');
         const wikiData = readFileSync(wikiPath, 'utf-8');
-        return JSON.parse(wikiData);
+        try {
+          return JSON.parse(wikiData);
+        } catch (parseErr) {
+          throw new Error('Character wiki fallback file contains invalid JSON');
+        }
       } catch (fileError) {
         console.error('Failed to load character wiki file:', fileError);
         throw wrapError(fileError, 'Could not load character data');

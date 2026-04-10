@@ -872,6 +872,7 @@ function CommunityCreations() {
     queryKey: ['content', 'feed', 'landing'],
     queryFn: () => trpcClient.content.feed.query({ limit: 20 }),
     staleTime: 60_000,
+    retry: false,
   });
 
   const items = data?.items;

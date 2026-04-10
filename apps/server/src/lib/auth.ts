@@ -1,42 +1,53 @@
 /**
- * Multi-chain authentication verification.
+ * Authentication Verification
  *
- * Verifies JWT session tokens from EVM (SIWE), Solana (SIWS), or SUI
- * wallet authentication. Returns a normalized user object for use in
- * tRPC context. Downstream code doesn't need to know which chain.
+ * Supports two auth methods:
+ * 1. SIWE JWT (wallet users) — Authorization: Bearer <jwt>
+ * 2. API Key (programmatic agents) — X-API-Key: loar_<agentId>_<hex>
+ *
+ * Returns a normalized AuthUser for use in tRPC context.
  */
 import { verifySessionToken } from './siwe';
-
-export type ChainFamily = 'evm' | 'solana' | 'sui';
+import { verifyApiKey, type ApiKeyDoc } from './apiKeys';
 
 export interface AuthUser {
   uid: string;
   address?: string;
   email?: string;
-  /** Which chain family the user authenticated with. */
-  chain?: ChainFamily;
+  /** Set when authenticated via API key */
+  apiKeyId?: string;
+  /** Set when the API key is linked to an AI agent */
+  aiAgentId?: string;
+  /** Permissions scoped to this API key (empty = full access via JWT) */
+  apiKeyPermissions?: string[];
 }
 
 export async function verifyAuth(headers: Headers): Promise<AuthUser | null> {
+  // 1. Try API key first (X-API-Key header)
+  const apiKey = headers.get('X-API-Key');
+  if (apiKey) {
+    const result = await verifyApiKey(apiKey);
+    if (result) {
+      return {
+        ...result.user,
+        apiKeyId: result.keyDoc.id,
+        aiAgentId: result.keyDoc.aiAgentId || undefined,
+        apiKeyPermissions: result.keyDoc.permissions,
+      };
+    }
+    return null; // Invalid API key — don't fall through to JWT
+  }
+
+  // 2. Try SIWE JWT (Authorization: Bearer <token>)
   const token = headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) return null;
 
   const payload = await verifySessionToken(token);
   if (payload?.sub) {
-    // Determine chain from JWT payload.
-    // Non-EVM JWTs have explicit `chain` field; fall back to 'evm'.
-    const payloadChain = (payload as Record<string, unknown>).chain;
-    const chain: ChainFamily =
-      payloadChain === 'solana' ? 'solana' : payloadChain === 'sui' ? 'sui' : 'evm';
-
-    // For EVM, uid is lowercased checksummed address.
-    // For Solana/SUI, uid keeps original casing.
-    const uid = chain === 'evm' ? payload.sub.toLowerCase() : payload.sub;
-
+    const uid = payload.sub.toLowerCase();
     return {
       uid,
       address: payload.sub,
-      chain,
     };
   }
 

@@ -1,9 +1,57 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
+import { validateUploadUrl } from '../lib/url-validator';
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY || '');
+/**
+ * Sanitize user-supplied text before interpolating into AI prompts.
+ * Strips common prompt injection patterns while preserving legitimate content.
+ */
+function sanitizeForPrompt(text: string): string {
+  return (
+    text
+      // Collapse multiple newlines to prevent instruction boundary spoofing
+      .replace(/\n{3,}/g, '\n\n')
+      // Strip common injection prefixes
+      .replace(/^(system|assistant|user)\s*:/gim, '[filtered]:')
+      // Strip "ignore previous instructions" patterns
+      .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, '[filtered]')
+      .replace(/ignore\s+(all\s+)?above/gi, '[filtered]')
+      // Limit length to prevent context flooding
+      .slice(0, 5000)
+  );
+}
+
+// Initialize Gemini — fail fast if key missing
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+if (!GOOGLE_API_KEY) {
+  console.warn(
+    '⚠️  GOOGLE_API_KEY not set — Gemini features (wiki generation, character analysis) will be unavailable'
+  );
+}
+const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY || 'missing');
+const fileManager = new GoogleAIFileManager(GOOGLE_API_KEY || 'missing');
+
+function ensureGeminiKey() {
+  if (!GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY environment variable is required for Gemini features');
+  }
+}
+
+function safeJsonParse<T>(text: string, label: string): T {
+  let jsonText = text.trim();
+  if (jsonText.startsWith('```json')) {
+    jsonText = jsonText.split('```json')[1].split('```')[0].trim();
+  } else if (jsonText.startsWith('```')) {
+    jsonText = jsonText.split('```')[1].split('```')[0].trim();
+  }
+  try {
+    return JSON.parse(jsonText) as T;
+  } catch (err) {
+    throw new Error(`Failed to parse Gemini ${label} response as JSON: ${(err as Error).message}`);
+  }
+}
+
+const FILE_PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface WikiData {
   title: string;
@@ -55,6 +103,7 @@ export async function generateWikiFromVideo(
     previousEvents?: Array<{ title: string; description: string }>;
   }
 ): Promise<VideoAnalysisResult> {
+  ensureGeminiKey();
   console.log(`🎬 Generating wiki for event ${eventData.eventId}`);
   console.log(`📝 Characters provided: ${eventData.characters?.length || 0}`);
   if (eventData.characters && eventData.characters.length > 0) {
@@ -70,9 +119,9 @@ export async function generateWikiFromVideo(
     characterContext = '\n\nCHARACTERS IN THIS SCENE:\n';
     eventData.characters.forEach((char) => {
       characterNames.push(char.name);
-      characterContext += `- **${char.name}**: ${char.userDescription}`;
+      characterContext += `- **${sanitizeForPrompt(char.name)}**: ${sanitizeForPrompt(char.userDescription)}`;
       if (char.visualDescription) {
-        characterContext += `\n  Visual appearance: ${char.visualDescription}`;
+        characterContext += `\n  Visual appearance: ${sanitizeForPrompt(char.visualDescription)}`;
       }
       characterContext += '\n';
     });
@@ -83,7 +132,7 @@ export async function generateWikiFromVideo(
   if (eventData.previousEvents && eventData.previousEvents.length > 0) {
     context = '\n\nPREVIOUS EVENTS IN THIS TIMELINE:\n';
     eventData.previousEvents.forEach((evt, idx) => {
-      context += `${idx + 1}. ${evt.title}: ${evt.description}\n`;
+      context += `${idx + 1}. ${sanitizeForPrompt(evt.title)}: ${sanitizeForPrompt(evt.description)}\n`;
     });
   }
 
@@ -92,7 +141,7 @@ export async function generateWikiFromVideo(
 
 EVENT CONTEXT:
 Event ID: ${eventData.eventId}
-User Description: ${eventData.description}
+User Description: ${sanitizeForPrompt(eventData.description)}
 ${characterContext}${context}
 
 YOUR TASK:
@@ -144,6 +193,8 @@ Generate a JSON response:
 Output valid JSON only. Be precise and factual.`;
 
   try {
+    // SSRF validation before downloading external URL
+    await validateUploadUrl(videoUrl);
     // Download video to buffer first (required for uploadFile)
     console.log(`📤 Downloading video: ${videoUrl}`);
     const videoResponse = await fetch(videoUrl);
@@ -160,9 +211,13 @@ Output valid JSON only. Be precise and factual.`;
       displayName: `event-${eventData.eventId}.mp4`,
     });
 
-    // Wait for video to be processed
+    // Wait for video to be processed (with timeout)
     let file = uploadResult.file;
+    const processingDeadline = Date.now() + FILE_PROCESSING_TIMEOUT_MS;
     while (file.state === 'PROCESSING') {
+      if (Date.now() > processingDeadline) {
+        throw new Error('Video processing timed out after 5 minutes');
+      }
       console.log('⏳ Video processing...');
       await new Promise((resolve) => setTimeout(resolve, 2000));
       file = await fileManager.getFile(file.name);
@@ -188,15 +243,7 @@ Output valid JSON only. Be precise and factual.`;
     const response = result.response;
     const text = response.text();
 
-    // Extract JSON from markdown if needed
-    let jsonText = text.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.split('```json')[1].split('```')[0].trim();
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.split('```')[1].split('```')[0].trim();
-    }
-
-    const wikiData = JSON.parse(jsonText) as WikiData;
+    const wikiData = safeJsonParse<WikiData>(text, 'wiki');
 
     // Map character IDs to elements by matching character names (case-insensitive)
     if (eventData.characters && eventData.characterIds && eventData.characters.length > 0) {
@@ -273,14 +320,15 @@ export async function analyzeCharacterImage(
   userDescription: string,
   characterName: string
 ): Promise<string> {
+  ensureGeminiKey();
   console.log(`🎨 Analyzing character image for: ${characterName}`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
   const prompt = `You are analyzing a character image to create a detailed visual description for narrative consistency.
 
-CHARACTER NAME: ${characterName}
-USER DESCRIPTION: ${userDescription}
+CHARACTER NAME: ${sanitizeForPrompt(characterName)}
+USER DESCRIPTION: ${sanitizeForPrompt(userDescription)}
 
 YOUR TASK:
 Analyze this character image and provide a detailed visual description that will help maintain consistency when this character appears in different scenes.
@@ -304,6 +352,8 @@ CRITICAL RULES:
 Generate a detailed visual description in plain text (no JSON, no formatting).`;
 
   try {
+    // SSRF validation before downloading external URL
+    await validateUploadUrl(imageUrl);
     // Generate content with image
     const result = await model.generateContent([
       {
@@ -346,6 +396,7 @@ export async function improveImagePrompt(
   userPrompt: string,
   characterContext?: Array<{ name: string; description: string }>
 ): Promise<string> {
+  ensureGeminiKey();
   console.log(`🎨 Improving image prompt with Gemini...`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
@@ -432,6 +483,7 @@ export async function improveVideoPrompt(
     plot?: string;
   }
 ): Promise<string> {
+  ensureGeminiKey();
   console.log(`🎬 Improving video prompt with Gemini...`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
@@ -530,13 +582,14 @@ export async function generateEntityLore(
   entityKind: string,
   description: string
 ): Promise<string> {
+  ensureGeminiKey();
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `You are a worldbuilding writer creating a concise wiki/lore card entry.
 
-ENTITY NAME: ${entityName}
-ENTITY KIND: ${entityKind}
-DESCRIPTION: ${description}
+ENTITY NAME: ${sanitizeForPrompt(entityName)}
+ENTITY KIND: ${sanitizeForPrompt(entityKind)}
+DESCRIPTION: ${sanitizeForPrompt(description)}
 
 Write a compelling 2–4 paragraph wiki entry for this ${entityKind}. Include:
 - What it is / who they are
@@ -552,10 +605,83 @@ Write in a neutral encyclopedic tone. No headers, no lists — flowing paragraph
   return text;
 }
 
+/** Metadata field definitions per entity kind — mirrors the frontend create form. */
+const METADATA_FIELDS_BY_KIND: Record<string, string[]> = {
+  person: ['role', 'appearance', 'motivations', 'abilities', 'homePlace', 'affiliations'],
+  place: ['placeType', 'atmosphere', 'rulesAndDangers', 'inhabitants', 'governingFaction'],
+  thing: ['thingType', 'origin', 'powersAndUse', 'rarity', 'currentOwner'],
+  faction: ['mission', 'ideology', 'leader', 'rivals', 'hq', 'resources'],
+  event: ['era', 'participants', 'location', 'causes', 'outcome', 'canonStatus'],
+  lore: ['loreType', 'article', 'relatedConcepts', 'canonWeight'],
+  species: ['biologicalType', 'traits', 'homeworld', 'culture', 'abilities'],
+  vehicle: ['vehicleType', 'crew', 'capabilities', 'origin', 'currentStatus'],
+  technology: ['techType', 'inventor', 'howItWorks', 'limitations', 'users'],
+  organization: ['orgType', 'purpose', 'structure', 'members', 'influence'],
+};
+
+/**
+ * Generate a full entity profile: description + kind-specific metadata fields.
+ * Returns structured JSON that can be directly applied to an entity.
+ */
+export async function generateEntityProfile(
+  entityName: string,
+  entityKind: string,
+  userHint: string
+): Promise<{ description: string; metadata: Record<string, string> }> {
+  ensureGeminiKey();
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const fields = METADATA_FIELDS_BY_KIND[entityKind] ?? [];
+
+  const fieldsInstruction =
+    fields.length > 0
+      ? `\nFill in the following metadata fields (use short, punchy text — 1-3 sentences max per field):\n${fields.map((f) => `- "${f}"`).join('\n')}`
+      : '';
+
+  const prompt = `You are a worldbuilding AI creating a detailed profile for a fictional ${entityKind}.
+
+ENTITY NAME: ${entityName}
+USER HINT: ${userHint || '(no additional context)'}
+
+YOUR TASK:
+1. Write a compelling 2–4 paragraph "description" for this ${entityKind}. Encyclopedic tone, no headers, no lists — flowing paragraphs only.
+2. ${fieldsInstruction || 'No additional metadata fields needed.'}
+
+Respond with a JSON object:
+{
+  "description": "...",
+  "metadata": {
+    ${fields.map((f) => `"${f}": "..."`).join(',\n    ')}
+  }
+}
+
+RULES:
+- Be creative but grounded — make the entity feel like it belongs in a rich universe.
+- Each metadata field should be concise (1-3 sentences) but evocative.
+- The description should be longer (2-4 paragraphs) and read like a wiki entry.
+- Output valid JSON only. No markdown fences.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
+
+  const parsed = safeJsonParse<{ description?: string; metadata?: Record<string, any> }>(
+    text,
+    'entity profile'
+  );
+  if (!parsed.description || typeof parsed.description !== 'string') {
+    throw new Error('AI returned invalid profile — missing description');
+  }
+
+  return {
+    description: parsed.description,
+    metadata: parsed.metadata ?? {},
+  };
+}
+
 export const geminiService = {
   generateWikiFromVideo,
   analyzeCharacterImage,
   improveImagePrompt,
   improveVideoPrompt,
   generateEntityLore,
+  generateEntityProfile,
 };

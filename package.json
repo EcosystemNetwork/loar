@@ -12,7 +12,7 @@
     "lint": "turbo lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
     "sc:test": "turbo run sc:test",

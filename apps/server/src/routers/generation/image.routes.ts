@@ -219,6 +219,7 @@ export const imageRouter = router({
     await saveRecord(record);
 
     // ── Deduct credits ───────────────────────────────────────────────
+    if (!db) throw new Error('Firebase is not configured — cannot deduct credits');
     const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
     try {
       await db.runTransaction(async (tx) => {
@@ -236,11 +237,13 @@ export const imageRouter = router({
         });
       });
     } catch (err) {
-      await imageGenerationsCol().doc(genId).update({
-        status: 'failed',
-        failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
-        completedAt: new Date(),
-      });
+      await imageGenerationsCol()
+        .doc(genId)
+        .update({
+          status: 'failed',
+          failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
+          completedAt: new Date(),
+        });
       throw err;
     }
 
@@ -277,7 +280,8 @@ export const imageRouter = router({
               imageUrls: fallback.imageUrls,
               modelUsed: fallback.fallbackModelId,
               modelDisplayName:
-                getImageModelById(fallback.fallbackModelId)?.displayName || fallback.fallbackModelId,
+                getImageModelById(fallback.fallbackModelId)?.displayName ||
+                fallback.fallbackModelId,
               routingMode: input.routingMode,
               reasonCode,
               creditsCharged: totalCredits,
@@ -287,12 +291,14 @@ export const imageRouter = router({
           }
         }
 
-        await imageGenerationsCol().doc(genId).update({
-          status: 'failed',
-          failureReason: result.error || 'Image generation failed',
-          latencyMs: Date.now() - startTime,
-          completedAt: new Date(),
-        });
+        await imageGenerationsCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: result.error || 'Image generation failed',
+            latencyMs: Date.now() - startTime,
+            completedAt: new Date(),
+          });
         throw new Error(result.error || 'Image generation failed');
       }
 
@@ -386,8 +392,7 @@ export const imageRouter = router({
         reasonCode = decision.reasonCode;
       }
 
-      if (!model)
-        return { credits: 0, fiatPriceUsd: 0, loarPriceUsd: 0, modelName: 'Unknown' };
+      if (!model) return { credits: 0, fiatPriceUsd: 0, loarPriceUsd: 0, modelName: 'Unknown' };
 
       return {
         credits: model.creditCostPerImage * input.numImages,
@@ -532,7 +537,23 @@ export const imageRouter = router({
       z.object({
         prompt: z.string().min(1, 'Prompt is required'),
         model: z
-          .enum(['fal-ai/nano-banana', 'fal-ai/flux/dev', 'fal-ai/flux-pro', 'fal-ai/flux/schnell'])
+          .enum([
+            'fal-ai/nano-banana',
+            'fal-ai/nano-banana-2',
+            'fal-ai/nano-banana-pro',
+            'fal-ai/flux/schnell',
+            'fal-ai/flux/dev',
+            'fal-ai/flux-pro',
+            'fal-ai/flux-pro/v1.1',
+            'fal-ai/flux-2-pro',
+            'fal-ai/flux-pro/kontext',
+            'fal-ai/recraft/v4/pro/text-to-image',
+            'fal-ai/ideogram/v3/generate',
+            'fal-ai/bytedance/seedream/v5/lite/edit',
+            'fal-ai/gpt-image-1.5/edit',
+            'fal-ai/wan/v2.7/text-to-image',
+            'fal-ai/qwen-image',
+          ])
           .optional(),
         negativePrompt: z.string().optional(),
         imageSize: imageSizeSchema.optional(),
@@ -543,8 +564,31 @@ export const imageRouter = router({
         enableSafetyChecker: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      return await falService.generateImage(input);
+    .mutation(async ({ input, ctx }) => {
+      const startTime = Date.now();
+      const result = await falService.generateImage(input);
+      if (result.status === 'completed' && result.imageUrl) {
+        try {
+          await imageGenerationsCol()
+            .doc(result.id || randomUUID())
+            .set({
+              id: result.id || randomUUID(),
+              userId: ctx.user?.uid || 'anonymous',
+              prompt: input.prompt,
+              model: input.model || 'fal-ai/nano-banana',
+              imageSize: input.imageSize || 'square_hd',
+              status: 'completed',
+              imageUrls: result.images?.map((i) => i.url) || [result.imageUrl],
+              seed: result.seed ?? null,
+              source: 'image.generateImage',
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+            });
+        } catch (e) {
+          /* db save is best-effort */
+        }
+      }
+      return result;
     }),
 
   editImage: protectedProcedure
@@ -561,12 +605,33 @@ export const imageRouter = router({
         enableSafetyChecker: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      try {
-        return await falService.editImage(input);
-      } catch (error) {
-        throw wrapError(error, 'Image editing failed');
+    .mutation(async ({ input, ctx }) => {
+      const startTime = Date.now();
+      const result = await falService.editImage(input);
+      if (result.status === 'completed' && result.imageUrl) {
+        try {
+          await imageGenerationsCol()
+            .doc(result.id || randomUUID())
+            .set({
+              id: result.id || randomUUID(),
+              userId: ctx.user?.uid || 'anonymous',
+              prompt: input.prompt,
+              model: 'fal-ai/nano-banana/edit',
+              task: 'image_to_image',
+              status: 'completed',
+              imageUrls: result.images?.map((i) => i.url) || [result.imageUrl],
+              seed: result.seed ?? null,
+              source: 'image.editImage',
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+            });
+        } catch (e) {
+          /* db save is best-effort */
+        }
       }
+      if (result.status === 'failed')
+        throw wrapError(new Error(result.error), 'Image editing failed');
+      return result;
     }),
 
   imageToImage: protectedProcedure
@@ -578,19 +643,43 @@ export const imageRouter = router({
         imageSize: z
           .union([
             imageSizeSchema,
-            z.object({ width: z.number().min(384).max(5000), height: z.number().min(384).max(5000) }),
+            z.object({
+              width: z.number().min(384).max(5000),
+              height: z.number().min(384).max(5000),
+            }),
           ])
           .optional(),
         numImages: z.number().min(1).max(4).optional().default(1),
         seed: z.number().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      try {
-        return await falService.imageToImage(input);
-      } catch (error) {
-        throw wrapError(error, 'Image-to-image transform failed');
+    .mutation(async ({ input, ctx }) => {
+      const startTime = Date.now();
+      const result = await falService.imageToImage(input);
+      if (result.status === 'completed' && result.imageUrl) {
+        try {
+          await imageGenerationsCol()
+            .doc(result.id || randomUUID())
+            .set({
+              id: result.id || randomUUID(),
+              userId: ctx.user?.uid || 'anonymous',
+              prompt: input.prompt,
+              model: 'fal-ai/nano-banana/edit',
+              task: 'image_to_image',
+              status: 'completed',
+              imageUrls: result.images?.map((i) => i.url) || [result.imageUrl],
+              seed: result.seed ?? null,
+              source: 'image.imageToImage',
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+            });
+        } catch (e) {
+          /* db save is best-effort */
+        }
       }
+      if (result.status === 'failed')
+        throw wrapError(new Error(result.error), 'Image-to-image failed');
+      return result;
     }),
 
   generateCharacter: protectedProcedure
@@ -628,23 +717,25 @@ export const imageRouter = router({
       let characterId: string | undefined;
       if (input.saveToDatabase) {
         characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
-        await charactersCol().doc(characterId).set({
-          character_name: input.name,
-          collection: 'Nano Banana AI',
-          token_id: characterId,
-          traits: {
-            style: input.style || 'cute',
-            generated_with: 'nano-banana',
-            seed: imageResult.seed?.toString() || 'random',
-          },
-          rarity_rank: 0,
-          rarity_percentage: null,
-          image_url: imageResult.imageUrl,
-          description: input.description,
-          detailed_visual_description: input.detailedVisualDescription || null,
-          created_at: new Date(),
-          updated_at: new Date(),
-        });
+        await charactersCol()
+          .doc(characterId)
+          .set({
+            character_name: input.name,
+            collection: 'Nano Banana AI',
+            token_id: characterId,
+            traits: {
+              style: input.style || 'cute',
+              generated_with: 'nano-banana',
+              seed: imageResult.seed?.toString() || 'random',
+            },
+            rarity_rank: 0,
+            rarity_percentage: null,
+            image_url: imageResult.imageUrl,
+            description: input.description,
+            detailed_visual_description: input.detailedVisualDescription || null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
       }
 
       return {
@@ -694,19 +785,21 @@ export const imageRouter = router({
     )
     .mutation(async ({ input }) => {
       const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
-      await charactersCol().doc(characterId).set({
-        character_name: input.name,
-        collection: 'Nano Banana AI',
-        token_id: characterId,
-        traits: { style: input.style, generated_with: 'nano-banana' },
-        rarity_rank: 0,
-        rarity_percentage: null,
-        image_url: input.imageUrl,
-        description: input.description,
-        detailed_visual_description: input.detailedVisualDescription || null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
+      await charactersCol()
+        .doc(characterId)
+        .set({
+          character_name: input.name,
+          collection: 'Nano Banana AI',
+          token_id: characterId,
+          traits: { style: input.style, generated_with: 'nano-banana' },
+          rarity_rank: 0,
+          rarity_percentage: null,
+          image_url: input.imageUrl,
+          description: input.description,
+          detailed_visual_description: input.detailedVisualDescription || null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
       return { success: true, characterId, characterName: input.name, imageUrl: input.imageUrl };
     }),
 });
