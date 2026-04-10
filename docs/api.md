@@ -6,12 +6,15 @@
 
 ### REST Endpoints
 
-| Method | Path                      | Description                                 |
-| ------ | ------------------------- | ------------------------------------------- |
-| `GET`  | `/`                       | Returns `"OK"` (simple health check)        |
-| `GET`  | `/health`                 | JSON health status: `{ status, timestamp }` |
-| `GET`  | `/images/*`               | Serve stored images                         |
-| `GET`  | `/api/filecoin/:pieceCid` | Stream content from Filecoin by PieceCID    |
+| Method | Path                      | Auth   | Description                                           |
+| ------ | ------------------------- | ------ | ----------------------------------------------------- |
+| `GET`  | `/`                       | No     | Returns `"OK"` (simple health check)                  |
+| `GET`  | `/health`                 | No     | JSON health status: `{ status, checks, uptime, env }` |
+| `GET`  | `/auth/nonce`             | No     | Generate a fresh nonce for SIWE message construction  |
+| `POST` | `/auth/verify`            | No     | Verify signed SIWE message, returns JWT session token |
+| `POST` | `/api/upload`             | Bearer | Direct file upload (multipart form, max 200MB)        |
+| `GET`  | `/images/*`               | No     | Serve stored images                                   |
+| `GET`  | `/api/filecoin/:pieceCid` | No     | Stream content from Filecoin by PieceCID              |
 
 ### tRPC API
 

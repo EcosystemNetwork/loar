@@ -13,13 +13,125 @@
  *   universeCredits/{universeId}          — shared credit balance
  *   universeCreditTransactions/{autoId}   — full audit trail
  */
+import { TRPCError } from '@trpc/server';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
+import { createPublicClient, http, parseUnits, type Hash } from 'viem';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { DEFAULT_PACKAGES } from '../credits/credits.routes';
+import { verifyStripePayment } from '../credits/stripe.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
 import { isUniverseAdmin } from '../../lib/safe-admin';
+
+const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '') as `0x${string}`;
+const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS ?? '') as `0x${string}`;
+const TRANSFER_TOPIC =
+  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
+
+function getTreasuryChainClient(chainId?: number) {
+  if (chainId === baseSepolia.id) {
+    return createPublicClient({
+      chain: baseSepolia,
+      transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+    });
+  }
+  return createPublicClient({
+    chain: sepolia,
+    transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
+  });
+}
+
+/** Verify an ETH tx was sent to treasury and meets minimum amount */
+async function verifyTreasuryEthPayment(txHash: string, expectedWei?: string): Promise<void> {
+  if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
+    throw new Error('TREASURY_ADDRESS is not configured');
+  }
+
+  // Dedup against universe credit transactions
+  const existing = await db
+    .collection('universeCreditTransactions')
+    .where('paymentRef', '==', txHash)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    throw new Error('This transaction has already been used to fund a universe pool');
+  }
+
+  const client = getTreasuryChainClient();
+  const tx = await client.getTransaction({ hash: txHash as Hash }).catch(() => {
+    throw new Error(
+      'Transaction not found on-chain. Confirm it has been broadcast and included in a block.'
+    );
+  });
+
+  const receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
+  if (receipt.status !== 'success') {
+    throw new Error('Transaction was reverted on-chain.');
+  }
+
+  if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
+    throw new Error('Transaction recipient does not match the platform treasury address.');
+  }
+
+  if (expectedWei && expectedWei !== '0') {
+    const minRequired = (BigInt(expectedWei) * 99n) / 100n;
+    if (tx.value < minRequired) {
+      throw new Error(
+        `Insufficient ETH. Expected ~${expectedWei} wei, got ${tx.value.toString()} wei.`
+      );
+    }
+  }
+}
+
+/** Verify a $LOAR ERC20 transfer to treasury */
+async function verifyTreasuryLoarPayment(txHash: string, expectedLoarWei: bigint): Promise<void> {
+  if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
+    throw new Error('LOAR_TOKEN_ADDRESS is not configured');
+  }
+  if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
+    throw new Error('TREASURY_ADDRESS is not configured');
+  }
+
+  const existing = await db
+    .collection('universeCreditTransactions')
+    .where('paymentRef', '==', txHash)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    throw new Error('This transaction has already been used to fund a universe pool');
+  }
+
+  const client = getTreasuryChainClient();
+  const receipt = await client.getTransactionReceipt({ hash: txHash as Hash }).catch(() => {
+    throw new Error('Transaction not found on-chain.');
+  });
+
+  if (receipt.status !== 'success') {
+    throw new Error('Transaction was reverted on-chain.');
+  }
+
+  const transferLog = receipt.logs.find(
+    (log) =>
+      log.address.toLowerCase() === LOAR_TOKEN_ADDRESS.toLowerCase() &&
+      log.topics[0] === TRANSFER_TOPIC &&
+      log.topics[2] &&
+      `0x${log.topics[2].slice(26)}`.toLowerCase() === TREASURY_ADDRESS.toLowerCase()
+  );
+
+  if (!transferLog) {
+    throw new Error('Transaction does not contain a $LOAR Transfer to the platform treasury.');
+  }
+
+  const transferredWei = BigInt(transferLog.data);
+  const minRequired = (expectedLoarWei * 99n) / 100n;
+  if (transferredWei < minRequired) {
+    throw new Error(
+      `Insufficient $LOAR transferred. Expected ~${expectedLoarWei.toString()} wei, got ${transferredWei.toString()} wei.`
+    );
+  }
+}
 
 const universeCreditCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -80,6 +192,29 @@ export const universeTreasuryRouter = router({
 
       const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
+
+      // ── Verify payment before issuing any credits ──────────────────
+      if (input.paymentMethod === 'eth' || input.paymentMethod === 'crypto') {
+        await verifyTreasuryEthPayment(input.paymentRef, pkg.ethPriceWei);
+      } else if (input.paymentMethod === 'loar') {
+        if (!input.loarAmount) throw new Error('loarAmount is required for $LOAR payments');
+        const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
+        await verifyTreasuryLoarPayment(input.paymentRef, expectedWei);
+      } else {
+        // card: verify Stripe PaymentIntent
+        const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
+        await verifyStripePayment(input.paymentRef, input.packageId, expectedCents);
+
+        // Dedup against universe credit transactions for card payments
+        const existing = await db
+          .collection('universeCreditTransactions')
+          .where('paymentRef', '==', input.paymentRef)
+          .limit(1)
+          .get();
+        if (!existing.empty) {
+          throw new Error('This payment reference has already been used to fund a universe pool');
+        }
+      }
 
       const isLoar = input.paymentMethod === 'loar';
       const totalCredits = isLoar
@@ -344,7 +479,10 @@ export const universeTreasuryRouter = router({
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
-        throw new Error('Only the universe admin can deposit revenue');
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can deposit revenue',
+        });
       }
 
       // Dedup check
@@ -353,11 +491,43 @@ export const universeTreasuryRouter = router({
         .limit(1)
         .get();
       if (!existing.empty) {
-        throw new Error('This transaction has already been deposited');
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This transaction has already been deposited',
+        });
       }
 
       const amountEth = parseFloat(input.amountEth);
-      if (isNaN(amountEth) || amountEth <= 0) throw new Error('Invalid amount');
+      if (isNaN(amountEth) || amountEth <= 0)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid amount' });
+
+      // Verify the deposit tx on-chain before issuing credits
+      if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
+        throw new Error('TREASURY_ADDRESS is not configured');
+      }
+      const client = getTreasuryChainClient();
+      const tx = await client.getTransaction({ hash: input.txHash as Hash }).catch(() => {
+        throw new Error(
+          'Deposit transaction not found on-chain. Confirm it has been broadcast and included in a block.'
+        );
+      });
+      const receipt = await client.getTransactionReceipt({ hash: input.txHash as Hash });
+      if (receipt.status !== 'success') {
+        throw new Error('Deposit transaction was reverted on-chain.');
+      }
+      if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
+        throw new Error(
+          'Deposit transaction recipient does not match the platform treasury address.'
+        );
+      }
+      // Verify the deposited amount matches the claimed amount (1% tolerance)
+      const claimedWei = parseUnits(input.amountEth, 18);
+      const minRequired = (claimedWei * 99n) / 100n;
+      if (tx.value < minRequired) {
+        throw new Error(
+          `Deposited ETH (${tx.value.toString()} wei) is less than the claimed amount (${claimedWei.toString()} wei).`
+        );
+      }
 
       // Convert ETH to credits using a rate
       // Base: 1 ETH ≈ 100,000 credits at current pricing ($0.008/credit, ~$3200/ETH)

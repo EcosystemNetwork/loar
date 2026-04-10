@@ -61,7 +61,14 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
 
     /// @param _treasury Receives the platform's fee cut immediately on each route()
     /// @param _defaultPlatformFeeBps Default fee in basis points (e.g. 1000 = 10%)
-    function initialize(address _treasury, uint16 _defaultPlatformFeeBps) external initializer {
+    /// @param _loarToken $LOAR token for dual-currency payments (can be address(0) initially)
+    /// @param _loarFeeDiscountBps Fee discount for $LOAR payments (e.g. 500 = 5%)
+    function initialize(
+        address _treasury,
+        uint16 _defaultPlatformFeeBps,
+        address _loarToken,
+        uint16 _loarFeeDiscountBps
+    ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -69,6 +76,8 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         if (_defaultPlatformFeeBps > 5000) revert FeeTooHigh();
         treasury = _treasury;
         defaultPlatformFeeBps = _defaultPlatformFeeBps;
+        loarToken = IERC20(_loarToken);
+        loarFeeDiscountBps = _loarFeeDiscountBps;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

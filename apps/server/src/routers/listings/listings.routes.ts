@@ -7,7 +7,14 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { createPublicClient, http, parseEther, type Hash } from 'viem';
+import { sepolia } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
+
+const sepoliaClient = createPublicClient({
+  chain: sepolia,
+  transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
+});
 
 export const PRODUCT_TYPES = [
   'EPISODE_NFT',
@@ -72,8 +79,12 @@ export const listingsRouter = router({
         const s = input.search.toLowerCase();
         docs = docs.filter(
           (d) =>
-            String(d.title ?? '').toLowerCase().includes(s) ||
-            String(d.description ?? '').toLowerCase().includes(s)
+            String(d.title ?? '')
+              .toLowerCase()
+              .includes(s) ||
+            String(d.description ?? '')
+              .toLowerCase()
+              .includes(s)
         );
       }
 
@@ -85,14 +96,12 @@ export const listingsRouter = router({
     }),
 
   /** Get a single listing by ID */
-  get: publicProcedure
-    .input(z.object({ listingId: z.string() }))
-    .query(async ({ input }) => {
-      if (!db) throwApiError('INTERNAL_SERVER_ERROR', 'Firebase not configured');
-      const doc = await listingsCol().doc(input.listingId).get();
-      if (!doc.exists) throwApiError('NOT_FOUND', 'Listing not found');
-      return { id: doc.id, ...doc.data() };
-    }),
+  get: publicProcedure.input(z.object({ listingId: z.string() })).query(async ({ input }) => {
+    if (!db) throwApiError('INTERNAL_SERVER_ERROR', 'Firebase not configured');
+    const doc = await listingsCol().doc(input.listingId).get();
+    if (!doc.exists) throwApiError('NOT_FOUND', 'Listing not found');
+    return { id: doc.id, ...doc.data() };
+  }),
 
   /** Create a new listing (DRAFT or ACTIVE) */
   create: protectedProcedure
@@ -216,6 +225,47 @@ export const listingsRouter = router({
         throwApiError('BAD_REQUEST', 'Insufficient supply');
       }
 
+      // Verify on-chain payment for ETH-denominated listings
+      if (listing.currency === 'ETH' && input.txHash) {
+        // Dedup: reject if this txHash was already used for another order
+        const existingOrder = await ordersCol().where('txHash', '==', input.txHash).limit(1).get();
+        if (!existingOrder.empty) {
+          throwApiError('BAD_REQUEST', 'This transaction has already been used for a purchase');
+        }
+
+        try {
+          const tx = await sepoliaClient.getTransaction({ hash: input.txHash as Hash });
+          const receipt = await sepoliaClient.getTransactionReceipt({ hash: input.txHash as Hash });
+
+          if (receipt.status !== 'success') {
+            throwApiError('BAD_REQUEST', 'Payment transaction was reverted on-chain');
+          }
+
+          // Verify the seller received the payment (seller address or listing-specified recipient)
+          const expectedRecipient = (listing.sellerAddress ?? listing.sellerUid)?.toLowerCase();
+          if (expectedRecipient && tx.to?.toLowerCase() !== expectedRecipient) {
+            throwApiError('BAD_REQUEST', 'Payment was not sent to the expected recipient');
+          }
+
+          // Verify minimum amount (listing price × quantity, 1% tolerance for gas)
+          if (listing.price > 0) {
+            const expectedWei = parseEther(String(listing.price * input.quantity));
+            const minRequired = (expectedWei * 99n) / 100n;
+            if (tx.value < minRequired) {
+              throwApiError(
+                'BAD_REQUEST',
+                `Insufficient payment. Expected ~${expectedWei.toString()} wei, got ${tx.value.toString()} wei`
+              );
+            }
+          }
+        } catch (err: any) {
+          if (err?.code) throw err; // Re-throw our own API errors
+          throwApiError('BAD_REQUEST', 'Payment transaction not found on-chain');
+        }
+      } else if (listing.currency === 'ETH' && !input.txHash) {
+        throwApiError('BAD_REQUEST', 'ETH purchases require a transaction hash');
+      }
+
       const now = new Date();
       const order = {
         listingId: input.listingId,
@@ -289,8 +339,7 @@ export const listingsRouter = router({
     const totalEarnings = orders
       .filter((o) => (o as any).currency === 'ETH' || (o as any).currency === 'LOAR')
       .reduce(
-        (sum, o) =>
-          sum + (parseFloat(String((o as any).price ?? '0')) * ((o as any).quantity ?? 1)),
+        (sum, o) => sum + parseFloat(String((o as any).price ?? '0')) * ((o as any).quantity ?? 1),
         0
       )
       .toString();

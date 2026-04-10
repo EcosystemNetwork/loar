@@ -427,7 +427,7 @@ match /takedownRequests/{id} {
 
 ## Admin Role Provisioning
 
-Add `role: 'admin'` as a custom claim on Firebase Auth (server-side only). Initial admin UIDs are set via an env var `ADMIN_UIDS` (comma-separated). On JWT verification in `verifyAuth()`, custom claims are passed through to `ctx.user`.
+Admin access is controlled by the `ADMIN_ADDRESSES` env var (comma-separated wallet addresses). The `adminProcedure` middleware in `apps/server/src/lib/trpc.ts` checks `ctx.user.address` against this list. No Firebase Auth custom claims are used — LOAR uses SIWE wallet auth, not Firebase Auth.
 
 ```ts
 // apps/server/src/lib/auth.ts addition

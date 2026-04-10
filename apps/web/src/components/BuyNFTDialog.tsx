@@ -114,13 +114,16 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
       }
 
       // Record purchase in Firebase
-      await recordMint.mutateAsync({
-        contentId: listing.contentId || listing.id,
-        universeId: listing.universeId || '',
-        minterAddress: address,
-        txHash: txHash ?? 'pending',
-        price: listing.mintPrice,
-      });
+      try {
+        await recordMint.mutateAsync({
+          episodeId: listing.contentId || listing.id,
+          tokenId: 0,
+          txHash: txHash ?? 'pending',
+          price: listing.mintPrice,
+        });
+      } catch {
+        // Non-critical — listing purchase already succeeded
+      }
 
       setStep('success');
       toast.success('NFT purchased!');

@@ -70,6 +70,22 @@ Needed for AI-powered features (video generation, wiki creation, storyline gener
 
 The server starts without these keys but AI features will throw errors when called.
 
+### Payments (Optional)
+
+| Variable             | App    | Description                                                   |
+| -------------------- | ------ | ------------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`  | server | Stripe secret key — enables card payments for credit purchase |
+| `TREASURY_ADDRESS`   | server | Ethereum address that receives ETH/$LOAR payments             |
+| `LOAR_TOKEN_ADDRESS` | server | $LOAR ERC-20 contract address for token payment verification  |
+
+### Infrastructure (Optional)
+
+| Variable    | App    | Description                                                               |
+| ----------- | ------ | ------------------------------------------------------------------------- |
+| `REDIS_URL` | server | Redis connection URL — enables distributed rate limiting (multi-instance) |
+
+When `REDIS_URL` is not set, the server uses an in-memory rate limiter (suitable for single-process deployments).
+
 ### Blockchain
 
 | Variable           | App     | Required | Description                                                      |

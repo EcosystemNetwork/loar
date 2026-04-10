@@ -6,6 +6,7 @@
  * this router reads state and manages platform-side benefits.
  */
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 
@@ -22,10 +23,10 @@ export const stakingRouter = router({
   getProfile: protectedProcedure.query(async ({ ctx }) => {
     const col = getStakingCol();
     if (!col) return null;
-    const doc = await col.doc(ctx.user.address.toLowerCase()).get();
+    const doc = await col.doc(ctx.user.address!.toLowerCase()).get();
     if (!doc.exists) {
       return {
-        address: ctx.user.address,
+        address: ctx.user.address!,
         tier: 'NONE',
         stakedAmount: 0,
         feeDiscountBps: 0,
@@ -47,13 +48,14 @@ export const stakingRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const col = getStakingCol();
-      if (!col) throw new Error('Not available');
+      if (!col)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
 
       const tier = calculateTier(input.stakedAmount);
       const tierIndex = TIER_NAMES.indexOf(tier);
 
       const profile = {
-        address: ctx.user.address.toLowerCase(),
+        address: ctx.user.address!.toLowerCase(),
         tier,
         stakedAmount: input.stakedAmount,
         feeDiscountBps: TIER_FEE_DISCOUNTS[tierIndex],
@@ -63,7 +65,7 @@ export const stakingRouter = router({
         updatedAt: new Date().toISOString(),
       };
 
-      await col.doc(ctx.user.address.toLowerCase()).set(profile, { merge: true });
+      await col.doc(ctx.user.address!.toLowerCase()).set(profile, { merge: true });
       return profile;
     }),
 
@@ -94,15 +96,16 @@ export const stakingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const curationCol = getCurationCol();
       const stakingCol = getStakingCol();
-      if (!curationCol || !stakingCol) throw new Error('Not available');
+      if (!curationCol || !stakingCol)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
 
       // Get user's curation boost from staking tier
-      const profileDoc = await stakingCol.doc(ctx.user.address.toLowerCase()).get();
+      const profileDoc = await stakingCol.doc(ctx.user.address!.toLowerCase()).get();
       const boost = profileDoc.exists ? profileDoc.data()?.curationBoost || 100 : 100;
       const boostedReward = (input.rewardLoar * boost) / 100;
 
       const record = {
-        address: ctx.user.address.toLowerCase(),
+        address: ctx.user.address!.toLowerCase(),
         contentId: input.contentId,
         universeId: input.universeId || null,
         baseReward: input.rewardLoar,
@@ -115,7 +118,7 @@ export const stakingRouter = router({
       await curationCol.add(record);
 
       // Update lifetime total
-      await stakingCol.doc(ctx.user.address.toLowerCase()).set(
+      await stakingCol.doc(ctx.user.address!.toLowerCase()).set(
         {
           totalCurationEarned: (profileDoc.data()?.totalCurationEarned || 0) + boostedReward,
           updatedAt: new Date().toISOString(),
@@ -133,7 +136,7 @@ export const stakingRouter = router({
       const col = getCurationCol();
       if (!col) return [];
       const snap = await col
-        .where('address', '==', ctx.user.address.toLowerCase())
+        .where('address', '==', ctx.user.address!.toLowerCase())
         .orderBy('createdAt', 'desc')
         .limit(input.limit)
         .get();

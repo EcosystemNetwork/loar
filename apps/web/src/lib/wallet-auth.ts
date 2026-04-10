@@ -62,14 +62,11 @@ export function clearSiweSession() {
 
 // ── SIWE message construction ───────────────────────────────────
 
-function buildSiweMessage(params: {
-  address: string;
-  nonce: string;
-  chainId: number;
-}) {
+function buildSiweMessage(params: { address: string; nonce: string; chainId: number }) {
   const domain = window.location.host;
   const uri = window.location.origin;
-  const now = new Date().toISOString();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
 
   return [
     `${domain} wants you to sign in with your Ethereum account:`,
@@ -81,7 +78,8 @@ function buildSiweMessage(params: {
     `Version: 1`,
     `Chain ID: ${params.chainId}`,
     `Nonce: ${params.nonce}`,
-    `Issued At: ${now}`,
+    `Issued At: ${now.toISOString()}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
   ].join('\n');
 }
 

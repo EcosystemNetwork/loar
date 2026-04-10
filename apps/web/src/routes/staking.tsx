@@ -82,7 +82,8 @@ function StakingPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staking-profile'] }),
   });
 
-  const currentTier = profile?.tier || 'NONE';
+  const p = profile as any;
+  const currentTier = p?.tier || 'NONE';
   const TierIcon = TIER_ICONS[currentTier] || Shield;
 
   return (
@@ -116,7 +117,7 @@ function StakingPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold tabular-nums">
-                      {(profile?.stakedAmount ?? 0).toLocaleString()}
+                      {(p?.stakedAmount ?? 0).toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground">$LOAR Staked</p>
                   </div>
@@ -127,26 +128,26 @@ function StakingPage() {
                   <div className="bg-white/5 dark:bg-black/20 rounded-lg p-3 text-center">
                     <Percent className="h-4 w-4 mx-auto mb-1 text-primary" />
                     <p className="text-lg font-bold">
-                      {((profile?.feeDiscountBps ?? 0) / 100).toFixed(1)}%
+                      {((p?.feeDiscountBps ?? 0) / 100).toFixed(1)}%
                     </p>
                     <p className="text-[10px] text-muted-foreground">Fee Discount</p>
                   </div>
                   <div className="bg-white/5 dark:bg-black/20 rounded-lg p-3 text-center">
                     <BarChart3 className="h-4 w-4 mx-auto mb-1 text-primary" />
                     <p className="text-lg font-bold">
-                      {((profile?.curationBoost ?? 100) / 100).toFixed(1)}x
+                      {((p?.curationBoost ?? 100) / 100).toFixed(1)}x
                     </p>
                     <p className="text-[10px] text-muted-foreground">Curation Boost</p>
                   </div>
                   <div className="bg-white/5 dark:bg-black/20 rounded-lg p-3 text-center">
                     <Zap className="h-4 w-4 mx-auto mb-1 text-primary" />
-                    <p className="text-lg font-bold">{profile?.priorityQueue ? 'Yes' : 'No'}</p>
+                    <p className="text-lg font-bold">{p?.priorityQueue ? 'Yes' : 'No'}</p>
                     <p className="text-[10px] text-muted-foreground">Priority Queue</p>
                   </div>
                   <div className="bg-white/5 dark:bg-black/20 rounded-lg p-3 text-center">
                     <TrendingUp className="h-4 w-4 mx-auto mb-1 text-primary" />
                     <p className="text-lg font-bold">
-                      {(profile?.totalCurationEarned ?? 0).toLocaleString()}
+                      {(p?.totalCurationEarned ?? 0).toLocaleString()}
                     </p>
                     <p className="text-[10px] text-muted-foreground">$LOAR Earned</p>
                   </div>

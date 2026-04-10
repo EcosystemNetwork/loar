@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { useWriteContract, useSendTransaction } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
+import { BuyNFTDialog } from '@/components/BuyNFTDialog';
 
 const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -61,6 +62,7 @@ function ProductDetailPage() {
   const { isConnected } = useWalletAuth();
   const { data: listing, isLoading } = useListing(id);
   const [buying, setBuying] = useState(false);
+  const [showNftBuy, setShowNftBuy] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
 
@@ -280,7 +282,19 @@ function ProductDetailPage() {
               </Button>
             </Link>
           ) : (
-            <Button className="w-full" size="lg" onClick={handleBuy} disabled={buying}>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                const isNft = ['EPISODE_NFT', 'CHARACTER_NFT', 'ARTIFACT'].includes(l.productType);
+                if (isNft && l.contractAddress) {
+                  setShowNftBuy(true);
+                } else {
+                  handleBuy();
+                }
+              }}
+              disabled={buying}
+            >
               {buying ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
@@ -295,6 +309,35 @@ function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      {/* NFT Purchase Dialog */}
+      {showNftBuy && (
+        <BuyNFTDialog
+          listing={{
+            id: l.id,
+            contentId: l.contentId,
+            title: l.title,
+            description: l.description,
+            imageUrl: l.mediaUrl ?? l.thumbnailUrl,
+            mintPrice: l.price ?? '0',
+            maxSupply: l.supply ?? 0,
+            minted: l.sold ?? 0,
+            creator: l.sellerAddress ?? '',
+            creatorName: l.sellerName,
+            universeId: l.universeId,
+            universeName: l.universeName,
+            contentType: l.productType,
+            contractAddress: l.contractAddress,
+            episodeId: l.episodeId,
+            metadataUri: l.metadataUri,
+          }}
+          onClose={() => setShowNftBuy(false)}
+          onSuccess={() => {
+            setShowNftBuy(false);
+            navigate({ to: '/my-works' });
+          }}
+        />
+      )}
     </div>
   );
 }

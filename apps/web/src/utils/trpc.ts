@@ -15,7 +15,7 @@ import { QueryCache, QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
-import { getSiweToken } from '../lib/wallet-auth';
+import { getSiweToken, clearSiweSession } from '../lib/wallet-auth';
 
 /** Shared React Query client. Retries 5xx errors and shows toast on failure. */
 export const queryClient = new QueryClient({
@@ -41,11 +41,22 @@ export const queryClient = new QueryClient({
     },
   },
   queryCache: new QueryCache({
-    onError: (error) => {
+    onError: (error: any) => {
       // Don't toast on network errors (server/indexer not running)
       if (error.message === 'Failed to fetch' || error.message.includes('ERR_CONNECTION_REFUSED')) {
         return;
       }
+
+      // Handle expired/invalid JWT — clear session and prompt re-auth
+      const httpStatus = error?.data?.httpStatus ?? error?.status;
+      if (httpStatus === 401 || error.message?.includes('UNAUTHORIZED')) {
+        clearSiweSession();
+        toast.error('Session expired. Please sign in again.', {
+          id: 'session-expired', // dedupe — one toast even if multiple queries fail
+        });
+        return;
+      }
+
       toast.error(error.message, {
         action: {
           label: 'retry',

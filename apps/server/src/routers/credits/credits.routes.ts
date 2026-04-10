@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { verifyStripePayment } from './stripe.routes';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 
@@ -50,12 +51,15 @@ const TRANSFER_TOPIC =
 /**
  * Verify an ETH or native-crypto payment by checking that the tx:
  * 1. Has not already been used (deduplication against creditTransactions)
- * 2. Exists on Sepolia and was not reverted
+ * 2. Exists on-chain and was not reverted
  * 3. Was sent to TREASURY_ADDRESS
- * Amount is not checked here because pkg.ethPriceWei defaults to '0' until
- * admin sets live prices — callers should add amount verification when ethPriceWei is set.
+ * 4. Transferred at least the expected amount (when expectedWei is set and non-zero)
  */
-async function verifyEthPayment(paymentRef: string, chainId?: number): Promise<void> {
+async function verifyEthPayment(
+  paymentRef: string,
+  chainId?: number,
+  expectedWei?: string
+): Promise<void> {
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
     throw new Error('TREASURY_ADDRESS is not configured on the server');
   }
@@ -90,6 +94,18 @@ async function verifyEthPayment(paymentRef: string, chainId?: number): Promise<v
     throw new Error(
       'Transaction recipient does not match the platform treasury address. Ensure you sent funds to the correct address.'
     );
+  }
+
+  // Enforce minimum payment amount when a price is configured
+  if (expectedWei && expectedWei !== '0') {
+    const expected = BigInt(expectedWei);
+    // Allow up to 1% underpayment to tolerate gas estimation variance
+    const minRequired = (expected * 99n) / 100n;
+    if (tx.value < minRequired) {
+      throw new Error(
+        `Insufficient ETH transferred. Expected ~${expectedWei} wei, got ${tx.value.toString()} wei.`
+      );
+    }
   }
 }
 
@@ -355,10 +371,14 @@ export const creditsRouter = router({
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
 
       if (input.paymentMethod === 'eth' || input.paymentMethod === 'crypto') {
-        // Verify on-chain: tx exists, confirmed, sent to treasury
-        await verifyEthPayment(input.paymentRef);
+        // Verify on-chain: tx exists, confirmed, sent to treasury, correct amount
+        await verifyEthPayment(input.paymentRef, undefined, pkg.ethPriceWei);
       } else {
-        // card: Stripe not yet integrated — deduplicate only to prevent double-spend
+        // card: Verify Stripe PaymentIntent succeeded with correct package and amount
+        const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
+        await verifyStripePayment(input.paymentRef, input.packageId, expectedCents);
+
+        // Deduplicate: reject if this PaymentIntent was already used
         const existing = await db
           .collection('creditTransactions')
           .where('paymentRef', '==', input.paymentRef)
