@@ -2,7 +2,7 @@
  * Public Profile Page
  *
  * Displays a user's public profile with their portfolio of content.
- * Shows different views for fun vs monetized content.
+ * Shows different views for fan / original / licensed content.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +13,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Globe, Lock, Play, Sparkles, DollarSign, ExternalLink, Users } from 'lucide-react';
+import {
+  Globe,
+  Lock,
+  Play,
+  Sparkles,
+  DollarSign,
+  ExternalLink,
+  Users,
+  ShieldCheck,
+} from 'lucide-react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 
 export const Route = createFileRoute('/profile/$username')({
@@ -140,8 +149,9 @@ function ProfilePage() {
   const followers = (profile as any).followers || 0;
   const following = (profile as any).following || 0;
   const items = contentData?.items || [];
-  const funItems = items.filter((i: any) => i.classification === 'fun');
-  const monetizedItems = items.filter((i: any) => i.classification === 'monetized');
+  const fanItems = items.filter((i: any) => i.classification === 'fan');
+  const originalItems = items.filter((i: any) => i.classification === 'original');
+  const licensedItems = items.filter((i: any) => i.classification === 'licensed');
   const gridCols =
     layout.gridColumns === '2'
       ? 'md:grid-cols-2'
@@ -282,16 +292,26 @@ function ProfilePage() {
         <Tabs defaultValue="all" className="mt-8 pb-12">
           <TabsList>
             <TabsTrigger value="all">All ({items.length})</TabsTrigger>
-            <TabsTrigger value="fun" className="gap-1">
-              <Sparkles className="h-3 w-3" /> Fun ({funItems.length})
+            <TabsTrigger value="fan" className="gap-1">
+              <Sparkles className="h-3 w-3" /> Non-Commercial ({fanItems.length})
             </TabsTrigger>
-            <TabsTrigger value="monetized" className="gap-1">
-              <DollarSign className="h-3 w-3" /> Monetized ({monetizedItems.length})
+            <TabsTrigger value="original" className="gap-1">
+              <DollarSign className="h-3 w-3" /> Creator-Owned ({originalItems.length})
+            </TabsTrigger>
+            <TabsTrigger value="licensed" className="gap-1">
+              <ShieldCheck className="h-3 w-3" /> Rights-Cleared ({licensedItems.length})
             </TabsTrigger>
           </TabsList>
 
-          {['all', 'fun', 'monetized'].map((tab) => {
-            const tabItems = tab === 'all' ? items : tab === 'fun' ? funItems : monetizedItems;
+          {(['all', 'fan', 'original', 'licensed'] as const).map((tab) => {
+            const tabItems =
+              tab === 'all'
+                ? items
+                : tab === 'fan'
+                  ? fanItems
+                  : tab === 'original'
+                    ? originalItems
+                    : licensedItems;
             return (
               <TabsContent key={tab} value={tab}>
                 {tabItems.length === 0 ? (
@@ -342,17 +362,21 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
           {/* Classification badge */}
           <div className="absolute top-2 right-2">
             <Badge
-              variant={item.classification === 'monetized' ? 'default' : 'secondary'}
+              variant={item.classification === 'fan' ? 'secondary' : 'default'}
               className="text-xs"
-              style={item.classification === 'monetized' ? { backgroundColor: accentColor } : {}}
+              style={item.classification !== 'fan' ? { backgroundColor: accentColor } : {}}
             >
-              {item.classification === 'monetized' ? (
+              {item.classification === 'original' ? (
                 <>
-                  <DollarSign className="h-3 w-3 mr-0.5" /> Monetized
+                  <DollarSign className="h-3 w-3 mr-0.5" /> Creator-Owned
+                </>
+              ) : item.classification === 'licensed' ? (
+                <>
+                  <ShieldCheck className="h-3 w-3 mr-0.5" /> Rights-Cleared
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3 w-3 mr-0.5" /> Fun
+                  <Sparkles className="h-3 w-3 mr-0.5" /> Non-Commercial
                 </>
               )}
             </Badge>

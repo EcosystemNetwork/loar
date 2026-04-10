@@ -448,7 +448,7 @@ export const generationRouter = router({
 
       const latencyMs = Date.now() - startTime;
 
-      if (result.status === 'failed' || result.error) {
+      if (result.status === 'failed' || result.error || !result.videoUrl) {
         // Mark provider unhealthy on failure
         markProviderUnhealthy(model.provider);
 

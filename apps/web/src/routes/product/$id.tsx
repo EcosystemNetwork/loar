@@ -102,13 +102,23 @@ function ProductDetailPage() {
     try {
       let txHash: string | undefined;
 
-      // For ETH listings, send ETH on-chain to seller before recording the order
-      if (l.currency === 'ETH' && l.price !== '0') {
-        const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
-        if (!recipient) {
-          toast.error('No payment recipient configured');
-          return;
-        }
+      // Direct ETH/LOAR transfers to seller EOAs are disabled until
+      // an escrow or PaymentRouter contract is integrated. Only contract-
+      // based purchases (NFT mints) are allowed for paid listings.
+      if (
+        (l.currency === 'ETH' || l.currency === 'LOAR') &&
+        l.price !== '0' &&
+        !l.contractAddress
+      ) {
+        toast.error(
+          'Direct purchases are temporarily disabled. This listing needs smart contract integration before it can accept payments.'
+        );
+        return;
+      }
+
+      // For ETH listings routed through a contract, send ETH on-chain
+      if (l.currency === 'ETH' && l.price !== '0' && l.contractAddress) {
+        const recipient = l.contractAddress as Address;
         toast.info('Confirm ETH payment in your wallet…');
         txHash = await sendTransactionAsync({
           to: recipient,
@@ -117,17 +127,13 @@ function ProductDetailPage() {
         toast.info('ETH sent! Recording order…');
       }
 
-      // For $LOAR listings, transfer tokens on-chain before recording the order
-      if (l.currency === 'LOAR' && l.price !== '0') {
+      // For $LOAR listings routed through a contract
+      if (l.currency === 'LOAR' && l.price !== '0' && l.contractAddress) {
         if (!LOAR_TOKEN_ADDRESS) {
           toast.error('$LOAR token address not configured');
           return;
         }
-        const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
-        if (!recipient) {
-          toast.error('No payment recipient configured');
-          return;
-        }
+        const recipient = l.contractAddress as Address;
         const loarAmount = parseUnits(l.price as string, 18);
         toast.info('Confirm $LOAR transfer in your wallet…');
         txHash = await writeContractAsync({
@@ -304,9 +310,11 @@ function ProductDetailPage() {
               )}
               {l.price === '0'
                 ? 'Claim Free'
-                : l.currency === 'ETH'
-                  ? `Pay ${l.price} ETH`
-                  : `Buy for ${l.price} ${l.currency}`}
+                : (l.currency === 'ETH' || l.currency === 'LOAR') && !l.contractAddress
+                  ? 'Purchase Unavailable'
+                  : l.currency === 'ETH'
+                    ? `Pay ${l.price} ETH`
+                    : `Buy for ${l.price} ${l.currency}`}
             </Button>
           )}
         </div>

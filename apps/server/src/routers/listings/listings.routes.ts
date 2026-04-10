@@ -221,8 +221,26 @@ export const listingsRouter = router({
 
       const listing = listingDoc.data()!;
       if (listing.status !== 'ACTIVE') throwApiError('BAD_REQUEST', 'Listing is not active');
+      if (listing.rightsLane === 'fan') {
+        throwApiError('BAD_REQUEST', 'Non-commercial (fan) content cannot be purchased');
+      }
       if (listing.supply > 0 && listing.sold + input.quantity > listing.supply) {
         throwApiError('BAD_REQUEST', 'Insufficient supply');
+      }
+
+      // Block direct ETH/LOAR purchases that bypass a smart contract.
+      // Until an escrow or PaymentRouter integration is live, direct transfers
+      // to seller EOAs are unsafe (no refund path, no dispute mechanism).
+      // Only allow: free claims, CREDITS purchases, and contract-based NFT mints.
+      if (
+        (listing.currency === 'ETH' || listing.currency === 'LOAR') &&
+        parseFloat(listing.price) > 0 &&
+        !listing.contractAddress
+      ) {
+        throwApiError(
+          'BAD_REQUEST',
+          'Direct ETH/LOAR purchases are temporarily disabled. Purchases must go through a smart contract (e.g. NFT mint). This listing needs a contract address configured.'
+        );
       }
 
       // Verify on-chain payment for ETH-denominated listings

@@ -183,6 +183,10 @@ export const voiceRouter = router({
           style: input.style,
         });
 
+        if (!result.audioBuffer || result.audioBuffer.length === 0) {
+          throw new Error('Provider returned empty audio — generation failed silently');
+        }
+
         const filename = `voice-tts-${genId}.mp3`;
         const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
         const latencyMs = Date.now() - startTime;
@@ -257,6 +261,12 @@ export const voiceRouter = router({
           text: input.text,
           durationSeconds: input.durationSeconds,
         });
+
+        if (!result.audioBuffer || result.audioBuffer.length === 0) {
+          throw new Error(
+            'Provider returned empty audio — sound effect generation failed silently'
+          );
+        }
 
         const filename = `voice-sfx-${genId}.mp3`;
         const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
@@ -334,6 +344,10 @@ export const voiceRouter = router({
           accent: input.accent,
           accentStrength: input.accentStrength,
         });
+
+        if (!result.audioBuffer || result.audioBuffer.length === 0 || !result.voiceId) {
+          throw new Error('Provider returned empty response — voice design failed silently');
+        }
 
         const filename = `voice-design-preview-${genId}.mp3`;
         const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
@@ -415,6 +429,10 @@ export const voiceRouter = router({
           description: input.description,
           audioBuffers,
         });
+
+        if (!result.voiceId) {
+          throw new Error('Provider returned empty response — voice clone failed silently');
+        }
 
         await voiceGenerationsCol().doc(genId).update({
           status: 'completed',
