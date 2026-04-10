@@ -12,7 +12,10 @@
 | `GET`  | `/health`                 | No     | JSON health status: `{ status, checks, uptime, env }` |
 | `GET`  | `/auth/nonce`             | No     | Generate a fresh nonce for SIWE message construction  |
 | `POST` | `/auth/verify`            | No     | Verify signed SIWE message, returns JWT session token |
+| `POST` | `/auth/refresh`           | Bearer | Refresh session — returns new JWT if current is valid |
+| `POST` | `/auth/revoke`            | Bearer | Revoke the current session token (server-side logout) |
 | `POST` | `/api/upload`             | Bearer | Direct file upload (multipart form, max 200MB)        |
+| `POST` | `/api/stripe/webhook`     | Stripe | Stripe webhook for payment_intent.succeeded events    |
 | `GET`  | `/images/*`               | No     | Serve stored images                                   |
 | `GET`  | `/api/filecoin/:pieceCid` | No     | Stream content from Filecoin by PieceCID              |
 

@@ -49,6 +49,10 @@ app.use(
   })
 );
 
+// Stripe webhook (must be before body-parsing middleware — needs raw body)
+const { stripeWebhookRoutes } = await import('./routes/stripe-webhook');
+app.route('/api/stripe', stripeWebhookRoutes);
+
 // SIWE authentication routes
 app.route('/auth', authRoutes);
 

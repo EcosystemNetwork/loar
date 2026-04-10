@@ -72,11 +72,12 @@ The server starts without these keys but AI features will throw errors when call
 
 ### Payments (Optional)
 
-| Variable             | App    | Description                                                   |
-| -------------------- | ------ | ------------------------------------------------------------- |
-| `STRIPE_SECRET_KEY`  | server | Stripe secret key — enables card payments for credit purchase |
-| `TREASURY_ADDRESS`   | server | Ethereum address that receives ETH/$LOAR payments             |
-| `LOAR_TOKEN_ADDRESS` | server | $LOAR ERC-20 contract address for token payment verification  |
+| Variable                | App    | Description                                                          |
+| ----------------------- | ------ | -------------------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`     | server | Stripe secret key — enables card payments for credit purchase        |
+| `STRIPE_WEBHOOK_SECRET` | server | Stripe webhook signing secret — verifies `/api/stripe/webhook` calls |
+| `TREASURY_ADDRESS`      | server | Ethereum address that receives ETH/$LOAR payments                    |
+| `LOAR_TOKEN_ADDRESS`    | server | $LOAR ERC-20 contract address for token payment verification         |
 
 ### Infrastructure (Optional)
 

@@ -17,7 +17,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Sparkles, ShieldCheck, Palette } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  Sparkles,
+  ShieldCheck,
+  Palette,
+  ImagePlus,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 
 type EntityKind =
   | 'person'
@@ -459,6 +468,9 @@ function EntityCreateForm() {
   const [rightsDeclaration, setRightsDeclaration] = useState<'original' | 'licensed' | null>(null);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [artworkPrompt, setArtworkPrompt] = useState('');
+  const [showArtwork, setShowArtwork] = useState(false);
+  const [generatingArt, setGeneratingArt] = useState(false);
 
   const handleGenerateAI = async () => {
     if (!name.trim()) {
@@ -539,6 +551,33 @@ function EntityCreateForm() {
       });
 
       toast.success(`${label} created!`);
+
+      // If artwork prompt was provided, generate artwork and update entity
+      if (artworkPrompt.trim()) {
+        setGeneratingArt(true);
+        try {
+          const artResult = await trpcClient.image.generate.mutate({
+            prompt: artworkPrompt.trim(),
+            task: 'text_to_image',
+            imageSize: 'square_hd',
+            numImages: 1,
+            routingMode: 'auto',
+            entityId: result.id,
+          });
+          if (artResult.status === 'completed' && artResult.imageUrls?.[0]) {
+            await trpcClient.entities.update.mutate({
+              entityId: result.id,
+              imageUrl: artResult.imageUrls[0],
+            });
+            toast.success('Artwork generated!');
+          }
+        } catch (artErr: any) {
+          toast.error(`Entity created but artwork failed: ${artErr.message ?? 'Unknown error'}`);
+        } finally {
+          setGeneratingArt(false);
+        }
+      }
+
       navigate({ to: '/wiki/entity/$id', params: { id: result.id } });
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to create entity');
@@ -757,13 +796,73 @@ function EntityCreateForm() {
           </CardContent>
         </Card>
 
+        {/* Optional AI Artwork */}
+        <Card>
+          <CardHeader>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-left"
+              onClick={() => setShowArtwork(!showArtwork)}
+            >
+              <div className="flex items-center gap-2">
+                <ImagePlus className="w-4 h-4" />
+                <CardTitle className="text-base">AI Artwork (Optional)</CardTitle>
+              </div>
+              {showArtwork ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+          </CardHeader>
+          {showArtwork && (
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Describe the artwork you want generated for this {label.toLowerCase()}. Leave empty
+                to skip. You can always generate artwork later.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="artworkPrompt">Artwork Prompt</Label>
+                <Textarea
+                  id="artworkPrompt"
+                  value={artworkPrompt}
+                  onChange={(e) => setArtworkPrompt(e.target.value)}
+                  placeholder={`e.g. A cinematic portrait of ${name || `this ${label.toLowerCase()}`}, dramatic lighting, detailed digital art...`}
+                  rows={3}
+                />
+              </div>
+              {name.trim() && !artworkPrompt.trim() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const autoPrompt =
+                      typedKind === 'person'
+                        ? `Character portrait of ${name}, ${description || fieldValues.appearance || fieldValues.role || ''}, cinematic lighting, high quality digital art, detailed`
+                        : typedKind === 'place'
+                          ? `Landscape painting of ${name}, ${description || fieldValues.atmosphere || ''}, cinematic, detailed environment concept art`
+                          : typedKind === 'thing'
+                            ? `Detailed illustration of ${name}, ${description || fieldValues.powersAndUse || ''}, fantasy artifact, dramatic lighting`
+                            : `Concept art of ${name}, ${description || ''}, high quality digital art, cinematic`;
+                    setArtworkPrompt(autoPrompt.replace(/,\s*,/g, ',').replace(/,\s*$/, ''));
+                  }}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Auto-fill prompt from details
+                </Button>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
         <div className="flex gap-3">
           <Button
             type="submit"
-            disabled={saving || !name.trim() || (monetized && !rightsDeclaration)}
+            disabled={saving || generatingArt || !name.trim() || (monetized && !rightsDeclaration)}
           >
-            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {saving ? 'Creating...' : `Create ${label}`}
+            {(saving || generatingArt) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {generatingArt ? 'Generating Artwork...' : saving ? 'Creating...' : `Create ${label}`}
           </Button>
           <Link to="/create">
             <Button type="button" variant="outline">

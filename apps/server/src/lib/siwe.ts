@@ -21,6 +21,28 @@ setInterval(
   5 * 60 * 1000
 );
 
+// Firestore nonce cleanup — delete expired/used nonces every 15 minutes
+// Prevents unbounded document accumulation.
+setInterval(
+  async () => {
+    const col = getNoncesCol();
+    if (!col) return;
+
+    try {
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000); // 10 min ago
+      const expired = await col.where('expiresAt', '<', cutoff).limit(500).get();
+      if (expired.empty) return;
+
+      const batch = db.batch();
+      expired.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    } catch (err) {
+      console.error('[SIWE] Nonce cleanup failed:', err);
+    }
+  },
+  15 * 60 * 1000
+);
+
 const jwtSecretRaw = process.env.SIWE_JWT_SECRET;
 if (!jwtSecretRaw || jwtSecretRaw.length < 32) {
   throw new Error(
@@ -140,24 +162,79 @@ export async function verifySiweSignature(
 
 /** Issue a signed JWT for the given wallet address. */
 export async function issueSessionToken(address: string): Promise<string> {
+  const jti = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, '0')
+  ).join('');
+
   return new SignJWT({ sub: getAddress(address) })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(JWT_ISSUER)
     .setIssuedAt()
+    .setJti(jti)
     .setExpirationTime(JWT_EXPIRY)
     .sign(JWT_SECRET);
 }
 
-/** Verify a SIWE session JWT. Returns the payload or null if invalid/expired. */
+// ── Token blacklist (in-memory, or Firestore if available) ──────────────
+// Used to revoke tokens before they expire naturally.
+const memoryBlacklist = new Set<string>();
+
+// Clean up expired blacklist entries every 30 minutes
+setInterval(
+  () => {
+    // In-memory entries auto-expire when the JWT itself expires.
+    // We just clear the whole set periodically since stale entries are harmless.
+    if (memoryBlacklist.size > 10_000) memoryBlacklist.clear();
+  },
+  30 * 60 * 1000
+);
+
+/** Blacklist a JWT so it cannot be used even before expiry. */
+export async function revokeToken(jti: string): Promise<void> {
+  const col = firebaseAvailable ? db.collection('revokedTokens') : null;
+  if (col) {
+    await col.doc(jti).set({ revokedAt: new Date() });
+  } else {
+    memoryBlacklist.add(jti);
+  }
+}
+
+/** Check if a token has been revoked. */
+async function isTokenRevoked(jti: string): Promise<boolean> {
+  const col = firebaseAvailable ? db.collection('revokedTokens') : null;
+  if (col) {
+    const doc = await col.doc(jti).get();
+    return doc.exists;
+  }
+  return memoryBlacklist.has(jti);
+}
+
+/** Verify a SIWE session JWT. Returns the payload or null if invalid/expired/revoked. */
 export async function verifySessionToken(token: string): Promise<SiweSessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
     });
+
+    // Check revocation if token has a jti
+    if (payload.jti && (await isTokenRevoked(payload.jti))) {
+      return null;
+    }
+
     return payload as SiweSessionPayload;
   } catch {
     return null;
   }
+}
+
+/**
+ * Refresh a session token. Returns a new JWT if the existing one is valid.
+ * The old token remains valid until it expires (or is explicitly revoked).
+ */
+export async function refreshSessionToken(token: string): Promise<string | null> {
+  const payload = await verifySessionToken(token);
+  if (!payload?.sub) return null;
+  return issueSessionToken(payload.sub);
 }
 
 /** Construct a SIWE-compliant message string. */
