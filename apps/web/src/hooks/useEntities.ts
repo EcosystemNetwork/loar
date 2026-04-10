@@ -92,6 +92,8 @@ export const ENTITY_ACTIONS: Record<EntityKind, string> = {
   domain: 'Assign Domain Control',
 };
 
+export type RightsDeclaration = 'original' | 'licensed';
+
 export interface Entity {
   id: string;
   name: string;
@@ -103,6 +105,8 @@ export interface Entity {
   imageUrl: string | null;
   metadata: Record<string, unknown>;
   creator: string;
+  monetized: boolean;
+  rightsDeclaration: RightsDeclaration | null;
   createdAt: string;
   updatedAt: string;
 }

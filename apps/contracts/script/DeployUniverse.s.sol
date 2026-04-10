@@ -116,7 +116,7 @@ contract DeployUniverseScript is Script {
         require(lockerAddress != address(0), "LOCKER_ADDRESS not set");
         require(pairedToken != address(0), "PAIRED_TOKEN not set");
 
-        universeManager = UniverseManager(universeManagerAddress);
+        universeManager = UniverseManager(payable(universeManagerAddress));
 
         console.log("=== Universe Deployment Configuration ===");
         console.log("Deployer address:", deployerAddress);

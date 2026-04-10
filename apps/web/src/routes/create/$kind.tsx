@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles, ShieldCheck, Palette } from 'lucide-react';
 
 type EntityKind =
   | 'person'
@@ -455,7 +455,38 @@ function EntityCreateForm() {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [monetized, setMonetized] = useState(false);
+  const [rightsDeclaration, setRightsDeclaration] = useState<'original' | 'licensed' | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!name.trim()) {
+      toast.error('Enter a name first so AI knows what to generate');
+      return;
+    }
+    setGenerating(true);
+    try {
+      const profile = await trpcClient.entities.generateProfile.mutate({
+        name: name.trim(),
+        kind: kind as EntityKind,
+        hint: description || '',
+      });
+      setDescription(profile.description);
+      const newFields: Record<string, string> = {};
+      for (const [key, value] of Object.entries(profile.metadata)) {
+        if (typeof value === 'string' && value) {
+          newFields[key] = value;
+        }
+      }
+      setFieldValues((prev) => ({ ...prev, ...newFields }));
+      toast.success('AI profile generated! Review and edit before saving.');
+    } catch (err: any) {
+      toast.error(err.message ?? 'AI generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   if (!VALID_KINDS.includes(kind as EntityKind)) {
     return (
@@ -491,12 +522,20 @@ function EntityCreateForm() {
         }
       }
 
+      if (monetized && !rightsDeclaration) {
+        toast.error('Select a rights declaration for monetized entities');
+        setSaving(false);
+        return;
+      }
+
       const result = await trpcClient.entities.create.mutate({
         name,
         description,
         kind: typedKind,
         imageUrl: imageUrl || null,
         metadata,
+        monetized,
+        rightsDeclaration: monetized ? rightsDeclaration : null,
       });
 
       toast.success(`${label} created!`);
@@ -527,8 +566,22 @@ function EntityCreateForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Core fields */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Core</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateAI}
+              disabled={generating || !name.trim()}
+            >
+              {generating ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              {generating ? 'Generating...' : 'Generate with AI'}
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -602,8 +655,113 @@ function EntityCreateForm() {
           </Card>
         )}
 
+        {/* Monetization */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Monetization</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Will you sell, license, or commercially use this {label.toLowerCase()}? Choose now —
+              you can change this later.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMonetized(false);
+                  setRightsDeclaration(null);
+                }}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-colors ${
+                  !monetized
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-muted-foreground/30'
+                }`}
+              >
+                <Palette className="w-5 h-5" />
+                <span className="font-medium text-sm">Non-Monetized</span>
+                <span className="text-xs text-muted-foreground">
+                  Personal use, fan art, exploration. Cannot be minted as NFT.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonetized(true)}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-colors ${
+                  monetized
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-muted-foreground/30'
+                }`}
+              >
+                <ShieldCheck className="w-5 h-5" />
+                <span className="font-medium text-sm">Monetized</span>
+                <span className="text-xs text-muted-foreground">
+                  Sell, license, or mint as NFT. Requires rights declaration.
+                </span>
+              </button>
+            </div>
+
+            {monetized && (
+              <div className="space-y-3 pt-2">
+                <Label>Rights Declaration *</Label>
+                <div className="space-y-2">
+                  <label
+                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      rightsDeclaration === 'original'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rights"
+                      checked={rightsDeclaration === 'original'}
+                      onChange={() => setRightsDeclaration('original')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="font-medium text-sm">Original Work</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        I created this — it does not copy or derive from existing copyrighted IP.
+                      </p>
+                    </div>
+                  </label>
+                  <label
+                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      rightsDeclaration === 'licensed'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rights"
+                      checked={rightsDeclaration === 'licensed'}
+                      onChange={() => setRightsDeclaration('licensed')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="font-medium text-sm">Licensed</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        I have a license or permission from the rights holder to use this
+                        commercially.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  False declarations may result in takedown and loss of minting privileges.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex gap-3">
-          <Button type="submit" disabled={saving || !name.trim()}>
+          <Button
+            type="submit"
+            disabled={saving || !name.trim() || (monetized && !rightsDeclaration)}
+          >
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {saving ? 'Creating...' : `Create ${label}`}
           </Button>

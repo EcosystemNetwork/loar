@@ -33,7 +33,7 @@ const LOAR_TO_USD = 0.01;
 
 const COSTS = {
   text_preview: 0.05,
-  text_refine: 0.20,
+  text_refine: 0.2,
   image_to_3d: 0.15,
 };
 
@@ -56,8 +56,14 @@ const threeDGenCol = () => {
 
 // ── Credit helpers ────────────────────────────────────────────────────
 
+const userCreditsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('userCredits');
+};
+
 async function deductCredits(userId: string, credits: number): Promise<void> {
-  const ref = db.collection('userCredits').doc(userId);
+  if (!db) throw new Error('Firebase is not configured');
+  const ref = userCreditsCol().doc(userId);
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
     const balance = doc.exists ? doc.data()?.balance || 0 : 0;
@@ -75,7 +81,7 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
 }
 
 async function refundCredits(userId: string, credits: number): Promise<void> {
-  const ref = db.collection('userCredits').doc(userId);
+  const ref = userCreditsCol().doc(userId);
   try {
     const doc = await ref.get();
     if (doc.exists) {
@@ -110,21 +116,23 @@ export const threedRouter = router({
       const cost = COSTS.text_preview;
       const credits = toCredits(cost);
 
-      await threeDGenCol().doc(genId).set({
-        id: genId,
-        userId: ctx.user.uid,
-        entityId: input.entityId || null,
-        universeId: input.universeId || null,
-        type: 'text_preview',
-        prompt: input.prompt,
-        artStyle: input.artStyle || 'realistic',
-        providerCostUsd: cost,
-        fiatPriceUsd: withFiat(cost),
-        loarPriceUsd: withLoar(cost),
-        creditsCharged: credits,
-        status: 'queued',
-        createdAt: new Date(),
-      });
+      await threeDGenCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || null,
+          universeId: input.universeId || null,
+          type: 'text_preview',
+          prompt: input.prompt,
+          artStyle: input.artStyle || 'realistic',
+          providerCostUsd: cost,
+          fiatPriceUsd: withFiat(cost),
+          loarPriceUsd: withLoar(cost),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+        });
 
       await deductCredits(ctx.user.uid, credits);
 
@@ -165,11 +173,13 @@ export const threedRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await threeDGenCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await threeDGenCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),
@@ -198,20 +208,22 @@ export const threedRouter = router({
       const cost = COSTS.text_refine;
       const credits = toCredits(cost);
 
-      await threeDGenCol().doc(genId).set({
-        id: genId,
-        userId: ctx.user.uid,
-        entityId: input.entityId || previewData.entityId || null,
-        type: 'text_refine',
-        previewGenerationId: input.previewGenerationId,
-        previewMeshyTaskId: previewData.meshyTaskId,
-        providerCostUsd: cost,
-        fiatPriceUsd: withFiat(cost),
-        loarPriceUsd: withLoar(cost),
-        creditsCharged: credits,
-        status: 'queued',
-        createdAt: new Date(),
-      });
+      await threeDGenCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || previewData.entityId || null,
+          type: 'text_refine',
+          previewGenerationId: input.previewGenerationId,
+          previewMeshyTaskId: previewData.meshyTaskId,
+          providerCostUsd: cost,
+          fiatPriceUsd: withFiat(cost),
+          loarPriceUsd: withLoar(cost),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+        });
 
       await deductCredits(ctx.user.uid, credits);
 
@@ -247,11 +259,13 @@ export const threedRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await threeDGenCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await threeDGenCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),
@@ -274,20 +288,22 @@ export const threedRouter = router({
       const credits = toCredits(cost);
       const isMulti = input.imageUrls.length > 1;
 
-      await threeDGenCol().doc(genId).set({
-        id: genId,
-        userId: ctx.user.uid,
-        entityId: input.entityId || null,
-        universeId: input.universeId || null,
-        type: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
-        imageUrls: input.imageUrls,
-        providerCostUsd: cost,
-        fiatPriceUsd: withFiat(cost),
-        loarPriceUsd: withLoar(cost),
-        creditsCharged: credits,
-        status: 'queued',
-        createdAt: new Date(),
-      });
+      await threeDGenCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || null,
+          universeId: input.universeId || null,
+          type: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
+          imageUrls: input.imageUrls,
+          providerCostUsd: cost,
+          fiatPriceUsd: withFiat(cost),
+          loarPriceUsd: withLoar(cost),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+        });
 
       await deductCredits(ctx.user.uid, credits);
 
@@ -334,11 +350,13 @@ export const threedRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await threeDGenCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await threeDGenCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),

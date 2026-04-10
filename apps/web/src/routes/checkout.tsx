@@ -18,10 +18,8 @@ import { z } from 'zod';
 import { useWriteContract } from 'wagmi';
 import { parseUnits, type Address } from 'viem';
 
-const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
-const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
+const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
+const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
 const ERC20_ABI = [
   {
@@ -96,8 +94,16 @@ function CheckoutPage() {
 
       // For $LOAR listings, transfer tokens on-chain before recording the order
       if (displayCurrency === 'LOAR' && displayPrice !== '0' && !isFree) {
+        if (!LOAR_TOKEN_ADDRESS) {
+          toast.error('$LOAR token address not configured');
+          return;
+        }
         const recipient =
           ((listing as any)?.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+        if (!recipient) {
+          toast.error('Treasury address not configured');
+          return;
+        }
         const loarAmount = parseUnits(displayPrice, 18);
         toast.info('Confirm $LOAR transfer in your wallet…');
         txHash = await writeContractAsync({

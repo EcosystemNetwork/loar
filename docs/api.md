@@ -19,10 +19,10 @@ All tRPC procedures are accessed at `/trpc/<procedure>`. The web app uses a tRPC
 
 #### Authentication
 
-Procedures marked **[protected]** require a Firebase ID token:
+Procedures marked **[protected]** require a SIWE session JWT:
 
 ```
-Authorization: Bearer <firebase-id-token>
+Authorization: Bearer <siwe-session-token>
 ```
 
 #### healthCheck
@@ -33,7 +33,7 @@ Authorization: Bearer <firebase-id-token>
 #### privateData
 
 - **Type:** query [protected]
-- **Returns:** `{ message: string, user: { uid: string, email: string } }`
+- **Returns:** `{ message: string, user: { uid: string, address: string } }`
 
 ---
 

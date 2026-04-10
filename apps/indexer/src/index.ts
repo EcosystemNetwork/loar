@@ -30,7 +30,7 @@ import { getAddress } from 'viem';
 // ============= UniverseManager Events =============
 
 ponder.on('UniverseManager:UniverseCreated', async ({ event, context }) => {
-  const universeAddress = getAddress(event.args.universe).toLowerCase();
+  const universeAddress = getAddress(event.args.universe).toLowerCase() as `0x${string}`;
 
   // Read metadata directly from the Universe contract
   let universeName = 'Untitled Universe';
@@ -114,7 +114,7 @@ ponder.on('UniverseManager:SetHook', async ({ event, context }) => {
 // ============= Universe (Dynamic Contract) Events =============
 
 ponder.on('Universe:NodeCreated', async ({ event, context }) => {
-  const universeAddress = getAddress(event.log.address).toLowerCase();
+  const universeAddress = getAddress(event.log.address).toLowerCase() as `0x${string}`;
   const nodeId = Number(event.args.id);
 
   // Content is now available directly in event args (no readContract needed)
@@ -155,7 +155,7 @@ ponder.on('Universe:NodeCreated', async ({ event, context }) => {
 });
 
 ponder.on('Universe:NodeCanonized', async ({ event, context }) => {
-  const universeAddress = getAddress(event.log.address).toLowerCase();
+  const universeAddress = getAddress(event.log.address).toLowerCase() as `0x${string}`;
   const nodeId = Number(event.args.id);
 
   await context.db.insert(nodeCanonization).values({
@@ -173,18 +173,9 @@ ponder.on('UniverseGovernor:ProposalCreated', async ({ event, context }) => {
   const governorAddress = getAddress(event.log.address);
   const proposalId = event.args.proposalId.toString();
 
-  // Find universe associated with this governor
-  // This requires a lookup or mapping
-  let universeAddress = null;
-  const universes = await context.db
-    .select()
-    .from(universe)
-    .where((u) => u.governorAddress === governorAddress)
-    .limit(1);
-
-  if (universes.length > 0) {
-    universeAddress = universes[0].id;
-  }
+  // Universe address is resolved lazily in the API layer via governor→universe join.
+  // Handler context does not support Drizzle select queries.
+  const universeAddress: `0x${string}` | null = null;
 
   await context.db.insert(proposal).values({
     id: proposalId,
@@ -258,7 +249,7 @@ ponder.on('GovernanceToken:Transfer', async ({ event, context }) => {
   const tokenAddress = getAddress(event.log.address);
   const from = getAddress(event.args.from);
   const to = getAddress(event.args.to);
-  const value = event.args.value;
+  const amount = event.args.amount;
 
   // Record transfer
   await context.db.insert(tokenTransfer).values({
@@ -266,7 +257,7 @@ ponder.on('GovernanceToken:Transfer', async ({ event, context }) => {
     tokenAddress,
     from,
     to,
-    value: value.toString(),
+    value: amount.toString(),
     timestamp: Number(event.block.timestamp),
     blockNumber: Number(event.block.number),
   });
@@ -275,13 +266,12 @@ ponder.on('GovernanceToken:Transfer', async ({ event, context }) => {
   if (from !== '0x0000000000000000000000000000000000000000') {
     const fromHolder = await context.db.find(tokenHolder, { id: `${tokenAddress}:${from}` });
     if (fromHolder) {
-      const newBalance = BigInt(fromHolder.balance) - value;
+      const newBalance = BigInt(fromHolder.balance) - amount;
       if (newBalance > 0n) {
         await context.db
           .update(tokenHolder, { id: `${tokenAddress}:${from}` })
           .set({ balance: newBalance.toString() });
       } else {
-        // Balance is zero, could delete the record but we'll keep it
         await context.db
           .update(tokenHolder, { id: `${tokenAddress}:${from}` })
           .set({ balance: '0' });
@@ -296,10 +286,10 @@ ponder.on('GovernanceToken:Transfer', async ({ event, context }) => {
         id: `${tokenAddress}:${to}`,
         tokenAddress,
         holderAddress: to,
-        balance: value.toString(),
+        balance: amount.toString(),
       })
       .onConflictDoUpdate((row) => ({
-        balance: (BigInt(row.balance) + value).toString(),
+        balance: (BigInt(row.balance) + amount).toString(),
       }));
   }
 });

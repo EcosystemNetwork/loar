@@ -212,10 +212,11 @@ Runs on every push/PR to `main`:
 
 ```json
 {
-  "buildCommand": "pnpm install --frozen-lockfile && cd apps/web && pnpm run build",
+  "buildCommand": "cd apps/web && pnpm run build",
   "outputDirectory": "apps/web/dist",
   "installCommand": "npm i -g pnpm@9.15.0 && pnpm install --frozen-lockfile",
-  "framework": null
+  "framework": null,
+  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }]
 }
 ```
 

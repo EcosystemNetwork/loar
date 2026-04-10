@@ -6,8 +6,8 @@
  * Token contracts spawned by the UniverseManager factory. Also indexes Uniswap v4
  * PoolManager swap events for token price tracking.
  */
-import './env.ts'; // validates env and loads .env files — must be first
-import { env } from './env.ts';
+import './env'; // validates env and loads .env files — must be first
+import { env } from './env';
 import { createConfig, factory } from 'ponder';
 import { parseAbiItem } from 'viem';
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from '@loar/abis/generated';

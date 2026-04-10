@@ -26,10 +26,7 @@ import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import {
-  elevenLabsService,
-  type ElevenLabsVoiceModel,
-} from '../../services/elevenlabs';
+import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
 
@@ -70,8 +67,14 @@ const voiceGenerationsCol = () => {
 
 // ── Credit deduction helper ───────────────────────────────────────────
 
+const userCreditsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('userCredits');
+};
+
 async function deductCredits(userId: string, credits: number): Promise<void> {
-  const ref = db.collection('userCredits').doc(userId);
+  if (!db) throw new Error('Firebase is not configured');
+  const ref = userCreditsCol().doc(userId);
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
     const balance = doc.exists ? doc.data()?.balance || 0 : 0;
@@ -89,7 +92,7 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
 }
 
 async function refundCredits(userId: string, credits: number): Promise<void> {
-  const ref = db.collection('userCredits').doc(userId);
+  const ref = userCreditsCol().doc(userId);
   try {
     const doc = await ref.get();
     if (doc.exists) {
@@ -102,7 +105,11 @@ async function refundCredits(userId: string, credits: number): Promise<void> {
 
 // ── Storage upload helper ─────────────────────────────────────────────
 
-async function uploadAudio(buffer: Buffer, _contentType: string, filename: string): Promise<string> {
+async function uploadAudio(
+  buffer: Buffer,
+  _contentType: string,
+  filename: string
+): Promise<string> {
   const key = await firebaseStorageService.upload(buffer, filename);
   return firebaseStorageService.getPublicUrl(key);
 }
@@ -200,11 +207,13 @@ export const voiceRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await voiceGenerationsCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),
@@ -223,19 +232,21 @@ export const voiceRouter = router({
       const genId = randomUUID();
       const credits = toCredits(SOUND_EFFECT_COST_USD);
 
-      await voiceGenerationsCol().doc(genId).set({
-        id: genId,
-        userId: ctx.user.uid,
-        entityId: input.entityId || null,
-        type: 'sound_effect',
-        prompt: input.text,
-        providerCostUsd: SOUND_EFFECT_COST_USD,
-        fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD),
-        loarPriceUsd: withLoar(SOUND_EFFECT_COST_USD),
-        creditsCharged: credits,
-        status: 'queued',
-        createdAt: new Date(),
-      });
+      await voiceGenerationsCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || null,
+          type: 'sound_effect',
+          prompt: input.text,
+          providerCostUsd: SOUND_EFFECT_COST_USD,
+          fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD),
+          loarPriceUsd: withLoar(SOUND_EFFECT_COST_USD),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+        });
 
       await deductCredits(ctx.user.uid, credits);
 
@@ -265,11 +276,13 @@ export const voiceRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await voiceGenerationsCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),
@@ -292,18 +305,20 @@ export const voiceRouter = router({
       const genId = randomUUID();
       const credits = toCredits(VOICE_DESIGN_COST_USD);
 
-      await voiceGenerationsCol().doc(genId).set({
-        id: genId,
-        userId: ctx.user.uid,
-        type: 'voice_design',
-        name: input.name,
-        providerCostUsd: VOICE_DESIGN_COST_USD,
-        fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD),
-        loarPriceUsd: withLoar(VOICE_DESIGN_COST_USD),
-        creditsCharged: credits,
-        status: 'queued',
-        createdAt: new Date(),
-      });
+      await voiceGenerationsCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          type: 'voice_design',
+          name: input.name,
+          providerCostUsd: VOICE_DESIGN_COST_USD,
+          fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD),
+          loarPriceUsd: withLoar(VOICE_DESIGN_COST_USD),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+        });
 
       await deductCredits(ctx.user.uid, credits);
 
@@ -341,11 +356,13 @@ export const voiceRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await voiceGenerationsCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),
@@ -364,18 +381,20 @@ export const voiceRouter = router({
       const genId = randomUUID();
       const credits = toCredits(INSTANT_CLONE_COST_USD);
 
-      await voiceGenerationsCol().doc(genId).set({
-        id: genId,
-        userId: ctx.user.uid,
-        type: 'instant_clone',
-        name: input.name,
-        providerCostUsd: INSTANT_CLONE_COST_USD,
-        fiatPriceUsd: withFiat(INSTANT_CLONE_COST_USD),
-        loarPriceUsd: withLoar(INSTANT_CLONE_COST_USD),
-        creditsCharged: credits,
-        status: 'queued',
-        createdAt: new Date(),
-      });
+      await voiceGenerationsCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          type: 'instant_clone',
+          name: input.name,
+          providerCostUsd: INSTANT_CLONE_COST_USD,
+          fiatPriceUsd: withFiat(INSTANT_CLONE_COST_USD),
+          loarPriceUsd: withLoar(INSTANT_CLONE_COST_USD),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+        });
 
       await deductCredits(ctx.user.uid, credits);
 
@@ -412,11 +431,13 @@ export const voiceRouter = router({
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits);
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error',
-          completedAt: new Date(),
-        });
+        await voiceGenerationsCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
         throw error;
       }
     }),
@@ -470,7 +491,9 @@ export const voiceRouter = router({
   // ── History ───────────────────────────────────────────────────────────
 
   history: protectedProcedure
-    .input(z.object({ limit: z.number().min(1).max(100).default(20), entityId: z.string().optional() }))
+    .input(
+      z.object({ limit: z.number().min(1).max(100).default(20), entityId: z.string().optional() })
+    )
     .query(async ({ input, ctx }) => {
       let query = voiceGenerationsCol()
         .where('userId', '==', ctx.user.uid)
