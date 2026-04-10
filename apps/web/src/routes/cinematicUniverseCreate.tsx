@@ -32,11 +32,17 @@ import {
   Sparkles,
   Image as ImageIcon,
   ArrowLeft,
+  PieChart,
+  Sliders,
+  Info,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
-import { parseEther } from 'viem';
+import { SafeSetup } from '@/components/SafeSetup';
+import { parseEther, decodeEventLog } from 'viem';
+import { universeManagerAbi } from '@loar/abis/generated';
 import {
   isSupportedChain,
   getExplorerAddressUrl,
@@ -72,12 +78,64 @@ function CinematicUniverseCreate() {
   const [metadata, setMetadata] = useState(''); // Additional token metadata
   const [context, setContext] = useState(''); // Universe context/lore
 
+  // Token allocation state (basis points, must sum to 10000)
+  const [lpBps, setLpBps] = useState(8000); // 80% LP
+  const [creatorBps, setCreatorBps] = useState(1000); // 10% Creator
+  const [treasuryBps, setTreasuryBps] = useState(500); // 5% Treasury
+  const [communityBps, setCommunityBps] = useState(500); // 5% Community
+  const [showAdvancedTokenomics, setShowAdvancedTokenomics] = useState(false);
+
+  // Allocation helpers
+  const allocationTotal = lpBps + creatorBps + treasuryBps + communityBps;
+  const allocationValid =
+    allocationTotal === 10000 && lpBps >= 5000 && treasuryBps >= 200 && creatorBps <= 4000;
+
+  const handleAllocationChange = (
+    field: 'lp' | 'creator' | 'treasury' | 'community',
+    value: number
+  ) => {
+    const current = {
+      lp: lpBps,
+      creator: creatorBps,
+      treasury: treasuryBps,
+      community: communityBps,
+    };
+    current[field] = value;
+    const remainder = 10000 - current.lp - current.creator - current.treasury - current.community;
+
+    // Auto-balance: distribute remainder to community
+    if (field !== 'community') {
+      const newCommunity = communityBps + remainder;
+      if (newCommunity >= 0 && newCommunity <= 10000) {
+        setCommunityBps(newCommunity);
+      }
+    }
+
+    switch (field) {
+      case 'lp':
+        setLpBps(value);
+        break;
+      case 'creator':
+        setCreatorBps(value);
+        break;
+      case 'treasury':
+        setTreasuryBps(value);
+        break;
+      case 'community':
+        setCommunityBps(value);
+        break;
+    }
+  };
+
   // Deployment state
   const [deploymentStep, setDeploymentStep] = useState<DeploymentStep>(DeploymentStep.IDLE);
   const [universeId, setUniverseId] = useState<bigint | null>(null);
   const [universeAddress, setUniverseAddress] = useState<`0x${string}` | null>(null);
   const [tokenAddress, setTokenAddress] = useState<`0x${string}` | null>(null);
   const [governorAddress, setGovernorAddress] = useState<`0x${string}` | null>(null);
+
+  // Multi-sig Safe state
+  const [safeAddress, setSafeAddress] = useState<`0x${string}` | null>(null);
 
   // Cover image generation state
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
@@ -144,22 +202,66 @@ function CinematicUniverseCreate() {
   };
 
   // Watch for transaction success and update deployment step
-  if (txSuccess && deploymentStep === DeploymentStep.CREATING_UNIVERSE) {
-    // Parse UniverseCreated event from receipt
-    // The createUniverse function returns (universeId, universeAddress)
-    // We need to extract these from the transaction logs
-    console.log('Universe creation tx successful:', txReceipt);
-
-    // TODO: Parse the UniverseCreated event to get universeId and universeAddress
-    // For now, we'll need to manually track these or use a read contract call
+  if (txSuccess && txReceipt && deploymentStep === DeploymentStep.CREATING_UNIVERSE) {
+    // Parse UniverseCreated event from receipt logs
+    for (const log of txReceipt.logs) {
+      try {
+        const decoded = decodeEventLog({
+          abi: universeManagerAbi,
+          data: log.data,
+          topics: log.topics,
+        });
+        if (decoded.eventName === 'UniverseCreated') {
+          const args = decoded.args as { universe: string; creator: string };
+          setUniverseAddress(args.universe as `0x${string}`);
+        }
+        if (decoded.eventName === 'UniverseMintFee') {
+          const args = decoded.args as { universeId: bigint };
+          setUniverseId(args.universeId);
+        }
+      } catch {
+        // Not a UniverseManager event, skip
+      }
+    }
     setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
+
+    // Register universe in Firestore
+    if (address && universeAddress) {
+      trpcClient.universes.create
+        .mutate({
+          address: universeAddress,
+          creator: safeAddress ?? address,
+          tokenAddress: '0x0000000000000000000000000000000000000000',
+          governanceAddress: '0x0000000000000000000000000000000000000000',
+          imageUrl: imageUrl,
+          description: description,
+          signature: '', // Will be set during Firestore create
+          message: '',
+          onChainUniverseId: universeId?.toString(),
+          mintTxHash: hash,
+        })
+        .catch((err) => console.error('Failed to register universe:', err));
+    }
   }
 
-  if (txSuccess && deploymentStep === DeploymentStep.DEPLOYING_TOKEN) {
-    console.log('Token deployment tx successful:', txReceipt);
-    setDeploymentStep(DeploymentStep.TOKEN_DEPLOYED);
-    // Parse TokenCreated event to get token, governor, pool addresses
-    // The indexer will pick these up automatically
+  if (txSuccess && txReceipt && deploymentStep === DeploymentStep.DEPLOYING_TOKEN) {
+    // Parse TokenCreated event for token + governor addresses
+    for (const log of txReceipt.logs) {
+      try {
+        const decoded = decodeEventLog({
+          abi: universeManagerAbi,
+          data: log.data,
+          topics: log.topics,
+        });
+        if (decoded.eventName === 'TokenCreated') {
+          const args = decoded.args as { tokenAddress: string; governor: string };
+          setTokenAddress(args.tokenAddress as `0x${string}`);
+          setGovernorAddress(args.governor as `0x${string}`);
+        }
+      } catch {
+        // Not a UniverseManager event, skip
+      }
+    }
     setDeploymentStep(DeploymentStep.COMPLETED);
   }
 
@@ -189,6 +291,7 @@ function CinematicUniverseCreate() {
         nodeCreationOptions: 0, // OPEN - anyone can create nodes
         nodeVisibilityOptions: 0, // PUBLIC - all nodes visible
         initialOwner: address,
+        safeAddress: safeAddress ?? undefined,
       });
     } catch (error) {
       console.error('Universe creation failed:', error);
@@ -230,21 +333,27 @@ function CinematicUniverseCreate() {
             pairedToken: defaultConfig.defaultPairedToken,
             tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
             tickSpacing: defaultConfig.defaultTickSpacing,
-            poolData: '0x' as `0x${string}`, // Empty bytes for now
+            poolData: '0x' as `0x${string}`,
           },
           lockerConfig: {
             locker: defaultConfig.defaultLocker,
-            rewardAdmins: [address], // Universe creator is reward admin
-            rewardRecipients: [address], // Creator gets initial rewards
-            rewardBps: [1000], // 10% (1000 basis points)
-            tickLower: [-887220], // Full range example
+            rewardAdmins: [address],
+            rewardRecipients: [address],
+            rewardBps: [1000],
+            tickLower: [-887220],
             tickUpper: [887220],
-            positionBps: [10000], // 100% (full position)
-            lockerData: '0x' as `0x${string}`, // Empty bytes for now
+            positionBps: [10000],
+            lockerData: '0x' as `0x${string}`,
+          },
+          allocationConfig: {
+            lpBps,
+            creatorBps,
+            treasuryBps,
+            communityBps,
           },
         },
         universeId,
-        parseEther('0.01') // Sending 0.01 ETH for initial liquidity - adjust as needed
+        parseEther('0.01')
       );
     } catch (error) {
       console.error('Token deployment failed:', error);
@@ -453,6 +562,13 @@ function CinematicUniverseCreate() {
                   />
                 </div>
 
+                {/* Multi-Sig Ownership (optional) */}
+                <SafeSetup
+                  disabled={deploymentStep !== DeploymentStep.IDLE}
+                  onSafeDeployed={(addr) => setSafeAddress(addr as `0x${string}`)}
+                  onDisabled={() => setSafeAddress(null)}
+                />
+
                 {deploymentStep === DeploymentStep.IDLE && (
                   <Button
                     onClick={handleCreateUniverse}
@@ -505,10 +621,189 @@ function CinematicUniverseCreate() {
                     />
                   </div>
 
+                  {/* Tokenomics Configuration */}
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedTokenomics(!showAdvancedTokenomics)}
+                      className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Sliders className="h-4 w-4" />
+                      Token Allocation
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {showAdvancedTokenomics ? 'Custom' : 'Default'}
+                      </Badge>
+                    </button>
+
+                    {showAdvancedTokenomics && (
+                      <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                          <Info className="h-3 w-3" />
+                          <span>100B tokens total supply. Adjust how they're distributed.</span>
+                        </div>
+
+                        {/* Allocation Pie Visual */}
+                        <div className="flex gap-2 h-3 rounded-full overflow-hidden mb-4">
+                          <div
+                            className="bg-blue-500 transition-all"
+                            style={{ width: `${lpBps / 100}%` }}
+                            title={`LP: ${lpBps / 100}%`}
+                          />
+                          <div
+                            className="bg-green-500 transition-all"
+                            style={{ width: `${creatorBps / 100}%` }}
+                            title={`Creator: ${creatorBps / 100}%`}
+                          />
+                          <div
+                            className="bg-purple-500 transition-all"
+                            style={{ width: `${treasuryBps / 100}%` }}
+                            title={`Treasury: ${treasuryBps / 100}%`}
+                          />
+                          <div
+                            className="bg-amber-500 transition-all"
+                            style={{ width: `${communityBps / 100}%` }}
+                            title={`Community: ${communityBps / 100}%`}
+                          />
+                        </div>
+
+                        {/* LP Allocation */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                              <Label className="text-xs font-medium">Liquidity Pool</Label>
+                            </div>
+                            <span className="text-xs font-bold tabular-nums">
+                              {(lpBps / 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[lpBps]}
+                            onValueChange={([v]) => handleAllocationChange('lp', v)}
+                            min={5000}
+                            max={9000}
+                            step={100}
+                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Locked forever. Higher = safer for buyers. Min 50%
+                          </p>
+                        </div>
+
+                        {/* Creator Allocation */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                              <Label className="text-xs font-medium">Creator</Label>
+                            </div>
+                            <span className="text-xs font-bold tabular-nums">
+                              {(creatorBps / 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[creatorBps]}
+                            onValueChange={([v]) => handleAllocationChange('creator', v)}
+                            min={0}
+                            max={4000}
+                            step={100}
+                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Your governance voting power from day 1. Max 40%
+                          </p>
+                        </div>
+
+                        {/* Treasury Allocation */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                              <Label className="text-xs font-medium">Protocol Treasury</Label>
+                            </div>
+                            <span className="text-xs font-bold tabular-nums">
+                              {(treasuryBps / 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[treasuryBps]}
+                            onValueChange={([v]) => handleAllocationChange('treasury', v)}
+                            min={200}
+                            max={2000}
+                            step={100}
+                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Protocol sustainability fee. Min 2%
+                          </p>
+                        </div>
+
+                        {/* Community Allocation */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                              <Label className="text-xs font-medium">Community Rewards</Label>
+                            </div>
+                            <span className="text-xs font-bold tabular-nums">
+                              {(communityBps / 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[communityBps]}
+                            onValueChange={([v]) => handleAllocationChange('community', v)}
+                            min={0}
+                            max={3000}
+                            step={100}
+                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Airdrops, contests, contributor rewards
+                          </p>
+                        </div>
+
+                        {/* Validation */}
+                        {!allocationValid && (
+                          <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-500">
+                            <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                            {allocationTotal !== 10000
+                              ? `Total must equal 100% (currently ${(allocationTotal / 100).toFixed(1)}%)`
+                              : lpBps < 5000
+                                ? 'LP must be at least 50%'
+                                : treasuryBps < 200
+                                  ? 'Treasury must be at least 2%'
+                                  : 'Creator cannot exceed 40%'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quick preview when collapsed */}
+                    {!showAdvancedTokenomics && (
+                      <div className="flex gap-3 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-500" /> LP {lpBps / 100}%
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500" /> Creator{' '}
+                          {creatorBps / 100}%
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-purple-500" /> Treasury{' '}
+                          {treasuryBps / 100}%
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Community{' '}
+                          {communityBps / 100}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
                   {deploymentStep === DeploymentStep.UNIVERSE_CREATED && (
                     <Button
                       onClick={handleDeployToken}
-                      disabled={!tokenSymbol || isPending || isConfirming}
+                      disabled={!tokenSymbol || !allocationValid || isPending || isConfirming}
                       className="w-full h-12 text-base font-bold"
                       size="lg"
                     >

@@ -1,6 +1,8 @@
 /**
  * tRPC context factory -- extracts the authenticated user (if any) from the
  * incoming request headers and makes it available to all tRPC procedures.
+ *
+ * Supports both SIWE JWT auth and API key auth.
  */
 import type { Context as HonoContext } from 'hono';
 import { verifyAuth, type AuthUser } from './auth';

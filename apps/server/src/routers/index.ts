@@ -62,10 +62,24 @@ import { threedRouter } from './generation/threed.routes';
 import { studioRouter } from './studio/studio.routes';
 import { governanceRouter } from './governance/governance.routes';
 import { revenueRouter } from './revenue/revenue.routes';
+import { tokenGatesRouter } from './tokenGates/tokenGates.routes';
 import { socialRouter } from './social/social.routes';
 import { feedRouter } from './feed/feed.routes';
 import { playerRouter } from './player/player.routes';
 import { loraRouter } from './generation/lora.routes';
+import { privateSectionRouter } from './privateSection/privateSection.routes';
+import { talentAgentsRouter } from './talentAgents/talentAgents.routes';
+import { aiAgentsRouter } from './aiAgents/aiAgents.routes';
+import { aiPipelinesRouter } from './aiPipelines/aiPipelines.routes';
+import { apiKeysRouter } from './apiKeys/apiKeys.routes';
+import { bountiesRouter } from './bounties/bounties.routes';
+import { stakingRouter } from './staking/staking.routes';
+import { splitsRouter } from './splits/splits.routes';
+import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
+import { contentLicensingRouter } from './contentLicensing/contentLicensing.routes';
+import { galleryRouter } from './gallery/gallery.routes';
+import { moderationRouter } from './moderation/moderation.routes';
+import { stripeRouter } from './credits/stripe.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -179,6 +193,7 @@ export const appRouter = router({
 
   // ── Governance ──────────────────────────────────────────────────────
   governance: governanceRouter,
+  tokenGates: tokenGatesRouter,
 
   // ── Revenue Dashboard ──────────────────────────────────────────────
   revenue: revenueRouter,
@@ -192,11 +207,32 @@ export const appRouter = router({
   // ── Player ─────────────────────────────────────────────────────────
   player: playerRouter,
 
+  // ── Private Section (Creator's Room) ────────────────────────────────
+  privateSection: privateSectionRouter,
+
   // ── Admin ───────────────────────────────────────────────────────────
   admin: adminRouter,
+  moderation: moderationRouter,
+  stripe: stripeRouter,
 
   // ── Portfolio BFF (mobile vault aggregation) ────────────────────────
   portfolio: portfolioRouter,
+
+  // ── $LOAR Token Economy ─────────────────────────────────────────────
+  bounties: bountiesRouter,
+  staking: stakingRouter,
+
+  // ── Agent Systems ──────────────────────────────────────────────────
+  talentAgents: talentAgentsRouter,
+  aiAgents: aiAgentsRouter,
+  aiPipelines: aiPipelinesRouter,
+  apiKeys: apiKeysRouter,
+
+  // ── Universe Creator Studio ────────────────────────────────────────
+  splits: splitsRouter,
+  universeGenConfig: universeGenConfigRouter,
+  contentLicensing: contentLicensingRouter,
+  gallery: galleryRouter,
 });
 
 export type AppRouter = typeof appRouter;

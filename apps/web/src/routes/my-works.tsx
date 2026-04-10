@@ -28,7 +28,9 @@ import {
   Film,
   Image as ImageIcon,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
+import { MintContentDialog } from '@/components/MintContentDialog';
 
 export const Route = createFileRoute('/my-works')({
   component: MyWorksPage,
@@ -57,6 +59,7 @@ function MyWorksPage() {
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<Classification>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [mintingItem, setMintingItem] = useState<any>(null);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
     queryKey: ['my-content', classFilter],
@@ -213,6 +216,7 @@ function MyWorksPage() {
                 item={item}
                 onDelete={() => deleteMutation.mutate(item.id)}
                 deleting={deleteMutation.isPending && deleteMutation.variables === item.id}
+                onMint={() => setMintingItem(item)}
               />
             ))}
           </div>
@@ -224,6 +228,7 @@ function MyWorksPage() {
                 item={item}
                 onDelete={() => deleteMutation.mutate(item.id)}
                 deleting={deleteMutation.isPending && deleteMutation.variables === item.id}
+                onMint={() => setMintingItem(item)}
               />
             ))}
           </div>
@@ -244,6 +249,17 @@ function MyWorksPage() {
           </div>
         )}
       </div>
+
+      {/* Mint dialog */}
+      {mintingItem && (
+        <MintContentDialog
+          contentId={mintingItem.id}
+          contentTitle={mintingItem.title}
+          universeId={mintingItem.universeId}
+          onClose={() => setMintingItem(null)}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['my-content'] })}
+        />
+      )}
     </div>
   );
 }
@@ -252,10 +268,12 @@ function ContentCard({
   item,
   onDelete,
   deleting,
+  onMint,
 }: {
   item: any;
   onDelete: () => void;
   deleting: boolean;
+  onMint: () => void;
 }) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
 
@@ -285,7 +303,14 @@ function ContentCard({
         )}
 
         {/* Overlay on hover */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <button
+            onClick={onMint}
+            className="p-2 rounded-full bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+            title="Mint as NFT"
+          >
+            <Sparkles className="h-4 w-4" />
+          </button>
           <button
             onClick={onDelete}
             disabled={deleting}
@@ -324,10 +349,12 @@ function ContentRow({
   item,
   onDelete,
   deleting,
+  onMint,
 }: {
   item: any;
   onDelete: () => void;
   deleting: boolean;
+  onMint: () => void;
 }) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
 
@@ -373,6 +400,13 @@ function ContentRow({
             </div>
           )}
         </div>
+        <button
+          onClick={onMint}
+          className="p-2 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors flex-shrink-0"
+          title="Mint as NFT"
+        >
+          <Sparkles className="h-4 w-4" />
+        </button>
         <button
           onClick={onDelete}
           disabled={deleting}

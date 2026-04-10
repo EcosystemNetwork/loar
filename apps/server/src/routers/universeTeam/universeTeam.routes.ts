@@ -11,6 +11,7 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { isUniverseAdmin } from '../../lib/safe-admin';
 
 const teamCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -18,16 +19,6 @@ const teamCol = () => {
 };
 
 const roleEnum = z.enum(['admin', 'contributor', 'moderator']);
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-/** Returns the on-chain universe admin address stored in cinematicUniverses */
-async function getUniverseAdminUid(universeId: string): Promise<string | null> {
-  const doc = await db.collection('cinematicUniverses').doc(universeId.toLowerCase()).get();
-  if (!doc.exists) return null;
-  // creator field holds the wallet address which doubles as uid in SIWE auth
-  return (doc.data()?.creator as string | undefined)?.toLowerCase() ?? null;
-}
 
 /** Returns the membership doc for a given universe + uid, or null */
 async function getMembership(universeId: string, uid: string) {
@@ -52,8 +43,7 @@ export const universeTeamRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const adminUid = await getUniverseAdminUid(input.universeId);
-      if (!adminUid || adminUid !== ctx.user.uid.toLowerCase()) {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can manage team members');
       }
 
@@ -84,8 +74,7 @@ export const universeTeamRouter = router({
   removeMember: protectedProcedure
     .input(z.object({ universeId: z.string(), memberUid: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const adminUid = await getUniverseAdminUid(input.universeId);
-      if (!adminUid || adminUid !== ctx.user.uid.toLowerCase()) {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can manage team members');
       }
 
@@ -107,8 +96,7 @@ export const universeTeamRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const adminUid = await getUniverseAdminUid(input.universeId);
-      if (!adminUid || adminUid !== ctx.user.uid.toLowerCase()) {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can manage team members');
       }
 

@@ -39,6 +39,7 @@ contract Universe is IUniverse {
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
+    mapping(address user => bool) public vaultWhitelisted;
 
     NodeCreationOptions private nodeCreationOption;
     NodeVisibilityOptions private nodeVisibilityOption;
@@ -76,6 +77,15 @@ contract Universe is IUniverse {
 
     function getWhitelisted(address user) public view returns (bool) {
         return isWhitelisted[user];
+    }
+
+    function setVaultWhitelisted(address user, bool status) public onlyAdmin {
+        vaultWhitelisted[user] = status;
+        emit VaultWhitelistUpdated(user, status);
+    }
+
+    function getVaultWhitelisted(address user) public view returns (bool) {
+        return vaultWhitelisted[user];
     }
 
     /// @notice Create a new narrative node. Hashes are stored on-chain; full strings emitted in event only.

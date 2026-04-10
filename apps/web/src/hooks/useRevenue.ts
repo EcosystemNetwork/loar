@@ -47,6 +47,27 @@ export function useCreateCharacterNFT() {
   });
 }
 
+export function useMintContent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.nft.mintContent.mutate>[0]) =>
+      trpcClient.nft.mintContent.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-nfts'] });
+      qc.invalidateQueries({ queryKey: ['episode-nfts'] });
+    },
+  });
+}
+
+export function useRecordMint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.nft.recordMint.mutate>[0]) =>
+      trpcClient.nft.recordMint.mutate(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-nfts'] }),
+  });
+}
+
 // ---- Canon Marketplace ----
 
 export function useCanonSubmissions(

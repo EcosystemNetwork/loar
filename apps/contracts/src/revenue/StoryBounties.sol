@@ -1,0 +1,247 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.30;
+
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+
+/// @title StoryBounties
+/// @notice Creators post $LOAR bounties for specific content requests.
+///         Community members submit work; creator approves and $LOAR is released.
+///
+///         Revenue model:
+///         - 5% platform fee on every bounty payout (configurable)
+///         - Creates circulation: $LOAR flows from token holders → content creators
+///         - Unclaimed bounties after expiry return to poster (minus small cancellation fee)
+///
+///         Example bounties:
+///         - "Need a villain origin story for my universe" — 500 $LOAR
+///         - "Create a 30-second trailer for Episode 3" — 2000 $LOAR
+///         - "Design a faction logo" — 200 $LOAR
+contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+
+    enum BountyStatus {
+        OPEN,
+        CLAIMED,
+        CANCELLED,
+        EXPIRED
+    }
+
+    struct Bounty {
+        uint256 id;
+        address poster;
+        uint256 universeId;         // 0 = platform-wide bounty
+        uint256 reward;             // $LOAR amount
+        string title;
+        string descriptionHash;     // IPFS hash of full description
+        string contentType;         // "video", "story", "character", "art", "music", etc.
+        uint256 deadline;           // unix timestamp
+        BountyStatus status;
+        address claimedBy;          // winner
+        bytes32 submissionHash;     // content hash of winning submission
+        uint256 createdAt;
+    }
+
+    IERC20 public loarToken;
+    address public treasury;
+    address public platform;
+
+    uint256 public nextBountyId;
+    mapping(uint256 => Bounty) public bounties;
+
+    /// @notice Platform fee on bounty payouts (default 500 = 5%)
+    uint16 public platformFeeBps;
+
+    /// @notice Cancellation fee — % of bounty kept by platform on cancel (default 200 = 2%)
+    uint16 public cancellationFeeBps;
+
+    /// @notice Minimum bounty amount
+    uint256 public minBountyAmount;
+
+    /// @notice Maximum deadline extension (365 days)
+    uint256 public constant MAX_DEADLINE = 365 days;
+
+    /// @notice Total $LOAR distributed through bounties (lifetime)
+    uint256 public totalDistributed;
+
+    /// @notice Total bounties created
+    uint256 public totalBounties;
+
+    // Active bounty IDs per universe (0 = platform-wide)
+    mapping(uint256 => uint256[]) public universeBounties;
+
+    event BountyCreated(uint256 indexed bountyId, address indexed poster, uint256 universeId, uint256 reward, string contentType);
+    event BountyClaimed(uint256 indexed bountyId, address indexed winner, uint256 reward, uint256 platformFee);
+    event BountyCancelled(uint256 indexed bountyId, uint256 refund, uint256 fee);
+    event BountyExpired(uint256 indexed bountyId);
+
+    error BountyNotOpen();
+    error NotPoster();
+    error DeadlinePassed();
+    error DeadlineNotPassed();
+    error AmountTooLow();
+    error InvalidDeadline();
+    error ZeroAddress();
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    function initialize(
+        address _loarToken,
+        address _treasury,
+        address _platform
+    ) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+        if (_loarToken == address(0) || _treasury == address(0)) revert ZeroAddress();
+
+        loarToken = IERC20(_loarToken);
+        treasury = _treasury;
+        platform = _platform;
+        platformFeeBps = 500;       // 5%
+        cancellationFeeBps = 200;   // 2%
+        minBountyAmount = 10e18;    // 10 $LOAR minimum
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    // ── Create bounty ───────────────────────────────────────────
+
+    /// @notice Post a new bounty — $LOAR is locked in this contract until claimed/cancelled
+    function createBounty(
+        uint256 universeId,
+        uint256 reward,
+        string calldata title,
+        string calldata descriptionHash,
+        string calldata contentType,
+        uint256 deadline
+    ) external nonReentrant returns (uint256 bountyId) {
+        if (reward < minBountyAmount) revert AmountTooLow();
+        if (deadline <= block.timestamp || deadline > block.timestamp + MAX_DEADLINE) revert InvalidDeadline();
+
+        // Lock $LOAR in contract
+        loarToken.transferFrom(msg.sender, address(this), reward);
+
+        bountyId = nextBountyId++;
+        bounties[bountyId] = Bounty({
+            id: bountyId,
+            poster: msg.sender,
+            universeId: universeId,
+            reward: reward,
+            title: title,
+            descriptionHash: descriptionHash,
+            contentType: contentType,
+            deadline: deadline,
+            status: BountyStatus.OPEN,
+            claimedBy: address(0),
+            submissionHash: bytes32(0),
+            createdAt: block.timestamp
+        });
+
+        universeBounties[universeId].push(bountyId);
+        totalBounties++;
+
+        emit BountyCreated(bountyId, msg.sender, universeId, reward, contentType);
+    }
+
+    // ── Award bounty ────────────────────────────────────────────
+
+    /// @notice Poster awards the bounty to a winner
+    function awardBounty(uint256 bountyId, address winner, bytes32 submissionHash) external nonReentrant {
+        Bounty storage b = bounties[bountyId];
+        if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
+        if (msg.sender != b.poster && msg.sender != platform) revert NotPoster();
+
+        uint256 platformFee = (b.reward * platformFeeBps) / 10_000;
+        uint256 winnerReward = b.reward - platformFee;
+
+        b.status = BountyStatus.CLAIMED;
+        b.claimedBy = winner;
+        b.submissionHash = submissionHash;
+
+        // Pay winner
+        loarToken.transfer(winner, winnerReward);
+
+        // Platform fee
+        if (platformFee > 0) {
+            loarToken.transfer(treasury, platformFee);
+        }
+
+        totalDistributed += winnerReward;
+
+        emit BountyClaimed(bountyId, winner, winnerReward, platformFee);
+    }
+
+    // ── Cancel bounty ───────────────────────────────────────────
+
+    /// @notice Poster cancels an open bounty before deadline — small fee applies
+    function cancelBounty(uint256 bountyId) external nonReentrant {
+        Bounty storage b = bounties[bountyId];
+        if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
+        if (msg.sender != b.poster) revert NotPoster();
+
+        uint256 fee = (b.reward * cancellationFeeBps) / 10_000;
+        uint256 refund = b.reward - fee;
+
+        b.status = BountyStatus.CANCELLED;
+
+        loarToken.transfer(b.poster, refund);
+        if (fee > 0) {
+            loarToken.transfer(treasury, fee);
+        }
+
+        emit BountyCancelled(bountyId, refund, fee);
+    }
+
+    // ── Expire bounty ───────────────────────────────────────────
+
+    /// @notice Anyone can mark a bounty as expired after deadline — full refund to poster
+    function expireBounty(uint256 bountyId) external nonReentrant {
+        Bounty storage b = bounties[bountyId];
+        if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
+        if (block.timestamp < b.deadline) revert DeadlineNotPassed();
+
+        b.status = BountyStatus.EXPIRED;
+        loarToken.transfer(b.poster, b.reward);
+
+        emit BountyExpired(bountyId);
+    }
+
+    // ── Views ───────────────────────────────────────────────────
+
+    function getUniverseBounties(uint256 universeId) external view returns (uint256[] memory) {
+        return universeBounties[universeId];
+    }
+
+    function getBounty(uint256 bountyId) external view returns (Bounty memory) {
+        return bounties[bountyId];
+    }
+
+    // ── Admin ───────────────────────────────────────────────────
+
+    function setPlatformFee(uint16 newFeeBps) external onlyOwner {
+        require(newFeeBps <= 2000, "Max 20%");
+        platformFeeBps = newFeeBps;
+    }
+
+    function setCancellationFee(uint16 newFeeBps) external onlyOwner {
+        require(newFeeBps <= 1000, "Max 10%");
+        cancellationFeeBps = newFeeBps;
+    }
+
+    function setMinBountyAmount(uint256 newMin) external onlyOwner {
+        minBountyAmount = newMin;
+    }
+
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert ZeroAddress();
+        treasury = newTreasury;
+    }
+
+    function setPlatform(address newPlatform) external onlyOwner {
+        platform = newPlatform;
+    }
+}

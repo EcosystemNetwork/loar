@@ -38,14 +38,20 @@ contract UniverseTokenDeployer is ReentrancyGuard {
     IUniverseManager public immutable universeManager;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
 
-    // Token allocation splits (basis points, must sum to 10000)
-    uint16 public constant LP_BPS = 8000;         // 80% → LP locker
-    uint16 public constant CREATOR_BPS = 1000;    // 10% → universe creator
-    uint16 public constant TREASURY_BPS = 500;    // 5%  → protocol treasury
-    uint16 public constant COMMUNITY_BPS = 500;   // 5%  → community rewards
+    // Default allocation splits (basis points, must sum to 10000)
+    uint16 public constant DEFAULT_LP_BPS = 8000;         // 80% → LP locker
+    uint16 public constant DEFAULT_CREATOR_BPS = 1000;    // 10% → universe creator
+    uint16 public constant DEFAULT_TREASURY_BPS = 500;    // 5%  → protocol treasury
+    uint16 public constant DEFAULT_COMMUNITY_BPS = 500;   // 5%  → community rewards
+
+    // Allocation constraints
+    uint16 public constant MIN_LP_BPS = 5000;        // LP must be ≥ 50%
+    uint16 public constant MIN_TREASURY_BPS = 200;   // Treasury must be ≥ 2%
+    uint16 public constant MAX_CREATOR_BPS = 4000;   // Creator can't exceed 40%
 
     error HookNotEnabled();
     error LockerNotEnabled();
+    error InvalidAllocation();
 
     event TokenDeployed(
         uint256 indexed universeId,
@@ -87,10 +93,31 @@ contract UniverseTokenDeployer is ReentrancyGuard {
             TOKEN_SUPPLY
         );
 
+        // Resolve allocation: use custom if provided, otherwise defaults
+        IUniverseManager.AllocationConfig memory alloc = deploymentConfig.allocationConfig;
+        uint16 lpBps = alloc.lpBps;
+        uint16 creatorBps = alloc.creatorBps;
+        uint16 treasuryBps = alloc.treasuryBps;
+        uint16 communityBps = alloc.communityBps;
+
+        // If all zeros, use defaults
+        if (lpBps == 0 && creatorBps == 0 && treasuryBps == 0 && communityBps == 0) {
+            lpBps = DEFAULT_LP_BPS;
+            creatorBps = DEFAULT_CREATOR_BPS;
+            treasuryBps = DEFAULT_TREASURY_BPS;
+            communityBps = DEFAULT_COMMUNITY_BPS;
+        }
+
+        // Validate allocation
+        if (lpBps + creatorBps + treasuryBps + communityBps != 10000) revert InvalidAllocation();
+        if (lpBps < MIN_LP_BPS) revert InvalidAllocation();
+        if (treasuryBps < MIN_TREASURY_BPS) revert InvalidAllocation();
+        if (creatorBps > MAX_CREATOR_BPS) revert InvalidAllocation();
+
         // Calculate allocation splits
-        uint256 lpAmount = (TOKEN_SUPPLY * LP_BPS) / 10000;
-        uint256 creatorAmount = (TOKEN_SUPPLY * CREATOR_BPS) / 10000;
-        uint256 treasuryAmount = (TOKEN_SUPPLY * TREASURY_BPS) / 10000;
+        uint256 lpAmount = (TOKEN_SUPPLY * lpBps) / 10000;
+        uint256 creatorAmount = (TOKEN_SUPPLY * creatorBps) / 10000;
+        uint256 treasuryAmount = (TOKEN_SUPPLY * treasuryBps) / 10000;
         uint256 communityAmount = TOKEN_SUPPLY - lpAmount - creatorAmount - treasuryAmount;
         assert(lpAmount + creatorAmount + treasuryAmount + communityAmount == TOKEN_SUPPLY);
 

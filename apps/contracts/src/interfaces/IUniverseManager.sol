@@ -39,10 +39,18 @@ interface IUniverseManager {
         bytes poolData;
     }
 
+    struct AllocationConfig {
+        uint16 lpBps;         // % → LP locker (min 5000 = 50%)
+        uint16 creatorBps;    // % → universe creator
+        uint16 treasuryBps;   // % → protocol treasury (min 200 = 2%)
+        uint16 communityBps;  // % → community rewards
+    }
+
     struct DeploymentConfig {
         TokenConfig tokenConfig;
         PoolConfig poolConfig;
         LockerConfig lockerConfig;
+        AllocationConfig allocationConfig;
     }
 
     struct LockerConfig {

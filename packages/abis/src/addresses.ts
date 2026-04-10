@@ -1,8 +1,15 @@
-// Auto-generated from deployments/sepolia.json — do not edit directly.
+// Auto-generated from deployments — do not edit directly.
 // To update: pnpm sync:addresses
+//
+// Chain IDs:
+//   11155111 = Sepolia (testnet)
+//   84532    = Base Sepolia (testnet)
+//   8453     = Base (mainnet) — addresses TBD after mainnet deployment
 
 export const UniverseManager = {
   '11155111': '0x7af142BbD14CaEECdA68f948F467Da0257f6B114',
+  // '84532': '0x...', // Base Sepolia — deploy and fill
+  // '8453': '0x...',  // Base mainnet — deploy and fill
 } as const;
 
 export type UniverseManagerChainId = keyof typeof UniverseManager;

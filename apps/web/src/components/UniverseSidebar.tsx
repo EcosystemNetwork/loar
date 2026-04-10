@@ -28,6 +28,8 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   X,
+  Target,
+  Vault,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
@@ -35,6 +37,9 @@ import { useChainId } from 'wagmi';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { getExplorerAddressUrl } from '@/configs/chains';
+import { TokenSwapWidget } from '@/components/TokenSwapWidget';
+import { SubscribeDialog } from '@/components/SubscribeDialog';
+import { Crown } from 'lucide-react';
 
 interface UniverseSidebarProps {
   finalUniverse: any;
@@ -64,6 +69,7 @@ export function UniverseSidebar({
   const chainId = useChainId();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showSubscribe, setShowSubscribe] = useState(false);
 
   // Close mobile sidebar on escape key
   useEffect(() => {
@@ -303,6 +309,11 @@ export function UniverseSidebar({
               </Card>
             )}
 
+            {/* Token Swap Widget */}
+            {isBlockchainUniverse && finalUniverse?.tokenAddress && finalUniverse?.address && (
+              <TokenSwapWidget universeAddress={finalUniverse.address} compact />
+            )}
+
             {/* Enhanced Action Buttons */}
             <div className="space-y-3">
               <Button
@@ -328,6 +339,73 @@ export function UniverseSidebar({
                     Govern
                   </Button>
                 )}
+
+              {/* Subscribe button */}
+              {isBlockchainUniverse && (
+                <Button
+                  onClick={() => setShowSubscribe(true)}
+                  className="w-full bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 hover:from-amber-700 hover:via-amber-800 hover:to-amber-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
+                  size="sm"
+                >
+                  <Crown className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
+                  Subscribe
+                </Button>
+              )}
+
+              {/* Gallery button */}
+              <Link to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gallery`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-950/30 dark:to-rose-950/30 hover:from-pink-100 hover:to-rose-100 dark:hover:from-pink-950/50 dark:hover:to-rose-950/50 border-pink-200 dark:border-pink-800 transition-all duration-300 group h-10"
+                >
+                  <Film className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-pink-600 dark:text-pink-400" />
+                  Gallery
+                </Button>
+              </Link>
+
+              {/* Gen Config button - only show for universe admin */}
+              {isBlockchainUniverse && (
+                <Link to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gen-config`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 hover:from-cyan-100 hover:to-teal-100 dark:hover:from-cyan-950/50 dark:hover:to-teal-950/50 border-cyan-200 dark:border-cyan-800 transition-all duration-300 group h-10"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-cyan-600 dark:text-cyan-400" />
+                    Gen Config
+                  </Button>
+                </Link>
+              )}
+
+              {/* Treasury button */}
+              {isBlockchainUniverse && (
+                <Link to={`/treasury/${finalUniverse?.address || finalUniverse?.id}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 hover:from-emerald-100 hover:to-green-100 dark:hover:from-emerald-950/50 dark:hover:to-green-950/50 border-emerald-200 dark:border-emerald-800 transition-all duration-300 group h-10"
+                  >
+                    <Vault className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-emerald-600 dark:text-emerald-400" />
+                    Treasury
+                  </Button>
+                </Link>
+              )}
+
+              {/* Bounties button */}
+              <Link
+                to="/bounties"
+                search={{ universeId: finalUniverse?.address || finalUniverse?.id }}
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-950/50 dark:hover:to-amber-950/50 border-orange-200 dark:border-orange-800 transition-all duration-300 group h-10"
+                >
+                  <Target className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-orange-600 dark:text-orange-400" />
+                  Bounties
+                </Button>
+              </Link>
 
               <Button
                 onClick={handleRefreshTimeline}
@@ -371,6 +449,15 @@ export function UniverseSidebar({
           </div>
         </div>
       </div>
+
+      {/* Subscribe Dialog */}
+      {showSubscribe && (
+        <SubscribeDialog
+          universeId={finalUniverse?.address || ''}
+          universeName={finalUniverse?.name || finalUniverse?.universeName || ''}
+          onClose={() => setShowSubscribe(false)}
+        />
+      )}
     </>
   );
 }

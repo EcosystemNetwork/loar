@@ -15,8 +15,8 @@ import { useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useWriteContract } from 'wagmi';
-import { parseUnits, type Address } from 'viem';
+import { useWriteContract, useSendTransaction } from 'wagmi';
+import { parseEther, parseUnits, type Address } from 'viem';
 
 const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -51,6 +51,7 @@ function CheckoutPage() {
   const { isConnected, address } = useWalletAuth();
   const [processing, setProcessing] = useState(false);
   const { writeContractAsync } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
 
   const { listingId, productType, title, price, currency } = search;
 
@@ -75,7 +76,40 @@ function CheckoutPage() {
       if (!isRealListing && listingId?.startsWith('sub:')) {
         // Subscription flow: listingId = "sub:<universeId>:<tier>"
         const [, universeId, tier] = listingId.split(':');
-        const txHash = `sub-pending-${Date.now()}`;
+        let txHash = `sub-free-${Date.now()}`;
+
+        // On-chain payment for paid subscription tiers
+        const subPrice = parseFloat(displayPrice);
+        if (subPrice > 0) {
+          if (displayCurrency === 'LOAR' && LOAR_TOKEN_ADDRESS) {
+            const recipient = TREASURY_ADDRESS;
+            if (!recipient) {
+              toast.error('Treasury address not configured');
+              return;
+            }
+            const loarAmount = parseUnits(displayPrice, 18);
+            toast.info('Confirm $LOAR transfer in your wallet...');
+            txHash = await writeContractAsync({
+              address: LOAR_TOKEN_ADDRESS,
+              abi: ERC20_ABI,
+              functionName: 'transfer',
+              args: [recipient, loarAmount],
+            });
+          } else {
+            if (!TREASURY_ADDRESS) {
+              toast.error('Treasury address not configured');
+              return;
+            }
+            const ethAmount = parseEther((subPrice / 3000).toFixed(18));
+            toast.info('Confirm ETH transfer in your wallet...');
+            txHash = await sendTransactionAsync({
+              to: TREASURY_ADDRESS,
+              value: ethAmount,
+            });
+          }
+          toast.info('Payment sent! Activating subscription...');
+        }
+
         await trpcClient.subscriptions.subscribe.mutate({
           universeId,
           tier: tier as 'FREE' | 'BASIC' | 'PREMIUM' | 'VIP',

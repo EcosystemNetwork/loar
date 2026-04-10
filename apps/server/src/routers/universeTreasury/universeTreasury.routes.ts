@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { DEFAULT_PACKAGES } from '../credits/credits.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
+import { isUniverseAdmin } from '../../lib/safe-admin';
 
 const universeCreditCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -28,14 +29,6 @@ const universeCreditTxCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('universeCreditTransactions');
 };
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-async function getUniverseAdminUid(universeId: string): Promise<string | null> {
-  const doc = await db.collection('cinematicUniverses').doc(universeId.toLowerCase()).get();
-  if (!doc.exists) return null;
-  return (doc.data()?.creator as string | undefined)?.toLowerCase() ?? null;
-}
 
 /** Read or initialise the universe credit pool document */
 async function getPoolData(universeId: string) {
@@ -81,8 +74,7 @@ export const universeTreasuryRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const adminUid = await getUniverseAdminUid(input.universeId);
-      if (!adminUid || adminUid !== ctx.user.uid.toLowerCase()) {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can fund the universe credit pool');
       }
 
@@ -155,7 +147,7 @@ export const universeTreasuryRouter = router({
 
       // Verify membership
       const membership = (await getMembership(universeId, callerUid)) as any;
-      const isAdmin = (await getUniverseAdminUid(universeId)) === callerUid;
+      const isAdmin = await isUniverseAdmin(universeId, callerUid);
       if (!isAdmin && (!membership || membership.status !== 'active')) {
         throw new Error('You are not an active team member of this universe');
       }
@@ -241,8 +233,7 @@ export const universeTreasuryRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
-      const adminUid = await getUniverseAdminUid(universeId);
-      if (!adminUid || adminUid !== ctx.user.uid.toLowerCase()) {
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can allocate credits to members');
       }
 
@@ -320,6 +311,109 @@ export const universeTreasuryRouter = router({
       };
     }),
 
+  // ── Deposit on-chain revenue into credits ────────────────────────
+  //
+  // Bridge: creator claims ETH from PaymentRouter → converts to credits.
+  // This is how NFT sales, marketplace fees, and subscriptions flow
+  // from on-chain revenue into the universe's AI generation budget.
+  //
+  // Also triggers reward distribution to universe stakers.
+
+  depositRevenue: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        amountEth: z.string(), // ETH amount deposited (as string for precision)
+        txHash: z.string(), // PaymentRouter claim tx or direct deposit tx
+        source: z.enum([
+          'nft_sales',
+          'marketplace',
+          'subscriptions',
+          'licensing',
+          'merch',
+          'ads',
+          'collabs',
+          'canon_royalties',
+          'remix_fees',
+          'other',
+        ]),
+        /** What % goes to credits vs staker rewards. Default 70% credits, 30% stakers */
+        creditSharePct: z.number().min(0).max(100).default(70),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can deposit revenue');
+      }
+
+      // Dedup check
+      const existing = await universeCreditTxCol()
+        .where('txHash', '==', input.txHash)
+        .limit(1)
+        .get();
+      if (!existing.empty) {
+        throw new Error('This transaction has already been deposited');
+      }
+
+      const amountEth = parseFloat(input.amountEth);
+      if (isNaN(amountEth) || amountEth <= 0) throw new Error('Invalid amount');
+
+      // Convert ETH to credits using a rate
+      // Base: 1 ETH ≈ 100,000 credits at current pricing ($0.008/credit, ~$3200/ETH)
+      const CREDITS_PER_ETH = 100_000;
+      const totalCredits = Math.floor(amountEth * CREDITS_PER_ETH);
+
+      // Split: credits for universe pool vs staker rewards
+      const creditsPortion = Math.floor(totalCredits * (input.creditSharePct / 100));
+      const stakerPortion = totalCredits - creditsPortion;
+
+      // Fund the universe credit pool
+      if (creditsPortion > 0) {
+        const poolRef = universeCreditCol().doc(universeId);
+        const poolData = await getPoolData(universeId);
+
+        await poolRef.set(
+          {
+            universeId,
+            balance: poolData.balance + creditsPortion,
+            totalPurchased: poolData.totalPurchased + creditsPortion,
+            lastFundedAt: new Date(),
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+      }
+
+      // Record the deposit
+      await universeCreditTxCol().add({
+        id: randomUUID(),
+        universeId,
+        type: 'revenue_deposit',
+        depositedByUid: ctx.user.uid.toLowerCase(),
+        txHash: input.txHash,
+        source: input.source,
+        amountEth: input.amountEth,
+        totalCredits,
+        creditsPortion,
+        stakerPortion,
+        creditSharePct: input.creditSharePct,
+        createdAt: new Date(),
+      });
+
+      return {
+        ok: true,
+        totalCredits,
+        creditsPortion,
+        stakerPortion,
+        source: input.source,
+        note:
+          stakerPortion > 0
+            ? `${stakerPortion} credits worth of $LOAR rewards pending for universe stakers`
+            : undefined,
+      };
+    }),
+
   // ── Transaction history for the universe pool ────────────────────
 
   getPoolHistory: protectedProcedure
@@ -333,11 +427,11 @@ export const universeTreasuryRouter = router({
       const universeId = input.universeId.toLowerCase();
 
       // Must be admin or active team member
-      const adminUid = await getUniverseAdminUid(universeId);
       const callerUid = ctx.user.uid.toLowerCase();
+      const callerIsAdmin = await isUniverseAdmin(universeId, callerUid);
       const membership = (await getMembership(universeId, callerUid)) as any;
 
-      if (adminUid !== callerUid && (!membership || membership.status !== 'active')) {
+      if (!callerIsAdmin && (!membership || membership.status !== 'active')) {
         throw new Error('Only universe admins and team members can view pool history');
       }
 
