@@ -23,7 +23,12 @@ export type ActivityEventType =
   | 'canon_accepted'
   | 'collab_started'
   | 'listed_item'
-  | 'sold_item';
+  | 'sold_item'
+  | 'agent_contract_proposed'
+  | 'agent_contract_accepted'
+  | 'agent_deal_brokered'
+  | 'ai_pipeline_completed'
+  | 'ai_agent_created';
 
 export type NotificationType =
   | 'new_follower'
@@ -33,7 +38,10 @@ export type NotificationType =
   | 'content_in_universe'
   | 'item_sold'
   | 'subscription_new'
-  | 'mention';
+  | 'mention'
+  | 'agent_contract_proposal'
+  | 'agent_commission_earned'
+  | 'ai_pipeline_failed';
 
 interface EmitActivityParams {
   actorUid: string;

@@ -3,7 +3,7 @@ import {
   createUseWriteContract,
   createUseSimulateContract,
   createUseWatchContractEvent,
-} from 'wagmi/codegen'
+} from 'wagmi/codegen';
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // GovernanceERC20
@@ -469,7 +469,7 @@ export const governanceErc20Abi = [
     inputs: [{ name: 'expiry', internalType: 'uint256', type: 'uint256' }],
     name: 'VotesExpiredSignature',
   },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LoarFeeLocker
@@ -507,10 +507,7 @@ export const loarFeeLockerAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'feeOwner', internalType: 'address', type: 'address' },
-      { name: 'token', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'claim',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -531,6 +528,13 @@ export const loarFeeLockerAbi = [
     name: 'owner',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'depositor', internalType: 'address', type: 'address' }],
+    name: 'removeDepositor',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -657,6 +661,19 @@ export const loarFeeLockerAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'depositor',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'RemoveDepositor',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'sender',
         internalType: 'address',
         type: 'address',
@@ -718,7 +735,7 @@ export const loarFeeLockerAbi = [
     name: 'SafeERC20FailedOperation',
   },
   { type: 'error', inputs: [], name: 'Unauthorized' },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LoarHookStaticFee
@@ -1173,9 +1190,7 @@ export const loarHookStaticFeeAbi = [
     type: 'function',
     inputs: [],
     name: 'poolManager',
-    outputs: [
-      { name: '', internalType: 'contract IPoolManager', type: 'address' },
-    ],
+    outputs: [{ name: '', internalType: 'contract IPoolManager', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -1365,7 +1380,7 @@ export const loarHookStaticFeeAbi = [
   { type: 'error', inputs: [], name: 'PastCreationTimestamp' },
   { type: 'error', inputs: [], name: 'UnsupportedInitializePath' },
   { type: 'error', inputs: [], name: 'WethCannotBeLoar' },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LoarLpLockerMultiple
@@ -1429,9 +1444,7 @@ export const loarLpLockerMultipleAbi = [
     type: 'function',
     inputs: [],
     name: 'feeLocker',
-    outputs: [
-      { name: '', internalType: 'contract ILoarFeeLocker', type: 'address' },
-    ],
+    outputs: [{ name: '', internalType: 'contract ILoarFeeLocker', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -1521,9 +1534,7 @@ export const loarLpLockerMultipleAbi = [
     type: 'function',
     inputs: [],
     name: 'positionManager',
-    outputs: [
-      { name: '', internalType: 'contract IPositionManager', type: 'address' },
-    ],
+    outputs: [{ name: '', internalType: 'contract IPositionManager', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -1893,7 +1904,7 @@ export const loarLpLockerMultipleAbi = [
   { type: 'error', inputs: [], name: 'Unauthorized' },
   { type: 'error', inputs: [], name: 'ZeroRewardAddress' },
   { type: 'error', inputs: [], name: 'ZeroRewardAmount' },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Universe
@@ -1947,6 +1958,13 @@ export const universeAbi = [
     name: 'createNode',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'currentCanonId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -2147,9 +2165,7 @@ export const universeAbi = [
     type: 'function',
     inputs: [],
     name: 'universeManager',
-    outputs: [
-      { name: '', internalType: 'contract IUniverseManager', type: 'address' },
-    ],
+    outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -2163,6 +2179,25 @@ export const universeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
+      {
+        name: 'newAdmin',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'AdminUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'nodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       {
         name: 'updater',
         internalType: 'address',
@@ -2254,6 +2289,28 @@ export const universeAbi = [
     name: 'NodeVisibilityOptionUpdated',
   },
   {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TokenUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'user', internalType: 'address', type: 'address', indexed: true },
+      { name: 'status', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'WhitelistedUpdated',
+  },
+  {
     type: 'error',
     inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
     name: 'CallerNotAdmin',
@@ -2262,7 +2319,7 @@ export const universeAbi = [
   { type: 'error', inputs: [], name: 'CanonNotSet' },
   { type: 'error', inputs: [], name: 'NodeDoesNotExist' },
   { type: 'error', inputs: [], name: 'TokenDoesNotExist' },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // UniverseGovernor
@@ -2271,9 +2328,7 @@ export const universeAbi = [
 export const universeGovernorAbi = [
   {
     type: 'constructor',
-    inputs: [
-      { name: '_token', internalType: 'contract IVotes', type: 'address' },
-    ],
+    inputs: [{ name: '_token', internalType: 'contract IVotes', type: 'address' }],
     stateMutability: 'nonpayable',
   },
   { type: 'receive', stateMutability: 'payable' },
@@ -2636,18 +2691,14 @@ export const universeGovernorAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'newVotingDelay', internalType: 'uint48', type: 'uint48' },
-    ],
+    inputs: [{ name: 'newVotingDelay', internalType: 'uint48', type: 'uint48' }],
     name: 'setVotingDelay',
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'newVotingPeriod', internalType: 'uint32', type: 'uint32' },
-    ],
+    inputs: [{ name: 'newVotingPeriod', internalType: 'uint32', type: 'uint32' }],
     name: 'setVotingPeriod',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -2656,9 +2707,7 @@ export const universeGovernorAbi = [
     type: 'function',
     inputs: [{ name: 'proposalId', internalType: 'uint256', type: 'uint256' }],
     name: 'state',
-    outputs: [
-      { name: '', internalType: 'enum IGovernor.ProposalState', type: 'uint8' },
-    ],
+    outputs: [{ name: '', internalType: 'enum IGovernor.ProposalState', type: 'uint8' }],
     stateMutability: 'view',
   },
   {
@@ -2677,9 +2726,7 @@ export const universeGovernorAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'newQuorumNumerator', internalType: 'uint256', type: 'uint256' },
-    ],
+    inputs: [{ name: 'newQuorumNumerator', internalType: 'uint256', type: 'uint256' }],
     name: 'updateQuorumNumerator',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -3000,9 +3047,7 @@ export const universeGovernorAbi = [
   { type: 'error', inputs: [], name: 'GovernorInvalidVoteType' },
   {
     type: 'error',
-    inputs: [
-      { name: 'votingPeriod', internalType: 'uint256', type: 'uint256' },
-    ],
+    inputs: [{ name: 'votingPeriod', internalType: 'uint256', type: 'uint256' }],
     name: 'GovernorInvalidVotingPeriod',
   },
   {
@@ -3068,7 +3113,7 @@ export const universeGovernorAbi = [
     inputs: [{ name: 'str', internalType: 'string', type: 'string' }],
     name: 'StringTooLong',
   },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // UniverseManager
@@ -3079,13 +3124,22 @@ export const universeManagerAbi = [
     type: 'constructor',
     inputs: [
       { name: '_teamFeeRecipient', internalType: 'address', type: 'address' },
+      { name: '_lpRecipient', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
   },
+  { type: 'receive', stateMutability: 'payable' },
   {
     type: 'function',
     inputs: [],
     name: 'BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MINT_FEE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -3098,8 +3152,25 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'recipient', internalType: 'address', type: 'address' }],
+    name: 'claimEth',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'claimTeamFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'consumeCreditFund',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -3126,7 +3197,7 @@ export const universeManagerAbi = [
       { name: '_id', internalType: 'uint256', type: 'uint256' },
       { name: '', internalType: 'address', type: 'address' },
     ],
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -3197,9 +3268,7 @@ export const universeManagerAbi = [
       { name: 'id', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'deployUniverseToken',
-    outputs: [
-      { name: 'tokenAddress', internalType: 'address', type: 'address' },
-    ],
+    outputs: [{ name: 'tokenAddress', internalType: 'address', type: 'address' }],
     stateMutability: 'payable',
   },
   {
@@ -3250,6 +3319,13 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'lpRecipient',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'owner',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -3291,18 +3367,21 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: '_teamFeeRecipient', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: '_lpRecipient', internalType: 'address', type: 'address' }],
+    name: 'setLpRecipient',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_teamFeeRecipient', internalType: 'address', type: 'address' }],
     name: 'setTeamFeeRecipient',
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    inputs: [
-      { name: '_tokenDeployer', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: '_tokenDeployer', internalType: 'address', type: 'address' }],
     name: 'setTokenDeployer',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -3330,10 +3409,24 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'totalCreditFundsHeld',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
     name: 'transferOwnership',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'universeCreditFund',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
   },
   {
     type: 'event',
@@ -3425,6 +3518,25 @@ export const universeManagerAbi = [
       { name: 'enabled', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'SetLocker',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldLpRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newLpRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'SetLpRecipient',
   },
   {
     type: 'event',
@@ -3576,6 +3688,37 @@ export const universeManagerAbi = [
     name: 'UniverseCreated',
   },
   {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'lpAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'creditAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'UniverseMintFee',
+  },
+  {
     type: 'error',
     inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
     name: 'AddressEmptyCode',
@@ -3590,9 +3733,11 @@ export const universeManagerAbi = [
   { type: 'error', inputs: [], name: 'Deprecated' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'HookNotEnabled' },
+  { type: 'error', inputs: [], name: 'InsufficientMintFee' },
   { type: 'error', inputs: [], name: 'InvalidHook' },
   { type: 'error', inputs: [], name: 'InvalidLocker' },
   { type: 'error', inputs: [], name: 'LockerNotEnabled' },
+  { type: 'error', inputs: [], name: 'LpRecipientNotSet' },
   {
     type: 'error',
     inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
@@ -3611,7 +3756,7 @@ export const universeManagerAbi = [
   },
   { type: 'error', inputs: [], name: 'TeamFeeRecipientNotSet' },
   { type: 'error', inputs: [], name: 'TokenAlreadyDeployed' },
-] as const
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // UniverseTokenDeployer
@@ -3620,16 +3765,42 @@ export const universeManagerAbi = [
 export const universeTokenDeployerAbi = [
   {
     type: 'constructor',
-    inputs: [
-      { name: '_universeManager', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'COMMUNITY_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'CREATOR_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'LP_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
     inputs: [],
     name: 'TOKEN_SUPPLY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'TREASURY_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
     stateMutability: 'view',
   },
   {
@@ -3711,10 +3882,45 @@ export const universeTokenDeployerAbi = [
     type: 'function',
     inputs: [],
     name: 'universeManager',
-    outputs: [
-      { name: '', internalType: 'contract IUniverseManager', type: 'address' },
-    ],
+    outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'lpAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'creatorAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'treasuryAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'communityAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'TokenAllocation',
   },
   {
     type: 'event',
@@ -3742,11 +3948,26 @@ export const universeTokenDeployerAbi = [
     ],
     name: 'TokenDeployed',
   },
-  { type: 'error', inputs: [], name: 'DeployerIsNotOwner' },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'HookNotEnabled' },
   { type: 'error', inputs: [], name: 'LockerNotEnabled' },
   { type: 'error', inputs: [], name: 'Reentrancy' },
-] as const
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // React
@@ -3755,348 +3976,318 @@ export const universeTokenDeployerAbi = [
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__
  */
-export const useGovernanceErc20_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: governanceErc20Abi })
+export const useGovernanceErc20_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"CLOCK_MODE"`
  */
-export const useGovernanceErc20_ClockMode_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'CLOCK_MODE',
-  })
+export const useGovernanceErc20_ClockMode_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'CLOCK_MODE',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"DOMAIN_SEPARATOR"`
  */
-export const useGovernanceErc20_DomainSeparator_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'DOMAIN_SEPARATOR',
-  })
+export const useGovernanceErc20_DomainSeparator_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'DOMAIN_SEPARATOR',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"admin"`
  */
-export const useGovernanceErc20_Admin_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'admin',
-  })
+export const useGovernanceErc20_Admin_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'admin',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"allowance"`
  */
-export const useGovernanceErc20_Allowance_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'allowance',
-  })
+export const useGovernanceErc20_Allowance_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'allowance',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"balanceOf"`
  */
-export const useGovernanceErc20_BalanceOf_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'balanceOf',
-  })
+export const useGovernanceErc20_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'balanceOf',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"checkpoints"`
  */
-export const useGovernanceErc20_Checkpoints_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'checkpoints',
-  })
+export const useGovernanceErc20_Checkpoints_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'checkpoints',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"clock"`
  */
-export const useGovernanceErc20_Clock_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'clock',
-  })
+export const useGovernanceErc20_Clock_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'clock',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"context"`
  */
-export const useGovernanceErc20_Context_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'context',
-  })
+export const useGovernanceErc20_Context_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'context',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"decimals"`
  */
-export const useGovernanceErc20_Decimals_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'decimals',
-  })
+export const useGovernanceErc20_Decimals_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'decimals',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"delegates"`
  */
-export const useGovernanceErc20_Delegates_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'delegates',
-  })
+export const useGovernanceErc20_Delegates_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'delegates',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"eip712Domain"`
  */
-export const useGovernanceErc20_Eip712Domain_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'eip712Domain',
-  })
+export const useGovernanceErc20_Eip712Domain_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'eip712Domain',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"getPastTotalSupply"`
  */
-export const useGovernanceErc20_GetPastTotalSupply_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'getPastTotalSupply',
-  })
+export const useGovernanceErc20_GetPastTotalSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'getPastTotalSupply',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"getPastVotes"`
  */
-export const useGovernanceErc20_GetPastVotes_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'getPastVotes',
-  })
+export const useGovernanceErc20_GetPastVotes_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'getPastVotes',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"getVotes"`
  */
-export const useGovernanceErc20_GetVotes_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'getVotes',
-  })
+export const useGovernanceErc20_GetVotes_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'getVotes',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"imageUrl"`
  */
-export const useGovernanceErc20_ImageUrl_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'imageUrl',
-  })
+export const useGovernanceErc20_ImageUrl_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'imageUrl',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"metadata"`
  */
-export const useGovernanceErc20_Metadata_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'metadata',
-  })
+export const useGovernanceErc20_Metadata_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'metadata',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"name"`
  */
-export const useGovernanceErc20_Name_read = /*#__PURE__*/ createUseReadContract(
-  { abi: governanceErc20Abi, functionName: 'name' },
-)
+export const useGovernanceErc20_Name_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'name',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"nonces"`
  */
-export const useGovernanceErc20_Nonces_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'nonces',
-  })
+export const useGovernanceErc20_Nonces_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'nonces',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"numCheckpoints"`
  */
-export const useGovernanceErc20_NumCheckpoints_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'numCheckpoints',
-  })
+export const useGovernanceErc20_NumCheckpoints_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'numCheckpoints',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"symbol"`
  */
-export const useGovernanceErc20_Symbol_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'symbol',
-  })
+export const useGovernanceErc20_Symbol_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'symbol',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"totalSupply"`
  */
-export const useGovernanceErc20_TotalSupply_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'totalSupply',
-  })
+export const useGovernanceErc20_TotalSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'totalSupply',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"universe"`
  */
-export const useGovernanceErc20_Universe_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: governanceErc20Abi,
-    functionName: 'universe',
-  })
+export const useGovernanceErc20_Universe_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'universe',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__
  */
-export const useGovernanceErc20_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: governanceErc20Abi })
+export const useGovernanceErc20_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"approve"`
  */
-export const useGovernanceErc20_Approve_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: governanceErc20Abi,
-    functionName: 'approve',
-  })
+export const useGovernanceErc20_Approve_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+  functionName: 'approve',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"delegate"`
  */
-export const useGovernanceErc20_Delegate_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: governanceErc20Abi,
-    functionName: 'delegate',
-  })
+export const useGovernanceErc20_Delegate_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+  functionName: 'delegate',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"delegateBySig"`
  */
-export const useGovernanceErc20_DelegateBySig_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: governanceErc20Abi,
-    functionName: 'delegateBySig',
-  })
+export const useGovernanceErc20_DelegateBySig_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+  functionName: 'delegateBySig',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"permit"`
  */
-export const useGovernanceErc20_Permit_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: governanceErc20Abi,
-    functionName: 'permit',
-  })
+export const useGovernanceErc20_Permit_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+  functionName: 'permit',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"transfer"`
  */
-export const useGovernanceErc20_Transfer_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: governanceErc20Abi,
-    functionName: 'transfer',
-  })
+export const useGovernanceErc20_Transfer_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+  functionName: 'transfer',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"transferFrom"`
  */
-export const useGovernanceErc20_TransferFrom_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: governanceErc20Abi,
-    functionName: 'transferFrom',
-  })
+export const useGovernanceErc20_TransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: governanceErc20Abi,
+  functionName: 'transferFrom',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__
  */
-export const useGovernanceErc20_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: governanceErc20Abi })
+export const useGovernanceErc20_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"approve"`
  */
-export const useGovernanceErc20_Approve_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'approve',
-  })
+export const useGovernanceErc20_Approve_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+  functionName: 'approve',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"delegate"`
  */
-export const useGovernanceErc20_Delegate_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'delegate',
-  })
+export const useGovernanceErc20_Delegate_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+  functionName: 'delegate',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"delegateBySig"`
  */
-export const useGovernanceErc20_DelegateBySig_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'delegateBySig',
-  })
+export const useGovernanceErc20_DelegateBySig_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+  functionName: 'delegateBySig',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"permit"`
  */
-export const useGovernanceErc20_Permit_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'permit',
-  })
+export const useGovernanceErc20_Permit_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+  functionName: 'permit',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"transfer"`
  */
-export const useGovernanceErc20_Transfer_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'transfer',
-  })
+export const useGovernanceErc20_Transfer_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+  functionName: 'transfer',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"transferFrom"`
  */
-export const useGovernanceErc20_TransferFrom_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'transferFrom',
-  })
+export const useGovernanceErc20_TransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: governanceErc20Abi,
+  functionName: 'transferFrom',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link governanceErc20Abi}__
  */
-export const useGovernanceErc20_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: governanceErc20Abi })
+export const useGovernanceErc20_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: governanceErc20Abi,
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link governanceErc20Abi}__ and `eventName` set to `"Approval"`
  */
-export const useGovernanceErc20_Approval_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: governanceErc20Abi,
-    eventName: 'Approval',
-  })
+export const useGovernanceErc20_Approval_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: governanceErc20Abi,
+  eventName: 'Approval',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link governanceErc20Abi}__ and `eventName` set to `"DelegateChanged"`
  */
-export const useGovernanceErc20_DelegateChanged_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: governanceErc20Abi,
-    eventName: 'DelegateChanged',
-  })
+export const useGovernanceErc20_DelegateChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: governanceErc20Abi,
+  eventName: 'DelegateChanged',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link governanceErc20Abi}__ and `eventName` set to `"DelegateVotesChanged"`
@@ -4105,7 +4296,7 @@ export const useGovernanceErc20_DelegateVotesChanged_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: governanceErc20Abi,
     eventName: 'DelegateVotesChanged',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link governanceErc20Abi}__ and `eventName` set to `"EIP712DomainChanged"`
@@ -4114,49 +4305,46 @@ export const useGovernanceErc20_Eip712DomainChanged_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: governanceErc20Abi,
     eventName: 'EIP712DomainChanged',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link governanceErc20Abi}__ and `eventName` set to `"Transfer"`
  */
-export const useGovernanceErc20_Transfer_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: governanceErc20Abi,
-    eventName: 'Transfer',
-  })
+export const useGovernanceErc20_Transfer_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: governanceErc20Abi,
+  eventName: 'Transfer',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFeeLockerAbi}__
  */
-export const useLoarFeeLocker_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: loarFeeLockerAbi })
+export const useLoarFeeLocker_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFeeLockerAbi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"allowedDepositors"`
  */
-export const useLoarFeeLocker_AllowedDepositors_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'allowedDepositors',
-  })
+export const useLoarFeeLocker_AllowedDepositors_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'allowedDepositors',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"availableFees"`
  */
-export const useLoarFeeLocker_AvailableFees_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'availableFees',
-  })
+export const useLoarFeeLocker_AvailableFees_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'availableFees',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"feesToClaim"`
  */
-export const useLoarFeeLocker_FeesToClaim_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'feesToClaim',
-  })
+export const useLoarFeeLocker_FeesToClaim_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'feesToClaim',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"owner"`
@@ -4164,142 +4352,148 @@ export const useLoarFeeLocker_FeesToClaim_read =
 export const useLoarFeeLocker_Owner_read = /*#__PURE__*/ createUseReadContract({
   abi: loarFeeLockerAbi,
   functionName: 'owner',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"supportsInterface"`
  */
-export const useLoarFeeLocker_SupportsInterface_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'supportsInterface',
-  })
+export const useLoarFeeLocker_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'supportsInterface',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__
  */
-export const useLoarFeeLocker_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: loarFeeLockerAbi })
+export const useLoarFeeLocker_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"addDepositor"`
  */
-export const useLoarFeeLocker_AddDepositor_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'addDepositor',
-  })
+export const useLoarFeeLocker_AddDepositor_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'addDepositor',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"claim"`
  */
-export const useLoarFeeLocker_Claim_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'claim',
-  })
+export const useLoarFeeLocker_Claim_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'claim',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"removeDepositor"`
+ */
+export const useLoarFeeLocker_RemoveDepositor_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'removeDepositor',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"renounceOwnership"`
  */
-export const useLoarFeeLocker_RenounceOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'renounceOwnership',
-  })
+export const useLoarFeeLocker_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'renounceOwnership',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"storeFees"`
  */
-export const useLoarFeeLocker_StoreFees_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'storeFees',
-  })
+export const useLoarFeeLocker_StoreFees_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'storeFees',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"transferOwnership"`
  */
-export const useLoarFeeLocker_TransferOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'transferOwnership',
-  })
+export const useLoarFeeLocker_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'transferOwnership',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__
  */
-export const useLoarFeeLocker_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: loarFeeLockerAbi })
+export const useLoarFeeLocker_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"addDepositor"`
  */
-export const useLoarFeeLocker_AddDepositor_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'addDepositor',
-  })
+export const useLoarFeeLocker_AddDepositor_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'addDepositor',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"claim"`
  */
-export const useLoarFeeLocker_Claim_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'claim',
-  })
+export const useLoarFeeLocker_Claim_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'claim',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"removeDepositor"`
+ */
+export const useLoarFeeLocker_RemoveDepositor_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'removeDepositor',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"renounceOwnership"`
  */
-export const useLoarFeeLocker_RenounceOwnership_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'renounceOwnership',
-  })
+export const useLoarFeeLocker_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'renounceOwnership',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"storeFees"`
  */
-export const useLoarFeeLocker_StoreFees_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'storeFees',
-  })
+export const useLoarFeeLocker_StoreFees_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'storeFees',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `functionName` set to `"transferOwnership"`
  */
-export const useLoarFeeLocker_TransferOwnership_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarFeeLockerAbi,
-    functionName: 'transferOwnership',
-  })
+export const useLoarFeeLocker_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFeeLockerAbi,
+  functionName: 'transferOwnership',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__
  */
-export const useLoarFeeLocker_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: loarFeeLockerAbi })
+export const useLoarFeeLocker_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFeeLockerAbi,
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `eventName` set to `"AddDepositor"`
  */
-export const useLoarFeeLocker_AddDepositor_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: loarFeeLockerAbi,
-    eventName: 'AddDepositor',
-  })
+export const useLoarFeeLocker_AddDepositor_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFeeLockerAbi,
+  eventName: 'AddDepositor',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `eventName` set to `"ClaimTokens"`
  */
-export const useLoarFeeLocker_ClaimTokens_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: loarFeeLockerAbi,
-    eventName: 'ClaimTokens',
-  })
+export const useLoarFeeLocker_ClaimTokens_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFeeLockerAbi,
+  eventName: 'ClaimTokens',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `eventName` set to `"ClaimTokensPermissioned"`
@@ -4308,7 +4502,7 @@ export const useLoarFeeLocker_ClaimTokensPermissioned_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarFeeLockerAbi,
     eventName: 'ClaimTokensPermissioned',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `eventName` set to `"OwnershipTransferred"`
@@ -4317,217 +4511,207 @@ export const useLoarFeeLocker_OwnershipTransferred_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarFeeLockerAbi,
     eventName: 'OwnershipTransferred',
-  })
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `eventName` set to `"RemoveDepositor"`
+ */
+export const useLoarFeeLocker_RemoveDepositor_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFeeLockerAbi,
+  eventName: 'RemoveDepositor',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFeeLockerAbi}__ and `eventName` set to `"StoreTokens"`
  */
-export const useLoarFeeLocker_StoreTokens_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: loarFeeLockerAbi,
-    eventName: 'StoreTokens',
-  })
+export const useLoarFeeLocker_StoreTokens_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFeeLockerAbi,
+  eventName: 'StoreTokens',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__
  */
-export const useLoarHookStaticFee_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: loarHookStaticFeeAbi })
+export const useLoarHookStaticFee_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"FEE_DENOMINATOR"`
  */
-export const useLoarHookStaticFee_FeeDenominator_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'FEE_DENOMINATOR',
-  })
+export const useLoarHookStaticFee_FeeDenominator_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'FEE_DENOMINATOR',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"MAX_LP_FEE"`
  */
-export const useLoarHookStaticFee_MaxLpFee_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'MAX_LP_FEE',
-  })
+export const useLoarHookStaticFee_MaxLpFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'MAX_LP_FEE',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"PROTOCOL_FEE_NUMERATOR"`
  */
-export const useLoarHookStaticFee_ProtocolFeeNumerator_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'PROTOCOL_FEE_NUMERATOR',
-  })
+export const useLoarHookStaticFee_ProtocolFeeNumerator_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'PROTOCOL_FEE_NUMERATOR',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"factory"`
  */
-export const useLoarHookStaticFee_Factory_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'factory',
-  })
+export const useLoarHookStaticFee_Factory_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'factory',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"getHookPermissions"`
  */
-export const useLoarHookStaticFee_GetHookPermissions_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'getHookPermissions',
-  })
+export const useLoarHookStaticFee_GetHookPermissions_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'getHookPermissions',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"loarFee"`
  */
-export const useLoarHookStaticFee_LoarFee_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'loarFee',
-  })
+export const useLoarHookStaticFee_LoarFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'loarFee',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"owner"`
  */
-export const useLoarHookStaticFee_Owner_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'owner',
-  })
+export const useLoarHookStaticFee_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'owner',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"pairedFee"`
  */
-export const useLoarHookStaticFee_PairedFee_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'pairedFee',
-  })
+export const useLoarHookStaticFee_PairedFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'pairedFee',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"poolCreationTimestamp"`
  */
-export const useLoarHookStaticFee_PoolCreationTimestamp_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'poolCreationTimestamp',
-  })
+export const useLoarHookStaticFee_PoolCreationTimestamp_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'poolCreationTimestamp',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"poolManager"`
  */
-export const useLoarHookStaticFee_PoolManager_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'poolManager',
-  })
+export const useLoarHookStaticFee_PoolManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'poolManager',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"protocolFee"`
  */
-export const useLoarHookStaticFee_ProtocolFee_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'protocolFee',
-  })
+export const useLoarHookStaticFee_ProtocolFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'protocolFee',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"supportsInterface"`
  */
-export const useLoarHookStaticFee_SupportsInterface_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'supportsInterface',
-  })
+export const useLoarHookStaticFee_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'supportsInterface',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"weth"`
  */
-export const useLoarHookStaticFee_Weth_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'weth',
-  })
+export const useLoarHookStaticFee_Weth_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'weth',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__
  */
-export const useLoarHookStaticFee_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: loarHookStaticFeeAbi })
+export const useLoarHookStaticFee_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterAddLiquidity"`
  */
-export const useLoarHookStaticFee_AfterAddLiquidity_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'afterAddLiquidity',
-  })
+export const useLoarHookStaticFee_AfterAddLiquidity_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'afterAddLiquidity',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterDonate"`
  */
-export const useLoarHookStaticFee_AfterDonate_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'afterDonate',
-  })
+export const useLoarHookStaticFee_AfterDonate_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'afterDonate',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterInitialize"`
  */
-export const useLoarHookStaticFee_AfterInitialize_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'afterInitialize',
-  })
+export const useLoarHookStaticFee_AfterInitialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'afterInitialize',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterRemoveLiquidity"`
  */
-export const useLoarHookStaticFee_AfterRemoveLiquidity_write =
-  /*#__PURE__*/ createUseWriteContract({
+export const useLoarHookStaticFee_AfterRemoveLiquidity_write = /*#__PURE__*/ createUseWriteContract(
+  {
     abi: loarHookStaticFeeAbi,
     functionName: 'afterRemoveLiquidity',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterSwap"`
  */
-export const useLoarHookStaticFee_AfterSwap_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'afterSwap',
-  })
+export const useLoarHookStaticFee_AfterSwap_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'afterSwap',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeAddLiquidity"`
  */
-export const useLoarHookStaticFee_BeforeAddLiquidity_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'beforeAddLiquidity',
-  })
+export const useLoarHookStaticFee_BeforeAddLiquidity_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'beforeAddLiquidity',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeDonate"`
  */
-export const useLoarHookStaticFee_BeforeDonate_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'beforeDonate',
-  })
+export const useLoarHookStaticFee_BeforeDonate_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'beforeDonate',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeInitialize"`
  */
-export const useLoarHookStaticFee_BeforeInitialize_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'beforeInitialize',
-  })
+export const useLoarHookStaticFee_BeforeInitialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'beforeInitialize',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeRemoveLiquidity"`
@@ -4536,49 +4720,46 @@ export const useLoarHookStaticFee_BeforeRemoveLiquidity_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'beforeRemoveLiquidity',
-  })
+  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeSwap"`
  */
-export const useLoarHookStaticFee_BeforeSwap_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'beforeSwap',
-  })
+export const useLoarHookStaticFee_BeforeSwap_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'beforeSwap',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"initializePool"`
  */
-export const useLoarHookStaticFee_InitializePool_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'initializePool',
-  })
+export const useLoarHookStaticFee_InitializePool_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'initializePool',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"renounceOwnership"`
  */
-export const useLoarHookStaticFee_RenounceOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'renounceOwnership',
-  })
+export const useLoarHookStaticFee_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'renounceOwnership',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"transferOwnership"`
  */
-export const useLoarHookStaticFee_TransferOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'transferOwnership',
-  })
+export const useLoarHookStaticFee_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'transferOwnership',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__
  */
-export const useLoarHookStaticFee_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: loarHookStaticFeeAbi })
+export const useLoarHookStaticFee_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarHookStaticFeeAbi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterAddLiquidity"`
@@ -4587,16 +4768,15 @@ export const useLoarHookStaticFee_AfterAddLiquidity_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'afterAddLiquidity',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterDonate"`
  */
-export const useLoarHookStaticFee_AfterDonate_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'afterDonate',
-  })
+export const useLoarHookStaticFee_AfterDonate_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'afterDonate',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterInitialize"`
@@ -4605,7 +4785,7 @@ export const useLoarHookStaticFee_AfterInitialize_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'afterInitialize',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterRemoveLiquidity"`
@@ -4614,16 +4794,15 @@ export const useLoarHookStaticFee_AfterRemoveLiquidity_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'afterRemoveLiquidity',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterSwap"`
  */
-export const useLoarHookStaticFee_AfterSwap_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'afterSwap',
-  })
+export const useLoarHookStaticFee_AfterSwap_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'afterSwap',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeAddLiquidity"`
@@ -4632,16 +4811,15 @@ export const useLoarHookStaticFee_BeforeAddLiquidity_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'beforeAddLiquidity',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeDonate"`
  */
-export const useLoarHookStaticFee_BeforeDonate_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'beforeDonate',
-  })
+export const useLoarHookStaticFee_BeforeDonate_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'beforeDonate',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeInitialize"`
@@ -4650,7 +4828,7 @@ export const useLoarHookStaticFee_BeforeInitialize_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'beforeInitialize',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeRemoveLiquidity"`
@@ -4659,25 +4837,25 @@ export const useLoarHookStaticFee_BeforeRemoveLiquidity_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'beforeRemoveLiquidity',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"beforeSwap"`
  */
-export const useLoarHookStaticFee_BeforeSwap_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarHookStaticFeeAbi,
-    functionName: 'beforeSwap',
-  })
+export const useLoarHookStaticFee_BeforeSwap_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'beforeSwap',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"initializePool"`
  */
-export const useLoarHookStaticFee_InitializePool_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
+export const useLoarHookStaticFee_InitializePool_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
     abi: loarHookStaticFeeAbi,
     functionName: 'initializePool',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"renounceOwnership"`
@@ -4686,7 +4864,7 @@ export const useLoarHookStaticFee_RenounceOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'renounceOwnership',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"transferOwnership"`
@@ -4695,13 +4873,14 @@ export const useLoarHookStaticFee_TransferOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarHookStaticFeeAbi,
     functionName: 'transferOwnership',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__
  */
-export const useLoarHookStaticFee_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: loarHookStaticFeeAbi })
+export const useLoarHookStaticFee_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarHookStaticFeeAbi,
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"ClaimProtocolFees"`
@@ -4710,7 +4889,7 @@ export const useLoarHookStaticFee_ClaimProtocolFees_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarHookStaticFeeAbi,
     eventName: 'ClaimProtocolFees',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"OwnershipTransferred"`
@@ -4719,7 +4898,7 @@ export const useLoarHookStaticFee_OwnershipTransferred_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarHookStaticFeeAbi,
     eventName: 'OwnershipTransferred',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"PoolCreatedFactory"`
@@ -4728,49 +4907,50 @@ export const useLoarHookStaticFee_PoolCreatedFactory_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarHookStaticFeeAbi,
     eventName: 'PoolCreatedFactory',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"PoolCreatedOpen"`
  */
-export const useLoarHookStaticFee_PoolCreatedOpen_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
+export const useLoarHookStaticFee_PoolCreatedOpen_watch = /*#__PURE__*/ createUseWatchContractEvent(
+  {
     abi: loarHookStaticFeeAbi,
     eventName: 'PoolCreatedOpen',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"PoolInitialized"`
  */
-export const useLoarHookStaticFee_PoolInitialized_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
+export const useLoarHookStaticFee_PoolInitialized_watch = /*#__PURE__*/ createUseWatchContractEvent(
+  {
     abi: loarHookStaticFeeAbi,
     eventName: 'PoolInitialized',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__
  */
-export const useLoarLpLockerMultiple_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: loarLpLockerMultipleAbi })
+export const useLoarLpLockerMultiple_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"BASIS_POINTS"`
  */
-export const useLoarLpLockerMultiple_BasisPoints_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'BASIS_POINTS',
-  })
+export const useLoarLpLockerMultiple_BasisPoints_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'BASIS_POINTS',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"MAX_LP_POSITIONS"`
  */
-export const useLoarLpLockerMultiple_MaxLpPositions_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'MAX_LP_POSITIONS',
-  })
+export const useLoarLpLockerMultiple_MaxLpPositions_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'MAX_LP_POSITIONS',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"MAX_REWARD_PARTICIPANTS"`
@@ -4779,94 +4959,86 @@ export const useLoarLpLockerMultiple_MaxRewardParticipants_read =
   /*#__PURE__*/ createUseReadContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'MAX_REWARD_PARTICIPANTS',
-  })
+  });
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"factory"`
  */
-export const useLoarLpLockerMultiple_Factory_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'factory',
-  })
+export const useLoarLpLockerMultiple_Factory_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'factory',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"feeLocker"`
  */
-export const useLoarLpLockerMultiple_FeeLocker_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'feeLocker',
-  })
+export const useLoarLpLockerMultiple_FeeLocker_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'feeLocker',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"owner"`
  */
-export const useLoarLpLockerMultiple_Owner_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'owner',
-  })
+export const useLoarLpLockerMultiple_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'owner',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"permit2"`
  */
-export const useLoarLpLockerMultiple_Permit2_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'permit2',
-  })
+export const useLoarLpLockerMultiple_Permit2_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'permit2',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"positionManager"`
  */
-export const useLoarLpLockerMultiple_PositionManager_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'positionManager',
-  })
+export const useLoarLpLockerMultiple_PositionManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'positionManager',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"supportsInterface"`
  */
-export const useLoarLpLockerMultiple_SupportsInterface_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'supportsInterface',
-  })
+export const useLoarLpLockerMultiple_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'supportsInterface',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"tokenRewards"`
  */
-export const useLoarLpLockerMultiple_TokenRewards_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'tokenRewards',
-  })
+export const useLoarLpLockerMultiple_TokenRewards_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'tokenRewards',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"version"`
  */
-export const useLoarLpLockerMultiple_Version_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'version',
-  })
+export const useLoarLpLockerMultiple_Version_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'version',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__
  */
-export const useLoarLpLockerMultiple_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: loarLpLockerMultipleAbi })
+export const useLoarLpLockerMultiple_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarLpLockerMultipleAbi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"collectRewards"`
  */
-export const useLoarLpLockerMultiple_CollectRewards_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'collectRewards',
-  })
+export const useLoarLpLockerMultiple_CollectRewards_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'collectRewards',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"collectRewardsWithoutUnlock"`
@@ -4875,52 +5047,53 @@ export const useLoarLpLockerMultiple_CollectRewardsWithoutUnlock_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'collectRewardsWithoutUnlock',
-  })
+  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"onERC721Received"`
  */
-export const useLoarLpLockerMultiple_OnErc721Received_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'onERC721Received',
-  })
+export const useLoarLpLockerMultiple_OnErc721Received_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'onERC721Received',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"placeLiquidity"`
  */
-export const useLoarLpLockerMultiple_PlaceLiquidity_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'placeLiquidity',
-  })
+export const useLoarLpLockerMultiple_PlaceLiquidity_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'placeLiquidity',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"renounceOwnership"`
  */
-export const useLoarLpLockerMultiple_RenounceOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
+export const useLoarLpLockerMultiple_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract(
+  {
     abi: loarLpLockerMultipleAbi,
     functionName: 'renounceOwnership',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"transferOwnership"`
  */
-export const useLoarLpLockerMultiple_TransferOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
+export const useLoarLpLockerMultiple_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract(
+  {
     abi: loarLpLockerMultipleAbi,
     functionName: 'transferOwnership',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardAdmin"`
  */
-export const useLoarLpLockerMultiple_UpdateRewardAdmin_write =
-  /*#__PURE__*/ createUseWriteContract({
+export const useLoarLpLockerMultiple_UpdateRewardAdmin_write = /*#__PURE__*/ createUseWriteContract(
+  {
     abi: loarLpLockerMultipleAbi,
     functionName: 'updateRewardAdmin',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardRecipient"`
@@ -4929,31 +5102,30 @@ export const useLoarLpLockerMultiple_UpdateRewardRecipient_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'updateRewardRecipient',
-  })
+  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawERC20"`
  */
-export const useLoarLpLockerMultiple_WithdrawErc20_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'withdrawERC20',
-  })
+export const useLoarLpLockerMultiple_WithdrawErc20_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'withdrawERC20',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawETH"`
  */
-export const useLoarLpLockerMultiple_WithdrawEth_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'withdrawETH',
-  })
+export const useLoarLpLockerMultiple_WithdrawEth_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'withdrawETH',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__
  */
-export const useLoarLpLockerMultiple_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: loarLpLockerMultipleAbi })
+export const useLoarLpLockerMultiple_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarLpLockerMultipleAbi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"collectRewards"`
@@ -4962,7 +5134,7 @@ export const useLoarLpLockerMultiple_CollectRewards_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'collectRewards',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"collectRewardsWithoutUnlock"`
@@ -4971,7 +5143,7 @@ export const useLoarLpLockerMultiple_CollectRewardsWithoutUnlock_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'collectRewardsWithoutUnlock',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"onERC721Received"`
@@ -4980,7 +5152,7 @@ export const useLoarLpLockerMultiple_OnErc721Received_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'onERC721Received',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"placeLiquidity"`
@@ -4989,7 +5161,7 @@ export const useLoarLpLockerMultiple_PlaceLiquidity_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'placeLiquidity',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"renounceOwnership"`
@@ -4998,7 +5170,7 @@ export const useLoarLpLockerMultiple_RenounceOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'renounceOwnership',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"transferOwnership"`
@@ -5007,7 +5179,7 @@ export const useLoarLpLockerMultiple_TransferOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'transferOwnership',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardAdmin"`
@@ -5016,7 +5188,7 @@ export const useLoarLpLockerMultiple_UpdateRewardAdmin_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'updateRewardAdmin',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardRecipient"`
@@ -5025,7 +5197,7 @@ export const useLoarLpLockerMultiple_UpdateRewardRecipient_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'updateRewardRecipient',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawERC20"`
@@ -5034,22 +5206,24 @@ export const useLoarLpLockerMultiple_WithdrawErc20_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'withdrawERC20',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawETH"`
  */
-export const useLoarLpLockerMultiple_WithdrawEth_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
+export const useLoarLpLockerMultiple_WithdrawEth_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
     abi: loarLpLockerMultipleAbi,
     functionName: 'withdrawETH',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__
  */
-export const useLoarLpLockerMultiple_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: loarLpLockerMultipleAbi })
+export const useLoarLpLockerMultiple_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarLpLockerMultipleAbi,
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"ClaimedRewards"`
@@ -5058,7 +5232,7 @@ export const useLoarLpLockerMultiple_ClaimedRewards_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarLpLockerMultipleAbi,
     eventName: 'ClaimedRewards',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"OwnershipTransferred"`
@@ -5067,16 +5241,15 @@ export const useLoarLpLockerMultiple_OwnershipTransferred_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarLpLockerMultipleAbi,
     eventName: 'OwnershipTransferred',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"Received"`
  */
-export const useLoarLpLockerMultiple_Received_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: loarLpLockerMultipleAbi,
-    eventName: 'Received',
-  })
+export const useLoarLpLockerMultiple_Received_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarLpLockerMultipleAbi,
+  eventName: 'Received',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"RewardAdminUpdated"`
@@ -5085,7 +5258,7 @@ export const useLoarLpLockerMultiple_RewardAdminUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarLpLockerMultipleAbi,
     eventName: 'RewardAdminUpdated',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"RewardRecipientUpdated"`
@@ -5094,7 +5267,7 @@ export const useLoarLpLockerMultiple_RewardRecipientUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarLpLockerMultipleAbi,
     eventName: 'RewardRecipientUpdated',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"TokenRewardAdded"`
@@ -5103,23 +5276,30 @@ export const useLoarLpLockerMultiple_TokenRewardAdded_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarLpLockerMultipleAbi,
     eventName: 'TokenRewardAdded',
-  })
+  });
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__
  */
 export const useUniverse_undefined_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"associatedToken"`
  */
-export const useUniverse_AssociatedToken_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'associatedToken',
-  })
+export const useUniverse_AssociatedToken_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'associatedToken',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"currentCanonId"`
+ */
+export const useUniverse_CurrentCanonId_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'currentCanonId',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getAdmin"`
@@ -5127,25 +5307,23 @@ export const useUniverse_AssociatedToken_read =
 export const useUniverse_GetAdmin_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'getAdmin',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getCanonChain"`
  */
-export const useUniverse_GetCanonChain_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'getCanonChain',
-  })
+export const useUniverse_GetCanonChain_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'getCanonChain',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getFullGraph"`
  */
-export const useUniverse_GetFullGraph_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'getFullGraph',
-  })
+export const useUniverse_GetFullGraph_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'getFullGraph',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getLeaves"`
@@ -5153,7 +5331,7 @@ export const useUniverse_GetFullGraph_read =
 export const useUniverse_GetLeaves_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'getLeaves',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getMedia"`
@@ -5161,7 +5339,7 @@ export const useUniverse_GetLeaves_read = /*#__PURE__*/ createUseReadContract({
 export const useUniverse_GetMedia_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'getMedia',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getNode"`
@@ -5169,14 +5347,15 @@ export const useUniverse_GetMedia_read = /*#__PURE__*/ createUseReadContract({
 export const useUniverse_GetNode_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'getNode',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getTimeline"`
  */
-export const useUniverse_GetTimeline_read = /*#__PURE__*/ createUseReadContract(
-  { abi: universeAbi, functionName: 'getTimeline' },
-)
+export const useUniverse_GetTimeline_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'getTimeline',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getToken"`
@@ -5184,32 +5363,31 @@ export const useUniverse_GetTimeline_read = /*#__PURE__*/ createUseReadContract(
 export const useUniverse_GetToken_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'getToken',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getWhitelisted"`
  */
-export const useUniverse_GetWhitelisted_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'getWhitelisted',
-  })
+export const useUniverse_GetWhitelisted_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'getWhitelisted',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"latestNodeId"`
  */
-export const useUniverse_LatestNodeId_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'latestNodeId',
-  })
+export const useUniverse_LatestNodeId_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'latestNodeId',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"nodeIDToHex"`
  */
-export const useUniverse_NodeIdToHex_read = /*#__PURE__*/ createUseReadContract(
-  { abi: universeAbi, functionName: 'nodeIDToHex' },
-)
+export const useUniverse_NodeIdToHex_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'nodeIDToHex',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"nodes"`
@@ -5217,68 +5395,62 @@ export const useUniverse_NodeIdToHex_read = /*#__PURE__*/ createUseReadContract(
 export const useUniverse_Nodes_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'nodes',
-})
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeAdmin"`
  */
-export const useUniverse_UniverseAdmin_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'universeAdmin',
-  })
+export const useUniverse_UniverseAdmin_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'universeAdmin',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeDescription"`
  */
-export const useUniverse_UniverseDescription_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'universeDescription',
-  })
+export const useUniverse_UniverseDescription_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'universeDescription',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeImageUrl"`
  */
-export const useUniverse_UniverseImageUrl_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'universeImageUrl',
-  })
+export const useUniverse_UniverseImageUrl_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'universeImageUrl',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeManager"`
  */
-export const useUniverse_UniverseManager_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'universeManager',
-  })
+export const useUniverse_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'universeManager',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeName"`
  */
-export const useUniverse_UniverseName_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeAbi,
-    functionName: 'universeName',
-  })
+export const useUniverse_UniverseName_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'universeName',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__
  */
-export const useUniverse_undefined_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: universeAbi },
-)
+export const useUniverse_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"createNode"`
  */
-export const useUniverse_CreateNode_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeAbi,
-    functionName: 'createNode',
-  })
+export const useUniverse_CreateNode_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'createNode',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setAdmin"`
@@ -5286,7 +5458,7 @@ export const useUniverse_CreateNode_write =
 export const useUniverse_SetAdmin_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeAbi,
   functionName: 'setAdmin',
-})
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setCanon"`
@@ -5294,7 +5466,7 @@ export const useUniverse_SetAdmin_write = /*#__PURE__*/ createUseWriteContract({
 export const useUniverse_SetCanon_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeAbi,
   functionName: 'setCanon',
-})
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setMedia"`
@@ -5302,25 +5474,23 @@ export const useUniverse_SetCanon_write = /*#__PURE__*/ createUseWriteContract({
 export const useUniverse_SetMedia_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeAbi,
   functionName: 'setMedia',
-})
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setNodeCreationOption"`
  */
-export const useUniverse_SetNodeCreationOption_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeAbi,
-    functionName: 'setNodeCreationOption',
-  })
+export const useUniverse_SetNodeCreationOption_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'setNodeCreationOption',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setNodeVisibilityOption"`
  */
-export const useUniverse_SetNodeVisibilityOption_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeAbi,
-    functionName: 'setNodeVisibilityOption',
-  })
+export const useUniverse_SetNodeVisibilityOption_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'setNodeVisibilityOption',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setToken"`
@@ -5328,127 +5498,127 @@ export const useUniverse_SetNodeVisibilityOption_write =
 export const useUniverse_SetToken_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeAbi,
   functionName: 'setToken',
-})
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setWhitelisted"`
  */
-export const useUniverse_SetWhitelisted_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeAbi,
-    functionName: 'setWhitelisted',
-  })
+export const useUniverse_SetWhitelisted_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'setWhitelisted',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__
  */
-export const useUniverse_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: universeAbi })
+export const useUniverse_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"createNode"`
  */
-export const useUniverse_CreateNode_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'createNode',
-  })
+export const useUniverse_CreateNode_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'createNode',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setAdmin"`
  */
-export const useUniverse_SetAdmin_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'setAdmin',
-  })
+export const useUniverse_SetAdmin_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'setAdmin',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setCanon"`
  */
-export const useUniverse_SetCanon_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'setCanon',
-  })
+export const useUniverse_SetCanon_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'setCanon',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setMedia"`
  */
-export const useUniverse_SetMedia_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'setMedia',
-  })
+export const useUniverse_SetMedia_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'setMedia',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setNodeCreationOption"`
  */
-export const useUniverse_SetNodeCreationOption_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'setNodeCreationOption',
-  })
+export const useUniverse_SetNodeCreationOption_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'setNodeCreationOption',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setNodeVisibilityOption"`
  */
-export const useUniverse_SetNodeVisibilityOption_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
+export const useUniverse_SetNodeVisibilityOption_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
     abi: universeAbi,
     functionName: 'setNodeVisibilityOption',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setToken"`
  */
-export const useUniverse_SetToken_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'setToken',
-  })
+export const useUniverse_SetToken_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'setToken',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setWhitelisted"`
  */
-export const useUniverse_SetWhitelisted_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'setWhitelisted',
-  })
+export const useUniverse_SetWhitelisted_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'setWhitelisted',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__
  */
-export const useUniverse_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: universeAbi })
+export const useUniverse_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"AdminUpdated"`
+ */
+export const useUniverse_AdminUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'AdminUpdated',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"MediaUpdated"`
  */
-export const useUniverse_MediaUpdated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeAbi,
-    eventName: 'MediaUpdated',
-  })
+export const useUniverse_MediaUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'MediaUpdated',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"NodeCanonized"`
  */
-export const useUniverse_NodeCanonized_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeAbi,
-    eventName: 'NodeCanonized',
-  })
+export const useUniverse_NodeCanonized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'NodeCanonized',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"NodeCreated"`
  */
-export const useUniverse_NodeCreated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeAbi,
-    eventName: 'NodeCreated',
-  })
+export const useUniverse_NodeCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'NodeCreated',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"NodeCreationOptionUpdated"`
@@ -5457,7 +5627,7 @@ export const useUniverse_NodeCreationOptionUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeAbi,
     eventName: 'NodeCreationOptionUpdated',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"NodeVisibilityOptionUpdated"`
@@ -5466,307 +5636,293 @@ export const useUniverse_NodeVisibilityOptionUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeAbi,
     eventName: 'NodeVisibilityOptionUpdated',
-  })
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"TokenUpdated"`
+ */
+export const useUniverse_TokenUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'TokenUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"WhitelistedUpdated"`
+ */
+export const useUniverse_WhitelistedUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'WhitelistedUpdated',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__
  */
-export const useUniverseGovernor_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: universeGovernorAbi })
+export const useUniverseGovernor_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"BALLOT_TYPEHASH"`
  */
-export const useUniverseGovernor_BallotTypehash_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'BALLOT_TYPEHASH',
-  })
+export const useUniverseGovernor_BallotTypehash_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'BALLOT_TYPEHASH',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"CLOCK_MODE"`
  */
-export const useUniverseGovernor_ClockMode_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'CLOCK_MODE',
-  })
+export const useUniverseGovernor_ClockMode_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'CLOCK_MODE',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"COUNTING_MODE"`
  */
-export const useUniverseGovernor_CountingMode_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'COUNTING_MODE',
-  })
+export const useUniverseGovernor_CountingMode_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'COUNTING_MODE',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"EXTENDED_BALLOT_TYPEHASH"`
  */
-export const useUniverseGovernor_ExtendedBallotTypehash_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'EXTENDED_BALLOT_TYPEHASH',
-  })
+export const useUniverseGovernor_ExtendedBallotTypehash_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'EXTENDED_BALLOT_TYPEHASH',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"clock"`
  */
-export const useUniverseGovernor_Clock_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'clock',
-  })
+export const useUniverseGovernor_Clock_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'clock',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"eip712Domain"`
  */
-export const useUniverseGovernor_Eip712Domain_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'eip712Domain',
-  })
+export const useUniverseGovernor_Eip712Domain_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'eip712Domain',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"getVotes"`
  */
-export const useUniverseGovernor_GetVotes_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'getVotes',
-  })
+export const useUniverseGovernor_GetVotes_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'getVotes',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"getVotesWithParams"`
  */
-export const useUniverseGovernor_GetVotesWithParams_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'getVotesWithParams',
-  })
+export const useUniverseGovernor_GetVotesWithParams_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'getVotesWithParams',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"hasVoted"`
  */
-export const useUniverseGovernor_HasVoted_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'hasVoted',
-  })
+export const useUniverseGovernor_HasVoted_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'hasVoted',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"hashProposal"`
  */
-export const useUniverseGovernor_HashProposal_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'hashProposal',
-  })
+export const useUniverseGovernor_HashProposal_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'hashProposal',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"name"`
  */
-export const useUniverseGovernor_Name_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'name',
-  })
+export const useUniverseGovernor_Name_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'name',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"nonces"`
  */
-export const useUniverseGovernor_Nonces_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'nonces',
-  })
+export const useUniverseGovernor_Nonces_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'nonces',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalDeadline"`
  */
-export const useUniverseGovernor_ProposalDeadline_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalDeadline',
-  })
+export const useUniverseGovernor_ProposalDeadline_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalDeadline',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalEta"`
  */
-export const useUniverseGovernor_ProposalEta_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalEta',
-  })
+export const useUniverseGovernor_ProposalEta_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalEta',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalNeedsQueuing"`
  */
-export const useUniverseGovernor_ProposalNeedsQueuing_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalNeedsQueuing',
-  })
+export const useUniverseGovernor_ProposalNeedsQueuing_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalNeedsQueuing',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalProposer"`
  */
-export const useUniverseGovernor_ProposalProposer_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalProposer',
-  })
+export const useUniverseGovernor_ProposalProposer_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalProposer',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalSnapshot"`
  */
-export const useUniverseGovernor_ProposalSnapshot_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalSnapshot',
-  })
+export const useUniverseGovernor_ProposalSnapshot_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalSnapshot',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalThreshold"`
  */
-export const useUniverseGovernor_ProposalThreshold_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalThreshold',
-  })
+export const useUniverseGovernor_ProposalThreshold_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalThreshold',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"proposalVotes"`
  */
-export const useUniverseGovernor_ProposalVotes_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'proposalVotes',
-  })
+export const useUniverseGovernor_ProposalVotes_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'proposalVotes',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"quorum"`
  */
-export const useUniverseGovernor_Quorum_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'quorum',
-  })
+export const useUniverseGovernor_Quorum_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'quorum',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"quorumDenominator"`
  */
-export const useUniverseGovernor_QuorumDenominator_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'quorumDenominator',
-  })
+export const useUniverseGovernor_QuorumDenominator_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'quorumDenominator',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"quorumNumerator"`
  */
-export const useUniverseGovernor_QuorumNumerator_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'quorumNumerator',
-  })
+export const useUniverseGovernor_QuorumNumerator_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'quorumNumerator',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"state"`
  */
-export const useUniverseGovernor_State_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'state',
-  })
+export const useUniverseGovernor_State_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'state',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"supportsInterface"`
  */
-export const useUniverseGovernor_SupportsInterface_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'supportsInterface',
-  })
+export const useUniverseGovernor_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'supportsInterface',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"token"`
  */
-export const useUniverseGovernor_Token_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'token',
-  })
+export const useUniverseGovernor_Token_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'token',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"version"`
  */
-export const useUniverseGovernor_Version_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'version',
-  })
+export const useUniverseGovernor_Version_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'version',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"votingDelay"`
  */
-export const useUniverseGovernor_VotingDelay_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'votingDelay',
-  })
+export const useUniverseGovernor_VotingDelay_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'votingDelay',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"votingPeriod"`
  */
-export const useUniverseGovernor_VotingPeriod_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeGovernorAbi,
-    functionName: 'votingPeriod',
-  })
+export const useUniverseGovernor_VotingPeriod_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeGovernorAbi,
+  functionName: 'votingPeriod',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__
  */
-export const useUniverseGovernor_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: universeGovernorAbi })
+export const useUniverseGovernor_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"cancel"`
  */
-export const useUniverseGovernor_Cancel_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'cancel',
-  })
+export const useUniverseGovernor_Cancel_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'cancel',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVote"`
  */
-export const useUniverseGovernor_CastVote_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'castVote',
-  })
+export const useUniverseGovernor_CastVote_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'castVote',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteBySig"`
  */
-export const useUniverseGovernor_CastVoteBySig_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'castVoteBySig',
-  })
+export const useUniverseGovernor_CastVoteBySig_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'castVoteBySig',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteWithReason"`
  */
-export const useUniverseGovernor_CastVoteWithReason_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'castVoteWithReason',
-  })
+export const useUniverseGovernor_CastVoteWithReason_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'castVoteWithReason',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteWithReasonAndParams"`
@@ -5775,7 +5931,7 @@ export const useUniverseGovernor_CastVoteWithReasonAndParams_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: universeGovernorAbi,
     functionName: 'castVoteWithReasonAndParams',
-  })
+  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteWithReasonAndParamsBySig"`
@@ -5784,16 +5940,15 @@ export const useUniverseGovernor_CastVoteWithReasonAndParamsBySig_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: universeGovernorAbi,
     functionName: 'castVoteWithReasonAndParamsBySig',
-  })
+  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"execute"`
  */
-export const useUniverseGovernor_Execute_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'execute',
-  })
+export const useUniverseGovernor_Execute_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'execute',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"onERC1155BatchReceived"`
@@ -5802,121 +5957,112 @@ export const useUniverseGovernor_OnErc1155BatchReceived_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: universeGovernorAbi,
     functionName: 'onERC1155BatchReceived',
-  })
+  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"onERC1155Received"`
  */
-export const useUniverseGovernor_OnErc1155Received_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'onERC1155Received',
-  })
+export const useUniverseGovernor_OnErc1155Received_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'onERC1155Received',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"onERC721Received"`
  */
-export const useUniverseGovernor_OnErc721Received_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'onERC721Received',
-  })
+export const useUniverseGovernor_OnErc721Received_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'onERC721Received',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"propose"`
  */
-export const useUniverseGovernor_Propose_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'propose',
-  })
+export const useUniverseGovernor_Propose_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'propose',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"queue"`
  */
-export const useUniverseGovernor_Queue_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'queue',
-  })
+export const useUniverseGovernor_Queue_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'queue',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"relay"`
  */
-export const useUniverseGovernor_Relay_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'relay',
-  })
+export const useUniverseGovernor_Relay_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'relay',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setProposalThreshold"`
  */
-export const useUniverseGovernor_SetProposalThreshold_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'setProposalThreshold',
-  })
+export const useUniverseGovernor_SetProposalThreshold_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'setProposalThreshold',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setVotingDelay"`
  */
-export const useUniverseGovernor_SetVotingDelay_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'setVotingDelay',
-  })
+export const useUniverseGovernor_SetVotingDelay_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'setVotingDelay',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setVotingPeriod"`
  */
-export const useUniverseGovernor_SetVotingPeriod_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeGovernorAbi,
-    functionName: 'setVotingPeriod',
-  })
+export const useUniverseGovernor_SetVotingPeriod_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeGovernorAbi,
+  functionName: 'setVotingPeriod',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"updateQuorumNumerator"`
  */
-export const useUniverseGovernor_UpdateQuorumNumerator_write =
-  /*#__PURE__*/ createUseWriteContract({
+export const useUniverseGovernor_UpdateQuorumNumerator_write = /*#__PURE__*/ createUseWriteContract(
+  {
     abi: universeGovernorAbi,
     functionName: 'updateQuorumNumerator',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__
  */
-export const useUniverseGovernor_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: universeGovernorAbi })
+export const useUniverseGovernor_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"cancel"`
  */
-export const useUniverseGovernor_Cancel_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'cancel',
-  })
+export const useUniverseGovernor_Cancel_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'cancel',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVote"`
  */
-export const useUniverseGovernor_CastVote_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'castVote',
-  })
+export const useUniverseGovernor_CastVote_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'castVote',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteBySig"`
  */
-export const useUniverseGovernor_CastVoteBySig_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'castVoteBySig',
-  })
+export const useUniverseGovernor_CastVoteBySig_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'castVoteBySig',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteWithReason"`
@@ -5925,7 +6071,7 @@ export const useUniverseGovernor_CastVoteWithReason_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'castVoteWithReason',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteWithReasonAndParams"`
@@ -5934,7 +6080,7 @@ export const useUniverseGovernor_CastVoteWithReasonAndParams_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'castVoteWithReasonAndParams',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"castVoteWithReasonAndParamsBySig"`
@@ -5943,16 +6089,15 @@ export const useUniverseGovernor_CastVoteWithReasonAndParamsBySig_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'castVoteWithReasonAndParamsBySig',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"execute"`
  */
-export const useUniverseGovernor_Execute_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'execute',
-  })
+export const useUniverseGovernor_Execute_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'execute',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"onERC1155BatchReceived"`
@@ -5961,7 +6106,7 @@ export const useUniverseGovernor_OnErc1155BatchReceived_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'onERC1155BatchReceived',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"onERC1155Received"`
@@ -5970,7 +6115,7 @@ export const useUniverseGovernor_OnErc1155Received_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'onERC1155Received',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"onERC721Received"`
@@ -5979,34 +6124,31 @@ export const useUniverseGovernor_OnErc721Received_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'onERC721Received',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"propose"`
  */
-export const useUniverseGovernor_Propose_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'propose',
-  })
+export const useUniverseGovernor_Propose_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'propose',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"queue"`
  */
-export const useUniverseGovernor_Queue_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'queue',
-  })
+export const useUniverseGovernor_Queue_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'queue',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"relay"`
  */
-export const useUniverseGovernor_Relay_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'relay',
-  })
+export const useUniverseGovernor_Relay_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'relay',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setProposalThreshold"`
@@ -6015,25 +6157,25 @@ export const useUniverseGovernor_SetProposalThreshold_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'setProposalThreshold',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setVotingDelay"`
  */
-export const useUniverseGovernor_SetVotingDelay_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeGovernorAbi,
-    functionName: 'setVotingDelay',
-  })
+export const useUniverseGovernor_SetVotingDelay_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeGovernorAbi,
+  functionName: 'setVotingDelay',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setVotingPeriod"`
  */
-export const useUniverseGovernor_SetVotingPeriod_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
+export const useUniverseGovernor_SetVotingPeriod_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
     abi: universeGovernorAbi,
     functionName: 'setVotingPeriod',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"updateQuorumNumerator"`
@@ -6042,13 +6184,14 @@ export const useUniverseGovernor_UpdateQuorumNumerator_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeGovernorAbi,
     functionName: 'updateQuorumNumerator',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__
  */
-export const useUniverseGovernor_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: universeGovernorAbi })
+export const useUniverseGovernor_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeGovernorAbi,
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"EIP712DomainChanged"`
@@ -6057,43 +6200,43 @@ export const useUniverseGovernor_Eip712DomainChanged_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeGovernorAbi,
     eventName: 'EIP712DomainChanged',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalCanceled"`
  */
-export const useUniverseGovernor_ProposalCanceled_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
+export const useUniverseGovernor_ProposalCanceled_watch = /*#__PURE__*/ createUseWatchContractEvent(
+  {
     abi: universeGovernorAbi,
     eventName: 'ProposalCanceled',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalCreated"`
  */
-export const useUniverseGovernor_ProposalCreated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeGovernorAbi,
-    eventName: 'ProposalCreated',
-  })
+export const useUniverseGovernor_ProposalCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeGovernorAbi,
+  eventName: 'ProposalCreated',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalExecuted"`
  */
-export const useUniverseGovernor_ProposalExecuted_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
+export const useUniverseGovernor_ProposalExecuted_watch = /*#__PURE__*/ createUseWatchContractEvent(
+  {
     abi: universeGovernorAbi,
     eventName: 'ProposalExecuted',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalQueued"`
  */
-export const useUniverseGovernor_ProposalQueued_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeGovernorAbi,
-    eventName: 'ProposalQueued',
-  })
+export const useUniverseGovernor_ProposalQueued_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeGovernorAbi,
+  eventName: 'ProposalQueued',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalThresholdSet"`
@@ -6102,7 +6245,7 @@ export const useUniverseGovernor_ProposalThresholdSet_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeGovernorAbi,
     eventName: 'ProposalThresholdSet',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"QuorumNumeratorUpdated"`
@@ -6111,16 +6254,15 @@ export const useUniverseGovernor_QuorumNumeratorUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeGovernorAbi,
     eventName: 'QuorumNumeratorUpdated',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"VoteCast"`
  */
-export const useUniverseGovernor_VoteCast_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeGovernorAbi,
-    eventName: 'VoteCast',
-  })
+export const useUniverseGovernor_VoteCast_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeGovernorAbi,
+  eventName: 'VoteCast',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"VoteCastWithParams"`
@@ -6129,31 +6271,30 @@ export const useUniverseGovernor_VoteCastWithParams_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeGovernorAbi,
     eventName: 'VoteCastWithParams',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"VotingDelaySet"`
  */
-export const useUniverseGovernor_VotingDelaySet_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeGovernorAbi,
-    eventName: 'VotingDelaySet',
-  })
+export const useUniverseGovernor_VotingDelaySet_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeGovernorAbi,
+  eventName: 'VotingDelaySet',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"VotingPeriodSet"`
  */
-export const useUniverseGovernor_VotingPeriodSet_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeGovernorAbi,
-    eventName: 'VotingPeriodSet',
-  })
+export const useUniverseGovernor_VotingPeriodSet_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeGovernorAbi,
+  eventName: 'VotingPeriodSet',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__
  */
-export const useUniverseManager_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: universeManagerAbi })
+export const useUniverseManager_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"BPS"`
@@ -6161,208 +6302,262 @@ export const useUniverseManager_undefined_read =
 export const useUniverseManager_Bps_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
   functionName: 'BPS',
-})
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"MINT_FEE"`
+ */
+export const useUniverseManager_MintFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'MINT_FEE',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"TOKEN_SUPPLY"`
  */
-export const useUniverseManager_TokenSupply_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'TOKEN_SUPPLY',
-  })
+export const useUniverseManager_TokenSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'TOKEN_SUPPLY',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deprecated"`
  */
-export const useUniverseManager_Deprecated_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'deprecated',
-  })
+export const useUniverseManager_Deprecated_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'deprecated',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"enabledHooks"`
  */
-export const useUniverseManager_EnabledHooks_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'enabledHooks',
-  })
+export const useUniverseManager_EnabledHooks_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'enabledHooks',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"enabledLockers"`
  */
-export const useUniverseManager_EnabledLockers_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'enabledLockers',
-  })
+export const useUniverseManager_EnabledLockers_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'enabledLockers',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"getUniverseData"`
  */
-export const useUniverseManager_GetUniverseData_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'getUniverseData',
-  })
+export const useUniverseManager_GetUniverseData_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'getUniverseData',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"lpRecipient"`
+ */
+export const useUniverseManager_LpRecipient_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'lpRecipient',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"owner"`
  */
-export const useUniverseManager_Owner_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'owner',
-  })
+export const useUniverseManager_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'owner',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"teamFee"`
  */
-export const useUniverseManager_TeamFee_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'teamFee',
-  })
+export const useUniverseManager_TeamFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'teamFee',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"teamFeeRecipient"`
  */
-export const useUniverseManager_TeamFeeRecipient_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'teamFeeRecipient',
-  })
+export const useUniverseManager_TeamFeeRecipient_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'teamFeeRecipient',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"tokenDeployer"`
  */
-export const useUniverseManager_TokenDeployer_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeManagerAbi,
-    functionName: 'tokenDeployer',
-  })
+export const useUniverseManager_TokenDeployer_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'tokenDeployer',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"totalCreditFundsHeld"`
+ */
+export const useUniverseManager_TotalCreditFundsHeld_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'totalCreditFundsHeld',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"universeCreditFund"`
+ */
+export const useUniverseManager_UniverseCreditFund_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'universeCreditFund',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__
  */
-export const useUniverseManager_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: universeManagerAbi })
+export const useUniverseManager_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimEth"`
+ */
+export const useUniverseManager_ClaimEth_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'claimEth',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimTeamFee"`
  */
-export const useUniverseManager_ClaimTeamFee_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'claimTeamFee',
-  })
+export const useUniverseManager_ClaimTeamFee_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'claimTeamFee',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"consumeCreditFund"`
+ */
+export const useUniverseManager_ConsumeCreditFund_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'consumeCreditFund',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"createUniverse"`
  */
-export const useUniverseManager_CreateUniverse_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'createUniverse',
-  })
+export const useUniverseManager_CreateUniverse_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'createUniverse',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deployUniverseToken"`
  */
-export const useUniverseManager_DeployUniverseToken_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'deployUniverseToken',
-  })
+export const useUniverseManager_DeployUniverseToken_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'deployUniverseToken',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"renounceOwnership"`
  */
-export const useUniverseManager_RenounceOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'renounceOwnership',
-  })
+export const useUniverseManager_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'renounceOwnership',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setDeprecated"`
  */
-export const useUniverseManager_SetDeprecated_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'setDeprecated',
-  })
+export const useUniverseManager_SetDeprecated_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setDeprecated',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setHook"`
  */
-export const useUniverseManager_SetHook_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'setHook',
-  })
+export const useUniverseManager_SetHook_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setHook',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setLocker"`
  */
-export const useUniverseManager_SetLocker_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'setLocker',
-  })
+export const useUniverseManager_SetLocker_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setLocker',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setLpRecipient"`
+ */
+export const useUniverseManager_SetLpRecipient_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setLpRecipient',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTeamFeeRecipient"`
  */
-export const useUniverseManager_SetTeamFeeRecipient_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'setTeamFeeRecipient',
-  })
+export const useUniverseManager_SetTeamFeeRecipient_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setTeamFeeRecipient',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTokenDeployer"`
  */
-export const useUniverseManager_SetTokenDeployer_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'setTokenDeployer',
-  })
+export const useUniverseManager_SetTokenDeployer_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setTokenDeployer',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferOwnership"`
  */
-export const useUniverseManager_TransferOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeManagerAbi,
-    functionName: 'transferOwnership',
-  })
+export const useUniverseManager_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'transferOwnership',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__
  */
-export const useUniverseManager_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: universeManagerAbi })
+export const useUniverseManager_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimEth"`
+ */
+export const useUniverseManager_ClaimEth_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'claimEth',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimTeamFee"`
  */
-export const useUniverseManager_ClaimTeamFee_simulate =
+export const useUniverseManager_ClaimTeamFee_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'claimTeamFee',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"consumeCreditFund"`
+ */
+export const useUniverseManager_ConsumeCreditFund_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
-    functionName: 'claimTeamFee',
-  })
+    functionName: 'consumeCreditFund',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"createUniverse"`
  */
-export const useUniverseManager_CreateUniverse_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeManagerAbi,
-    functionName: 'createUniverse',
-  })
+export const useUniverseManager_CreateUniverse_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'createUniverse',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deployUniverseToken"`
@@ -6371,7 +6566,7 @@ export const useUniverseManager_DeployUniverseToken_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
     functionName: 'deployUniverseToken',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"renounceOwnership"`
@@ -6380,34 +6575,39 @@ export const useUniverseManager_RenounceOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
     functionName: 'renounceOwnership',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setDeprecated"`
  */
-export const useUniverseManager_SetDeprecated_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeManagerAbi,
-    functionName: 'setDeprecated',
-  })
+export const useUniverseManager_SetDeprecated_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setDeprecated',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setHook"`
  */
-export const useUniverseManager_SetHook_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeManagerAbi,
-    functionName: 'setHook',
-  })
+export const useUniverseManager_SetHook_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setHook',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setLocker"`
  */
-export const useUniverseManager_SetLocker_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeManagerAbi,
-    functionName: 'setLocker',
-  })
+export const useUniverseManager_SetLocker_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setLocker',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setLpRecipient"`
+ */
+export const useUniverseManager_SetLpRecipient_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setLpRecipient',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTeamFeeRecipient"`
@@ -6416,16 +6616,17 @@ export const useUniverseManager_SetTeamFeeRecipient_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
     functionName: 'setTeamFeeRecipient',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTokenDeployer"`
  */
-export const useUniverseManager_SetTokenDeployer_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
+export const useUniverseManager_SetTokenDeployer_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
     abi: universeManagerAbi,
     functionName: 'setTokenDeployer',
-  })
+  }
+);
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferOwnership"`
@@ -6434,22 +6635,22 @@ export const useUniverseManager_TransferOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
     functionName: 'transferOwnership',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__
  */
-export const useUniverseManager_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: universeManagerAbi })
+export const useUniverseManager_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"ClaimTeamFees"`
  */
-export const useUniverseManager_ClaimTeamFees_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'ClaimTeamFees',
-  })
+export const useUniverseManager_ClaimTeamFees_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'ClaimTeamFees',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"OwnershipTransferred"`
@@ -6458,34 +6659,39 @@ export const useUniverseManager_OwnershipTransferred_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeManagerAbi,
     eventName: 'OwnershipTransferred',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetDeprecated"`
  */
-export const useUniverseManager_SetDeprecated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'SetDeprecated',
-  })
+export const useUniverseManager_SetDeprecated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SetDeprecated',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetHook"`
  */
-export const useUniverseManager_SetHook_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'SetHook',
-  })
+export const useUniverseManager_SetHook_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SetHook',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetLocker"`
  */
-export const useUniverseManager_SetLocker_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'SetLocker',
-  })
+export const useUniverseManager_SetLocker_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SetLocker',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetLpRecipient"`
+ */
+export const useUniverseManager_SetLpRecipient_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SetLpRecipient',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetTeamFeeRecipient"`
@@ -6494,73 +6700,109 @@ export const useUniverseManager_SetTeamFeeRecipient_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeManagerAbi,
     eventName: 'SetTeamFeeRecipient',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetTokenDeployer"`
  */
-export const useUniverseManager_SetTokenDeployer_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'SetTokenDeployer',
-  })
+export const useUniverseManager_SetTokenDeployer_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SetTokenDeployer',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"TokenCreated"`
  */
-export const useUniverseManager_TokenCreated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'TokenCreated',
-  })
+export const useUniverseManager_TokenCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'TokenCreated',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"TokenDeployed"`
  */
-export const useUniverseManager_TokenDeployed_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'TokenDeployed',
-  })
+export const useUniverseManager_TokenDeployed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'TokenDeployed',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseCreated"`
  */
-export const useUniverseManager_UniverseCreated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'UniverseCreated',
-  })
+export const useUniverseManager_UniverseCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'UniverseCreated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseMintFee"`
+ */
+export const useUniverseManager_UniverseMintFee_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'UniverseMintFee',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__
  */
-export const useUniverseTokenDeployer_undefined_read =
-  /*#__PURE__*/ createUseReadContract({ abi: universeTokenDeployerAbi })
+export const useUniverseTokenDeployer_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"COMMUNITY_BPS"`
+ */
+export const useUniverseTokenDeployer_CommunityBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'COMMUNITY_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"CREATOR_BPS"`
+ */
+export const useUniverseTokenDeployer_CreatorBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'CREATOR_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"LP_BPS"`
+ */
+export const useUniverseTokenDeployer_LpBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'LP_BPS',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"TOKEN_SUPPLY"`
  */
-export const useUniverseTokenDeployer_TokenSupply_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeTokenDeployerAbi,
-    functionName: 'TOKEN_SUPPLY',
-  })
+export const useUniverseTokenDeployer_TokenSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'TOKEN_SUPPLY',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"TREASURY_BPS"`
+ */
+export const useUniverseTokenDeployer_TreasuryBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'TREASURY_BPS',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"universeManager"`
  */
-export const useUniverseTokenDeployer_UniverseManager_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: universeTokenDeployerAbi,
-    functionName: 'universeManager',
-  })
+export const useUniverseTokenDeployer_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'universeManager',
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__
  */
-export const useUniverseTokenDeployer_undefined_write =
-  /*#__PURE__*/ createUseWriteContract({ abi: universeTokenDeployerAbi })
+export const useUniverseTokenDeployer_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeTokenDeployerAbi,
+});
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"deployTokenAndGovernance"`
@@ -6569,13 +6811,14 @@ export const useUniverseTokenDeployer_DeployTokenAndGovernance_write =
   /*#__PURE__*/ createUseWriteContract({
     abi: universeTokenDeployerAbi,
     functionName: 'deployTokenAndGovernance',
-  })
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__
  */
-export const useUniverseTokenDeployer_undefined_simulate =
-  /*#__PURE__*/ createUseSimulateContract({ abi: universeTokenDeployerAbi })
+export const useUniverseTokenDeployer_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeTokenDeployerAbi,
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"deployTokenAndGovernance"`
@@ -6584,13 +6827,23 @@ export const useUniverseTokenDeployer_DeployTokenAndGovernance_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeTokenDeployerAbi,
     functionName: 'deployTokenAndGovernance',
-  })
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeTokenDeployerAbi}__
  */
-export const useUniverseTokenDeployer_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: universeTokenDeployerAbi })
+export const useUniverseTokenDeployer_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeTokenDeployerAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `eventName` set to `"TokenAllocation"`
+ */
+export const useUniverseTokenDeployer_TokenAllocation_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeTokenDeployerAbi,
+    eventName: 'TokenAllocation',
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `eventName` set to `"TokenDeployed"`
@@ -6599,4 +6852,4 @@ export const useUniverseTokenDeployer_TokenDeployed_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeTokenDeployerAbi,
     eventName: 'TokenDeployed',
-  })
+  });

@@ -1,13 +1,12 @@
 import { useAccount, useReadContract } from 'wagmi';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { formatEther } from 'viem';
+import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
 
 export function VotingPowerCard({ universeId }: { universeId: string }) {
   const { address } = useAccount();
 
-  // TODO: Resolve governance token address from universe data
-  // For now this shows a placeholder
-  const tokenAddress = undefined as `0x${string}` | undefined;
+  const { tokenAddress } = useUniverseAddresses(universeId);
 
   const { data: balance } = useReadContract({
     address: tokenAddress,

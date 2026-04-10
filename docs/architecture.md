@@ -11,6 +11,7 @@ graph TD
     subgraph Backend
         SERVER[API Server<br/>Hono + tRPC<br/>:3000]
         INDEXER[Blockchain Indexer<br/>Ponder v0.15<br/>:42069]
+        MCP[MCP Server<br/>AI Agent Gateway<br/>stdio]
     end
 
     subgraph External Services
@@ -40,7 +41,22 @@ graph TD
     SERVER --> STORACHA
 
     INDEXER -->|RPC polling| SEPOLIA
+
+    MCP -->|X-API-Key| SERVER
 ```
+
+### Agent Systems
+
+LOAR supports two agent systems with programmatic access:
+
+| System                 | Type       | Description                                           |
+| ---------------------- | ---------- | ----------------------------------------------------- |
+| **Talent Agents**      | Human      | Represent creators, broker deals, earn commissions    |
+| **AI Agent Pipelines** | Autonomous | Multi-step content creation and universe management   |
+| **API Keys**           | Auth       | Programmatic access via `X-API-Key` header            |
+| **MCP Server**         | Gateway    | Exposes LOAR as 20 tools for MCP-compatible AI agents |
+
+See [docs/agents.md](agents.md) for full documentation.
 
 ## Authentication Flow
 
@@ -76,15 +92,17 @@ sequenceDiagram
 | `apps/web/src/lib/wallet-auth.ts` | `useWalletAuth()` hook — SIWE sign-in/sign-out          |
 | `apps/web/src/utils/trpc.ts`      | Attaches Bearer token to tRPC requests                  |
 | `apps/server/src/lib/siwe.ts`     | SIWE message verification, JWT signing/verification     |
-| `apps/server/src/lib/auth.ts`     | `verifyAuth()` — extracts and verifies Bearer token     |
+| `apps/server/src/lib/auth.ts`     | `verifyAuth()` — supports SIWE JWT + API key auth       |
+| `apps/server/src/lib/apiKeys.ts`  | API key generation, verification, rate limiting         |
 | `apps/server/src/lib/context.ts`  | `createContext()` — sets `ctx.user` from verified token |
 | `apps/server/src/lib/firebase.ts` | Firebase Admin SDK init (exports `db` — Firestore only) |
 | `apps/server/src/lib/trpc.ts`     | Defines `publicProcedure` and `protectedProcedure`      |
 
 ### Access Control
 
-- **`publicProcedure`** — No authentication required. Used for read-only queries (characters, health check).
-- **`protectedProcedure`** — Requires valid SIWE session JWT. Rejects with UNAUTHORIZED if `ctx.user` is null. Used for private data access.
+- **`publicProcedure`** — No authentication required. Used for read-only queries.
+- **`protectedProcedure`** — Requires SIWE JWT or valid API key. Rejects with UNAUTHORIZED if `ctx.user` is null.
+- **API Key auth** — `X-API-Key: loar_...` header. Keys are SHA-256 hashed, rate-limited, and scoped with permissions. See `apps/server/src/lib/apiKeys.ts`.
 
 ## Server Architecture
 

@@ -6,6 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgrade
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 /// @title PaymentRouter
 /// @notice Centralizes all ETH revenue routing across the LOAR platform.
@@ -22,15 +23,33 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @notice Accumulated ETH per creator, claimable via pull pattern
     mapping(address => uint256) public claimable;
 
+    /// @notice $LOAR token for dual-currency payments
+    IERC20 public loarToken;
+
+    /// @notice Accumulated $LOAR per creator, claimable via pull pattern
+    mapping(address => uint256) public claimableLoar;
+
+    /// @notice Fee discount for $LOAR payments (default 500 = 5% discount)
+    uint16 public loarFeeDiscountBps;
+
     event PaymentRouted(
         address indexed creator,
         uint256 creatorAmount,
         uint256 platformAmount,
         uint16 feeBps
     );
+    event LoarPaymentRouted(
+        address indexed creator,
+        uint256 creatorAmount,
+        uint256 platformAmount,
+        uint16 feeBps
+    );
     event Claimed(address indexed creator, uint256 amount);
+    event LoarClaimed(address indexed creator, uint256 amount);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event DefaultFeeUpdated(uint16 newFeeBps);
+    event LoarTokenUpdated(address newToken);
+    event LoarFeeDiscountUpdated(uint16 newDiscountBps);
 
     error ZeroAddress();
     error NothingToClaim();
@@ -107,5 +126,71 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         if (newFeeBps > 5000) revert FeeTooHigh();
         defaultPlatformFeeBps = newFeeBps;
         emit DefaultFeeUpdated(newFeeBps);
+    }
+
+    // ── $LOAR Dual Payment ──────────────────────────────────────
+
+    /// @notice Route a $LOAR payment with fee discount. Caller must have approved this contract.
+    /// @param creator Address that will be able to claim the creator portion
+    /// @param feeBps Platform fee in basis points; USE_DEFAULT_FEE to use default (with discount applied)
+    /// @param amount $LOAR amount to route
+    function routeLoar(address creator, uint16 feeBps, uint256 amount) external nonReentrant {
+        if (amount == 0) return;
+        if (address(loarToken) == address(0)) revert ZeroAddress();
+
+        uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;
+        if (bps > 5000) revert FeeTooHigh();
+
+        // Apply $LOAR fee discount (incentivizes paying in $LOAR)
+        if (loarFeeDiscountBps > 0 && bps > loarFeeDiscountBps) {
+            bps -= loarFeeDiscountBps;
+        } else if (loarFeeDiscountBps >= bps) {
+            bps = 0;
+        }
+
+        uint256 platformCut = (amount * bps) / 10_000;
+        uint256 creatorCut = amount - platformCut;
+
+        // Pull $LOAR from caller
+        loarToken.transferFrom(msg.sender, address(this), amount);
+
+        if (creatorCut > 0) {
+            claimableLoar[creator] += creatorCut;
+        }
+        if (platformCut > 0) {
+            loarToken.transfer(treasury, platformCut);
+        }
+
+        emit LoarPaymentRouted(creator, creatorCut, platformCut, bps);
+    }
+
+    /// @notice Route $LOAR entirely to treasury
+    function routeLoarToTreasury(uint256 amount) external nonReentrant {
+        if (amount == 0) return;
+        if (address(loarToken) == address(0)) revert ZeroAddress();
+        loarToken.transferFrom(msg.sender, address(this), amount);
+        loarToken.transfer(treasury, amount);
+    }
+
+    /// @notice Creator pulls accumulated $LOAR earnings
+    function claimLoar() external nonReentrant {
+        uint256 amount = claimableLoar[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        claimableLoar[msg.sender] = 0;
+        loarToken.transfer(msg.sender, amount);
+        emit LoarClaimed(msg.sender, amount);
+    }
+
+    // ── $LOAR Admin ─────────────────────────────────────────────
+
+    function setLoarToken(address _loarToken) external onlyOwner {
+        loarToken = IERC20(_loarToken);
+        emit LoarTokenUpdated(_loarToken);
+    }
+
+    function setLoarFeeDiscount(uint16 newDiscountBps) external onlyOwner {
+        require(newDiscountBps <= 2000, "Max 20% discount");
+        loarFeeDiscountBps = newDiscountBps;
+        emit LoarFeeDiscountUpdated(newDiscountBps);
     }
 }

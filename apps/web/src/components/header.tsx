@@ -22,8 +22,12 @@ export default function Header() {
   const links: Array<{ to: string; label: string }> = [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/discover', label: 'Discover' },
+    { to: '/tokens', label: 'Launchpad' },
+    { to: '/bounties', label: 'Bounties' },
+    { to: '/staking', label: 'Staking' },
     { to: '/create', label: 'Create' },
     { to: '/wiki', label: 'Wiki' },
+    { to: '/gallery', label: 'Gallery' },
     { to: '/market', label: 'Slop Market' },
     { to: '/credits', label: 'Credits' },
     { to: '/activity', label: 'Activity' },

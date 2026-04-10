@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as StakingRouteImport } from './routes/staking'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -24,10 +26,15 @@ import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
+import { Route as TokensIndexRouteImport } from './routes/tokens/index'
 import { Route as SellIndexRouteImport } from './routes/sell/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
+import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
+import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AdsIndexRouteImport } from './routes/ads/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
+import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$universeId'
+import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SellNewRouteImport } from './routes/sell/new'
 import { Route as SellEarningsRouteImport } from './routes/sell/earnings'
@@ -39,10 +46,18 @@ import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
+import { Route as BountiesMineRouteImport } from './routes/bounties/mine'
+import { Route as BountiesBountyIdRouteImport } from './routes/bounties/$bountyId'
+import { Route as AgentsRegisterRouteImport } from './routes/agents/register'
+import { Route as AgentsDashboardRouteImport } from './routes/agents/dashboard'
+import { Route as AgentsUidRouteImport } from './routes/agents/$uid'
 import { Route as AdsNewRouteImport } from './routes/ads/new'
 import { Route as AdsSlotIdRouteImport } from './routes/ads/$slotId'
+import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
+import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
+import { Route as UniverseIdGalleryRouteImport } from './routes/universe/$id/gallery'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
 const VideosRoute = VideosRouteImport.update({
@@ -53,6 +68,11 @@ const VideosRoute = VideosRouteImport.update({
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StakingRoute = StakingRouteImport.update({
+  id: '/staking',
+  path: '/staking',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SandboxRoute = SandboxRouteImport.update({
@@ -73,6 +93,11 @@ const MarketRoute = MarketRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryRoute = GalleryRouteImport.update({
+  id: '/gallery',
+  path: '/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRoute = DocsRouteImport.update({
@@ -120,6 +145,11 @@ const WikiIndexRoute = WikiIndexRouteImport.update({
   path: '/wiki/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TokensIndexRoute = TokensIndexRouteImport.update({
+  id: '/tokens/',
+  path: '/tokens/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SellIndexRoute = SellIndexRouteImport.update({
   id: '/sell/',
   path: '/sell/',
@@ -130,6 +160,16 @@ const CreateIndexRoute = CreateIndexRouteImport.update({
   path: '/create/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BountiesIndexRoute = BountiesIndexRouteImport.update({
+  id: '/bounties/',
+  path: '/bounties/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsIndexRoute = AgentsIndexRouteImport.update({
+  id: '/agents/',
+  path: '/agents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdsIndexRoute = AdsIndexRouteImport.update({
   id: '/ads/',
   path: '/ads/',
@@ -138,6 +178,16 @@ const AdsIndexRoute = AdsIndexRouteImport.update({
 const UniverseIdRoute = UniverseIdRouteImport.update({
   id: '/universe/$id',
   path: '/universe/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TreasuryUniverseIdRoute = TreasuryUniverseIdRouteImport.update({
+  id: '/treasury/$universeId',
+  path: '/treasury/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TokensAddressRoute = TokensAddressRouteImport.update({
+  id: '/tokens/$address',
+  path: '/tokens/$address',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopUniverseIdRoute = ShopUniverseIdRouteImport.update({
@@ -195,6 +245,31 @@ const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
   path: '/canon/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BountiesMineRoute = BountiesMineRouteImport.update({
+  id: '/bounties/mine',
+  path: '/bounties/mine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BountiesBountyIdRoute = BountiesBountyIdRouteImport.update({
+  id: '/bounties/$bountyId',
+  path: '/bounties/$bountyId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsRegisterRoute = AgentsRegisterRouteImport.update({
+  id: '/agents/register',
+  path: '/agents/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsDashboardRoute = AgentsDashboardRouteImport.update({
+  id: '/agents/dashboard',
+  path: '/agents/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsUidRoute = AgentsUidRouteImport.update({
+  id: '/agents/$uid',
+  path: '/agents/$uid',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdsNewRoute = AdsNewRouteImport.update({
   id: '/ads/new',
   path: '/ads/new',
@@ -203,6 +278,11 @@ const AdsNewRoute = AdsNewRouteImport.update({
 const AdsSlotIdRoute = AdsSlotIdRouteImport.update({
   id: '/ads/$slotId',
   path: '/ads/$slotId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminModerationRoute = AdminModerationRouteImport.update({
+  id: '/admin/moderation',
+  path: '/admin/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WikiEntityIdRoute = WikiEntityIdRouteImport.update({
@@ -214,6 +294,16 @@ const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
   id: '/wiki/character/$id',
   path: '/wiki/character/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const UniverseIdGenConfigRoute = UniverseIdGenConfigRouteImport.update({
+  id: '/gen-config',
+  path: '/gen-config',
+  getParentRoute: () => UniverseIdRoute,
+} as any)
+const UniverseIdGalleryRoute = UniverseIdGalleryRouteImport.update({
+  id: '/gallery',
+  path: '/gallery',
+  getParentRoute: () => UniverseIdRoute,
 } as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   id: '/event/$universe/$event',
@@ -230,14 +320,22 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/docs': typeof DocsRoute
+  '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
   '/sandbox': typeof SandboxRoute
+  '/staking': typeof StakingRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
+  '/admin/moderation': typeof AdminModerationRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
+  '/agents/$uid': typeof AgentsUidRoute
+  '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/register': typeof AgentsRegisterRoute
+  '/bounties/$bountyId': typeof BountiesBountyIdRoute
+  '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
@@ -249,12 +347,19 @@ export interface FileRoutesByFullPath {
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
-  '/universe/$id': typeof UniverseIdRoute
+  '/tokens/$address': typeof TokensAddressRoute
+  '/treasury/$universeId': typeof TreasuryUniverseIdRoute
+  '/universe/$id': typeof UniverseIdRouteWithChildren
   '/ads/': typeof AdsIndexRoute
+  '/agents/': typeof AgentsIndexRoute
+  '/bounties/': typeof BountiesIndexRoute
   '/create/': typeof CreateIndexRoute
   '/sell/': typeof SellIndexRoute
+  '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/universe/$id/gallery': typeof UniverseIdGalleryRoute
+  '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
@@ -267,14 +372,22 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/docs': typeof DocsRoute
+  '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
   '/sandbox': typeof SandboxRoute
+  '/staking': typeof StakingRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
+  '/admin/moderation': typeof AdminModerationRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
+  '/agents/$uid': typeof AgentsUidRoute
+  '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/register': typeof AgentsRegisterRoute
+  '/bounties/$bountyId': typeof BountiesBountyIdRoute
+  '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
@@ -286,12 +399,19 @@ export interface FileRoutesByTo {
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
-  '/universe/$id': typeof UniverseIdRoute
+  '/tokens/$address': typeof TokensAddressRoute
+  '/treasury/$universeId': typeof TreasuryUniverseIdRoute
+  '/universe/$id': typeof UniverseIdRouteWithChildren
   '/ads': typeof AdsIndexRoute
+  '/agents': typeof AgentsIndexRoute
+  '/bounties': typeof BountiesIndexRoute
   '/create': typeof CreateIndexRoute
   '/sell': typeof SellIndexRoute
+  '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/universe/$id/gallery': typeof UniverseIdGalleryRoute
+  '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
@@ -305,14 +425,22 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
   '/docs': typeof DocsRoute
+  '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
   '/sandbox': typeof SandboxRoute
+  '/staking': typeof StakingRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
+  '/admin/moderation': typeof AdminModerationRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
+  '/agents/$uid': typeof AgentsUidRoute
+  '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/register': typeof AgentsRegisterRoute
+  '/bounties/$bountyId': typeof BountiesBountyIdRoute
+  '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
@@ -324,12 +452,19 @@ export interface FileRoutesById {
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
-  '/universe/$id': typeof UniverseIdRoute
+  '/tokens/$address': typeof TokensAddressRoute
+  '/treasury/$universeId': typeof TreasuryUniverseIdRoute
+  '/universe/$id': typeof UniverseIdRouteWithChildren
   '/ads/': typeof AdsIndexRoute
+  '/agents/': typeof AgentsIndexRoute
+  '/bounties/': typeof BountiesIndexRoute
   '/create/': typeof CreateIndexRoute
   '/sell/': typeof SellIndexRoute
+  '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/universe/$id/gallery': typeof UniverseIdGalleryRoute
+  '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
@@ -344,14 +479,22 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discover'
     | '/docs'
+    | '/gallery'
     | '/login'
     | '/market'
     | '/my-works'
     | '/sandbox'
+    | '/staking'
     | '/upload'
     | '/videos'
+    | '/admin/moderation'
     | '/ads/$slotId'
     | '/ads/new'
+    | '/agents/$uid'
+    | '/agents/dashboard'
+    | '/agents/register'
+    | '/bounties/$bountyId'
+    | '/bounties/mine'
     | '/canon/$universeId'
     | '/create/$kind'
     | '/governance/$universeId'
@@ -363,12 +506,19 @@ export interface FileRouteTypes {
     | '/sell/earnings'
     | '/sell/new'
     | '/shop/$universeId'
+    | '/tokens/$address'
+    | '/treasury/$universeId'
     | '/universe/$id'
     | '/ads/'
+    | '/agents/'
+    | '/bounties/'
     | '/create/'
     | '/sell/'
+    | '/tokens/'
     | '/wiki/'
     | '/event/$universe/$event'
+    | '/universe/$id/gallery'
+    | '/universe/$id/gen-config'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -381,14 +531,22 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discover'
     | '/docs'
+    | '/gallery'
     | '/login'
     | '/market'
     | '/my-works'
     | '/sandbox'
+    | '/staking'
     | '/upload'
     | '/videos'
+    | '/admin/moderation'
     | '/ads/$slotId'
     | '/ads/new'
+    | '/agents/$uid'
+    | '/agents/dashboard'
+    | '/agents/register'
+    | '/bounties/$bountyId'
+    | '/bounties/mine'
     | '/canon/$universeId'
     | '/create/$kind'
     | '/governance/$universeId'
@@ -400,12 +558,19 @@ export interface FileRouteTypes {
     | '/sell/earnings'
     | '/sell/new'
     | '/shop/$universeId'
+    | '/tokens/$address'
+    | '/treasury/$universeId'
     | '/universe/$id'
     | '/ads'
+    | '/agents'
+    | '/bounties'
     | '/create'
     | '/sell'
+    | '/tokens'
     | '/wiki'
     | '/event/$universe/$event'
+    | '/universe/$id/gallery'
+    | '/universe/$id/gen-config'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
   id:
@@ -418,14 +583,22 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discover'
     | '/docs'
+    | '/gallery'
     | '/login'
     | '/market'
     | '/my-works'
     | '/sandbox'
+    | '/staking'
     | '/upload'
     | '/videos'
+    | '/admin/moderation'
     | '/ads/$slotId'
     | '/ads/new'
+    | '/agents/$uid'
+    | '/agents/dashboard'
+    | '/agents/register'
+    | '/bounties/$bountyId'
+    | '/bounties/mine'
     | '/canon/$universeId'
     | '/create/$kind'
     | '/governance/$universeId'
@@ -437,12 +610,19 @@ export interface FileRouteTypes {
     | '/sell/earnings'
     | '/sell/new'
     | '/shop/$universeId'
+    | '/tokens/$address'
+    | '/treasury/$universeId'
     | '/universe/$id'
     | '/ads/'
+    | '/agents/'
+    | '/bounties/'
     | '/create/'
     | '/sell/'
+    | '/tokens/'
     | '/wiki/'
     | '/event/$universe/$event'
+    | '/universe/$id/gallery'
+    | '/universe/$id/gen-config'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
   fileRoutesById: FileRoutesById
@@ -456,14 +636,22 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DiscoverRoute: typeof DiscoverRoute
   DocsRoute: typeof DocsRoute
+  GalleryRoute: typeof GalleryRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
   MyWorksRoute: typeof MyWorksRoute
   SandboxRoute: typeof SandboxRoute
+  StakingRoute: typeof StakingRoute
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
+  AdminModerationRoute: typeof AdminModerationRoute
   AdsSlotIdRoute: typeof AdsSlotIdRoute
   AdsNewRoute: typeof AdsNewRoute
+  AgentsUidRoute: typeof AgentsUidRoute
+  AgentsDashboardRoute: typeof AgentsDashboardRoute
+  AgentsRegisterRoute: typeof AgentsRegisterRoute
+  BountiesBountyIdRoute: typeof BountiesBountyIdRoute
+  BountiesMineRoute: typeof BountiesMineRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
@@ -475,10 +663,15 @@ export interface RootRouteChildren {
   SellEarningsRoute: typeof SellEarningsRoute
   SellNewRoute: typeof SellNewRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
-  UniverseIdRoute: typeof UniverseIdRoute
+  TokensAddressRoute: typeof TokensAddressRoute
+  TreasuryUniverseIdRoute: typeof TreasuryUniverseIdRoute
+  UniverseIdRoute: typeof UniverseIdRouteWithChildren
   AdsIndexRoute: typeof AdsIndexRoute
+  AgentsIndexRoute: typeof AgentsIndexRoute
+  BountiesIndexRoute: typeof BountiesIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
   SellIndexRoute: typeof SellIndexRoute
+  TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
@@ -499,6 +692,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staking': {
+      id: '/staking'
+      path: '/staking'
+      fullPath: '/staking'
+      preLoaderRoute: typeof StakingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sandbox': {
@@ -527,6 +727,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery': {
+      id: '/gallery'
+      path: '/gallery'
+      fullPath: '/gallery'
+      preLoaderRoute: typeof GalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -592,6 +799,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tokens/': {
+      id: '/tokens/'
+      path: '/tokens'
+      fullPath: '/tokens/'
+      preLoaderRoute: typeof TokensIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sell/': {
       id: '/sell/'
       path: '/sell'
@@ -606,6 +820,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bounties/': {
+      id: '/bounties/'
+      path: '/bounties'
+      fullPath: '/bounties/'
+      preLoaderRoute: typeof BountiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/': {
+      id: '/agents/'
+      path: '/agents'
+      fullPath: '/agents/'
+      preLoaderRoute: typeof AgentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ads/': {
       id: '/ads/'
       path: '/ads'
@@ -618,6 +846,20 @@ declare module '@tanstack/react-router' {
       path: '/universe/$id'
       fullPath: '/universe/$id'
       preLoaderRoute: typeof UniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/treasury/$universeId': {
+      id: '/treasury/$universeId'
+      path: '/treasury/$universeId'
+      fullPath: '/treasury/$universeId'
+      preLoaderRoute: typeof TreasuryUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tokens/$address': {
+      id: '/tokens/$address'
+      path: '/tokens/$address'
+      fullPath: '/tokens/$address'
+      preLoaderRoute: typeof TokensAddressRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop/$universeId': {
@@ -697,6 +939,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CanonUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bounties/mine': {
+      id: '/bounties/mine'
+      path: '/bounties/mine'
+      fullPath: '/bounties/mine'
+      preLoaderRoute: typeof BountiesMineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bounties/$bountyId': {
+      id: '/bounties/$bountyId'
+      path: '/bounties/$bountyId'
+      fullPath: '/bounties/$bountyId'
+      preLoaderRoute: typeof BountiesBountyIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/register': {
+      id: '/agents/register'
+      path: '/agents/register'
+      fullPath: '/agents/register'
+      preLoaderRoute: typeof AgentsRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/dashboard': {
+      id: '/agents/dashboard'
+      path: '/agents/dashboard'
+      fullPath: '/agents/dashboard'
+      preLoaderRoute: typeof AgentsDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/$uid': {
+      id: '/agents/$uid'
+      path: '/agents/$uid'
+      fullPath: '/agents/$uid'
+      preLoaderRoute: typeof AgentsUidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ads/new': {
       id: '/ads/new'
       path: '/ads/new'
@@ -709,6 +986,13 @@ declare module '@tanstack/react-router' {
       path: '/ads/$slotId'
       fullPath: '/ads/$slotId'
       preLoaderRoute: typeof AdsSlotIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/moderation': {
+      id: '/admin/moderation'
+      path: '/admin/moderation'
+      fullPath: '/admin/moderation'
+      preLoaderRoute: typeof AdminModerationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wiki/entity/$id': {
@@ -725,6 +1009,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/universe/$id/gen-config': {
+      id: '/universe/$id/gen-config'
+      path: '/gen-config'
+      fullPath: '/universe/$id/gen-config'
+      preLoaderRoute: typeof UniverseIdGenConfigRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
+    '/universe/$id/gallery': {
+      id: '/universe/$id/gallery'
+      path: '/gallery'
+      fullPath: '/universe/$id/gallery'
+      preLoaderRoute: typeof UniverseIdGalleryRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
     '/event/$universe/$event': {
       id: '/event/$universe/$event'
       path: '/event/$universe/$event'
@@ -735,6 +1033,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface UniverseIdRouteChildren {
+  UniverseIdGalleryRoute: typeof UniverseIdGalleryRoute
+  UniverseIdGenConfigRoute: typeof UniverseIdGenConfigRoute
+}
+
+const UniverseIdRouteChildren: UniverseIdRouteChildren = {
+  UniverseIdGalleryRoute: UniverseIdGalleryRoute,
+  UniverseIdGenConfigRoute: UniverseIdGenConfigRoute,
+}
+
+const UniverseIdRouteWithChildren = UniverseIdRoute._addFileChildren(
+  UniverseIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
@@ -744,14 +1056,22 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DiscoverRoute: DiscoverRoute,
   DocsRoute: DocsRoute,
+  GalleryRoute: GalleryRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
   MyWorksRoute: MyWorksRoute,
   SandboxRoute: SandboxRoute,
+  StakingRoute: StakingRoute,
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
+  AdminModerationRoute: AdminModerationRoute,
   AdsSlotIdRoute: AdsSlotIdRoute,
   AdsNewRoute: AdsNewRoute,
+  AgentsUidRoute: AgentsUidRoute,
+  AgentsDashboardRoute: AgentsDashboardRoute,
+  AgentsRegisterRoute: AgentsRegisterRoute,
+  BountiesBountyIdRoute: BountiesBountyIdRoute,
+  BountiesMineRoute: BountiesMineRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
@@ -763,10 +1083,15 @@ const rootRouteChildren: RootRouteChildren = {
   SellEarningsRoute: SellEarningsRoute,
   SellNewRoute: SellNewRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
-  UniverseIdRoute: UniverseIdRoute,
+  TokensAddressRoute: TokensAddressRoute,
+  TreasuryUniverseIdRoute: TreasuryUniverseIdRoute,
+  UniverseIdRoute: UniverseIdRouteWithChildren,
   AdsIndexRoute: AdsIndexRoute,
+  AgentsIndexRoute: AgentsIndexRoute,
+  BountiesIndexRoute: BountiesIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
   SellIndexRoute: SellIndexRoute,
+  TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,

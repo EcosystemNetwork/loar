@@ -39,7 +39,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-// Using input instead of textarea for now
+import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
+import { SafeSignerList } from '@/components/SafeSignerList';
+import { SafeTransactionQueue } from '@/components/SafeTransactionQueue';
 
 interface GovernanceSidebarProps {
   isOpen: boolean;
@@ -99,6 +101,11 @@ export function GovernanceSidebar({
   const governanceAddress = finalUniverse?.governanceAddress as Address;
   const tokenAddress = finalUniverse?.tokenAddress as Address;
   const timelineAddress = finalUniverse?.address as Address;
+
+  // Multi-sig admin detection
+  const { isSafe, safeAddress, owners, threshold } = useIsUniverseAdmin(
+    timelineAddress as `0x${string}` | undefined
+  );
 
   // Check if governance is properly configured
   const isGovernanceConfigured = governanceAddress && tokenAddress && timelineAddress;
@@ -1041,6 +1048,26 @@ export function GovernanceSidebar({
             )}
           </div>
         </div>
+
+        {/* Multi-Sig Section (shown only for Safe-admin universes) */}
+        {isSafe && safeAddress && (
+          <div className="px-4 pb-4 space-y-4">
+            <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Multi-Sig Admin</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <SafeSignerList owners={owners} threshold={threshold} safeAddress={safeAddress} />
+                <div className="border-t pt-3">
+                  <SafeTransactionQueue
+                    safeAddress={safeAddress}
+                    universeAddress={timelineAddress}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Footer with Close Button */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">

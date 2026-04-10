@@ -24,6 +24,7 @@ interface IUniverse {
     event NodeCreationOptionUpdated(NodeCreationOptions option);
     event MediaUpdated(uint indexed nodeId, address updater, bytes32 contentHash, string link);
     event WhitelistedUpdated(address indexed user, bool status);
+    event VaultWhitelistUpdated(address indexed user, bool status);
     event TokenUpdated(address indexed token);
     event AdminUpdated(address indexed newAdmin);
 
@@ -31,4 +32,6 @@ interface IUniverse {
     function setToken(address) external;
     function getAdmin() external returns (address);
     function getToken() external returns (address);
+    function setVaultWhitelisted(address user, bool status) external;
+    function getVaultWhitelisted(address user) external view returns (bool);
 }

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { BranchingPlayer } from '../../components/player/BranchingPlayer';
+import { TokenGateGuard } from '../../components/governance/TokenGateGuard';
 
 export const Route = createFileRoute('/play/$universeId')({
   component: PlayPage,
@@ -10,7 +11,9 @@ function PlayPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      <BranchingPlayer universeId={universeId} />
+      <TokenGateGuard universeId={universeId} target="play">
+        <BranchingPlayer universeId={universeId} />
+      </TokenGateGuard>
     </div>
   );
 }

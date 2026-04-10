@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useMutation } from '@tanstack/react-query';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
+import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
 import { trpc } from '../../utils/trpc';
 import { encodeFunctionData } from 'viem';
 import { universeAbi } from '@loar/abis/generated';
@@ -25,9 +26,7 @@ export function ProposalCreateDialog({
 
   const syncProposal = useMutation(trpc.governance.syncProposal.mutationOptions());
 
-  // TODO: Get governor + universe addresses from universe data
-  const governorAddress = undefined as `0x${string}` | undefined;
-  const universeAddress = undefined as `0x${string}` | undefined;
+  const { governorAddress, universeAddress, tokenAddress } = useUniverseAddresses(universeId);
 
   const { propose } = useUniverseGovernor(governorAddress);
 
@@ -67,7 +66,7 @@ export function ProposalCreateDialog({
         proposalId: tempId,
         universeId,
         governorAddress: governorAddress || '',
-        tokenAddress: '',
+        tokenAddress: tokenAddress || '',
         description,
         proposer: address,
         targets: targets.map(String),
