@@ -81,11 +81,37 @@ ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
   const deployer = getAddress(event.args.msgSender);
   const governorAddress = getAddress(event.args.governor);
 
-  // Create token record
-  // Note: universeAddress will be linked via API queries using creator/governor
+  // Resolve the universe this token belongs to by reading the contract.
+  // deployUniverseToken sets universe.token and universe.admin to the governor,
+  // so we can find the universe that just had its governor set to this address.
+  // Alternatively, look up by deployer (creator) — the most recent universe
+  // with tokenAddress=null created by this deployer is the match.
+  let resolvedUniverseAddress: `0x${string}` = '0x0000000000000000000000000000000000000000';
+
+  try {
+    // Query universes created by this deployer that don't have a token yet
+    const universes = await context.db.sql`
+      SELECT id FROM universe
+      WHERE creator = ${deployer} AND "tokenAddress" IS NULL
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `;
+    if (universes.rows.length > 0) {
+      resolvedUniverseAddress = universes.rows[0].id as `0x${string}`;
+
+      // Also update the universe record with token + governor addresses
+      await context.db.update(universe, { id: resolvedUniverseAddress }).set({
+        tokenAddress: tokenAddress,
+        governorAddress: governorAddress,
+      });
+    }
+  } catch (err) {
+    console.error('Failed to resolve universe for token:', err);
+  }
+
   await context.db.insert(token).values({
     id: tokenAddress,
-    universeAddress: '0x0000000000000000000000000000000000000000', // Will query via creator
+    universeAddress: resolvedUniverseAddress,
     deployer: deployer,
     tokenAdmin: getAddress(event.args.tokenAdmin),
     name: event.args.tokenName,

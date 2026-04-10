@@ -92,6 +92,18 @@ export async function verifySiweSignature(
     throw new Error('Signature does not match claimed address');
   }
 
+  // Validate message expiration time (if present)
+  const expirationMatch = message.match(/Expiration Time: (.+)/);
+  if (expirationMatch) {
+    const expiresAt = new Date(expirationMatch[1]);
+    if (isNaN(expiresAt.getTime())) {
+      throw new Error('Invalid Expiration Time in SIWE message');
+    }
+    if (new Date() > expiresAt) {
+      throw new Error('SIWE message has expired. Please sign in again.');
+    }
+  }
+
   // Extract and validate nonce
   const nonceMatch = message.match(/Nonce: ([a-f0-9]+)/);
   if (!nonceMatch) {
@@ -116,7 +128,11 @@ export async function verifySiweSignature(
     if (nonceData.used) throw new Error('Nonce already used');
     if (new Date() > nonceData.expiresAt) throw new Error('Nonce expired');
 
-    nonceData.used = true;
+    // Atomically consume the nonce — delete prevents any concurrent use.
+    // In Node.js single-threaded model, delete between awaits is safe, but
+    // using delete (instead of a flag) makes double-use impossible even if
+    // two requests interleave across microtask boundaries.
+    memoryNonces.delete(nonce);
   }
 
   return address;
@@ -153,7 +169,8 @@ export function buildSiweMessage(params: {
   chainId: number;
   statement?: string;
 }): string {
-  const now = new Date().toISOString();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
   return [
     `${params.domain} wants you to sign in with your Ethereum account:`,
     params.address,
@@ -164,6 +181,7 @@ export function buildSiweMessage(params: {
     `Version: 1`,
     `Chain ID: ${params.chainId}`,
     `Nonce: ${params.nonce}`,
-    `Issued At: ${now}`,
+    `Issued At: ${now.toISOString()}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
   ].join('\n');
 }

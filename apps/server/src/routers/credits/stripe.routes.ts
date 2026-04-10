@@ -14,7 +14,7 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 
 let stripe: any = null;
 
-function getStripe() {
+export function getStripe() {
   if (stripe) return stripe;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
@@ -85,3 +85,52 @@ export const stripeRouter = router({
       };
     }),
 });
+
+/**
+ * Server-side Stripe PaymentIntent verification.
+ * Confirms:
+ *   1. Stripe is configured
+ *   2. The PaymentIntent exists and status === 'succeeded'
+ *   3. The metadata.packageId matches the requested package
+ *   4. The amount matches the expected package price
+ *
+ * Throws on any mismatch so callers can reject the purchase.
+ */
+export async function verifyStripePayment(
+  paymentIntentId: string,
+  expectedPackageId: string,
+  expectedAmountCents: number
+): Promise<void> {
+  const stripeClient = getStripe();
+  if (!stripeClient) {
+    throw new Error(
+      'Card payments are not available. Stripe is not configured. Please use ETH or $LOAR.'
+    );
+  }
+
+  if (!paymentIntentId.startsWith('pi_')) {
+    throw new Error(
+      'Invalid payment reference. Card payments require a Stripe PaymentIntent ID (pi_...).'
+    );
+  }
+
+  const intent = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+
+  if (intent.status !== 'succeeded') {
+    throw new Error(
+      `Payment has not been completed. Current status: ${intent.status}. Please complete payment before purchasing credits.`
+    );
+  }
+
+  if (intent.metadata?.packageId !== expectedPackageId) {
+    throw new Error(
+      'Payment metadata does not match the requested package. Do not reuse payment intents across packages.'
+    );
+  }
+
+  if (intent.amount < expectedAmountCents) {
+    throw new Error(
+      `Payment amount ($${(intent.amount / 100).toFixed(2)}) is less than the package price ($${(expectedAmountCents / 100).toFixed(2)}).`
+    );
+  }
+}

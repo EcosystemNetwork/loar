@@ -209,10 +209,18 @@ contract DeployUniverseScript is Script {
             lockerData: ""
         });
 
+        IUniverseManager.AllocationConfig memory allocationConfig = IUniverseManager.AllocationConfig({
+            lpBps: 0,
+            creatorBps: 0,
+            treasuryBps: 0,
+            communityBps: 0
+        });
+
         IUniverseManager.DeploymentConfig memory deployConfig = IUniverseManager.DeploymentConfig({
             tokenConfig: tokenConfig,
             poolConfig: poolConfig,
-            lockerConfig: lockerConfig
+            lockerConfig: lockerConfig,
+            allocationConfig: allocationConfig
         });
 
         address tokenAddress = universeManager.deployUniverseToken(deployConfig, universeId);

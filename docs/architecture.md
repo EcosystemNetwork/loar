@@ -73,9 +73,9 @@ sequenceDiagram
     Web->>Wallet: Sign SIWE message
     Wallet-->>Web: Signature
 
-    Web->>Server: POST /trpc/auth.verify { message, signature }
+    Web->>Server: POST /auth/verify { message, signature }
     Server->>Server: Verify SIWE signature, issue JWT
-    Server-->>Web: Session token (JWT)
+    Server-->>Web: { token (JWT), address, chain: "evm" }
     Web->>Web: Store token in localStorage
 
     Note over Web,Server: On each tRPC request:

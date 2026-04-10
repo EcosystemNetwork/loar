@@ -95,6 +95,41 @@ export const universesRouter = router({
     return await getUniversesByCreator(input.creator);
   }),
 
+  /** Update token and governance addresses after token deployment (Step 2). */
+  finalizeTokenDeployment: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        tokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid token address'),
+        governanceAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid governance address'),
+        tokenDeployTxHash: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid tx hash')
+          .optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can finalize token deployment');
+      }
+
+      const doc = await db.collection('cinematicUniverses').doc(universeId).get();
+      if (!doc.exists) throw new Error('Universe not found');
+
+      await db
+        .collection('cinematicUniverses')
+        .doc(universeId)
+        .update({
+          tokenAddress: input.tokenAddress.toLowerCase(),
+          governanceAddress: input.governanceAddress.toLowerCase(),
+          tokenDeployTxHash: input.tokenDeployTxHash ?? null,
+          updated_at: new Date(),
+        });
+
+      return { ok: true };
+    }),
+
   /** Convert a universe to multi-sig ownership via a Safe wallet. */
   setMultiSig: protectedProcedure
     .input(

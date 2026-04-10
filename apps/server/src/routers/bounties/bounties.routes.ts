@@ -5,6 +5,7 @@
  * Creators post bounties → community submits → creator awards → $LOAR released.
  */
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 
@@ -68,7 +69,8 @@ export const bountiesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const col = getBountiesCol();
-      if (!col) throw new Error('Bounties not available');
+      if (!col)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Bounties not available' });
 
       const now = new Date();
       const deadline = new Date(now.getTime() + input.deadlineDays * 86400 * 1000);
@@ -107,13 +109,17 @@ export const bountiesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const bountiesCol = getBountiesCol();
       const subsCol = getBountySubmissionsCol();
-      if (!bountiesCol || !subsCol) throw new Error('Not available');
+      if (!bountiesCol || !subsCol)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
 
       const bountyDoc = await bountiesCol.doc(input.bountyId).get();
-      if (!bountyDoc.exists) throw new Error('Bounty not found');
+      if (!bountyDoc.exists)
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = bountyDoc.data()!;
-      if (bounty.status !== 'open') throw new Error('Bounty is not open');
-      if (new Date(bounty.deadline) < new Date()) throw new Error('Bounty expired');
+      if (bounty.status !== 'open')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty is not open' });
+      if (new Date(bounty.deadline) < new Date())
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty expired' });
 
       const now = new Date();
       const submission = {
@@ -161,16 +167,21 @@ export const bountiesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const bountiesCol = getBountiesCol();
       const subsCol = getBountySubmissionsCol();
-      if (!bountiesCol || !subsCol) throw new Error('Not available');
+      if (!bountiesCol || !subsCol)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
 
       const bountyDoc = await bountiesCol.doc(input.bountyId).get();
-      if (!bountyDoc.exists) throw new Error('Bounty not found');
+      if (!bountyDoc.exists)
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = bountyDoc.data()!;
-      if (bounty.poster !== ctx.user.address) throw new Error('Only poster can award');
-      if (bounty.status !== 'open') throw new Error('Bounty not open');
+      if (bounty.poster !== ctx.user.address)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only poster can award' });
+      if (bounty.status !== 'open')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty not open' });
 
       const subDoc = await subsCol.doc(input.submissionId).get();
-      if (!subDoc.exists) throw new Error('Submission not found');
+      if (!subDoc.exists)
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Submission not found' });
       const submission = subDoc.data()!;
 
       const now = new Date();
@@ -194,12 +205,15 @@ export const bountiesRouter = router({
     .input(z.object({ bountyId: z.string(), txHash: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const col = getBountiesCol();
-      if (!col) throw new Error('Not available');
+      if (!col)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
       const doc = await col.doc(input.bountyId).get();
-      if (!doc.exists) throw new Error('Bounty not found');
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = doc.data()!;
-      if (bounty.poster !== ctx.user.address) throw new Error('Only poster can cancel');
-      if (bounty.status !== 'open') throw new Error('Bounty not open');
+      if (bounty.poster !== ctx.user.address)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only poster can cancel' });
+      if (bounty.status !== 'open')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty not open' });
 
       await col.doc(input.bountyId).update({
         status: 'cancelled',

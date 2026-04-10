@@ -46,6 +46,12 @@ const envSchema = z.object({
     .regex(/^0x[0-9a-fA-F]{40}$/, 'TREASURY_ADDRESS must be a valid Ethereum address')
     .optional(),
 
+  // ── Redis (optional — enables distributed rate limiting) ──────────────────
+  REDIS_URL: z.string().url('REDIS_URL must be a valid URL (redis://...)').optional(),
+
+  // ── Stripe (optional — enables card payments) ────────────────────────────
+  STRIPE_SECRET_KEY: z.string().optional(),
+
   // ── Platform config ───────────────────────────────────────────────────────
   UNIVERSE_MINT_CREDITS: z
     .string()

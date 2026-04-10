@@ -41,10 +41,10 @@ contract DeployRevenueScript is Script {
         console.log("Deployer:", d);
         vm.startBroadcast(pk);
 
-        // 1. PaymentRouter (UUPS) — initialize(treasury, feeBps)
+        // 1. PaymentRouter (UUPS) — initialize(treasury, feeBps, loarToken, loarFeeDiscount)
         PaymentRouter pr = PaymentRouter(address(new ERC1967Proxy(
             address(new PaymentRouter()),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, FEE))
+            abi.encodeCall(PaymentRouter.initialize, (treasury, FEE, loarToken, 500))
         )));
         console.log("PaymentRouter:", address(pr));
 

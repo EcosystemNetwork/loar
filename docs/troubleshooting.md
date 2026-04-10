@@ -42,13 +42,7 @@ lsof -ti:42069 | xargs kill -9
 
 ## Firebase Errors
 
-### "Firebase: Error (auth/api-key-not-valid)"
-
-Your `VITE_FIREBASE_API_KEY` in `.env` is incorrect or missing. Get it from Firebase Console > Project Settings > General.
-
-### "Firebase: Error (auth/project-not-found)"
-
-`VITE_FIREBASE_PROJECT_ID` does not match your Firebase project. Double-check it in Firebase Console.
+> **Note:** LOAR uses SIWE (Sign-In With Ethereum) for authentication, not Firebase Auth. Firebase is used only for Firestore (data storage). There are no `VITE_FIREBASE_*` client-side env vars.
 
 ### Server crashes: "Cannot read properties of undefined (reading 'getFirestore')"
 
@@ -90,7 +84,7 @@ The server is not running or the URL is wrong. Check:
 
 ### "UNAUTHORIZED" error
 
-Your Firebase ID token has expired. Refresh the page to re-authenticate.
+Your SIWE session token (JWT) has expired. Refresh the page to re-authenticate via wallet signature.
 
 ### CORS errors in browser console
 

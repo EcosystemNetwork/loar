@@ -246,6 +246,9 @@ function CinematicUniverseCreate() {
 
   if (txSuccess && txReceipt && deploymentStep === DeploymentStep.DEPLOYING_TOKEN) {
     // Parse TokenCreated event for token + governor addresses
+    let parsedTokenAddress: `0x${string}` | undefined;
+    let parsedGovernorAddress: `0x${string}` | undefined;
+
     for (const log of txReceipt.logs) {
       try {
         const decoded = decodeEventLog({
@@ -255,14 +258,28 @@ function CinematicUniverseCreate() {
         });
         if (decoded.eventName === 'TokenCreated') {
           const args = decoded.args as { tokenAddress: string; governor: string };
-          setTokenAddress(args.tokenAddress as `0x${string}`);
-          setGovernorAddress(args.governor as `0x${string}`);
+          parsedTokenAddress = args.tokenAddress as `0x${string}`;
+          parsedGovernorAddress = args.governor as `0x${string}`;
+          setTokenAddress(parsedTokenAddress);
+          setGovernorAddress(parsedGovernorAddress);
         }
       } catch {
         // Not a UniverseManager event, skip
       }
     }
     setDeploymentStep(DeploymentStep.COMPLETED);
+
+    // Update Firestore with real token and governance addresses
+    if (universeAddress && parsedTokenAddress && parsedGovernorAddress) {
+      trpcClient.universes.finalizeTokenDeployment
+        .mutate({
+          universeId: universeAddress,
+          tokenAddress: parsedTokenAddress,
+          governanceAddress: parsedGovernorAddress,
+          tokenDeployTxHash: hash,
+        })
+        .catch((err) => console.error('Failed to finalize token deployment in Firestore:', err));
+    }
   }
 
   const handleCreateUniverse = async () => {
