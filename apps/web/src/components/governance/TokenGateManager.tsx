@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
 import { useTokenGateRules, type GateTarget, type GateRule } from '../../hooks/useTokenGate';
+import { useVocab } from '../../hooks/use-vocab';
 
 interface TokenGateManagerProps {
   universeId: string;
@@ -17,7 +18,7 @@ interface TokenGateManagerProps {
 const ALL_TARGETS: { value: GateTarget; label: string; description: string }[] = [
   { value: 'view', label: 'View Content', description: 'View timeline & media' },
   { value: 'create', label: 'Create Nodes', description: 'Add new narrative nodes' },
-  { value: 'canon', label: 'Canon Marketplace', description: 'Submit & vote on canon' },
+  { value: 'canon', label: 'Canon', description: 'Submit & vote on canon' },
   { value: 'wiki', label: 'Wiki & Lore', description: 'Access universe wiki' },
   { value: 'governance', label: 'Governance', description: 'Vote on proposals' },
   { value: 'play', label: 'Player', description: 'Use branching player' },
@@ -32,6 +33,7 @@ interface RuleState {
 export function TokenGateManager({ universeId, creatorAddress }: TokenGateManagerProps) {
   const { address } = useAccount();
   const queryClient = useQueryClient();
+  const v = useVocab();
   const { tokenAddress } = useUniverseAddresses(universeId);
   const { rules, isLoading } = useTokenGateRules(universeId);
 
@@ -82,7 +84,7 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
   if (!tokenAddress) {
     return (
       <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-        <h3 className="font-semibold text-white mb-2">Token Gates</h3>
+        <h3 className="font-semibold text-white mb-2">{v('token-gates')}</h3>
         <p className="text-zinc-500 text-sm">
           Deploy a governance token first to enable token gating.
         </p>
@@ -128,7 +130,7 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
   return (
     <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-white">Token Gate Rules</h3>
+        <h3 className="font-semibold text-white">{v('token-gate-rules')}</h3>
         {enabledCount > 0 && (
           <span className="text-xs bg-violet-600/20 text-violet-400 px-2 py-0.5 rounded-full">
             {enabledCount} active

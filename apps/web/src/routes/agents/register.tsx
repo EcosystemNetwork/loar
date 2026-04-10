@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { Briefcase, ArrowLeft } from 'lucide-react';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/agents/register')({
   component: AgentRegisterPage,
@@ -37,6 +38,7 @@ const SPECIALTIES = [
 function AgentRegisterPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useWalletAuth();
+  const v = useVocab();
   const { data: existing } = useMyAgentProfile();
   const register = useRegisterAgent();
 
@@ -53,7 +55,7 @@ function AgentRegisterPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="p-8 text-center">
           <Briefcase className="mx-auto mb-4 h-12 w-12 text-violet-400" />
-          <h2 className="mb-2 text-xl font-bold text-white">Connect Wallet to Register</h2>
+          <h2 className="mb-2 text-xl font-bold text-white">{v('connect-wallet-to-register')}</h2>
           <p className="mb-4 text-zinc-400">You need a wallet to become a talent agent</p>
           <WalletConnectButton />
         </Card>

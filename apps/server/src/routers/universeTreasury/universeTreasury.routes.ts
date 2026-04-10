@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
-import { DEFAULT_PACKAGES } from '../credits/credits.routes';
+import { DEFAULT_PACKAGES, buildPackagesFromConfig } from '../credits/credits.routes';
 import { verifyStripePayment } from '../credits/stripe.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
 import { isUniverseAdmin } from '../../lib/safe-admin';
@@ -76,7 +76,7 @@ async function verifyTreasuryEthPayment(txHash: string, expectedWei?: string): P
   }
 
   if (expectedWei && expectedWei !== '0') {
-    const minRequired = (BigInt(expectedWei) * 99n) / 100n;
+    const minRequired = BigInt(expectedWei);
     if (tx.value < minRequired) {
       throw new Error(
         `Insufficient ETH. Expected ~${expectedWei} wei, got ${tx.value.toString()} wei.`
@@ -125,7 +125,7 @@ async function verifyTreasuryLoarPayment(txHash: string, expectedLoarWei: bigint
   }
 
   const transferredWei = BigInt(transferLog.data);
-  const minRequired = (expectedLoarWei * 99n) / 100n;
+  const minRequired = expectedLoarWei;
   if (transferredWei < minRequired) {
     throw new Error(
       `Insufficient $LOAR transferred. Expected ~${expectedLoarWei.toString()} wei, got ${transferredWei.toString()} wei.`
@@ -190,11 +190,16 @@ export const universeTreasuryRouter = router({
         throw new Error('Only the universe admin can fund the universe credit pool');
       }
 
-      const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+      // Use live pricing so ETH amounts reflect current ETH/USD rate
+      const livePackages = await buildPackagesFromConfig();
+      const pkg = livePackages.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
 
       // ── Verify payment before issuing any credits ──────────────────
       if (input.paymentMethod === 'eth' || input.paymentMethod === 'crypto') {
+        if (!pkg.ethPriceWei || pkg.ethPriceWei === '0') {
+          throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
+        }
         await verifyTreasuryEthPayment(input.paymentRef, pkg.ethPriceWei);
       } else if (input.paymentMethod === 'loar') {
         if (!input.loarAmount) throw new Error('loarAmount is required for $LOAR payments');
@@ -204,16 +209,7 @@ export const universeTreasuryRouter = router({
         // card: verify Stripe PaymentIntent
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
         await verifyStripePayment(input.paymentRef, input.packageId, expectedCents);
-
-        // Dedup against universe credit transactions for card payments
-        const existing = await db
-          .collection('universeCreditTransactions')
-          .where('paymentRef', '==', input.paymentRef)
-          .limit(1)
-          .get();
-        if (!existing.empty) {
-          throw new Error('This payment reference has already been used to fund a universe pool');
-        }
+        // Dedup is enforced atomically inside the transaction below
       }
 
       const isLoar = input.paymentMethod === 'loar';
@@ -222,41 +218,56 @@ export const universeTreasuryRouter = router({
         : pkg.credits + pkg.bonusCredits;
 
       const universeId = input.universeId.toLowerCase();
-      const poolRef = universeCreditCol().doc(universeId);
-      const poolData = await getPoolData(universeId);
 
-      await poolRef.set(
-        {
+      // Atomic: dedup + pool credit + tx record
+      const txDocId = `fund-${universeId}-${input.paymentRef}`;
+      const newBalance = await db.runTransaction(async (tx) => {
+        const dedupRef = universeCreditTxCol().doc(txDocId);
+        const dedupDoc = await tx.get(dedupRef);
+        if (dedupDoc.exists) {
+          throw new Error('This payment reference has already been used to fund a universe pool');
+        }
+
+        const poolRef = universeCreditCol().doc(universeId);
+        const poolDoc = await tx.get(poolRef);
+        const poolBalance = (poolDoc.data()?.balance as number) || 0;
+        const poolPurchased = (poolDoc.data()?.totalPurchased as number) || 0;
+
+        tx.set(
+          poolRef,
+          {
+            universeId,
+            balance: poolBalance + totalCredits,
+            totalPurchased: poolPurchased + totalCredits,
+            lastFundedAt: new Date(),
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+
+        tx.set(dedupRef, {
+          id: txDocId,
           universeId,
-          balance: poolData.balance + totalCredits,
-          totalPurchased: poolData.totalPurchased + totalCredits,
-          totalSpent: poolData.totalSpent,
-          lastFundedAt: new Date(),
-          updatedAt: new Date(),
-        },
-        { merge: true }
-      );
+          type: 'fund',
+          fundedByUid: ctx.user.uid.toLowerCase(),
+          packageId: input.packageId,
+          packageName: pkg.name,
+          paymentMethod: input.paymentMethod,
+          paymentRef: input.paymentRef,
+          loarAmount: input.loarAmount ?? null,
+          credits: totalCredits,
+          pricePaidUsd: isLoar ? pkg.loarPriceUsd : pkg.fiatPriceUsd,
+          marginPercent: isLoar ? 25 : 35,
+          createdAt: new Date(),
+        });
 
-      await universeCreditTxCol().add({
-        id: randomUUID(),
-        universeId,
-        type: 'fund',
-        fundedByUid: ctx.user.uid.toLowerCase(),
-        packageId: input.packageId,
-        packageName: pkg.name,
-        paymentMethod: input.paymentMethod,
-        paymentRef: input.paymentRef,
-        loarAmount: input.loarAmount ?? null,
-        credits: totalCredits,
-        pricePaidUsd: isLoar ? pkg.loarPriceUsd : pkg.fiatPriceUsd,
-        marginPercent: isLoar ? 25 : 35,
-        createdAt: new Date(),
+        return poolBalance + totalCredits;
       });
 
       return {
         ok: true,
         creditsAdded: totalCredits,
-        newBalance: poolData.balance + totalCredits,
+        newBalance,
       };
     }),
 
@@ -287,68 +298,76 @@ export const universeTreasuryRouter = router({
         throw new Error('You are not an active team member of this universe');
       }
 
-      // Enforce monthly allowance if set (skip for admin)
-      if (!isAdmin && membership.monthlyAllowance > 0) {
-        // Reset counter if we're in a new calendar month
-        const periodStart = membership.allowancePeriodStart?.toDate?.() ?? new Date(0);
-        const now = new Date();
-        const sameMonth =
-          periodStart.getFullYear() === now.getFullYear() &&
-          periodStart.getMonth() === now.getMonth();
+      // Atomic: allowance check + pool deduction + tx record
+      const remainingPoolBalance = await db.runTransaction(async (tx) => {
+        const poolRef = universeCreditCol().doc(universeId);
+        const poolDoc = await tx.get(poolRef);
+        const poolBalance = (poolDoc.data()?.balance as number) || 0;
+        const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
-        const usedThisMonth = sameMonth ? membership.creditsUsedThisMonth || 0 : 0;
-
-        if (usedThisMonth + input.cost > membership.monthlyAllowance) {
+        if (poolBalance < input.cost) {
           throw new Error(
-            `Monthly credit allowance exceeded. Allowance: ${membership.monthlyAllowance}, used: ${usedThisMonth}, requested: ${input.cost}`
+            `Universe credit pool is too low. Need ${input.cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`
           );
         }
 
-        // Update usage counter
-        const docId = `${universeId}-${callerUid}`;
-        await db
-          .collection('universeTeamMembers')
-          .doc(docId)
-          .update({
+        // Enforce monthly allowance inside transaction (skip for admin)
+        if (!isAdmin && membership.monthlyAllowance > 0) {
+          const memberDocId = `${universeId}-${callerUid}`;
+          const memberRef = db.collection('universeTeamMembers').doc(memberDocId);
+          const memberSnap = await tx.get(memberRef);
+          const memberData = memberSnap.data()!;
+          const periodStart = memberData.allowancePeriodStart?.toDate?.() ?? new Date(0);
+          const now = new Date();
+          const sameMonth =
+            periodStart.getFullYear() === now.getFullYear() &&
+            periodStart.getMonth() === now.getMonth();
+          const usedThisMonth = sameMonth ? memberData.creditsUsedThisMonth || 0 : 0;
+
+          if (usedThisMonth + input.cost > memberData.monthlyAllowance) {
+            throw new Error(
+              `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, requested: ${input.cost}`
+            );
+          }
+
+          tx.update(memberRef, {
             creditsUsedThisMonth: usedThisMonth + input.cost,
-            allowancePeriodStart: sameMonth ? membership.allowancePeriodStart : now,
+            allowancePeriodStart: sameMonth ? memberData.allowancePeriodStart : now,
             updatedAt: now,
           });
-      }
+        }
 
-      // Deduct from pool
-      const poolRef = universeCreditCol().doc(universeId);
-      const poolData = await getPoolData(universeId);
-
-      if (poolData.balance < input.cost) {
-        throw new Error(
-          `Universe credit pool is too low. Need ${input.cost}, available ${poolData.balance}. Ask the universe admin to top up the pool.`
+        tx.set(
+          poolRef,
+          {
+            balance: poolBalance - input.cost,
+            totalSpent: poolSpent + input.cost,
+            updatedAt: new Date(),
+          },
+          { merge: true }
         );
-      }
 
-      await poolRef.update({
-        balance: poolData.balance - input.cost,
-        totalSpent: poolData.totalSpent + input.cost,
-        updatedAt: new Date(),
-      });
+        const spendRef = universeCreditTxCol().doc();
+        tx.set(spendRef, {
+          id: randomUUID(),
+          universeId,
+          type: 'spend',
+          spentByUid: callerUid,
+          generationType: input.generationType,
+          credits: -input.cost,
+          generationId: input.generationId ?? null,
+          modelId: input.modelId ?? null,
+          metadata: input.metadata ?? null,
+          createdAt: new Date(),
+        });
 
-      await universeCreditTxCol().add({
-        id: randomUUID(),
-        universeId,
-        type: 'spend',
-        spentByUid: callerUid,
-        generationType: input.generationType,
-        credits: -input.cost,
-        generationId: input.generationId ?? null,
-        modelId: input.modelId ?? null,
-        metadata: input.metadata ?? null,
-        createdAt: new Date(),
+        return poolBalance - input.cost;
       });
 
       return {
         ok: true,
         creditsSpent: input.cost,
-        remainingPoolBalance: poolData.balance - input.cost,
+        remainingPoolBalance,
       };
     }),
 
@@ -372,77 +391,86 @@ export const universeTreasuryRouter = router({
         throw new Error('Only the universe admin can allocate credits to members');
       }
 
-      const poolData = await getPoolData(universeId);
-      if (poolData.balance < input.credits) {
-        throw new Error(
-          `Universe credit pool has insufficient balance. Available: ${poolData.balance}, requested: ${input.credits}`
-        );
-      }
-
       const memberUid = input.memberUid.toLowerCase();
 
-      // Deduct from pool
-      await universeCreditCol()
-        .doc(universeId)
-        .update({
-          balance: poolData.balance - input.credits,
-          totalSpent: poolData.totalSpent + input.credits,
-          updatedAt: new Date(),
-        });
+      // Atomic: pool deduction + member credit + audit records
+      const newPoolBalance = await db.runTransaction(async (tx) => {
+        const poolRef = universeCreditCol().doc(universeId);
+        const poolDoc = await tx.get(poolRef);
+        const poolBalance = (poolDoc.data()?.balance as number) || 0;
+        const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
-      // Credit the member's personal balance
-      const memberRef = db.collection('userCredits').doc(memberUid);
-      const memberDoc = await memberRef.get();
+        if (poolBalance < input.credits) {
+          throw new Error(
+            `Universe credit pool has insufficient balance. Available: ${poolBalance}, requested: ${input.credits}`
+          );
+        }
 
-      if (memberDoc.exists) {
-        const d = memberDoc.data()!;
-        await memberRef.update({
-          balance: (d.balance || 0) + input.credits,
-          totalBonusReceived: (d.totalBonusReceived || 0) + input.credits,
-          updatedAt: new Date(),
-        });
-      } else {
-        await memberRef.set({
-          uid: memberUid,
-          balance: input.credits,
-          totalPurchased: 0,
-          totalSpent: 0,
-          totalBonusReceived: input.credits,
-          totalLoarPurchases: 0,
-          totalFiatPurchases: 0,
+        const memberRef = db.collection('userCredits').doc(memberUid);
+        const memberDoc = await tx.get(memberRef);
+        const prev = memberDoc.data() ?? {};
+
+        // Deduct from pool
+        tx.set(
+          poolRef,
+          {
+            balance: poolBalance - input.credits,
+            totalSpent: poolSpent + input.credits,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+
+        // Credit the member's personal balance
+        tx.set(
+          memberRef,
+          {
+            uid: memberUid,
+            balance: (prev.balance || 0) + input.credits,
+            totalBonusReceived: (prev.totalBonusReceived || 0) + input.credits,
+            totalPurchased: prev.totalPurchased || 0,
+            totalSpent: prev.totalSpent || 0,
+            totalLoarPurchases: prev.totalLoarPurchases || 0,
+            totalFiatPurchases: prev.totalFiatPurchases || 0,
+            updatedAt: new Date(),
+            ...(!memberDoc.exists && { createdAt: new Date() }),
+          },
+          { merge: true }
+        );
+
+        // Audit log on the universe side
+        const auditRef = universeCreditTxCol().doc();
+        tx.set(auditRef, {
+          id: randomUUID(),
+          universeId,
+          type: 'allocate',
+          allocatedByUid: ctx.user.uid.toLowerCase(),
+          allocatedToUid: memberUid,
+          credits: -input.credits,
+          reason: input.reason ?? null,
           createdAt: new Date(),
-          updatedAt: new Date(),
         });
-      }
 
-      // Audit log on the universe side
-      await universeCreditTxCol().add({
-        id: randomUUID(),
-        universeId,
-        type: 'allocate',
-        allocatedByUid: ctx.user.uid.toLowerCase(),
-        allocatedToUid: memberUid,
-        credits: -input.credits,
-        reason: input.reason ?? null,
-        createdAt: new Date(),
-      });
+        // Personal credit transaction for the member
+        const personalTxRef = db.collection('creditTransactions').doc();
+        tx.set(personalTxRef, {
+          uid: memberUid,
+          type: 'grant',
+          source: 'universe_treasury',
+          credits: input.credits,
+          reason: input.reason ?? `Universe treasury allocation from ${universeId}`,
+          universeId,
+          allocatedByUid: ctx.user.uid.toLowerCase(),
+          createdAt: new Date(),
+        });
 
-      // Personal credit transaction for the member
-      await db.collection('creditTransactions').add({
-        uid: memberUid,
-        type: 'grant',
-        source: 'universe_treasury',
-        credits: input.credits,
-        reason: input.reason ?? `Universe treasury allocation from ${universeId}`,
-        universeId,
-        allocatedByUid: ctx.user.uid.toLowerCase(),
-        createdAt: new Date(),
+        return poolBalance - input.credits;
       });
 
       return {
         ok: true,
         creditsAllocated: input.credits,
-        newPoolBalance: poolData.balance - input.credits,
+        newPoolBalance,
       };
     }),
 

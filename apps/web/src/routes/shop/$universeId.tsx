@@ -31,6 +31,7 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { formatEther } from 'viem';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/shop/$universeId')({
   component: UniverseShopPage,
@@ -39,6 +40,7 @@ export const Route = createFileRoute('/shop/$universeId')({
 function UniverseShopPage() {
   const { universeId } = useParams({ from: '/shop/$universeId' });
   const { address } = useWalletAuth();
+  const v = useVocab();
 
   const { data: storefront, isLoading } = useUniverseStorefront(universeId);
   const { data: subTiers } = useSubscriptionTiers(universeId);
@@ -182,7 +184,7 @@ function UniverseShopPage() {
             <TabsContent value="canon">
               <div className="text-center py-6 space-y-3">
                 <Gavel className="w-10 h-10 mx-auto text-primary/40" />
-                <p className="text-sm font-medium">Canon Marketplace</p>
+                <p className="text-sm font-medium">{v('canon-marketplace')}</p>
                 <p className="text-xs text-muted-foreground">
                   Submit content proposals and vote on what becomes permanent universe canon.
                 </p>
@@ -195,7 +197,7 @@ function UniverseShopPage() {
                 <Link to="/shop/$universeId" params={{ universeId }}>
                   <Button className="gap-2">
                     <Gavel className="w-4 h-4" />
-                    Open Canon Marketplace
+                    Open {v('canon-marketplace')}
                   </Button>
                 </Link>
               </div>

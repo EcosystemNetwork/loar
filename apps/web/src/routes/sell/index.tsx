@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMyListings, useDelistListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/sell/')({
   component: SellPage,
@@ -35,6 +36,7 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 
 function SellPage() {
   const { isConnected } = useWalletAuth();
+  const v = useVocab();
   const { data: active = [], isLoading: loadingActive } = useMyListings('ACTIVE');
   const { data: drafts = [], isLoading: loadingDrafts } = useMyListings('DRAFT');
   const { data: sold = [], isLoading: loadingSold } = useMyListings('SOLD_OUT');
@@ -44,9 +46,9 @@ function SellPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
         <Store className="w-12 h-12 text-muted-foreground opacity-30" />
-        <p className="font-semibold">Connect your wallet to sell</p>
+        <p className="font-semibold">{v('connect-wallet-to-sell')}</p>
         <Link to="/login">
-          <Button>Connect Wallet</Button>
+          <Button>{v('connect-wallet')}</Button>
         </Link>
       </div>
     );
@@ -95,7 +97,9 @@ function SellPage() {
             <TabsTrigger value="drafts" className="flex-1">
               Drafts {(drafts as any[]).length > 0 && `(${(drafts as any[]).length})`}
             </TabsTrigger>
-            <TabsTrigger value="sold" className="flex-1">Sold Out</TabsTrigger>
+            <TabsTrigger value="sold" className="flex-1">
+              Sold Out
+            </TabsTrigger>
           </TabsList>
 
           {/* Active */}
@@ -103,7 +107,11 @@ function SellPage() {
             {loadingActive ? (
               <LoadingState />
             ) : (active as any[]).length === 0 ? (
-              <EmptyState label="No active listings" cta="Create your first listing" href="/sell/new" />
+              <EmptyState
+                label="No active listings"
+                cta="Create your first listing"
+                href="/sell/new"
+              />
             ) : (
               <div className="space-y-3">
                 {(active as any[]).map((l: any) => (
@@ -163,7 +171,11 @@ function SellerListingRow({
         <div className="flex gap-3">
           <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
             {listing.thumbnailUrl ? (
-              <img src={listing.thumbnailUrl} alt={listing.title} className="w-full h-full object-cover" />
+              <img
+                src={listing.thumbnailUrl}
+                alt={listing.title}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <Package className="w-6 h-6 text-muted-foreground opacity-30" />
             )}
@@ -188,7 +200,9 @@ function SellerListingRow({
           </div>
           <div className="flex flex-col gap-1">
             {isDraft && (
-              <Badge variant="outline" className="text-xs">Draft</Badge>
+              <Badge variant="outline" className="text-xs">
+                Draft
+              </Badge>
             )}
             <div className="flex gap-1 mt-auto">
               <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -225,7 +239,9 @@ function EmptyState({ label, cta, href }: { label: string; cta?: string; href?: 
       <p className="text-sm">{label}</p>
       {cta && href && (
         <Link to={href as any}>
-          <Button variant="outline" size="sm" className="mt-3">{cta}</Button>
+          <Button variant="outline" size="sm" className="mt-3">
+            {cta}
+          </Button>
         </Link>
       )}
     </div>

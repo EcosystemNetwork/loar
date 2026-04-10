@@ -6,6 +6,7 @@
  */
 import { useWalletAuth } from '../../lib/wallet-auth';
 import { usePrivateAccess, type AccessLevel } from '../../hooks/usePrivateAccess';
+import { useVocab } from '../../hooks/use-vocab';
 
 interface PrivateSectionGuardProps {
   universeId: string;
@@ -15,6 +16,7 @@ interface PrivateSectionGuardProps {
 export function PrivateSectionGuard({ universeId, children }: PrivateSectionGuardProps) {
   const { isAuthenticated, isConnected } = useWalletAuth();
   const { accessLevel, config, isLoading, hasAccess } = usePrivateAccess(universeId);
+  const v = useVocab();
 
   if (isLoading) {
     return (
@@ -69,8 +71,8 @@ export function PrivateSectionGuard({ universeId, children }: PrivateSectionGuar
             {!isConnected && (
               <AccessOption
                 icon="wallet"
-                title="Connect Wallet"
-                description="Sign in with your wallet to check access."
+                title={v('connect-wallet')}
+                description={`${v('connect-wallet')} to check access.`}
               />
             )}
             {isConnected && !isAuthenticated && (

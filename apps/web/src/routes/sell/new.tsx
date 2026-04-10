@@ -31,6 +31,7 @@ import {
 import { useCreateListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/sell/new')({
   component: CreateListingPage,
@@ -114,6 +115,7 @@ const STEP_LABELS: Record<Step, string> = {
 function CreateListingPage() {
   const navigate = useNavigate();
   const { isConnected } = useWalletAuth();
+  const v = useVocab();
   const create = useCreateListing();
   const [step, setStep] = useState<Step>('type');
   const [form, setForm] = useState<FormData>({
@@ -337,7 +339,7 @@ function CreateListingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="royalty">Royalty (basis points, 500 = 5%)</Label>
+              <Label htmlFor="royalty">{v('royalty')} (basis points, 500 = 5%)</Label>
               <Input
                 id="royalty"
                 type="number"
@@ -381,7 +383,7 @@ function CreateListingPage() {
               <SummaryRow label="Supply" value={form.supply === '0' ? 'Unlimited' : form.supply} />
               <SummaryRow label="Rights" value={form.rightsLane} />
               <SummaryRow
-                label="Royalty"
+                label={v('royalty')}
                 value={`${(parseInt(form.royaltyBps) / 100).toFixed(1)}%`}
               />
             </div>

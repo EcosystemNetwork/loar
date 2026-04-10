@@ -1,5 +1,25 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
+import { validateUploadUrl } from '../lib/url-validator';
+
+/**
+ * Sanitize user-supplied text before interpolating into AI prompts.
+ * Strips common prompt injection patterns while preserving legitimate content.
+ */
+function sanitizeForPrompt(text: string): string {
+  return (
+    text
+      // Collapse multiple newlines to prevent instruction boundary spoofing
+      .replace(/\n{3,}/g, '\n\n')
+      // Strip common injection prefixes
+      .replace(/^(system|assistant|user)\s*:/gim, '[filtered]:')
+      // Strip "ignore previous instructions" patterns
+      .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, '[filtered]')
+      .replace(/ignore\s+(all\s+)?above/gi, '[filtered]')
+      // Limit length to prevent context flooding
+      .slice(0, 5000)
+  );
+}
 
 // Initialize Gemini — fail fast if key missing
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
@@ -99,9 +119,9 @@ export async function generateWikiFromVideo(
     characterContext = '\n\nCHARACTERS IN THIS SCENE:\n';
     eventData.characters.forEach((char) => {
       characterNames.push(char.name);
-      characterContext += `- **${char.name}**: ${char.userDescription}`;
+      characterContext += `- **${sanitizeForPrompt(char.name)}**: ${sanitizeForPrompt(char.userDescription)}`;
       if (char.visualDescription) {
-        characterContext += `\n  Visual appearance: ${char.visualDescription}`;
+        characterContext += `\n  Visual appearance: ${sanitizeForPrompt(char.visualDescription)}`;
       }
       characterContext += '\n';
     });
@@ -112,7 +132,7 @@ export async function generateWikiFromVideo(
   if (eventData.previousEvents && eventData.previousEvents.length > 0) {
     context = '\n\nPREVIOUS EVENTS IN THIS TIMELINE:\n';
     eventData.previousEvents.forEach((evt, idx) => {
-      context += `${idx + 1}. ${evt.title}: ${evt.description}\n`;
+      context += `${idx + 1}. ${sanitizeForPrompt(evt.title)}: ${sanitizeForPrompt(evt.description)}\n`;
     });
   }
 
@@ -121,7 +141,7 @@ export async function generateWikiFromVideo(
 
 EVENT CONTEXT:
 Event ID: ${eventData.eventId}
-User Description: ${eventData.description}
+User Description: ${sanitizeForPrompt(eventData.description)}
 ${characterContext}${context}
 
 YOUR TASK:
@@ -173,6 +193,8 @@ Generate a JSON response:
 Output valid JSON only. Be precise and factual.`;
 
   try {
+    // SSRF validation before downloading external URL
+    await validateUploadUrl(videoUrl);
     // Download video to buffer first (required for uploadFile)
     console.log(`📤 Downloading video: ${videoUrl}`);
     const videoResponse = await fetch(videoUrl);
@@ -305,8 +327,8 @@ export async function analyzeCharacterImage(
 
   const prompt = `You are analyzing a character image to create a detailed visual description for narrative consistency.
 
-CHARACTER NAME: ${characterName}
-USER DESCRIPTION: ${userDescription}
+CHARACTER NAME: ${sanitizeForPrompt(characterName)}
+USER DESCRIPTION: ${sanitizeForPrompt(userDescription)}
 
 YOUR TASK:
 Analyze this character image and provide a detailed visual description that will help maintain consistency when this character appears in different scenes.
@@ -330,6 +352,8 @@ CRITICAL RULES:
 Generate a detailed visual description in plain text (no JSON, no formatting).`;
 
   try {
+    // SSRF validation before downloading external URL
+    await validateUploadUrl(imageUrl);
     // Generate content with image
     const result = await model.generateContent([
       {
@@ -563,9 +587,9 @@ export async function generateEntityLore(
 
   const prompt = `You are a worldbuilding writer creating a concise wiki/lore card entry.
 
-ENTITY NAME: ${entityName}
-ENTITY KIND: ${entityKind}
-DESCRIPTION: ${description}
+ENTITY NAME: ${sanitizeForPrompt(entityName)}
+ENTITY KIND: ${sanitizeForPrompt(entityKind)}
+DESCRIPTION: ${sanitizeForPrompt(description)}
 
 Write a compelling 2–4 paragraph wiki entry for this ${entityKind}. Include:
 - What it is / who they are

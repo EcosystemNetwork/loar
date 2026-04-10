@@ -52,6 +52,7 @@ contract UniverseTokenDeployer is ReentrancyGuard {
     error HookNotEnabled();
     error LockerNotEnabled();
     error InvalidAllocation();
+    error AllocationSupplyMismatch();
 
     event TokenDeployed(
         uint256 indexed universeId,
@@ -119,7 +120,7 @@ contract UniverseTokenDeployer is ReentrancyGuard {
         uint256 creatorAmount = (TOKEN_SUPPLY * creatorBps) / 10000;
         uint256 treasuryAmount = (TOKEN_SUPPLY * treasuryBps) / 10000;
         uint256 communityAmount = TOKEN_SUPPLY - lpAmount - creatorAmount - treasuryAmount;
-        assert(lpAmount + creatorAmount + treasuryAmount + communityAmount == TOKEN_SUPPLY);
+        if (lpAmount + creatorAmount + treasuryAmount + communityAmount != TOKEN_SUPPLY) revert AllocationSupplyMismatch();
 
         // LP portion goes to UniverseManager for pool locking
         IERC20(tokenAddress).safeTransfer(address(universeManager), lpAmount);

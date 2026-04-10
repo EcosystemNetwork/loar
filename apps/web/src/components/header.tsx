@@ -14,17 +14,19 @@ import { NotificationBell } from './social/NotificationBell';
 import { Button } from './ui/button';
 import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { useVocab } from '@/hooks/use-vocab';
 
 export default function Header() {
   const matchRoute = useMatchRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const v = useVocab();
 
   const links: Array<{ to: string; label: string }> = [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/discover', label: 'Discover' },
     { to: '/tokens', label: 'Launchpad' },
     { to: '/bounties', label: 'Bounties' },
-    { to: '/staking', label: 'Staking' },
+    { to: '/staking', label: v('staking') },
     { to: '/create', label: 'Create' },
     { to: '/wiki', label: 'Wiki' },
     { to: '/gallery', label: 'Gallery' },

@@ -14,6 +14,7 @@ import {
 } from './universes.handlers';
 import { isUniverseAdmin, getSafeInfo } from '../../lib/safe-admin';
 import { db } from '../../lib/firebase';
+import { generateNonce, consumeNonce } from '../../lib/siwe';
 
 const createUniverseSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address'),
@@ -24,6 +25,8 @@ const createUniverseSchema = z.object({
   description: z.string().min(1, 'Description is required').max(1000, 'Description too long'),
   signature: z.string().min(1, 'Signature is required'),
   message: z.string().min(1, 'Message is required'),
+  /** Server-issued nonce from /auth/nonce — prevents signature replay */
+  nonce: z.string().min(1, 'Nonce is required'),
   onChainUniverseId: z.string().optional(),
   mintTxHash: z
     .string()
@@ -40,7 +43,13 @@ const getByCreatorSchema = z.object({
 });
 
 export const universesRouter = router({
-  /** Create a new universe (wallet-based auth via signature). */
+  /** Generate a nonce for universe creation signatures */
+  getNonce: publicProcedure.query(async () => {
+    const nonce = await generateNonce();
+    return { nonce };
+  }),
+
+  /** Create a new universe (wallet-based auth via signature + server nonce). */
   create: publicProcedure.input(createUniverseSchema).mutation(async ({ input }) => {
     const { verifyMessage } = await import('viem');
 
@@ -58,15 +67,11 @@ export const universesRouter = router({
       throw new Error('Message must contain creator address');
     }
 
-    const timestampMatch = input.message.match(/at (\d+)/);
-    if (!timestampMatch) {
-      throw new Error("Message must contain timestamp (e.g. 'at 1234567890')");
+    // Verify the server-issued nonce is present in the message and hasn't been used
+    if (!input.message.includes(input.nonce)) {
+      throw new Error('Message must contain the server-issued nonce');
     }
-    const messageTimestamp = parseInt(timestampMatch[1], 10);
-    const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - messageTimestamp) > 300) {
-      throw new Error('Message timestamp expired (>5 minutes)');
-    }
+    await consumeNonce(input.nonce);
 
     return await createUniverse({
       address: input.address,

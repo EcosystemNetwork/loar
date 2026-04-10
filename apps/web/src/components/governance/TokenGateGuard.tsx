@@ -7,6 +7,7 @@ import { useTokenGate, type GateTarget } from '../../hooks/useTokenGate';
 import { useAccount, useReadContract } from 'wagmi';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
+import { useVocab } from '../../hooks/use-vocab';
 
 interface TokenGateGuardProps {
   universeId: string;
@@ -17,6 +18,7 @@ interface TokenGateGuardProps {
 
 export function TokenGateGuard({ universeId, target = 'view', children }: TokenGateGuardProps) {
   const { isConnected } = useAccount();
+  const v = useVocab();
   const gate = useTokenGate(universeId, target);
   const { tokenAddress } = useUniverseAddresses(universeId);
 
@@ -46,9 +48,9 @@ export function TokenGateGuard({ universeId, target = 'view', children }: TokenG
   const targetLabels: Record<GateTarget, string> = {
     view: 'View Content',
     create: 'Create Nodes',
-    canon: 'Canon Marketplace',
+    canon: v('canon-marketplace'),
     wiki: 'Wiki & Lore',
-    governance: 'Governance',
+    governance: v('governance'),
     play: 'Player',
   };
 

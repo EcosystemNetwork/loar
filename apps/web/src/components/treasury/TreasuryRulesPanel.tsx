@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Loader2, Users } from 'lucide-react';
 import { useTeamMembers } from '@/hooks/useTreasury';
+import { useVocab } from '@/hooks/use-vocab';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -15,6 +16,7 @@ interface TreasuryRulesPanelProps {
 }
 
 export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
+  const v = useVocab();
   const [creditSharePct, setCreditSharePct] = useState(70);
   const { data: members } = useTeamMembers(universeId);
   const qc = useQueryClient();
@@ -74,14 +76,17 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
             />
             <div className="flex items-center justify-between text-xs text-zinc-500">
               <span>Credit Pool: {creditSharePct}%</span>
-              <span>Staker Rewards: {100 - creditSharePct}%</span>
+              <span>
+                {v('staker-rewards')}: {100 - creditSharePct}%
+              </span>
             </div>
           </div>
 
           <div className="bg-zinc-800/50 rounded-lg p-3 text-xs text-zinc-400 space-y-1">
             <p>This setting applies when you use "Deposit Revenue" from the Overview tab.</p>
             <p>
-              Credits fuel AI generation for your team. Staker rewards incentivize token holders.
+              Credits fuel AI generation for your team. {v('staker-rewards')} incentivize{' '}
+              {v('token-holders').toLowerCase()}.
             </p>
           </div>
         </CardContent>

@@ -26,6 +26,7 @@ import {
 import { useAccount } from 'wagmi';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/staking')({
   component: StakingPage,
@@ -58,6 +59,7 @@ const TIER_ICONS: Record<string, typeof Shield> = {
 function StakingPage() {
   const { address } = useAccount();
   const queryClient = useQueryClient();
+  const v = useVocab();
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
 
@@ -93,11 +95,11 @@ function StakingPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold">$LOAR Staking</h1>
+            <h1 className="text-3xl md:text-4xl font-bold">$LOAR {v('staking')}</h1>
           </div>
           <p className="text-muted-foreground">
-            Stake $LOAR to unlock tier benefits: fee discounts, priority AI queue, curation boosts,
-            and launchpad allocation.
+            {v('stake')} $LOAR to unlock tier benefits: fee discounts, priority AI queue, curation
+            boosts, and launchpad allocation.
           </p>
         </div>
 
@@ -160,7 +162,7 @@ function StakingPage() {
               <Card>
                 <CardContent className="p-4 space-y-3">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <ArrowUp className="h-4 w-4 text-green-500" /> Stake $LOAR
+                    <ArrowUp className="h-4 w-4 text-green-500" /> {v('stake-loar')}
                   </h3>
                   <Input
                     type="number"
@@ -185,7 +187,8 @@ function StakingPage() {
                     className="w-full bg-green-600 hover:bg-green-500"
                     disabled={!stakeAmount || Number(stakeAmount) <= 0}
                   >
-                    Stake {stakeAmount ? `${Number(stakeAmount).toLocaleString()} $LOAR` : ''}
+                    {v('stake')}{' '}
+                    {stakeAmount ? `${Number(stakeAmount).toLocaleString()} $LOAR` : ''}
                   </Button>
                   <p className="text-[10px] text-muted-foreground">
                     7-day lock period. Early unstake = 5% penalty to LP.
@@ -196,7 +199,7 @@ function StakingPage() {
               <Card>
                 <CardContent className="p-4 space-y-3">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <ArrowDown className="h-4 w-4 text-red-500" /> Unstake $LOAR
+                    <ArrowDown className="h-4 w-4 text-red-500" /> {v('unstake')} $LOAR
                   </h3>
                   <Input
                     type="number"
@@ -209,7 +212,8 @@ function StakingPage() {
                     className="w-full text-red-500 border-red-500/30 hover:bg-red-500/10"
                     disabled={!unstakeAmount || Number(unstakeAmount) <= 0}
                   >
-                    Unstake {unstakeAmount ? `${Number(unstakeAmount).toLocaleString()} $LOAR` : ''}
+                    {v('unstake')}{' '}
+                    {unstakeAmount ? `${Number(unstakeAmount).toLocaleString()} $LOAR` : ''}
                   </Button>
                   <p className="text-[10px] text-muted-foreground">
                     Penalty-free after 7 days. Early unstake sends 5% to LP (not burned).
@@ -274,7 +278,7 @@ function StakingPage() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Users className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm">Top Stakers</h3>
+                  <h3 className="font-semibold text-sm">{v('stakers')}</h3>
                 </div>
                 {!leaderboard?.length ? (
                   <p className="text-center py-8 text-xs text-muted-foreground">No stakers yet</p>
@@ -311,7 +315,7 @@ function StakingPage() {
               <CardContent className="p-4 space-y-3">
                 <h3 className="font-semibold text-sm">How It Works</h3>
                 <div className="space-y-2 text-xs text-muted-foreground">
-                  <p>1. Stake $LOAR to reach a tier</p>
+                  <p>1. {v('stake')} $LOAR to reach a tier</p>
                   <p>2. Higher tier = bigger marketplace fee discounts</p>
                   <p>3. Silver+ gets priority AI generation queue</p>
                   <p>4. Curation mining: discover content early, earn boosted $LOAR</p>

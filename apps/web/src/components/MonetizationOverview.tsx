@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { CreditStore } from '@/components/CreditStore';
+import { useVocab } from '@/hooks/use-vocab';
 
 interface Stream {
   id: string;
@@ -38,7 +39,7 @@ const STREAMS: Stream[] = [
     desc: 'Tokenize your episodes. Set your own price and supply.',
     potential: 'Resale royalties',
     status: 'beta',
-    ctaLabel: 'Mint Episode',
+    ctaLabel: 'Publish Episode',
     ctaAction: 'nfts',
   },
   {
@@ -48,7 +49,7 @@ const STREAMS: Stream[] = [
     desc: 'Tokenize characters — earn 5% royalty each time they appear in content.',
     potential: '5% appearance royalty',
     status: 'beta',
-    ctaLabel: 'Mint Character',
+    ctaLabel: 'Publish Character',
     ctaAction: 'nfts',
   },
   {
@@ -64,7 +65,7 @@ const STREAMS: Stream[] = [
   {
     id: 'canon',
     icon: '🗳️',
-    label: 'Canon Marketplace',
+    label: 'Canon Shop',
     desc: 'Community votes on storylines. License winning submissions for royalties.',
     potential: 'License fees',
     status: 'live',
@@ -108,6 +109,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function MonetizationOverview() {
   const [showCreditStore, setShowCreditStore] = useState(false);
   const navigate = useNavigate();
+  const v = useVocab();
 
   const handleCta = (action: Stream['ctaAction'], status: Stream['status']) => {
     if (status === 'soon') return;
@@ -133,46 +135,58 @@ export function MonetizationOverview() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        {STREAMS.map((stream) => (
-          <div
-            key={stream.id}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-2 hover:border-zinc-700 transition-colors group"
-          >
-            {/* Top row */}
-            <div className="flex items-start justify-between">
-              <span className="text-2xl">{stream.icon}</span>
-              <span
-                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border tracking-widest ${STATUS_STYLES[stream.status]}`}
-              >
-                {STATUS_LABELS[stream.status]}
-              </span>
-            </div>
-
-            {/* Label + desc */}
-            <div>
-              <div className="text-sm font-bold text-white">{stream.label}</div>
-              <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{stream.desc}</p>
-            </div>
-
-            {/* Potential */}
-            <div className="text-[10px] text-amber-500 font-semibold mt-auto">
-              ◆ {stream.potential}
-            </div>
-
-            {/* CTA */}
-            <button
-              onClick={() => handleCta(stream.ctaAction, stream.status)}
-              disabled={stream.status === 'soon'}
-              className={`w-full mt-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                stream.status === 'soon'
-                  ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                  : 'bg-zinc-800 hover:bg-amber-600 text-zinc-300 hover:text-white group-hover:bg-amber-600/20'
-              }`}
+        {STREAMS.map((stream) => {
+          // Override labels for web3 mode
+          const ctaOverrides: Record<string, string> = {
+            nfts: stream.id === 'nfts' ? `${v('mint')} Episode` : `${v('mint')} Character`,
+            canon: stream.ctaLabel,
+          };
+          const labelOverrides: Record<string, string> = {
+            canon: v('canon-marketplace'),
+          };
+          const ctaLabel = ctaOverrides[stream.ctaAction] ?? stream.ctaLabel;
+          const label = labelOverrides[stream.id] ?? stream.label;
+          return (
+            <div
+              key={stream.id}
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-2 hover:border-zinc-700 transition-colors group"
             >
-              {stream.ctaLabel}
-            </button>
-          </div>
-        ))}
+              {/* Top row */}
+              <div className="flex items-start justify-between">
+                <span className="text-2xl">{stream.icon}</span>
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded border tracking-widest ${STATUS_STYLES[stream.status]}`}
+                >
+                  {STATUS_LABELS[stream.status]}
+                </span>
+              </div>
+
+              {/* Label + desc */}
+              <div>
+                <div className="text-sm font-bold text-white">{label}</div>
+                <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{stream.desc}</p>
+              </div>
+
+              {/* Potential */}
+              <div className="text-[10px] text-amber-500 font-semibold mt-auto">
+                ◆ {stream.potential}
+              </div>
+
+              {/* CTA */}
+              <button
+                onClick={() => handleCta(stream.ctaAction, stream.status)}
+                disabled={stream.status === 'soon'}
+                className={`w-full mt-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  stream.status === 'soon'
+                    ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                    : 'bg-zinc-800 hover:bg-amber-600 text-zinc-300 hover:text-white group-hover:bg-amber-600/20'
+                }`}
+              >
+                {ctaLabel}
+              </button>
+            </div>
+          );
+        })}
 
         {/* Summary card */}
         <div className="bg-gradient-to-br from-amber-950/60 to-zinc-900 border border-amber-800/40 rounded-xl p-4 flex flex-col justify-between">

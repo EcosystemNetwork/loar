@@ -34,6 +34,7 @@ import {
   Zap,
   Gift,
 } from 'lucide-react';
+import { useVocab } from '@/hooks/use-vocab';
 
 interface UniverseAccessSettingsProps {
   universeId: string;
@@ -86,6 +87,7 @@ const DEFAULT_TIERS: Record<string, TierConfig> = {
 
 export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSettingsProps) {
   const queryClient = useQueryClient();
+  const v = useVocab();
   const [accessModel, setAccessModel] = useState<AccessModel>('open');
   const [tokenThreshold, setTokenThreshold] = useState('1'); // % of total supply
   const [tiers, setTiers] = useState<TierConfig[]>([
@@ -178,7 +180,12 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
         icon: Crown,
         desc: 'Paid tiers with benefits',
       },
-      { value: 'token_gate', label: 'Token Gate', icon: Coins, desc: 'Must hold governance token' },
+      {
+        value: 'token_gate',
+        label: v('token-gate'),
+        icon: Coins,
+        desc: `Must hold ${v('governance-token').toLowerCase()}`,
+      },
       { value: 'both', label: 'Sub + Token', icon: Shield, desc: 'Subscribe OR hold tokens' },
     ];
 
@@ -225,7 +232,7 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Coins className="w-4 h-4 text-amber-500" />
-                Token Gate Threshold
+                {v('token-gate-threshold')}
               </CardTitle>
             </CardHeader>
             <CardContent>

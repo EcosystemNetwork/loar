@@ -113,7 +113,9 @@ export const aiPipelinesRouter = router({
     .input(
       z.object({
         pipelineId: z.string(),
-        overrides: z.record(z.string(), z.unknown()).optional(), // override step configs
+        overrides: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -167,12 +169,16 @@ export const aiPipelinesRouter = router({
 
       await pipelineRunsCol().doc(runId).set(run);
 
-      // Apply overrides to step configs
+      // Apply overrides to step configs (filter dangerous keys to prevent prototype pollution)
       let steps = pipeline.steps;
       if (input.overrides) {
+        const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+        const safeOverrides = Object.fromEntries(
+          Object.entries(input.overrides).filter(([k]) => !DANGEROUS_KEYS.has(k))
+        );
         steps = steps.map((s: any) => ({
           ...s,
-          config: { ...s.config, ...input.overrides },
+          config: { ...s.config, ...safeOverrides },
         }));
       }
 

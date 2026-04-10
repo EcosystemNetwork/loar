@@ -51,7 +51,7 @@ if (!jwtSecretRaw || jwtSecretRaw.length < 32) {
 }
 const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
 const JWT_ISSUER = 'loar-server';
-const JWT_EXPIRY = '4h';
+const JWT_EXPIRY = '24h';
 
 /** Allowed SIWE domains. Add production domain when deploying. */
 const ALLOWED_DOMAINS = new Set(
@@ -80,6 +80,25 @@ export async function generateNonce(): Promise<string> {
   }
 
   return nonce;
+}
+
+/** Consume a server-issued nonce (marks as used, throws if invalid/expired/reused). */
+export async function consumeNonce(nonce: string): Promise<void> {
+  const col = getNoncesCol();
+  if (col) {
+    const nonceDoc = await col.doc(nonce).get();
+    if (!nonceDoc.exists) throw new Error('Unknown nonce');
+    const nonceData = nonceDoc.data()!;
+    if (nonceData.used) throw new Error('Nonce already used');
+    if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Nonce expired');
+    await col.doc(nonce).update({ used: true });
+  } else {
+    const nonceData = memoryNonces.get(nonce);
+    if (!nonceData) throw new Error('Unknown nonce');
+    if (nonceData.used) throw new Error('Nonce already used');
+    if (new Date() > nonceData.expiresAt) throw new Error('Nonce expired');
+    memoryNonces.delete(nonce);
+  }
 }
 
 /** Verify a SIWE message signature and consume the nonce. Returns the checksummed address. */

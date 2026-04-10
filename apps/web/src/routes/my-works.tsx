@@ -31,6 +31,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { MintContentDialog } from '@/components/MintContentDialog';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/my-works')({
   component: MyWorksPage,
@@ -275,6 +276,7 @@ function ContentCard({
   deleting: boolean;
   onMint: () => void;
 }) {
+  const v = useVocab();
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
 
   return (
@@ -307,7 +309,7 @@ function ContentCard({
           <button
             onClick={onMint}
             className="p-2 rounded-full bg-amber-600 text-white hover:bg-amber-500 transition-colors"
-            title="Mint as NFT"
+            title={v('mint-as-nft')}
           >
             <Sparkles className="h-4 w-4" />
           </button>
