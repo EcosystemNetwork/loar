@@ -1,6 +1,9 @@
 /**
  * FAL AI router — tRPC procedures for image generation, video generation,
  * character creation, image editing, and Gemini-powered character analysis.
+ *
+ * @deprecated Prefer `generation.*` routes which enforce credit deduction.
+ * These legacy routes now also deduct credits to prevent free generation.
  */
 import { router, publicProcedure, protectedProcedure } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
@@ -9,6 +12,39 @@ import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
 import { db } from '../../lib/firebase';
 import { geminiService } from '../../services/gemini';
+
+// ── Credit costs for FAL routes (mirrors generation.routes.ts) ──────────
+const FAL_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as const;
+
+/** Deduct credits from user balance. Throws if insufficient. */
+async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
+  if (!db) return; // Skip in degraded mode (no Firestore)
+  const userRef = db.collection('userCredits').doc(uid);
+  const userDoc = await userRef.get();
+  const balance = userDoc.data()?.balance || 0;
+
+  if (balance < cost) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+    });
+  }
+
+  await userRef.update({
+    balance: balance - cost,
+    totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
+    updatedAt: new Date(),
+  });
+
+  await db.collection('creditTransactions').add({
+    uid,
+    type: 'spend',
+    generationType,
+    credits: -cost,
+    source: 'fal_legacy',
+    createdAt: new Date(),
+  });
+}
 
 const charactersCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -97,6 +133,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.image, 'image');
       const startTime = Date.now();
       const result = await falService.generateImage(input);
       if (result.status === 'failed') {
@@ -136,6 +173,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.edit, 'image_edit');
       const startTime = Date.now();
       const result = await falService.editImage(input);
       if (result.status === 'failed') {
@@ -187,6 +225,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.edit, 'image_to_image');
       const startTime = Date.now();
       const result = await falService.imageToImage(input);
       if (result.status === 'failed') {
@@ -221,7 +260,8 @@ export const falRouter = router({
         detailedVisualDescription: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.character, 'character');
       const stylePrompts = {
         cute: 'cute kawaii style, adorable, soft colors',
         realistic: 'photorealistic, detailed, cinematic lighting',
@@ -370,7 +410,13 @@ export const falRouter = router({
         videoProvider: z.enum(['fal']).optional().default('fal'),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Character image + video generation
+      await deductCredits(
+        ctx.user.uid,
+        FAL_CREDIT_COSTS.character + FAL_CREDIT_COSTS.video,
+        'character_and_video'
+      );
       const stylePrompts = {
         cute: 'cute kawaii style, adorable, soft colors',
         realistic: 'photorealistic, detailed, cinematic lighting',
@@ -500,6 +546,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video');
       const startTime = Date.now();
       const result = await falService.generateVideo(input);
       if (result.status === 'failed' || result.error) {
@@ -530,6 +577,7 @@ export const falRouter = router({
   quickGenerate: protectedProcedure
     .input(z.object({ prompt: z.string().min(1), imageUrl: z.string().url().optional() }))
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_quick');
       const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
@@ -573,6 +621,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_veo3');
       const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
@@ -617,6 +666,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_kling');
       const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
@@ -662,6 +712,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_wan25');
       const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
@@ -706,6 +757,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_sora');
       const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,

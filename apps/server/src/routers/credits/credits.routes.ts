@@ -771,4 +771,14 @@ export const creditsRouter = router({
         },
       };
     }),
+
+  // ── ETH Price (for frontend conversion) ────────────────────────
+
+  getEthPrice: publicProcedure.query(async () => {
+    const cfg = await getPlatformConfig();
+    // Platform config stores an admin-configurable ETH/USD price.
+    // Falls back to a default that should be updated regularly.
+    const ethUsd = (cfg as any).ethPriceUsd || 3000;
+    return { ethPriceUsd: ethUsd, updatedAt: new Date().toISOString() };
+  }),
 });

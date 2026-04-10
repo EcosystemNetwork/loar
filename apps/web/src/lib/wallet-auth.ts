@@ -53,12 +53,64 @@ function setSession(token: string, address: string) {
   emitChange();
 }
 
-/** Clear the SIWE session from localStorage. */
-export function clearSiweSession() {
+/** Clear the SIWE session from localStorage and optionally revoke server-side. */
+export function clearSiweSession(revoke = false) {
+  const token = localStorage.getItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ADDRESS_KEY);
   emitChange();
+
+  // Fire-and-forget server-side revocation
+  if (revoke && token) {
+    fetch(`${SERVER_URL}/auth/revoke`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {}); // Best-effort
+  }
 }
+
+/** Refresh the session token. Returns true if refreshed, false if expired. */
+export async function refreshSession(): Promise<boolean> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return false;
+
+  try {
+    const res = await fetch(`${SERVER_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem(TOKEN_KEY, data.token);
+      emitChange();
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Proactive session refresh — refresh 30 minutes before expiry.
+// JWT has 4h TTL, so refresh at the 3.5h mark.
+setInterval(
+  async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresIn = payload.exp * 1000 - Date.now();
+      if (expiresIn > 0 && expiresIn < 30 * 60 * 1000) {
+        await refreshSession();
+      }
+    } catch {
+      clearSiweSession();
+    }
+  },
+  5 * 60 * 1000
+);
 
 // ── SIWE message construction ───────────────────────────────────
 
@@ -149,9 +201,9 @@ export function useWalletAuth() {
     }
   }, [address, chain, signMessageAsync]);
 
-  /** Disconnect wallet and clear SIWE session. */
+  /** Disconnect wallet, revoke JWT server-side, and clear SIWE session. */
   const signOut = useCallback(() => {
-    clearSiweSession();
+    clearSiweSession(true); // revoke = true
     disconnect();
   }, [disconnect]);
 
@@ -165,6 +217,13 @@ export function useWalletAuth() {
       clearSiweSession();
     }
   }, [isConnected, address, token]);
+
+  // Auto-trigger SIWE sign-in when wallet connects without an existing session
+  useEffect(() => {
+    if (isConnected && address && chain && !token && !isAuthenticating) {
+      signIn();
+    }
+  }, [isConnected, address, chain, token, isAuthenticating, signIn]);
 
   return {
     address,

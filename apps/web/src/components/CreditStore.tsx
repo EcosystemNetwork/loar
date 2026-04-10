@@ -3,15 +3,15 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  useAccount,
-  useSendTransaction,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from 'wagmi';
+import { useAccount, useSendTransaction, useWriteContract } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
+
+const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
+const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
 
 // $LOAR token contract address (update after deployment)
 const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
@@ -65,6 +65,171 @@ interface CreditPackage {
   popular: boolean;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Stripe checkout form — rendered inside <Elements> provider        */
+/* ------------------------------------------------------------------ */
+function StripeCheckoutForm({
+  packageId,
+  paymentIntentId,
+  onSuccess,
+  onCancel,
+}: {
+  packageId: string;
+  paymentIntentId: string;
+  onSuccess: (paymentIntentId: string) => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsSubmitting(true);
+    setErrorMsg(null);
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: 'if_required',
+    });
+
+    if (error) {
+      setErrorMsg(error.message ?? 'Payment failed');
+      setIsSubmitting(false);
+    } else {
+      onSuccess(paymentIntentId);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement
+        options={{
+          layout: 'tabs',
+        }}
+      />
+      {errorMsg && <p className="text-xs text-red-400">{errorMsg}</p>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={!stripe || isSubmitting}
+          className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+        >
+          {isSubmitting ? 'Processing...' : 'Pay'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card payment section — handles intent creation + Elements mount   */
+/* ------------------------------------------------------------------ */
+function CardPaymentSection({
+  pkg,
+  onSuccess,
+}: {
+  pkg: CreditPackage;
+  onSuccess: (paymentIntentId: string) => void;
+}) {
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const startCardPayment = async () => {
+    setIsCreating(true);
+    try {
+      const { available } = await trpcClient.stripe.isAvailable.query();
+      if (!available) {
+        toast.info('Card payments are not yet configured. Please use ETH or $LOAR.');
+        setIsCreating(false);
+        return;
+      }
+
+      if (!stripePromise) {
+        toast.error(
+          'Stripe is not configured. Add VITE_STRIPE_PUBLISHABLE_KEY to your environment.'
+        );
+        setIsCreating(false);
+        return;
+      }
+
+      const amountCents = Math.round(pkg.fiatPriceUsd * 100);
+      const result = await trpcClient.stripe.createPaymentIntent.mutate({
+        packageId: pkg.id,
+        amountCents,
+      });
+
+      setClientSecret(result.clientSecret);
+      setPaymentIntentId(result.paymentIntentId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to start card payment');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // If we have a clientSecret, show the Stripe Elements form
+  if (clientSecret && paymentIntentId && stripePromise) {
+    return (
+      <Elements
+        stripe={stripePromise}
+        options={{
+          clientSecret,
+          appearance: {
+            theme: 'night',
+            variables: {
+              colorPrimary: '#3b82f6',
+              colorBackground: '#18181b',
+              colorText: '#e4e4e7',
+              colorDanger: '#ef4444',
+              borderRadius: '8px',
+            },
+          },
+        }}
+      >
+        <StripeCheckoutForm
+          packageId={pkg.id}
+          paymentIntentId={paymentIntentId}
+          onSuccess={onSuccess}
+          onCancel={() => {
+            setClientSecret(null);
+            setPaymentIntentId(null);
+          }}
+        />
+      </Elements>
+    );
+  }
+
+  // Otherwise show the "Pay with Card" button
+  return (
+    <button
+      disabled={isCreating}
+      onClick={startCardPayment}
+      className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+    >
+      {isCreating ? 'Setting up...' : 'Pay with Card'}
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main CreditStore component                                        */
+/* ------------------------------------------------------------------ */
 export function CreditStore({ onClose }: { onClose?: () => void }) {
   const [paymentTab, setPaymentTab] = useState<PaymentTab>('loar');
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
@@ -73,6 +238,13 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   const { isConnected } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
+
+  const { data: ethPriceData } = useQuery({
+    queryKey: ['ethPrice'],
+    queryFn: () => trpcClient.credits.getEthPrice.query(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const ethPriceUsd = ethPriceData?.ethPriceUsd ?? 3000;
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['creditPackages'],
@@ -118,6 +290,17 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   });
 
   const pkgs = (packages || []) as CreditPackage[];
+
+  const handleCardSuccess = async (paymentIntentId: string) => {
+    const pkg = pkgs.find((p) => p.id === selectedPkg);
+    if (!pkg) return;
+    toast.info('Payment confirmed! Issuing credits...');
+    await purchaseFiatMutation.mutateAsync({
+      packageId: pkg.id,
+      paymentMethod: 'card' as const,
+      paymentRef: paymentIntentId,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -256,7 +439,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       {/* Purchase Button */}
       {selectedPkg && (
         <div className="pt-2">
-          {!isConnected ? (
+          {!isConnected && paymentTab !== 'card' ? (
             <p className="text-center text-sm text-zinc-400 py-3">
               Connect your wallet to purchase credits
             </p>
@@ -294,54 +477,11 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
               {isPaying ? 'Processing...' : 'Pay with $LOAR'}
             </button>
           ) : paymentTab === 'card' ? (
-            <button
-              disabled={isPaying}
-              onClick={async () => {
-                const pkg = pkgs.find((p) => p.id === selectedPkg);
-                if (!pkg) return;
-                setIsPaying(true);
-                try {
-                  // Check if Stripe is available
-                  const { available } = await trpcClient.stripe.isAvailable.query();
-                  if (!available) {
-                    toast.info('Card payments are not yet configured. Please use ETH or $LOAR.');
-                    setIsPaying(false);
-                    return;
-                  }
-
-                  // Create payment intent
-                  const amountCents = Math.round(pkg.fiatPriceUsd * 100);
-                  const { clientSecret, paymentIntentId } =
-                    await trpcClient.stripe.createPaymentIntent.mutate({
-                      packageId: pkg.id,
-                      amountCents,
-                    });
-
-                  // For full integration, you'd load Stripe.js and use Elements here.
-                  // For now, copy the payment intent ID for manual confirmation.
-                  toast.success(`Payment intent created: ${paymentIntentId}`, {
-                    description: 'Complete payment in the Stripe checkout window.',
-                    duration: 10000,
-                  });
-
-                  // After payment succeeds, record the credit purchase
-                  await purchaseFiatMutation.mutateAsync({
-                    packageId: pkg.id,
-                    paymentMethod: 'card' as const,
-                    paymentRef: paymentIntentId,
-                  });
-                } catch (err) {
-                  if (err instanceof Error && !err.message.includes('rejected')) {
-                    toast.error('Card payment failed: ' + err.message);
-                  }
-                } finally {
-                  setIsPaying(false);
-                }
-              }}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
-            >
-              {isPaying ? 'Processing...' : 'Pay with Card'}
-            </button>
+            (() => {
+              const pkg = pkgs.find((p) => p.id === selectedPkg);
+              if (!pkg) return null;
+              return <CardPaymentSection key={pkg.id} pkg={pkg} onSuccess={handleCardSuccess} />;
+            })()
           ) : (
             <button
               disabled={isPaying}
@@ -350,7 +490,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                 if (!pkg) return;
                 setIsPaying(true);
                 try {
-                  const ethPrice = pkg.fiatPriceUsd / 3000;
+                  const ethPrice = pkg.fiatPriceUsd / ethPriceUsd;
                   const ethAmount = parseEther(ethPrice.toFixed(18));
                   toast.info('Confirm ETH transfer in your wallet...');
                   const txHash = await sendTransactionAsync({

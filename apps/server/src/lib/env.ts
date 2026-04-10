@@ -51,6 +51,7 @@ const envSchema = z.object({
 
   // ── Stripe (optional — enables card payments) ────────────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
   // ── Platform config ───────────────────────────────────────────────────────
   UNIVERSE_MINT_CREDITS: z
