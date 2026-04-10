@@ -99,8 +99,7 @@ async function verifyEthPayment(
   // Enforce minimum payment amount when a price is configured
   if (expectedWei && expectedWei !== '0') {
     const expected = BigInt(expectedWei);
-    // Allow up to 1% underpayment to tolerate gas estimation variance
-    const minRequired = (expected * 99n) / 100n;
+    const minRequired = expected;
     if (tx.value < minRequired) {
       throw new Error(
         `Insufficient ETH transferred. Expected ~${expectedWei} wei, got ${tx.value.toString()} wei.`
@@ -242,13 +241,18 @@ function buildPackage(
   fiatMargin = FIAT_MARGIN,
   loarMargin = LOAR_MARGIN,
   loarBonusFraction = 0.1,
-  baseCreditCostUsd = BASE_CREDIT_COST_USD
+  baseCreditCostUsd = BASE_CREDIT_COST_USD,
+  ethPriceUsd = 3000
 ): CreditPackage {
   const baseCostUsd = credits * baseCreditCostUsd;
   const fiatPriceUsd = Math.round(baseCostUsd * fiatMargin * 100) / 100;
   const loarPriceUsd = Math.round(baseCostUsd * loarMargin * 100) / 100;
   const loarTokenAmount = Math.ceil(loarPriceUsd / LOAR_TO_USD);
   const loarBonusCredits = Math.floor(credits * loarBonusFraction);
+
+  // Compute expected ETH wei from the fiat price and ETH/USD rate
+  const ethPriceWei =
+    ethPriceUsd > 0 ? parseUnits((fiatPriceUsd / ethPriceUsd).toFixed(18), 18).toString() : '0';
 
   return {
     id,
@@ -258,7 +262,7 @@ function buildPackage(
     fiatPriceUsd,
     loarPriceUsd,
     loarTokenAmount,
-    ethPriceWei: '0',
+    ethPriceWei,
     popular,
     active: true,
     loarBonusCredits,
@@ -271,7 +275,7 @@ export const DEFAULT_PACKAGES: CreditPackage[] = PACKAGE_DEFINITIONS.map((p) =>
 );
 
 /** Build packages with live margins from platformConfig */
-async function buildPackagesFromConfig(): Promise<CreditPackage[]> {
+export async function buildPackagesFromConfig(): Promise<CreditPackage[]> {
   const cfg = await getPlatformConfig();
   return PACKAGE_DEFINITIONS.map((p) =>
     buildPackage(
@@ -283,7 +287,8 @@ async function buildPackagesFromConfig(): Promise<CreditPackage[]> {
       cfg.fiatMargin,
       cfg.loarMargin,
       cfg.loarCreditBonusFraction,
-      cfg.baseCreditCostUsd
+      cfg.baseCreditCostUsd,
+      cfg.ethPriceUsd
     )
   );
 }
@@ -367,70 +372,68 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+      // Use live pricing so ETH amounts reflect current ETH/USD rate
+      const livePackages = await buildPackagesFromConfig();
+      const pkg = livePackages.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
 
       if (input.paymentMethod === 'eth' || input.paymentMethod === 'crypto') {
         // Verify on-chain: tx exists, confirmed, sent to treasury, correct amount
+        if (!pkg.ethPriceWei || pkg.ethPriceWei === '0') {
+          throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
+        }
         await verifyEthPayment(input.paymentRef, undefined, pkg.ethPriceWei);
       } else {
         // card: Verify Stripe PaymentIntent succeeded with correct package and amount
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
         await verifyStripePayment(input.paymentRef, input.packageId, expectedCents);
-
-        // Deduplicate: reject if this PaymentIntent was already used
-        const existing = await db
-          .collection('creditTransactions')
-          .where('paymentRef', '==', input.paymentRef)
-          .limit(1)
-          .get();
-        if (!existing.empty) {
-          throw new Error('This payment reference has already been used');
-        }
+        // Dedup is enforced atomically inside the transaction below
       }
 
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
-      // Update user balance
-      const userRef = creditsCol().doc(ctx.user.uid);
-      const userDoc = await userRef.get();
+      // Atomic: dedup + balance update + tx record in one Firestore transaction
+      const txDocId = `fiat-${input.paymentRef}`;
+      await db.runTransaction(async (tx) => {
+        const dedupRef = creditTxCol().doc(txDocId);
+        const dedupDoc = await tx.get(dedupRef);
+        if (dedupDoc.exists) {
+          throw new Error('This payment reference has already been used');
+        }
 
-      const updateData: Record<string, any> = {
-        balance: (userDoc.data()?.balance || 0) + totalCredits,
-        totalPurchased: (userDoc.data()?.totalPurchased || 0) + pkg.credits,
-        totalBonusReceived: (userDoc.data()?.totalBonusReceived || 0) + pkg.bonusCredits,
-        totalFiatPurchases: (userDoc.data()?.totalFiatPurchases || 0) + 1,
-        updatedAt: new Date(),
-      };
+        const userRef = creditsCol().doc(ctx.user.uid);
+        const userDoc = await tx.get(userRef);
+        const prev = userDoc.data() ?? {};
 
-      if (userDoc.exists) {
-        await userRef.update(updateData);
-      } else {
-        await userRef.set({
+        const updated: Record<string, any> = {
           uid: ctx.user.uid,
-          ...updateData,
-          totalSpent: 0,
-          totalLoarPurchases: 0,
+          balance: (prev.balance || 0) + totalCredits,
+          totalPurchased: (prev.totalPurchased || 0) + pkg.credits,
+          totalBonusReceived: (prev.totalBonusReceived || 0) + pkg.bonusCredits,
+          totalFiatPurchases: (prev.totalFiatPurchases || 0) + 1,
+          totalSpent: prev.totalSpent || 0,
+          totalLoarPurchases: prev.totalLoarPurchases || 0,
+          updatedAt: new Date(),
+          ...(!userDoc.exists && { createdAt: new Date() }),
+        };
+
+        tx.set(userRef, updated, { merge: true });
+        tx.set(dedupRef, {
+          id: txDocId,
+          uid: ctx.user.uid,
+          type: 'purchase',
+          paymentMethod: input.paymentMethod,
+          packageId: input.packageId,
+          packageName: pkg.name,
+          credits: pkg.credits,
+          bonusCredits: pkg.bonusCredits,
+          totalCredits,
+          pricePaidUsd: pkg.fiatPriceUsd,
+          marginPercent: 35,
+          paymentRef: input.paymentRef,
+          amountPaid: input.amountPaid || null,
           createdAt: new Date(),
         });
-      }
-
-      // Record transaction
-      await creditTxCol().add({
-        id: randomUUID(),
-        uid: ctx.user.uid,
-        type: 'purchase',
-        paymentMethod: input.paymentMethod,
-        packageId: input.packageId,
-        packageName: pkg.name,
-        credits: pkg.credits,
-        bonusCredits: pkg.bonusCredits,
-        totalCredits,
-        pricePaidUsd: pkg.fiatPriceUsd,
-        marginPercent: 35,
-        paymentRef: input.paymentRef,
-        amountPaid: input.amountPaid || null,
-        createdAt: new Date(),
       });
 
       return {
@@ -455,7 +458,8 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+      const livePackages = await buildPackagesFromConfig();
+      const pkg = livePackages.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
 
       // Verify the on-chain transfer before issuing any credits
@@ -464,48 +468,53 @@ export const creditsRouter = router({
 
       // $LOAR buyers get: base credits + package bonus + 10% LOAR bonus
       const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;
-
-      // Update user balance
-      const userRef = creditsCol().doc(ctx.user.uid);
-      const userDoc = await userRef.get();
-
       const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
-      const updateData: Record<string, any> = {
-        balance: (userDoc.data()?.balance || 0) + totalCredits,
-        totalPurchased: (userDoc.data()?.totalPurchased || 0) + pkg.credits,
-        totalBonusReceived: (userDoc.data()?.totalBonusReceived || 0) + totalBonus,
-        totalLoarPurchases: (userDoc.data()?.totalLoarPurchases || 0) + 1,
-        updatedAt: new Date(),
-      };
 
-      if (userDoc.exists) {
-        await userRef.update(updateData);
-      } else {
-        await userRef.set({
+      // Atomic: dedup + balance update + tx record
+      const txDocId = `loar-${input.txHash}`;
+      await db.runTransaction(async (tx) => {
+        const dedupRef = creditTxCol().doc(txDocId);
+        const dedupDoc = await tx.get(dedupRef);
+        if (dedupDoc.exists) {
+          throw new Error('This transaction has already been used to purchase credits');
+        }
+
+        const userRef = creditsCol().doc(ctx.user.uid);
+        const userDoc = await tx.get(userRef);
+        const prev = userDoc.data() ?? {};
+
+        tx.set(
+          userRef,
+          {
+            uid: ctx.user.uid,
+            balance: (prev.balance || 0) + totalCredits,
+            totalPurchased: (prev.totalPurchased || 0) + pkg.credits,
+            totalBonusReceived: (prev.totalBonusReceived || 0) + totalBonus,
+            totalLoarPurchases: (prev.totalLoarPurchases || 0) + 1,
+            totalSpent: prev.totalSpent || 0,
+            totalFiatPurchases: prev.totalFiatPurchases || 0,
+            updatedAt: new Date(),
+            ...(!userDoc.exists && { createdAt: new Date() }),
+          },
+          { merge: true }
+        );
+
+        tx.set(dedupRef, {
+          id: txDocId,
           uid: ctx.user.uid,
-          ...updateData,
-          totalSpent: 0,
-          totalFiatPurchases: 0,
+          type: 'purchase',
+          paymentMethod: 'loar',
+          packageId: input.packageId,
+          packageName: pkg.name,
+          credits: pkg.credits,
+          bonusCredits: totalBonus,
+          totalCredits,
+          pricePaidUsd: pkg.loarPriceUsd,
+          loarTokensPaid: input.loarAmount,
+          marginPercent: 25,
+          txHash: input.txHash,
           createdAt: new Date(),
         });
-      }
-
-      // Record transaction
-      await creditTxCol().add({
-        id: randomUUID(),
-        uid: ctx.user.uid,
-        type: 'purchase',
-        paymentMethod: 'loar',
-        packageId: input.packageId,
-        packageName: pkg.name,
-        credits: pkg.credits,
-        bonusCredits: totalBonus,
-        totalCredits,
-        pricePaidUsd: pkg.loarPriceUsd,
-        loarTokensPaid: input.loarAmount,
-        marginPercent: 25,
-        txHash: input.txHash,
-        createdAt: new Date(),
       });
 
       return {
@@ -565,103 +574,122 @@ export const creditsRouter = router({
           throw new Error('You are not an active team member of this universe');
         }
 
-        // Enforce monthly allowance for non-admins
-        if (!isAdmin && membership!.monthlyAllowance > 0) {
-          const periodStart = membership!.allowancePeriodStart?.toDate?.() ?? new Date(0);
-          const now = new Date();
-          const sameMonth =
-            periodStart.getFullYear() === now.getFullYear() &&
-            periodStart.getMonth() === now.getMonth();
-          const usedThisMonth = sameMonth ? membership!.creditsUsedThisMonth || 0 : 0;
+        // Atomic: allowance check + pool deduction + tx record
+        const remainingBalance = await db.runTransaction(async (tx) => {
+          const poolRef = db.collection('universeCredits').doc(universeId);
+          const poolDoc = await tx.get(poolRef);
+          const poolBalance = (poolDoc.data()?.balance as number) || 0;
+          const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
-          if (usedThisMonth + cost > membership!.monthlyAllowance) {
+          if (poolBalance < cost) {
             throw new Error(
-              `Monthly credit allowance exceeded. Allowance: ${membership!.monthlyAllowance}, used: ${usedThisMonth}, need: ${cost}`
+              `Universe credit pool is too low. Need ${cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`
             );
           }
 
-          await db
-            .collection('universeTeamMembers')
-            .doc(`${universeId}-${callerUid}`)
-            .update({
+          // Enforce monthly allowance for non-admins (inside transaction)
+          if (!isAdmin && membership!.monthlyAllowance > 0) {
+            const memberDocId = `${universeId}-${callerUid}`;
+            const memberRef = db.collection('universeTeamMembers').doc(memberDocId);
+            const memberSnap = await tx.get(memberRef);
+            const memberData = memberSnap.data()!;
+            const periodStart = memberData.allowancePeriodStart?.toDate?.() ?? new Date(0);
+            const now = new Date();
+            const sameMonth =
+              periodStart.getFullYear() === now.getFullYear() &&
+              periodStart.getMonth() === now.getMonth();
+            const usedThisMonth = sameMonth ? memberData.creditsUsedThisMonth || 0 : 0;
+
+            if (usedThisMonth + cost > memberData.monthlyAllowance) {
+              throw new Error(
+                `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, need: ${cost}`
+              );
+            }
+
+            tx.update(memberRef, {
               creditsUsedThisMonth: usedThisMonth + cost,
-              allowancePeriodStart: sameMonth ? membership!.allowancePeriodStart : now,
+              allowancePeriodStart: sameMonth ? memberData.allowancePeriodStart : now,
               updatedAt: now,
             });
-        }
+          }
 
-        // Deduct from the universe pool
-        const poolRef = db.collection('universeCredits').doc(universeId);
-        const poolDoc = await poolRef.get();
-        const poolBalance = (poolDoc.data()?.balance as number) || 0;
-        const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
-
-        if (poolBalance < cost) {
-          throw new Error(
-            `Universe credit pool is too low. Need ${cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`
+          tx.set(
+            poolRef,
+            {
+              balance: poolBalance - cost,
+              totalSpent: poolSpent + cost,
+              updatedAt: new Date(),
+            },
+            { merge: true }
           );
-        }
 
-        await poolRef.set(
-          { balance: poolBalance - cost, totalSpent: poolSpent + cost, updatedAt: new Date() },
-          { merge: true }
-        );
+          const spendRef = db.collection('universeCreditTransactions').doc();
+          tx.set(spendRef, {
+            universeId,
+            type: 'spend',
+            spentByUid: callerUid,
+            generationType: input.generationType,
+            credits: -cost,
+            generationId: input.generationId ?? null,
+            modelId: input.modelId ?? null,
+            metadata: input.metadata ?? null,
+            createdAt: new Date(),
+          });
 
-        await db.collection('universeCreditTransactions').add({
-          universeId,
-          type: 'spend',
-          spentByUid: callerUid,
-          generationType: input.generationType,
-          credits: -cost,
-          generationId: input.generationId ?? null,
-          modelId: input.modelId ?? null,
-          metadata: input.metadata ?? null,
-          createdAt: new Date(),
+          return poolBalance - cost;
         });
 
         return {
           ok: true,
           creditsSpent: cost,
-          remainingBalance: poolBalance - cost,
+          remainingBalance,
           source: 'universe_pool',
         };
       }
 
       // ── Personal balance path (default) ──────────────────────────
-      const userRef = creditsCol().doc(ctx.user.uid);
-      const userDoc = await userRef.get();
+      const remainingBalance = await db.runTransaction(async (tx) => {
+        const userRef = creditsCol().doc(ctx.user.uid);
+        const userDoc = await tx.get(userRef);
 
-      if (!userDoc.exists) throw new Error('No credits available. Purchase credits first.');
-      const data = userDoc.data()!;
-      if ((data.balance || 0) < cost) {
-        throw new Error(
-          `Insufficient credits. Need ${cost}, have ${data.balance || 0}. Purchase more credits to continue.`
+        if (!userDoc.exists) throw new Error('No credits available. Purchase credits first.');
+        const data = userDoc.data()!;
+        const balance = data.balance || 0;
+        if (balance < cost) {
+          throw new Error(
+            `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`
+          );
+        }
+
+        tx.update(userRef, {
+          balance: balance - cost,
+          totalSpent: (data.totalSpent || 0) + cost,
+          updatedAt: new Date(),
+        });
+
+        // Use a deterministic ID to prevent duplicate spend records
+        const spendDocRef = creditTxCol().doc(
+          `spend-${ctx.user.uid}-${Date.now()}-${randomUUID().slice(0, 8)}`
         );
-      }
+        tx.set(spendDocRef, {
+          uid: ctx.user.uid,
+          type: 'spend',
+          generationType: input.generationType,
+          credits: -cost,
+          universeId: input.universeId || null,
+          generationId: input.generationId || null,
+          modelId: input.modelId || null,
+          metadata: input.metadata || null,
+          createdAt: new Date(),
+        });
 
-      await userRef.update({
-        balance: data.balance - cost,
-        totalSpent: (data.totalSpent || 0) + cost,
-        updatedAt: new Date(),
-      });
-
-      // Record transaction
-      await creditTxCol().add({
-        uid: ctx.user.uid,
-        type: 'spend',
-        generationType: input.generationType,
-        credits: -cost,
-        universeId: input.universeId || null,
-        generationId: input.generationId || null,
-        modelId: input.modelId || null,
-        metadata: input.metadata || null,
-        createdAt: new Date(),
+        return balance - cost;
       });
 
       return {
         ok: true,
         creditsSpent: cost,
-        remainingBalance: data.balance - cost,
+        remainingBalance,
         source: 'personal',
       };
     }),
@@ -776,9 +804,6 @@ export const creditsRouter = router({
 
   getEthPrice: publicProcedure.query(async () => {
     const cfg = await getPlatformConfig();
-    // Platform config stores an admin-configurable ETH/USD price.
-    // Falls back to a default that should be updated regularly.
-    const ethUsd = (cfg as any).ethPriceUsd || 3000;
-    return { ethPriceUsd: ethUsd, updatedAt: new Date().toISOString() };
+    return { ethPriceUsd: cfg.ethPriceUsd, updatedAt: new Date().toISOString() };
   }),
 });

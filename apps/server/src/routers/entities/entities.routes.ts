@@ -42,7 +42,9 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z.record(z.string(), z.unknown()).optional(),
+        metadata: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .optional(),
         monetized: z.boolean().default(false),
         rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
       })
@@ -140,7 +142,7 @@ export const entitiesRouter = router({
       return { children, total: children.length };
     }),
 
-  /** Update an existing entity. */
+  /** Update an existing entity. Only the creator can update. */
   update: protectedProcedure
     .input(
       z.object({
@@ -152,12 +154,19 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z.record(z.string(), z.unknown()).optional(),
+        metadata: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .optional(),
         monetized: z.boolean().optional(),
         rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can update it');
+      }
       const { entityId, universeAddress: _unused, ...updates } = input;
       const entity = await updateEntity(entityId, {
         ...updates,
@@ -167,7 +176,7 @@ export const entitiesRouter = router({
       return { success: true, data: entity };
     }),
 
-  /** Delete an entity. Fails if it has children. */
+  /** Delete an entity. Only the creator can delete. Fails if it has children. */
   delete: protectedProcedure
     .input(
       z.object({
@@ -176,7 +185,12 @@ export const entitiesRouter = router({
         universeAddress: ethereumAddress.optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can delete it');
+      }
       await deleteEntity(input.entityId);
       return { success: true };
     }),

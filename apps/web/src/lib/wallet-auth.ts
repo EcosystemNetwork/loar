@@ -92,8 +92,8 @@ export async function refreshSession(): Promise<boolean> {
   }
 }
 
-// Proactive session refresh — refresh 30 minutes before expiry.
-// JWT has 4h TTL, so refresh at the 3.5h mark.
+// Proactive session refresh — refresh 1 hour before expiry.
+// JWT has 24h TTL, so refresh at the 23h mark.
 setInterval(
   async () => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -102,7 +102,7 @@ setInterval(
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const expiresIn = payload.exp * 1000 - Date.now();
-      if (expiresIn > 0 && expiresIn < 30 * 60 * 1000) {
+      if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
         await refreshSession();
       }
     } catch {
@@ -111,6 +111,30 @@ setInterval(
   },
   5 * 60 * 1000
 );
+
+// Refresh token when user returns to a backgrounded tab.
+// setInterval doesn't fire reliably in inactive tabs, so this
+// catches expired-or-nearly-expired tokens on tab focus.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresIn = payload.exp * 1000 - Date.now();
+      if (expiresIn <= 0) {
+        clearSiweSession();
+      } else if (expiresIn < 60 * 60 * 1000) {
+        const ok = await refreshSession();
+        if (!ok) clearSiweSession();
+      }
+    } catch {
+      clearSiweSession();
+    }
+  });
+}
 
 // ── SIWE message construction ───────────────────────────────────
 

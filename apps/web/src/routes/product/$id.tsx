@@ -27,6 +27,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useWriteContract, useSendTransaction } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { BuyNFTDialog } from '@/components/BuyNFTDialog';
+import { useVocab } from '@/hooks/use-vocab';
 
 const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -60,6 +61,7 @@ function ProductDetailPage() {
   const { id } = useParams({ from: '/product/$id' });
   const navigate = useNavigate();
   const { isConnected } = useWalletAuth();
+  const v = useVocab();
   const { data: listing, isLoading } = useListing(id);
   const [buying, setBuying] = useState(false);
   const [showNftBuy, setShowNftBuy] = useState(false);
@@ -278,7 +280,7 @@ function ProductDetailPage() {
           ) : !isConnected ? (
             <Link to="/login">
               <Button className="w-full" size="lg">
-                Connect Wallet to Buy
+                {v('connect-wallet-to-buy')}
               </Button>
             </Link>
           ) : (

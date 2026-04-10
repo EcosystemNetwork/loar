@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title PaymentRouter
 /// @notice Centralizes all ETH revenue routing across the LOAR platform.
@@ -17,6 +18,8 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 ///         Replaces the scattered platform.call + creator.call patterns in each
 ///         revenue contract, giving a single place to adjust fees and routing.
 contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
+
     address public treasury;
     uint16 public defaultPlatformFeeBps;
 
@@ -161,13 +164,13 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         uint256 creatorCut = amount - platformCut;
 
         // Pull $LOAR from caller
-        loarToken.transferFrom(msg.sender, address(this), amount);
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
 
         if (creatorCut > 0) {
             claimableLoar[creator] += creatorCut;
         }
         if (platformCut > 0) {
-            loarToken.transfer(treasury, platformCut);
+            loarToken.safeTransfer(treasury, platformCut);
         }
 
         emit LoarPaymentRouted(creator, creatorCut, platformCut, bps);
@@ -177,8 +180,8 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     function routeLoarToTreasury(uint256 amount) external nonReentrant {
         if (amount == 0) return;
         if (address(loarToken) == address(0)) revert ZeroAddress();
-        loarToken.transferFrom(msg.sender, address(this), amount);
-        loarToken.transfer(treasury, amount);
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
+        loarToken.safeTransfer(treasury, amount);
     }
 
     /// @notice Creator pulls accumulated $LOAR earnings
@@ -186,7 +189,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         uint256 amount = claimableLoar[msg.sender];
         if (amount == 0) revert NothingToClaim();
         claimableLoar[msg.sender] = 0;
-        loarToken.transfer(msg.sender, amount);
+        loarToken.safeTransfer(msg.sender, amount);
         emit LoarClaimed(msg.sender, amount);
     }
 

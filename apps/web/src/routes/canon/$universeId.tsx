@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { useCanonSubmissions, useSubmitCanon, useVoteCanon, useCanon } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useVocab } from '@/hooks/use-vocab';
 import { useUniverseAddresses } from '@/hooks/useUniverseAddresses';
 import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { useState } from 'react';
@@ -58,6 +59,7 @@ const SUBMISSION_TYPES = [
 function CanonPage() {
   const { universeId } = useParams({ from: '/canon/$universeId' });
   const { isConnected, address } = useWalletAuth();
+  const v = useVocab();
   const { tokenAddress } = useUniverseAddresses(universeId);
 
   const { data: voting, isLoading: loadingVoting } = useCanonSubmissions(universeId, 'VOTING');
@@ -74,7 +76,7 @@ function CanonPage() {
             </Button>
           </Link>
           <Gavel className="w-4 h-4 text-primary" />
-          <span className="font-semibold">Canon Marketplace</span>
+          <span className="font-semibold">{v('canon-marketplace')}</span>
         </div>
 
         <div className="max-w-2xl mx-auto px-4 pt-4">
@@ -151,9 +153,9 @@ function CanonPage() {
             <TabsContent value="submit">
               {!isConnected ? (
                 <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">Connect your wallet to submit</p>
+                  <p className="text-muted-foreground mb-4">{v('connect-wallet')} to submit</p>
                   <Link to="/login">
-                    <Button variant="outline">Connect Wallet</Button>
+                    <Button variant="outline">{v('connect-wallet')}</Button>
                   </Link>
                 </div>
               ) : (

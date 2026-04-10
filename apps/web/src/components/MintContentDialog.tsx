@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, keccak256, toBytes } from 'viem';
 import { useMintContent, useRecordMint } from '@/hooks/useRevenue';
+import { useVocab } from '@/hooks/use-vocab';
 import { toast } from 'sonner';
 import { Loader2, Sparkles, X, CheckCircle2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,7 @@ export function MintContentDialog({
   onSuccess,
 }: MintContentDialogProps) {
   const { address, isConnected } = useAccount();
+  const v = useVocab();
   const mint = useMintContent();
   const recordMint = useRecordMint();
   const { writeContractAsync, data: txHash } = useWriteContract();
@@ -134,7 +136,7 @@ export function MintContentDialog({
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6 text-center">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">NFT Listed!</h2>
+          <h2 className="text-xl font-bold text-white mb-2">{v('nft-listed')}</h2>
           <p className="text-sm text-zinc-400 mb-1">
             {contentTitle || 'Content'} is now available for {price} ETH
           </p>
@@ -157,7 +159,7 @@ export function MintContentDialog({
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-400" />
-            <h2 className="text-xl font-bold text-white">Mint as NFT</h2>
+            <h2 className="text-xl font-bold text-white">{v('mint-as-nft')}</h2>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-white" aria-label="Close">
             <X className="w-5 h-5" />
@@ -168,7 +170,7 @@ export function MintContentDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-zinc-300">Mint Price (ETH)</Label>
+            <Label className="text-zinc-300">{v('mint')} Price (ETH)</Label>
             <Input
               type="number"
               step="0.001"
@@ -197,7 +199,9 @@ export function MintContentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-zinc-300">Royalty ({parseInt(royaltyBps) / 100 || 0}%)</Label>
+            <Label className="text-zinc-300">
+              {v('royalty')} ({parseInt(royaltyBps) / 100 || 0}%)
+            </Label>
             <Input
               type="number"
               min="0"
@@ -240,7 +244,7 @@ export function MintContentDialog({
             ) : (
               <Sparkles className="w-4 h-4 mr-2" />
             )}
-            {step !== 'form' ? 'Minting...' : 'Mint NFT'}
+            {step !== 'form' ? v('minting') : v('mint-nft')}
           </Button>
         </div>
 

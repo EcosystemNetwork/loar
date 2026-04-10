@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { useWriteContract, useSendTransaction } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
+import { useVocab } from '@/hooks/use-vocab';
 
 const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -49,6 +50,7 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: '/checkout' });
   const { isConnected, address } = useWalletAuth();
+  const v = useVocab();
   const [processing, setProcessing] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
@@ -236,7 +238,7 @@ function CheckoutPage() {
               <div className="text-center py-2">
                 <p className="text-sm text-muted-foreground mb-3">No wallet connected</p>
                 <Button variant="outline" size="sm" onClick={() => navigate({ to: '/login' })}>
-                  Connect Wallet
+                  {v('connect-wallet')}
                 </Button>
               </div>
             )}

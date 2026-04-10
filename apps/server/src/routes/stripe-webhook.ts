@@ -56,18 +56,6 @@ stripeWebhookRoutes.post('/webhook', async (c) => {
     }
 
     try {
-      // Dedup: check if credits were already issued for this PaymentIntent
-      const existing = await db
-        .collection('creditTransactions')
-        .where('paymentRef', '==', intent.id)
-        .limit(1)
-        .get();
-
-      if (!existing.empty) {
-        // Credits already issued (frontend completed first) — skip
-        return c.json({ received: true, alreadyProcessed: true });
-      }
-
       const pkg = DEFAULT_PACKAGES.find((p) => p.id === packageId);
       if (!pkg) {
         console.error(`[Stripe Webhook] Unknown package: ${packageId}`);
@@ -76,47 +64,59 @@ stripeWebhookRoutes.post('/webhook', async (c) => {
 
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
-      // Issue credits
-      const userRef = db.collection('userCredits').doc(userId);
-      const userDoc = await userRef.get();
+      // Atomic: dedup + balance update + tx record in one Firestore transaction
+      const txDocId = `fiat-${intent.id}`;
+      let alreadyProcessed = false;
+      await db.runTransaction(async (tx) => {
+        const dedupRef = db.collection('creditTransactions').doc(txDocId);
+        const dedupDoc = await tx.get(dedupRef);
+        if (dedupDoc.exists) {
+          alreadyProcessed = true;
+          return;
+        }
 
-      const updateData: Record<string, any> = {
-        balance: (userDoc.data()?.balance || 0) + totalCredits,
-        totalPurchased: (userDoc.data()?.totalPurchased || 0) + pkg.credits,
-        totalBonusReceived: (userDoc.data()?.totalBonusReceived || 0) + pkg.bonusCredits,
-        totalFiatPurchases: (userDoc.data()?.totalFiatPurchases || 0) + 1,
-        updatedAt: new Date(),
-      };
+        const userRef = db.collection('userCredits').doc(userId);
+        const userDoc = await tx.get(userRef);
+        const prev = userDoc.data() ?? {};
 
-      if (userDoc.exists) {
-        await userRef.update(updateData);
-      } else {
-        await userRef.set({
+        tx.set(
+          userRef,
+          {
+            uid: userId,
+            balance: (prev.balance || 0) + totalCredits,
+            totalPurchased: (prev.totalPurchased || 0) + pkg.credits,
+            totalBonusReceived: (prev.totalBonusReceived || 0) + pkg.bonusCredits,
+            totalFiatPurchases: (prev.totalFiatPurchases || 0) + 1,
+            totalSpent: prev.totalSpent || 0,
+            totalLoarPurchases: prev.totalLoarPurchases || 0,
+            updatedAt: new Date(),
+            ...(!userDoc.exists && { createdAt: new Date() }),
+          },
+          { merge: true }
+        );
+
+        tx.set(dedupRef, {
+          id: txDocId,
           uid: userId,
-          ...updateData,
-          totalSpent: 0,
-          totalLoarPurchases: 0,
+          type: 'purchase',
+          paymentMethod: 'card',
+          packageId,
+          packageName: pkg.name,
+          credits: pkg.credits,
+          bonusCredits: pkg.bonusCredits,
+          totalCredits,
+          pricePaidUsd: pkg.fiatPriceUsd,
+          marginPercent: 35,
+          paymentRef: intent.id,
+          amountPaid: intent.amount,
+          source: 'stripe_webhook',
           createdAt: new Date(),
         });
-      }
-
-      // Record transaction
-      await db.collection('creditTransactions').add({
-        uid: userId,
-        type: 'purchase',
-        paymentMethod: 'card',
-        packageId,
-        packageName: pkg.name,
-        credits: pkg.credits,
-        bonusCredits: pkg.bonusCredits,
-        totalCredits,
-        pricePaidUsd: pkg.fiatPriceUsd,
-        marginPercent: 35,
-        paymentRef: intent.id,
-        amountPaid: intent.amount,
-        source: 'stripe_webhook',
-        createdAt: new Date(),
       });
+
+      if (alreadyProcessed) {
+        return c.json({ received: true, alreadyProcessed: true });
+      }
 
       console.log(`[Stripe Webhook] Issued ${totalCredits} credits to ${userId} for ${packageId}`);
     } catch (err) {

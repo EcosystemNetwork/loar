@@ -33,6 +33,7 @@ import { useAdBids, usePlaceBid, useAcceptBid } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
+import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/ads/$slotId')({
   component: SlotDetailPage,
@@ -72,6 +73,7 @@ export function SlotDetailPage() {
   const search = Route.useSearch() as SlotSearch;
   const navigate = useNavigate();
   const { address, isConnected } = useWalletAuth();
+  const v = useVocab();
 
   const { data: bids, isLoading: bidsLoading } = useAdBids(slotId);
   const placeBid = usePlaceBid();
@@ -305,7 +307,7 @@ export function SlotDetailPage() {
                 onClick={() => setShowBidForm(true)}
                 disabled={!isConnected}
               >
-                {isConnected ? 'Place a Bid' : 'Connect Wallet to Bid'}
+                {isConnected ? 'Place a Bid' : v('connect-wallet-to-bid')}
               </Button>
             ) : (
               <Card>

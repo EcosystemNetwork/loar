@@ -26,11 +26,47 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   });
 });
 
-/** Admin addresses — loaded from ADMIN_ADDRESSES env var (comma-separated) */
-const ADMIN_ADDRESSES = (process.env.ADMIN_ADDRESSES ?? '')
-  .split(',')
-  .map((a) => a.trim().toLowerCase())
-  .filter(Boolean);
+/**
+ * Admin addresses — consolidated from ADMIN_ADDRESSES (comma-separated list)
+ * with fallback to legacy ADMIN_WALLET (single address).
+ * Validated at load time: invalid addresses are rejected with a warning.
+ */
+const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const ADMIN_ADDRESSES: string[] = (() => {
+  const raw = [
+    ...(process.env.ADMIN_ADDRESSES ?? '').split(','),
+    ...(process.env.ADMIN_WALLET ? [process.env.ADMIN_WALLET] : []),
+  ]
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  // Deduplicate
+  const unique = [...new Set(raw)];
+  // Validate each address
+  for (const addr of unique) {
+    if (!ETH_ADDRESS_RE.test(addr)) {
+      console.warn(`[trpc] Invalid admin address ignored: ${addr}`);
+    }
+  }
+  return unique.filter((a) => ETH_ADDRESS_RE.test(a));
+})();
+
+/**
+ * Enforce API key permissions. JWT users bypass (full access).
+ * Use in routes: `protectedProcedure.use(requirePermission('entities.update'))`.
+ */
+export function requirePermission(permission: string) {
+  return t.middleware(({ ctx, next }) => {
+    const perms = (ctx as any).user?.apiKeyPermissions;
+    // JWT users have no apiKeyPermissions → full access
+    if (perms && perms.length > 0 && !perms.includes(permission)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: `API key lacks required permission: ${permission}`,
+      });
+    }
+    return next({ ctx });
+  });
+}
 
 /** Protected procedure that also requires admin role */
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -38,11 +74,10 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (!address) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access requires a wallet address' });
   }
-  // Require ADMIN_ADDRESSES to be configured — reject all if not set
   if (ADMIN_ADDRESSES.length === 0) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Admin access not configured. Set ADMIN_ADDRESSES env var.',
+      message: 'Admin access not configured. Set ADMIN_ADDRESSES or ADMIN_WALLET env var.',
     });
   }
   if (!ADMIN_ADDRESSES.includes(address)) {
