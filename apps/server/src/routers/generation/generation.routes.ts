@@ -47,7 +47,7 @@ const generateInputSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
   imageUrl: z.string().url().optional(),
   mode: generationModeSchema,
-  durationSec: z.number().min(1).max(12).default(5),
+  durationSec: z.number().min(1).max(20).default(5),
   resolution: z.string().default('720p'),
   aspectRatio: z.string().default('16:9'),
   audio: z.boolean().default(false),

@@ -107,7 +107,7 @@ contract DeployRevenueScript is Script {
         // 9. CollabManager (UUPS) — initialize(platform, paymentRouter, feeBps)
         CollabManager cl = CollabManager(address(new ERC1967Proxy(
             address(new CollabManager()),
-            abi.encodeCall(CollabManager.initialize, (d, address(pr), FEE))
+            abi.encodeCall(CollabManager.initialize, (d, address(pr), address(0), FEE))
         )));
         console.log("CollabManager:", address(cl));
 

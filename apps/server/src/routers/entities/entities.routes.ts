@@ -22,7 +22,9 @@ import {
   deleteEntity,
   addNodeToEntity,
   removeNodeFromEntity,
+  assertMintEligible,
 } from './entities.handlers';
+import { geminiService } from '../../services/gemini';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
 
@@ -41,6 +43,8 @@ export const entitiesRouter = router({
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
         metadata: z.record(z.string(), z.unknown()).optional(),
+        monetized: z.boolean().default(false),
+        rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -57,6 +61,8 @@ export const entitiesRouter = router({
           nodeIds: input.nodeIds,
           imageUrl: input.imageUrl ?? null,
           metadata: input.metadata,
+          monetized: input.monetized,
+          rightsDeclaration: input.rightsDeclaration ?? null,
         },
         ctx.user.address
       );
@@ -147,6 +153,8 @@ export const entitiesRouter = router({
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
         metadata: z.record(z.string(), z.unknown()).optional(),
+        monetized: z.boolean().optional(),
+        rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
       })
     )
     .mutation(async ({ input }) => {
@@ -201,6 +209,37 @@ export const entitiesRouter = router({
     .mutation(async ({ input }) => {
       const entity = await removeNodeFromEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
+    }),
+  /** Check if an entity is eligible for NFT minting (monetized + rights declared). */
+  mintEligibility: publicProcedure
+    .input(z.object({ entityId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const entity = await getEntity(input.entityId);
+      if (!entity) throw new Error('Entity not found');
+      return {
+        eligible: entity.monetized && !!entity.rightsDeclaration,
+        monetized: entity.monetized,
+        rightsDeclaration: entity.rightsDeclaration,
+        reason: !entity.monetized
+          ? 'Entity is not marked as monetized'
+          : !entity.rightsDeclaration
+            ? 'No rights declaration on file'
+            : null,
+      };
+    }),
+
+  /** Generate an AI profile (description + metadata) for a new or existing entity. */
+  generateProfile: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        kind: entityKindSchema,
+        hint: z.string().max(1000).default(''),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const profile = await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
+      return profile;
     }),
 });
 

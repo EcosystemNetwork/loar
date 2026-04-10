@@ -2,7 +2,22 @@ import * as fal from '@fal-ai/serverless-client';
 
 export interface FalImageGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/nano-banana' | 'fal-ai/flux/dev' | 'fal-ai/flux-pro' | 'fal-ai/flux/schnell';
+  model?:
+    | 'fal-ai/nano-banana'
+    | 'fal-ai/nano-banana-2'
+    | 'fal-ai/nano-banana-pro'
+    | 'fal-ai/flux/schnell'
+    | 'fal-ai/flux/dev'
+    | 'fal-ai/flux-pro'
+    | 'fal-ai/flux-pro/v1.1'
+    | 'fal-ai/flux-2-pro'
+    | 'fal-ai/flux-pro/kontext'
+    | 'fal-ai/recraft/v4/pro/text-to-image'
+    | 'fal-ai/ideogram/v3/generate'
+    | 'fal-ai/bytedance/seedream/v5/lite/edit'
+    | 'fal-ai/gpt-image-1.5/edit'
+    | 'fal-ai/wan/v2.7/text-to-image'
+    | 'fal-ai/qwen-image';
   negativePrompt?: string;
   imageSize?:
     | 'square_hd'
@@ -63,15 +78,34 @@ export interface FalVideoGenerationOptions {
     | 'fal-ai/cogvideox-5b'
     | 'fal-ai/runway-gen3'
     | 'fal-ai/veo3.1/fast'
+    | 'fal-ai/veo3.1'
+    | 'fal-ai/veo3.1/lite'
     | 'fal-ai/sora-2/text-to-video'
+    | 'fal-ai/sora-2/text-to-video/pro'
     | 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video'
     | 'fal-ai/wan-25-preview/text-to-video'
+    | 'fal-ai/wan/v2.7/text-to-video'
+    | 'fal-ai/pixverse/v6/text-to-video'
     // Image-to-Video models
     | 'fal-ai/veo3.1/fast/image-to-video'
+    | 'fal-ai/veo3.1/image-to-video'
+    | 'fal-ai/veo3.1/lite/image-to-video'
     | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
+    | 'fal-ai/kling-video/v3/pro/image-to-video'
     | 'fal-ai/wan-25-preview/image-to-video'
-    | 'fal-ai/sora-2/image-to-video';
+    | 'fal-ai/wan/v2.7/image-to-video'
+    | 'fal-ai/sora-2/image-to-video'
+    | 'fal-ai/sora-2/image-to-video/pro'
+    | 'fal-ai/pixverse/v6/image-to-video'
+    // Seedance 2.0 models
+    | 'bytedance/seedance-2.0/text-to-video'
+    | 'bytedance/seedance-2.0/image-to-video'
+    | 'bytedance/seedance-2.0/fast/text-to-video'
+    | 'bytedance/seedance-2.0/fast/image-to-video'
+    | 'bytedance/seedance-2.0/reference-to-video'
+    | 'bytedance/seedance-2.0/fast/reference-to-video';
   imageUrl?: string;
+  endImageUrl?: string;
   duration?: number;
   fps?: number;
   width?: number;
@@ -82,9 +116,10 @@ export interface FalVideoGenerationOptions {
   motionStrength?: number;
   negativePrompt?: string;
   cfgScale?: number;
-  resolution?: '720p' | '1080p' | 'auto';
+  resolution?: '480p' | '720p' | '1080p' | 'auto';
   enablePromptExpansion?: boolean;
-  generateAudio?: boolean; // New: for veo3 audio generation
+  generateAudio?: boolean;
+  seed?: number;
 }
 
 export interface FalVideoGenerationResult {
@@ -113,8 +148,6 @@ export class FalService {
 
   async generateImage(options: FalImageGenerationOptions): Promise<FalImageGenerationResult> {
     this.ensureConfigured();
-    console.log('🎨 === FAL IMAGE GENERATION ===');
-    console.log('Options:', JSON.stringify(options, null, 2));
 
     try {
       const model = options.model || 'fal-ai/nano-banana';
@@ -129,16 +162,10 @@ export class FalService {
       if (options.enableSafetyChecker !== undefined)
         input.enable_safety_checker = options.enableSafetyChecker;
 
-      console.log(`🚀 Calling FAL API: ${model}`);
-      console.log('Input:', JSON.stringify(input, null, 2));
-
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => console.log('📊 FAL Queue Update:', update),
       });
-
-      console.log('📥 Raw FAL Response:', JSON.stringify(result, null, 2));
 
       // Parse the response
       let data: any;
@@ -180,8 +207,6 @@ export class FalService {
 
   async editImage(options: FalImageEditOptions): Promise<FalImageGenerationResult> {
     this.ensureConfigured();
-    console.log('✏️ === FAL IMAGE EDITING ===');
-    console.log('Options:', JSON.stringify(options, null, 2));
 
     try {
       const model = 'fal-ai/nano-banana/edit';
@@ -196,7 +221,6 @@ export class FalService {
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => console.log('📊 FAL Edit Queue Update:', update),
       });
 
       let responseData: any;
@@ -237,8 +261,6 @@ export class FalService {
 
   async imageToImage(options: FalImageToImageOptions): Promise<FalImageGenerationResult> {
     this.ensureConfigured();
-    console.log('🖼️ === FAL IMAGE TO IMAGE (Nano Banana Edit) ===');
-    console.log('Options:', JSON.stringify(options, null, 2));
 
     try {
       const model = 'fal-ai/nano-banana/edit';
@@ -264,12 +286,10 @@ export class FalService {
       };
 
       // Validate and process image URLs
-      console.log('Processing image URLs:', options.imageUrls);
       const validImageUrls: string[] = [];
 
       for (const url of options.imageUrls) {
         if (!url || typeof url !== 'string' || url.trim() === '') {
-          console.warn('Skipping empty URL');
           continue;
         }
 
@@ -277,7 +297,6 @@ export class FalService {
 
         // Check if it's a data URI (base64)
         if (trimmedUrl.startsWith('data:')) {
-          console.log('✅ Data URI detected');
           validImageUrls.push(trimmedUrl);
           continue;
         }
@@ -285,11 +304,8 @@ export class FalService {
         // Check if it's a valid URL
         try {
           new URL(trimmedUrl);
-          console.log('✅ Valid URL:', trimmedUrl.substring(0, 80) + '...');
           validImageUrls.push(trimmedUrl);
-        } catch (urlError) {
-          console.warn('⚠️ Invalid URL format, skipping');
-        }
+        } catch (urlError) {}
       }
 
       if (validImageUrls.length === 0) {
@@ -311,19 +327,15 @@ export class FalService {
         input.aspect_ratio = aspectRatio;
       }
 
-      console.log('📤 Sending to Nano Banana Edit with input:', JSON.stringify(input, null, 2));
-
       const result = await fal.subscribe(model, {
         input,
         logs: true,
         onQueueUpdate: (update) => {
           if (update.status === 'IN_PROGRESS') {
-            update.logs.map((log) => log.message).forEach(console.log);
+            // queue progress
           }
         },
       });
-
-      console.log('📥 Raw Nano Banana Edit Response:', JSON.stringify(result, null, 2));
 
       // Parse response using same strategy as generateImage (which works!)
       let data: any;
@@ -354,11 +366,6 @@ export class FalService {
         throw new Error(`No image URLs found. Response keys: ${Object.keys(data).join(', ')}`);
       }
 
-      console.log('✅ Successfully extracted image:', images[0].url.substring(0, 80) + '...');
-      if (data.description) {
-        console.log('📝 AI Description:', data.description);
-      }
-
       return {
         id: (result as any).requestId || Date.now().toString(),
         status: 'completed',
@@ -384,70 +391,54 @@ export class FalService {
 
       if (model === 'fal-ai/veo3.1/fast') {
         // Text-to-video model (no image required)
-        console.log('🔧 Building Veo3.1 text-to-video input...');
 
         // Veo3.1 only supports 8s duration
         input.duration = '8s';
-        console.log('Using duration: 8s (Veo3.1 requirement)');
 
         // Aspect ratio
         if (options.aspectRatio && options.aspectRatio !== 'auto') {
           input.aspect_ratio = options.aspectRatio;
-          console.log(`Using aspect ratio: ${options.aspectRatio}`);
         }
 
         // Resolution
         if (options.resolution) {
           input.resolution = options.resolution;
-          console.log(`Using resolution: ${options.resolution}`);
         }
 
         // Generate audio (optional)
         if (options.generateAudio === true) {
           input.generate_audio = true;
-          console.log('Audio generation enabled');
         }
-
-        console.log('✅ Veo3.1 text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else if (model === 'fal-ai/veo3.1/fast/image-to-video') {
         // Image-to-video model (image required)
         if (!options.imageUrl)
           throw new Error('Image URL is required for Veo3.1 image-to-video model');
 
-        console.log('🔧 Building Veo3.1 image-to-video input...');
-
         input.image_url = options.imageUrl;
 
         // Veo3.1 only supports 8s duration
         input.duration = '8s';
-        console.log('Using duration: 8s (Veo3.1 requirement)');
 
         // If aspect_ratio is provided and NOT "auto", use it
         // Otherwise let Veo3.1 auto-detect from image
         if (options.aspectRatio && options.aspectRatio !== 'auto') {
           input.aspect_ratio = options.aspectRatio;
-          console.log(`Using aspect ratio: ${options.aspectRatio}`);
         } else {
           // For veo3.1, omit aspect_ratio to let it auto-detect
           // or explicitly set to "auto"
           input.aspect_ratio = 'auto';
-          console.log('Using auto aspect ratio');
         }
 
         // Resolution for veo3.1 - defaults to 720p
         // Only include if specified
         if (options.resolution) {
           input.resolution = options.resolution;
-          console.log(`Using resolution: ${options.resolution}`);
         }
 
         // Generate audio (optional) - only include if explicitly set
         if (options.generateAudio === true) {
           input.generate_audio = true;
-          console.log('Audio generation enabled');
         }
-
-        console.log('✅ Veo3.1 image-to-video input prepared:', JSON.stringify(input, null, 2));
       } else if (model === 'fal-ai/wan-25-preview/image-to-video') {
         if (!options.imageUrl)
           throw new Error('Image URL is required for wan25 image-to-video model');
@@ -484,7 +475,6 @@ export class FalService {
         // Sora can generate audio naturally from prompts if needed
       } else if (model === 'fal-ai/sora-2/text-to-video') {
         // Sora 2 text-to-video (no image required)
-        console.log('🔧 Building Sora 2 text-to-video input...');
 
         // Duration: 4, 8, or 12 seconds (as number)
         const validDurations = [4, 8, 12];
@@ -499,25 +489,147 @@ export class FalService {
 
         // Resolution: Only "720p" supported
         input.resolution = '720p';
-
-        console.log('✅ Sora 2 text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video') {
         // Kling text-to-video (no image required)
-        console.log('🔧 Building Kling text-to-video input...');
         input.duration = String(options.duration || 5); // 5 or 10 seconds
         input.aspect_ratio = options.aspectRatio || '16:9';
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
         if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
-        console.log('✅ Kling text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else if (model === 'fal-ai/wan-25-preview/text-to-video') {
         // Wan 2.5 text-to-video (no image required)
-        console.log('🔧 Building Wan 2.5 text-to-video input...');
         input.duration = String(options.duration || 5); // 5 or 10 seconds
         input.resolution = options.resolution || '1080p';
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
         if (options.enablePromptExpansion !== undefined)
           input.enable_prompt_expansion = options.enablePromptExpansion;
-        console.log('✅ Wan 2.5 text-to-video input prepared:', JSON.stringify(input, null, 2));
+      } else if (
+        model === 'bytedance/seedance-2.0/text-to-video' ||
+        model === 'bytedance/seedance-2.0/fast/text-to-video'
+      ) {
+        // Seedance 2.0 text-to-video
+        input.duration = String(options.duration || 'auto');
+        input.resolution = options.resolution === '1080p' ? '720p' : options.resolution || '720p';
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+          input.aspect_ratio = options.aspectRatio;
+        }
+        input.generate_audio = options.generateAudio ?? true;
+        if (options.seed) input.seed = options.seed;
+      } else if (
+        model === 'bytedance/seedance-2.0/image-to-video' ||
+        model === 'bytedance/seedance-2.0/fast/image-to-video'
+      ) {
+        // Seedance 2.0 image-to-video
+        if (!options.imageUrl)
+          throw new Error('Image URL is required for Seedance 2.0 image-to-video');
+        input.image_url = options.imageUrl;
+        if (options.endImageUrl) input.end_image_url = options.endImageUrl;
+        input.duration = String(options.duration || 'auto');
+        input.resolution = options.resolution === '1080p' ? '720p' : options.resolution || '720p';
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+          input.aspect_ratio = options.aspectRatio;
+        }
+        input.generate_audio = options.generateAudio ?? true;
+        if (options.seed) input.seed = options.seed;
+      } else if (
+        model === 'bytedance/seedance-2.0/reference-to-video' ||
+        model === 'bytedance/seedance-2.0/fast/reference-to-video'
+      ) {
+        // Seedance 2.0 reference-to-video (character-consistent)
+        if (!options.imageUrl)
+          throw new Error('Image URL is required for Seedance 2.0 reference-to-video');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 'auto');
+        input.resolution = options.resolution === '1080p' ? '720p' : options.resolution || '720p';
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+          input.aspect_ratio = options.aspectRatio;
+        }
+        input.generate_audio = options.generateAudio ?? true;
+        if (options.seed) input.seed = options.seed;
+      } else if (model === 'fal-ai/veo3.1' || model === 'fal-ai/veo3.1/lite') {
+        // Veo 3.1 standard/lite text-to-video (same API as fast)
+        input.duration = '8s';
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+          input.aspect_ratio = options.aspectRatio;
+        }
+        if (options.resolution) input.resolution = options.resolution;
+        if (options.generateAudio === true) input.generate_audio = true;
+      } else if (
+        model === 'fal-ai/veo3.1/image-to-video' ||
+        model === 'fal-ai/veo3.1/lite/image-to-video'
+      ) {
+        // Veo 3.1 standard/lite image-to-video
+        if (!options.imageUrl) throw new Error('Image URL is required for Veo 3.1 image-to-video');
+        input.image_url = options.imageUrl;
+        input.duration = '8s';
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+          input.aspect_ratio = options.aspectRatio;
+        } else {
+          input.aspect_ratio = 'auto';
+        }
+        if (options.resolution) input.resolution = options.resolution;
+        if (options.generateAudio === true) input.generate_audio = true;
+      } else if (model === 'fal-ai/sora-2/text-to-video/pro') {
+        // Sora 2 Pro text-to-video
+        const validDurations = [4, 8, 12];
+        input.duration = validDurations.includes(options.duration || 0) ? options.duration : 4;
+        if (options.aspectRatio === '9:16' || options.aspectRatio === '16:9') {
+          input.aspect_ratio = options.aspectRatio;
+        } else {
+          input.aspect_ratio = '16:9';
+        }
+        input.resolution = '720p';
+      } else if (model === 'fal-ai/sora-2/image-to-video/pro') {
+        // Sora 2 Pro image-to-video
+        if (!options.imageUrl)
+          throw new Error('Image URL is required for Sora 2 Pro image-to-video');
+        input.image_url = options.imageUrl;
+        input.duration = options.duration || 4;
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+          input.aspect_ratio = options.aspectRatio;
+        } else {
+          input.aspect_ratio = 'auto';
+        }
+        if (options.resolution && options.resolution !== 'auto') {
+          input.resolution = options.resolution;
+        } else {
+          input.resolution = 'auto';
+        }
+      } else if (model === 'fal-ai/kling-video/v3/pro/image-to-video') {
+        // Kling 3.0 Pro image-to-video
+        if (!options.imageUrl) throw new Error('Image URL is required for Kling 3.0 Pro');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 5);
+        input.aspect_ratio = options.aspectRatio || '16:9';
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
+      } else if (model === 'fal-ai/pixverse/v6/text-to-video') {
+        // PixVerse V6 text-to-video
+        input.duration = options.duration || 4;
+        if (options.aspectRatio) input.aspect_ratio = options.aspectRatio;
+        if (options.resolution) input.resolution = options.resolution;
+      } else if (model === 'fal-ai/pixverse/v6/image-to-video') {
+        // PixVerse V6 image-to-video
+        if (!options.imageUrl) throw new Error('Image URL is required for PixVerse V6 i2v');
+        input.image_url = options.imageUrl;
+        input.duration = options.duration || 4;
+        if (options.aspectRatio) input.aspect_ratio = options.aspectRatio;
+        if (options.resolution) input.resolution = options.resolution;
+      } else if (model === 'fal-ai/wan/v2.7/text-to-video') {
+        // WAN 2.7 text-to-video
+        input.duration = String(options.duration || 5);
+        input.resolution = options.resolution || '1080p';
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.enablePromptExpansion !== undefined)
+          input.enable_prompt_expansion = options.enablePromptExpansion;
+      } else if (model === 'fal-ai/wan/v2.7/image-to-video') {
+        // WAN 2.7 image-to-video
+        if (!options.imageUrl) throw new Error('Image URL is required for WAN 2.7 i2v');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 5);
+        input.resolution = options.resolution || '1080p';
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.enablePromptExpansion !== undefined)
+          input.enable_prompt_expansion = options.enablePromptExpansion;
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;
@@ -528,18 +640,14 @@ export class FalService {
         if (options.imageUrl) input.image_url = options.imageUrl;
       }
 
-      console.log(`🎬 Calling FAL API: ${model}`);
-      console.log('📤 Final input:', JSON.stringify(input, null, 2));
-
       let result;
       try {
         result = await fal.subscribe(model, {
           input,
           logs: true,
           onQueueUpdate: (update) => {
-            console.log('📊 Status:', update.status);
             if (update.status === 'IN_PROGRESS' && update.logs) {
-              update.logs.map((log: any) => log.message).forEach(console.log);
+              // queue progress
             }
           },
         });
@@ -605,16 +713,9 @@ export class FalService {
         throw enhancedError;
       }
 
-      console.log('📥 Video generation completed!');
-
       // Parse response - FAL returns result.data
       const resultAny = result as any;
       const data = resultAny.data || resultAny;
-
-      console.log('Response structure:', {
-        hasData: !!resultAny.data,
-        dataKeys: Object.keys(data).join(', '),
-      });
 
       // Try different possible video URL locations
       let videoUrl: string | undefined;
@@ -634,8 +735,6 @@ export class FalService {
         console.error('Available data:', JSON.stringify(data, null, 2));
         throw new Error(`No video URL found. Response keys: ${Object.keys(data).join(', ')}`);
       }
-
-      console.log('✅ Video generated:', videoUrl.substring(0, 100) + '...');
 
       return {
         id: resultAny.requestId || Date.now().toString(),

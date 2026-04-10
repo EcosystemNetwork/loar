@@ -21,9 +21,13 @@ setInterval(
   5 * 60 * 1000
 );
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.SIWE_JWT_SECRET || 'dev-secret-change-in-production'
-);
+const jwtSecretRaw = process.env.SIWE_JWT_SECRET;
+if (!jwtSecretRaw || jwtSecretRaw.length < 32) {
+  throw new Error(
+    'SIWE_JWT_SECRET must be set and at least 32 characters. Generate one with: openssl rand -hex 32'
+  );
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
 const JWT_ISSUER = 'loar-server';
 const JWT_EXPIRY = '4h';
 

@@ -27,10 +27,8 @@ import { trpcClient } from '@/utils/trpc';
 import { useWriteContract, useSendTransaction } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 
-const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
-const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
+const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
+const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
 const ERC20_ABI = [
   {
@@ -103,6 +101,10 @@ function ProductDetailPage() {
       // For ETH listings, send ETH on-chain to seller before recording the order
       if (l.currency === 'ETH' && l.price !== '0') {
         const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+        if (!recipient) {
+          toast.error('No payment recipient configured');
+          return;
+        }
         toast.info('Confirm ETH payment in your wallet…');
         txHash = await sendTransactionAsync({
           to: recipient,
@@ -113,7 +115,15 @@ function ProductDetailPage() {
 
       // For $LOAR listings, transfer tokens on-chain before recording the order
       if (l.currency === 'LOAR' && l.price !== '0') {
+        if (!LOAR_TOKEN_ADDRESS) {
+          toast.error('$LOAR token address not configured');
+          return;
+        }
         const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+        if (!recipient) {
+          toast.error('No payment recipient configured');
+          return;
+        }
         const loarAmount = parseUnits(l.price as string, 18);
         toast.info('Confirm $LOAR transfer in your wallet…');
         txHash = await writeContractAsync({

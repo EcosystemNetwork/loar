@@ -136,8 +136,8 @@ export function useUniverseManager() {
  */
 export function useDefaultDeploymentConfig() {
   return {
-    defaultHook: '0xc3afc04510600b9b69d5cbbe404b6713f3f7a8cc' as `0x${string}`, // LoarHookStaticFee
-    defaultLocker: '0x7a8c6162bd525a1011852f3540d3dcfdd776335a' as `0x${string}`, // LoarLpLockerMultiple
+    defaultHook: '0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC' as `0x${string}`, // LoarHookStaticFee (Sepolia)
+    defaultLocker: '0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6' as `0x${string}`, // LoarLpLockerMultiple (Sepolia)
     defaultPairedToken: '0x0000000000000000000000000000000000000000' as `0x${string}`, // ETH or WETH
     defaultTickSpacing: 60,
     defaultTickIfToken0IsLoar: -887220, // Example starting tick
