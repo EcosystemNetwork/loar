@@ -49,6 +49,7 @@ export async function createUniverse(input: CreateUniverseInput) {
       hasPrivateSection: true,
       isMultiSig: false,
       multiSigAddress: null,
+      accessModel: 'open', // open | subscription | token_gate | both
       created_at: new Date(),
       updated_at: new Date(),
     };

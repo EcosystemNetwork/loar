@@ -39,7 +39,9 @@ import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { getExplorerAddressUrl } from '@/configs/chains';
 import { TokenSwapWidget } from '@/components/TokenSwapWidget';
 import { SubscribeDialog } from '@/components/SubscribeDialog';
-import { Crown } from 'lucide-react';
+import { UniverseAccessSettings } from '@/components/UniverseAccessSettings';
+import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
+import { Crown, Settings } from 'lucide-react';
 
 interface UniverseSidebarProps {
   finalUniverse: any;
@@ -70,6 +72,10 @@ export function UniverseSidebar({
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
+  const [showAccessSettings, setShowAccessSettings] = useState(false);
+  const { isAdmin } = useIsUniverseAdmin(
+    finalUniverse?.address?.startsWith('0x') ? (finalUniverse.address as `0x${string}`) : undefined
+  );
 
   // Close mobile sidebar on escape key
   useEffect(() => {
@@ -352,6 +358,19 @@ export function UniverseSidebar({
                 </Button>
               )}
 
+              {/* Access Settings button — admin only */}
+              {isBlockchainUniverse && isAdmin && (
+                <Button
+                  onClick={() => setShowAccessSettings(true)}
+                  variant="outline"
+                  className="w-full border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group h-9"
+                  size="sm"
+                >
+                  <Settings className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-500" />
+                  Access Settings
+                </Button>
+              )}
+
               {/* Gallery button */}
               <Link to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gallery`}>
                 <Button
@@ -456,6 +475,13 @@ export function UniverseSidebar({
           universeId={finalUniverse?.address || ''}
           universeName={finalUniverse?.name || finalUniverse?.universeName || ''}
           onClose={() => setShowSubscribe(false)}
+        />
+      )}
+
+      {showAccessSettings && (
+        <UniverseAccessSettings
+          universeId={finalUniverse?.address || ''}
+          onClose={() => setShowAccessSettings(false)}
         />
       )}
     </>

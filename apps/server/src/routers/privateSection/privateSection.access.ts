@@ -80,39 +80,60 @@ export async function resolveAccessLevel(
     }
   }
 
-  // 3. Check token holdings against configured threshold
-  const address = userAddress?.toLowerCase();
-  if (address) {
-    const tokenAddress = universeData?.tokenAddress;
-    if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
-      try {
-        const configDoc = await configCol().doc(id).get();
-        const config = configDoc.data();
-        const minPercentage = config?.holderMinPercentage ?? 1;
+  // Determine access model — universe owner can set: open | subscription | token_gate | both
+  const accessModel = (universeData?.accessModel as string) || 'open';
 
-        const client = getChainClient();
+  // Open access — everyone gets holder-level access
+  if (accessModel === 'open') return 'holders';
 
-        const [balance, totalSupply] = await Promise.all([
-          client.readContract({
-            address: tokenAddress as `0x${string}`,
-            abi: erc20Abi,
-            functionName: 'balanceOf',
-            args: [address as `0x${string}`],
-          }),
-          client.readContract({
-            address: tokenAddress as `0x${string}`,
-            abi: erc20Abi,
-            functionName: 'totalSupply',
-          }),
-        ]);
+  // 3. Check subscription (when model is subscription or both)
+  if (accessModel === 'subscription' || accessModel === 'both') {
+    try {
+      const subDoc = await db.collection('subscriptions').doc(`${uid}-${id}`).get();
+      if (subDoc.exists) {
+        const subData = subDoc.data()!;
+        const expiresAt = subData.expiresAt?.toDate?.() || new Date(0);
+        if (expiresAt > new Date()) return 'holders';
+      }
+    } catch (err) {
+      console.error('[resolveAccessLevel] Subscription check failed:', err);
+    }
+  }
 
-        if (totalSupply > 0n) {
-          const ownershipPct = Number((balance * 10000n) / totalSupply) / 100;
-          if (ownershipPct >= minPercentage) return 'holders';
+  // 4. Check token holdings against configured threshold (when model is token_gate or both)
+  if (accessModel === 'token_gate' || accessModel === 'both') {
+    const address = userAddress?.toLowerCase();
+    if (address) {
+      const tokenAddress = universeData?.tokenAddress;
+      if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
+        try {
+          const configDoc = await configCol().doc(id).get();
+          const config = configDoc.data();
+          const minPercentage = config?.holderMinPercentage ?? 1;
+
+          const client = getChainClient();
+
+          const [balance, totalSupply] = await Promise.all([
+            client.readContract({
+              address: tokenAddress as `0x${string}`,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [address as `0x${string}`],
+            }),
+            client.readContract({
+              address: tokenAddress as `0x${string}`,
+              abi: erc20Abi,
+              functionName: 'totalSupply',
+            }),
+          ]);
+
+          if (totalSupply > 0n) {
+            const ownershipPct = Number((balance * 10000n) / totalSupply) / 100;
+            if (ownershipPct >= minPercentage) return 'holders';
+          }
+        } catch (err) {
+          console.error('[resolveAccessLevel] Token balance check failed:', err);
         }
-      } catch (err) {
-        console.error('[resolveAccessLevel] Token balance check failed:', err);
-        // Fall through to 'none' — don't grant access on RPC failure
       }
     }
   }
