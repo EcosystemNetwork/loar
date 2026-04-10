@@ -39,6 +39,7 @@ contract Universe is IUniverse {
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
+    mapping(address user => bool) public vaultWhitelisted;
 
     NodeCreationOptions private nodeCreationOption;
     NodeVisibilityOptions private nodeVisibilityOption;
@@ -71,10 +72,20 @@ contract Universe is IUniverse {
 
     function setWhitelisted(address user, bool status) public onlyAdmin {
         isWhitelisted[user] = status;
+        emit WhitelistedUpdated(user, status);
     }
 
     function getWhitelisted(address user) public view returns (bool) {
         return isWhitelisted[user];
+    }
+
+    function setVaultWhitelisted(address user, bool status) public onlyAdmin {
+        vaultWhitelisted[user] = status;
+        emit VaultWhitelistUpdated(user, status);
+    }
+
+    function getVaultWhitelisted(address user) public view returns (bool) {
+        return vaultWhitelisted[user];
     }
 
     /// @notice Create a new narrative node. Hashes are stored on-chain; full strings emitted in event only.
@@ -93,6 +104,7 @@ contract Universe is IUniverse {
         if (nodeCreationOption == NodeCreationOptions.WHITELISTED) {
             require(isWhitelisted[msg.sender], "Not whitelisted");
         }
+        require(_previous == 0 || nodes[_previous].id != 0, "Previous node does not exist");
         // Token-gated creation: if visibility is HOLDERS, require token balance
         if (nodeVisibilityOption == NodeVisibilityOptions.HOLDERS && associatedToken != address(0)) {
             require(
@@ -191,12 +203,14 @@ contract Universe is IUniverse {
         NodeVisibilityOptions _option
     ) public onlyAdmin {
         nodeVisibilityOption = _option;
+        emit NodeVisibilityOptionUpdated(_option);
     }
 
     function setNodeCreationOption(
         NodeCreationOptions _option
     ) public onlyAdmin {
         nodeCreationOption = _option;
+        emit NodeCreationOptionUpdated(_option);
     }
 
     function getFullGraph()
@@ -269,9 +283,11 @@ contract Universe is IUniverse {
 
     function setToken(address token) external onlyManager{
         associatedToken = token;
+        emit TokenUpdated(token);
     }
     function setAdmin(address newAdmin) public onlyManager {
       universeAdmin = newAdmin;
+      emit AdminUpdated(newAdmin);
     }
     function getAdmin() external view returns(address) {
       return universeAdmin;

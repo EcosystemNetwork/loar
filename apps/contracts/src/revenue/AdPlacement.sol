@@ -50,10 +50,14 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
 
     mapping(uint256 => address) public universeCreators;
 
+    /// @notice Pending withdrawals for outbid bidders (pull pattern)
+    mapping(address => uint256) public pendingWithdrawals;
+
     event AdSlotCreated(uint256 indexed slotId, uint256 universeId, PlacementType placementType, uint256 minBid);
     event BidPlaced(uint256 indexed slotId, address bidder, uint256 amount);
     event SponsorshipActivated(uint256 indexed sponsorshipId, uint256 slotId, address sponsor);
     event ImpressionRecorded(uint256 indexed sponsorshipId, uint256 totalImpressions);
+    event RefundWithdrawn(address indexed bidder, uint256 amount);
 
     error NotPlatform();
     error NotCreator();
@@ -62,6 +66,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     error NoRevenue();
     error TransferFailed();
     error FeeTooHigh();
+    error NoPendingWithdrawal();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -128,27 +133,36 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         emit AdSlotCreated(slotId, universeId, placementType, minBid);
     }
 
-    /// @notice Bid on an ad slot (checks-effects-interactions safe)
+    /// @notice Bid on an ad slot. Outbid refunds use pull pattern (withdrawRefund).
     function bid(uint256 slotId) external payable nonReentrant {
         AdSlot storage slot = adSlots[slotId];
         if (!slot.active) revert SlotNotActive();
         if (msg.value < slot.minBid || msg.value <= slot.currentBid) revert BidTooLow();
 
-        // Cache previous bidder for refund (effects before interactions)
+        // Credit previous bidder for withdrawal (pull pattern — no external call)
         address previousBidder = slot.currentBidder;
         uint256 previousBid = slot.currentBid;
+        if (previousBidder != address(0) && previousBid > 0) {
+            pendingWithdrawals[previousBidder] += previousBid;
+        }
 
-        // Update state BEFORE external call
         slot.currentBid = msg.value;
         slot.currentBidder = msg.sender;
 
-        // Refund previous bidder (interaction after state update)
-        if (previousBidder != address(0) && previousBid > 0) {
-            (bool refund,) = previousBidder.call{value: previousBid}("");
-            if (!refund) revert TransferFailed();
-        }
-
         emit BidPlaced(slotId, msg.sender, msg.value);
+    }
+
+    /// @notice Withdraw refund from being outbid (pull pattern)
+    function withdrawRefund() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NoPendingWithdrawal();
+
+        pendingWithdrawals[msg.sender] = 0;
+
+        (bool sent,) = msg.sender.call{value: amount}("");
+        if (!sent) revert TransferFailed();
+
+        emit RefundWithdrawn(msg.sender, amount);
     }
 
     /// @notice Accept winning bid and activate sponsorship

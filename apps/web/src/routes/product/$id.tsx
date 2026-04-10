@@ -26,11 +26,11 @@ import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { useWriteContract, useSendTransaction } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
+import { BuyNFTDialog } from '@/components/BuyNFTDialog';
+import { useVocab } from '@/hooks/use-vocab';
 
-const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
-const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
+const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
+const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
 const ERC20_ABI = [
   {
@@ -61,8 +61,10 @@ function ProductDetailPage() {
   const { id } = useParams({ from: '/product/$id' });
   const navigate = useNavigate();
   const { isConnected } = useWalletAuth();
+  const v = useVocab();
   const { data: listing, isLoading } = useListing(id);
   const [buying, setBuying] = useState(false);
+  const [showNftBuy, setShowNftBuy] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
 
@@ -100,9 +102,23 @@ function ProductDetailPage() {
     try {
       let txHash: string | undefined;
 
-      // For ETH listings, send ETH on-chain to seller before recording the order
-      if (l.currency === 'ETH' && l.price !== '0') {
-        const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+      // Direct ETH/LOAR transfers to seller EOAs are disabled until
+      // an escrow or PaymentRouter contract is integrated. Only contract-
+      // based purchases (NFT mints) are allowed for paid listings.
+      if (
+        (l.currency === 'ETH' || l.currency === 'LOAR') &&
+        l.price !== '0' &&
+        !l.contractAddress
+      ) {
+        toast.error(
+          'Direct purchases are temporarily disabled. This listing needs smart contract integration before it can accept payments.'
+        );
+        return;
+      }
+
+      // For ETH listings routed through a contract, send ETH on-chain
+      if (l.currency === 'ETH' && l.price !== '0' && l.contractAddress) {
+        const recipient = l.contractAddress as Address;
         toast.info('Confirm ETH payment in your wallet…');
         txHash = await sendTransactionAsync({
           to: recipient,
@@ -111,9 +127,13 @@ function ProductDetailPage() {
         toast.info('ETH sent! Recording order…');
       }
 
-      // For $LOAR listings, transfer tokens on-chain before recording the order
-      if (l.currency === 'LOAR' && l.price !== '0') {
-        const recipient = (l.sellerAddress as Address | undefined) ?? TREASURY_ADDRESS;
+      // For $LOAR listings routed through a contract
+      if (l.currency === 'LOAR' && l.price !== '0' && l.contractAddress) {
+        if (!LOAR_TOKEN_ADDRESS) {
+          toast.error('$LOAR token address not configured');
+          return;
+        }
+        const recipient = l.contractAddress as Address;
         const loarAmount = parseUnits(l.price as string, 18);
         toast.info('Confirm $LOAR transfer in your wallet…');
         txHash = await writeContractAsync({
@@ -266,11 +286,23 @@ function ProductDetailPage() {
           ) : !isConnected ? (
             <Link to="/login">
               <Button className="w-full" size="lg">
-                Connect Wallet to Buy
+                {v('connect-wallet-to-buy')}
               </Button>
             </Link>
           ) : (
-            <Button className="w-full" size="lg" onClick={handleBuy} disabled={buying}>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                const isNft = ['EPISODE_NFT', 'CHARACTER_NFT', 'ARTIFACT'].includes(l.productType);
+                if (isNft && l.contractAddress) {
+                  setShowNftBuy(true);
+                } else {
+                  handleBuy();
+                }
+              }}
+              disabled={buying}
+            >
               {buying ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
@@ -278,13 +310,44 @@ function ProductDetailPage() {
               )}
               {l.price === '0'
                 ? 'Claim Free'
-                : l.currency === 'ETH'
-                  ? `Pay ${l.price} ETH`
-                  : `Buy for ${l.price} ${l.currency}`}
+                : (l.currency === 'ETH' || l.currency === 'LOAR') && !l.contractAddress
+                  ? 'Purchase Unavailable'
+                  : l.currency === 'ETH'
+                    ? `Pay ${l.price} ETH`
+                    : `Buy for ${l.price} ${l.currency}`}
             </Button>
           )}
         </div>
       </div>
+
+      {/* NFT Purchase Dialog */}
+      {showNftBuy && (
+        <BuyNFTDialog
+          listing={{
+            id: l.id,
+            contentId: l.contentId,
+            title: l.title,
+            description: l.description,
+            imageUrl: l.mediaUrl ?? l.thumbnailUrl,
+            mintPrice: l.price ?? '0',
+            maxSupply: l.supply ?? 0,
+            minted: l.sold ?? 0,
+            creator: l.sellerAddress ?? '',
+            creatorName: l.sellerName,
+            universeId: l.universeId,
+            universeName: l.universeName,
+            contentType: l.productType,
+            contractAddress: l.contractAddress,
+            episodeId: l.episodeId,
+            metadataUri: l.metadataUri,
+          }}
+          onClose={() => setShowNftBuy(false)}
+          onSuccess={() => {
+            setShowNftBuy(false);
+            navigate({ to: '/my-works' });
+          }}
+        />
+      )}
     </div>
   );
 }

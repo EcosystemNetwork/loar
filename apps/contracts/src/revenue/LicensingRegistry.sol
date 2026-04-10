@@ -52,6 +52,9 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     // universeId => merch IDs
     mapping(uint256 => uint256[]) public universeMerch;
 
+    // universeId => creator/admin
+    mapping(uint256 => address) public universeCreators;
+
     address public platform;
     IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
@@ -65,6 +68,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     error NotPlatform();
     error NotLicensor();
+    error NotUniverseCreator();
     error InvalidStatus();
     error TransferFailed();
     error NoRevenue();
@@ -97,9 +101,20 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    // ---- Universe Registration ----
+
+    event UniverseRegistered(uint256 indexed universeId, address creator);
+
+    /// @notice Register a universe creator (platform only)
+    function registerUniverse(uint256 universeId, address creator) external onlyPlatform {
+        if (creator == address(0)) revert ZeroAddress();
+        universeCreators[universeId] = creator;
+        emit UniverseRegistered(universeId, creator);
+    }
+
     // ---- Licensing ----
 
-    /// @notice Create a licensing deal
+    /// @notice Create a licensing deal (universe creator or platform only)
     function createLicense(
         uint256 universeId,
         LicenseType licenseType,
@@ -109,6 +124,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         uint256 duration,
         string calldata terms
     ) external payable returns (uint256 licenseId) {
+        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotUniverseCreator();
         licenseId = nextLicenseId++;
 
         licenses[licenseId] = License({

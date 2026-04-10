@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
+import { resolveActingUid } from '../../services/agentAuth';
 
 const submissionsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -47,12 +48,16 @@ export const marketplaceRouter = router({
         metadataURI: z.string(),
         mediaUrl: z.string().optional(),
         submissionFeeTxHash: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...submitInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'marketplace');
+
       const submission = {
-        ...input,
-        creatorUid: ctx.user.uid,
+        ...submitInput,
+        creatorUid: actingUid,
         creatorAddress: ctx.user.address || null,
         status: 'VOTING' as const,
         votesFor: 0,
@@ -241,23 +246,27 @@ export const marketplaceRouter = router({
         submissionId: z.string(),
         fee: z.string(), // wei
         txHash: z.string(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const subDoc = await submissionsCol().doc(input.submissionId).get();
+      const { onBehalfOfUid, ...licenseInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'marketplace');
+
+      const subDoc = await submissionsCol().doc(licenseInput.submissionId).get();
       if (!subDoc.exists) throw new Error('Submission not found');
       const sub = subDoc.data()!;
       if (sub.status !== 'ACCEPTED') throw new Error('Not accepted canon');
 
       const config = await getPlatformConfig();
       const feeBps = config.marketplacePlatformFeeBps;
-      const feeWei = BigInt(input.fee);
+      const feeWei = BigInt(licenseInput.fee);
       const platformFeeWei = (feeWei * BigInt(feeBps)) / BigInt(10_000);
       const creatorReceivesWei = feeWei - platformFeeWei;
 
       const license = {
-        submissionId: input.submissionId,
-        licenseeUid: ctx.user.uid,
+        submissionId: licenseInput.submissionId,
+        licenseeUid: actingUid,
         licenseeAddress: ctx.user.address || null,
         creatorUid: sub.creatorUid || null,
         creatorAddress: sub.creatorAddress || null,

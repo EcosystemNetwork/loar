@@ -178,15 +178,44 @@ export function SceneEditor({
     );
   };
 
-  // Download merged video
+  // Download merged video — concatenates segment URLs into a playlist file
+  // Full server-side FFmpeg stitching would require a backend endpoint;
+  // for now we download the individual clips or a single selected clip.
   const handleDownload = () => {
-    // Implementation for downloading the merged scene
-    console.log('Download scene');
+    if (segments.length === 0) return;
+
+    if (segments.length === 1) {
+      // Single clip — direct download
+      const seg = segments[0];
+      if (seg.videoUrl) {
+        const a = document.createElement('a');
+        a.href = seg.videoUrl;
+        a.download = `scene-clip-${seg.order}.mp4`;
+        a.click();
+      }
+      return;
+    }
+
+    // Multiple clips — download as M3U playlist for local concatenation
+    const playlist = ['#EXTM3U'];
+    segments.forEach((seg, i) => {
+      if (seg.videoUrl) {
+        playlist.push(`#EXTINF:${seg.duration || 5},Clip ${i + 1}`);
+        playlist.push(seg.videoUrl);
+      }
+    });
+    const blob = new Blob([playlist.join('\n')], { type: 'audio/x-mpegurl' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scene-playlist.m3u';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  // Organize segments
+  // Organize segments — sort by drag order or reverse
   const handleOrganize = () => {
-    console.log('Organize segments');
+    setSegments([...segments].reverse().map((seg, idx) => ({ ...seg, order: idx })));
   };
 
   const modelNames: Record<string, string> = {
@@ -375,7 +404,18 @@ export function SceneEditor({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('Extend segment', index);
+                          // Insert a new empty segment after this one
+                          const newSeg: VideoSegment = {
+                            id: `seg-${Date.now()}`,
+                            videoUrl: '',
+                            prompt: '',
+                            duration: 5,
+                            model: 'fal-veo3',
+                            order: index + 1,
+                          };
+                          const updated = [...segments];
+                          updated.splice(index + 1, 0, newSeg);
+                          setSegments(updated.map((s, i) => ({ ...s, order: i })));
                         }}
                         className="absolute top-1/2 -right-3 transform -translate-y-1/2 p-1 bg-primary hover:bg-primary/80 text-primary-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
                       >

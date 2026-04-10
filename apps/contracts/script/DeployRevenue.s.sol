@@ -41,10 +41,10 @@ contract DeployRevenueScript is Script {
         console.log("Deployer:", d);
         vm.startBroadcast(pk);
 
-        // 1. PaymentRouter (UUPS) — initialize(treasury, feeBps)
+        // 1. PaymentRouter (UUPS) — initialize(treasury, feeBps, loarToken, loarFeeDiscount)
         PaymentRouter pr = PaymentRouter(address(new ERC1967Proxy(
             address(new PaymentRouter()),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, FEE))
+            abi.encodeCall(PaymentRouter.initialize, (treasury, FEE, loarToken, 500))
         )));
         console.log("PaymentRouter:", address(pr));
 
@@ -107,7 +107,7 @@ contract DeployRevenueScript is Script {
         // 9. CollabManager (UUPS) — initialize(platform, paymentRouter, feeBps)
         CollabManager cl = CollabManager(address(new ERC1967Proxy(
             address(new CollabManager()),
-            abi.encodeCall(CollabManager.initialize, (d, address(pr), FEE))
+            abi.encodeCall(CollabManager.initialize, (d, address(pr), address(0), FEE))
         )));
         console.log("CollabManager:", address(cl));
 

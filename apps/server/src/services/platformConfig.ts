@@ -50,6 +50,10 @@ export interface PlatformConfig {
   /** Platform cut of NFT mint revenue in basis points */
   nftPlatformFeeBps: number;
 
+  // ── ETH pricing ───────────────────────────────────────────────────
+  /** Current ETH/USD price — used to compute expected wei for credit purchases */
+  ethPriceUsd: number;
+
   // ── Affiliates & quests ───────────────────────────────────────────
   /** $LOAR awarded to referrer per successful referral */
   affiliateReferrerLoar: number;
@@ -76,6 +80,8 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   collabPlatformFeeBps: 500, // 5%
   subscriptionPlatformFeeBps: 0, // creators keep 100%
   nftPlatformFeeBps: 1500, // 15%
+
+  ethPriceUsd: 3000,
 
   affiliateReferrerLoar: 100,
   affiliateNewUserLoar: 50,

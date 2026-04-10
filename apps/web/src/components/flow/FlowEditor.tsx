@@ -94,16 +94,6 @@ interface FlowEditorProps {
 }
 
 export default function FlowEditor({ timelineData, universeAddress, universeId }: FlowEditorProps) {
-  // Debug what props FlowEditor is receiving
-  useEffect(() => {
-    console.log('FlowEditor received props:', {
-      timelineData,
-      universeAddress,
-      universeId,
-      hasTimelineData: !!timelineData,
-      timelineDataLength: timelineData?.length || 0,
-    });
-  }, [timelineData, universeAddress, universeId]);
   // Generate initial nodes from timeline data if provided
   const generatedNodes = useMemo(() => {
     if (!timelineData || timelineData.length === 0) {
@@ -195,16 +185,6 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
               // Handle different connection types
               if (sourceNode.type === 'character' && targetNode.type === 'plotPoint') {
                 // Character -> PlotPoint: Setup image-to-video generation
-                console.log('Character-to-Plot connection detected:', {
-                  sourceNodeId: sourceNode.id,
-                  targetNodeId: targetNode.id,
-                  characterData: sourceNode.data,
-                  plotData: targetNode.data,
-                  characterImage: sourceNode.data.characterImage,
-                  characterName: sourceNode.data.characterName,
-                  selectedCharacterId: sourceNode.data.selectedCharacterId,
-                });
-
                 // Handle multiple character connections - accumulate into arrays
                 const existingCharacterImages = Array.isArray(updatedData.characterImageUrls)
                   ? updatedData.characterImageUrls
@@ -215,12 +195,6 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                 const existingCharacterIds = Array.isArray(updatedData.characterIds)
                   ? updatedData.characterIds
                   : [];
-
-                console.log('Existing arrays before accumulation:', {
-                  existingCharacterImages: existingCharacterImages,
-                  existingCharacterNames: existingCharacterNames,
-                  existingCharacterIds: existingCharacterIds,
-                });
 
                 // Only add if not already present (avoid duplicates by ID)
                 const newCharacterImage = sourceNode.data.characterImage;
@@ -240,9 +214,6 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                     Boolean
                   );
                   finalCharacterIds = [...existingCharacterIds, newCharacterId].filter(Boolean);
-                  console.log('Added new character to arrays');
-                } else {
-                  console.log('Character already exists in arrays, skipping duplicate');
                 }
 
                 updatedData = {
@@ -259,13 +230,6 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                   isImageToVideo: true,
                   connectionType: 'character-to-plot',
                 };
-
-                console.log('Updated plot data after connection:', {
-                  characterImageUrls: updatedData.characterImageUrls,
-                  characterNames: updatedData.characterNames,
-                  characterIds: updatedData.characterIds,
-                  totalCharacters: updatedData.characterImageUrls?.length || 0,
-                });
               } else if (sourceNode.type === 'plotPoint' && targetNode.type === 'plotPoint') {
                 // PlotPoint -> PlotPoint: Setup blockchain timeline connection
                 let previousNodeId = 0;

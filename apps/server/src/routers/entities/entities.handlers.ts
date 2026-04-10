@@ -24,6 +24,28 @@ function entitiesCol() {
   return db.collection('entities');
 }
 
+/**
+ * Assert that an entity is eligible for minting as an NFT.
+ * Only monetized entities with a valid rights declaration can be minted.
+ */
+export async function assertMintEligible(entityId: string): Promise<Entity> {
+  const doc = await entitiesCol().doc(entityId).get();
+  if (!doc.exists) throw new Error('Entity not found');
+  const entity = { id: doc.id, ...doc.data() } as Entity;
+
+  if (!entity.monetized) {
+    throw new Error(
+      'Only monetized entities can be minted as NFTs. Update this entity to monetized first.'
+    );
+  }
+  if (!entity.rightsDeclaration) {
+    throw new Error(
+      'Rights declaration is required before minting. Declare this as original or licensed work.'
+    );
+  }
+  return entity;
+}
+
 /** Validate parent-child relationship for structural kinds only. */
 async function validateParent(kind: EntityKind, parentId: string | null): Promise<void> {
   // Creator kinds can have any or no parent — skip strict validation
@@ -68,6 +90,11 @@ export async function createEntity(
   const ref = col.doc();
   const now = new Date();
 
+  const monetized = input.monetized ?? false;
+  if (monetized && !input.rightsDeclaration) {
+    throw new Error('Rights declaration is required for monetized entities');
+  }
+
   const entity: Entity = {
     id: ref.id,
     name: input.name,
@@ -79,6 +106,8 @@ export async function createEntity(
     imageUrl: input.imageUrl ?? null,
     metadata: input.metadata ?? {},
     creator,
+    monetized,
+    rightsDeclaration: monetized ? input.rightsDeclaration! : null,
     createdAt: now,
     updatedAt: now,
   };
@@ -206,6 +235,15 @@ export async function updateEntity(
   if (input.nodeIds !== undefined) updates.nodeIds = input.nodeIds;
   if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl;
   if (input.metadata !== undefined) updates.metadata = input.metadata;
+  if (input.monetized !== undefined) {
+    updates.monetized = input.monetized;
+    if (input.monetized && !input.rightsDeclaration) {
+      throw new Error('Rights declaration is required for monetized entities');
+    }
+    updates.rightsDeclaration = input.monetized ? input.rightsDeclaration! : null;
+  } else if (input.rightsDeclaration !== undefined) {
+    updates.rightsDeclaration = input.rightsDeclaration;
+  }
 
   await ref.update(updates);
 

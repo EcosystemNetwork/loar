@@ -189,7 +189,7 @@ export const sandboxRouter = router({
     }),
 
   // Get a single draft
-  getDraft: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
+  getDraft: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
     const snap = await sandboxCol().doc(input.id).get();
     if (!snap.exists) return null;
     const d = snap.data()!;

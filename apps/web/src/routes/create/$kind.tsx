@@ -17,7 +17,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  Sparkles,
+  ShieldCheck,
+  Palette,
+  ImagePlus,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 
 type EntityKind =
   | 'person'
@@ -455,7 +464,41 @@ function EntityCreateForm() {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [monetized, setMonetized] = useState(false);
+  const [rightsDeclaration, setRightsDeclaration] = useState<'original' | 'licensed' | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [artworkPrompt, setArtworkPrompt] = useState('');
+  const [showArtwork, setShowArtwork] = useState(false);
+  const [generatingArt, setGeneratingArt] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!name.trim()) {
+      toast.error('Enter a name first so AI knows what to generate');
+      return;
+    }
+    setGenerating(true);
+    try {
+      const profile = await trpcClient.entities.generateProfile.mutate({
+        name: name.trim(),
+        kind: kind as EntityKind,
+        hint: description || '',
+      });
+      setDescription(profile.description);
+      const newFields: Record<string, string> = {};
+      for (const [key, value] of Object.entries(profile.metadata)) {
+        if (typeof value === 'string' && value) {
+          newFields[key] = value;
+        }
+      }
+      setFieldValues((prev) => ({ ...prev, ...newFields }));
+      toast.success('AI profile generated! Review and edit before saving.');
+    } catch (err: any) {
+      toast.error(err.message ?? 'AI generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   if (!VALID_KINDS.includes(kind as EntityKind)) {
     return (
@@ -491,15 +534,50 @@ function EntityCreateForm() {
         }
       }
 
+      if (monetized && !rightsDeclaration) {
+        toast.error('Select a rights declaration for monetized entities');
+        setSaving(false);
+        return;
+      }
+
       const result = await trpcClient.entities.create.mutate({
         name,
         description,
         kind: typedKind,
         imageUrl: imageUrl || null,
         metadata,
+        monetized,
+        rightsDeclaration: monetized ? rightsDeclaration : null,
       });
 
       toast.success(`${label} created!`);
+
+      // If artwork prompt was provided, generate artwork and update entity
+      if (artworkPrompt.trim()) {
+        setGeneratingArt(true);
+        try {
+          const artResult = await trpcClient.image.generate.mutate({
+            prompt: artworkPrompt.trim(),
+            task: 'text_to_image',
+            imageSize: 'square_hd',
+            numImages: 1,
+            routingMode: 'auto',
+            entityId: result.id,
+          });
+          if (artResult.status === 'completed' && artResult.imageUrls?.[0]) {
+            await trpcClient.entities.update.mutate({
+              entityId: result.id,
+              imageUrl: artResult.imageUrls[0],
+            });
+            toast.success('Artwork generated!');
+          }
+        } catch (artErr: any) {
+          toast.error(`Entity created but artwork failed: ${artErr.message ?? 'Unknown error'}`);
+        } finally {
+          setGeneratingArt(false);
+        }
+      }
+
       navigate({ to: '/wiki/entity/$id', params: { id: result.id } });
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to create entity');
@@ -527,8 +605,22 @@ function EntityCreateForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Core fields */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Core</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateAI}
+              disabled={generating || !name.trim()}
+            >
+              {generating ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              {generating ? 'Generating...' : 'Generate with AI'}
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -602,10 +694,175 @@ function EntityCreateForm() {
           </Card>
         )}
 
+        {/* Monetization */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Monetization</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Will you sell, license, or commercially use this {label.toLowerCase()}? Choose now —
+              you can change this later.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMonetized(false);
+                  setRightsDeclaration(null);
+                }}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-colors ${
+                  !monetized
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-muted-foreground/30'
+                }`}
+              >
+                <Palette className="w-5 h-5" />
+                <span className="font-medium text-sm">Non-Monetized</span>
+                <span className="text-xs text-muted-foreground">
+                  Personal use, fan art, exploration. Cannot be minted as NFT.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonetized(true)}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-colors ${
+                  monetized
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-muted-foreground/30'
+                }`}
+              >
+                <ShieldCheck className="w-5 h-5" />
+                <span className="font-medium text-sm">Monetized</span>
+                <span className="text-xs text-muted-foreground">
+                  Sell, license, or mint as NFT. Requires rights declaration.
+                </span>
+              </button>
+            </div>
+
+            {monetized && (
+              <div className="space-y-3 pt-2">
+                <Label>Rights Declaration *</Label>
+                <div className="space-y-2">
+                  <label
+                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      rightsDeclaration === 'original'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rights"
+                      checked={rightsDeclaration === 'original'}
+                      onChange={() => setRightsDeclaration('original')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="font-medium text-sm">Original Work</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        I created this — it does not copy or derive from existing copyrighted IP.
+                      </p>
+                    </div>
+                  </label>
+                  <label
+                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      rightsDeclaration === 'licensed'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rights"
+                      checked={rightsDeclaration === 'licensed'}
+                      onChange={() => setRightsDeclaration('licensed')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="font-medium text-sm">Licensed</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        I have a license or permission from the rights holder to use this
+                        commercially.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  False declarations may result in takedown and loss of minting privileges.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Optional AI Artwork */}
+        <Card>
+          <CardHeader>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-left"
+              onClick={() => setShowArtwork(!showArtwork)}
+            >
+              <div className="flex items-center gap-2">
+                <ImagePlus className="w-4 h-4" />
+                <CardTitle className="text-base">AI Artwork (Optional)</CardTitle>
+              </div>
+              {showArtwork ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+          </CardHeader>
+          {showArtwork && (
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Describe the artwork you want generated for this {label.toLowerCase()}. Leave empty
+                to skip. You can always generate artwork later.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="artworkPrompt">Artwork Prompt</Label>
+                <Textarea
+                  id="artworkPrompt"
+                  value={artworkPrompt}
+                  onChange={(e) => setArtworkPrompt(e.target.value)}
+                  placeholder={`e.g. A cinematic portrait of ${name || `this ${label.toLowerCase()}`}, dramatic lighting, detailed digital art...`}
+                  rows={3}
+                />
+              </div>
+              {name.trim() && !artworkPrompt.trim() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const autoPrompt =
+                      typedKind === 'person'
+                        ? `Character portrait of ${name}, ${description || fieldValues.appearance || fieldValues.role || ''}, cinematic lighting, high quality digital art, detailed`
+                        : typedKind === 'place'
+                          ? `Landscape painting of ${name}, ${description || fieldValues.atmosphere || ''}, cinematic, detailed environment concept art`
+                          : typedKind === 'thing'
+                            ? `Detailed illustration of ${name}, ${description || fieldValues.powersAndUse || ''}, fantasy artifact, dramatic lighting`
+                            : `Concept art of ${name}, ${description || ''}, high quality digital art, cinematic`;
+                    setArtworkPrompt(autoPrompt.replace(/,\s*,/g, ',').replace(/,\s*$/, ''));
+                  }}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Auto-fill prompt from details
+                </Button>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
         <div className="flex gap-3">
-          <Button type="submit" disabled={saving || !name.trim()}>
-            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {saving ? 'Creating...' : `Create ${label}`}
+          <Button
+            type="submit"
+            disabled={saving || generatingArt || !name.trim() || (monetized && !rightsDeclaration)}
+          >
+            {(saving || generatingArt) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {generatingArt ? 'Generating Artwork...' : saving ? 'Creating...' : `Create ${label}`}
           </Button>
           <Link to="/create">
             <Button type="button" variant="outline">

@@ -10,6 +10,7 @@ const PONDER_URL = import.meta.env.VITE_PONDER_URL || 'http://localhost:42069';
 
 /** Circuit breaker: skip requests when indexer is known offline. */
 let _offlineUntil = 0;
+let _offlineLogged = false;
 const OFFLINE_COOLDOWN_MS = 30_000; // back off 30s after a connection failure
 
 /**
@@ -28,6 +29,8 @@ export async function ponderGql<T = any>(
     err.code = 'PONDER_OFFLINE';
     throw err;
   }
+  // Reset log flag when cooldown expires so we log once per outage window
+  _offlineLogged = false;
 
   let res: Response;
   try {
@@ -38,7 +41,10 @@ export async function ponderGql<T = any>(
     });
   } catch {
     _offlineUntil = Date.now() + OFFLINE_COOLDOWN_MS;
-    console.warn('[ponder] Indexer unreachable — suppressing requests for 30s');
+    if (!_offlineLogged) {
+      console.warn('[ponder] Indexer unreachable — suppressing requests for 30s');
+      _offlineLogged = true;
+    }
     const err = new Error('Blockchain indexer unreachable') as Error & { code: string };
     err.code = 'PONDER_OFFLINE';
     throw err;

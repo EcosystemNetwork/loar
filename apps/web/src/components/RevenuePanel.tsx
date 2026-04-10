@@ -44,6 +44,7 @@ import {
   useUniverseMerch,
   useUniverseMetrics,
 } from '@/hooks/useRevenue';
+import { useVocab } from '@/hooks/use-vocab';
 
 interface RevenuePanelProps {
   universeId: string;
@@ -240,12 +241,13 @@ function NFTTab({ universeId }: { universeId: string }) {
 function CanonTab({ universeId }: { universeId: string }) {
   const { data: submissions } = useCanonSubmissions(universeId, 'VOTING');
   const submitCanon = useSubmitCanon();
+  const v = useVocab();
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold">Canon Marketplace</h3>
+      <h3 className="font-semibold">{v('canon-marketplace')}</h3>
       <p className="text-sm text-muted-foreground">
-        Active submissions being voted on by token holders
+        Active submissions being voted on by {v('token-holders').toLowerCase()}
       </p>
       {(submissions as any[])?.length ? (
         <div className="space-y-2">

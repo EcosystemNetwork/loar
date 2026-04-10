@@ -1,32 +1,91 @@
 /**
  * FAL AI router — tRPC procedures for image generation, video generation,
  * character creation, image editing, and Gemini-powered character analysis.
+ *
+ * @deprecated Prefer `generation.*` routes which enforce credit deduction.
+ * These legacy routes now also deduct credits to prevent free generation.
  */
 import { router, publicProcedure, protectedProcedure } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
 import { db } from '../../lib/firebase';
 import { geminiService } from '../../services/gemini';
 
+// ── Credit costs for FAL routes (mirrors generation.routes.ts) ──────────
+const FAL_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as const;
+
+/** Deduct credits from user balance. Throws if insufficient. */
+async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
+  if (!db) return; // Skip in degraded mode (no Firestore)
+  const userRef = db.collection('userCredits').doc(uid);
+  const userDoc = await userRef.get();
+  const balance = userDoc.data()?.balance || 0;
+
+  if (balance < cost) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+    });
+  }
+
+  await userRef.update({
+    balance: balance - cost,
+    totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
+    updatedAt: new Date(),
+  });
+
+  await db.collection('creditTransactions').add({
+    uid,
+    type: 'spend',
+    generationType,
+    credits: -cost,
+    source: 'fal_legacy',
+    createdAt: new Date(),
+  });
+}
+
 const charactersCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('characters');
 };
 
+const imageGenerationsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('imageGenerations');
+};
+
+const videoGenerationsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('videoGenerations');
+};
+
+/** Fire-and-forget save — never blocks the response */
+function saveGenerationRecord(collection: 'image' | 'video', record: Record<string, any>) {
+  const col = collection === 'image' ? imageGenerationsCol : videoGenerationsCol;
+  try {
+    col()
+      .doc(record.id)
+      .set(record)
+      .catch((err: any) =>
+        console.error(`Failed to save ${collection} generation record:`, err.message)
+      );
+  } catch {
+    // db not configured — skip silently
+  }
+}
+
 export const falRouter = router({
-  testConnection: publicProcedure.query(async () => {
+  testConnection: protectedProcedure.query(async () => {
     try {
-      const hasKey = !!process.env.FAL_KEY;
       return {
         success: true,
-        hasApiKey: hasKey,
-        message: hasKey ? 'FAL API key is configured' : 'FAL API key is missing',
+        message: 'FAL service is available',
       };
     } catch (error) {
       return {
         success: false,
-        hasApiKey: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -37,7 +96,23 @@ export const falRouter = router({
       z.object({
         prompt: z.string().min(1, 'Prompt is required'),
         model: z
-          .enum(['fal-ai/nano-banana', 'fal-ai/flux/dev', 'fal-ai/flux-pro', 'fal-ai/flux/schnell'])
+          .enum([
+            'fal-ai/nano-banana',
+            'fal-ai/nano-banana-2',
+            'fal-ai/nano-banana-pro',
+            'fal-ai/flux/schnell',
+            'fal-ai/flux/dev',
+            'fal-ai/flux-pro',
+            'fal-ai/flux-pro/v1.1',
+            'fal-ai/flux-2-pro',
+            'fal-ai/flux-pro/kontext',
+            'fal-ai/recraft/v4/pro/text-to-image',
+            'fal-ai/ideogram/v3/generate',
+            'fal-ai/bytedance/seedream/v5/lite/edit',
+            'fal-ai/gpt-image-1.5/edit',
+            'fal-ai/wan/v2.7/text-to-image',
+            'fal-ai/qwen-image',
+          ])
           .optional(),
         negativePrompt: z.string().optional(),
         imageSize: z
@@ -57,8 +132,30 @@ export const falRouter = router({
         enableSafetyChecker: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      return await falService.generateImage(input);
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.image, 'image');
+      const startTime = Date.now();
+      const result = await falService.generateImage(input);
+      if (result.status === 'failed') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: result.error || 'Image generation failed',
+        });
+      }
+      saveGenerationRecord('image', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: input.model || 'fal-ai/nano-banana',
+        imageSize: input.imageSize || 'square_hd',
+        status: 'completed',
+        imageUrls: result.images?.map((i) => i.url) || (result.imageUrl ? [result.imageUrl] : []),
+        seed: result.seed ?? null,
+        source: 'fal.generateImage',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
     }),
 
   editImage: protectedProcedure
@@ -75,14 +172,30 @@ export const falRouter = router({
         enableSafetyChecker: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      try {
-        const result = await falService.editImage(input);
-        return result;
-      } catch (error) {
-        console.error('FAL service error:', error);
-        throw error;
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.edit, 'image_edit');
+      const startTime = Date.now();
+      const result = await falService.editImage(input);
+      if (result.status === 'failed') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: result.error || 'Image editing failed',
+        });
       }
+      saveGenerationRecord('image', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/nano-banana/edit',
+        task: 'image_to_image',
+        status: 'completed',
+        imageUrls: result.images?.map((i) => i.url) || (result.imageUrl ? [result.imageUrl] : []),
+        seed: result.seed ?? null,
+        source: 'fal.editImage',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
     }),
 
   imageToImage: protectedProcedure
@@ -111,14 +224,30 @@ export const falRouter = router({
         seed: z.number().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      try {
-        const result = await falService.imageToImage(input);
-        return result;
-      } catch (error) {
-        console.error('FAL imageToImage service error:', error);
-        throw error;
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.edit, 'image_to_image');
+      const startTime = Date.now();
+      const result = await falService.imageToImage(input);
+      if (result.status === 'failed') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: result.error || 'Image-to-image failed',
+        });
       }
+      saveGenerationRecord('image', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/nano-banana/edit',
+        task: 'image_to_image',
+        status: 'completed',
+        imageUrls: result.images?.map((i) => i.url) || (result.imageUrl ? [result.imageUrl] : []),
+        seed: result.seed ?? null,
+        source: 'fal.imageToImage',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
     }),
 
   generateCharacter: protectedProcedure
@@ -131,7 +260,8 @@ export const falRouter = router({
         detailedVisualDescription: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.character, 'character');
       const stylePrompts = {
         cute: 'cute kawaii style, adorable, soft colors',
         realistic: 'photorealistic, detailed, cinematic lighting',
@@ -280,7 +410,13 @@ export const falRouter = router({
         videoProvider: z.enum(['fal']).optional().default('fal'),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Character image + video generation
+      await deductCredits(
+        ctx.user.uid,
+        FAL_CREDIT_COSTS.character + FAL_CREDIT_COSTS.video,
+        'character_and_video'
+      );
       const stylePrompts = {
         cute: 'cute kawaii style, adorable, soft colors',
         realistic: 'photorealistic, detailed, cinematic lighting',
@@ -357,40 +493,80 @@ export const falRouter = router({
         prompt: z.string().min(1),
         model: z
           .enum([
+            // Text-to-Video
             'fal-ai/hunyuan-video',
             'fal-ai/ltx-video',
             'fal-ai/cogvideox-5b',
             'fal-ai/runway-gen3',
             'fal-ai/veo3.1/fast',
+            'fal-ai/veo3.1',
+            'fal-ai/veo3.1/lite',
             'fal-ai/sora-2/text-to-video',
+            'fal-ai/sora-2/text-to-video/pro',
             'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
             'fal-ai/wan-25-preview/text-to-video',
+            'fal-ai/wan/v2.7/text-to-video',
+            'fal-ai/pixverse/v6/text-to-video',
+            // Image-to-Video
             'fal-ai/veo3.1/fast/image-to-video',
+            'fal-ai/veo3.1/image-to-video',
+            'fal-ai/veo3.1/lite/image-to-video',
             'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+            'fal-ai/kling-video/v3/pro/image-to-video',
             'fal-ai/wan-25-preview/image-to-video',
+            'fal-ai/wan/v2.7/image-to-video',
             'fal-ai/sora-2/image-to-video',
+            'fal-ai/sora-2/image-to-video/pro',
+            'fal-ai/pixverse/v6/image-to-video',
+            // Seedance 2.0
+            'bytedance/seedance-2.0/text-to-video',
+            'bytedance/seedance-2.0/image-to-video',
+            'bytedance/seedance-2.0/fast/text-to-video',
+            'bytedance/seedance-2.0/fast/image-to-video',
+            'bytedance/seedance-2.0/reference-to-video',
+            'bytedance/seedance-2.0/fast/reference-to-video',
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
-        duration: z.number().min(1).max(10).optional(),
+        duration: z.number().min(1).max(20).optional(),
         fps: z.number().min(8).max(30).optional(),
         width: z.number().min(256).max(1920).optional(),
         height: z.number().min(256).max(1080).optional(),
         guidanceScale: z.number().min(1).max(20).optional(),
         numInferenceSteps: z.number().min(10).max(50).optional(),
-        aspectRatio: z.enum(['16:9', '9:16', '1:1', 'auto']).optional(),
+        aspectRatio: z.enum(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', 'auto']).optional(),
         motionStrength: z.number().min(1).max(255).optional(),
         negativePrompt: z.string().optional(),
         cfgScale: z.number().min(0.1).max(2.0).optional(),
-        resolution: z.enum(['720p', '1080p', 'auto']).optional(),
+        resolution: z.enum(['480p', '720p', '1080p', 'auto']).optional(),
         enablePromptExpansion: z.boolean().optional(),
+        generateAudio: z.boolean().optional(),
+        endImageUrl: z.string().url().optional(),
+        seed: z.number().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video');
+      const startTime = Date.now();
       const result = await falService.generateVideo(input);
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Video generation failed');
       }
+      saveGenerationRecord('video', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: input.model || 'fal-ai/ltx-video',
+        mode: input.imageUrl ? 'image_to_video' : 'text_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration ?? null,
+        aspectRatio: input.aspectRatio ?? null,
+        resolution: input.resolution ?? null,
+        source: 'fal.generateVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
       return result;
     }),
 
@@ -400,8 +576,10 @@ export const falRouter = router({
 
   quickGenerate: protectedProcedure
     .input(z.object({ prompt: z.string().min(1), imageUrl: z.string().url().optional() }))
-    .mutation(async ({ input }) => {
-      return await falService.generateVideo({
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_quick');
+      const startTime = Date.now();
+      const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
         model: 'fal-ai/ltx-video',
@@ -412,6 +590,21 @@ export const falRouter = router({
         guidanceScale: 3,
         numInferenceSteps: 30,
       });
+      if (result.status !== 'failed') {
+        saveGenerationRecord('video', {
+          id: result.id || randomUUID(),
+          userId: ctx.user?.uid || 'anonymous',
+          prompt: input.prompt,
+          model: 'fal-ai/ltx-video',
+          mode: input.imageUrl ? 'image_to_video' : 'text_to_video',
+          status: result.status,
+          videoUrl: result.videoUrl,
+          source: 'fal.quickGenerate',
+          latencyMs: Date.now() - startTime,
+          createdAt: new Date(),
+        });
+      }
+      return result;
     }),
 
   veo3ImageToVideo: protectedProcedure
@@ -427,7 +620,9 @@ export const falRouter = router({
         motionStrength: z.number().min(1).max(255).optional().default(127),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_veo3');
+      const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
@@ -439,6 +634,20 @@ export const falRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Veo3 video generation failed');
       }
+      saveGenerationRecord('video', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/veo3.1/fast/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        source: 'fal.veo3ImageToVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
       return result;
     }),
 
@@ -456,7 +665,9 @@ export const falRouter = router({
         cfgScale: z.number().min(0.1).max(2.0).optional().default(0.5),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_kling');
+      const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
@@ -469,6 +680,20 @@ export const falRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Kling video generation failed');
       }
+      saveGenerationRecord('video', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        source: 'fal.klingVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
       return result;
     }),
 
@@ -486,7 +711,9 @@ export const falRouter = router({
         enablePromptExpansion: z.boolean().optional().default(true),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_wan25');
+      const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
@@ -499,6 +726,20 @@ export const falRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Wan25 video generation failed');
       }
+      saveGenerationRecord('video', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/wan-25-preview/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        resolution: input.resolution,
+        source: 'fal.wan25ImageToVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
       return result;
     }),
 
@@ -515,7 +756,9 @@ export const falRouter = router({
         resolution: z.enum(['720p', '1080p', 'auto']).optional().default('auto'),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, FAL_CREDIT_COSTS.video, 'video_sora');
+      const startTime = Date.now();
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
@@ -527,6 +770,21 @@ export const falRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Sora video generation failed');
       }
+      saveGenerationRecord('video', {
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/sora-2/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        resolution: input.resolution,
+        source: 'fal.soraImageToVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
       return result;
     }),
 });

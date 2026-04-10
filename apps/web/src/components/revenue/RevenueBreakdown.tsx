@@ -10,19 +10,22 @@ const SOURCE_COLORS: Record<string, string> = {
   appearance_fees: '#f97316',
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  nft_sales: 'NFT Sales',
-  subscriptions: 'Subscriptions',
-  credits: 'Credits',
-  licensing: 'IP Licensing',
-  merch: 'Merchandise',
-  ads: 'Ad Revenue',
-  canon_royalties: 'Canon Royalties',
-  collabs: 'Collaborations',
-  appearance_fees: 'Appearances',
-};
+import { useVocab } from '@/hooks/use-vocab';
 
 export function RevenueBreakdown({ bySource }: { bySource: Record<string, number> }) {
+  const v = useVocab();
+
+  const SOURCE_LABELS: Record<string, string> = {
+    nft_sales: v('nft-sales'),
+    subscriptions: 'Subscriptions',
+    credits: 'Credits',
+    licensing: 'IP Licensing',
+    merch: 'Merchandise',
+    ads: 'Ad Revenue',
+    canon_royalties: v('canon-royalties'),
+    collabs: 'Collaborations',
+    appearance_fees: 'Appearances',
+  };
   const entries = Object.entries(bySource).filter(([, v]) => v > 0);
   const total = entries.reduce((sum, [, v]) => sum + v, 0);
 

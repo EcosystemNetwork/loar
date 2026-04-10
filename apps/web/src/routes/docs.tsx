@@ -189,7 +189,7 @@ function DocsPage() {
                 ['Token Governance', 'ERC20 governance tokens with proposal voting per universe'],
                 [
                   'Decentralized Storage',
-                  'Multi-provider (Walrus, IPFS, Synapse, Firebase) with fallback',
+                  'Multi-provider (Pinata, Lighthouse, Storacha, Firebase) with fallback',
                 ],
                 ['Uniswap v4 Hooks', 'Custom liquidity hooks for tokenized narratives'],
                 ['Blockchain Indexing', 'Real-time event indexing with Ponder + GraphQL API'],
@@ -230,9 +230,9 @@ function DocsPage() {
   │     │                              ├─► Firebase (Auth + Firestore)
   │     │                              ├─► FAL / Gemini / OpenAI (AI)
   │     │                              └─► Storage Manager
-  │     │                                    ├─► Walrus (Sui)
-  │     │                                    ├─► IPFS (Pinata)
-  │     │                                    ├─► Synapse (Filecoin)
+  │     │                                    ├─► Pinata (IPFS)
+  │     │                                    ├─► Lighthouse (Filecoin)
+  │     │                                    ├─► Storacha (Archive)
   │     │                                    └─► Firebase Storage
   │     │
   │     └─► Ponder GraphQL ────────► Indexer (Ponder)
@@ -255,9 +255,9 @@ function DocsPage() {
                 ['Backend', 'Hono, tRPC, Firebase Admin, Node.js 20'],
                 ['Contracts', 'Solidity 0.8.30+, Foundry, OpenZeppelin, Uniswap v4'],
                 ['Indexer', 'Ponder v0.15, PostgreSQL, GraphQL'],
-                ['Storage', 'Walrus, IPFS (Pinata), Synapse (Filecoin), Firebase Storage'],
+                ['Storage', 'Pinata (IPFS), Lighthouse (Filecoin), Storacha, Firebase Storage'],
                 ['AI', 'FAL (Flux, Veo3, Kling, Wan25, Sora), Google Gemini, OpenAI'],
-                ['Auth', 'Firebase Auth (email/password + wallet)'],
+                ['Auth', 'SIWE (Sign-In with Ethereum) + JWT sessions'],
                 ['Database', 'Firebase Firestore'],
                 ['Infra', 'Docker, Turborepo, pnpm workspaces'],
               ]}
@@ -394,7 +394,6 @@ function DocsPage() {
                   '/api/upload',
                   'Direct multipart file upload (up to 200MB, auth required)',
                 ],
-                ['GET', '/api/filecoin/:pieceCid', 'Stream Filecoin content (auth required)'],
                 ['ALL', '/trpc/*', 'tRPC router (all procedures)'],
               ]}
             />
@@ -621,16 +620,12 @@ const { universes } = await ponderGql(\`{
               headers={['Provider', 'Network', 'Use Case']}
               rows={[
                 [
-                  'Walrus',
-                  'Sui blockchain',
-                  'Primary decentralized storage (default highest priority)',
-                ],
-                [
-                  'IPFS (Pinata)',
+                  'Pinata',
                   'IPFS network',
-                  'Content-addressable storage with pinning service',
+                  'Hot storage and public content delivery (highest priority)',
                 ],
-                ['Synapse', 'Filecoin', 'Long-term archival storage'],
+                ['Lighthouse', 'Filecoin', 'Permanent storage with token-gated encryption'],
+                ['Storacha', 'IPFS + Filecoin', 'Redundancy and archival storage'],
                 ['Firebase Storage', 'Google Cloud', 'Fast fallback for availability'],
               ]}
             />
@@ -1320,7 +1315,7 @@ const { universes } = await ponderGql(\`{
               rows={[
                 [
                   'Video/image files',
-                  'Walrus, IPFS, Synapse, Firebase',
+                  'Pinata, Lighthouse, Storacha, Firebase',
                   'Hash the retrieved file and compare to on-chain contentHash',
                 ],
                 [
@@ -1803,21 +1798,14 @@ writeContract({
             <Table
               headers={['Variable', 'Default', 'Description']}
               rows={[
-                [
-                  'WALRUS_PUBLISHER_URL',
-                  'https://publisher.walrus-testnet.walrus.space',
-                  'Walrus publisher endpoint',
-                ],
-                [
-                  'WALRUS_AGGREGATOR_URL',
-                  'https://aggregator.walrus-testnet.walrus.space',
-                  'Walrus aggregator endpoint',
-                ],
                 ['PINATA_JWT', '', 'Pinata IPFS API token'],
                 ['PINATA_GATEWAY_URL', '', 'Pinata IPFS gateway URL'],
+                ['LIGHTHOUSE_API_KEY', '', 'Lighthouse Filecoin API key'],
+                ['STORACHA_KEY', '', 'Storacha DID key'],
+                ['STORACHA_PROOF', '', 'Storacha delegation proof (base64)'],
                 [
                   'STORAGE_PROVIDER_PRIORITY',
-                  'walrus,ipfs,synapse,firebase',
+                  'pinata,lighthouse,storacha,firebase',
                   'Provider priority order',
                 ],
               ]}

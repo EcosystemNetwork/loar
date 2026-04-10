@@ -53,23 +53,96 @@ function setSession(token: string, address: string) {
   emitChange();
 }
 
-/** Clear the SIWE session from localStorage. */
-export function clearSiweSession() {
+/** Clear the SIWE session from localStorage and optionally revoke server-side. */
+export function clearSiweSession(revoke = false) {
+  const token = localStorage.getItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ADDRESS_KEY);
   emitChange();
+
+  // Fire-and-forget server-side revocation
+  if (revoke && token) {
+    fetch(`${SERVER_URL}/auth/revoke`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {}); // Best-effort
+  }
+}
+
+/** Refresh the session token. Returns true if refreshed, false if expired. */
+export async function refreshSession(): Promise<boolean> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return false;
+
+  try {
+    const res = await fetch(`${SERVER_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem(TOKEN_KEY, data.token);
+      emitChange();
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Proactive session refresh — refresh 1 hour before expiry.
+// JWT has 24h TTL, so refresh at the 23h mark.
+setInterval(
+  async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresIn = payload.exp * 1000 - Date.now();
+      if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
+        await refreshSession();
+      }
+    } catch {
+      clearSiweSession();
+    }
+  },
+  5 * 60 * 1000
+);
+
+// Refresh token when user returns to a backgrounded tab.
+// setInterval doesn't fire reliably in inactive tabs, so this
+// catches expired-or-nearly-expired tokens on tab focus.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresIn = payload.exp * 1000 - Date.now();
+      if (expiresIn <= 0) {
+        clearSiweSession();
+      } else if (expiresIn < 60 * 60 * 1000) {
+        const ok = await refreshSession();
+        if (!ok) clearSiweSession();
+      }
+    } catch {
+      clearSiweSession();
+    }
+  });
 }
 
 // ── SIWE message construction ───────────────────────────────────
 
-function buildSiweMessage(params: {
-  address: string;
-  nonce: string;
-  chainId: number;
-}) {
+function buildSiweMessage(params: { address: string; nonce: string; chainId: number }) {
   const domain = window.location.host;
   const uri = window.location.origin;
-  const now = new Date().toISOString();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
 
   return [
     `${domain} wants you to sign in with your Ethereum account:`,
@@ -81,7 +154,8 @@ function buildSiweMessage(params: {
     `Version: 1`,
     `Chain ID: ${params.chainId}`,
     `Nonce: ${params.nonce}`,
-    `Issued At: ${now}`,
+    `Issued At: ${now.toISOString()}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
   ].join('\n');
 }
 
@@ -151,9 +225,9 @@ export function useWalletAuth() {
     }
   }, [address, chain, signMessageAsync]);
 
-  /** Disconnect wallet and clear SIWE session. */
+  /** Disconnect wallet, revoke JWT server-side, and clear SIWE session. */
   const signOut = useCallback(() => {
-    clearSiweSession();
+    clearSiweSession(true); // revoke = true
     disconnect();
   }, [disconnect]);
 
@@ -167,6 +241,13 @@ export function useWalletAuth() {
       clearSiweSession();
     }
   }, [isConnected, address, token]);
+
+  // Auto-trigger SIWE sign-in when wallet connects without an existing session
+  useEffect(() => {
+    if (isConnected && address && chain && !token && !isAuthenticating) {
+      signIn();
+    }
+  }, [isConnected, address, chain, token, isAuthenticating, signIn]);
 
   return {
     address,

@@ -24,7 +24,7 @@ contract UpgradeTest is Test {
         PaymentRouter implV1 = new PaymentRouter();
         PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
             address(implV1),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 500))
+            abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
         )));
 
         // Verify V1 state
@@ -49,7 +49,7 @@ contract UpgradeTest is Test {
         PaymentRouter impl = new PaymentRouter();
         PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 500))
+            abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
         )));
         PaymentRouter newImpl = new PaymentRouter();
         vm.stopPrank();
@@ -65,12 +65,12 @@ contract UpgradeTest is Test {
         vm.startPrank(deployer);
         PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
             address(new PaymentRouter()),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 500))
+            abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
         )));
 
         // Try to reinitialize — should revert
         vm.expectRevert();
-        proxy.initialize(makeAddr("hacker"), 9999);
+        proxy.initialize(makeAddr("hacker"), 9999, address(0), 0);
         vm.stopPrank();
     }
 

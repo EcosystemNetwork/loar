@@ -29,6 +29,9 @@ COPY apps/indexer/abis ./apps/indexer/abis
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
+RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
+USER appuser
+
 WORKDIR /app/apps/indexer
 
 EXPOSE 42069

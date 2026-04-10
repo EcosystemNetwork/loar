@@ -28,7 +28,10 @@ export function useUniverseManager() {
     nodeCreationOptions: number; // 0 = OPEN, 1 = TOKEN_GATED, 2 = ADMIN_ONLY
     nodeVisibilityOptions: number; // 0 = PUBLIC, 1 = TOKEN_GATED
     initialOwner: `0x${string}`;
+    /** Optional Safe multi-sig address — if set, used as initialOwner instead */
+    safeAddress?: `0x${string}`;
   }) => {
+    const owner = config.safeAddress ?? config.initialOwner;
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: universeManagerAbi,
@@ -39,7 +42,7 @@ export function useUniverseManager() {
         config.description,
         config.nodeCreationOptions,
         config.nodeVisibilityOptions,
-        config.initialOwner,
+        owner,
       ],
       chainId,
     });
@@ -80,10 +83,23 @@ export function useUniverseManager() {
         positionBps: number[];
         lockerData: `0x${string}`;
       };
+      allocationConfig?: {
+        lpBps: number;
+        creatorBps: number;
+        treasuryBps: number;
+        communityBps: number;
+      };
     },
     universeId: bigint,
     value: bigint
   ) => {
+    const allocationConfig = config.allocationConfig ?? {
+      lpBps: 8000,
+      creatorBps: 1000,
+      treasuryBps: 500,
+      communityBps: 500,
+    };
+
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: universeManagerAbi,
@@ -93,6 +109,7 @@ export function useUniverseManager() {
           tokenConfig: config.tokenConfig,
           poolConfig: config.poolConfig,
           lockerConfig: config.lockerConfig,
+          allocationConfig,
         },
         universeId,
       ],
@@ -136,8 +153,8 @@ export function useUniverseManager() {
  */
 export function useDefaultDeploymentConfig() {
   return {
-    defaultHook: '0xc3afc04510600b9b69d5cbbe404b6713f3f7a8cc' as `0x${string}`, // LoarHookStaticFee
-    defaultLocker: '0x7a8c6162bd525a1011852f3540d3dcfdd776335a' as `0x${string}`, // LoarLpLockerMultiple
+    defaultHook: '0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC' as `0x${string}`, // LoarHookStaticFee (Sepolia)
+    defaultLocker: '0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6' as `0x${string}`, // LoarLpLockerMultiple (Sepolia)
     defaultPairedToken: '0x0000000000000000000000000000000000000000' as `0x${string}`, // ETH or WETH
     defaultTickSpacing: 60,
     defaultTickIfToken0IsLoar: -887220, // Example starting tick

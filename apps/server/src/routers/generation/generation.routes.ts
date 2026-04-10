@@ -47,7 +47,7 @@ const generateInputSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
   imageUrl: z.string().url().optional(),
   mode: generationModeSchema,
-  durationSec: z.number().min(1).max(12).default(5),
+  durationSec: z.number().min(1).max(20).default(5),
   resolution: z.string().default('720p'),
   aspectRatio: z.string().default('16:9'),
   audio: z.boolean().default(false),
@@ -253,6 +253,67 @@ export const generationRouter = router({
     const generationId = randomUUID();
     const startTime = Date.now();
 
+    // ── Universe Gen Config enforcement ─────────────────────────────
+    let genConfig: any = null;
+    if (input.universeId && db) {
+      const genConfigDoc = await db
+        .collection('universeGenConfigs')
+        .doc(input.universeId.toLowerCase())
+        .get();
+      if (genConfigDoc.exists) {
+        genConfig = genConfigDoc.data();
+
+        // Access control
+        if (genConfig.accessType === 'WHITELISTED') {
+          const address = ctx.user.address?.toLowerCase();
+          const whitelisted = (genConfig.whitelistedAddresses || []).map((a: string) =>
+            a.toLowerCase()
+          );
+          if (!address || !whitelisted.includes(address)) {
+            // Check if universe admin
+            const universeDoc = await db
+              .collection('cinematicUniverses')
+              .doc(input.universeId.toLowerCase())
+              .get();
+            const isAdmin =
+              universeDoc.exists &&
+              universeDoc.data()?.creator?.toLowerCase() === ctx.user.uid.toLowerCase();
+            if (!isAdmin) {
+              throw new Error('Not whitelisted for generation in this universe');
+            }
+          }
+        }
+        // HOLDERS access type — client-side check (on-chain token balance)
+
+        // Model validation
+        if (input.routingMode === 'manual' && input.selectedModelId) {
+          const approved: string[] = genConfig.approvedModelIds || [];
+          const blocked: string[] = genConfig.blockedModelIds || [];
+          if (approved.length > 0 && !approved.includes(input.selectedModelId)) {
+            throw new Error('Selected model is not approved for this universe');
+          }
+          if (blocked.includes(input.selectedModelId)) {
+            throw new Error('Selected model is blocked in this universe');
+          }
+        }
+
+        // Prompt modification
+        if (genConfig.defaultPromptPrefix) {
+          input.prompt = `${genConfig.defaultPromptPrefix} ${input.prompt}`;
+        }
+        if (genConfig.defaultPromptSuffix) {
+          input.prompt = `${input.prompt} ${genConfig.defaultPromptSuffix}`;
+        }
+
+        // Inject negative prompts
+        if (genConfig.negativePrompts?.length > 0) {
+          const existingNeg = input.negativePrompt || '';
+          const configNeg = genConfig.negativePrompts.join(', ');
+          input.negativePrompt = existingNeg ? `${existingNeg}, ${configNeg}` : configNeg;
+        }
+      }
+    }
+
     let finalModelId: string;
     let reasonCode: RoutingReasonCode;
     let providerCostUsd: number;
@@ -309,6 +370,14 @@ export const generationRouter = router({
 
     const model = getModelById(finalModelId);
     if (!model) throw new Error(`Model ${finalModelId} not found in registry`);
+
+    // ── Apply universe credit multiplier ───────────────────────────
+    if (genConfig?.creditMultiplier && genConfig.creditMultiplier !== 1.0) {
+      creditsCharged = Math.ceil(creditsCharged * genConfig.creditMultiplier);
+    }
+    if (genConfig?.minCreditsPerGen && creditsCharged < genConfig.minCreditsPerGen) {
+      creditsCharged = genConfig.minCreditsPerGen;
+    }
 
     // ── Build initial record ────────────────────────────────────────
     const record: VideoGenerationRecord = {
@@ -379,7 +448,7 @@ export const generationRouter = router({
 
       const latencyMs = Date.now() - startTime;
 
-      if (result.status === 'failed' || result.error) {
+      if (result.status === 'failed' || result.error || !result.videoUrl) {
         // Mark provider unhealthy on failure
         markProviderUnhealthy(model.provider);
 

@@ -16,7 +16,7 @@ export const storageRouter = router({
   upload: protectedProcedure
     .input(
       z.object({
-        url: z.string().min(1, 'URL is required'),
+        url: z.string().url('A valid URL is required'),
         filename: z.string().optional(),
       })
     )

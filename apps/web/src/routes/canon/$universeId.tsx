@@ -36,8 +36,14 @@ import {
 } from '@/components/ui/select';
 import { useCanonSubmissions, useSubmitCanon, useVoteCanon, useCanon } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useVocab } from '@/hooks/use-vocab';
+import { useUniverseAddresses } from '@/hooks/useUniverseAddresses';
+import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useReadContract } from 'wagmi';
+import { governanceErc20Abi } from '@loar/abis/generated';
+import { formatEther } from 'viem';
 
 export const Route = createFileRoute('/canon/$universeId')({
   component: CanonPage,
@@ -53,108 +59,113 @@ const SUBMISSION_TYPES = [
 function CanonPage() {
   const { universeId } = useParams({ from: '/canon/$universeId' });
   const { isConnected, address } = useWalletAuth();
+  const v = useVocab();
+  const { tokenAddress } = useUniverseAddresses(universeId);
 
   const { data: voting, isLoading: loadingVoting } = useCanonSubmissions(universeId, 'VOTING');
   const { data: accepted, isLoading: loadingAccepted } = useCanon(universeId);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
-        <Link to="/shop/$universeId" params={{ universeId }}>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <Gavel className="w-4 h-4 text-primary" />
-        <span className="font-semibold">Canon Marketplace</span>
-      </div>
+    <TokenGateGuard universeId={universeId} target="canon">
+      <div className="min-h-screen bg-background pb-24">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
+          <Link to="/shop/$universeId" params={{ universeId }}>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          </Link>
+          <Gavel className="w-4 h-4 text-primary" />
+          <span className="font-semibold">{v('canon-marketplace')}</span>
+        </div>
 
-      <div className="max-w-2xl mx-auto px-4 pt-4">
-        <Tabs defaultValue="voting">
-          <TabsList className="w-full mb-4">
-            <TabsTrigger value="voting" className="flex-1 gap-1">
-              <Clock className="w-3 h-3" />
-              Voting
-              {voting && voting.length > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs px-1.5 h-4">
-                  {voting.length}
-                </Badge>
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <Tabs defaultValue="voting">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="voting" className="flex-1 gap-1">
+                <Clock className="w-3 h-3" />
+                Voting
+                {voting && voting.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs px-1.5 h-4">
+                    {voting.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="accepted" className="flex-1 gap-1">
+                <Trophy className="w-3 h-3" />
+                Canon
+              </TabsTrigger>
+              <TabsTrigger value="submit" className="flex-1 gap-1">
+                <Plus className="w-3 h-3" />
+                Submit
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Voting tab */}
+            <TabsContent value="voting">
+              {loadingVoting ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : voting && voting.length > 0 ? (
+                <div className="space-y-3">
+                  {(voting as any[]).map((sub) => (
+                    <SubmissionCard
+                      key={sub.id}
+                      submission={sub}
+                      universeId={universeId}
+                      isConnected={isConnected}
+                      voterAddress={address}
+                      tokenAddress={tokenAddress}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Gavel className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No active submissions to vote on</p>
+                </div>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="accepted" className="flex-1 gap-1">
-              <Trophy className="w-3 h-3" />
-              Canon
-            </TabsTrigger>
-            <TabsTrigger value="submit" className="flex-1 gap-1">
-              <Plus className="w-3 h-3" />
-              Submit
-            </TabsTrigger>
-          </TabsList>
+            </TabsContent>
 
-          {/* Voting tab */}
-          <TabsContent value="voting">
-            {loadingVoting ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : voting && voting.length > 0 ? (
-              <div className="space-y-3">
-                {(voting as any[]).map((sub) => (
-                  <SubmissionCard
-                    key={sub.id}
-                    submission={sub}
-                    universeId={universeId}
-                    isConnected={isConnected}
-                    voterAddress={address}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <Gavel className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No active submissions to vote on</p>
-              </div>
-            )}
-          </TabsContent>
+            {/* Accepted canon tab */}
+            <TabsContent value="accepted">
+              {loadingAccepted ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : accepted && (accepted as any[]).length > 0 ? (
+                <div className="space-y-3">
+                  {(accepted as any[]).map((entry) => (
+                    <CanonCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No canon entries yet</p>
+                  <p className="text-xs mt-1">Submit content and let token holders decide</p>
+                </div>
+              )}
+            </TabsContent>
 
-          {/* Accepted canon tab */}
-          <TabsContent value="accepted">
-            {loadingAccepted ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : accepted && (accepted as any[]).length > 0 ? (
-              <div className="space-y-3">
-                {(accepted as any[]).map((entry) => (
-                  <CanonCard key={entry.id} entry={entry} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No canon entries yet</p>
-                <p className="text-xs mt-1">Submit content and let token holders decide</p>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Submit tab */}
-          <TabsContent value="submit">
-            {!isConnected ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground mb-4">Connect your wallet to submit</p>
-                <Link to="/login">
-                  <Button variant="outline">Connect Wallet</Button>
-                </Link>
-              </div>
-            ) : (
-              <SubmitForm universeId={universeId} />
-            )}
-          </TabsContent>
-        </Tabs>
+            {/* Submit tab */}
+            <TabsContent value="submit">
+              {!isConnected ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground mb-4">{v('connect-wallet')} to submit</p>
+                  <Link to="/login">
+                    <Button variant="outline">{v('connect-wallet')}</Button>
+                  </Link>
+                </div>
+              ) : (
+                <SubmitForm universeId={universeId} tokenAddress={tokenAddress} />
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </TokenGateGuard>
   );
 }
 
@@ -165,14 +176,27 @@ function SubmissionCard({
   universeId,
   isConnected,
   voterAddress,
+  tokenAddress,
 }: {
   submission: any;
   universeId: string;
   isConnected: boolean;
   voterAddress?: string | null;
+  tokenAddress?: `0x${string}`;
 }) {
   const vote = useVoteCanon();
   const [voted, setVoted] = useState(false);
+
+  // Read governance token balance for weighted voting
+  const { data: tokenBalance } = useReadContract({
+    address: tokenAddress,
+    abi: governanceErc20Abi,
+    functionName: 'balanceOf',
+    args: voterAddress ? [voterAddress as `0x${string}`] : undefined,
+    query: { enabled: !!voterAddress && !!tokenAddress },
+  });
+
+  const voteWeight = tokenBalance ? formatEther(tokenBalance) : '1';
 
   const totalVotes = (submission.votesFor || 0) + (submission.votesAgainst || 0);
   const forPct = totalVotes > 0 ? Math.round((submission.votesFor / totalVotes) * 100) : 0;
@@ -194,7 +218,7 @@ function SubmissionCard({
       await vote.mutateAsync({
         submissionId: submission.id,
         support,
-        weight: '1', // 1 vote per wallet (governance token weighting TBD on-chain)
+        weight: voteWeight,
       });
       setVoted(true);
       toast.success(support ? 'Voted for!' : 'Voted against');
@@ -319,7 +343,13 @@ function CanonCard({ entry }: { entry: any }) {
 
 // ---- Submit form ----
 
-function SubmitForm({ universeId }: { universeId: string }) {
+function SubmitForm({
+  universeId,
+  tokenAddress,
+}: {
+  universeId: string;
+  tokenAddress?: `0x${string}`;
+}) {
   const submit = useSubmitCanon();
   const [form, setForm] = useState({
     submissionType: 'CHARACTER' as const,
@@ -346,7 +376,7 @@ function SubmitForm({ universeId }: { universeId: string }) {
     try {
       await submit.mutateAsync({
         universeId,
-        universeToken: '', // governance token address (optional for off-chain voting)
+        universeToken: tokenAddress || '',
         submissionType: form.submissionType,
         title: form.title.trim(),
         description: form.description.trim(),

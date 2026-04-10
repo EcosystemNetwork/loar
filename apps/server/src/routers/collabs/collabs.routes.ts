@@ -5,6 +5,7 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { resolveActingUid, recordAgentCommission } from '../../services/agentAuth';
 
 const collabsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -26,12 +27,16 @@ export const collabsRouter = router({
         title: z.string(),
         description: z.string(),
         metadataURI: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...collabInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'collabs');
+
       const collab = {
-        ...input,
-        proposerUid: ctx.user.uid,
+        ...collabInput,
+        proposerUid: actingUid,
         proposerAddress: ctx.user.address || null,
         acceptorUid: null as string | null,
         acceptorAddress: null as string | null,
@@ -49,15 +54,18 @@ export const collabsRouter = router({
     }),
 
   accept: protectedProcedure
-    .input(z.object({ collabId: z.string() }))
+    .input(z.object({ collabId: z.string(), onBehalfOfUid: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'collabs');
+
       const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
       if (doc.data()?.status !== 'PROPOSED') throw new Error('Not in proposed status');
 
       await ref.update({
-        acceptorUid: ctx.user.uid,
+        acceptorUid: actingUid,
         acceptorAddress: ctx.user.address || null,
         status: 'ACCEPTED',
         updatedAt: new Date(),

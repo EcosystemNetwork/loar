@@ -140,9 +140,18 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (sub.expiresAt > block.timestamp) {
             // Extend existing subscription
             startTime = sub.expiresAt;
+            // If changing tiers on an active subscription, adjust counts
+            if (sub.tier != tier) {
+                subscriberCount[universeId][sub.tier]--;
+                subscriberCount[universeId][tier]++;
+            }
         } else if (sub.expiresAt > 0) {
             // Previous subscription expired, decrement old tier count
             subscriberCount[universeId][sub.tier]--;
+            subscriberCount[universeId][tier]++;
+        } else {
+            // Brand new subscriber
+            subscriberCount[universeId][tier]++;
         }
 
         uint256 expiry = startTime + (months * 30 days);
@@ -154,10 +163,6 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
             expiresAt: expiry,
             autoRenew: true
         });
-
-        if (sub.expiresAt == 0 || sub.expiresAt <= block.timestamp) {
-            subscriberCount[universeId][tier]++;
-        }
 
         // Route subscription payment through PaymentRouter
         address creator = universeCreators[universeId];

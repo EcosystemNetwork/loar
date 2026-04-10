@@ -116,7 +116,7 @@ contract DeployUniverseScript is Script {
         require(lockerAddress != address(0), "LOCKER_ADDRESS not set");
         require(pairedToken != address(0), "PAIRED_TOKEN not set");
 
-        universeManager = UniverseManager(universeManagerAddress);
+        universeManager = UniverseManager(payable(universeManagerAddress));
 
         console.log("=== Universe Deployment Configuration ===");
         console.log("Deployer address:", deployerAddress);
@@ -209,10 +209,18 @@ contract DeployUniverseScript is Script {
             lockerData: ""
         });
 
+        IUniverseManager.AllocationConfig memory allocationConfig = IUniverseManager.AllocationConfig({
+            lpBps: 0,
+            creatorBps: 0,
+            treasuryBps: 0,
+            communityBps: 0
+        });
+
         IUniverseManager.DeploymentConfig memory deployConfig = IUniverseManager.DeploymentConfig({
             tokenConfig: tokenConfig,
             poolConfig: poolConfig,
-            lockerConfig: lockerConfig
+            lockerConfig: lockerConfig,
+            allocationConfig: allocationConfig
         });
 
         address tokenAddress = universeManager.deployUniverseToken(deployConfig, universeId);

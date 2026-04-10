@@ -3,24 +3,29 @@
  *
  * Used alongside Dynamic Labs wallet provider. Dynamic supplies the
  * connectors — this config only declares chains and transports.
+ *
+ * Chain set is controlled by VITE_CHAIN_ENV (see src/configs/chains.ts).
  */
 
 import { createConfig, http } from 'wagmi';
-import { base, baseSepolia, sepolia, mainnet, arbitrum, optimism, polygon } from 'wagmi/chains';
+import { sepolia, base, baseSepolia } from 'wagmi/chains';
+import { SUPPORTED_EVM_CHAIN_IDS } from './src/configs/chains';
+
+const allChains = {
+  [sepolia.id]: sepolia,
+  [base.id]: base,
+  [baseSepolia.id]: baseSepolia,
+} as const;
+
+const chains = SUPPORTED_EVM_CHAIN_IDS.map((id) => allChains[id]);
 
 /** Default chain used for contract interactions and wallet prompts. */
-export const defaultChain = sepolia;
+export const defaultChain = chains[0];
+
+const transports = Object.fromEntries(chains.map((c) => [c.id, http()]));
 
 export const config = createConfig({
-  chains: [sepolia, baseSepolia, base, mainnet, arbitrum, optimism, polygon],
+  chains: chains as unknown as readonly [(typeof chains)[0], ...typeof chains],
   multiInjectedProviderDiscovery: false,
-  transports: {
-    [sepolia.id]: http(),
-    [baseSepolia.id]: http(),
-    [base.id]: http(),
-    [mainnet.id]: http(),
-    [arbitrum.id]: http(),
-    [optimism.id]: http(),
-    [polygon.id]: http(),
-  },
+  transports,
 });
