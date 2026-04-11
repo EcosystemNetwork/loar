@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20.18.1-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
@@ -28,7 +28,7 @@ RUN pnpm add -w -D esbuild && pnpm exec esbuild apps/server/src/index.ts \
   --packages=external
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:20.18.1-alpine AS production
 
 RUN apk add --no-cache curl
 WORKDIR /app

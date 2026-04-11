@@ -33,8 +33,11 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
     uint256 public constant BPS = 10_000;
 
-    /// @notice Fee required to mint a universe (0.05 Base ETH).
-    uint256 public constant MINT_FEE = 0.05 ether;
+    /// @notice Fee required to mint a universe (default 0.05 ETH).
+    uint256 public mintFee;
+
+    /// @notice Split basis points: how much of mint fee goes to LP (rest to credit fund). Default 5000 = 50%.
+    uint16 public mintFeeLpBps;
 
     /// @notice Address that receives the LP half of the mint fee to deepen $LOAR liquidity.
     address public lpRecipient;
@@ -52,10 +55,25 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     bool public deprecated;
 
     event SetTokenDeployer(address oldTokenDeployer, address newTokenDeployer);
+    event MintFeeUpdated(uint256 oldFee, uint256 newFee);
+    event MintFeeLpBpsUpdated(uint16 oldBps, uint16 newBps);
 
     constructor(address _teamFeeRecipient, address _lpRecipient) Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
         lpRecipient = _lpRecipient;
+        mintFee = 0.05 ether;
+        mintFeeLpBps = 5000; // 50% to LP, 50% to credit fund
+    }
+
+    function setMintFee(uint256 _mintFee) external onlyOwner {
+        emit MintFeeUpdated(mintFee, _mintFee);
+        mintFee = _mintFee;
+    }
+
+    function setMintFeeLpBps(uint16 _mintFeeLpBps) external onlyOwner {
+        require(_mintFeeLpBps <= 10_000, "Invalid bps");
+        emit MintFeeLpBpsUpdated(mintFeeLpBps, _mintFeeLpBps);
+        mintFeeLpBps = _mintFeeLpBps;
     }
 
     function setTokenDeployer(address _tokenDeployer) external onlyOwner {
@@ -100,19 +118,19 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         address initialOwner
     ) public payable nonReentrant returns (uint256 _id, address) {
         require(!deprecated, "Manager is deprecated");
-        if (msg.value < MINT_FEE) revert InsufficientMintFee();
+        if (msg.value < mintFee) revert InsufficientMintFee();
         if (lpRecipient == address(0)) revert LpRecipientNotSet();
 
-        // ── Fee split: 50 % to LP recipient, 50 % held for universe credit pool ──
-        uint256 lpAmount     = MINT_FEE / 2;           // 0.025 ETH → $LOAR LP
-        uint256 creditAmount = MINT_FEE - lpAmount;    // 0.025 ETH → universe credit pool
+        // ── Fee split: configurable LP/credit split via mintFeeLpBps ──
+        uint256 lpAmount     = (mintFee * mintFeeLpBps) / 10_000;
+        uint256 creditAmount = mintFee - lpAmount;
 
         (bool lpSent,) = lpRecipient.call{value: lpAmount}("");
         require(lpSent, "LP fee transfer failed");
 
         // Refund any overpayment
-        if (msg.value > MINT_FEE) {
-            (bool refunded,) = msg.sender.call{value: msg.value - MINT_FEE}("");
+        if (msg.value > mintFee) {
+            (bool refunded,) = msg.sender.call{value: msg.value - mintFee}("");
             require(refunded, "Refund failed");
         }
 

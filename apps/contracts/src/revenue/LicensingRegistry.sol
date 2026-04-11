@@ -5,13 +5,14 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title LicensingRegistry
 /// @notice Manages IP licensing for original universes. When a universe gains traction,
 ///         creators can register licensing deals with external platforms (Netflix, Amazon, etc).
 ///         Also handles merch licensing for original IP (shirts, posters, figurines, comics).
-contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum LicenseType { STREAMING, MERCH, GAMING, COMIC, AUDIO, OTHER }
     enum LicenseStatus { PROPOSED, ACTIVE, EXPIRED, REVOKED }
 
@@ -96,12 +97,16 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -127,7 +132,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         uint16 royaltyBps,
         uint256 duration,
         string calldata terms
-    ) external returns (uint256 licenseId) {
+    ) external whenNotPaused returns (uint256 licenseId) {
         if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotUniverseCreator();
         licenseId = nextLicenseId++;
 
@@ -151,7 +156,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Activate a license (licensee pays upfront fee)
-    function activateLicense(uint256 licenseId) external payable nonReentrant {
+    function activateLicense(uint256 licenseId) external payable nonReentrant whenNotPaused {
         License storage lic = licenses[licenseId];
         if (lic.status != LicenseStatus.PROPOSED) revert InvalidStatus();
         require(msg.sender == lic.licensee, "Not licensee");
@@ -171,7 +176,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Pay ongoing royalties for an active license
-    function payRoyalty(uint256 licenseId) external payable {
+    function payRoyalty(uint256 licenseId) external payable whenNotPaused {
         License storage lic = licenses[licenseId];
         require(lic.status == LicenseStatus.ACTIVE, "Not active");
 
@@ -201,7 +206,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         string calldata name,
         string calldata metadataURI,
         uint256 price
-    ) external returns (uint256 merchId) {
+    ) external whenNotPaused returns (uint256 merchId) {
         merchId = nextMerchId++;
         merchItems[merchId] = MerchItem({
             id: merchId,
@@ -218,7 +223,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Purchase merchandise
-    function purchaseMerch(uint256 merchId) external payable nonReentrant {
+    function purchaseMerch(uint256 merchId) external payable nonReentrant whenNotPaused {
         MerchItem storage item = merchItems[merchId];
         if (!item.active) revert MerchNotActive();
         if (msg.value < item.price) revert InsufficientPayment();

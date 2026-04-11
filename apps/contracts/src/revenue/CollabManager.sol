@@ -5,6 +5,7 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
 
@@ -12,7 +13,7 @@ import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
 /// @notice Manages cross-universe collaborations ("collisions").
 ///         Two universes can merge for special event episodes, joint NFTs,
 ///         and shared liquidity events.
-contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum CollabStatus { PROPOSED, ACCEPTED, ACTIVE, COMPLETED, CANCELLED }
 
     struct Collab {
@@ -79,6 +80,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _paymentRouter == address(0) || _universeManager == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
@@ -86,6 +88,9 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         universeManager = IUniverseManager(_universeManager);
         platformFeeBps = _platformFeeBps;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -98,7 +103,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         uint256 duration,           // seconds
         string calldata metadataURI,
         address targetAcceptor
-    ) external returns (uint256 collabId) {
+    ) external whenNotPaused returns (uint256 collabId) {
         require(revenueShareBps <= 10000, "Invalid share");
         if (targetAcceptor == address(0)) revert ZeroAddress();
 
@@ -126,7 +131,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     /// @notice Accept a collaboration proposal (only the designated targetAcceptor)
-    function acceptCollab(uint256 collabId) external {
+    function acceptCollab(uint256 collabId) external whenNotPaused {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.PROPOSED) revert InvalidStatus();
         if (msg.sender != c.acceptor) revert NotAcceptor();
@@ -137,7 +142,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     /// @notice Activate a collaboration (starts the event window)
-    function activateCollab(uint256 collabId) external {
+    function activateCollab(uint256 collabId) external whenNotPaused {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.ACCEPTED) revert InvalidStatus();
         require(msg.sender == c.proposer || msg.sender == c.acceptor, "Not participant");
@@ -154,7 +159,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     /// @notice Record revenue from a collab episode (called by platform)
-    function recordCollabRevenue(uint256 collabId) external payable onlyPlatform {
+    function recordCollabRevenue(uint256 collabId) external payable onlyPlatform whenNotPaused {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.ACTIVE) revert CollabNotActive();
 
