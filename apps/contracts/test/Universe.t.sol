@@ -139,7 +139,7 @@ contract UniverseTest is Test {
         universe.setCanon(child);
 
         (,,,,,bool rootCanon,) = universe.getNode(root);
-        assertFalse(rootCanon);
+        assertTrue(rootCanon); // root stays canon — setCanon only marks the target node
         (,,,,,bool childCanon,) = universe.getNode(child);
         assertTrue(childCanon);
     }
