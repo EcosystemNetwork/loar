@@ -28,53 +28,53 @@ An architecture-level security review found **no critical or high-severity issue
 
 | Contract              | Address                                      | Etherscan                                                                               |
 | --------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| UniverseManager       | `0x7af142BbD14CaEECdA68f948F467Da0257f6B114` | [View](https://sepolia.etherscan.io/address/0x7af142BbD14CaEECdA68f948F467Da0257f6B114) |
-| UniverseTokenDeployer | `0xE34DAB193105F3d7ec6EE4E6172cbE6213108d8B` | [View](https://sepolia.etherscan.io/address/0xE34DAB193105F3d7ec6EE4E6172cbE6213108d8B) |
-| LoarToken             | `0x0A647b3b7426Bce958e7C2FE59f0a89191952C17` | [View](https://sepolia.etherscan.io/address/0x0A647b3b7426Bce958e7C2FE59f0a89191952C17) |
-| LoarHookStaticFee     | `0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC` | [View](https://sepolia.etherscan.io/address/0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC) |
-| LoarFeeLocker         | `0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f` | [View](https://sepolia.etherscan.io/address/0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f) |
-| LoarLpLockerMultiple  | `0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6` | [View](https://sepolia.etherscan.io/address/0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6) |
+| UniverseManager       | `0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce` | [View](https://sepolia.etherscan.io/address/0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce) |
+| UniverseTokenDeployer | `0xa2556B55C834504b2d71ECa8D1c1295e19D31BEf` | [View](https://sepolia.etherscan.io/address/0xa2556B55C834504b2d71ECa8D1c1295e19D31BEf) |
+| LoarToken             | `0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F` | [View](https://sepolia.etherscan.io/address/0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F) |
+| LoarHookStaticFee     | `0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc` | [View](https://sepolia.etherscan.io/address/0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc) |
+| LoarFeeLocker         | `0x1E10b62bd2817d0C2414909027E1E63653fcCd8e` | [View](https://sepolia.etherscan.io/address/0x1E10b62bd2817d0C2414909027E1E63653fcCd8e) |
+| LoarLpLockerMultiple  | `0xc00225D9463C15280748dC2E21D8D8625982Ad54` | [View](https://sepolia.etherscan.io/address/0xc00225D9463C15280748dC2E21D8D8625982Ad54) |
 
 #### Revenue Singletons (UUPS Proxies)
 
 | Contract            | Proxy Address                                | Implementation                               | Etherscan                                                                               |
 | ------------------- | -------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| PaymentRouter       | `0xd8b49c99aDb51575eea4FB795645fc9e1ce4Fa9C` | `0x52b42135703a0b4180f56323e01a75b7186db3f9` | [View](https://sepolia.etherscan.io/address/0xd8b49c99aDb51575eea4FB795645fc9e1ce4Fa9C) |
-| RightsRegistry      | `0x711eC315392f6f9FFd37e673B35acc63b9999323` | `0x4ee8a6055270ee5b9cc4132c98cad686bbb08fc4` | [View](https://sepolia.etherscan.io/address/0x711eC315392f6f9FFd37e673B35acc63b9999323) |
-| CanonMarketplace    | `0x8e6c09198267B07E3FC8C66F0343759111D63016` | `0x4c617ca52de2d2ca8bb0414f7f1dd0a90a915031` | [View](https://sepolia.etherscan.io/address/0x8e6c09198267B07E3FC8C66F0343759111D63016) |
-| CreditManager       | `0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240` | `0x4ce3d82b3ab99ecf404f43aa5167c1e6bf52a3cf` | [View](https://sepolia.etherscan.io/address/0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240) |
-| AdPlacement         | `0xB18db49DFAB0d8B05916260D457574348893601d` | `0x5baad71add73e7748f1c1c2b67a2eb4040dceb1c` | [View](https://sepolia.etherscan.io/address/0xB18db49DFAB0d8B05916260D457574348893601d) |
-| SubscriptionManager | `0xa6c4bd0256da30780529bf3cf6d78bfedacbcbb9` | (direct, not proxied)                        | [View](https://sepolia.etherscan.io/address/0xa6c4bd0256da30780529bf3cf6d78bfedacbcbb9) |
-| LicensingRegistry   | `0xE64563E0361f26228783e6cBAd3789563A6d5eA7` | `0x1485efdd66c5e8cf43bac3ee57e4d50660bc4779` | [View](https://sepolia.etherscan.io/address/0xE64563E0361f26228783e6cBAd3789563A6d5eA7) |
-| CollabManager       | `0xD98755fdEA77Aa76b19DD979f9a3134502D18294` | `0x59695f4b5f4202968317b925eafb786653aae7a0` | [View](https://sepolia.etherscan.io/address/0xD98755fdEA77Aa76b19DD979f9a3134502D18294) |
-| AnalyticsRegistry   | `0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8` | `0x0947ec7ea4bd4509b1b72257cbfdace14d2c9e4a` | [View](https://sepolia.etherscan.io/address/0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8) |
+| PaymentRouter       | `0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6` | `0x3991d3f3327F05E36430f021451b700bb101CF4D` | [View](https://sepolia.etherscan.io/address/0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6) |
+| RightsRegistry      | `0x3A14A746990498d5a4eCe867db10a197f91856Bc` | `0x82b4Fe50cE07a64CbF5f97E9d70F2cEb8af63EA3` | [View](https://sepolia.etherscan.io/address/0x3A14A746990498d5a4eCe867db10a197f91856Bc) |
+| CanonMarketplace    | `0xDc5998C5e334345Ac3Aa9a9c6e141f471e929c81` | `0x2BB4750b79c48E5d39c29b5E88dE05db94a6Ab1F` | [View](https://sepolia.etherscan.io/address/0xDc5998C5e334345Ac3Aa9a9c6e141f471e929c81) |
+| CreditManager       | `0x5110FCCaf50316D8F874F22428dC1a832F591639` | `0x511C6A684F8AA68C2e42b2fd7aC94E94270535A9` | [View](https://sepolia.etherscan.io/address/0x5110FCCaf50316D8F874F22428dC1a832F591639) |
+| AdPlacement         | `0x972bD30323B0Fb5f2466E39593cCdE1e8ae3F8C1` | `0x5baad71add73e7748f1c1c2b67a2eb4040dceb1c` | [View](https://sepolia.etherscan.io/address/0x972bD30323B0Fb5f2466E39593cCdE1e8ae3F8C1) |
+| SubscriptionManager | `0x53542bA1e3445804D9a225C967E2677F017D1d47` | (direct, not proxied)                        | [View](https://sepolia.etherscan.io/address/0x53542bA1e3445804D9a225C967E2677F017D1d47) |
+| LicensingRegistry   | `0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C` | `0x1485efdd66c5e8cf43bac3ee57e4d50660bc4779` | [View](https://sepolia.etherscan.io/address/0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C) |
+| CollabManager       | `0xE981454B4149BEa3a9018fa2ab77482F388ba01f` | `0x59695f4b5f4202968317b925eafb786653aae7a0` | [View](https://sepolia.etherscan.io/address/0xE981454B4149BEa3a9018fa2ab77482F388ba01f) |
+| AnalyticsRegistry   | `0xB86539C4bf30036B6bd1513320cF38Bc839c7922` | `0x0947ec7ea4bd4509b1b72257cbfdace14d2c9e4a` | [View](https://sepolia.etherscan.io/address/0xB86539C4bf30036B6bd1513320cF38Bc839c7922) |
 
 #### NFT Beacons
 
 | Contract       | Beacon Address                               | Implementation                               | Etherscan                                                                               |
 | -------------- | -------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| EpisodeEdition | `0xd70A0A63d1F80D6f28BeB3e8f3FC2a34dBEC3618` | `0x54ca19957b1fa6114603f2ba0422584063fd2b02` | [View](https://sepolia.etherscan.io/address/0xd70A0A63d1F80D6f28BeB3e8f3FC2a34dBEC3618) |
-| Character      | `0xe15D941140e5504AF7C1b56AC14dA236963A99ae` | `0xedd26a1870344789eb7b900875516aedae04d102` | [View](https://sepolia.etherscan.io/address/0xe15D941140e5504AF7C1b56AC14dA236963A99ae) |
-| Entity         | `0x152ADc8350ee69162989c0C52f5ffb2f8A09E17B` | `0x222604e2185802046692293fd31dcb4bde249bc3` | [View](https://sepolia.etherscan.io/address/0x152ADc8350ee69162989c0C52f5ffb2f8A09E17B) |
-| EntityEdition  | `0x7e62116B9A889150E6D07830a179f3cF803c2908` | `0x6077ce7cb99bfe1ec3c67f8635a597a76e3fbb71` | [View](https://sepolia.etherscan.io/address/0x7e62116B9A889150E6D07830a179f3cF803c2908) |
-| EpisodeNFT     | `0x89c4b520319FDB6cd23cb8DC5E6b023B110F23fC` | `0x751ed220b082ae763446fe1fd583f3962eebe6a3` | [View](https://sepolia.etherscan.io/address/0x89c4b520319FDB6cd23cb8DC5E6b023B110F23fC) |
+| EpisodeEdition | `0x14742D6BB8eeE513D0D70a235d8B4d801F19F9ed` | `0x54ca19957b1fa6114603f2ba0422584063fd2b02` | [View](https://sepolia.etherscan.io/address/0x14742D6BB8eeE513D0D70a235d8B4d801F19F9ed) |
+| Character      | `0x0BEcc54417e9AaC9289C748eb72ECBb55292756f` | `0xedd26a1870344789eb7b900875516aedae04d102` | [View](https://sepolia.etherscan.io/address/0x0BEcc54417e9AaC9289C748eb72ECBb55292756f) |
+| Entity         | `0xF951065C7d4d28805188F60a3F8bd398B7776EC8` | `0x222604e2185802046692293fd31dcb4bde249bc3` | [View](https://sepolia.etherscan.io/address/0xF951065C7d4d28805188F60a3F8bd398B7776EC8) |
+| EntityEdition  | `0xb3D7889c393b710edF2e087Cd2b7148a2556f47b` | `0x6077ce7cb99bfe1ec3c67f8635a597a76e3fbb71` | [View](https://sepolia.etherscan.io/address/0xb3D7889c393b710edF2e087Cd2b7148a2556f47b) |
+| EpisodeNFT     | `0x3ebb4FFd384Fc971F445AA950055203916b749a5` | `0x751ed220b082ae763446fe1fd583f3962eebe6a3` | [View](https://sepolia.etherscan.io/address/0x3ebb4FFd384Fc971F445AA950055203916b749a5) |
 
 #### Factory
 
 | Contract             | Address                                      | Etherscan                                                                               |
 | -------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| RevenueModuleFactory | `0x056dDe6c068cE3FE17C2E6eE6cfA8F76eB5A5264` | [View](https://sepolia.etherscan.io/address/0x056dDe6c068cE3FE17C2E6eE6cfA8F76eB5A5264) |
+| RevenueModuleFactory | `0x6D5CEf09F044224A51bd59EB841769255070e5dA` | [View](https://sepolia.etherscan.io/address/0x6D5CEf09F044224A51bd59EB841769255070e5dA) |
 
 ### Base Sepolia (Chain 84532)
 
 | Contract              | Address                                      | Etherscan                                                                               |
 | --------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| UniverseManager       | `0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f` | [View](https://sepolia.basescan.org/address/0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f) |
-| UniverseTokenDeployer | `0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6` | [View](https://sepolia.basescan.org/address/0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6) |
-| LoarToken             | `0x30A37d04aFa2648FA4427b13c7ca380490F46BaD` | [View](https://sepolia.basescan.org/address/0x30A37d04aFa2648FA4427b13c7ca380490F46BaD) |
-| LoarHookStaticFee     | `0x31D8C79D81517a967175E1723d777c6B4AD568CC` | [View](https://sepolia.basescan.org/address/0x31D8C79D81517a967175E1723d777c6B4AD568CC) |
-| LoarFeeLocker         | `0xf97b6900f5573cba7dcE4e58e5118b403E098434` | [View](https://sepolia.basescan.org/address/0xf97b6900f5573cba7dcE4e58e5118b403E098434) |
-| LoarLpLockerMultiple  | `0x91D581cFdda6F1AC4cA211d8A05B31BeFcEF2882` | [View](https://sepolia.basescan.org/address/0x91D581cFdda6F1AC4cA211d8A05B31BeFcEF2882) |
+| UniverseManager       | `0x46ce7cd72763B784977349686AEa72B84d3F86B6` | [View](https://sepolia.basescan.org/address/0x46ce7cd72763B784977349686AEa72B84d3F86B6) |
+| UniverseTokenDeployer | `0xEC9455F29A5a7A2a5F496bB7D4B428A1df3850dF` | [View](https://sepolia.basescan.org/address/0xEC9455F29A5a7A2a5F496bB7D4B428A1df3850dF) |
+| LoarToken             | `0x008B6266C10d124B0E8713769C310De802D76a35` | [View](https://sepolia.basescan.org/address/0x008B6266C10d124B0E8713769C310De802D76a35) |
+| LoarHookStaticFee     | `0xAC0C66fc1A9daE256ba91797D5B3E4fe4938a8Cc` | [View](https://sepolia.basescan.org/address/0xAC0C66fc1A9daE256ba91797D5B3E4fe4938a8Cc) |
+| LoarFeeLocker         | `0x0a66152096f37F83D41c56534022e746B159b052` | [View](https://sepolia.basescan.org/address/0x0a66152096f37F83D41c56534022e746B159b052) |
+| LoarLpLockerMultiple  | `0x6FB4b73B1e980217010d20B7DA065b06EA7802B6` | [View](https://sepolia.basescan.org/address/0x6FB4b73B1e980217010d20B7DA065b06EA7802B6) |
 
 **Contract Owner:** `0x116C28e6DCABCa363f83217C712d79DCE168d90e`
 
@@ -87,7 +87,7 @@ To verify all contracts on Etherscan, run from `apps/contracts/`:
 ```bash
 # Sepolia — core protocol
 source ../../.env
-forge verify-contract 0x7af142BbD14CaEECdA68f948F467Da0257f6B114 src/UniverseManager.sol:UniverseManager \
+forge verify-contract 0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce src/UniverseManager.sol:UniverseManager \
   --chain-id 11155111 --etherscan-api-key $VERIFICATION_KEY_1
 
 # Repeat for each contract address above

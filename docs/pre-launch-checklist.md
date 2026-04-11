@@ -43,9 +43,9 @@ Audit-driven checklist. Items are grouped by launch phase.
 - [ ] **#7 Placeholder Contracts** — Pause or gate unused Sepolia contracts
   - IP Licensing and Collabs have deployed contracts but NO public UI
   - Someone could interact directly with:
-    - `AdPlacement: 0xB18db49...`
-    - `LicensingRegistry: 0xE64563E...`
-    - `CollabManager: 0xD98755f...`
+    - `AdPlacement: 0x972bD30...`
+    - `LicensingRegistry: 0xbF0Fed6...`
+    - `CollabManager: 0xE981454...`
   - **Action**: Call `pause()` on each (if Pausable) or transfer ownership to a burn address
   - **Note**: These contracts do NOT inherit Pausable — see #2 below
 

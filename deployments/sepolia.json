@@ -1,17 +1,13 @@
 {
   "chainId": 11155111,
   "environment": "sepolia",
-  "startBlock": 10530132,
-  "updatedAt": "2026-03-28T00:00:00.000Z",
+  "startBlock": 10638157,
+  "updatedAt": "2026-04-11T16:38:30.280Z",
   "contracts": {
-    "UniverseManager": "0x7af142BbD14CaEECdA68f948F467Da0257f6B114",
-    "UniverseTokenDeployer": "0xE34DAB193105F3d7ec6EE4E6172cbE6213108d8B",
-    "LoarFeeLocker": "0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f",
-    "LoarLpLockerMultiple": "0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6",
-    "LoarHookStaticFee": "0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC",
-    "LoarToken": "0x0A647b3b7426Bce958e7C2FE59f0a89191952C17",
-    "PaymentRouter": "0xd8b49c99adb51575eea4fb795645fc9e1ce4fa9c",
-    "CreditManager": "0x7bb6cddd392bf8a6a6e58fd8600b87c8455e8240",
-    "SubscriptionManager": "0xa6c4bd0256da30780529bf3cf6d78bfedacbcbb9"
+    "UniverseManager": "0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce",
+    "UniverseTokenDeployer": "0xa2556B55C834504b2d71ECa8D1c1295e19D31BEf",
+    "LoarFeeLocker": "0x1E10b62bd2817d0C2414909027E1E63653fcCd8e",
+    "LoarLpLockerMultiple": "0xc00225D9463C15280748dC2E21D8D8625982Ad54",
+    "LoarHookStaticFee": "0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc"
   }
 }

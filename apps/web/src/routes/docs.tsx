@@ -542,11 +542,11 @@ getUniverse(address) → UniverseData`}</CodeBlock>
             <Table
               headers={['Contract', 'Address']}
               rows={[
-                ['UniverseManager', '0x7af142BbD14CaEECdA68f948F467Da0257f6B114'],
-                ['UniverseTokenDeployer', '0xE34DAB193105F3d7ec6EE4E6172cbE6213108d8B'],
-                ['LoarFeeLocker', '0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f'],
-                ['LoarLpLockerMultiple', '0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6'],
-                ['LoarHookStaticFee', '0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC'],
+                ['UniverseManager', '0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce'],
+                ['UniverseTokenDeployer', '0xa2556B55C834504b2d71ECa8D1c1295e19D31BEf'],
+                ['LoarFeeLocker', '0x1E10b62bd2817d0C2414909027E1E63653fcCd8e'],
+                ['LoarLpLockerMultiple', '0xc00225D9463C15280748dC2E21D8D8625982Ad54'],
+                ['LoarHookStaticFee', '0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc'],
               ]}
             />
           </Section>
