@@ -5,10 +5,8 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
-import {IUniverse} from "../interfaces/IUniverse.sol";
 
 /// @title CollabManager
 /// @notice Manages cross-universe collaborations ("collisions").
@@ -62,8 +60,12 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
-        if (msg.sender != platform) revert NotPlatform();
+        _checkPlatform();
         _;
+    }
+
+    function _checkPlatform() internal view {
+        if (msg.sender != platform) revert NotPlatform();
     }
 
     error ZeroAddress();
@@ -88,14 +90,17 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Propose a cross-universe collaboration
+    /// @param targetAcceptor The address authorized to accept this collab (must be universe B admin)
     function proposeCollab(
         uint256 universeA,
         uint256 universeB,
         uint256 revenueShareBps,   // A's share in bps
         uint256 duration,           // seconds
-        string calldata metadataURI
+        string calldata metadataURI,
+        address targetAcceptor
     ) external returns (uint256 collabId) {
         require(revenueShareBps <= 10000, "Invalid share");
+        if (targetAcceptor == address(0)) revert ZeroAddress();
 
         collabId = nextCollabId++;
 
@@ -104,7 +109,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
             universeA: universeA,
             universeB: universeB,
             proposer: msg.sender,
-            acceptor: address(0),
+            acceptor: targetAcceptor,
             status: CollabStatus.PROPOSED,
             revenueShareBps: revenueShareBps,
             totalRevenue: 0,
@@ -120,16 +125,12 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         emit CollabProposed(collabId, universeA, universeB, msg.sender);
     }
 
-    /// @notice Accept a collaboration proposal (only admin of universe B)
+    /// @notice Accept a collaboration proposal (only the designated targetAcceptor)
     function acceptCollab(uint256 collabId) external {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.PROPOSED) revert InvalidStatus();
+        if (msg.sender != c.acceptor) revert NotAcceptor();
 
-        // Verify msg.sender is the admin/creator of universe B
-        (IUniverse universeB,,,,) = universeManager.getUniverseData(c.universeB);
-        if (universeB.getAdmin() != msg.sender) revert NotUniverseBAdmin();
-
-        c.acceptor = msg.sender;
         c.status = CollabStatus.ACCEPTED;
 
         emit CollabAccepted(collabId, msg.sender);

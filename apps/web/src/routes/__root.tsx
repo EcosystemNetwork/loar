@@ -120,6 +120,20 @@ function RootComponent() {
               <main className="flex-1">
                 <Outlet />
               </main>
+              <footer className="border-t py-6 px-4">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+                  <span>&copy; {new Date().getFullYear()} LOAR</span>
+                  <Link to="/terms" className="hover:text-foreground transition-colors">
+                    Terms of Service
+                  </Link>
+                  <Link to="/privacy" className="hover:text-foreground transition-colors">
+                    Privacy Policy
+                  </Link>
+                  <Link to="/dmca" className="hover:text-foreground transition-colors">
+                    DMCA
+                  </Link>
+                </div>
+              </footer>
             </>
           )}
         </div>

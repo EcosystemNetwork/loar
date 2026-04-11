@@ -25,7 +25,18 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+/** Which chain to index: "sepolia" (default) or "base-sepolia" */
+const PONDER_CHAIN = (process.env.PONDER_CHAIN ?? 'sepolia').toLowerCase();
+const VALID_CHAINS = ['sepolia', 'base-sepolia'] as const;
+if (!VALID_CHAINS.includes(PONDER_CHAIN as any)) {
+  console.error(
+    `\n❌ Invalid PONDER_CHAIN="${PONDER_CHAIN}". Must be one of: ${VALID_CHAINS.join(', ')}\n`
+  );
+  process.exit(1);
+}
+
 export const env = {
   PONDER_RPC_URL: process.env.PONDER_RPC_URL_2 as string,
   PONDER_RPC_FALLBACKS: (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean),
+  PONDER_CHAIN: PONDER_CHAIN as (typeof VALID_CHAINS)[number],
 } as const;

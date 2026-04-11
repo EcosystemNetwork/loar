@@ -26,7 +26,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     using TickMath for int24;
     using SafeERC20 for IERC20;
 
-    string public constant version = "1";
+    string public constant VERSION = "1";
 
     uint256 public constant BASIS_POINTS = 10_000;
     uint256 public constant MAX_REWARD_PARTICIPANTS = 7;
@@ -52,10 +52,14 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     }
 
     modifier onlyFactory() {
+        _checkFactory();
+        _;
+    }
+
+    function _checkFactory() internal view {
         if (msg.sender != factory) {
             revert Unauthorized();
         }
-        _;
     }
 
     function tokenRewards(address token) external view returns (TokenRewardInfo memory) {
@@ -255,6 +259,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         {
             IERC20(token).approve(address(permit2), poolSupply);
             permit2.approve(
+                // forge-lint: disable-next-line(unsafe-typecast)
                 token, address(positionManager), uint160(poolSupply), uint48(block.timestamp)
             );
         }
@@ -416,7 +421,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     }
 
     // Withdraw ETH from the contract
-    function withdrawETH(address recipient) public onlyOwner nonReentrant {
+    function withdrawEth(address recipient) public onlyOwner nonReentrant {
         require(recipient != address(0), "Invalid recipient");
         (bool success, ) = payable(recipient).call{value: address(this).balance}("");
         require(success, "ETH transfer failed");

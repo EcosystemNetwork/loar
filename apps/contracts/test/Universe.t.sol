@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Universe} from "../src/Universe.sol";
 import {IUniverse} from "../src/interfaces/IUniverse.sol";
 import {IUniverseManager} from "../src/interfaces/IUniverseManager.sol";
@@ -146,21 +146,21 @@ contract UniverseTest is Test {
 
     // --- Security tests ---
 
-    function test_nodeIDToHex_validId() public {
+    function test_nodeIdToHex_validId() public {
         uint id = createNode();
-        bytes32 result = universe.nodeIDToHex(id);
+        bytes32 result = universe.nodeIdToHex(id);
         assertTrue(result != bytes32(0));
     }
 
-    function test_nodeIDToHex_invalidId() public {
+    function test_nodeIdToHex_invalidId() public {
         createNode(); // latestNodeId = 1
         vm.expectRevert(abi.encodeWithSelector(IUniverse.NodeDoesNotExist.selector));
-        universe.nodeIDToHex(999);
+        universe.nodeIdToHex(999);
     }
 
-    function test_nodeIDToHex_zeroId() public {
+    function test_nodeIdToHex_zeroId() public {
         vm.expectRevert(abi.encodeWithSelector(IUniverse.NodeDoesNotExist.selector));
-        universe.nodeIDToHex(0);
+        universe.nodeIdToHex(0);
     }
 
     function test_createNode_whitelistedMode_revert() public {

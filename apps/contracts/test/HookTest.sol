@@ -98,6 +98,7 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
             FixedPoint128.Q128
         );
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         return (int128(int256(fees0)), int128(int256(fees1)));
     }
 
@@ -153,6 +154,7 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
             swap(
                 poolKey,
                 i < 2 ? false : true,
+                // forge-lint: disable-next-line(unsafe-typecast)
                 i % 2 == 0 ? -int256(amount) : int256(amount),
                 ZERO_BYTES
             );

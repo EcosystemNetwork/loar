@@ -52,8 +52,12 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     error NotPlatform();
 
     modifier onlyPlatform() {
-        if (msg.sender != platform) revert NotPlatform();
+        _checkPlatform();
         _;
+    }
+
+    function _checkPlatform() internal view {
+        if (msg.sender != platform) revert NotPlatform();
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor

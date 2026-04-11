@@ -64,14 +64,10 @@ async function verifyEthPayment(
     throw new Error('TREASURY_ADDRESS is not configured on the server');
   }
 
-  const existing = await db
-    .collection('creditTransactions')
-    .where('paymentRef', '==', paymentRef)
-    .limit(1)
-    .get();
-  if (!existing.empty) {
-    throw new Error('This transaction has already been used to purchase credits');
-  }
+  // Note: dedup is enforced atomically inside the Firestore transaction
+  // (purchaseWithFiat / purchaseWithLoar). No pre-check here to avoid
+  // a TOCTOU race where two concurrent requests both pass the query
+  // but the transaction correctly rejects the second one.
 
   const client = getChainClient(chainId);
   const chainName = getChainName(chainId);
@@ -120,15 +116,8 @@ async function verifyLoarPayment(
     throw new Error('TREASURY_ADDRESS is not configured on the server');
   }
 
-  // Deduplicate: reject if this tx hash was already used
-  const existing = await db
-    .collection('creditTransactions')
-    .where('txHash', '==', txHash)
-    .limit(1)
-    .get();
-  if (!existing.empty) {
-    throw new Error('This transaction has already been used to purchase credits');
-  }
+  // Note: dedup is enforced atomically inside the Firestore transaction
+  // (purchaseWithLoar). No pre-check here to avoid TOCTOU race.
 
   const client = getChainClient(chainId);
   const chainName = getChainName(chainId);

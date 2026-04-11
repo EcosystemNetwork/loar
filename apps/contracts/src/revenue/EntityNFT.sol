@@ -127,13 +127,13 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
     }
 
     /// @notice Get entities in a universe filtered by kind (paginated)
-    function getByUniverse(uint256 universeId, EntityKind kind, uint256 startId, uint256 count)
+    function getByUniverse(uint256 _universeId, EntityKind kind, uint256 startId, uint256 count)
         external view returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
         for (uint256 i = startId; i <= nextTokenId && found < count; i++) {
-            if (entities[i].universeId == universeId && entities[i].kind == kind) {
+            if (entities[i].universeId == _universeId && entities[i].kind == kind) {
                 temp[found++] = i;
             }
         }

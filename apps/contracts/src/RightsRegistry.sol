@@ -28,8 +28,12 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     error ZeroHash();
 
     modifier onlyOperator() {
-        if (!operators[msg.sender] && msg.sender != owner()) revert NotOperator();
+        _checkOperator();
         _;
+    }
+
+    function _checkOperator() internal view {
+        if (!operators[msg.sender] && msg.sender != owner()) revert NotOperator();
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor

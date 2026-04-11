@@ -79,8 +79,12 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
-        if (msg.sender != platform) revert NotPlatform();
+        _checkPlatform();
         _;
+    }
+
+    function _checkPlatform() internal view {
+        if (msg.sender != platform) revert NotPlatform();
     }
 
     error ZeroAddress();
@@ -123,7 +127,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         uint16 royaltyBps,
         uint256 duration,
         string calldata terms
-    ) external payable returns (uint256 licenseId) {
+    ) external returns (uint256 licenseId) {
         if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotUniverseCreator();
         licenseId = nextLicenseId++;
 

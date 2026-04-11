@@ -63,8 +63,12 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
     uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
-        if (msg.sender != platform) revert NotPlatform();
+        _checkPlatform();
         _;
+    }
+
+    function _checkPlatform() internal view {
+        if (msg.sender != platform) revert NotPlatform();
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor

@@ -44,7 +44,11 @@ function getTreasuryChainClient(chainId?: number) {
 }
 
 /** Verify an ETH tx was sent to treasury and meets minimum amount */
-async function verifyTreasuryEthPayment(txHash: string, expectedWei?: string): Promise<void> {
+async function verifyTreasuryEthPayment(
+  txHash: string,
+  expectedWei?: string,
+  chainId?: number
+): Promise<void> {
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
     throw new Error('TREASURY_ADDRESS is not configured');
   }
@@ -59,7 +63,7 @@ async function verifyTreasuryEthPayment(txHash: string, expectedWei?: string): P
     throw new Error('This transaction has already been used to fund a universe pool');
   }
 
-  const client = getTreasuryChainClient();
+  const client = getTreasuryChainClient(chainId);
   const tx = await client.getTransaction({ hash: txHash as Hash }).catch(() => {
     throw new Error(
       'Transaction not found on-chain. Confirm it has been broadcast and included in a block.'
@@ -86,7 +90,11 @@ async function verifyTreasuryEthPayment(txHash: string, expectedWei?: string): P
 }
 
 /** Verify a $LOAR ERC20 transfer to treasury */
-async function verifyTreasuryLoarPayment(txHash: string, expectedLoarWei: bigint): Promise<void> {
+async function verifyTreasuryLoarPayment(
+  txHash: string,
+  expectedLoarWei: bigint,
+  chainId?: number
+): Promise<void> {
   if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
     throw new Error('LOAR_TOKEN_ADDRESS is not configured');
   }
@@ -103,7 +111,7 @@ async function verifyTreasuryLoarPayment(txHash: string, expectedLoarWei: bigint
     throw new Error('This transaction has already been used to fund a universe pool');
   }
 
-  const client = getTreasuryChainClient();
+  const client = getTreasuryChainClient(chainId);
   const receipt = await client.getTransactionReceipt({ hash: txHash as Hash }).catch(() => {
     throw new Error('Transaction not found on-chain.');
   });
@@ -183,6 +191,8 @@ export const universeTreasuryRouter = router({
         paymentRef: z.string(),
         /** $LOAR token amount in wei (only for paymentMethod=loar) */
         loarAmount: z.string().optional(),
+        /** Chain ID for on-chain payment verification (eth/crypto/loar) */
+        chainId: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -200,11 +210,11 @@ export const universeTreasuryRouter = router({
         if (!pkg.ethPriceWei || pkg.ethPriceWei === '0') {
           throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
         }
-        await verifyTreasuryEthPayment(input.paymentRef, pkg.ethPriceWei);
+        await verifyTreasuryEthPayment(input.paymentRef, pkg.ethPriceWei, input.chainId);
       } else if (input.paymentMethod === 'loar') {
         if (!input.loarAmount) throw new Error('loarAmount is required for $LOAR payments');
         const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
-        await verifyTreasuryLoarPayment(input.paymentRef, expectedWei);
+        await verifyTreasuryLoarPayment(input.paymentRef, expectedWei, input.chainId);
       } else {
         // card: verify Stripe PaymentIntent
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
@@ -502,6 +512,8 @@ export const universeTreasuryRouter = router({
         ]),
         /** What % goes to credits vs staker rewards. Default 70% credits, 30% stakers */
         creditSharePct: z.number().min(0).max(100).default(70),
+        /** Chain ID for on-chain deposit verification */
+        chainId: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -533,7 +545,7 @@ export const universeTreasuryRouter = router({
       if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
         throw new Error('TREASURY_ADDRESS is not configured');
       }
-      const client = getTreasuryChainClient();
+      const client = getTreasuryChainClient(input.chainId);
       const tx = await client.getTransaction({ hash: input.txHash as Hash }).catch(() => {
         throw new Error(
           'Deposit transaction not found on-chain. Confirm it has been broadcast and included in a block.'

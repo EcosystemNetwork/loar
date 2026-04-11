@@ -133,7 +133,9 @@ contract DeployUniverseScript is Script {
         console.log("Name:", tokenName);
         console.log("Symbol:", tokenSymbol);
         console.log("\n--- Pool Config ---");
+        // forge-lint: disable-next-line(unsafe-typecast)
         console.log("Starting Tick:", uint256(uint24(startingTick)));
+        // forge-lint: disable-next-line(unsafe-typecast)
         console.log("Tick Spacing:", uint256(uint24(tickSpacing)));
         console.log("Loar Fee (bps):", loarFee);
         console.log("Paired Fee (bps):", pairedFee);

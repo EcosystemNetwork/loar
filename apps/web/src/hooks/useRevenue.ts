@@ -208,6 +208,70 @@ export function useMyCollabs() {
   });
 }
 
+export function useCollab(collabId: string) {
+  return useQuery({
+    queryKey: ['collab', collabId],
+    queryFn: () => trpcClient.collabs.getCollab.query({ collabId }),
+    enabled: !!collabId,
+  });
+}
+
+export function useCollabEpisodes(collabId: string) {
+  return useQuery({
+    queryKey: ['collab-episodes', collabId],
+    queryFn: () => trpcClient.collabs.getEpisodes.query({ collabId }),
+    enabled: !!collabId,
+  });
+}
+
+export function useAcceptCollab() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.collabs.accept.mutate>[0]) =>
+      trpcClient.collabs.accept.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collabs'] });
+      qc.invalidateQueries({ queryKey: ['my-collabs'] });
+    },
+  });
+}
+
+export function useActivateCollab() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.collabs.activate.mutate>[0]) =>
+      trpcClient.collabs.activate.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collabs'] });
+      qc.invalidateQueries({ queryKey: ['my-collabs'] });
+    },
+  });
+}
+
+export function useCancelCollab() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.collabs.cancel.mutate>[0]) =>
+      trpcClient.collabs.cancel.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collabs'] });
+      qc.invalidateQueries({ queryKey: ['my-collabs'] });
+    },
+  });
+}
+
+export function useCompleteCollab() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.collabs.complete.mutate>[0]) =>
+      trpcClient.collabs.complete.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collabs'] });
+      qc.invalidateQueries({ queryKey: ['my-collabs'] });
+    },
+  });
+}
+
 // ---- Ads ----
 
 export function useAdSlots(universeId: string) {
@@ -291,6 +355,38 @@ export function useCreateLicense() {
     mutationFn: (input: Parameters<typeof trpcClient.licensing.createLicense.mutate>[0]) =>
       trpcClient.licensing.createLicense.mutate(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['licenses'] }),
+  });
+}
+
+export function useActivateLicense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.licensing.activateLicense.mutate>[0]) =>
+      trpcClient.licensing.activateLicense.mutate(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['licenses'] }),
+  });
+}
+
+export function useRevokeLicense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.licensing.revokeLicense.mutate>[0]) =>
+      trpcClient.licensing.revokeLicense.mutate(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['licenses'] }),
+  });
+}
+
+export function useMerchOrders(limit = 20) {
+  return useQuery({
+    queryKey: ['merch-orders', limit],
+    queryFn: () => trpcClient.licensing.getOrders.query({ limit }),
+  });
+}
+
+export function useMyMerch() {
+  return useQuery({
+    queryKey: ['my-merch'],
+    queryFn: () => trpcClient.licensing.myMerch.query(),
   });
 }
 

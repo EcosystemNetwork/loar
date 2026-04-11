@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
-import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
@@ -50,19 +49,28 @@ contract Universe is IUniverse {
     uint public currentCanonId;  // tracked canon node (avoids unbounded loop)
 
     modifier onlyAdmin() {
-      if (universeAdmin != msg.sender) {
-        revert CallerNotAdmin(msg.sender);
-      }
-      _;
-    }
-    modifier onlyManager() {
-      if (address(universeManager) != msg.sender) {
-        revert CallerNotManager();
-      }
+      _checkAdmin();
       _;
     }
 
-    function nodeIDToHex(uint id) public view returns (bytes32){
+    function _checkAdmin() internal view {
+      if (universeAdmin != msg.sender) {
+        revert CallerNotAdmin(msg.sender);
+      }
+    }
+
+    modifier onlyManager() {
+      _checkManager();
+      _;
+    }
+
+    function _checkManager() internal view {
+      if (address(universeManager) != msg.sender) {
+        revert CallerNotManager();
+      }
+    }
+
+    function nodeIdToHex(uint id) public view returns (bytes32){
         if (id == 0 || id > latestNodeId) {
             revert NodeDoesNotExist();
         }
