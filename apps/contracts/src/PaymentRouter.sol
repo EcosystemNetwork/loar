@@ -5,6 +5,7 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -17,7 +18,7 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///
 ///         Replaces the scattered platform.call + creator.call patterns in each
 ///         revenue contract, giving a single place to adjust fees and routing.
-contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     address public treasury;
@@ -75,6 +76,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_treasury == address(0)) revert ZeroAddress();
         if (_defaultPlatformFeeBps > 5000) revert FeeTooHigh();
         treasury = _treasury;
@@ -82,6 +84,9 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         loarToken = IERC20(_loarToken);
         loarFeeDiscountBps = _loarFeeDiscountBps;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -92,7 +97,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @notice Route a payment: send platform cut to treasury, accrue creator's cut
     /// @param creator Address that will be able to claim the creator portion
     /// @param feeBps Platform fee in basis points; pass USE_DEFAULT_FEE to use defaultPlatformFeeBps, 0 for no fee
-    function route(address creator, uint16 feeBps) external payable nonReentrant {
+    function route(address creator, uint16 feeBps) external payable nonReentrant whenNotPaused {
         if (msg.value == 0) return;
         uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;
         if (bps > 5000) revert FeeTooHigh();
@@ -112,7 +117,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
 
     /// @notice Route a payment entirely to treasury (no creator split)
     ///         Used for credit purchases and other platform-only flows.
-    function routeToTreasury() external payable nonReentrant {
+    function routeToTreasury() external payable nonReentrant whenNotPaused {
         if (msg.value == 0) return;
         (bool s,) = treasury.call{value: msg.value}("");
         if (!s) revert TransferFailed();
@@ -146,7 +151,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @param creator Address that will be able to claim the creator portion
     /// @param feeBps Platform fee in basis points; USE_DEFAULT_FEE to use default (with discount applied)
     /// @param amount $LOAR amount to route
-    function routeLoar(address creator, uint16 feeBps, uint256 amount) external nonReentrant {
+    function routeLoar(address creator, uint16 feeBps, uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) return;
         if (address(loarToken) == address(0)) revert ZeroAddress();
 
@@ -177,7 +182,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     }
 
     /// @notice Route $LOAR entirely to treasury
-    function routeLoarToTreasury(uint256 amount) external nonReentrant {
+    function routeLoarToTreasury(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) return;
         if (address(loarToken) == address(0)) revert ZeroAddress();
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -201,8 +206,10 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         emit LoarTokenUpdated(_loarToken);
     }
 
+    error DiscountTooHigh();
+
     function setLoarFeeDiscount(uint16 newDiscountBps) external onlyOwner {
-        require(newDiscountBps <= 2000, "Max 20% discount");
+        if (newDiscountBps > 2000) revert DiscountTooHigh();
         loarFeeDiscountBps = newDiscountBps;
         emit LoarFeeDiscountUpdated(newDiscountBps);
     }

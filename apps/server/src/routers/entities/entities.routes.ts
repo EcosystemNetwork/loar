@@ -9,7 +9,7 @@
  * All mutations require authentication. Reads are public.
  */
 import { z } from 'zod';
-import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
 import { ENTITY_KINDS, CREATOR_KINDS } from './entities.types';
 import {
   createEntity,
@@ -33,6 +33,7 @@ const ethereumAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereu
 export const entitiesRouter = router({
   /** Create a new entity. universeAddress is optional for creator kinds. */
   create: protectedProcedure
+    .use(requirePermission('entities.create'))
     .input(
       z.object({
         name: z.string().min(1).max(200),
@@ -144,6 +145,7 @@ export const entitiesRouter = router({
 
   /** Update an existing entity. Only the creator can update. */
   update: protectedProcedure
+    .use(requirePermission('entities.update'))
     .input(
       z.object({
         entityId: z.string().min(1),

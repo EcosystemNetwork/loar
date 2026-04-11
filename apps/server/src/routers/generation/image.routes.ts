@@ -18,7 +18,13 @@
  *   image.imageToImage    — Raw fal img2img (backward compat).
  *   image.generateCharacter / analyzeCharacter / saveCharacter — character tools.
  */
-import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
+import {
+  router,
+  protectedProcedure,
+  publicProcedure,
+  adminProcedure,
+  requirePermission,
+} from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
@@ -133,233 +139,236 @@ async function attemptFallback(
 export const imageRouter = router({
   // ── Routed generation (new primary endpoint) ─────────────────────────
 
-  generate: protectedProcedure.input(generateSchema).mutation(async ({ input, ctx }) => {
-    const genId = randomUUID();
-    const startTime = Date.now();
+  generate: protectedProcedure
+    .use(requirePermission('generation.image'))
+    .input(generateSchema)
+    .mutation(async ({ input, ctx }) => {
+      const genId = randomUUID();
+      const startTime = Date.now();
 
-    // ── Validate image_to_image inputs ──────────────────────────────
-    if (input.task === 'image_to_image' && (!input.imageUrls || input.imageUrls.length === 0)) {
-      throw new Error('imageUrls is required for image_to_image task');
-    }
-
-    // ── Resolve model ────────────────────────────────────────────────
-    let finalModelId: string;
-    let reasonCode: ImageGenerationRecord['routingReasonCode'];
-    let providerCostUsd: number;
-    let fiatPriceUsd: number;
-    let loarPriceUsd: number;
-    let creditCostPerImage: number;
-    let requestedModelId: string | undefined;
-
-    if (input.routingMode === 'manual' && input.selectedModelId) {
-      requestedModelId = input.selectedModelId;
-      const validation = validateImageModelSelection(input.selectedModelId, { task: input.task });
-      if (!validation.valid) {
-        throw new Error(
-          `Cannot use selected model: ${validation.reason}` +
-            (validation.suggestion ? `. Try "${validation.suggestion}" instead.` : '')
-        );
+      // ── Validate image_to_image inputs ──────────────────────────────
+      if (input.task === 'image_to_image' && (!input.imageUrls || input.imageUrls.length === 0)) {
+        throw new Error('imageUrls is required for image_to_image task');
       }
-      const model = getImageModelById(input.selectedModelId)!;
-      finalModelId = model.id;
-      reasonCode = 'manual_user_selection';
-      providerCostUsd = model.providerCostUsd;
-      fiatPriceUsd = model.fiatPriceUsd;
-      loarPriceUsd = model.loarPriceUsd;
-      creditCostPerImage = model.creditCostPerImage;
-    } else {
-      const decision = routeImageModel({
-        task: input.task,
-        numImages: input.numImages,
-        qualityTarget: input.qualityTarget,
-        costBudget: input.costBudget,
-        latencyPreference: input.latencyPreference,
-      });
-      finalModelId = decision.chosenModelId;
-      reasonCode = decision.reasonCode;
-      providerCostUsd = decision.providerCostUsd;
-      fiatPriceUsd = decision.fiatPriceUsd;
-      loarPriceUsd = decision.loarPriceUsd;
-      creditCostPerImage = decision.creditCostPerImage;
-    }
 
-    const model = getImageModelById(finalModelId);
-    if (!model) throw new Error(`Model ${finalModelId} not found`);
+      // ── Resolve model ────────────────────────────────────────────────
+      let finalModelId: string;
+      let reasonCode: ImageGenerationRecord['routingReasonCode'];
+      let providerCostUsd: number;
+      let fiatPriceUsd: number;
+      let loarPriceUsd: number;
+      let creditCostPerImage: number;
+      let requestedModelId: string | undefined;
 
-    const totalCredits = creditCostPerImage * input.numImages;
-    const totalFiat = fiatPriceUsd * input.numImages;
-    const totalLoar = loarPriceUsd * input.numImages;
-    const totalProvider = providerCostUsd * input.numImages;
-
-    // ── Save initial record ──────────────────────────────────────────
-    const record: ImageGenerationRecord = {
-      id: genId,
-      userId: ctx.user.uid,
-      entityId: input.entityId,
-      universeId: input.universeId,
-      routingMode: input.routingMode,
-      requestedModelId,
-      finalModelId,
-      provider: model.provider,
-      status: 'queued',
-      prompt: input.prompt,
-      negativePrompt: input.negativePrompt,
-      task: input.task,
-      imageSize: input.imageSize,
-      numImages: input.numImages,
-      seed: input.seed,
-      providerCostUsd: totalProvider,
-      fiatPriceUsd: totalFiat,
-      loarPriceUsd: totalLoar,
-      creditsCharged: totalCredits,
-      marginUsd: totalFiat - totalProvider,
-      routingReasonCode: reasonCode,
-      createdAt: new Date(),
-    };
-    await saveRecord(record);
-
-    // ── Deduct credits ───────────────────────────────────────────────
-    if (!db) throw new Error('Firebase is not configured — cannot deduct credits');
-    const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
-    try {
-      await db.runTransaction(async (tx) => {
-        const doc = await tx.get(userCreditsRef);
-        const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-        if (balance < totalCredits) {
+      if (input.routingMode === 'manual' && input.selectedModelId) {
+        requestedModelId = input.selectedModelId;
+        const validation = validateImageModelSelection(input.selectedModelId, { task: input.task });
+        if (!validation.valid) {
           throw new Error(
-            `Insufficient credits. Need ${totalCredits}, have ${balance}. Purchase more credits to continue.`
+            `Cannot use selected model: ${validation.reason}` +
+              (validation.suggestion ? `. Try "${validation.suggestion}" instead.` : '')
           );
         }
-        tx.update(userCreditsRef, {
-          balance: balance - totalCredits,
-          totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
-          updatedAt: new Date(),
+        const model = getImageModelById(input.selectedModelId)!;
+        finalModelId = model.id;
+        reasonCode = 'manual_user_selection';
+        providerCostUsd = model.providerCostUsd;
+        fiatPriceUsd = model.fiatPriceUsd;
+        loarPriceUsd = model.loarPriceUsd;
+        creditCostPerImage = model.creditCostPerImage;
+      } else {
+        const decision = routeImageModel({
+          task: input.task,
+          numImages: input.numImages,
+          qualityTarget: input.qualityTarget,
+          costBudget: input.costBudget,
+          latencyPreference: input.latencyPreference,
         });
-      });
-    } catch (err) {
-      await imageGenerationsCol()
-        .doc(genId)
-        .update({
-          status: 'failed',
-          failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
-          completedAt: new Date(),
-        });
-      throw err;
-    }
+        finalModelId = decision.chosenModelId;
+        reasonCode = decision.reasonCode;
+        providerCostUsd = decision.providerCostUsd;
+        fiatPriceUsd = decision.fiatPriceUsd;
+        loarPriceUsd = decision.loarPriceUsd;
+        creditCostPerImage = decision.creditCostPerImage;
+      }
 
-    // ── Generate ─────────────────────────────────────────────────────
-    try {
-      await imageGenerationsCol().doc(genId).update({ status: 'running' });
+      const model = getImageModelById(finalModelId);
+      if (!model) throw new Error(`Model ${finalModelId} not found`);
 
-      const result = await falService.generateImage({
+      const totalCredits = creditCostPerImage * input.numImages;
+      const totalFiat = fiatPriceUsd * input.numImages;
+      const totalLoar = loarPriceUsd * input.numImages;
+      const totalProvider = providerCostUsd * input.numImages;
+
+      // ── Save initial record ──────────────────────────────────────────
+      const record: ImageGenerationRecord = {
+        id: genId,
+        userId: ctx.user.uid,
+        entityId: input.entityId,
+        universeId: input.universeId,
+        routingMode: input.routingMode,
+        requestedModelId,
+        finalModelId,
+        provider: model.provider,
+        status: 'queued',
         prompt: input.prompt,
-        model: model.falModelId as any,
         negativePrompt: input.negativePrompt,
+        task: input.task,
         imageSize: input.imageSize,
         numImages: input.numImages,
         seed: input.seed,
-      });
+        providerCostUsd: totalProvider,
+        fiatPriceUsd: totalFiat,
+        loarPriceUsd: totalLoar,
+        creditsCharged: totalCredits,
+        marginUsd: totalFiat - totalProvider,
+        routingReasonCode: reasonCode,
+        createdAt: new Date(),
+      };
+      await saveRecord(record);
 
-      if (result.status !== 'completed' || !result.images?.length) {
-        markImageProviderUnhealthy(model.provider);
-
-        if (input.allowFallback) {
-          const fallback = await attemptFallback(input, model.id);
-          if (fallback) {
-            const latencyMs = Date.now() - startTime;
-            await imageGenerationsCol().doc(genId).update({
-              status: 'completed',
-              fallbackModelId: fallback.fallbackModelId,
-              imageUrls: fallback.imageUrls,
-              latencyMs,
-              completedAt: new Date(),
-            });
-            return {
-              generationId: genId,
-              status: 'completed' as const,
-              imageUrls: fallback.imageUrls,
-              modelUsed: fallback.fallbackModelId,
-              modelDisplayName:
-                getImageModelById(fallback.fallbackModelId)?.displayName ||
-                fallback.fallbackModelId,
-              routingMode: input.routingMode,
-              reasonCode,
-              creditsCharged: totalCredits,
-              fiatPriceUsd: totalFiat,
-              wasFallback: true,
-            };
+      // ── Deduct credits ───────────────────────────────────────────────
+      if (!db) throw new Error('Firebase is not configured — cannot deduct credits');
+      const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
+      try {
+        await db.runTransaction(async (tx) => {
+          const doc = await tx.get(userCreditsRef);
+          const balance = doc.exists ? doc.data()?.balance || 0 : 0;
+          if (balance < totalCredits) {
+            throw new Error(
+              `Insufficient credits. Need ${totalCredits}, have ${balance}. Purchase more credits to continue.`
+            );
           }
-        }
-
+          tx.update(userCreditsRef, {
+            balance: balance - totalCredits,
+            totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
+            updatedAt: new Date(),
+          });
+        });
+      } catch (err) {
         await imageGenerationsCol()
           .doc(genId)
           .update({
             status: 'failed',
-            failureReason: result.error || 'Image generation failed',
-            latencyMs: Date.now() - startTime,
+            failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
             completedAt: new Date(),
           });
-        throw new Error(result.error || 'Image generation failed');
+        throw err;
       }
 
-      markImageProviderHealthy(model.provider);
-      const latencyMs = Date.now() - startTime;
-      const imageUrls = result.images.map((img) => img.url);
-
-      // Fire-and-forget quest tracking
-      trackQuests(ctx.user.uid, [
-        { questId: 'first_image_generation' },
-        { questId: 'daily_generation' },
-        { questId: 'generate_10_images' },
-      ]);
-
-      await imageGenerationsCol().doc(genId).update({
-        status: 'completed',
-        imageUrls,
-        seed: result.seed,
-        latencyMs,
-        completedAt: new Date(),
-      });
-
-      return {
-        generationId: genId,
-        status: 'completed' as const,
-        imageUrls,
-        seed: result.seed,
-        modelUsed: finalModelId,
-        modelDisplayName: model.displayName,
-        routingMode: input.routingMode,
-        reasonCode,
-        creditsCharged: totalCredits,
-        fiatPriceUsd: totalFiat,
-        wasFallback: false,
-      };
-    } catch (error) {
-      const latencyMs = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Refund credits
+      // ── Generate ─────────────────────────────────────────────────────
       try {
-        const refundDoc = await userCreditsRef.get();
-        if (refundDoc.exists) {
-          await userCreditsRef.update({
-            balance: (refundDoc.data()?.balance || 0) + totalCredits,
-            updatedAt: new Date(),
-          });
-        }
-      } catch (refundErr) {
-        console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
-      }
+        await imageGenerationsCol().doc(genId).update({ status: 'running' });
 
-      await imageGenerationsCol().doc(genId).update({
-        status: 'failed',
-        failureReason: errorMessage,
-        latencyMs,
-        completedAt: new Date(),
-      });
-      throw error;
-    }
-  }),
+        const result = await falService.generateImage({
+          prompt: input.prompt,
+          model: model.falModelId as any,
+          negativePrompt: input.negativePrompt,
+          imageSize: input.imageSize,
+          numImages: input.numImages,
+          seed: input.seed,
+        });
+
+        if (result.status !== 'completed' || !result.images?.length) {
+          markImageProviderUnhealthy(model.provider);
+
+          if (input.allowFallback) {
+            const fallback = await attemptFallback(input, model.id);
+            if (fallback) {
+              const latencyMs = Date.now() - startTime;
+              await imageGenerationsCol().doc(genId).update({
+                status: 'completed',
+                fallbackModelId: fallback.fallbackModelId,
+                imageUrls: fallback.imageUrls,
+                latencyMs,
+                completedAt: new Date(),
+              });
+              return {
+                generationId: genId,
+                status: 'completed' as const,
+                imageUrls: fallback.imageUrls,
+                modelUsed: fallback.fallbackModelId,
+                modelDisplayName:
+                  getImageModelById(fallback.fallbackModelId)?.displayName ||
+                  fallback.fallbackModelId,
+                routingMode: input.routingMode,
+                reasonCode,
+                creditsCharged: totalCredits,
+                fiatPriceUsd: totalFiat,
+                wasFallback: true,
+              };
+            }
+          }
+
+          await imageGenerationsCol()
+            .doc(genId)
+            .update({
+              status: 'failed',
+              failureReason: result.error || 'Image generation failed',
+              latencyMs: Date.now() - startTime,
+              completedAt: new Date(),
+            });
+          throw new Error(result.error || 'Image generation failed');
+        }
+
+        markImageProviderHealthy(model.provider);
+        const latencyMs = Date.now() - startTime;
+        const imageUrls = result.images.map((img) => img.url);
+
+        // Fire-and-forget quest tracking
+        trackQuests(ctx.user.uid, [
+          { questId: 'first_image_generation' },
+          { questId: 'daily_generation' },
+          { questId: 'generate_10_images' },
+        ]);
+
+        await imageGenerationsCol().doc(genId).update({
+          status: 'completed',
+          imageUrls,
+          seed: result.seed,
+          latencyMs,
+          completedAt: new Date(),
+        });
+
+        return {
+          generationId: genId,
+          status: 'completed' as const,
+          imageUrls,
+          seed: result.seed,
+          modelUsed: finalModelId,
+          modelDisplayName: model.displayName,
+          routingMode: input.routingMode,
+          reasonCode,
+          creditsCharged: totalCredits,
+          fiatPriceUsd: totalFiat,
+          wasFallback: false,
+        };
+      } catch (error) {
+        const latencyMs = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        // Refund credits
+        try {
+          const refundDoc = await userCreditsRef.get();
+          if (refundDoc.exists) {
+            await userCreditsRef.update({
+              balance: (refundDoc.data()?.balance || 0) + totalCredits,
+              updatedAt: new Date(),
+            });
+          }
+        } catch (refundErr) {
+          console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
+        }
+
+        await imageGenerationsCol().doc(genId).update({
+          status: 'failed',
+          failureReason: errorMessage,
+          latencyMs,
+          completedAt: new Date(),
+        });
+        throw error;
+      }
+    }),
 
   estimateCost: publicProcedure
     .input(

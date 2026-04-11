@@ -10,9 +10,9 @@ LOAR enables creators to build and monetize AI-generated cinematic universes. Be
 
 ## Content Classification
 
-All uploaded content must be classified into one of two categories:
+All uploaded content must be classified into one of three categories. These values are enforced in both the backend API and the frontend UI:
 
-### Fun (Non-Commercial)
+### Fan (`fan`)
 
 - **Purpose:** Creative expression, fan works, experimentation, learning
 - **IP Rules:** Relaxed — may include copyrighted characters, settings, music references
@@ -20,36 +20,46 @@ All uploaded content must be classified into one of two categories:
 - **Use cases:** Fan fiction universes, remix culture, parody, educational projects
 - **Visibility:** Public, private, or unlisted
 
-### Monetized (Commercial)
+### Original (`original`)
 
-- **Purpose:** Revenue-generating content
+- **Purpose:** Revenue-generating original content
 - **IP Rules:** Strict — must meet ALL requirements below
-- **Monetization:** Eligible for all 10 revenue streams
+- **Monetization:** Eligible for all revenue streams
 - **Visibility:** Public or unlisted (private content cannot be monetized)
+- **Requirements:** Creator must own all IP. No third-party copyrighted material.
+
+### Licensed (`licensed`)
+
+- **Purpose:** Revenue-generating content that incorporates third-party IP under license
+- **IP Rules:** Strict — must provide licensing proof
+- **Monetization:** Eligible for all revenue streams, subject to license terms
+- **Required fields:** `licensingProof` object with licensor name, license type, and documentation
+- **Visibility:** Public or unlisted
 
 ---
 
-## Monetized Content Requirements
+## Original / Licensed Content Requirements
 
-Content classified as "Monetized" must satisfy ALL of the following:
+Content classified as `original` or `licensed` must satisfy ALL of the following:
 
-| Requirement                 | What It Means                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------- |
-| **Must be original**        | Created by you or with explicit documented permission                                 |
-| **No copyrighted material** | Cannot include third-party characters, music, logos, or settings without a license    |
-| **Not a fan work**          | Cannot be derivative of existing copyrighted franchises (no "Star Wars but on-chain") |
-| **License must be set**     | You must choose a license for your content                                            |
-| **AI-generated is fine**    | AI-generated content using LOAR's tools is considered original for platform purposes  |
+| Requirement                     | What It Means                                                                                                                                                                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Must be original**            | Created by you or with explicit documented permission                                                                                                                                                                                                               |
+| **No copyrighted material**     | Cannot include third-party characters, music, logos, or settings without a license                                                                                                                                                                                  |
+| **Not a fan work**              | Cannot be derivative of existing copyrighted franchises (no "Star Wars but on-chain")                                                                                                                                                                               |
+| **License must be set**         | You must choose a license for your content                                                                                                                                                                                                                          |
+| **AI-generated — with caveats** | AI-generated content using LOAR's tools may be classified as `original`, but the creator must not use target-style prompting to replicate specific copyrighted works. AI models are trained on third-party data; the creator assumes responsibility for the output. |
 
 ### Examples
 
 | Content                                               | Classification | Why                                    |
 | ----------------------------------------------------- | -------------- | -------------------------------------- |
-| Original sci-fi universe with AI-generated characters | Monetized      | Original IP, AI tools are fine         |
-| "What if Batman met Naruto" crossover                 | Fun only       | Uses copyrighted characters            |
-| Fan-made Game of Thrones alternate timeline           | Fun only       | Derivative of copyrighted franchise    |
-| Original universe that _happens to resemble_ a genre  | Monetized      | Genre conventions aren't copyrightable |
-| Remix of public domain works (Shakespeare, mythology) | Monetized      | Public domain is fair game             |
+| Original sci-fi universe with AI-generated characters | `original`     | Original IP, AI tools are fine         |
+| "What if Batman met Naruto" crossover                 | `fan`          | Uses copyrighted characters            |
+| Fan-made Game of Thrones alternate timeline           | `fan`          | Derivative of copyrighted franchise    |
+| Original universe that _happens to resemble_ a genre  | `original`     | Genre conventions aren't copyrightable |
+| Remix of public domain works (Shakespeare, mythology) | `original`     | Public domain is fair game             |
+| Content using licensed stock music/assets             | `licensed`     | Third-party IP used under license      |
 
 ---
 
@@ -64,7 +74,11 @@ At upload time, creators declare:
 | `copyrightNotes`          | string (optional) | Explain any third-party usage                   |
 | `license`                 | enum              | Rights grant for this content                   |
 
-**Enforcement:** The upload flow (`/upload`) and content API (`content.create`) programmatically reject monetized content that fails these checks. You cannot set `classification: "monetized"` if `usesCopyrightedMaterial: true` and `isOriginal: false`.
+**Enforcement:** The upload flow (`/upload`) and content API (`content.create`) programmatically reject commercial content that fails these checks:
+
+- `original` classification requires `isOriginal: true` and `usesCopyrightedMaterial: false`
+- `licensed` classification requires a valid `licensingProof` object with licensor details
+- `fan` classification cannot be monetized regardless of other fields
 
 ### Available Licenses
 
@@ -144,21 +158,27 @@ When licensing to third parties (studios, publishers, game developers):
 
 ### Current State (Testnet)
 
-LOAR does not yet have an automated dispute resolution system. Since all activity is on testnet with no real economic value, disputes are handled informally.
+The following dispute resolution features are **implemented**:
 
-### Planned (Before Mainnet)
+- **Content Flagging** — Any authenticated user can flag content via `moderation.flag`. Flagged content has `contentStatus` set to `flagged`, blocking commercial transactions.
+- **DMCA Takedown Intake** — Public form at `/dmca` and API at `POST /api/takedown`. Submissions are stored and reviewed by admin.
+- **Admin Review Queue** — Admin-only moderation dashboard at `/admin/moderation` for reviewing flags, updating content status, and resolving takedowns.
+- **Immutable Audit Log** — All moderation actions logged in `contentAuditLog` Firestore collection (append-only).
+- **Content Status Gating** — `contentStatus` (active/flagged/under_review/hidden/removed/reinstated) gates commercial transactions via `assertContentOperable()`.
 
-| Capability             | Description                                                |
-| ---------------------- | ---------------------------------------------------------- |
-| **DMCA Takedown**      | Request form, 72-hour review, counter-notice support       |
-| **Content Flagging**   | Community reports with review queue                        |
-| **Creator Appeals**    | Contest classification changes or removals                 |
-| **Arbitration**        | For licensing disputes above a value threshold             |
-| **Proactive Scanning** | Automated similarity detection for known copyrighted works |
+### Required Before Mainnet
+
+| Capability                     | Status   | Description                                                    |
+| ------------------------------ | -------- | -------------------------------------------------------------- |
+| **DMCA Designated Agent**      | NOT DONE | Must register with U.S. Copyright Office for §512 safe harbor  |
+| **Counter-Notice Flow**        | NOT DONE | §512(g) requires put-back after 10–14 business days            |
+| **Proactive Content Scanning** | NOT DONE | PhotoDNA for CSAM (mandatory), perceptual hash for known works |
+| **Creator Appeals**            | NOT DONE | Contest classification changes or removals                     |
+| **Arbitration**                | NOT DONE | For licensing disputes above a value threshold                 |
 
 ### Interim Process
 
-Disputes should be reported to the platform team. Infringing monetized content will be reclassified to "Fun" (disabling monetization) pending review.
+Disputes should be reported to the platform team. Infringing content will be reclassified to `fan` (disabling monetization) pending review.
 
 ---
 

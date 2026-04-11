@@ -2,7 +2,7 @@
  * Canon Marketplace Router — Submit content for universe canon,
  * vote on submissions, license accepted canon
  */
-import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
@@ -37,6 +37,7 @@ export const marketplaceRouter = router({
   // ---- Submissions ----
 
   submit: protectedProcedure
+    .use(requirePermission('marketplace.submit'))
     .input(
       z.object({
         universeId: z.string(),

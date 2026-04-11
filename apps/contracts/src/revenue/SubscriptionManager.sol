@@ -5,12 +5,13 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title SubscriptionManager
 /// @notice Manages subscriptions to universes. Subscribers get early episodes,
 ///         voting rights, premium content, and behind-the-scenes access.
-contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum SubscriptionTier { FREE, BASIC, PREMIUM, VIP }
 
     struct TierConfig {
@@ -45,6 +46,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     mapping(uint256 => address) public universeCreators;
 
     event TierConfigured(uint256 indexed universeId, SubscriptionTier tier, uint256 pricePerMonth);
+    event TierDeactivated(uint256 indexed universeId, SubscriptionTier tier);
     event Subscribed(address indexed user, uint256 indexed universeId, SubscriptionTier tier, uint256 expiresAt);
     event SubscriptionRenewed(address indexed user, uint256 indexed universeId, uint256 newExpiry);
     event SubscriptionCancelled(address indexed user, uint256 indexed universeId);
@@ -83,6 +85,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
@@ -90,7 +93,19 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         platformFeeBps = _platformFeeBps;
     }
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    error NotAuthorized();
+
+    /// @notice Deactivate a subscription tier
+    function deactivateTier(uint256 universeId, SubscriptionTier tier) external {
+        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
+        tierConfigs[universeId][tier].active = false;
+        emit TierDeactivated(universeId, tier);
+    }
 
     /// @notice Configure a subscription tier for a universe
     function configureTier(
@@ -104,10 +119,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint16 creditBonus
     ) external {
         // Must be universe creator or platform
-        require(
-            msg.sender == universeCreators[universeId] || msg.sender == platform,
-            "Not authorized"
-        );
+        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
 
         tierConfigs[universeId][tier] = TierConfig({
             pricePerMonth: pricePerMonth,
@@ -132,7 +144,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     }
 
     /// @notice Subscribe to a universe tier
-    function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months) external payable nonReentrant {
+    function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months) external payable nonReentrant whenNotPaused {
         if (months == 0 || months > 120) revert MonthsTooHigh(); // max 10 years
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();

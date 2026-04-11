@@ -31,6 +31,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     struct Deal {
         uint256 id;
         bytes32 contentHash;
+        bytes32 splitEntityHash;    // stored so royalty routing works without reverse lookup
         DealType dealType;
         DealStatus status;
         address buyer;
@@ -54,6 +55,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // contentHash => current owner (set on BUY)
     mapping(bytes32 => address) public contentOwner;
 
+    // splitEntityHash => contentHash (reverse lookup for payment routing)
+    mapping(bytes32 => bytes32) public splitToContent;
+
     event ContentRegistered(bytes32 indexed contentHash, address creator, uint256 universeId, bytes32 splitEntityHash);
     event ContentBought(uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 price);
     event ContentRented(uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 price, uint256 endTime);
@@ -75,6 +79,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error FeeTooHigh();
     error ZeroAddress();
     error ZeroHash();
+    error SplitRouterFailed();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -131,6 +136,11 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
         contentOwner[contentHash] = msg.sender;
 
+        // Store reverse lookup so payment routing can find the creator
+        if (splitEntityHash != bytes32(0)) {
+            splitToContent[splitEntityHash] = contentHash;
+        }
+
         emit ContentRegistered(contentHash, msg.sender, universeId, splitEntityHash);
     }
 
@@ -147,6 +157,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         deals[dealId] = Deal({
             id: dealId,
             contentHash: contentHash,
+            splitEntityHash: reg.splitEntityHash,
             dealType: DealType.BUY,
             status: DealStatus.ACTIVE,
             buyer: msg.sender,
@@ -181,6 +192,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         deals[dealId] = Deal({
             id: dealId,
             contentHash: contentHash,
+            splitEntityHash: reg.splitEntityHash,
             dealType: DealType.RENT,
             status: DealStatus.ACTIVE,
             buyer: msg.sender,
@@ -209,6 +221,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         deals[dealId] = Deal({
             id: dealId,
             contentHash: contentHash,
+            splitEntityHash: reg.splitEntityHash,
             dealType: DealType.LICENSE,
             status: DealStatus.ACTIVE,
             buyer: msg.sender,
@@ -305,21 +318,20 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
                     splitRouter.routeWithSplits{value: amount}(splitEntityHash, platformFeeBps);
                     return;
                 }
-            } catch {}
+            } catch (bytes memory reason) {
+                // Only swallow "no splits configured" — revert on real failures
+                // Empty reason = function reverted without data (e.g. not found)
+                if (reason.length > 0) revert SplitRouterFailed();
+            }
         }
 
-        // Fallback: route directly to content creator via PaymentRouter
-        ContentRegistration storage reg = registrations[_dealContentHash(splitEntityHash)];
+        // Fallback: use reverse mapping to find the content creator
+        bytes32 contentHash = splitToContent[splitEntityHash];
+        ContentRegistration storage reg = registrations[contentHash];
         if (reg.creator != address(0)) {
             paymentRouter.route{value: amount}(reg.creator, platformFeeBps);
         } else {
             paymentRouter.routeToTreasury{value: amount}();
         }
-    }
-
-    /// @dev Helper to find contentHash from splitEntityHash (reverse lookup not stored,
-    ///      so this is a best-effort. In practice, splits should always be configured.)
-    function _dealContentHash(bytes32) internal pure returns (bytes32) {
-        return bytes32(0);
     }
 }

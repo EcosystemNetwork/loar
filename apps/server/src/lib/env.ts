@@ -38,6 +38,8 @@ const envSchema = z.object({
   // Falls back to PONDER_RPC_URL_2 in credits.routes.ts if unset, but setting
   // this separately is recommended so server and indexer use independent RPCs.
   RPC_URL: z.string().url('RPC_URL must be a valid URL').optional(),
+  /** Base Sepolia RPC — required if multi-chain purchases or Base multi-sig universes are enabled */
+  RPC_URL_BASE_SEPOLIA: z.string().url('RPC_URL_BASE_SEPOLIA must be a valid URL').optional(),
   LOAR_TOKEN_ADDRESS: z
     .string()
     .regex(/^0x[0-9a-fA-F]{40}$/, 'LOAR_TOKEN_ADDRESS must be a valid Ethereum address')
@@ -77,6 +79,10 @@ const envSchema = z.object({
   // ── Storage — Storacha ────────────────────────────────────────────────────
   STORACHA_KEY: z.string().optional(),
   STORACHA_PROOF: z.string().optional(),
+
+  // ── Indexer RPC (fallback) ─────────────────────────────────────────────────
+  /** Used as fallback when RPC_URL is unset. Shared with the Ponder indexer. */
+  PONDER_RPC_URL_2: z.string().url('PONDER_RPC_URL_2 must be a valid URL').optional(),
 
   // ── Storage — priority ────────────────────────────────────────────────────
   STORAGE_PROVIDER_PRIORITY: z
@@ -133,6 +139,18 @@ export function validateEnv(): Env {
     if (!env.RPC_URL) {
       prodErrors.push(
         'RPC_URL is required in production (fallback to PONDER_RPC_URL_2 is not reliable for payment verification)'
+      );
+    }
+
+    if (!env.RPC_URL_BASE_SEPOLIA) {
+      prodErrors.push(
+        'RPC_URL_BASE_SEPOLIA is required in production for multi-chain payment verification and Base multi-sig admin checks'
+      );
+    }
+
+    if (!env.ADMIN_ADDRESSES && !env.ADMIN_WALLET) {
+      prodErrors.push(
+        'At least one of ADMIN_ADDRESSES or ADMIN_WALLET must be set in production for admin authorization'
       );
     }
 

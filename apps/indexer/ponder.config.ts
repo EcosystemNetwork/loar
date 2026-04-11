@@ -11,7 +11,14 @@ import './env'; // validates env and loads .env files — must be first
 import { env } from './env';
 import { createConfig, factory } from 'ponder';
 import { parseAbiItem } from 'viem';
-import { universeManagerAbi, universeAbi, universeGovernorAbi } from '@loar/abis/generated';
+import {
+  universeManagerAbi,
+  universeAbi,
+  universeGovernorAbi,
+  paymentRouterAbi,
+  creditManagerAbi,
+  subscriptionManagerAbi,
+} from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
 import { sepolia, baseSepolia } from 'viem/chains';
@@ -41,6 +48,17 @@ const poolManagerAddress = chainConfig.poolManager;
 const deployment = require(`../../deployments/${chainConfig.deploymentFile}`);
 const address = getAddress(deployment.contracts.UniverseManager);
 const startBlock = deployment.startBlock;
+
+// Revenue contract addresses (deployed separately via DeployRevenue.s.sol)
+const paymentRouterAddress = deployment.contracts.PaymentRouter
+  ? getAddress(deployment.contracts.PaymentRouter)
+  : undefined;
+const creditManagerAddress = deployment.contracts.CreditManager
+  ? getAddress(deployment.contracts.CreditManager)
+  : undefined;
+const subscriptionManagerAddress = deployment.contracts.SubscriptionManager
+  ? getAddress(deployment.contracts.SubscriptionManager)
+  : undefined;
 
 const universeCreatedEvent = parseAbiItem(
   'event UniverseCreated(address universe, address creator)'
@@ -104,5 +122,32 @@ export default createConfig({
       address: poolManagerAddress,
       startBlock: startBlock,
     },
+    // ── Revenue contracts (indexed for on-chain source of truth) ─────
+    ...(paymentRouterAddress && {
+      PaymentRouter: {
+        chain: chainName,
+        abi: paymentRouterAbi,
+        address: paymentRouterAddress,
+        startBlock: startBlock,
+      },
+    }),
+    ...(creditManagerAddress && {
+      CreditManager: {
+        chain: chainName,
+        abi: creditManagerAbi,
+        address: creditManagerAddress,
+        startBlock: startBlock,
+      },
+    }),
+    ...(subscriptionManagerAddress && {
+      SubscriptionManager: {
+        chain: chainName,
+        abi: subscriptionManagerAbi,
+        address: subscriptionManagerAddress,
+        startBlock: startBlock,
+      },
+    }),
+    // TODO: Add CanonMarketplace, AdPlacement, LicensingRegistry, CollabManager,
+    // AnalyticsRegistry once ABIs are generated (run: forge build && npx wagmi generate)
   },
 });
