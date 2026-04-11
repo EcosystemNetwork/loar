@@ -1,5 +1,5 @@
 {
-  "filter_paths": ["lib/", "dependencies/", "test/"],
+  "filter_paths": "lib/,dependencies/,test/",
   "exclude_informational": true,
   "exclude_low": false,
   "solc_remaps": [
