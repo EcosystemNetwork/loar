@@ -5,12 +5,13 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title AdPlacement
 /// @notice Manages programmatic product placement and sponsorships inside
 ///         AI-generated episodes. Sponsors bid for placement slots.
-contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum PlacementType { BILLBOARD, PRODUCT, SPONSORED_CHARACTER, AUDIO_MENTION }
 
     struct AdSlot {
@@ -88,12 +89,16 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -113,7 +118,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         uint256 minBid,
         uint256 episodes,
         string calldata metadata
-    ) external returns (uint256 slotId) {
+    ) external whenNotPaused returns (uint256 slotId) {
         require(universeCreators[universeId] != address(0), "Universe not registered");
         require(
             msg.sender == universeCreators[universeId] || msg.sender == platform,
@@ -138,7 +143,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     }
 
     /// @notice Bid on an ad slot. Outbid refunds use pull pattern (withdrawRefund).
-    function bid(uint256 slotId) external payable nonReentrant {
+    function bid(uint256 slotId) external payable nonReentrant whenNotPaused {
         AdSlot storage slot = adSlots[slotId];
         if (!slot.active) revert SlotNotActive();
         if (msg.value < slot.minBid || msg.value <= slot.currentBid) revert BidTooLow();
@@ -170,7 +175,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     }
 
     /// @notice Accept winning bid and activate sponsorship
-    function acceptBid(uint256 slotId) external nonReentrant returns (uint256 sponsorshipId) {
+    function acceptBid(uint256 slotId) external nonReentrant whenNotPaused returns (uint256 sponsorshipId) {
         AdSlot storage slot = adSlots[slotId];
         require(
             msg.sender == universeCreators[slot.universeId] || msg.sender == platform,

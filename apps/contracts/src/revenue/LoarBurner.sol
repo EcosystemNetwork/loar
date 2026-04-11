@@ -5,6 +5,7 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
@@ -23,7 +24,7 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///         - lpRatioBps% → LP address (deepens protocol-owned liquidity)
 ///         - remainder → DAO treasury (protocol revenue)
 ///         Default: 50% LP, 50% treasury.
-contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     enum BurnAction {
@@ -100,6 +101,7 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_loarToken == address(0) || _treasury == address(0)) revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
@@ -115,13 +117,16 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
         actions[BurnAction.REMIX_BOOST]         = ActionConfig({cost: 100e18, active: true, totalBurned: 0, totalCount: 0});
     }
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ── Core burn functions ─────────────────────────────────────
 
     /// @notice Execute a premium action — $LOAR split to LP + treasury (requires prior approval)
     /// @param action The action type to execute
-    function execute(BurnAction action) external nonReentrant {
+    function execute(BurnAction action) external nonReentrant whenNotPaused {
         ActionConfig storage config = actions[action];
         if (!config.active) revert ActionNotActive();
         (uint256 toLp, uint256 toTreasury) = _processPayment(msg.sender, config.cost);
@@ -131,7 +136,7 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
     }
 
     /// @notice Platform executes on behalf of a user (user must have approved this contract)
-    function executeFor(address user, BurnAction action) external nonReentrant {
+    function executeFor(address user, BurnAction action) external nonReentrant whenNotPaused {
         require(msg.sender == platform || msg.sender == owner(), "Unauthorized");
         ActionConfig storage config = actions[action];
         if (!config.active) revert ActionNotActive();
@@ -142,7 +147,7 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
     }
 
     /// @notice Execute a custom-named action
-    function executeCustom(bytes32 actionName) external nonReentrant {
+    function executeCustom(bytes32 actionName) external nonReentrant whenNotPaused {
         ActionConfig storage config = customActions[actionName];
         if (!config.active) revert ActionNotActive();
         (uint256 toLp, uint256 toTreasury) = _processPayment(msg.sender, config.cost);
