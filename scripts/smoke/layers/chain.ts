@@ -28,7 +28,7 @@ const CHAINS: Record<number, typeof sepolia> = {
 // Contract addresses per chain — update after deployments
 const UNIVERSE_MANAGER_ADDRESSES: Record<number, `0x${string}`> = {
   [sepolia.id]: '0x7af142BbD14CaEECdA68f948F467Da0257f6B114',
-  [baseSepolia.id]: '0x0000000000000000000000000000000000000000', // TODO: deploy to Base Sepolia
+  [baseSepolia.id]: '0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f',
 };
 
 const UNIVERSE_MANAGER_ABI = parseAbi([

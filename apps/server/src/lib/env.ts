@@ -80,6 +80,10 @@ const envSchema = z.object({
   STORACHA_KEY: z.string().optional(),
   STORACHA_PROOF: z.string().optional(),
 
+  // ── Indexer RPC (fallback) ─────────────────────────────────────────────────
+  /** Used as fallback when RPC_URL is unset. Shared with the Ponder indexer. */
+  PONDER_RPC_URL_2: z.string().url('PONDER_RPC_URL_2 must be a valid URL').optional(),
+
   // ── Storage — priority ────────────────────────────────────────────────────
   STORAGE_PROVIDER_PRIORITY: z
     .string()

@@ -46,6 +46,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     mapping(uint256 => address) public universeCreators;
 
     event TierConfigured(uint256 indexed universeId, SubscriptionTier tier, uint256 pricePerMonth);
+    event TierDeactivated(uint256 indexed universeId, SubscriptionTier tier);
     event Subscribed(address indexed user, uint256 indexed universeId, SubscriptionTier tier, uint256 expiresAt);
     event SubscriptionRenewed(address indexed user, uint256 indexed universeId, uint256 newExpiry);
     event SubscriptionCancelled(address indexed user, uint256 indexed universeId);
@@ -97,6 +98,15 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    error NotAuthorized();
+
+    /// @notice Deactivate a subscription tier
+    function deactivateTier(uint256 universeId, SubscriptionTier tier) external {
+        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
+        tierConfigs[universeId][tier].active = false;
+        emit TierDeactivated(universeId, tier);
+    }
+
     /// @notice Configure a subscription tier for a universe
     function configureTier(
         uint256 universeId,
@@ -109,10 +119,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint16 creditBonus
     ) external {
         // Must be universe creator or platform
-        require(
-            msg.sender == universeCreators[universeId] || msg.sender == platform,
-            "Not authorized"
-        );
+        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
 
         tierConfigs[universeId][tier] = TierConfig({
             pricePerMonth: pricePerMonth,

@@ -56,7 +56,9 @@ const ADMIN_ADDRESSES: string[] = (() => {
  */
 export function requirePermission(permission: string) {
   return t.middleware(({ ctx, next }) => {
-    const perms = (ctx as any).user?.apiKeyPermissions;
+    // ctx.user is guaranteed non-null here (chained after protectedProcedure)
+    const user = ctx.user as NonNullable<typeof ctx.user>;
+    const perms = (user as any).apiKeyPermissions as string[] | undefined;
     // JWT users have no apiKeyPermissions → full access
     if (perms && perms.length > 0 && !perms.includes(permission)) {
       throw new TRPCError({
@@ -64,7 +66,7 @@ export function requirePermission(permission: string) {
         message: `API key lacks required permission: ${permission}`,
       });
     }
-    return next({ ctx });
+    return next({ ctx: { ...ctx, user } });
   });
 }
 

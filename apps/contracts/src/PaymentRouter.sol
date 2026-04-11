@@ -206,8 +206,10 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         emit LoarTokenUpdated(_loarToken);
     }
 
+    error DiscountTooHigh();
+
     function setLoarFeeDiscount(uint16 newDiscountBps) external onlyOwner {
-        require(newDiscountBps <= 2000, "Max 20% discount");
+        if (newDiscountBps > 2000) revert DiscountTooHigh();
         loarFeeDiscountBps = newDiscountBps;
         emit LoarFeeDiscountUpdated(newDiscountBps);
     }
