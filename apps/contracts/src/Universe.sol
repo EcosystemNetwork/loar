@@ -44,7 +44,7 @@ contract Universe is IUniverse {
     NodeVisibilityOptions private nodeVisibilityOption;
 
     address public associatedToken;
-    IUniverseManager public universeManager;
+    IUniverseManager public immutable universeManager;
     address public universeAdmin;
     uint public currentCanonId;  // tracked canon node (avoids unbounded loop)
 

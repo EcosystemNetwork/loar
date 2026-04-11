@@ -56,11 +56,11 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     // universeId => layer => nameHash => tokenId (duplicate guard)
     mapping(uint256 => mapping(uint8 => mapping(bytes32 => uint256))) public deedByName;
 
-    address public platform;
-    IPaymentRouter public paymentRouter;
-    IRightsRegistry public rightsRegistry;
-    uint16 public platformFeeBps;
-    uint16 public royaltyBps;
+    address public immutable platform;
+    IPaymentRouter public immutable paymentRouter;
+    IRightsRegistry public immutable rightsRegistry;
+    uint16 public immutable platformFeeBps;
+    uint16 public immutable royaltyBps;
 
     event DeedMinted(
         uint256 indexed tokenId,

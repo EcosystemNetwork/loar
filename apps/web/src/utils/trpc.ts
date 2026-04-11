@@ -47,13 +47,17 @@ export const queryClient = new QueryClient({
         return;
       }
 
-      // Handle expired/invalid JWT — clear session and prompt re-auth
+      // Handle expired/invalid JWT — clear session and prompt re-auth.
+      // Only toast if the user actually had a session; unauthenticated 401s are expected.
       const httpStatus = error?.data?.httpStatus ?? error?.status;
       if (httpStatus === 401 || error.message?.includes('UNAUTHORIZED')) {
+        const hadSession = Boolean(getSiweToken());
         clearSiweSession();
-        toast.error('Session expired. Please sign in again.', {
-          id: 'session-expired', // dedupe — one toast even if multiple queries fail
-        });
+        if (hadSession) {
+          toast.error('Session expired. Please sign in again.', {
+            id: 'session-expired', // dedupe — one toast even if multiple queries fail
+          });
+        }
         return;
       }
 
