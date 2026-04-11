@@ -30,7 +30,13 @@ const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS ?? '') as `0x${string
 const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
+/** Allowed chain IDs for treasury payment verification. */
+const ALLOWED_CHAIN_IDS = new Set([sepolia.id, baseSepolia.id]);
+
 function getTreasuryChainClient(chainId?: number) {
+  if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
+    throw new Error(`Chain ID ${chainId} is not supported for treasury operations.`);
+  }
   if (chainId === baseSepolia.id) {
     return createPublicClient({
       chain: baseSepolia,
@@ -289,12 +295,12 @@ export const universeTreasuryRouter = router({
   spendFromPool: protectedProcedure
     .input(
       z.object({
-        universeId: z.string(),
-        generationType: z.string(),
-        cost: z.number().min(1),
-        generationId: z.string().optional(),
-        modelId: z.string().optional(),
-        metadata: z.record(z.string(), z.string()).optional(),
+        universeId: z.string().max(200),
+        generationType: z.string().max(50),
+        cost: z.number().min(1).max(100_000),
+        generationId: z.string().max(200).optional(),
+        modelId: z.string().max(100).optional(),
+        metadata: z.record(z.string().max(100), z.string().max(500)).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

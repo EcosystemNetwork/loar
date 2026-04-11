@@ -29,8 +29,16 @@ const baseSepoliaClient = createPublicClient({
   transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
 });
 
+/** Allowed chain IDs for on-chain payment verification. */
+const ALLOWED_CHAIN_IDS = new Set([sepolia.id, baseSepolia.id]);
+
 /** Get the appropriate chain client based on chain ID. */
 function getChainClient(chainId?: number) {
+  if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
+    throw new Error(
+      `Chain ID ${chainId} is not supported. Use Sepolia (${sepolia.id}) or Base Sepolia (${baseSepolia.id}).`
+    );
+  }
   if (chainId === baseSepolia.id) return baseSepoliaClient;
   return sepoliaClient; // default
 }
@@ -384,8 +392,8 @@ export const creditsRouter = router({
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
       // Atomic: dedup + balance update + tx record in one Firestore transaction
-      const chainTag = input.chainId ?? 'default';
-      const txDocId = `fiat-${chainTag}-${input.paymentRef}`;
+      // Dedup key uses raw paymentRef only — tx hashes are globally unique across chains
+      const txDocId = `fiat-${input.paymentRef}`;
       await db.runTransaction(async (tx) => {
         const dedupRef = creditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);
@@ -465,8 +473,8 @@ export const creditsRouter = router({
       const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
 
       // Atomic: dedup + balance update + tx record
-      const chainTag = input.chainId ?? 'default';
-      const txDocId = `loar-${chainTag}-${input.txHash}`;
+      // Dedup key uses raw txHash only — tx hashes are globally unique across chains
+      const txDocId = `loar-${input.txHash}`;
       await db.runTransaction(async (tx) => {
         const dedupRef = creditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);
@@ -531,12 +539,12 @@ export const creditsRouter = router({
   spend: protectedProcedure
     .input(
       z.object({
-        generationType: z.string(),
-        creditOverride: z.number().optional(), // for model-specific costs
-        universeId: z.string().optional(),
-        generationId: z.string().optional(),
-        modelId: z.string().optional(),
-        metadata: z.record(z.string(), z.string()).optional(),
+        generationType: z.string().max(50),
+        creditOverride: z.number().min(1).max(10_000).optional(),
+        universeId: z.string().max(200).optional(),
+        generationId: z.string().max(200).optional(),
+        modelId: z.string().max(100).optional(),
+        metadata: z.record(z.string().max(100), z.string().max(500)).optional(),
         /**
          * When true and universeId is set, deduct from the universe's shared
          * credit pool (funded from the universe treasury) instead of the
