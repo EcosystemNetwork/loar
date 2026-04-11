@@ -4,6 +4,10 @@
  */
 import { vi } from 'vitest';
 
+// Set required env vars before modules load
+process.env.ADMIN_ADDRESSES = '0xad0000000000000000000000000000000000dead';
+process.env.SIWE_JWT_SECRET = 'test-jwt-secret-that-is-at-least-32-characters-long-for-tests';
+
 const emptySnapshot = { docs: [], empty: true, size: 0 };
 
 /** Creates a chainable Firestore query mock that supports arbitrary .where().where().orderBy().limit() chains */
@@ -120,13 +124,68 @@ vi.mock('../services/storage', () => ({
   }),
 }));
 
+// Stub safe-admin (universe admin checks)
+vi.mock('../lib/safe-admin', () => ({
+  isUniverseAdmin: vi.fn().mockResolvedValue(false),
+  getSafeInfo: vi.fn().mockResolvedValue(null),
+  getUniverseAdminAddress: vi.fn().mockResolvedValue(null),
+}));
+
+// Stub universeTeam getMembership (used by universeTreasury routes)
+// Note: the universeTeam router itself still works normally via Firebase mocks.
+// This only stubs the named export that treasury routes import directly.
+vi.mock('../routers/universeTeam/universeTeam.routes', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    getMembership: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// Stub Stripe
+vi.mock('../routers/credits/stripe.routes', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    verifyStripePayment: vi.fn().mockRejectedValue(new Error('Stripe not configured in tests')),
+    getStripe: vi.fn().mockReturnValue(null),
+  };
+});
+
+// Stub viem createPublicClient (prevents real RPC calls in tests)
+vi.mock('viem', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  const mockClient = {
+    getTransaction: vi.fn().mockRejectedValue(new Error('RPC not available in tests')),
+    getTransactionReceipt: vi.fn().mockRejectedValue(new Error('RPC not available in tests')),
+    readContract: vi.fn().mockRejectedValue(new Error('RPC not available in tests')),
+  };
+  return {
+    ...actual,
+    createPublicClient: vi.fn().mockReturnValue(mockClient),
+  };
+});
+
+// Stub platformConfig
+vi.mock('../services/platformConfig', () => ({
+  getPlatformConfig: vi.fn().mockResolvedValue({
+    fiatMargin: 1.35,
+    loarMargin: 1.25,
+    loarCreditBonusFraction: 0.1,
+    baseCreditCostUsd: 0.008,
+    ethPriceUsd: 3000,
+  }),
+}));
+
 // Stub storage upload queue
+const mockUploadQueue = {
+  enqueue: vi.fn().mockReturnValue('job-123'),
+  getStatus: vi.fn().mockReturnValue({ jobId: 'job-123', status: 'pending' }),
+  getActiveJobs: vi.fn().mockReturnValue([]),
+  getRecentJobs: vi.fn().mockReturnValue([]),
+  retry: vi.fn().mockReturnValue(true),
+};
 vi.mock('../services/storage/upload-queue', () => ({
-  uploadQueue: {
-    enqueue: vi.fn().mockReturnValue('job-123'),
-    getStatus: vi.fn().mockReturnValue({ jobId: 'job-123', status: 'pending' }),
-    getActiveJobs: vi.fn().mockReturnValue([]),
-    getRecentJobs: vi.fn().mockReturnValue([]),
-    retry: vi.fn().mockReturnValue(true),
-  },
+  uploadQueue: mockUploadQueue,
+  getUploadQueue: vi.fn().mockReturnValue(mockUploadQueue),
 }));

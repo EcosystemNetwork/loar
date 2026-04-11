@@ -118,13 +118,13 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
     }
 
     /// @notice Get all characters in a universe
-    function getCharactersByUniverse(uint256 universeId, uint256 startId, uint256 count)
+    function getCharactersByUniverse(uint256 _universeId, uint256 startId, uint256 count)
         external view returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
         for (uint256 i = startId; i <= nextCharacterId && found < count; i++) {
-            if (characters[i].universeId == universeId) {
+            if (characters[i].universeId == _universeId) {
                 temp[found++] = i;
             }
         }

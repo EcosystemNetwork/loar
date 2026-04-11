@@ -161,13 +161,13 @@ contract EntityEditionNFT is Initializable, ERC1155, ERC2981, ReentrancyGuardUpg
     }
 
     /// @notice Get editions in a universe filtered by kind (paginated)
-    function getByUniverse(uint256 universeId, EntityKind kind, uint256 startId, uint256 count)
+    function getByUniverse(uint256 _universeId, EntityKind kind, uint256 startId, uint256 count)
         external view returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
         for (uint256 i = startId; i < nextEditionId && found < count; i++) {
-            if (editions[i].universeId == universeId && editions[i].kind == kind) {
+            if (editions[i].universeId == _universeId && editions[i].kind == kind) {
                 temp[found++] = i;
             }
         }

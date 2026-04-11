@@ -3,8 +3,14 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAccount, useSendTransaction, useWriteContract } from 'wagmi';
-import { parseEther, parseUnits, type Address } from 'viem';
+import {
+  useAccount,
+  useChainId,
+  useReadContract,
+  useSendTransaction,
+  useWriteContract,
+} from 'wagmi';
+import { parseEther, parseUnits, formatUnits, type Address } from 'viem';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { trpcClient } from '@/utils/trpc';
@@ -19,6 +25,8 @@ const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
 // Platform treasury address
 const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
   '0x0000000000000000000000000000000000000000') as Address;
+// Faucet contract address (testnet only)
+const LOAR_FAUCET_ADDRESS = (import.meta.env.VITE_LOAR_FAUCET_ADDRESS ?? '') as Address;
 
 // Minimal ERC20 ABI for approve + transfer
 const ERC20_ABI = [
@@ -47,6 +55,41 @@ const ERC20_ABI = [
     type: 'function' as const,
     stateMutability: 'view' as const,
     inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+// Minimal faucet ABI
+const FAUCET_ABI = [
+  {
+    name: 'claim',
+    type: 'function' as const,
+    stateMutability: 'nonpayable' as const,
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'canClaim',
+    type: 'function' as const,
+    stateMutability: 'view' as const,
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [
+      { name: 'ok', type: 'bool' },
+      { name: 'availableAt', type: 'uint256' },
+    ],
+  },
+  {
+    name: 'claimAmount',
+    type: 'function' as const,
+    stateMutability: 'view' as const,
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'faucetBalance',
+    type: 'function' as const,
+    stateMutability: 'view' as const,
+    inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
   },
 ] as const;
@@ -235,7 +278,8 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const queryClient = useQueryClient();
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const chainId = useChainId();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
 
@@ -261,6 +305,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       packageId: string;
       paymentMethod: 'card' | 'eth' | 'crypto';
       paymentRef: string;
+      chainId?: number;
     }) => trpcClient.credits.purchaseWithFiat.mutate(params),
     onSuccess: (data) => {
       toast.success(`Added ${data.creditsAdded} credits!`);
@@ -275,8 +320,12 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   });
 
   const purchaseLoarMutation = useMutation({
-    mutationFn: (params: { packageId: string; txHash: string; loarAmount: string }) =>
-      trpcClient.credits.purchaseWithLoar.mutate(params),
+    mutationFn: (params: {
+      packageId: string;
+      txHash: string;
+      loarAmount: string;
+      chainId?: number;
+    }) => trpcClient.credits.purchaseWithLoar.mutate(params),
     onSuccess: (data) => {
       toast.success(data.savings);
       queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
@@ -290,6 +339,51 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   });
 
   const pkgs = (packages || []) as CreditPackage[];
+
+  // ── Faucet state ───────────────────────────────────────────────────
+  const hasFaucet = !!LOAR_FAUCET_ADDRESS && LOAR_FAUCET_ADDRESS !== '0x';
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  const { data: canClaimData, refetch: refetchCanClaim } = useReadContract({
+    address: LOAR_FAUCET_ADDRESS,
+    abi: FAUCET_ABI,
+    functionName: 'canClaim',
+    args: address ? [address] : undefined,
+    query: { enabled: hasFaucet && !!address },
+  });
+
+  const { data: claimAmountData } = useReadContract({
+    address: LOAR_FAUCET_ADDRESS,
+    abi: FAUCET_ABI,
+    functionName: 'claimAmount',
+    query: { enabled: hasFaucet },
+  });
+
+  const canClaimResult = canClaimData as [boolean, bigint] | undefined;
+  const canClaimNow = canClaimResult?.[0] ?? false;
+  const nextClaimAt = canClaimResult?.[1] ? Number(canClaimResult[1]) : 0;
+  const faucetAmount = claimAmountData ? Number(formatUnits(claimAmountData as bigint, 18)) : 1000;
+
+  const handleFaucetClaim = async () => {
+    if (!hasFaucet) return;
+    setIsClaiming(true);
+    try {
+      toast.info('Confirm faucet claim in your wallet...');
+      await writeContractAsync({
+        address: LOAR_FAUCET_ADDRESS,
+        abi: FAUCET_ABI,
+        functionName: 'claim',
+      });
+      toast.success(`Claimed ${faucetAmount.toLocaleString()} $LOAR!`);
+      refetchCanClaim();
+    } catch (err) {
+      if (err instanceof Error && !err.message.includes('rejected')) {
+        toast.error('Faucet claim failed: ' + err.message);
+      }
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   const handleCardSuccess = async (paymentIntentId: string) => {
     const pkg = pkgs.find((p) => p.id === selectedPkg);
@@ -319,6 +413,30 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
           </button>
         )}
       </div>
+
+      {/* Faucet Banner (testnet only) */}
+      {hasFaucet && isConnected && (
+        <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-lg p-3 flex items-center justify-between gap-3">
+          <div className="text-xs">
+            <div className="text-emerald-400 font-medium">Testnet $LOAR Faucet</div>
+            <p className="text-zinc-400 mt-0.5">
+              Claim {faucetAmount.toLocaleString()} free $LOAR to try credit purchases
+            </p>
+            {!canClaimNow && nextClaimAt > 0 && (
+              <p className="text-zinc-500 mt-0.5">
+                Next claim available {new Date(nextClaimAt * 1000).toLocaleString()}
+              </p>
+            )}
+          </div>
+          <button
+            disabled={isClaiming || !canClaimNow}
+            onClick={handleFaucetClaim}
+            className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            {isClaiming ? 'Claiming...' : canClaimNow ? 'Claim $LOAR' : 'Cooldown'}
+          </button>
+        </div>
+      )}
 
       {/* Payment Method Tabs */}
       <div className="flex rounded-lg bg-zinc-900 p-1 gap-1">
@@ -464,6 +582,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                     packageId: pkg.id,
                     txHash,
                     loarAmount: loarAmount.toString(),
+                    chainId,
                   });
                 } catch (err) {
                   if (err instanceof Error && !err.message.includes('rejected')) {
@@ -502,6 +621,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                     packageId: pkg.id,
                     paymentMethod: 'eth',
                     paymentRef: txHash,
+                    chainId,
                   });
                 } catch (err) {
                   if (err instanceof Error && !err.message.includes('rejected')) {

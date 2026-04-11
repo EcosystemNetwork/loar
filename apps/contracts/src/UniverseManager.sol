@@ -6,7 +6,6 @@ import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {ILoarHook} from "./interfaces/ILoarHook.sol";
@@ -14,8 +13,8 @@ import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
 import {ILoarLpLocker} from "./interfaces/ILoarLpLocker.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
-import "./libraries/NodeOptions.sol";
-import "./types/UniverseData.sol";
+import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
+import {UniverseData} from "./types/UniverseData.sol";
 
 interface IUniverseTokenDeployer {
     function deployTokenAndGovernance(
@@ -117,35 +116,35 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             require(refunded, "Refund failed");
         }
 
-        UniverseConfig memory config = UniverseConfig(
-            nodeCreationOptions,
-            nodeVisibilityOptions,
-            initialOwner,
-            name,
-            imageURL,
-            description,
-            address(this)
-        );
+        UniverseConfig memory config = UniverseConfig({
+            nodeCreationOption: nodeCreationOptions,
+            nodeVisibilityOption: nodeVisibilityOptions,
+            universeAdmin: initialOwner,
+            name: name,
+            imageURL: imageURL,
+            description: description,
+            universeManager: address(this)
+        });
         Universe universe = new Universe(config);
-        UniverseData memory data = UniverseData(
-            IUniverse(universe),
-            IERC20(address(0)),
-            IGovernor(address(0)),
-            IHooks(address(0)),
-            ILoarLpLocker(address(0))
-        );
+        UniverseData memory data = UniverseData({
+            universe: IUniverse(universe),
+            token: IERC20(address(0)),
+            universeGovernor: IGovernor(address(0)),
+            hook: IHooks(address(0)),
+            locker: ILoarLpLocker(address(0))
+        });
 
-        uint256 current_id = latestId;
-        universeDatas[current_id] = data;
-        universeCreditFund[current_id] = creditAmount;
+        uint256 currentId = latestId;
+        universeDatas[currentId] = data;
+        universeCreditFund[currentId] = creditAmount;
         totalCreditFundsHeld += creditAmount;
 
         latestId++;
 
         emit UniverseCreated(address(universe), msg.sender);
-        emit UniverseMintFee(current_id, msg.sender, lpAmount, creditAmount);
+        emit UniverseMintFee(currentId, msg.sender, lpAmount, creditAmount);
 
-        return (current_id, address(universe));
+        return (currentId, address(universe));
     }
 
     function deployUniverseToken(

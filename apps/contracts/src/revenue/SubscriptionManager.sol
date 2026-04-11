@@ -63,12 +63,18 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     uint16 public constant MAX_FEE_BPS = 5000;
 
     modifier onlyPlatform() {
-        if (msg.sender != platform) revert NotPlatform();
+        _checkPlatform();
         _;
+    }
+
+    function _checkPlatform() internal view {
+        if (msg.sender != platform) revert NotPlatform();
     }
 
     error ZeroAddress();
     error MonthsTooHigh();
+    error CreatorNotRegistered();
+    error RefundFailed();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -131,6 +137,9 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();
 
+        address creator = universeCreators[universeId];
+        if (creator == address(0)) revert CreatorNotRegistered();
+
         uint256 totalPrice = config.pricePerMonth * months;
         if (msg.value < totalPrice) revert InsufficientPayment();
 
@@ -164,10 +173,16 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
             autoRenew: true
         });
 
-        // Route subscription payment through PaymentRouter
-        address creator = universeCreators[universeId];
-        if (msg.value > 0 && creator != address(0)) {
-            paymentRouter.route{value: msg.value}(creator, platformFeeBps);
+        // Route only totalPrice through PaymentRouter (not full msg.value)
+        if (totalPrice > 0) {
+            paymentRouter.route{value: totalPrice}(creator, platformFeeBps);
+        }
+
+        // Refund overpayment
+        uint256 overpaid = msg.value - totalPrice;
+        if (overpaid > 0) {
+            (bool ok,) = msg.sender.call{value: overpaid}("");
+            if (!ok) revert RefundFailed();
         }
 
         emit Subscribed(msg.sender, universeId, tier, expiry);

@@ -1,33 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-//import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
-//import {ILoarMevModule} from "../interfaces/ILoarMevModule.sol";
 import {ILoarHook} from "../interfaces/ILoarHook.sol";
-import {GovernanceERC20} from "../GovernanceERC20.sol";
-import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
-import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
+import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
 import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
-import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
-
-import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
-
-import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
-import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
-import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
-import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {BeforeSwapDelta, toBeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
-import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
 import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
 import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
@@ -54,10 +39,14 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     mapping(PoolId => uint256) public poolCreationTimestamp;
 
     modifier onlyFactory() {
+        _checkFactory();
+        _;
+    }
+
+    function _checkFactory() internal view {
         if (msg.sender != factory) {
             revert OnlyFactory();
         }
-        _;
     }
 
     constructor(
@@ -70,23 +59,25 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     }
 
     function _setFee(
-        PoolKey calldata poolKey,
-        SwapParams calldata swapParams
+        PoolKey calldata,
+        SwapParams calldata
     ) internal virtual {
         return;
     }
 
     // function to set the protocol fee to 20% of the lp fee
     function _setProtocolFee(uint24 lpFee) internal {
-        protocolFee = uint24(
-            (uint256(lpFee) * PROTOCOL_FEE_NUMERATOR) / uint128(FEE_DENOMINATOR)
-        );
+        // casting is safe: result ≤ lpFee (20% of a uint24), uint128 wraps a known constant
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 scaled = (uint256(lpFee) * PROTOCOL_FEE_NUMERATOR) / uint128(FEE_DENOMINATOR);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        protocolFee = uint24(scaled);
     }
 
     // function for inheriting hooks to set process data in during initialization flow
     function _initializePoolData(
-        PoolKey memory poolKey,
-        bytes memory poolData
+        PoolKey memory,
+        bytes memory
     ) internal virtual {
         return;
     }
@@ -195,9 +186,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             // since we're taking the protocol fee before the LP swap, we want to
             // take a slightly smaller amount to keep the taken LP/protocol fee at the 20% ratio,
             // this also helps us match the ExactOutput swappingForLoar scenario
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint128 scaledProtocolFee = (uint128(protocolFee) * 1e18) /
                 (1_000_000 + protocolFee);
+            // forge-lint: disable-next-line(unsafe-typecast)
             int128 fee = int128(
+                // forge-lint: disable-next-line(unsafe-typecast)
                 (swapParams.amountSpecified * -int128(scaledProtocolFee)) / 1e18
             );
 
@@ -207,6 +201,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
                 token0IsLoar
                     ? poolKey.currency1.toId()
                     : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(fee))
             );
         }
@@ -218,9 +213,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         if (!isExactInput && !swappingForLoar) {
             // we increase the protocol fee here because we want to better match
             // the ExactOutput !swappingForLoar scenario
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint128 scaledProtocolFee = (uint128(protocolFee) * 1e18) /
                 (1_000_000 - protocolFee);
+            // forge-lint: disable-next-line(unsafe-typecast)
             int128 fee = int128(
+                // forge-lint: disable-next-line(unsafe-typecast)
                 (swapParams.amountSpecified * int128(scaledProtocolFee)) / 1e18
             );
             delta = toBeforeSwapDelta(fee, 0);
@@ -230,6 +228,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
                 token0IsLoar
                     ? poolKey.currency1.toId()
                     : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(fee))
             );
         }
@@ -257,6 +256,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from it
             unspecifiedDelta =
+                // forge-lint: disable-next-line(unsafe-typecast)
                 (amountOut * int24(protocolFee)) /
                 FEE_DENOMINATOR;
             poolManager.mint(
@@ -264,6 +264,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
                 token0IsLoar
                     ? poolKey.currency1.toId()
                     : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(unspecifiedDelta))
             );
         }
@@ -277,6 +278,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from amount int
             unspecifiedDelta =
+                // forge-lint: disable-next-line(unsafe-typecast)
                 (amountIn * -int24(protocolFee)) /
                 FEE_DENOMINATOR;
             poolManager.mint(
@@ -284,6 +286,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
                 token0IsLoar
                     ? poolKey.currency1.toId()
                     : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(unspecifiedDelta))
             );
         }
@@ -307,7 +310,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
 
     function _beforeAddLiquidity(
         address,
-        PoolKey calldata poolKey,
+        PoolKey calldata,
         ModifyLiquidityParams calldata,
         bytes calldata
     ) internal virtual override returns (bytes4) {

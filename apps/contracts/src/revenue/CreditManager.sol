@@ -78,8 +78,12 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     error ZeroAddress();
 
     modifier onlyPlatform() {
-        if (msg.sender != platform) revert NotPlatform();
+        _checkPlatform();
         _;
+    }
+
+    function _checkPlatform() internal view {
+        if (msg.sender != platform) revert NotPlatform();
     }
 
     // ── Constructor ──────────────────────────────────────────────

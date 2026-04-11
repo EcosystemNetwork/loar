@@ -6,6 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgrade
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title LoarBurner
 /// @notice Premium action fees — $LOAR is redirected to LP and DAO treasury.
@@ -23,6 +24,7 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 ///         - remainder → DAO treasury (protocol revenue)
 ///         Default: 50% LP, 50% treasury.
 contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     enum BurnAction {
         PRIORITY_GENERATION,
@@ -153,11 +155,11 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
         toTreasury = cost - toLp;
 
         // Transfer from payer to this contract
-        loarToken.transferFrom(payer, address(this), cost);
+        loarToken.safeTransferFrom(payer, address(this), cost);
 
         // LP portion — deepens protocol-owned liquidity
         if (toLp > 0 && liquidityPool != address(0)) {
-            loarToken.transfer(liquidityPool, toLp);
+            loarToken.safeTransfer(liquidityPool, toLp);
             totalToLp += toLp;
         } else {
             // If no LP set, all goes to treasury
@@ -167,7 +169,7 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
 
         // Treasury portion — DAO revenue
         if (toTreasury > 0) {
-            loarToken.transfer(treasury, toTreasury);
+            loarToken.safeTransfer(treasury, toTreasury);
         }
 
         totalCollected += cost;

@@ -3,15 +3,11 @@ pragma solidity ^0.8.30;
 
 import {LoarDeployer} from "./utils/LoarDeployer.sol";
 import {UniverseGovernor} from "./UniverseGovernor.sol";
-import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
-import {ILoarHook} from "./interfaces/ILoarHook.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
-import {ILoarLpLocker} from "./interfaces/ILoarLpLocker.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 

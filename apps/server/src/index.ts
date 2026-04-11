@@ -62,7 +62,8 @@ app.use(
 const { stripeWebhookRoutes } = await import('./routes/stripe-webhook');
 app.route('/api/stripe', stripeWebhookRoutes);
 
-// SIWE authentication routes
+// SIWE authentication routes — stricter rate limit (10 req/min per IP)
+app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 10 }));
 app.route('/auth', authRoutes);
 
 // Add image serving routes

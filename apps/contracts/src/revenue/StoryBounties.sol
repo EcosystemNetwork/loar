@@ -6,6 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgrade
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title StoryBounties
 /// @notice Creators post $LOAR bounties for specific content requests.
@@ -21,6 +22,7 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 ///         - "Create a 30-second trailer for Episode 3" — 2000 $LOAR
 ///         - "Design a faction logo" — 200 $LOAR
 contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     enum BountyStatus {
         OPEN,
@@ -123,7 +125,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         if (deadline <= block.timestamp || deadline > block.timestamp + MAX_DEADLINE) revert InvalidDeadline();
 
         // Lock $LOAR in contract
-        loarToken.transferFrom(msg.sender, address(this), reward);
+        loarToken.safeTransferFrom(msg.sender, address(this), reward);
 
         bountyId = nextBountyId++;
         bounties[bountyId] = Bounty({
@@ -163,11 +165,11 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         b.submissionHash = submissionHash;
 
         // Pay winner
-        loarToken.transfer(winner, winnerReward);
+        loarToken.safeTransfer(winner, winnerReward);
 
         // Platform fee
         if (platformFee > 0) {
-            loarToken.transfer(treasury, platformFee);
+            loarToken.safeTransfer(treasury, platformFee);
         }
 
         totalDistributed += winnerReward;
@@ -188,9 +190,9 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
         b.status = BountyStatus.CANCELLED;
 
-        loarToken.transfer(b.poster, refund);
+        loarToken.safeTransfer(b.poster, refund);
         if (fee > 0) {
-            loarToken.transfer(treasury, fee);
+            loarToken.safeTransfer(treasury, fee);
         }
 
         emit BountyCancelled(bountyId, refund, fee);
@@ -205,7 +207,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         if (block.timestamp < b.deadline) revert DeadlineNotPassed();
 
         b.status = BountyStatus.EXPIRED;
-        loarToken.transfer(b.poster, b.reward);
+        loarToken.safeTransfer(b.poster, b.reward);
 
         emit BountyExpired(bountyId);
     }

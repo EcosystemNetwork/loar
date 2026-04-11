@@ -1,10 +1,11 @@
 /**
  * Ponder Indexer Configuration
  *
- * Configures Ponder to index LOAR protocol contracts on Ethereum Sepolia.
- * Uses the factory pattern to dynamically track Universe, Governor, and
- * Token contracts spawned by the UniverseManager factory. Also indexes Uniswap v4
- * PoolManager swap events for token price tracking.
+ * Configures Ponder to index LOAR protocol contracts on Ethereum Sepolia
+ * or Base Sepolia (set PONDER_CHAIN env var). Uses the factory pattern to
+ * dynamically track Universe, Governor, and Token contracts spawned by
+ * the UniverseManager factory. Also indexes Uniswap v4 PoolManager swap
+ * events for token price tracking.
  */
 import './env'; // validates env and loads .env files — must be first
 import { env } from './env';
@@ -13,16 +14,31 @@ import { parseAbiItem } from 'viem';
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
-import { sepolia } from 'viem/chains';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { getAddress } from 'viem/utils';
 
-// ── Chain config (Sepolia only) ──────────────────────────────────────────────
-const chainName = 'sepolia';
-const chainId = sepolia.id;
-const poolManagerAddress: `0x${string}` = '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543';
+// ── Chain config (driven by PONDER_CHAIN env var) ───────────────────────────
+const CHAIN_CONFIGS = {
+  sepolia: {
+    chainName: 'sepolia' as const,
+    chain: sepolia,
+    poolManager: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543' as `0x${string}`,
+    deploymentFile: 'sepolia.json',
+  },
+  'base-sepolia': {
+    chainName: 'base-sepolia' as const,
+    chain: baseSepolia,
+    poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408' as `0x${string}`,
+    deploymentFile: 'base-sepolia.json',
+  },
+} as const;
+
+const chainConfig = CHAIN_CONFIGS[env.PONDER_CHAIN];
+const chainName = chainConfig.chainName;
+const poolManagerAddress = chainConfig.poolManager;
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const deployment = require('../../deployments/sepolia.json');
+const deployment = require(`../../deployments/${chainConfig.deploymentFile}`);
 const address = getAddress(deployment.contracts.UniverseManager);
 const startBlock = deployment.startBlock;
 
@@ -37,7 +53,7 @@ const tokenCreatedEvent = parseAbiItem(
 export default createConfig({
   chains: {
     [chainName]: {
-      id: chainId,
+      id: chainConfig.chain.id,
       rpc: [env.PONDER_RPC_URL, ...env.PONDER_RPC_FALLBACKS].filter(Boolean),
       maxRequestsPerSecond: 4,
     },

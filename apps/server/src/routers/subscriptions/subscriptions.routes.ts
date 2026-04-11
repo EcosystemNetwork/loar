@@ -38,6 +38,17 @@ export const subscriptionsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify caller is universe admin
+      const universeDoc = await db
+        .collection('cinematicUniverses')
+        .doc(input.universeId.toLowerCase())
+        .get();
+      if (!universeDoc.exists) throw new Error('Universe not found');
+      const universeData = universeDoc.data()!;
+      if (universeData.creator?.toLowerCase() !== ctx.user.uid.toLowerCase()) {
+        throw new Error('Only the universe admin can configure subscription tiers');
+      }
+
       const tierId = `${input.universeId}-${input.tier}`;
       const tierData = {
         ...input,

@@ -92,7 +92,7 @@ export const characterNftAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
       { name: 'startId', internalType: 'uint256', type: 'uint256' },
       { name: 'count', internalType: 'uint256', type: 'uint256' },
     ],
@@ -1121,7 +1121,7 @@ export const episodeNftAbi = [
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
       { name: 'maxSupply', internalType: 'uint256', type: 'uint256' },
-      { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: '', internalType: 'string', type: 'string' },
     ],
     name: 'createEpisode',
     outputs: [{ name: 'episodeId', internalType: 'uint256', type: 'uint256' }],
@@ -2657,10 +2657,21 @@ export const launchpadStakingAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InsufficientStake' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
@@ -2678,6 +2689,11 @@ export const launchpadStakingAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
     type: 'error',
@@ -3088,10 +3104,21 @@ export const loarBurnerAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InsufficientAllowance' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
@@ -3107,6 +3134,11 @@ export const loarBurnerAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
     type: 'error',
@@ -4066,6 +4098,13 @@ export const loarLpLockerMultipleAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'collectRewards',
     outputs: [],
@@ -4272,13 +4311,6 @@ export const loarLpLockerMultipleAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'version',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [
       { name: 'token', internalType: 'address', type: 'address' },
       { name: 'recipient', internalType: 'address', type: 'address' },
@@ -4290,7 +4322,7 @@ export const loarLpLockerMultipleAbi = [
   {
     type: 'function',
     inputs: [{ name: 'recipient', internalType: 'address', type: 'address' }],
-    name: 'withdrawETH',
+    name: 'withdrawEth',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -5502,10 +5534,21 @@ export const paymentRouterAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FeeTooHigh' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
@@ -5522,6 +5565,11 @@ export const paymentRouterAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
   { type: 'error', inputs: [], name: 'TransferFailed' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
@@ -5916,10 +5964,21 @@ export const remixFeesAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FeeBelowMinimum' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
@@ -5936,6 +5995,11 @@ export const remixFeesAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
     type: 'error',
@@ -6277,6 +6341,7 @@ export const slopMarketAbi = [
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   { type: 'error', inputs: [], name: 'RefundFailed' },
   { type: 'error', inputs: [], name: 'UnsupportedTokenStandard' },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6708,6 +6773,16 @@ export const storyBountiesAbi = [
     inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
     name: 'AddressEmptyCode',
   },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
   { type: 'error', inputs: [], name: 'AmountTooLow' },
   { type: 'error', inputs: [], name: 'BountyNotOpen' },
   { type: 'error', inputs: [], name: 'DeadlineNotPassed' },
@@ -6718,6 +6793,7 @@ export const storyBountiesAbi = [
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InvalidDeadline' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
@@ -6734,6 +6810,11 @@ export const storyBountiesAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
     type: 'error',
@@ -7137,6 +7218,7 @@ export const subscriptionManagerAbi = [
     name: 'AddressEmptyCode',
   },
   { type: 'error', inputs: [], name: 'AlreadySubscribed' },
+  { type: 'error', inputs: [], name: 'CreatorNotRegistered' },
   {
     type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
@@ -7165,6 +7247,7 @@ export const subscriptionManagerAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'RefundFailed' },
   { type: 'error', inputs: [], name: 'TierNotActive' },
   { type: 'error', inputs: [], name: 'TransferFailed' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
@@ -7331,7 +7414,7 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [{ name: 'id', internalType: 'uint256', type: 'uint256' }],
-    name: 'nodeIDToHex',
+    name: 'nodeIdToHex',
     outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'view',
   },
@@ -9304,6 +9387,7 @@ export const universeTokenDeployerAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'AddressInsufficientBalance',
   },
+  { type: 'error', inputs: [], name: 'AllocationSupplyMismatch' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'HookNotEnabled' },
   { type: 'error', inputs: [], name: 'InvalidAllocation' },
@@ -12522,6 +12606,14 @@ export const useLoarLpLockerMultiple_MaxRewardParticipants_read =
   });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"VERSION"`
+ */
+export const useLoarLpLockerMultiple_Version_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'VERSION',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"factory"`
  */
 export const useLoarLpLockerMultiple_Factory_read = /*#__PURE__*/ createUseReadContract({
@@ -12575,14 +12667,6 @@ export const useLoarLpLockerMultiple_SupportsInterface_read = /*#__PURE__*/ crea
 export const useLoarLpLockerMultiple_TokenRewards_read = /*#__PURE__*/ createUseReadContract({
   abi: loarLpLockerMultipleAbi,
   functionName: 'tokenRewards',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"version"`
- */
-export const useLoarLpLockerMultiple_Version_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarLpLockerMultipleAbi,
-  functionName: 'version',
 });
 
 /**
@@ -12673,11 +12757,11 @@ export const useLoarLpLockerMultiple_WithdrawErc20_write = /*#__PURE__*/ createU
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawETH"`
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawEth"`
  */
 export const useLoarLpLockerMultiple_WithdrawEth_write = /*#__PURE__*/ createUseWriteContract({
   abi: loarLpLockerMultipleAbi,
-  functionName: 'withdrawETH',
+  functionName: 'withdrawEth',
 });
 
 /**
@@ -12769,12 +12853,12 @@ export const useLoarLpLockerMultiple_WithdrawErc20_simulate =
   });
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawETH"`
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawEth"`
  */
 export const useLoarLpLockerMultiple_WithdrawEth_simulate = /*#__PURE__*/ createUseSimulateContract(
   {
     abi: loarLpLockerMultipleAbi,
-    functionName: 'withdrawETH',
+    functionName: 'withdrawEth',
   }
 );
 
@@ -15350,11 +15434,11 @@ export const useUniverse_LatestNodeId_read = /*#__PURE__*/ createUseReadContract
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"nodeIDToHex"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"nodeIdToHex"`
  */
 export const useUniverse_NodeIdToHex_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
-  functionName: 'nodeIDToHex',
+  functionName: 'nodeIdToHex',
 });
 
 /**

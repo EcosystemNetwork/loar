@@ -6,6 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgrade
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title RemixFees
 /// @notice When someone branches/remixes content from another creator's work,
@@ -21,6 +22,7 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 ///         Universe creators can set custom remix fees for their universe.
 ///         Platform sets a minimum and default.
 contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     struct RemixConfig {
         uint256 fee;            // $LOAR cost to remix content from this universe
@@ -122,7 +124,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         if (fee == 0) return;
 
         // Transfer $LOAR from remixer
-        loarToken.transferFrom(remixer, address(this), fee);
+        loarToken.safeTransferFrom(remixer, address(this), fee);
 
         // Calculate splits
         uint256 toCreator = (fee * creatorShareBps) / 10_000;
@@ -131,18 +133,18 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
 
         // Distribute
         if (toCreator > 0) {
-            loarToken.transfer(originalCreator, toCreator);
+            loarToken.safeTransfer(originalCreator, toCreator);
             totalToCreators += toCreator;
         }
         if (toLp > 0 && liquidityPool != address(0)) {
-            loarToken.transfer(liquidityPool, toLp);
+            loarToken.safeTransfer(liquidityPool, toLp);
             totalToLp += toLp;
         } else {
             toTreasuryAmount += toLp;
             toLp = 0;
         }
         if (toTreasuryAmount > 0) {
-            loarToken.transfer(treasury, toTreasuryAmount);
+            loarToken.safeTransfer(treasury, toTreasuryAmount);
         }
 
         totalRemixFees += fee;

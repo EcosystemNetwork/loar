@@ -110,7 +110,11 @@ export const collabsRouter = router({
       const collabRef = collabsCol().doc(input.collabId);
       const collabDoc = await collabRef.get();
       if (!collabDoc.exists) throw new Error('Collab not found');
-      if (collabDoc.data()?.status !== 'ACTIVE') throw new Error('Collab not active');
+      const collabData = collabDoc.data()!;
+      if (collabData.status !== 'ACTIVE') throw new Error('Collab not active');
+      if (collabData.proposerUid !== ctx.user.uid && collabData.acceptorUid !== ctx.user.uid) {
+        throw new Error('Only collab participants can record episodes');
+      }
 
       const episode = {
         collabId: input.collabId,

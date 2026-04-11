@@ -7,7 +7,6 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -83,7 +82,7 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
         bytes32 contentHash,
         uint256 mintPrice,
         uint256 maxSupply,
-        string calldata metadataURI
+        string calldata /* metadataURI */
     ) external returns (uint256 episodeId) {
         if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         episodeId = nextEpisodeId++;

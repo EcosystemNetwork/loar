@@ -204,6 +204,10 @@ export const contentRouter = router({
     if (!doc.exists) return null;
 
     const data = doc.data()!;
+    // Hide flagged/removed/hidden content from public access
+    const status = data.contentStatus || 'active';
+    if (status !== 'active' && status !== 'reinstated') return null;
+
     return {
       id: doc.id,
       title: data.title,
