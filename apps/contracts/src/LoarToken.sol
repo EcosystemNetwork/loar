@@ -48,8 +48,12 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     error FeeIncreaseExceedsLimit();
 
     modifier onlyMinter() {
-        if (!minters[msg.sender] && msg.sender != owner()) revert NotMinter();
+        _checkMinter();
         _;
+    }
+
+    function _checkMinter() internal view {
+        if (!minters[msg.sender] && msg.sender != owner()) revert NotMinter();
     }
 
     constructor(

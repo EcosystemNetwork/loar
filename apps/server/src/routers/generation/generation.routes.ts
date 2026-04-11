@@ -564,9 +564,10 @@ export const generationRouter = router({
    */
   getRecord: protectedProcedure
     .input(z.object({ generationId: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const doc = await generationsCol().doc(input.generationId).get();
       if (!doc.exists) return null;
+      if (doc.data()?.userId !== ctx.user.uid) return null;
       return { id: doc.id, ...doc.data() };
     }),
 

@@ -143,7 +143,15 @@ function ProfilePage() {
   const themeClass = THEME_CLASSES[layout.theme || 'default'] || '';
   const accentColor = layout.accentColor || '#8b5cf6';
   const socialLinks = (profile as any).socialLinks || {};
-  const customLinks: { label: string; url: string }[] = (profile as any).customLinks || [];
+  const customLinks: { label: string; url: string }[] = ((profile as any).customLinks || []).filter(
+    (link: { url: string }) => {
+      try {
+        return ['http:', 'https:'].includes(new URL(link.url).protocol);
+      } catch {
+        return false;
+      }
+    }
+  );
   const tags = (profile as any).tags || [];
   const bio = (profile as any).bio || '';
   const followers = (profile as any).followers || 0;
@@ -219,16 +227,23 @@ function ProfilePage() {
               Object.keys(SOCIAL_PLATFORMS).some((k) => socialLinks[k]) ||
               customLinks.length > 0) && (
               <div className="flex flex-wrap gap-2 mt-3">
-                {socialLinks.website && (
-                  <a
-                    href={socialLinks.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <Globe className="h-3.5 w-3.5" /> Website
-                  </a>
-                )}
+                {socialLinks.website &&
+                  (() => {
+                    try {
+                      return ['http:', 'https:'].includes(new URL(socialLinks.website).protocol);
+                    } catch {
+                      return false;
+                    }
+                  })() && (
+                    <a
+                      href={socialLinks.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Globe className="h-3.5 w-3.5" /> Website
+                    </a>
+                  )}
                 {Object.entries(SOCIAL_PLATFORMS).map(([key, platform]) => {
                   const value = socialLinks[key];
                   if (!value) return null;

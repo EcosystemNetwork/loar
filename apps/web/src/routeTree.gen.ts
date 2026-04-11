@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as StakingRouteImport } from './routes/staking'
 import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
@@ -28,7 +30,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as TokensIndexRouteImport } from './routes/tokens/index'
 import { Route as SellIndexRouteImport } from './routes/sell/index'
+import { Route as LicensingIndexRouteImport } from './routes/licensing/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
+import { Route as CollabsIndexRouteImport } from './routes/collabs/index'
 import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AdsIndexRouteImport } from './routes/ads/index'
@@ -43,8 +47,10 @@ import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
 import { Route as ProductIdRouteImport } from './routes/product/$id'
 import { Route as PlayUniverseIdRouteImport } from './routes/play/$universeId'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
+import { Route as LicensingNewRouteImport } from './routes/licensing/new'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
+import { Route as CollabsNewRouteImport } from './routes/collabs/new'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
 import { Route as BountiesMineRouteImport } from './routes/bounties/mine'
 import { Route as BountiesBountyIdRouteImport } from './routes/bounties/$bountyId'
@@ -70,6 +76,11 @@ const UploadRoute = UploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StakingRoute = StakingRouteImport.update({
   id: '/staking',
   path: '/staking',
@@ -78,6 +89,11 @@ const StakingRoute = StakingRouteImport.update({
 const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
   path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyWorksRoute = MyWorksRouteImport.update({
@@ -155,9 +171,19 @@ const SellIndexRoute = SellIndexRouteImport.update({
   path: '/sell/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LicensingIndexRoute = LicensingIndexRouteImport.update({
+  id: '/licensing/',
+  path: '/licensing/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreateIndexRoute = CreateIndexRouteImport.update({
   id: '/create/',
   path: '/create/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollabsIndexRoute = CollabsIndexRouteImport.update({
+  id: '/collabs/',
+  path: '/collabs/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BountiesIndexRoute = BountiesIndexRouteImport.update({
@@ -230,6 +256,11 @@ const OrderIdRoute = OrderIdRouteImport.update({
   path: '/order/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LicensingNewRoute = LicensingNewRouteImport.update({
+  id: '/licensing/new',
+  path: '/licensing/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
   id: '/governance/$universeId',
   path: '/governance/$universeId',
@@ -238,6 +269,11 @@ const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
 const CreateKindRoute = CreateKindRouteImport.update({
   id: '/create/$kind',
   path: '/create/$kind',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollabsNewRoute = CollabsNewRouteImport.update({
+  id: '/collabs/new',
+  path: '/collabs/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
@@ -324,8 +360,10 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/privacy': typeof PrivacyRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
+  '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -337,8 +375,10 @@ export interface FileRoutesByFullPath {
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/licensing/new': typeof LicensingNewRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -353,7 +393,9 @@ export interface FileRoutesByFullPath {
   '/ads/': typeof AdsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
+  '/collabs/': typeof CollabsIndexRoute
   '/create/': typeof CreateIndexRoute
+  '/licensing/': typeof LicensingIndexRoute
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
@@ -376,8 +418,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/privacy': typeof PrivacyRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
+  '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -389,8 +433,10 @@ export interface FileRoutesByTo {
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/licensing/new': typeof LicensingNewRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -405,7 +451,9 @@ export interface FileRoutesByTo {
   '/ads': typeof AdsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/bounties': typeof BountiesIndexRoute
+  '/collabs': typeof CollabsIndexRoute
   '/create': typeof CreateIndexRoute
+  '/licensing': typeof LicensingIndexRoute
   '/sell': typeof SellIndexRoute
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
@@ -429,8 +477,10 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/privacy': typeof PrivacyRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
+  '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -442,8 +492,10 @@ export interface FileRoutesById {
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/licensing/new': typeof LicensingNewRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -458,7 +510,9 @@ export interface FileRoutesById {
   '/ads/': typeof AdsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
+  '/collabs/': typeof CollabsIndexRoute
   '/create/': typeof CreateIndexRoute
+  '/licensing/': typeof LicensingIndexRoute
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
@@ -483,8 +537,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/market'
     | '/my-works'
+    | '/privacy'
     | '/sandbox'
     | '/staking'
+    | '/terms'
     | '/upload'
     | '/videos'
     | '/admin/moderation'
@@ -496,8 +552,10 @@ export interface FileRouteTypes {
     | '/bounties/$bountyId'
     | '/bounties/mine'
     | '/canon/$universeId'
+    | '/collabs/new'
     | '/create/$kind'
     | '/governance/$universeId'
+    | '/licensing/new'
     | '/order/$id'
     | '/play/$universeId'
     | '/product/$id'
@@ -512,7 +570,9 @@ export interface FileRouteTypes {
     | '/ads/'
     | '/agents/'
     | '/bounties/'
+    | '/collabs/'
     | '/create/'
+    | '/licensing/'
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
@@ -535,8 +595,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/market'
     | '/my-works'
+    | '/privacy'
     | '/sandbox'
     | '/staking'
+    | '/terms'
     | '/upload'
     | '/videos'
     | '/admin/moderation'
@@ -548,8 +610,10 @@ export interface FileRouteTypes {
     | '/bounties/$bountyId'
     | '/bounties/mine'
     | '/canon/$universeId'
+    | '/collabs/new'
     | '/create/$kind'
     | '/governance/$universeId'
+    | '/licensing/new'
     | '/order/$id'
     | '/play/$universeId'
     | '/product/$id'
@@ -564,7 +628,9 @@ export interface FileRouteTypes {
     | '/ads'
     | '/agents'
     | '/bounties'
+    | '/collabs'
     | '/create'
+    | '/licensing'
     | '/sell'
     | '/tokens'
     | '/wiki'
@@ -587,8 +653,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/market'
     | '/my-works'
+    | '/privacy'
     | '/sandbox'
     | '/staking'
+    | '/terms'
     | '/upload'
     | '/videos'
     | '/admin/moderation'
@@ -600,8 +668,10 @@ export interface FileRouteTypes {
     | '/bounties/$bountyId'
     | '/bounties/mine'
     | '/canon/$universeId'
+    | '/collabs/new'
     | '/create/$kind'
     | '/governance/$universeId'
+    | '/licensing/new'
     | '/order/$id'
     | '/play/$universeId'
     | '/product/$id'
@@ -616,7 +686,9 @@ export interface FileRouteTypes {
     | '/ads/'
     | '/agents/'
     | '/bounties/'
+    | '/collabs/'
     | '/create/'
+    | '/licensing/'
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
@@ -640,8 +712,10 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
   MyWorksRoute: typeof MyWorksRoute
+  PrivacyRoute: typeof PrivacyRoute
   SandboxRoute: typeof SandboxRoute
   StakingRoute: typeof StakingRoute
+  TermsRoute: typeof TermsRoute
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
   AdminModerationRoute: typeof AdminModerationRoute
@@ -653,8 +727,10 @@ export interface RootRouteChildren {
   BountiesBountyIdRoute: typeof BountiesBountyIdRoute
   BountiesMineRoute: typeof BountiesMineRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
+  CollabsNewRoute: typeof CollabsNewRoute
   CreateKindRoute: typeof CreateKindRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
+  LicensingNewRoute: typeof LicensingNewRoute
   OrderIdRoute: typeof OrderIdRoute
   PlayUniverseIdRoute: typeof PlayUniverseIdRoute
   ProductIdRoute: typeof ProductIdRoute
@@ -669,7 +745,9 @@ export interface RootRouteChildren {
   AdsIndexRoute: typeof AdsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   BountiesIndexRoute: typeof BountiesIndexRoute
+  CollabsIndexRoute: typeof CollabsIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
+  LicensingIndexRoute: typeof LicensingIndexRoute
   SellIndexRoute: typeof SellIndexRoute
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
@@ -694,6 +772,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/staking': {
       id: '/staking'
       path: '/staking'
@@ -706,6 +791,13 @@ declare module '@tanstack/react-router' {
       path: '/sandbox'
       fullPath: '/sandbox'
       preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-works': {
@@ -813,11 +905,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SellIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/licensing/': {
+      id: '/licensing/'
+      path: '/licensing'
+      fullPath: '/licensing/'
+      preLoaderRoute: typeof LicensingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/create/': {
       id: '/create/'
       path: '/create'
       fullPath: '/create/'
       preLoaderRoute: typeof CreateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collabs/': {
+      id: '/collabs/'
+      path: '/collabs'
+      fullPath: '/collabs/'
+      preLoaderRoute: typeof CollabsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bounties/': {
@@ -918,6 +1024,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/licensing/new': {
+      id: '/licensing/new'
+      path: '/licensing/new'
+      fullPath: '/licensing/new'
+      preLoaderRoute: typeof LicensingNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/governance/$universeId': {
       id: '/governance/$universeId'
       path: '/governance/$universeId'
@@ -930,6 +1043,13 @@ declare module '@tanstack/react-router' {
       path: '/create/$kind'
       fullPath: '/create/$kind'
       preLoaderRoute: typeof CreateKindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collabs/new': {
+      id: '/collabs/new'
+      path: '/collabs/new'
+      fullPath: '/collabs/new'
+      preLoaderRoute: typeof CollabsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/canon/$universeId': {
@@ -1060,8 +1180,10 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
   MyWorksRoute: MyWorksRoute,
+  PrivacyRoute: PrivacyRoute,
   SandboxRoute: SandboxRoute,
   StakingRoute: StakingRoute,
+  TermsRoute: TermsRoute,
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
   AdminModerationRoute: AdminModerationRoute,
@@ -1073,8 +1195,10 @@ const rootRouteChildren: RootRouteChildren = {
   BountiesBountyIdRoute: BountiesBountyIdRoute,
   BountiesMineRoute: BountiesMineRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
+  CollabsNewRoute: CollabsNewRoute,
   CreateKindRoute: CreateKindRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
+  LicensingNewRoute: LicensingNewRoute,
   OrderIdRoute: OrderIdRoute,
   PlayUniverseIdRoute: PlayUniverseIdRoute,
   ProductIdRoute: ProductIdRoute,
@@ -1089,7 +1213,9 @@ const rootRouteChildren: RootRouteChildren = {
   AdsIndexRoute: AdsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   BountiesIndexRoute: BountiesIndexRoute,
+  CollabsIndexRoute: CollabsIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
+  LicensingIndexRoute: LicensingIndexRoute,
   SellIndexRoute: SellIndexRoute,
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,

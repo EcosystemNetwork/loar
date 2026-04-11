@@ -5,7 +5,6 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -168,7 +167,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         });
 
         // Platform takes cut of submission fee via PaymentRouter
-        uint256 platformCut = (msg.value * platformFeeBps) / 10000;
+        uint256 platformCut = _platformCut(msg.value);
         uint256 held = msg.value - platformCut;
         creatorHeldAmount[submissionId] = held;
         if (platformCut > 0) {
@@ -208,23 +207,35 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (sub.status != SubmissionStatus.VOTING) revert InvalidStatus();
         if (block.timestamp < sub.votingDeadline) revert VotingNotEnded();
 
+        uint256 held = creatorHeldAmount[submissionId];
+        creatorHeldAmount[submissionId] = 0;
+
         if (sub.votesFor > sub.votesAgainst) {
             sub.status = SubmissionStatus.ACCEPTED;
             canonSubmissions[sub.universeId].push(submissionId);
 
             // Creator earns the remaining submission fee (platform cut already taken in submit)
-            uint256 creatorReward = creatorHeldAmount[submissionId];
-            creatorHeldAmount[submissionId] = 0;
-            if (creatorReward > 0) {
-                paymentRouter.route{value: creatorReward}(sub.creator, 0);
+            if (held > 0) {
+                paymentRouter.route{value: held}(sub.creator, 0);
             }
 
             emit SubmissionAccepted(submissionId, sub.universeId);
             emit CanonSubmissionAccepted(sub.universeId, submissionId, sub.contentHash);
         } else {
             sub.status = SubmissionStatus.REJECTED;
+
+            // Route rejected submission remainder to treasury (not left stuck in contract)
+            if (held > 0) {
+                paymentRouter.routeToTreasury{value: held}();
+            }
+
             emit SubmissionRejected(submissionId);
         }
+    }
+
+    /// @dev Compute platform cut from a gross amount
+    function _platformCut(uint256 amount) private view returns (uint256) {
+        return (amount * platformFeeBps) / 10000;
     }
 
     /// @notice License accepted canon content for use within the universe

@@ -237,7 +237,10 @@ contract SlopMarket is ReentrancyGuard, Ownable {
         emit PlatformFeeUpdated(newFeeBps);
     }
 
+    error ZeroAddress();
+
     function setPaymentRouter(address newRouter) external onlyOwner {
+        if (newRouter == address(0)) revert ZeroAddress();
         paymentRouter = IPaymentRouter(newRouter);
     }
 

@@ -284,32 +284,54 @@ export const listingsRouter = router({
         throwApiError('BAD_REQUEST', 'ETH purchases require a transaction hash');
       }
 
+      // Atomic: re-validate listing state + create order + update sold counter
+      // in a single transaction to prevent price manipulation and quantity oversell.
       const now = new Date();
-      const order = {
-        listingId: input.listingId,
-        buyerUid: ctx.user.uid,
-        buyerAddress: ctx.user.address ?? null,
-        sellerUid: listing.sellerUid,
-        productType: listing.productType,
-        universeId: listing.universeId,
-        title: listing.title,
-        thumbnailUrl: listing.thumbnailUrl ?? null,
-        price: listing.price,
-        currency: listing.currency,
-        quantity: input.quantity,
-        txHash: input.txHash ?? null,
-        status: 'COMPLETED',
-        createdAt: now,
-      };
+      const result = await db.runTransaction(async (tx) => {
+        const freshListingDoc = await tx.get(listingRef);
+        if (!freshListingDoc.exists) throw new Error('Listing not found');
+        const freshListing = freshListingDoc.data()!;
 
-      const orderRef = await ordersCol().add(order);
+        // Re-validate inside transaction (listing may have changed since initial read)
+        if (freshListing.status !== 'ACTIVE') throw new Error('Listing is no longer active');
+        if (
+          freshListing.supply > 0 &&
+          (freshListing.sold ?? 0) + input.quantity > freshListing.supply
+        ) {
+          throw new Error('Insufficient supply');
+        }
 
-      const newSold = (listing.sold ?? 0) + input.quantity;
-      const newStatus =
-        listing.supply > 0 && newSold >= listing.supply ? 'SOLD_OUT' : listing.status;
-      await listingRef.update({ sold: newSold, status: newStatus, updatedAt: now });
+        const order = {
+          listingId: input.listingId,
+          buyerUid: ctx.user.uid,
+          buyerAddress: ctx.user.address ?? null,
+          sellerUid: freshListing.sellerUid,
+          productType: freshListing.productType,
+          universeId: freshListing.universeId,
+          title: freshListing.title,
+          thumbnailUrl: freshListing.thumbnailUrl ?? null,
+          price: freshListing.price,
+          currency: freshListing.currency,
+          quantity: input.quantity,
+          txHash: input.txHash ?? null,
+          status: 'COMPLETED',
+          createdAt: now,
+        };
 
-      return { orderId: orderRef.id, ...order };
+        const orderRef = ordersCol().doc();
+        tx.set(orderRef, order);
+
+        const newSold = (freshListing.sold ?? 0) + input.quantity;
+        const newStatus =
+          freshListing.supply > 0 && newSold >= freshListing.supply
+            ? 'SOLD_OUT'
+            : freshListing.status;
+        tx.update(listingRef, { sold: newSold, status: newStatus, updatedAt: now });
+
+        return { orderId: orderRef.id, ...order };
+      });
+
+      return result;
     }),
 
   /** Get a single order (buyer or seller only) */

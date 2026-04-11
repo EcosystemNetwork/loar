@@ -6,6 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgrade
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title LaunchpadStaking
 /// @notice Dual staking: global tiers + per-universe staking for revenue share.
@@ -27,6 +28,7 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 ///         - Early unstake penalty: 5% to LP (not burned)
 ///         - Minimum lock period: 7 days
 contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     enum Tier {
         NONE,       // 0 - not staked
@@ -147,7 +149,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     function stake(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
-        loarToken.transferFrom(msg.sender, address(this), amount);
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
 
         StakeInfo storage s = stakes[msg.sender];
         Tier oldTier = s.tier;
@@ -204,12 +206,12 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         }
 
         // Return tokens
-        loarToken.transfer(msg.sender, payout);
+        loarToken.safeTransfer(msg.sender, payout);
 
         // Penalty goes to LP (deepens liquidity) or treasury as fallback
         if (penalty > 0) {
             address penaltyRecipient = liquidityPool != address(0) ? liquidityPool : treasury;
-            loarToken.transfer(penaltyRecipient, penalty);
+            loarToken.safeTransfer(penaltyRecipient, penalty);
             totalPenaltyCollected += penalty;
         }
 
@@ -222,7 +224,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     function stakeInUniverse(uint256 universeId, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
-        loarToken.transferFrom(msg.sender, address(this), amount);
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
 
         UniversePool storage pool = universePools[universeId];
         UniverseStake storage us = universeStakes[msg.sender][universeId];
@@ -231,7 +233,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (us.amount > 0 && pool.accRewardPerShare > 0) {
             uint256 pending = (us.amount * pool.accRewardPerShare / 1e18) - us.rewardDebt;
             if (pending > 0) {
-                loarToken.transfer(msg.sender, pending);
+                loarToken.safeTransfer(msg.sender, pending);
                 emit UniverseRewardClaimed(msg.sender, universeId, pending);
             }
         }
@@ -258,7 +260,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (pool.accRewardPerShare > 0) {
             uint256 pending = (us.amount * pool.accRewardPerShare / 1e18) - us.rewardDebt;
             if (pending > 0) {
-                loarToken.transfer(msg.sender, pending);
+                loarToken.safeTransfer(msg.sender, pending);
                 emit UniverseRewardClaimed(msg.sender, universeId, pending);
             }
         }
@@ -276,11 +278,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         totalUniverseStaked -= amount;
 
         uint256 payout = amount - penalty;
-        loarToken.transfer(msg.sender, payout);
+        loarToken.safeTransfer(msg.sender, payout);
 
         if (penalty > 0) {
             address penaltyRecipient = liquidityPool != address(0) ? liquidityPool : treasury;
-            loarToken.transfer(penaltyRecipient, penalty);
+            loarToken.safeTransfer(penaltyRecipient, penalty);
             totalPenaltyCollected += penalty;
         }
 
@@ -294,11 +296,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         UniversePool storage pool = universePools[universeId];
         if (pool.totalStaked == 0) {
             // No stakers — send to treasury
-            loarToken.transferFrom(msg.sender, treasury, amount);
+            loarToken.safeTransferFrom(msg.sender, treasury, amount);
             return;
         }
 
-        loarToken.transferFrom(msg.sender, address(this), amount);
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
         pool.accRewardPerShare += (amount * 1e18) / pool.totalStaked;
         pool.totalDistributed += amount;
 
@@ -315,7 +317,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (pending == 0) revert NothingToClaim();
 
         us.rewardDebt = us.amount * pool.accRewardPerShare / 1e18;
-        loarToken.transfer(msg.sender, pending);
+        loarToken.safeTransfer(msg.sender, pending);
 
         emit UniverseRewardClaimed(msg.sender, universeId, pending);
     }

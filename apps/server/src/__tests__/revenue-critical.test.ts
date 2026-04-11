@@ -1,11 +1,12 @@
 /**
  * Revenue-critical module integration tests.
  * These routers handle money flows and must be tested thoroughly:
- * marketplace, subscriptions, credits, licensing, analytics, ads.
+ * marketplace, subscriptions, credits, licensing, analytics, ads,
+ * universeTreasury, and admin-only authorization enforcement.
  */
 import { describe, it, expect } from 'vitest';
 import { TRPCError } from '@trpc/server';
-import { createPublicCaller, createAuthCaller } from './helpers';
+import { createPublicCaller, createAuthCaller, createAdminCaller } from './helpers';
 
 // ---------------------------------------------------------------------------
 // marketplace (canon submissions & voting)
@@ -333,5 +334,208 @@ describe('collabs router', () => {
   it('myCollabs rejects unauthenticated callers', async () => {
     const caller = createPublicCaller();
     await expect(caller.collabs.myCollabs()).rejects.toThrow(TRPCError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// credits — admin-only route enforcement
+// ---------------------------------------------------------------------------
+describe('credits admin authorization', () => {
+  it('grant rejects authenticated non-admin callers with FORBIDDEN', async () => {
+    const caller = createAuthCaller(); // non-admin address
+    await expect(
+      caller.credits.grant({
+        targetUid: 'user2',
+        credits: 100,
+        reason: 'should not work',
+      })
+    ).rejects.toThrow(TRPCError);
+
+    try {
+      await caller.credits.grant({
+        targetUid: 'user2',
+        credits: 100,
+        reason: 'should not work',
+      });
+    } catch (e: any) {
+      expect(e.code).toBe('FORBIDDEN');
+    }
+  });
+
+  it('grant succeeds for admin callers', async () => {
+    const caller = createAdminCaller();
+    const result = await caller.credits.grant({
+      targetUid: 'user2',
+      credits: 50,
+      reason: 'admin grant test',
+    });
+    expect(result).toHaveProperty('ok', true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// credits — purchaseWithLoar auth enforcement
+// ---------------------------------------------------------------------------
+describe('credits purchaseWithLoar', () => {
+  it('rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.credits.purchaseWithLoar({
+        packageId: 'starter',
+        txHash: '0xabc',
+        loarAmount: '1000000000000000000',
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// universeTreasury — authorization enforcement
+// ---------------------------------------------------------------------------
+describe('universeTreasury router', () => {
+  it('getPoolBalance is public', async () => {
+    const caller = createPublicCaller();
+    const result = await caller.universeTreasury.getPoolBalance({
+      universeId: 'test-universe',
+    });
+    expect(result).toHaveProperty('balance');
+  });
+
+  it('fundPool rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.universeTreasury.fundPool({
+        universeId: 'u1',
+        packageId: 'starter',
+        paymentMethod: 'eth',
+        paymentRef: '0xabc',
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+
+  it('fundPool rejects authenticated non-admin callers', async () => {
+    const caller = createAuthCaller(); // isUniverseAdmin mock returns false
+    await expect(
+      caller.universeTreasury.fundPool({
+        universeId: 'u1',
+        packageId: 'starter',
+        paymentMethod: 'eth',
+        paymentRef: '0xabc',
+      })
+    ).rejects.toThrow('Only the universe admin can fund');
+  });
+
+  it('fundPool accepts chainId parameter', async () => {
+    const caller = createAuthCaller();
+    // Still rejected by isUniverseAdmin, but validates chainId is accepted in schema
+    await expect(
+      caller.universeTreasury.fundPool({
+        universeId: 'u1',
+        packageId: 'starter',
+        paymentMethod: 'eth',
+        paymentRef: '0xabc',
+        chainId: 84532, // Base Sepolia
+      })
+    ).rejects.toThrow('Only the universe admin can fund');
+  });
+
+  it('spendFromPool rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.universeTreasury.spendFromPool({
+        universeId: 'u1',
+        generationType: 'image',
+        cost: 3,
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+
+  it('spendFromPool rejects non-team-member callers', async () => {
+    const caller = createAuthCaller(); // isUniverseAdmin=false, getMembership=null
+    await expect(
+      caller.universeTreasury.spendFromPool({
+        universeId: 'u1',
+        generationType: 'image',
+        cost: 3,
+      })
+    ).rejects.toThrow('not an active team member');
+  });
+
+  it('allocateToMember rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.universeTreasury.allocateToMember({
+        universeId: 'u1',
+        memberUid: 'member1',
+        credits: 50,
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+
+  it('allocateToMember rejects authenticated non-admin callers', async () => {
+    const caller = createAuthCaller();
+    await expect(
+      caller.universeTreasury.allocateToMember({
+        universeId: 'u1',
+        memberUid: 'member1',
+        credits: 50,
+      })
+    ).rejects.toThrow('Only the universe admin can allocate');
+  });
+
+  it('depositRevenue rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.universeTreasury.depositRevenue({
+        universeId: 'u1',
+        amountEth: '0.1',
+        txHash: '0xabc',
+        source: 'nft_sales',
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+
+  it('depositRevenue rejects authenticated non-admin callers', async () => {
+    const caller = createAuthCaller();
+    await expect(
+      caller.universeTreasury.depositRevenue({
+        universeId: 'u1',
+        amountEth: '0.1',
+        txHash: '0xabc',
+        source: 'nft_sales',
+      })
+    ).rejects.toThrow(); // FORBIDDEN from isUniverseAdmin check
+  });
+
+  it('depositRevenue accepts chainId parameter', async () => {
+    const caller = createAuthCaller();
+    // Rejected by isUniverseAdmin, but validates chainId is accepted in schema
+    await expect(
+      caller.universeTreasury.depositRevenue({
+        universeId: 'u1',
+        amountEth: '0.1',
+        txHash: '0xabc',
+        source: 'nft_sales',
+        chainId: 84532, // Base Sepolia
+      })
+    ).rejects.toThrow();
+  });
+
+  it('getPoolHistory rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.universeTreasury.getPoolHistory({
+        universeId: 'u1',
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+
+  it('getPoolHistory rejects non-team-member callers', async () => {
+    const caller = createAuthCaller(); // isUniverseAdmin=false, getMembership=null
+    await expect(
+      caller.universeTreasury.getPoolHistory({
+        universeId: 'u1',
+      })
+    ).rejects.toThrow('Only universe admins and team members');
   });
 });

@@ -18,7 +18,7 @@
  *   image.imageToImage    — Raw fal img2img (backward compat).
  *   image.generateCharacter / analyzeCharacter / saveCharacter — character tools.
  */
-import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
@@ -490,15 +490,16 @@ export const imageRouter = router({
 
   getRecord: protectedProcedure
     .input(z.object({ generationId: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const doc = await imageGenerationsCol().doc(input.generationId).get();
       if (!doc.exists) return null;
+      if (doc.data()?.userId !== ctx.user.uid) return null;
       return { id: doc.id, ...doc.data() };
     }),
 
   // ── Admin ─────────────────────────────────────────────────────────────
 
-  adminListModels: protectedProcedure.query(async () => {
+  adminListModels: adminProcedure.query(async () => {
     const overrides = new Map<string, Record<string, any>>();
     try {
       const snapshot = await imageModelOverridesCol().get();
@@ -512,7 +513,7 @@ export const imageRouter = router({
     });
   }),
 
-  adminUpdateModel: protectedProcedure
+  adminUpdateModel: adminProcedure
     .input(
       z.object({
         modelId: z.string(),
@@ -530,9 +531,9 @@ export const imageRouter = router({
       return { ok: true, modelId: input.modelId, applied: update };
     }),
 
-  // ── Backward-compat raw endpoints ────────────────────────────────────
+  // ── Backward-compat raw endpoints (admin-only — no credit billing) ───
 
-  generateImage: protectedProcedure
+  generateImage: adminProcedure
     .input(
       z.object({
         prompt: z.string().min(1, 'Prompt is required'),
@@ -591,7 +592,7 @@ export const imageRouter = router({
       return result;
     }),
 
-  editImage: protectedProcedure
+  editImage: adminProcedure
     .input(
       z.object({
         prompt: z.string().min(1, 'Edit prompt is required'),
@@ -634,7 +635,7 @@ export const imageRouter = router({
       return result;
     }),
 
-  imageToImage: protectedProcedure
+  imageToImage: adminProcedure
     .input(
       z.object({
         prompt: z.string().min(1).max(2000),
