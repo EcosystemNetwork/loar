@@ -32,6 +32,26 @@ const baseSepoliaClient = createPublicClient({
 /** Allowed chain IDs for on-chain payment verification. */
 const ALLOWED_CHAIN_IDS = new Set([sepolia.id, baseSepolia.id]);
 
+// ── RPC response cache (prevents DoS via repeated verification calls) ───
+const TX_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const TX_CACHE_MAX = 500;
+const txCache = new Map<string, { data: any; ts: number }>();
+
+function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = txCache.get(key);
+  if (cached && Date.now() - cached.ts < TX_CACHE_TTL) return cached.data as Promise<T>;
+  const promise = fetcher();
+  promise.then((data) => {
+    if (txCache.size >= TX_CACHE_MAX) {
+      // Evict oldest entry
+      const oldest = txCache.keys().next().value;
+      if (oldest) txCache.delete(oldest);
+    }
+    txCache.set(key, { data, ts: Date.now() });
+  });
+  return promise;
+}
+
 /** Get the appropriate chain client based on chain ID. */
 function getChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
@@ -82,14 +102,18 @@ async function verifyEthPayment(
 
   let tx: Awaited<ReturnType<typeof client.getTransaction>>;
   try {
-    tx = await client.getTransaction({ hash: paymentRef as Hash });
+    tx = await getCachedOrFetch(`tx-${paymentRef}`, () =>
+      client.getTransaction({ hash: paymentRef as Hash })
+    );
   } catch {
     throw new Error(
       `Transaction not found on ${chainName}. Confirm it has been broadcast and included in a block.`
     );
   }
 
-  const receipt = await client.getTransactionReceipt({ hash: paymentRef as Hash });
+  const receipt = await getCachedOrFetch(`receipt-${paymentRef}`, () =>
+    client.getTransactionReceipt({ hash: paymentRef as Hash })
+  );
   if (receipt.status !== 'success') {
     throw new Error('Transaction was reverted on-chain. No credits will be issued.');
   }
