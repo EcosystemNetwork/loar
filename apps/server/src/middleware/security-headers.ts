@@ -1,16 +1,70 @@
 /**
  * Security headers middleware — adds standard HTTP security headers
  * (HSTS, CSP, X-Frame-Options, etc.) to all responses.
+ *
+ * CSP uses a strict policy with explicit allowlists for known third-party
+ * services (FAL, Pinata, Firebase, Lighthouse, etc.).
  */
 import type { Context, Next } from 'hono';
+import { randomBytes } from 'crypto';
+
+/** Trusted domains for connect-src (API calls from the frontend). */
+const TRUSTED_CONNECT = [
+  "'self'",
+  'https://*.fal.ai',
+  'https://*.pinata.cloud',
+  'https://gateway.pinata.cloud',
+  'https://*.lighthouse.storage',
+  'https://*.firebaseio.com',
+  'https://firestore.googleapis.com',
+  'https://*.googleapis.com',
+  'https://*.w3s.link',
+  'https://rpc.sepolia.org',
+  'https://sepolia.base.org',
+].join(' ');
+
+/** Trusted domains for img-src. */
+const TRUSTED_IMG = [
+  "'self'",
+  'data:',
+  'blob:',
+  'https://*.pinata.cloud',
+  'https://gateway.pinata.cloud',
+  'https://*.ipfs.w3s.link',
+  'https://*.lighthouse.storage',
+  'https://firebasestorage.googleapis.com',
+].join(' ');
 
 export async function securityHeaders(c: Context, next: Next) {
+  // Generate a per-request nonce for inline scripts (if any are needed)
+  const nonce = randomBytes(16).toString('base64');
+  c.set('cspNonce', nonce);
+
   await next();
+
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
-  c.header('X-XSS-Protection', '1; mode=block');
-  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  c.header('X-XSS-Protection', '0'); // Deprecated; CSP is the real protection
+  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  c.header('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none'");
+  c.header(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      `script-src 'self' 'nonce-${nonce}'`,
+      "style-src 'self' 'unsafe-inline'", // many UI libs need inline styles
+      `connect-src ${TRUSTED_CONNECT}`,
+      `img-src ${TRUSTED_IMG}`,
+      "font-src 'self'",
+      "media-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      'upgrade-insecure-requests',
+    ].join('; ')
+  );
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  c.header('Cross-Origin-Opener-Policy', 'same-origin');
+  c.header('Cross-Origin-Resource-Policy', 'same-origin');
 }

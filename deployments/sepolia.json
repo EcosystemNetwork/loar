@@ -9,6 +9,9 @@
     "LoarFeeLocker": "0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f",
     "LoarLpLockerMultiple": "0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6",
     "LoarHookStaticFee": "0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC",
-    "LoarToken": "0x0A647b3b7426Bce958e7C2FE59f0a89191952C17"
+    "LoarToken": "0x0A647b3b7426Bce958e7C2FE59f0a89191952C17",
+    "PaymentRouter": "0xd8b49c99adb51575eea4fb795645fc9e1ce4fa9c",
+    "CreditManager": "0x7bb6cddd392bf8a6a6e58fd8600b87c8455e8240",
+    "SubscriptionManager": "0xa6c4bd0256da30780529bf3cf6d78bfedacbcbb9"
   }
 }

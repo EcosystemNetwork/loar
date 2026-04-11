@@ -67,6 +67,72 @@ else
   fail "server CORS header missing for loar.fun (check CORS_ORIGIN env var)"
 fi
 
+# ── Auth & tRPC ───────────────────────────────────────────────────────────────
+
+# 4. tRPC credit packages endpoint must respond (public)
+RESP=$(curl -sf --max-time 10 \
+  "$SERVER_URL/trpc/credits.getPackages" 2>/dev/null) || RESP=""
+if echo "$RESP" | grep -q '"result"'; then
+  pass "tRPC credits.getPackages → returns result"
+else
+  fail "tRPC credits.getPackages → unexpected response (tRPC may not be mounted)"
+fi
+
+# 5. tRPC credit costs endpoint must respond (public)
+RESP=$(curl -sf --max-time 10 \
+  "$SERVER_URL/trpc/credits.getCosts" 2>/dev/null) || RESP=""
+if echo "$RESP" | grep -q '"result"'; then
+  pass "tRPC credits.getCosts → returns result"
+else
+  fail "tRPC credits.getCosts → unexpected response"
+fi
+
+# 6. Protected endpoint must reject unauthenticated requests
+HTTP=$(curl -sf --max-time 10 -o /dev/null -w "%{http_code}" \
+  "$SERVER_URL/trpc/credits.getBalance" 2>/dev/null) || HTTP="000"
+if [ "$HTTP" = "401" ]; then
+  pass "tRPC credits.getBalance → 401 (auth enforced)"
+elif [ "$HTTP" = "200" ]; then
+  fail "tRPC credits.getBalance → 200 without auth (SECURITY: auth not enforced!)"
+else
+  fail "tRPC credits.getBalance → HTTP $HTTP (expected 401)"
+fi
+
+# 7. Admin-only grant endpoint must reject unauthenticated requests
+HTTP=$(curl -sf --max-time 10 -o /dev/null -w "%{http_code}" \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"targetUid":"x","credits":1,"reason":"test"}' \
+  "$SERVER_URL/trpc/credits.grant" 2>/dev/null) || HTTP="000"
+if [ "$HTTP" = "401" ]; then
+  pass "tRPC credits.grant → 401 (admin auth enforced)"
+elif [ "$HTTP" = "200" ]; then
+  fail "tRPC credits.grant → 200 without auth (CRITICAL: admin endpoint open!)"
+else
+  # 403 or other non-200 is acceptable — the endpoint is protected
+  pass "tRPC credits.grant → HTTP $HTTP (protected)"
+fi
+
+# 8. Stripe availability check (informational — not a blocker)
+RESP=$(curl -sf --max-time 10 \
+  "$SERVER_URL/trpc/stripe.isAvailable" 2>/dev/null) || RESP=""
+if echo "$RESP" | grep -q '"available":true'; then
+  pass "Stripe → configured and available"
+elif echo "$RESP" | grep -q '"available":false'; then
+  pass "Stripe → not configured (card payments disabled — expected if no STRIPE_SECRET_KEY)"
+else
+  fail "Stripe → isAvailable endpoint unreachable"
+fi
+
+# 9. Treasury pool balance endpoint (public)
+RESP=$(curl -sf --max-time 10 \
+  "$SERVER_URL/trpc/universeTreasury.getPoolBalance?input=%7B%22universeId%22%3A%22test%22%7D" \
+  2>/dev/null) || RESP=""
+if echo "$RESP" | grep -q '"result"'; then
+  pass "tRPC universeTreasury.getPoolBalance → returns result"
+else
+  fail "tRPC universeTreasury.getPoolBalance → unexpected response"
+fi
+
 # ── Indexer ───────────────────────────────────────────────────────────────────
 
 # 4. Indexer health endpoint must report healthy (DB reachable)

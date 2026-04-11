@@ -57,7 +57,11 @@ const universesCol = () => db.collection('cinematicUniverses');
  * Multi-sig path: if the universe doc has `isMultiSig: true`, call the
  * Safe contract's `getOwners()` and check membership.
  */
-export async function isUniverseAdmin(universeId: string, callerAddress: string): Promise<boolean> {
+export async function isUniverseAdmin(
+  universeId: string,
+  callerAddress: string,
+  chainId?: number
+): Promise<boolean> {
   const id = universeId.toLowerCase();
   const caller = callerAddress.toLowerCase();
 
@@ -74,7 +78,9 @@ export async function isUniverseAdmin(universeId: string, callerAddress: string)
   if (data.isMultiSig && data.multiSigAddress) {
     try {
       const safeAddress = (data.multiSigAddress as string).toLowerCase() as `0x${string}`;
-      const owners = await getChainClient().readContract({
+      // Use explicit chainId if provided, fall back to stored universe chainId, then Sepolia default
+      const resolvedChainId = chainId ?? (data.chainId as number | undefined);
+      const owners = await getChainClient(resolvedChainId).readContract({
         address: safeAddress,
         abi: SAFE_OWNERS_ABI,
         functionName: 'getOwners',
