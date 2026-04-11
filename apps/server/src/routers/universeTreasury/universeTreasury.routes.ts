@@ -25,8 +25,8 @@ import { verifyStripePayment } from '../credits/stripe.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
 import { isUniverseAdmin } from '../../lib/safe-admin';
 
-const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '') as `0x${string}`;
-const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS ?? '') as `0x${string}`;
+const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS || '0x') as `0x${string}`;
+const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS || '0x') as `0x${string}`;
 const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
@@ -35,7 +35,10 @@ const ALLOWED_CHAIN_IDS = new Set([sepolia.id, baseSepolia.id]);
 
 function getTreasuryChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
-    throw new Error(`Chain ID ${chainId} is not supported for treasury operations.`);
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Chain ID ${chainId} is not supported for treasury operations.`,
+    });
   }
   if (chainId === baseSepolia.id) {
     return createPublicClient({
@@ -56,7 +59,10 @@ async function verifyTreasuryEthPayment(
   chainId?: number
 ): Promise<void> {
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
-    throw new Error('TREASURY_ADDRESS is not configured');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'TREASURY_ADDRESS is not configured',
+    });
   }
 
   // Dedup against universe credit transactions
@@ -66,31 +72,40 @@ async function verifyTreasuryEthPayment(
     .limit(1)
     .get();
   if (!existing.empty) {
-    throw new Error('This transaction has already been used to fund a universe pool');
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'This transaction has already been used to fund a universe pool',
+    });
   }
 
   const client = getTreasuryChainClient(chainId);
   const tx = await client.getTransaction({ hash: txHash as Hash }).catch(() => {
-    throw new Error(
-      'Transaction not found on-chain. Confirm it has been broadcast and included in a block.'
-    );
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message:
+        'Transaction not found on-chain. Confirm it has been broadcast and included in a block.',
+    });
   });
 
   const receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
   if (receipt.status !== 'success') {
-    throw new Error('Transaction was reverted on-chain.');
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Transaction was reverted on-chain.' });
   }
 
   if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
-    throw new Error('Transaction recipient does not match the platform treasury address.');
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Transaction recipient does not match the platform treasury address.',
+    });
   }
 
   if (expectedWei && expectedWei !== '0') {
     const minRequired = BigInt(expectedWei);
     if (tx.value < minRequired) {
-      throw new Error(
-        `Insufficient ETH. Expected ~${expectedWei} wei, got ${tx.value.toString()} wei.`
-      );
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Insufficient ETH. Expected ~${expectedWei} wei, got ${tx.value.toString()} wei.`,
+      });
     }
   }
 }
@@ -102,10 +117,16 @@ async function verifyTreasuryLoarPayment(
   chainId?: number
 ): Promise<void> {
   if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
-    throw new Error('LOAR_TOKEN_ADDRESS is not configured');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'LOAR_TOKEN_ADDRESS is not configured',
+    });
   }
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
-    throw new Error('TREASURY_ADDRESS is not configured');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'TREASURY_ADDRESS is not configured',
+    });
   }
 
   const existing = await db
@@ -114,16 +135,19 @@ async function verifyTreasuryLoarPayment(
     .limit(1)
     .get();
   if (!existing.empty) {
-    throw new Error('This transaction has already been used to fund a universe pool');
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'This transaction has already been used to fund a universe pool',
+    });
   }
 
   const client = getTreasuryChainClient(chainId);
   const receipt = await client.getTransactionReceipt({ hash: txHash as Hash }).catch(() => {
-    throw new Error('Transaction not found on-chain.');
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Transaction not found on-chain.' });
   });
 
   if (receipt.status !== 'success') {
-    throw new Error('Transaction was reverted on-chain.');
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Transaction was reverted on-chain.' });
   }
 
   const transferLog = receipt.logs.find(
@@ -135,24 +159,30 @@ async function verifyTreasuryLoarPayment(
   );
 
   if (!transferLog) {
-    throw new Error('Transaction does not contain a $LOAR Transfer to the platform treasury.');
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Transaction does not contain a $LOAR Transfer to the platform treasury.',
+    });
   }
 
   const transferredWei = BigInt(transferLog.data);
   const minRequired = expectedLoarWei;
   if (transferredWei < minRequired) {
-    throw new Error(
-      `Insufficient $LOAR transferred. Expected ~${expectedLoarWei.toString()} wei, got ${transferredWei.toString()} wei.`
-    );
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Insufficient $LOAR transferred. Expected ~${expectedLoarWei.toString()} wei, got ${transferredWei.toString()} wei.`,
+    });
   }
 }
 
 const universeCreditCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
+  if (!db)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase is not configured' });
   return db.collection('universeCredits');
 };
 const universeCreditTxCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
+  if (!db)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase is not configured' });
   return db.collection('universeCreditTransactions');
 };
 
@@ -203,22 +233,33 @@ export const universeTreasuryRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       if (!(await isUniverseAdmin(input.universeId, ctx.user.uid, input.chainId))) {
-        throw new Error('Only the universe admin can fund the universe credit pool');
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can fund the universe credit pool',
+        });
       }
 
       // Use live pricing so ETH amounts reflect current ETH/USD rate
       const livePackages = await buildPackagesFromConfig();
       const pkg = livePackages.find((p) => p.id === input.packageId);
-      if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
+      if (!pkg || !pkg.active)
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Package not found or inactive' });
 
       // ── Verify payment before issuing any credits ──────────────────
       if (input.paymentMethod === 'eth' || input.paymentMethod === 'crypto') {
         if (!pkg.ethPriceWei || pkg.ethPriceWei === '0') {
-          throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'ETH pricing is not configured. Cannot verify payment amount.',
+          });
         }
         await verifyTreasuryEthPayment(input.paymentRef, pkg.ethPriceWei, input.chainId);
       } else if (input.paymentMethod === 'loar') {
-        if (!input.loarAmount) throw new Error('loarAmount is required for $LOAR payments');
+        if (!input.loarAmount)
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'loarAmount is required for $LOAR payments',
+          });
         const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
         await verifyTreasuryLoarPayment(input.paymentRef, expectedWei, input.chainId);
       } else {
@@ -241,7 +282,10 @@ export const universeTreasuryRouter = router({
         const dedupRef = universeCreditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);
         if (dedupDoc.exists) {
-          throw new Error('This payment reference has already been used to fund a universe pool');
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This payment reference has already been used to fund a universe pool',
+          });
         }
 
         const poolRef = universeCreditCol().doc(universeId);
@@ -311,7 +355,10 @@ export const universeTreasuryRouter = router({
       const membership = (await getMembership(universeId, callerUid)) as any;
       const isAdmin = await isUniverseAdmin(universeId, callerUid);
       if (!isAdmin && (!membership || membership.status !== 'active')) {
-        throw new Error('You are not an active team member of this universe');
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not an active team member of this universe',
+        });
       }
 
       // Atomic: allowance check + pool deduction + tx record
@@ -322,9 +369,10 @@ export const universeTreasuryRouter = router({
         const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
         if (poolBalance < input.cost) {
-          throw new Error(
-            `Universe credit pool is too low. Need ${input.cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`
-          );
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Universe credit pool is too low. Need ${input.cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`,
+          });
         }
 
         // Enforce monthly allowance inside transaction (skip for admin)
@@ -341,9 +389,10 @@ export const universeTreasuryRouter = router({
           const usedThisMonth = sameMonth ? memberData.creditsUsedThisMonth || 0 : 0;
 
           if (usedThisMonth + input.cost > memberData.monthlyAllowance) {
-            throw new Error(
-              `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, requested: ${input.cost}`
-            );
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, requested: ${input.cost}`,
+            });
           }
 
           tx.update(memberRef, {
@@ -404,7 +453,10 @@ export const universeTreasuryRouter = router({
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
-        throw new Error('Only the universe admin can allocate credits to members');
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can allocate credits to members',
+        });
       }
 
       const memberUid = input.memberUid.toLowerCase();
@@ -417,9 +469,10 @@ export const universeTreasuryRouter = router({
         const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
         if (poolBalance < input.credits) {
-          throw new Error(
-            `Universe credit pool has insufficient balance. Available: ${poolBalance}, requested: ${input.credits}`
-          );
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Universe credit pool has insufficient balance. Available: ${poolBalance}, requested: ${input.credits}`,
+          });
         }
 
         const memberRef = db.collection('userCredits').doc(memberUid);
@@ -549,30 +602,40 @@ export const universeTreasuryRouter = router({
 
       // Verify the deposit tx on-chain before issuing credits
       if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
-        throw new Error('TREASURY_ADDRESS is not configured');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'TREASURY_ADDRESS is not configured',
+        });
       }
       const client = getTreasuryChainClient(input.chainId);
       const tx = await client.getTransaction({ hash: input.txHash as Hash }).catch(() => {
-        throw new Error(
-          'Deposit transaction not found on-chain. Confirm it has been broadcast and included in a block.'
-        );
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message:
+            'Deposit transaction not found on-chain. Confirm it has been broadcast and included in a block.',
+        });
       });
       const receipt = await client.getTransactionReceipt({ hash: input.txHash as Hash });
       if (receipt.status !== 'success') {
-        throw new Error('Deposit transaction was reverted on-chain.');
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Deposit transaction was reverted on-chain.',
+        });
       }
       if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
-        throw new Error(
-          'Deposit transaction recipient does not match the platform treasury address.'
-        );
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Deposit transaction recipient does not match the platform treasury address.',
+        });
       }
       // Verify the deposited amount matches the claimed amount (1% tolerance)
       const claimedWei = parseUnits(input.amountEth, 18);
       const minRequired = (claimedWei * 99n) / 100n;
       if (tx.value < minRequired) {
-        throw new Error(
-          `Deposited ETH (${tx.value.toString()} wei) is less than the claimed amount (${claimedWei.toString()} wei).`
-        );
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Deposited ETH (${tx.value.toString()} wei) is less than the claimed amount (${claimedWei.toString()} wei).`,
+        });
       }
 
       // Convert ETH to credits using a rate
@@ -584,37 +647,51 @@ export const universeTreasuryRouter = router({
       const creditsPortion = Math.floor(totalCredits * (input.creditSharePct / 100));
       const stakerPortion = totalCredits - creditsPortion;
 
-      // Fund the universe credit pool
-      if (creditsPortion > 0) {
-        const poolRef = universeCreditCol().doc(universeId);
-        const poolData = await getPoolData(universeId);
+      // Atomic: dedup + pool credit + tx record
+      const depositTxDocId = `deposit-${universeId}-${input.txHash}`;
+      await db.runTransaction(async (txn) => {
+        const dedupRef = universeCreditTxCol().doc(depositTxDocId);
+        const dedupDoc = await txn.get(dedupRef);
+        if (dedupDoc.exists) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This deposit has already been recorded',
+          });
+        }
 
-        await poolRef.set(
-          {
-            universeId,
-            balance: poolData.balance + creditsPortion,
-            totalPurchased: poolData.totalPurchased + creditsPortion,
-            lastFundedAt: new Date(),
-            updatedAt: new Date(),
-          },
-          { merge: true }
-        );
-      }
+        if (creditsPortion > 0) {
+          const poolRef = universeCreditCol().doc(universeId);
+          const poolDoc = await txn.get(poolRef);
+          const poolBalance = (poolDoc.data()?.balance as number) || 0;
+          const poolPurchased = (poolDoc.data()?.totalPurchased as number) || 0;
 
-      // Record the deposit
-      await universeCreditTxCol().add({
-        id: randomUUID(),
-        universeId,
-        type: 'revenue_deposit',
-        depositedByUid: ctx.user.uid.toLowerCase(),
-        txHash: input.txHash,
-        source: input.source,
-        amountEth: input.amountEth,
-        totalCredits,
-        creditsPortion,
-        stakerPortion,
-        creditSharePct: input.creditSharePct,
-        createdAt: new Date(),
+          txn.set(
+            poolRef,
+            {
+              universeId,
+              balance: poolBalance + creditsPortion,
+              totalPurchased: poolPurchased + creditsPortion,
+              lastFundedAt: new Date(),
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
+        }
+
+        txn.set(dedupRef, {
+          id: randomUUID(),
+          universeId,
+          type: 'revenue_deposit',
+          depositedByUid: ctx.user.uid.toLowerCase(),
+          txHash: input.txHash,
+          source: input.source,
+          amountEth: input.amountEth,
+          totalCredits,
+          creditsPortion,
+          stakerPortion,
+          creditSharePct: input.creditSharePct,
+          createdAt: new Date(),
+        });
       });
 
       return {
@@ -648,7 +725,10 @@ export const universeTreasuryRouter = router({
       const membership = (await getMembership(universeId, callerUid)) as any;
 
       if (!callerIsAdmin && (!membership || membership.status !== 'active')) {
-        throw new Error('Only universe admins and team members can view pool history');
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only universe admins and team members can view pool history',
+        });
       }
 
       const snapshot = await universeCreditTxCol()

@@ -18,7 +18,7 @@
  *   text-to-3D refine   ~$0.20
  *   image-to-3D         ~$0.15
  */
-import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, publicProcedure, requirePermission } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -100,6 +100,7 @@ export const threedRouter = router({
   // ── Text-to-3D preview ────────────────────────────────────────────────
 
   textTo3DPreview: protectedProcedure
+    .use(requirePermission('generation.3d'))
     .input(
       z.object({
         prompt: z.string().min(1).max(1000),

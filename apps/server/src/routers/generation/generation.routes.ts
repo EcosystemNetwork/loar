@@ -5,7 +5,13 @@
  * Persists generation records to Firestore for analytics.
  * Handles fallback logic and cost tracking.
  */
-import { router, publicProcedure, protectedProcedure, adminProcedure } from '../../lib/trpc';
+import {
+  router,
+  publicProcedure,
+  protectedProcedure,
+  adminProcedure,
+  requirePermission,
+} from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -249,315 +255,319 @@ export const generationRouter = router({
   /**
    * Main generation endpoint — handles both auto and manual routing.
    */
-  generate: protectedProcedure.input(generateInputSchema).mutation(async ({ input, ctx }) => {
-    const generationId = randomUUID();
-    const startTime = Date.now();
+  generate: protectedProcedure
+    .use(requirePermission('generation.video'))
+    .input(generateInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const generationId = randomUUID();
+      const startTime = Date.now();
 
-    // ── Universe Gen Config enforcement ─────────────────────────────
-    let genConfig: any = null;
-    if (input.universeId && db) {
-      const genConfigDoc = await db
-        .collection('universeGenConfigs')
-        .doc(input.universeId.toLowerCase())
-        .get();
-      if (genConfigDoc.exists) {
-        genConfig = genConfigDoc.data();
+      // ── Universe Gen Config enforcement ─────────────────────────────
+      let genConfig: any = null;
+      if (input.universeId && db) {
+        const genConfigDoc = await db
+          .collection('universeGenConfigs')
+          .doc(input.universeId.toLowerCase())
+          .get();
+        if (genConfigDoc.exists) {
+          genConfig = genConfigDoc.data();
 
-        // Access control
-        if (genConfig.accessType === 'WHITELISTED') {
-          const address = ctx.user.address?.toLowerCase();
-          const whitelisted = (genConfig.whitelistedAddresses || []).map((a: string) =>
-            a.toLowerCase()
-          );
-          if (!address || !whitelisted.includes(address)) {
-            // Check if universe admin
-            const universeDoc = await db
-              .collection('cinematicUniverses')
-              .doc(input.universeId.toLowerCase())
-              .get();
-            const isAdmin =
-              universeDoc.exists &&
-              universeDoc.data()?.creator?.toLowerCase() === ctx.user.uid.toLowerCase();
-            if (!isAdmin) {
-              throw new Error('Not whitelisted for generation in this universe');
+          // Access control
+          if (genConfig.accessType === 'WHITELISTED') {
+            const address = ctx.user.address?.toLowerCase();
+            const whitelisted = (genConfig.whitelistedAddresses || []).map((a: string) =>
+              a.toLowerCase()
+            );
+            if (!address || !whitelisted.includes(address)) {
+              // Check if universe admin
+              const universeDoc = await db
+                .collection('cinematicUniverses')
+                .doc(input.universeId.toLowerCase())
+                .get();
+              const isAdmin =
+                universeDoc.exists &&
+                universeDoc.data()?.creator?.toLowerCase() === ctx.user.uid.toLowerCase();
+              if (!isAdmin) {
+                throw new Error('Not whitelisted for generation in this universe');
+              }
             }
           }
-        }
-        // HOLDERS access type — client-side check (on-chain token balance)
+          // HOLDERS access type — client-side check (on-chain token balance)
 
-        // Model validation
-        if (input.routingMode === 'manual' && input.selectedModelId) {
-          const approved: string[] = genConfig.approvedModelIds || [];
-          const blocked: string[] = genConfig.blockedModelIds || [];
-          if (approved.length > 0 && !approved.includes(input.selectedModelId)) {
-            throw new Error('Selected model is not approved for this universe');
+          // Model validation
+          if (input.routingMode === 'manual' && input.selectedModelId) {
+            const approved: string[] = genConfig.approvedModelIds || [];
+            const blocked: string[] = genConfig.blockedModelIds || [];
+            if (approved.length > 0 && !approved.includes(input.selectedModelId)) {
+              throw new Error('Selected model is not approved for this universe');
+            }
+            if (blocked.includes(input.selectedModelId)) {
+              throw new Error('Selected model is blocked in this universe');
+            }
           }
-          if (blocked.includes(input.selectedModelId)) {
-            throw new Error('Selected model is blocked in this universe');
+
+          // Prompt modification
+          if (genConfig.defaultPromptPrefix) {
+            input.prompt = `${genConfig.defaultPromptPrefix} ${input.prompt}`;
           }
-        }
+          if (genConfig.defaultPromptSuffix) {
+            input.prompt = `${input.prompt} ${genConfig.defaultPromptSuffix}`;
+          }
 
-        // Prompt modification
-        if (genConfig.defaultPromptPrefix) {
-          input.prompt = `${genConfig.defaultPromptPrefix} ${input.prompt}`;
-        }
-        if (genConfig.defaultPromptSuffix) {
-          input.prompt = `${input.prompt} ${genConfig.defaultPromptSuffix}`;
-        }
-
-        // Inject negative prompts
-        if (genConfig.negativePrompts?.length > 0) {
-          const existingNeg = input.negativePrompt || '';
-          const configNeg = genConfig.negativePrompts.join(', ');
-          input.negativePrompt = existingNeg ? `${existingNeg}, ${configNeg}` : configNeg;
+          // Inject negative prompts
+          if (genConfig.negativePrompts?.length > 0) {
+            const existingNeg = input.negativePrompt || '';
+            const configNeg = genConfig.negativePrompts.join(', ');
+            input.negativePrompt = existingNeg ? `${existingNeg}, ${configNeg}` : configNeg;
+          }
         }
       }
-    }
 
-    let finalModelId: string;
-    let reasonCode: RoutingReasonCode;
-    let providerCostUsd: number;
-    let fiatPriceUsd: number;
-    let loarPriceUsd: number;
-    let creditsCharged: number;
-    let requestedModelId: string | undefined;
+      let finalModelId: string;
+      let reasonCode: RoutingReasonCode;
+      let providerCostUsd: number;
+      let fiatPriceUsd: number;
+      let loarPriceUsd: number;
+      let creditsCharged: number;
+      let requestedModelId: string | undefined;
 
-    // ── Resolve model ───────────────────────────────────────────────
-    if (input.routingMode === 'manual' && input.selectedModelId) {
-      requestedModelId = input.selectedModelId;
+      // ── Resolve model ───────────────────────────────────────────────
+      if (input.routingMode === 'manual' && input.selectedModelId) {
+        requestedModelId = input.selectedModelId;
 
-      const validation = validateManualSelection(input.selectedModelId, {
-        mode: input.mode,
-        durationSec: input.durationSec,
-        resolution: input.resolution,
-        audio: input.audio,
-      });
+        const validation = validateManualSelection(input.selectedModelId, {
+          mode: input.mode,
+          durationSec: input.durationSec,
+          resolution: input.resolution,
+          audio: input.audio,
+        });
 
-      if (!validation.valid) {
-        throw new Error(
-          `Cannot use selected model: ${validation.reason}` +
-            (validation.suggestion ? `. Try "${validation.suggestion}" instead.` : '')
-        );
-      }
-
-      const model = getModelById(input.selectedModelId)!;
-      finalModelId = model.id;
-      reasonCode = 'manual_user_selection';
-      providerCostUsd = model.providerCostUsd;
-      fiatPriceUsd = model.fiatPriceUsd;
-      loarPriceUsd = model.loarPriceUsd;
-      creditsCharged = model.creditCost;
-    } else {
-      // Auto routing
-      const decision = routeModel({
-        mode: input.mode,
-        durationSec: input.durationSec,
-        resolution: input.resolution,
-        audio: input.audio,
-        universeId: input.universeId,
-        qualityTarget: input.qualityTarget,
-        costBudget: input.costBudget,
-        latencyPreference: input.latencyPreference,
-      });
-
-      finalModelId = decision.chosenModelId;
-      reasonCode = decision.reasonCode;
-      providerCostUsd = decision.providerCostUsd;
-      fiatPriceUsd = decision.fiatPriceUsd;
-      loarPriceUsd = decision.loarPriceUsd;
-      creditsCharged = decision.creditCost;
-    }
-
-    const model = getModelById(finalModelId);
-    if (!model) throw new Error(`Model ${finalModelId} not found in registry`);
-
-    // ── Apply universe credit multiplier ───────────────────────────
-    if (genConfig?.creditMultiplier && genConfig.creditMultiplier !== 1.0) {
-      creditsCharged = Math.ceil(creditsCharged * genConfig.creditMultiplier);
-    }
-    if (genConfig?.minCreditsPerGen && creditsCharged < genConfig.minCreditsPerGen) {
-      creditsCharged = genConfig.minCreditsPerGen;
-    }
-
-    // ── Build initial record ────────────────────────────────────────
-    const record: VideoGenerationRecord = {
-      id: generationId,
-      userId: ctx.user.uid,
-      universeId: input.universeId,
-      routingMode: input.routingMode,
-      requestedModelId,
-      finalModelId,
-      provider: model.provider,
-      status: 'queued',
-      prompt: input.prompt,
-      mode: input.mode,
-      durationSec: input.durationSec,
-      resolution: input.resolution,
-      aspectRatio: input.aspectRatio,
-      providerCostUsd,
-      fiatPriceUsd,
-      loarPriceUsd,
-      creditsCharged,
-      marginUsd: fiatPriceUsd - providerCostUsd,
-      routingReasonCode: reasonCode,
-      createdAt: new Date(),
-    };
-
-    // Save initial record
-    await saveGenerationRecord(record);
-
-    // ── Deduct credits (transactional) ─────────────────────────────
-    const userCreditsCol = db.collection('userCredits');
-    const userCreditsRef = userCreditsCol.doc(ctx.user.uid);
-
-    try {
-      await db.runTransaction(async (tx) => {
-        const userCreditsDoc = await tx.get(userCreditsRef);
-        const currentBalance = userCreditsDoc.exists ? userCreditsDoc.data()?.balance || 0 : 0;
-
-        if (currentBalance < creditsCharged) {
+        if (!validation.valid) {
           throw new Error(
-            `Insufficient credits. Need ${creditsCharged}, have ${currentBalance}. Purchase more credits to continue.`
+            `Cannot use selected model: ${validation.reason}` +
+              (validation.suggestion ? `. Try "${validation.suggestion}" instead.` : '')
           );
         }
 
-        tx.update(userCreditsRef, {
-          balance: currentBalance - creditsCharged,
-          totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
-          updatedAt: new Date(),
+        const model = getModelById(input.selectedModelId)!;
+        finalModelId = model.id;
+        reasonCode = 'manual_user_selection';
+        providerCostUsd = model.providerCostUsd;
+        fiatPriceUsd = model.fiatPriceUsd;
+        loarPriceUsd = model.loarPriceUsd;
+        creditsCharged = model.creditCost;
+      } else {
+        // Auto routing
+        const decision = routeModel({
+          mode: input.mode,
+          durationSec: input.durationSec,
+          resolution: input.resolution,
+          audio: input.audio,
+          universeId: input.universeId,
+          qualityTarget: input.qualityTarget,
+          costBudget: input.costBudget,
+          latencyPreference: input.latencyPreference,
         });
-      });
-    } catch (creditErr) {
-      await generationsCol()
-        .doc(generationId)
-        .update({
-          status: 'failed',
-          failureReason: creditErr instanceof Error ? creditErr.message : 'Credit deduction failed',
-          completedAt: new Date(),
-        });
-      throw creditErr;
-    }
 
-    // ── Generate ────────────────────────────────────────────────────
-    try {
-      record.status = 'running';
-      await generationsCol().doc(generationId).update({ status: 'running' });
+        finalModelId = decision.chosenModelId;
+        reasonCode = decision.reasonCode;
+        providerCostUsd = decision.providerCostUsd;
+        fiatPriceUsd = decision.fiatPriceUsd;
+        loarPriceUsd = decision.loarPriceUsd;
+        creditsCharged = decision.creditCost;
+      }
 
-      const falInput = buildFalInput(model, input);
-      const result = await falService.generateVideo(falInput);
+      const model = getModelById(finalModelId);
+      if (!model) throw new Error(`Model ${finalModelId} not found in registry`);
 
-      const latencyMs = Date.now() - startTime;
+      // ── Apply universe credit multiplier ───────────────────────────
+      if (genConfig?.creditMultiplier && genConfig.creditMultiplier !== 1.0) {
+        creditsCharged = Math.ceil(creditsCharged * genConfig.creditMultiplier);
+      }
+      if (genConfig?.minCreditsPerGen && creditsCharged < genConfig.minCreditsPerGen) {
+        creditsCharged = genConfig.minCreditsPerGen;
+      }
 
-      if (result.status === 'failed' || result.error || !result.videoUrl) {
-        // Mark provider unhealthy on failure
-        markProviderUnhealthy(model.provider);
+      // ── Build initial record ────────────────────────────────────────
+      const record: VideoGenerationRecord = {
+        id: generationId,
+        userId: ctx.user.uid,
+        universeId: input.universeId,
+        routingMode: input.routingMode,
+        requestedModelId,
+        finalModelId,
+        provider: model.provider,
+        status: 'queued',
+        prompt: input.prompt,
+        mode: input.mode,
+        durationSec: input.durationSec,
+        resolution: input.resolution,
+        aspectRatio: input.aspectRatio,
+        providerCostUsd,
+        fiatPriceUsd,
+        loarPriceUsd,
+        creditsCharged,
+        marginUsd: fiatPriceUsd - providerCostUsd,
+        routingReasonCode: reasonCode,
+        createdAt: new Date(),
+      };
 
-        // Attempt fallback in auto mode
-        if (input.routingMode === 'auto' && input.allowFallback) {
-          const fallbackResult = await attemptFallback(input, model.id, generationId);
-          if (fallbackResult) {
-            // Update record with fallback info
-            await generationsCol()
-              .doc(generationId)
-              .update({
-                status: 'completed',
-                fallbackModelId: fallbackResult.fallbackModelId,
-                videoUrl: fallbackResult.videoUrl,
-                latencyMs: Date.now() - startTime,
-                completedAt: new Date(),
-              });
+      // Save initial record
+      await saveGenerationRecord(record);
 
-            return {
-              generationId,
-              status: 'completed' as const,
-              videoUrl: fallbackResult.videoUrl,
-              modelUsed: fallbackResult.fallbackModelId,
-              modelDisplayName:
-                getModelById(fallbackResult.fallbackModelId)?.displayName ||
-                fallbackResult.fallbackModelId,
-              routingMode: input.routingMode,
-              reasonCode,
-              creditsCharged,
-              fiatPriceUsd,
-              wasFallback: true,
-            };
+      // ── Deduct credits (transactional) ─────────────────────────────
+      const userCreditsCol = db.collection('userCredits');
+      const userCreditsRef = userCreditsCol.doc(ctx.user.uid);
+
+      try {
+        await db.runTransaction(async (tx) => {
+          const userCreditsDoc = await tx.get(userCreditsRef);
+          const currentBalance = userCreditsDoc.exists ? userCreditsDoc.data()?.balance || 0 : 0;
+
+          if (currentBalance < creditsCharged) {
+            throw new Error(
+              `Insufficient credits. Need ${creditsCharged}, have ${currentBalance}. Purchase more credits to continue.`
+            );
           }
+
+          tx.update(userCreditsRef, {
+            balance: currentBalance - creditsCharged,
+            totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
+            updatedAt: new Date(),
+          });
+        });
+      } catch (creditErr) {
+        await generationsCol()
+          .doc(generationId)
+          .update({
+            status: 'failed',
+            failureReason:
+              creditErr instanceof Error ? creditErr.message : 'Credit deduction failed',
+            completedAt: new Date(),
+          });
+        throw creditErr;
+      }
+
+      // ── Generate ────────────────────────────────────────────────────
+      try {
+        record.status = 'running';
+        await generationsCol().doc(generationId).update({ status: 'running' });
+
+        const falInput = buildFalInput(model, input);
+        const result = await falService.generateVideo(falInput);
+
+        const latencyMs = Date.now() - startTime;
+
+        if (result.status === 'failed' || result.error || !result.videoUrl) {
+          // Mark provider unhealthy on failure
+          markProviderUnhealthy(model.provider);
+
+          // Attempt fallback in auto mode
+          if (input.routingMode === 'auto' && input.allowFallback) {
+            const fallbackResult = await attemptFallback(input, model.id, generationId);
+            if (fallbackResult) {
+              // Update record with fallback info
+              await generationsCol()
+                .doc(generationId)
+                .update({
+                  status: 'completed',
+                  fallbackModelId: fallbackResult.fallbackModelId,
+                  videoUrl: fallbackResult.videoUrl,
+                  latencyMs: Date.now() - startTime,
+                  completedAt: new Date(),
+                });
+
+              return {
+                generationId,
+                status: 'completed' as const,
+                videoUrl: fallbackResult.videoUrl,
+                modelUsed: fallbackResult.fallbackModelId,
+                modelDisplayName:
+                  getModelById(fallbackResult.fallbackModelId)?.displayName ||
+                  fallbackResult.fallbackModelId,
+                routingMode: input.routingMode,
+                reasonCode,
+                creditsCharged,
+                fiatPriceUsd,
+                wasFallback: true,
+              };
+            }
+          }
+
+          // No fallback or manual mode — fail
+          await generationsCol().doc(generationId).update({
+            status: 'failed',
+            failureReason: result.error,
+            latencyMs,
+            completedAt: new Date(),
+          });
+
+          throw new Error(result.error || 'Video generation failed');
         }
 
-        // No fallback or manual mode — fail
+        // Success — mark provider healthy + track quests
+        markProviderHealthy(model.provider);
+
+        // Fire-and-forget quest tracking
+        trackQuests(ctx.user.uid, [
+          { questId: 'first_generation' },
+          { questId: 'daily_generation' },
+          { questId: 'generate_5_videos' },
+          { questId: 'generate_100_videos' },
+          ...(input.routingMode === 'auto' ? [{ questId: 'smart_auto_10' }] : []),
+        ]);
+        trackModelUsage(ctx.user.uid, finalModelId);
+
         await generationsCol().doc(generationId).update({
-          status: 'failed',
-          failureReason: result.error,
+          status: 'completed',
+          videoUrl: result.videoUrl,
           latencyMs,
           completedAt: new Date(),
         });
 
-        throw new Error(result.error || 'Video generation failed');
-      }
+        return {
+          generationId,
+          status: 'completed' as const,
+          videoUrl: result.videoUrl,
+          modelUsed: finalModelId,
+          modelDisplayName: model.displayName,
+          routingMode: input.routingMode,
+          reasonCode,
+          creditsCharged,
+          fiatPriceUsd,
+          wasFallback: false,
+        };
+      } catch (error) {
+        const latencyMs = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-      // Success — mark provider healthy + track quests
-      markProviderHealthy(model.provider);
-
-      // Fire-and-forget quest tracking
-      trackQuests(ctx.user.uid, [
-        { questId: 'first_generation' },
-        { questId: 'daily_generation' },
-        { questId: 'generate_5_videos' },
-        { questId: 'generate_100_videos' },
-        ...(input.routingMode === 'auto' ? [{ questId: 'smart_auto_10' }] : []),
-      ]);
-      trackModelUsage(ctx.user.uid, finalModelId);
-
-      await generationsCol().doc(generationId).update({
-        status: 'completed',
-        videoUrl: result.videoUrl,
-        latencyMs,
-        completedAt: new Date(),
-      });
-
-      return {
-        generationId,
-        status: 'completed' as const,
-        videoUrl: result.videoUrl,
-        modelUsed: finalModelId,
-        modelDisplayName: model.displayName,
-        routingMode: input.routingMode,
-        reasonCode,
-        creditsCharged,
-        fiatPriceUsd,
-        wasFallback: false,
-      };
-    } catch (error) {
-      const latencyMs = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Refund credits on failure (restore balance only, don't touch totalSpent)
-      try {
-        const refundDoc = await userCreditsRef.get();
-        if (refundDoc.exists) {
-          await userCreditsRef.update({
-            balance: (refundDoc.data()?.balance || 0) + creditsCharged,
-            updatedAt: new Date(),
-          });
-          console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
+        // Refund credits on failure (restore balance only, don't touch totalSpent)
+        try {
+          const refundDoc = await userCreditsRef.get();
+          if (refundDoc.exists) {
+            await userCreditsRef.update({
+              balance: (refundDoc.data()?.balance || 0) + creditsCharged,
+              updatedAt: new Date(),
+            });
+            console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
+          }
+        } catch (refundErr) {
+          console.error(
+            `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
+            refundErr
+          );
         }
-      } catch (refundErr) {
-        console.error(
-          `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
-          refundErr
-        );
+
+        await generationsCol().doc(generationId).update({
+          status: 'failed',
+          failureReason: errorMessage,
+          latencyMs,
+          completedAt: new Date(),
+        });
+
+        throw error;
       }
-
-      await generationsCol().doc(generationId).update({
-        status: 'failed',
-        failureReason: errorMessage,
-        latencyMs,
-        completedAt: new Date(),
-      });
-
-      throw error;
-    }
-  }),
+    }),
 
   /**
    * Get generation status/record by ID.

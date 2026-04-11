@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Coins } from 'lucide-react';
 import { useFundPool } from '@/hooks/useTreasury';
+import { useChainId } from 'wagmi';
 
 const PACKAGES = [
   { id: 'starter', name: 'Starter', credits: 500, price: '$4.00' },
@@ -32,6 +33,7 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
   const [paymentRef, setPaymentRef] = useState('');
   const [loarAmount, setLoarAmount] = useState('');
   const fundPool = useFundPool();
+  const chainId = useChainId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +45,7 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
       paymentMethod,
       paymentRef: paymentRef.trim(),
       ...(paymentMethod === 'loar' ? { loarAmount } : {}),
+      ...(paymentMethod !== 'card' ? { chainId } : {}),
     });
     onOpenChange(false);
     setPaymentRef('');

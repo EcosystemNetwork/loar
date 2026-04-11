@@ -22,7 +22,7 @@
  * Voice design:  ~$0.08 flat fee
  * Instant clone: ~$0.09 flat fee
  */
-import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, publicProcedure, requirePermission } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -127,6 +127,7 @@ export const voiceRouter = router({
   // ── TTS with billing ──────────────────────────────────────────────────
 
   synthesize: protectedProcedure
+    .use(requirePermission('generation.voice'))
     .input(
       z.object({
         text: z.string().min(1).max(5000),

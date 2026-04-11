@@ -30,8 +30,8 @@ interface IUniverse {
 
     function setAdmin(address newAdmin) external;
     function setToken(address) external;
-    function getAdmin() external returns (address);
-    function getToken() external returns (address);
+    function getAdmin() external view returns (address);
+    function getToken() external view returns (address);
     function setVaultWhitelisted(address user, bool status) external;
     function getVaultWhitelisted(address user) external view returns (bool);
 }
