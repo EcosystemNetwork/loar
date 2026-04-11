@@ -80,6 +80,9 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
     event ActionConfigUpdated(BurnAction action, uint256 cost, bool active);
     event CustomActionConfigUpdated(bytes32 actionName, uint256 cost, bool active);
     event LpRatioUpdated(uint16 oldRatio, uint16 newRatio);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event LiquidityPoolUpdated(address indexed oldPool, address indexed newPool);
+    event PlatformUpdated(address indexed oldPlatform, address indexed newPlatform);
 
     error ActionNotActive();
     error InsufficientAllowance();
@@ -197,14 +200,17 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
 
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
+        emit TreasuryUpdated(treasury, newTreasury);
         treasury = newTreasury;
     }
 
     function setLiquidityPool(address newPool) external onlyOwner {
+        emit LiquidityPoolUpdated(liquidityPool, newPool);
         liquidityPool = newPool;
     }
 
     function setPlatform(address newPlatform) external onlyOwner {
+        emit PlatformUpdated(platform, newPlatform);
         platform = newPlatform;
     }
 }
