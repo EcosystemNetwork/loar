@@ -196,6 +196,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     // ── $LOAR Admin ─────────────────────────────────────────────
 
     function setLoarToken(address _loarToken) external onlyOwner {
+        if (_loarToken == address(0)) revert ZeroAddress();
         loarToken = IERC20(_loarToken);
         emit LoarTokenUpdated(_loarToken);
     }
