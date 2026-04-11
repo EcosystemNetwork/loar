@@ -2818,6 +2818,20 @@ export const loarBurnerAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'platform',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -2917,6 +2931,13 @@ export const loarBurnerAbi = [
     name: 'treasury',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -3050,6 +3071,25 @@ export const loarBurnerAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'oldPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'LiquidityPoolUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'oldRatio',
         internalType: 'uint16',
         type: 'uint16',
@@ -3088,6 +3128,70 @@ export const loarBurnerAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'PlatformUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TreasuryUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'implementation',
         internalType: 'address',
         type: 'address',
@@ -3118,6 +3222,8 @@ export const loarBurnerAbi = [
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InsufficientAllowance' },
@@ -5226,6 +5332,20 @@ export const paymentRouterAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'proxiableUUID',
     outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'view',
@@ -5313,6 +5433,13 @@ export const paymentRouterAbi = [
     name: 'treasury',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -5469,6 +5596,19 @@ export const paymentRouterAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'creator',
         internalType: 'address',
         type: 'address',
@@ -5519,6 +5659,19 @@ export const paymentRouterAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'implementation',
         internalType: 'address',
         type: 'address',
@@ -5542,12 +5695,15 @@ export const paymentRouterAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'AddressInsufficientBalance',
   },
+  { type: 'error', inputs: [], name: 'DiscountTooHigh' },
   {
     type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FeeTooHigh' },
@@ -6874,6 +7030,20 @@ export const subscriptionManagerAbi = [
   {
     type: 'function',
     inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
+    ],
+    name: 'deactivateTier',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: 'user', internalType: 'address', type: 'address' },
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
     ],
@@ -6921,6 +7091,20 @@ export const subscriptionManagerAbi = [
     inputs: [],
     name: 'owner',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -7055,6 +7239,13 @@ export const subscriptionManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'newImplementation', internalType: 'address', type: 'address' },
       { name: 'data', internalType: 'bytes', type: 'bytes' },
@@ -7094,6 +7285,19 @@ export const subscriptionManagerAbi = [
       },
     ],
     name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
   },
   {
     type: 'event',
@@ -7191,6 +7395,25 @@ export const subscriptionManagerAbi = [
         indexed: true,
       },
       {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+        indexed: false,
+      },
+    ],
+    name: 'TierDeactivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
         name: 'creator',
         internalType: 'address',
         type: 'address',
@@ -7198,6 +7421,19 @@ export const subscriptionManagerAbi = [
       },
     ],
     name: 'UniverseRegistered',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
   },
   {
     type: 'event',
@@ -7225,6 +7461,8 @@ export const subscriptionManagerAbi = [
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FeeTooHigh' },
   { type: 'error', inputs: [], name: 'InsufficientPayment' },
@@ -7233,6 +7471,7 @@ export const subscriptionManagerAbi = [
   { type: 'error', inputs: [], name: 'MonthsTooHigh' },
   { type: 'error', inputs: [], name: 'NoActiveSubscription' },
   { type: 'error', inputs: [], name: 'NoRevenue' },
+  { type: 'error', inputs: [], name: 'NotAuthorized' },
   { type: 'error', inputs: [], name: 'NotCreator' },
   { type: 'error', inputs: [], name: 'NotInitializing' },
   { type: 'error', inputs: [], name: 'NotPlatform' },
@@ -8525,13 +8764,6 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'MINT_FEE',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'TOKEN_SUPPLY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -8723,6 +8955,20 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'mintFee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'mintFeeLpBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'owner',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -8766,6 +9012,20 @@ export const universeManagerAbi = [
     type: 'function',
     inputs: [{ name: '_lpRecipient', internalType: 'address', type: 'address' }],
     name: 'setLpRecipient',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_mintFee', internalType: 'uint256', type: 'uint256' }],
+    name: 'setMintFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_mintFeeLpBps', internalType: 'uint16', type: 'uint16' }],
+    name: 'setMintFeeLpBps',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -8849,6 +9109,44 @@ export const universeManagerAbi = [
       },
     ],
     name: 'ClaimTeamFees',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'MintFeeLpBpsUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'MintFeeUpdated',
   },
   {
     type: 'event',
@@ -11626,6 +11924,14 @@ export const useLoarBurner_Owner_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"paused"`
+ */
+export const useLoarBurner_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarBurnerAbi,
+  functionName: 'paused',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"platform"`
  */
 export const useLoarBurner_Platform_read = /*#__PURE__*/ createUseReadContract({
@@ -11705,6 +12011,14 @@ export const useLoarBurner_Initialize_write = /*#__PURE__*/ createUseWriteContra
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLoarBurner_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarBurnerAbi,
+  functionName: 'pause',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"renounceOwnership"`
  */
 export const useLoarBurner_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
@@ -11769,6 +12083,14 @@ export const useLoarBurner_TransferOwnership_write = /*#__PURE__*/ createUseWrit
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLoarBurner_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarBurnerAbi,
+  functionName: 'unpause',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const useLoarBurner_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
@@ -11813,6 +12135,14 @@ export const useLoarBurner_ExecuteFor_simulate = /*#__PURE__*/ createUseSimulate
 export const useLoarBurner_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: loarBurnerAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLoarBurner_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarBurnerAbi,
+  functionName: 'pause',
 });
 
 /**
@@ -11880,6 +12210,14 @@ export const useLoarBurner_TransferOwnership_simulate = /*#__PURE__*/ createUseS
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLoarBurner_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarBurnerAbi,
+  functionName: 'unpause',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarBurnerAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const useLoarBurner_UpgradeToAndCall_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -11936,6 +12274,14 @@ export const useLoarBurner_Initialized_watch = /*#__PURE__*/ createUseWatchContr
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarBurnerAbi}__ and `eventName` set to `"LiquidityPoolUpdated"`
+ */
+export const useLoarBurner_LiquidityPoolUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarBurnerAbi,
+  eventName: 'LiquidityPoolUpdated',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarBurnerAbi}__ and `eventName` set to `"LpRatioUpdated"`
  */
 export const useLoarBurner_LpRatioUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -11949,6 +12295,38 @@ export const useLoarBurner_LpRatioUpdated_watch = /*#__PURE__*/ createUseWatchCo
 export const useLoarBurner_OwnershipTransferred_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: loarBurnerAbi,
   eventName: 'OwnershipTransferred',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarBurnerAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useLoarBurner_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarBurnerAbi,
+  eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarBurnerAbi}__ and `eventName` set to `"PlatformUpdated"`
+ */
+export const useLoarBurner_PlatformUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarBurnerAbi,
+  eventName: 'PlatformUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarBurnerAbi}__ and `eventName` set to `"TreasuryUpdated"`
+ */
+export const useLoarBurner_TreasuryUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarBurnerAbi,
+  eventName: 'TreasuryUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarBurnerAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useLoarBurner_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarBurnerAbi,
+  eventName: 'Unpaused',
 });
 
 /**
@@ -13494,6 +13872,14 @@ export const usePaymentRouter_Owner_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"paused"`
+ */
+export const usePaymentRouter_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: paymentRouterAbi,
+  functionName: 'paused',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"proxiableUUID"`
  */
 export const usePaymentRouter_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
@@ -13538,6 +13924,14 @@ export const usePaymentRouter_ClaimLoar_write = /*#__PURE__*/ createUseWriteCont
 export const usePaymentRouter_Initialize_write = /*#__PURE__*/ createUseWriteContract({
   abi: paymentRouterAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"pause"`
+ */
+export const usePaymentRouter_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: paymentRouterAbi,
+  functionName: 'pause',
 });
 
 /**
@@ -13621,6 +14015,14 @@ export const usePaymentRouter_TransferOwnership_write = /*#__PURE__*/ createUseW
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"unpause"`
+ */
+export const usePaymentRouter_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: paymentRouterAbi,
+  functionName: 'unpause',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const usePaymentRouter_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
@@ -13657,6 +14059,14 @@ export const usePaymentRouter_ClaimLoar_simulate = /*#__PURE__*/ createUseSimula
 export const usePaymentRouter_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: paymentRouterAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"pause"`
+ */
+export const usePaymentRouter_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: paymentRouterAbi,
+  functionName: 'pause',
 });
 
 /**
@@ -13743,6 +14153,14 @@ export const usePaymentRouter_TransferOwnership_simulate = /*#__PURE__*/ createU
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"unpause"`
+ */
+export const usePaymentRouter_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: paymentRouterAbi,
+  functionName: 'unpause',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const usePaymentRouter_UpgradeToAndCall_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -13824,6 +14242,14 @@ export const usePaymentRouter_OwnershipTransferred_watch =
   });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link paymentRouterAbi}__ and `eventName` set to `"Paused"`
+ */
+export const usePaymentRouter_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: paymentRouterAbi,
+  eventName: 'Paused',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link paymentRouterAbi}__ and `eventName` set to `"PaymentRouted"`
  */
 export const usePaymentRouter_PaymentRouted_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -13837,6 +14263,14 @@ export const usePaymentRouter_PaymentRouted_watch = /*#__PURE__*/ createUseWatch
 export const usePaymentRouter_TreasuryUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: paymentRouterAbi,
   eventName: 'TreasuryUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link paymentRouterAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const usePaymentRouter_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: paymentRouterAbi,
+  eventName: 'Unpaused',
 });
 
 /**
@@ -15033,6 +15467,14 @@ export const useSubscriptionManager_Owner_read = /*#__PURE__*/ createUseReadCont
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"paused"`
+ */
+export const useSubscriptionManager_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'paused',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"paymentRouter"`
  */
 export const useSubscriptionManager_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
@@ -15122,11 +15564,27 @@ export const useSubscriptionManager_ConfigureTier_write = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"deactivateTier"`
+ */
+export const useSubscriptionManager_DeactivateTier_write = /*#__PURE__*/ createUseWriteContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'deactivateTier',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"initialize"`
  */
 export const useSubscriptionManager_Initialize_write = /*#__PURE__*/ createUseWriteContract({
   abi: subscriptionManagerAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"pause"`
+ */
+export const useSubscriptionManager_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'pause',
 });
 
 /**
@@ -15159,6 +15617,14 @@ export const useSubscriptionManager_Subscribe_write = /*#__PURE__*/ createUseWri
 export const useSubscriptionManager_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
   abi: subscriptionManagerAbi,
   functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useSubscriptionManager_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'unpause',
 });
 
 /**
@@ -15195,11 +15661,28 @@ export const useSubscriptionManager_ConfigureTier_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"deactivateTier"`
+ */
+export const useSubscriptionManager_DeactivateTier_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: subscriptionManagerAbi,
+    functionName: 'deactivateTier',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"initialize"`
  */
 export const useSubscriptionManager_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: subscriptionManagerAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"pause"`
+ */
+export const useSubscriptionManager_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'pause',
 });
 
 /**
@@ -15238,6 +15721,14 @@ export const useSubscriptionManager_TransferOwnership_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useSubscriptionManager_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'unpause',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const useSubscriptionManager_UpgradeToAndCall_simulate =
@@ -15269,6 +15760,14 @@ export const useSubscriptionManager_OwnershipTransferred_watch =
     abi: subscriptionManagerAbi,
     eventName: 'OwnershipTransferred',
   });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useSubscriptionManager_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: subscriptionManagerAbi,
+  eventName: 'Paused',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `eventName` set to `"Subscribed"`
@@ -15306,6 +15805,15 @@ export const useSubscriptionManager_TierConfigured_watch =
   });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `eventName` set to `"TierDeactivated"`
+ */
+export const useSubscriptionManager_TierDeactivated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: subscriptionManagerAbi,
+    eventName: 'TierDeactivated',
+  });
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `eventName` set to `"UniverseRegistered"`
  */
 export const useSubscriptionManager_UniverseRegistered_watch =
@@ -15313,6 +15821,14 @@ export const useSubscriptionManager_UniverseRegistered_watch =
     abi: subscriptionManagerAbi,
     eventName: 'UniverseRegistered',
   });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useSubscriptionManager_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: subscriptionManagerAbi,
+  eventName: 'Unpaused',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `eventName` set to `"Upgraded"`
@@ -16389,14 +16905,6 @@ export const useUniverseManager_Bps_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"MINT_FEE"`
- */
-export const useUniverseManager_MintFee_read = /*#__PURE__*/ createUseReadContract({
-  abi: universeManagerAbi,
-  functionName: 'MINT_FEE',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"TOKEN_SUPPLY"`
  */
 export const useUniverseManager_TokenSupply_read = /*#__PURE__*/ createUseReadContract({
@@ -16442,6 +16950,22 @@ export const useUniverseManager_GetUniverseData_read = /*#__PURE__*/ createUseRe
 export const useUniverseManager_LpRecipient_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
   functionName: 'lpRecipient',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"mintFee"`
+ */
+export const useUniverseManager_MintFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'mintFee',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"mintFeeLpBps"`
+ */
+export const useUniverseManager_MintFeeLpBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'mintFeeLpBps',
 });
 
 /**
@@ -16580,6 +17104,22 @@ export const useUniverseManager_SetLpRecipient_write = /*#__PURE__*/ createUseWr
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFee"`
+ */
+export const useUniverseManager_SetMintFee_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setMintFee',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFeeLpBps"`
+ */
+export const useUniverseManager_SetMintFeeLpBps_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setMintFeeLpBps',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTeamFeeRecipient"`
  */
 export const useUniverseManager_SetTeamFeeRecipient_write = /*#__PURE__*/ createUseWriteContract({
@@ -16694,6 +17234,22 @@ export const useUniverseManager_SetLpRecipient_simulate = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFee"`
+ */
+export const useUniverseManager_SetMintFee_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setMintFee',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFeeLpBps"`
+ */
+export const useUniverseManager_SetMintFeeLpBps_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setMintFeeLpBps',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTeamFeeRecipient"`
  */
 export const useUniverseManager_SetTeamFeeRecipient_simulate =
@@ -16734,6 +17290,23 @@ export const useUniverseManager_undefined_watch = /*#__PURE__*/ createUseWatchCo
 export const useUniverseManager_ClaimTeamFees_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeManagerAbi,
   eventName: 'ClaimTeamFees',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"MintFeeLpBpsUpdated"`
+ */
+export const useUniverseManager_MintFeeLpBpsUpdated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeManagerAbi,
+    eventName: 'MintFeeLpBpsUpdated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"MintFeeUpdated"`
+ */
+export const useUniverseManager_MintFeeUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'MintFeeUpdated',
 });
 
 /**

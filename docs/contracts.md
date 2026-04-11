@@ -17,35 +17,35 @@ All upgradeable contracts use OpenZeppelin Upgradeable v5.0.2.
 
 | Contract             | Address                                      | Purpose                             |
 | -------------------- | -------------------------------------------- | ----------------------------------- |
-| UniverseManager      | `0x7af142BbD14CaEECdA68f948F467Da0257f6B114` | Factory: deploys universes + tokens |
-| LoarHookStaticFee    | `0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC` | Uniswap v4 fee collection hook      |
-| LoarLpLockerMultiple | `0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6` | LP token locking (anti-rug)         |
-| LoarFeeLocker        | `0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f` | Fee escrow and creator payouts      |
+| UniverseManager      | `0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce` | Factory: deploys universes + tokens |
+| LoarHookStaticFee    | `0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc` | Uniswap v4 fee collection hook      |
+| LoarLpLockerMultiple | `0xc00225D9463C15280748dC2E21D8D8625982Ad54` | LP token locking (anti-rug)         |
+| LoarFeeLocker        | `0x1E10b62bd2817d0C2414909027E1E63653fcCd8e` | Fee escrow and creator payouts      |
 
 ### Revenue Singletons (UUPS Proxies)
 
 | Contract            | Proxy Address                                | Purpose                                  |
 | ------------------- | -------------------------------------------- | ---------------------------------------- |
-| PaymentRouter       | `0xD8b49c99aDb51575eea4FB795645fc9e1ce4Fa9C` | Fee splits & treasury routing            |
-| RightsRegistry      | `0x711eC315392f6f9FFd37e673B35acc63b9999323` | Content rights & ownership tracking      |
-| CanonMarketplace    | `0x8e6c09198267B07E3FC8C66F0343759111D63016` | Canon submission, voting & licensing     |
-| CreditManager       | `0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240` | AI generation credits & tiers            |
-| AdPlacement         | `0xB18db49DFAB0d8B05916260D457574348893601d` | Ad slot bidding & impressions            |
-| SubscriptionManager | `0x99562C96389A91b17662ce5f15143f5b07b84090` | Creator subscription tiers               |
-| LicensingRegistry   | `0xE64563E0361f26228783e6cBAd3789563A6d5eA7` | IP licensing (6 types) & royalty splits  |
-| CollabManager       | `0xD98755fdEA77Aa76b19DD979f9a3134502D18294` | Multi-creator collaboration management   |
-| AnalyticsRegistry   | `0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8` | On-chain analytics & engagement tracking |
+| PaymentRouter       | `0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6` | Fee splits & treasury routing            |
+| RightsRegistry      | `0x3A14A746990498d5a4eCe867db10a197f91856Bc` | Content rights & ownership tracking      |
+| CanonMarketplace    | `0xDc5998C5e334345Ac3Aa9a9c6e141f471e929c81` | Canon submission, voting & licensing     |
+| CreditManager       | `0x5110FCCaf50316D8F874F22428dC1a832F591639` | AI generation credits & tiers            |
+| AdPlacement         | `0x972bD30323B0Fb5f2466E39593cCdE1e8ae3F8C1` | Ad slot bidding & impressions            |
+| SubscriptionManager | `0x53542bA1e3445804D9a225C967E2677F017D1d47` | Creator subscription tiers               |
+| LicensingRegistry   | `0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C` | IP licensing (6 types) & royalty splits  |
+| CollabManager       | `0xE981454B4149BEa3a9018fa2ab77482F388ba01f` | Multi-creator collaboration management   |
+| AnalyticsRegistry   | `0xB86539C4bf30036B6bd1513320cF38Bc839c7922` | On-chain analytics & engagement tracking |
 
 ### NFT Beacons & Factory
 
 | Contract              | Address                                      | Purpose                            |
 | --------------------- | -------------------------------------------- | ---------------------------------- |
-| RevenueModuleFactory  | `0x056dDe6c068cE3FE17C2E6eE6cfA8F76eB5A5264` | Deploys 5 NFT proxies per universe |
-| EpisodeEdition Beacon | `0xd70A0A63d1F80D6f28BeB3e8f3FC2a34dBEC3618` | ERC1155 episode editions           |
-| Character Beacon      | `0xe15D941140e5504AF7C1b56AC14dA236963A99ae` | ERC721 character NFTs              |
-| Entity Beacon         | `0x152ADc8350ee69162989c0C52f5ffb2f8A09E17B` | ERC721 entity NFTs                 |
-| EntityEdition Beacon  | `0x7e62116B9A889150E6D07830a179f3cF803c2908` | ERC1155 entity editions            |
-| EpisodeNFT Beacon     | `0x89c4b520319FDB6cd23cb8DC5E6b023B110F23fC` | ERC721 per-episode NFTs            |
+| RevenueModuleFactory  | `0x6D5CEf09F044224A51bd59EB841769255070e5dA` | Deploys 5 NFT proxies per universe |
+| EpisodeEdition Beacon | `0x14742D6BB8eeE513D0D70a235d8B4d801F19F9ed` | ERC1155 episode editions           |
+| Character Beacon      | `0x0BEcc54417e9AaC9289C748eb72ECBb55292756f` | ERC721 character NFTs              |
+| Entity Beacon         | `0xF951065C7d4d28805188F60a3F8bd398B7776EC8` | ERC721 entity NFTs                 |
+| EntityEdition Beacon  | `0xb3D7889c393b710edF2e087Cd2b7148a2556f47b` | ERC1155 entity editions            |
+| EpisodeNFT Beacon     | `0x3ebb4FFd384Fc971F445AA950055203916b749a5` | ERC721 per-episode NFTs            |
 
 **Owner:** `0x116C28e6DCABCa363f83217C712d79DCE168d90e`
 
