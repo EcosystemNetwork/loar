@@ -5,12 +5,13 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title SubscriptionManager
 /// @notice Manages subscriptions to universes. Subscribers get early episodes,
 ///         voting rights, premium content, and behind-the-scenes access.
-contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum SubscriptionTier { FREE, BASIC, PREMIUM, VIP }
 
     struct TierConfig {
@@ -83,12 +84,16 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -132,7 +137,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     }
 
     /// @notice Subscribe to a universe tier
-    function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months) external payable nonReentrant {
+    function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months) external payable nonReentrant whenNotPaused {
         if (months == 0 || months > 120) revert MonthsTooHigh(); // max 10 years
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();

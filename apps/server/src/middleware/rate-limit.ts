@@ -58,6 +58,8 @@ class MemoryStore implements RateLimitStore {
 class RedisStore implements RateLimitStore {
   private client: any;
   private ready = false;
+  /** In-memory fallback used when Redis is unavailable (fail-closed, not fail-open) */
+  private memoryFallback = new MemoryStore();
 
   constructor(redisUrl: string) {
     this.init(redisUrl);
@@ -84,8 +86,8 @@ class RedisStore implements RateLimitStore {
 
   async consume(key: string, windowMs: number, max: number) {
     if (!this.ready || !this.client) {
-      // Fallback: allow request (fail-open) if Redis is down
-      return { remaining: max, blocked: false };
+      // Fail-closed: use in-memory rate limiting instead of allowing all requests
+      return this.memoryFallback.consume(key, windowMs, max);
     }
 
     try {
@@ -109,8 +111,8 @@ class RedisStore implements RateLimitStore {
 
       return { remaining: max - count, blocked: false };
     } catch {
-      // Redis error — fail open
-      return { remaining: max, blocked: false };
+      // Redis error — fail-closed: fall back to in-memory limiting
+      return this.memoryFallback.consume(key, windowMs, max);
     }
   }
 }
@@ -177,19 +179,22 @@ export function rateLimiter(opts: { windowMs: number; max: number }) {
 /**
  * Stricter rate limiter for expensive endpoints (AI generation).
  * Uses a composite key of IP + tRPC procedure path for per-endpoint limits.
+ * Also enforces per-wallet limits when a user is authenticated.
  */
 export function aiRateLimiter(opts: { windowMs: number; max: number }) {
   return async (c: Context, next: Next) => {
     const ip = getClientKey(c);
     // Extract tRPC procedure name from the URL path (e.g. /trpc/generation.generate)
     const procedurePath = c.req.path.replace('/trpc/', '');
-    const key = `ai:${ip}:${procedurePath}`;
-    const result = await getStore().consume(key, opts.windowMs, opts.max);
+
+    // Per-IP rate limit
+    const ipKey = `ai:${ip}:${procedurePath}`;
+    const ipResult = await getStore().consume(ipKey, opts.windowMs, opts.max);
 
     c.header('X-RateLimit-Limit', String(opts.max));
-    c.header('X-RateLimit-Remaining', String(result.remaining));
+    c.header('X-RateLimit-Remaining', String(ipResult.remaining));
 
-    if (result.blocked) {
+    if (ipResult.blocked) {
       c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
       return c.json(
         {
@@ -201,6 +206,53 @@ export function aiRateLimiter(opts: { windowMs: number; max: number }) {
         },
         429
       );
+    }
+
+    // Per-wallet rate limit (10 req/min per wallet across all AI endpoints)
+    const authHeader = c.req.header('authorization');
+    if (authHeader) {
+      // Extract wallet address from JWT (best-effort, non-blocking on parse failure)
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        const wallet = (payload.address || payload.sub || '').toLowerCase();
+        if (wallet) {
+          const walletKey = `ai-wallet:${wallet}`;
+          const walletResult = await getStore().consume(walletKey, opts.windowMs, opts.max);
+          if (walletResult.blocked) {
+            c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
+            return c.json(
+              {
+                error: {
+                  message:
+                    'Per-wallet AI generation rate limit exceeded. Please wait before trying again.',
+                  code: -32029,
+                  data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
+                },
+              },
+              429
+            );
+          }
+
+          // Daily cost ceiling: 200 generations per wallet per 24h
+          const dailyKey = `ai-daily:${wallet}`;
+          const dailyResult = await getStore().consume(dailyKey, 86_400_000, 200);
+          if (dailyResult.blocked) {
+            return c.json(
+              {
+                error: {
+                  message: 'Daily generation limit reached (200/day). Try again tomorrow.',
+                  code: -32029,
+                  data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
+                },
+              },
+              429
+            );
+          }
+        }
+      } catch {
+        // JWT parse failed — skip wallet rate limiting, IP limit still applies
+      }
     }
 
     await next();

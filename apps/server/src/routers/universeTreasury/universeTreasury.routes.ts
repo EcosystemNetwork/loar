@@ -202,7 +202,7 @@ export const universeTreasuryRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid, input.chainId))) {
         throw new Error('Only the universe admin can fund the universe credit pool');
       }
 
@@ -524,7 +524,7 @@ export const universeTreasuryRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid, input.chainId))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Only the universe admin can deposit revenue',

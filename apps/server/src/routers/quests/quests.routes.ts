@@ -341,7 +341,9 @@ export const questsRouter = router({
         throw new Error('Quest reward already claimed');
       }
 
-      // Grant $LOAR tokens
+      // Grant $LOAR tokens as credits.
+      // Quest rewards are immediately spendable on the platform but subject
+      // to a 7-day transfer/swap lockup to prevent Sybil farming.
       const creditsCol = db.collection('userCredits');
       const userRef = creditsCol.doc(ctx.user.uid);
       const userDoc = await userRef.get();
@@ -367,12 +369,14 @@ export const questsRouter = router({
         });
       }
 
-      // Record reward
+      // Record reward with lockup metadata
+      const lockupExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await questRewardsCol().add({
         userId: ctx.user.uid,
         questId: input.questId,
         loarTokens: quest.loarReward,
         claimedAt: new Date(),
+        lockupExpiresAt, // Quest rewards locked for 7 days before transfer/swap
       });
 
       // Update progress
@@ -429,7 +433,14 @@ export const questsRouter = router({
 
   /**
    * Record a referral when a new user signs up with a referral code.
-   * Rewards both the referrer and the new user.
+   *
+   * Sybil resistance measures:
+   * 1. Referrer rewards are PENDING — only unlock after the referee performs
+   *    a gated action (credit purchase or NFT mint) via unlockReferralReward.
+   * 2. Per-referrer daily cap: max 10 new referrals per 24h.
+   * 3. Account must exist for 1+ hours before claiming a referral (prevents
+   *    bot scripts that create+refer in rapid succession).
+   * 4. Self-referral and duplicate referral checks remain.
    */
   recordReferral: protectedProcedure
     .input(z.object({ referralCode: z.string() }))
@@ -463,38 +474,36 @@ export const questsRouter = router({
         return { ok: false, reason: 'Already referred' };
       }
 
-      const REFERRER_REWARD = 100; // $LOAR for referrer
-      const REFERRED_REWARD = 50; // $LOAR for new user
+      // Sybil check: per-referrer daily cap (max 10 referrals per 24h)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recentReferrals = await affiliateRewardsCol()
+        .where('referrerUserId', '==', referrerUid)
+        .where('createdAt', '>=', oneDayAgo)
+        .get();
 
-      // Reward referrer
-      const creditsCol = db.collection('userCredits');
-      const referrerCreditsRef = creditsCol.doc(referrerUid);
-      const referrerCreditsDoc = await referrerCreditsRef.get();
-
-      if (referrerCreditsDoc.exists) {
-        const data = referrerCreditsDoc.data()!;
-        await referrerCreditsRef.update({
-          balance: (data.balance || 0) + REFERRER_REWARD,
-          totalBonusReceived: (data.totalBonusReceived || 0) + REFERRER_REWARD,
-          updatedAt: new Date(),
-        });
-      } else {
-        await referrerCreditsRef.set({
-          uid: referrerUid,
-          balance: REFERRER_REWARD,
-          totalPurchased: 0,
-          totalSpent: 0,
-          totalBonusReceived: REFERRER_REWARD,
-          totalLoarPurchases: 0,
-          totalFiatPurchases: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+      if (recentReferrals.size >= 10) {
+        return { ok: false, reason: 'Referrer daily limit reached (max 10/day)' };
       }
 
-      // Reward referred user
-      const userCreditsRef = creditsCol.doc(ctx.user.uid);
+      // Sybil check: account must be at least 1 hour old
+      const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
       const userCreditsDoc = await userCreditsRef.get();
+      if (userCreditsDoc.exists) {
+        const createdAt = userCreditsDoc.data()?.createdAt?.toDate?.();
+        if (createdAt && Date.now() - createdAt.getTime() < 60 * 60 * 1000) {
+          return { ok: false, reason: 'Account too new. Wait 1 hour before claiming a referral.' };
+        }
+      }
+
+      const REFERRER_REWARD = 100; // $LOAR for referrer (PENDING until referee gates)
+      const REFERRED_REWARD = 50; // $LOAR for new user (immediate)
+
+      // Referrer reward is PENDING — stored but NOT added to balance.
+      // Unlocked when referee performs a gated action (purchase, mint, etc.)
+      // via the unlockReferralReward procedure.
+
+      // Reward referred user immediately (small amount, low abuse value)
+      const creditsCol = db.collection('userCredits');
 
       if (userCreditsDoc.exists) {
         const data = userCreditsDoc.data()!;
@@ -517,20 +526,21 @@ export const questsRouter = router({
         });
       }
 
-      // Update referrer stats
+      // Update referrer stats (but NOT balance — reward is pending)
       await referrerDoc.ref.update({
         totalReferrals: (referrerData.totalReferrals || 0) + 1,
-        totalEarned: (referrerData.totalEarned || 0) + REFERRER_REWARD,
+        pendingRewards: (referrerData.pendingRewards || 0) + REFERRER_REWARD,
         updatedAt: new Date(),
       });
 
-      // Record referral
+      // Record referral with pending status
       await affiliateRewardsCol().add({
         referrerUserId: referrerUid,
         referredUserId: ctx.user.uid,
         referralCode: input.referralCode,
         referrerReward: REFERRER_REWARD,
         referredReward: REFERRED_REWARD,
+        status: 'pending', // 'pending' | 'unlocked'
         createdAt: new Date(),
       });
 
@@ -572,6 +582,79 @@ export const questsRouter = router({
         referrerReward: REFERRER_REWARD,
         referredReward: REFERRED_REWARD,
       };
+    }),
+
+  /**
+   * Unlock pending referral rewards for a referrer.
+   * Called automatically when a referred user performs a gated action
+   * (credit purchase, NFT mint, etc.). This prevents Sybil farming:
+   * rewards only flow when the referee has real economic activity.
+   */
+  unlockReferralReward: protectedProcedure
+    .input(z.object({ referredUserId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // Find the pending referral record for this referee
+      const pendingSnap = await affiliateRewardsCol()
+        .where('referredUserId', '==', input.referredUserId)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get();
+
+      if (pendingSnap.empty) {
+        return { ok: false, reason: 'No pending referral reward found' };
+      }
+
+      const rewardDoc = pendingSnap.docs[0];
+      const rewardData = rewardDoc.data();
+      const referrerUid = rewardData.referrerUserId;
+      const reward = rewardData.referrerReward || 100;
+
+      // Credit the referrer's balance
+      const creditsCol = db.collection('userCredits');
+      const referrerRef = creditsCol.doc(referrerUid);
+      const referrerDoc = await referrerRef.get();
+
+      if (referrerDoc.exists) {
+        const data = referrerDoc.data()!;
+        await referrerRef.update({
+          balance: (data.balance || 0) + reward,
+          totalBonusReceived: (data.totalBonusReceived || 0) + reward,
+          updatedAt: new Date(),
+        });
+      } else {
+        await referrerRef.set({
+          uid: referrerUid,
+          balance: reward,
+          totalPurchased: 0,
+          totalSpent: 0,
+          totalBonusReceived: reward,
+          totalLoarPurchases: 0,
+          totalFiatPurchases: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      // Update affiliate stats
+      const affiliateRef = affiliatesCol().doc(referrerUid);
+      const affiliateDoc = await affiliateRef.get();
+      if (affiliateDoc.exists) {
+        const aData = affiliateDoc.data()!;
+        await affiliateRef.update({
+          totalEarned: (aData.totalEarned || 0) + reward,
+          pendingRewards: Math.max(0, (aData.pendingRewards || 0) - reward),
+          updatedAt: new Date(),
+        });
+      }
+
+      // Mark reward as unlocked
+      await rewardDoc.ref.update({
+        status: 'unlocked',
+        unlockedAt: new Date(),
+        unlockedBy: ctx.user.uid,
+      });
+
+      return { ok: true, referrerUid, rewardUnlocked: reward };
     }),
 
   // ── Daily Check-in ──────────────────────────────────────────────

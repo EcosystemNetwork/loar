@@ -12,6 +12,61 @@ import { createHash, randomBytes } from 'crypto';
 import { TRPCError } from '@trpc/server';
 import type { AuthUser } from './auth';
 
+// ── Permission Scopes ─────────────────────────────────────────────────
+
+/**
+ * Defined permission scopes for API keys. Using an enum prevents
+ * arbitrary strings and makes auditing possible.
+ */
+export const API_KEY_SCOPES = {
+  // Read-only
+  'entities.read': 'Read entities and wiki data',
+  'universes.read': 'Read universe metadata',
+  'marketplace.read': 'Read marketplace listings',
+  'credits.read': 'Read credit balance',
+  'profiles.read': 'Read user profiles',
+
+  // Write — creation
+  'entities.create': 'Create entities',
+  'entities.update': 'Update entities',
+
+  // Write — generation (costs credits)
+  'generation.image': 'Generate images (costs credits)',
+  'generation.video': 'Generate videos (costs credits)',
+  'generation.voice': 'Generate voice/audio (costs credits)',
+  'generation.3d': 'Generate 3D models (costs credits)',
+
+  // Write — marketplace
+  'marketplace.list': 'Create marketplace listings',
+  'marketplace.submit': 'Submit to canon',
+
+  // Write — collaboration
+  'collab.propose': 'Propose collaborations',
+
+  // Admin (should never be granted to external keys)
+  'admin.all': 'Full admin access (internal only)',
+} as const;
+
+export type ApiKeyScope = keyof typeof API_KEY_SCOPES;
+
+/**
+ * Validate that all permissions in an array are known scopes.
+ * Rejects unknown strings to prevent scope creep.
+ */
+export function validatePermissions(permissions: string[]): permissions is ApiKeyScope[] {
+  const validScopes = new Set(Object.keys(API_KEY_SCOPES));
+  return permissions.every((p) => validScopes.has(p));
+}
+
+/**
+ * Check if a key has a specific permission scope.
+ * Supports wildcard 'admin.all' which grants everything.
+ */
+export function hasPermission(keyDoc: ApiKeyDoc, scope: ApiKeyScope): boolean {
+  if (keyDoc.permissions.includes('admin.all')) return true;
+  return keyDoc.permissions.includes(scope);
+}
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface ApiKeyDoc {
@@ -72,6 +127,24 @@ export async function generateApiKey(params: {
   rateLimitPerMinute?: number;
   expiresInDays?: number;
 }): Promise<{ rawKey: string; keyDoc: ApiKeyDoc }> {
+  // Validate permissions against known scopes
+  if (!validatePermissions(params.permissions)) {
+    const validScopes = Object.keys(API_KEY_SCOPES);
+    const invalid = params.permissions.filter((p) => !validScopes.includes(p));
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Invalid API key permissions: ${invalid.join(', ')}. Valid scopes: ${validScopes.join(', ')}`,
+    });
+  }
+
+  // Prevent external keys from getting admin access
+  if (params.permissions.includes('admin.all')) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Cannot grant admin.all scope to API keys',
+    });
+  }
+
   const randomPart = randomBytes(24).toString('hex');
   const agentPart = params.aiAgentId || 'global';
   const rawKey = `loar_${agentPart.slice(0, 8)}_${randomPart}`;
