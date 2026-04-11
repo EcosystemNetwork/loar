@@ -20,11 +20,11 @@ contract RevenueModuleFactory is Ownable {
     address public paymentRouter;
 
     // ── Beacons (shared, upgradeable) ──
-    UpgradeableBeacon public episodeBeacon;
-    UpgradeableBeacon public characterBeacon;
-    UpgradeableBeacon public entityBeacon;
-    UpgradeableBeacon public entityEdBeacon;
-    UpgradeableBeacon public episodeNftBeacon;
+    UpgradeableBeacon public immutable episodeBeacon;
+    UpgradeableBeacon public immutable characterBeacon;
+    UpgradeableBeacon public immutable entityBeacon;
+    UpgradeableBeacon public immutable entityEdBeacon;
+    UpgradeableBeacon public immutable episodeNftBeacon;
 
     // ── Fee defaults ──
     uint16 public episodePlatformFeeBps;

@@ -50,9 +50,9 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     // Prevents double-listing the same ERC721 token
     mapping(address => mapping(uint256 => uint256)) public activeERC721Listing;
 
-    address public platform;
+    address public immutable platform;
     IPaymentRouter public paymentRouter;
-    IRightsRegistry public rightsRegistry;
+    IRightsRegistry public immutable rightsRegistry;
     uint16 public platformFeeBps;
 
     event Listed(

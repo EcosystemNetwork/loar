@@ -27,7 +27,7 @@ interface IUniverseTokenDeployer {
 }
 
 contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
-    uint public teamFee;
+    uint public constant teamFee = 0;
     address public teamFeeRecipient;
     address public tokenDeployer;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
