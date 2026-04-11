@@ -5,6 +5,7 @@ import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -14,7 +15,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///         Covers all creator entity kinds: characters, plot arcs, locations, lore rules,
 ///         items, factions, species, vehicles, technology, and organizations.
 ///         Universe token holders vote submissions into canon. Accepted creators earn fees.
-contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum SubmissionType {
         CHARACTER,      // person
         PLOT_ARC,       // event / narrative arc
@@ -67,6 +68,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // submissionId => creator's portion held by contract after platform cut in submit()
     mapping(uint256 => uint256) public creatorHeldAmount;
 
+    /// @notice Claimable refunds for rejected submissions (pull pattern)
+    mapping(address => uint256) public claimableRefunds;
+
     // universeId => accepted submission IDs
     mapping(uint256 => uint256[]) public canonSubmissions;
 
@@ -84,6 +88,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     event SubmissionRejected(uint256 indexed submissionId);
     event CanonLicensed(uint256 indexed licenseId, uint256 submissionId, address licensee, uint256 fee);
     event CanonSubmissionAccepted(uint256 indexed universeId, uint256 indexed submissionId, bytes32 contentHash);
+    event RefundClaimed(address indexed creator, uint256 amount);
 
     error AlreadyVoted();
     error VotingNotActive();
@@ -96,6 +101,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error NoVotingPower();
     error FeeTooHigh();
     error ContentNotMonetizable();
+    error NothingToClaim();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -116,6 +122,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         if (_canonLicenseFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -127,6 +134,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         minSubmissionFee = _minSubmissionFee;
         votingDuration = _votingDuration;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -140,7 +150,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         SubmissionType subType,
         bytes32 contentHash,
         string calldata metadataURI
-    ) external payable nonReentrant returns (uint256 submissionId) {
+    ) external payable nonReentrant whenNotPaused returns (uint256 submissionId) {
         if (universeToken == address(0)) revert InvalidToken();
         if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         if (msg.value < minSubmissionFee) revert InsufficientFee();
@@ -179,7 +189,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice Vote on a submission (weighted by governance token snapshot at submission time)
     /// @dev Uses getPastVotes() for flash-loan protection — vote weight is locked at snapshotBlock
-    function vote(uint256 submissionId, bool support) external {
+    function vote(uint256 submissionId, bool support) external whenNotPaused {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert VotingNotActive();
         if (block.timestamp > sub.votingDeadline) revert VotingNotActive();
@@ -202,7 +212,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Finalize a submission after voting ends
-    function finalize(uint256 submissionId) external {
+    function finalize(uint256 submissionId) external whenNotPaused {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert InvalidStatus();
         if (block.timestamp < sub.votingDeadline) revert VotingNotEnded();
@@ -224,13 +234,23 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         } else {
             sub.status = SubmissionStatus.REJECTED;
 
-            // Route rejected submission remainder to treasury (not left stuck in contract)
+            // Credit rejected amount to creator as claimable refund (pull pattern)
             if (held > 0) {
-                paymentRouter.routeToTreasury{value: held}();
+                claimableRefunds[sub.creator] += held;
             }
 
             emit SubmissionRejected(submissionId);
         }
+    }
+
+    /// @notice Claim accumulated refunds from rejected submissions
+    function claimRefund() external nonReentrant {
+        uint256 amount = claimableRefunds[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        claimableRefunds[msg.sender] = 0;
+        (bool sent,) = msg.sender.call{value: amount}("");
+        require(sent, "Refund transfer failed");
+        emit RefundClaimed(msg.sender, amount);
     }
 
     /// @dev Compute platform cut from a gross amount
@@ -239,7 +259,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice License accepted canon content for use within the universe
-    function licenseCanon(uint256 submissionId) external payable nonReentrant returns (uint256 licenseId) {
+    function licenseCanon(uint256 submissionId) external payable nonReentrant whenNotPaused returns (uint256 licenseId) {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.ACCEPTED) revert InvalidStatus();
 

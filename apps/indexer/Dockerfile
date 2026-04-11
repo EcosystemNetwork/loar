@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20.18.1-alpine
 
 RUN apk add --no-cache curl
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
