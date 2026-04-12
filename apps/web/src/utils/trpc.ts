@@ -6,8 +6,8 @@
  * - `trpcClient`: Vanilla tRPC client for imperative calls (e.g., in hooks/callbacks).
  * - `trpc`: TanStack React Query-integrated tRPC proxy for use in components and loaders.
  *
- * Authentication is handled automatically -- the httpBatchLink injects the
- * SIWE JWT session token as a Bearer header on every request.
+ * Authentication is handled automatically via httpOnly session cookies.
+ * The browser sends the cookie on every request (credentials: 'include').
  */
 
 import type { AppRouter } from '@loar/shared/trpc';
@@ -15,7 +15,7 @@ import { QueryCache, QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
-import { getSiweToken, clearSiweSession } from '../lib/wallet-auth';
+import { hasSession, clearSiweSession } from '../lib/wallet-auth';
 
 /** Shared React Query client. Retries 5xx errors and shows toast on failure. */
 export const queryClient = new QueryClient({
@@ -51,7 +51,7 @@ export const queryClient = new QueryClient({
       // Only toast if the user actually had a session; unauthenticated 401s are expected.
       const httpStatus = error?.data?.httpStatus ?? error?.status;
       if (httpStatus === 401 || error.message?.includes('UNAUTHORIZED')) {
-        const hadSession = Boolean(getSiweToken());
+        const hadSession = hasSession();
         clearSiweSession();
         if (hadSession) {
           toast.error('Session expired. Please sign in again.', {
@@ -78,9 +78,9 @@ export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
       url: `${import.meta.env.VITE_SERVER_URL}/trpc`,
-      headers() {
-        const token = getSiweToken();
-        return token ? { Authorization: `Bearer ${token}` } : {};
+      // httpOnly cookie is sent automatically via credentials: 'include'
+      fetch(url, options) {
+        return fetch(url, { ...options, credentials: 'include' });
       },
     }),
   ],

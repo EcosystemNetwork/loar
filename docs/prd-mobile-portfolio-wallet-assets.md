@@ -257,7 +257,7 @@ Notification types and tap-through destinations:
 ### Wallet management
 
 - FR-W-01: The disconnect action MUST call SIWE sign-out and clear the local JWT and all cached portfolio data before navigating to the auth screen.
-- FR-W-02: WalletConnect/Reown integration MUST use Reown AppKit React Native SDK. It MUST NOT attempt to use the web CDP Embedded Wallet SDK on native.
+- FR-W-02: WalletConnect/Reown integration MUST use Reown AppKit React Native SDK. It MUST NOT attempt to use the web wallet SDK on native.
 - FR-W-03: The linked secondary wallet address MUST be persisted in Firestore via `profiles.upsert` so the server can route royalties correctly.
 - FR-W-04: Network badge MUST reflect the actual connected chain (Sepolia in all pre-mainnet builds) and MUST turn red if the wallet is on the wrong network.
 
@@ -320,7 +320,7 @@ apps/mobile/
 
 **tRPC client:** `@trpc/react-query` with a custom `fetch` adapter. Auth header injection via Bearer JWT from Expo SecureStore.
 
-**Wallet:** Reown AppKit React Native (`@reown/appkit-react-native`). CDP Embedded Wallet is NOT used on native. SIWE auth session established on first launch; JWT stored in SecureStore.
+**Wallet:** Reown AppKit React Native (`@reown/appkit-react-native`). SIWE auth session established on first launch; JWT stored in SecureStore.
 
 **Navigation:** Expo Router (file-based). Bottom tabs defined in `app/(tabs)/_layout.tsx`. Portfolio tab at `app/(tabs)/portfolio/`.
 
@@ -634,7 +634,7 @@ SIWE JWTs have a configurable expiry (default: 24 hours, minimum: 1 hour). When 
 3. If `exp - now < 30 minutes` (i.e., the token is less than 30 minutes old or expired very recently), the client initiates a silent re-auth:
    a. The stored wallet address is retrieved from SecureStore.
    b. A new SIWE message is constructed with the current timestamp and a fresh nonce.
-   c. The CDP Embedded Wallet signs the message silently (CDP supports silent signing for active sessions — no user interaction required).
+   c. The wallet SDK signs the message silently (if the wallet session is still valid — no UI shown).
    d. The new JWT is sent to the server via `auth.siweLogin` and stored back in SecureStore.
    e. The original failed request is retried with the new JWT.
 4. If the token is more than 30 minutes old, the silent re-auth is NOT attempted. The user is redirected to the auth screen with a toast: "Your session expired. Please sign in again."
@@ -675,15 +675,15 @@ const silentReAuthLink = new TRPCLink(({ next, op }) => {
 
 #### Expo SecureStore vs. AsyncStorage — What Lives Where
 
-| Data                                                 | Storage location                                             | Rationale                                                                                                                                        |
-| ---------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| JWT (SIWE session token)                             | `Expo SecureStore`                                           | Encrypted at rest using platform keychain (iOS Keychain / Android Keystore). Never in AsyncStorage.                                              |
-| Wallet address (primary)                             | `Expo SecureStore`                                           | Required for silent re-auth; treated as sensitive identity anchor                                                                                |
-| Expo push token                                      | `Expo SecureStore`                                           | Not a secret, but stored securely to prevent accidental exposure in logs or crash reports                                                        |
-| Portfolio cache (`portfolio.getSummary` last result) | `AsyncStorage`                                               | Non-sensitive display cache; acceptable in unencrypted storage                                                                                   |
-| NFT list cache                                       | `AsyncStorage`                                               | Non-sensitive                                                                                                                                    |
-| TanStack Query persisted cache (non-auth)            | `AsyncStorage` via `@tanstack/query-async-storage-persister` | Standard TanStack Query offline persistence                                                                                                      |
-| Private keys                                         | NEVER stored on device                                       | CDP Embedded Wallet manages key material in the CDP cloud enclave. This app NEVER has access to private keys and MUST NOT request or store them. |
+| Data                                                 | Storage location                                             | Rationale                                                                                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| JWT (SIWE session token)                             | `Expo SecureStore`                                           | Encrypted at rest using platform keychain (iOS Keychain / Android Keystore). Never in AsyncStorage.                                |
+| Wallet address (primary)                             | `Expo SecureStore`                                           | Required for silent re-auth; treated as sensitive identity anchor                                                                  |
+| Expo push token                                      | `Expo SecureStore`                                           | Not a secret, but stored securely to prevent accidental exposure in logs or crash reports                                          |
+| Portfolio cache (`portfolio.getSummary` last result) | `AsyncStorage`                                               | Non-sensitive display cache; acceptable in unencrypted storage                                                                     |
+| NFT list cache                                       | `AsyncStorage`                                               | Non-sensitive                                                                                                                      |
+| TanStack Query persisted cache (non-auth)            | `AsyncStorage` via `@tanstack/query-async-storage-persister` | Standard TanStack Query offline persistence                                                                                        |
+| Private keys                                         | NEVER stored on device                                       | The wallet provider manages key material externally. This app NEVER has access to private keys and MUST NOT request or store them. |
 
 #### Credit Purchase Security — Stripe Webhook Verification
 
@@ -707,7 +707,7 @@ The fiat purchase flow has an inherent race condition: the Stripe PaymentIntent 
 
 The `credits.purchaseWithLoar` flow:
 
-1. Client submits the on-chain transaction (ERC-20 transfer to the treasury address) via the CDP wallet.
+1. Client submits the on-chain transaction (ERC-20 transfer to the treasury address) via the connected wallet.
 2. Client receives the transaction hash `txHash` from the wallet SDK.
 3. Client calls `credits.purchaseWithLoar({ packageId, txHash })`.
 4. Server verifies the transaction on Sepolia:

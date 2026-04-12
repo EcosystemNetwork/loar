@@ -36,6 +36,18 @@ export function TokenSwapWidget({
 
   const mode = modeProp ?? (compact ? 'compact' : 'card');
 
+  // Calculate current price
+  const currentPrice = poolData?.sqrtPriceX96
+    ? priceFromSqrtX96(poolData.sqrtPriceX96)
+    : poolData?.tick != null
+      ? priceFromTick(poolData.tick)
+      : null;
+
+  const estimatedTokens = useMemo(() => {
+    if (!buyAmount || !currentPrice || isNaN(Number(buyAmount))) return null;
+    return currentPrice > 0 ? Number(buyAmount) / currentPrice : 0;
+  }, [buyAmount, currentPrice]);
+
   if (isLoading) {
     return mode === 'compact' ? null : (
       <div className="flex items-center justify-center py-3 text-xs text-muted-foreground">
@@ -48,18 +60,6 @@ export function TokenSwapWidget({
   if (!pool || isError) return null;
 
   const swapUrl = getSwapUrl(pool.tokenAddress, chainId);
-
-  // Calculate current price
-  const currentPrice = poolData?.sqrtPriceX96
-    ? priceFromSqrtX96(poolData.sqrtPriceX96)
-    : poolData?.tick != null
-      ? priceFromTick(poolData.tick)
-      : null;
-
-  const estimatedTokens = useMemo(() => {
-    if (!buyAmount || !currentPrice || isNaN(Number(buyAmount))) return null;
-    return currentPrice > 0 ? Number(buyAmount) / currentPrice : 0;
-  }, [buyAmount, currentPrice]);
 
   // ─── Compact mode ────────────────────────────────────────────────────
   if (mode === 'compact') {

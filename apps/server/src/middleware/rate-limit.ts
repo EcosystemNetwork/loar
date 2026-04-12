@@ -68,7 +68,6 @@ class RedisStore implements RateLimitStore {
   private async init(redisUrl: string) {
     try {
       // Dynamic import — ioredis is an optional dependency
-      // @ts-ignore ioredis is an optional peer dep, not always installed
       const Redis = (await import('ioredis')).default;
       this.client = new Redis(redisUrl, {
         maxRetriesPerRequest: 1,
@@ -141,20 +140,25 @@ function getStore(): RateLimitStore {
  * Priority:
  *   1. x-forwarded-for — last entry (closest trusted proxy hop)
  *   2. x-real-ip — set by nginx / similar
- *   3. 'anonymous' — fallback when no header is present
+ *   3. Connection remote address
  *
  * IMPORTANT: Configure your reverse proxy to strip/overwrite these headers
  * from the original client request. If the proxy passes client-supplied
  * headers through, clients can spoof their IP to bypass rate limits.
  */
+const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/;
+
 function getClientKey(c: Context): string {
   const xff = c.req.header('x-forwarded-for');
   if (xff) {
     // Take the LAST entry — that's the IP your trusted proxy appended.
-    // If your proxy is the only one, this is the real client IP.
-    return xff.split(',').pop()!.trim();
+    const lastIp = xff.split(',').pop()?.trim();
+    if (lastIp && IP_RE.test(lastIp)) return lastIp;
   }
-  return c.req.header('x-real-ip') || 'anonymous';
+  const realIp = c.req.header('x-real-ip');
+  if (realIp && IP_RE.test(realIp)) return realIp;
+  // Fallback to connection-level IP — never share a single bucket for all unknowns
+  return (c.req.raw as any)?.socket?.remoteAddress || 'unknown-' + Date.now();
 }
 
 // ── Middleware ───────────────────────────────────────────────────────────
@@ -211,11 +215,14 @@ export function aiRateLimiter(opts: { windowMs: number; max: number }) {
     // Per-wallet rate limit (10 req/min per wallet across all AI endpoints)
     const authHeader = c.req.header('authorization');
     if (authHeader) {
-      // Extract wallet address from JWT (best-effort, non-blocking on parse failure)
+      // Extract wallet address from JWT via cryptographic verification.
+      // Using verifySessionToken ensures attackers cannot forge wallet addresses
+      // to bypass per-wallet rate limits.
       try {
+        const { verifySessionToken } = await import('../lib/siwe');
         const token = authHeader.replace('Bearer ', '');
-        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-        const wallet = (payload.address || payload.sub || '').toLowerCase();
+        const payload = await verifySessionToken(token);
+        const wallet = (payload?.sub || '').toLowerCase();
         if (wallet) {
           const walletKey = `ai-wallet:${wallet}`;
           const walletResult = await getStore().consume(walletKey, opts.windowMs, opts.max);

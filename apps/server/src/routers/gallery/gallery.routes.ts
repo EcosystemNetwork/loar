@@ -93,7 +93,7 @@ export const galleryRouter = router({
       // Enrich with licensing data if available
       const contentHashes = items.map((i: any) => i.contentHash).filter(Boolean);
 
-      let licensingMap: Record<string, any> = {};
+      const licensingMap: Record<string, any> = {};
       if (contentHashes.length > 0) {
         // Firestore `in` queries support up to 30 values
         const chunks = [];

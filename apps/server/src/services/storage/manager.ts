@@ -94,6 +94,13 @@ export class StorageManager {
     mimeType?: string,
     userId?: string
   ): Promise<StorageManifest> {
+    const MAX_UPLOAD_BYTES = 200 * 1024 * 1024; // 200MB
+    if (buffer.length > MAX_UPLOAD_BYTES) {
+      throw new Error(
+        `File too large: ${(buffer.length / 1024 / 1024).toFixed(1)}MB exceeds 200MB limit`
+      );
+    }
+
     const uploadStart = Date.now();
     const contentHash = computeSha256(buffer);
     const resolvedMime = mimeType || getMimeType(filename);

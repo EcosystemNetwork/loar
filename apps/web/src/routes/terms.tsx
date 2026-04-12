@@ -120,7 +120,7 @@ function TermsPage() {
             <p>
               LOAR complies with the Digital Millennium Copyright Act (DMCA). To submit a copyright
               takedown request, visit our{' '}
-              <Link to="/dmca" className="text-primary underline">
+              <Link to={'/dmca' as any} className="text-primary underline">
                 DMCA page
               </Link>
               . Upon receipt of a valid takedown notice, we will remove or disable access to the

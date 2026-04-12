@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { getSiweToken } from '@/lib/wallet-auth';
+import { hasSession } from '@/lib/wallet-auth';
 
 interface StorageManifest {
   contentHash: string;
@@ -26,22 +26,65 @@ interface DirectUploadProps {
 
 const DEFAULT_TYPES = [
   // Video
-  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/x-matroska',
   // Raster images
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff', 'image/bmp',
-  'image/avif', 'image/heic', 'image/heif', 'image/svg+xml',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/tiff',
+  'image/bmp',
+  'image/avif',
+  'image/heic',
+  'image/heif',
+  'image/svg+xml',
   // Design formats
-  'image/vnd.adobe.photoshop', 'image/x-xcf', 'application/postscript',
+  'image/vnd.adobe.photoshop',
+  'image/x-xcf',
+  'application/postscript',
   // 3D models
-  'model/gltf+json', 'model/gltf-binary', 'model/obj', 'model/stl',
+  'model/gltf+json',
+  'model/gltf-binary',
+  'model/obj',
+  'model/stl',
   // Audio
-  'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/aac',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'audio/flac',
+  'audio/aac',
   // Documents
   'application/pdf',
   // Proprietary art app formats (reported as application/octet-stream by browsers)
-  '.blend', '.fbx', '.ma', '.mb', '.c4d', '.zpr', '.ztl', '.dae', '.abc', '.3ds', '.lwo',
-  '.psd', '.psb', '.kra', '.clip', '.procreate', '.sketch', '.afdesign', '.afphoto', '.afpub', '.cdr',
-  '.exr', '.hdr', '.tga', '.dds',
+  '.blend',
+  '.fbx',
+  '.ma',
+  '.mb',
+  '.c4d',
+  '.zpr',
+  '.ztl',
+  '.dae',
+  '.abc',
+  '.3ds',
+  '.lwo',
+  '.psd',
+  '.psb',
+  '.kra',
+  '.clip',
+  '.procreate',
+  '.sketch',
+  '.afdesign',
+  '.afphoto',
+  '.afpub',
+  '.cdr',
+  '.exr',
+  '.hdr',
+  '.tga',
+  '.dds',
 ];
 
 export function DirectUpload({
@@ -56,8 +99,8 @@ export function DirectUpload({
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getAuthToken = useCallback((): string | null => {
-    return getSiweToken();
+  const checkAuth = useCallback((): boolean => {
+    return hasSession();
   }, []);
 
   const uploadFile = useCallback(
@@ -80,8 +123,7 @@ export function DirectUpload({
         return;
       }
 
-      const token = getAuthToken();
-      if (!token) {
+      if (!checkAuth()) {
         toast.error('Authentication required');
         return;
       }
@@ -128,7 +170,7 @@ export function DirectUpload({
           xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
           xhr.open('POST', `${serverUrl}/api/upload`);
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.withCredentials = true; // send httpOnly session cookie
           xhr.send(formData);
         });
 
@@ -150,7 +192,7 @@ export function DirectUpload({
         setFileName(null);
       }
     },
-    [acceptedTypes, maxSizeMB, getAuthToken, onUploadComplete]
+    [acceptedTypes, maxSizeMB, checkAuth, onUploadComplete]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {

@@ -60,7 +60,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
         rateLimitPerMinute: form.rateLimitPerMinute,
         expiresInDays: form.expiresInDays,
       });
-      setNewKey(result.rawKey);
+      setNewKey((result as any).rawKey);
       setForm({ name: '', permissions: [], rateLimitPerMinute: 60, expiresInDays: undefined });
       toast.success('API key created');
     } catch (err: any) {

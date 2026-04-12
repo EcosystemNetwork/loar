@@ -122,18 +122,11 @@
   }
 }
 
-/* Fix CDP modal z-index layering issues */
+/* Fix modal z-index layering issues */
 @layer components {
-  /* Ensure CDP modals appear above everything */
-  [data-cdp-modal],
-  [data-cdp-overlay],
-  .cdp-modal,
-  .cdp-overlay,
-  /* Target common CDP modal selectors */
-  [class*="cdp-modal"],
-  [class*="cdp-overlay"],
-  [class*="modal"],
-  [class*="overlay"] {
+  /* Ensure modals appear above everything */
+  [class*='modal'],
+  [class*='overlay'] {
     z-index: 9999 !important;
   }
 

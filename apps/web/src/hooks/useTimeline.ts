@@ -149,7 +149,7 @@ export function useCreateNode() {
   ) =>
     contract.writeContractAsync({
       abi: universeAbi,
-      address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as `0x${string}`,
       functionName: 'createNode',
       args: [contentHash, plotHash, BigInt(previous), link, plot],
       chainId,

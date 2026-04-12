@@ -87,7 +87,7 @@ function AgentDashboardPage() {
           <Briefcase className="h-8 w-8 text-violet-400" />
           Agent Dashboard
         </h1>
-        <p className="mt-1 text-zinc-400">{profile.agencyName}</p>
+        <p className="mt-1 text-zinc-400">{(profile as any).agencyName}</p>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-4">

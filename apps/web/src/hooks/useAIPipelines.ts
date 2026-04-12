@@ -2,14 +2,14 @@
  * AI Pipeline Hooks — React Query wrappers for the AI pipeline system
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { trpc } from '../utils/trpc';
+import { trpcClient } from '../utils/trpc';
 
 // ── CRUD ───────────────────────────────────────────────────────────────
 
 export function usePipeline(pipelineId: string | undefined) {
   return useQuery({
     queryKey: ['aiPipelines', 'get', pipelineId],
-    queryFn: () => trpc.aiPipelines.get.query({ pipelineId: pipelineId! }),
+    queryFn: () => trpcClient.aiPipelines.get.query({ pipelineId: pipelineId! }),
     enabled: !!pipelineId,
   });
 }
@@ -17,7 +17,7 @@ export function usePipeline(pipelineId: string | undefined) {
 export function usePipelinesByAgent(aiAgentId: string | undefined) {
   return useQuery({
     queryKey: ['aiPipelines', 'byAgent', aiAgentId],
-    queryFn: () => trpc.aiPipelines.listByAgent.query({ aiAgentId: aiAgentId! }),
+    queryFn: () => trpcClient.aiPipelines.listByAgent.query({ aiAgentId: aiAgentId! }),
     enabled: !!aiAgentId,
   });
 }
@@ -25,8 +25,8 @@ export function usePipelinesByAgent(aiAgentId: string | undefined) {
 export function useCreatePipeline() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof trpc.aiPipelines.create.mutate>[0]) =>
-      trpc.aiPipelines.create.mutate(input),
+    mutationFn: (input: Parameters<typeof trpcClient.aiPipelines.create.mutate>[0]) =>
+      trpcClient.aiPipelines.create.mutate(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['aiPipelines'] });
     },
@@ -36,8 +36,8 @@ export function useCreatePipeline() {
 export function useUpdatePipeline() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof trpc.aiPipelines.update.mutate>[0]) =>
-      trpc.aiPipelines.update.mutate(input),
+    mutationFn: (input: Parameters<typeof trpcClient.aiPipelines.update.mutate>[0]) =>
+      trpcClient.aiPipelines.update.mutate(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['aiPipelines'] });
     },
@@ -47,7 +47,7 @@ export function useUpdatePipeline() {
 export function useDeletePipeline() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (pipelineId: string) => trpc.aiPipelines.delete.mutate({ pipelineId }),
+    mutationFn: (pipelineId: string) => trpcClient.aiPipelines.delete.mutate({ pipelineId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['aiPipelines'] });
     },
@@ -59,8 +59,10 @@ export function useDeletePipeline() {
 export function useRunPipeline() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { pipelineId: string; overrides?: Record<string, unknown> }) =>
-      trpc.aiPipelines.run.mutate(input),
+    mutationFn: (input: {
+      pipelineId: string;
+      overrides?: Record<string, string | number | boolean | null>;
+    }) => trpcClient.aiPipelines.run.mutate(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['aiPipelines', 'runs'] });
     },
@@ -70,7 +72,7 @@ export function useRunPipeline() {
 export function usePipelineRun(runId: string | undefined) {
   return useQuery({
     queryKey: ['aiPipelines', 'run', runId],
-    queryFn: () => trpc.aiPipelines.getRun.query({ runId: runId! }),
+    queryFn: () => trpcClient.aiPipelines.getRun.query({ runId: runId! }),
     enabled: !!runId,
     refetchInterval: (query) => {
       // Auto-poll while running
@@ -83,7 +85,7 @@ export function usePipelineRun(runId: string | undefined) {
 export function usePipelineRuns(pipelineId: string | undefined, limit: number = 20) {
   return useQuery({
     queryKey: ['aiPipelines', 'runs', pipelineId, limit],
-    queryFn: () => trpc.aiPipelines.listRuns.query({ pipelineId: pipelineId!, limit }),
+    queryFn: () => trpcClient.aiPipelines.listRuns.query({ pipelineId: pipelineId!, limit }),
     enabled: !!pipelineId,
   });
 }

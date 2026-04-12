@@ -30,7 +30,7 @@ graph TD
 
     WEB -->|tRPC over HTTP| SERVER
     WEB -->|GraphQL| INDEXER
-    WEB -->|wagmi + RainbowKit| SEPOLIA
+    WEB -->|wagmi + Dynamic Labs| SEPOLIA
 
     SERVER --> FIREBASE
     SERVER --> FAL
@@ -64,11 +64,11 @@ See [docs/agents.md](agents.md) for full documentation.
 sequenceDiagram
     participant User
     participant Web as Web App
-    participant Wallet as CDP Embedded Wallet
+    participant Wallet as Dynamic Labs Wallet
     participant Server as API Server
 
-    User->>Web: Sign in (Google/Apple/passkeys/email)
-    Web->>Wallet: Connect via CDP Embedded Wallet
+    User->>Web: Connect wallet (MetaMask, WalletConnect, etc.)
+    Web->>Wallet: Connect via Dynamic Labs
     Wallet-->>Web: Wallet address (0x...)
     Web->>Wallet: Sign SIWE message
     Wallet-->>Web: Signature
@@ -169,15 +169,15 @@ _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved
 
 **Entry point:** `apps/web/src/main.tsx`
 
-| Layer         | Technology               | Purpose                                    |
-| ------------- | ------------------------ | ------------------------------------------ |
-| Bundler       | Vite                     | Dev server (port 3001), build              |
-| Routing       | TanStack Router          | File-based routing (`src/routes/`)         |
-| Data Fetching | TanStack Query + tRPC    | Server state management                    |
-| Web3          | wagmi + RainbowKit       | Wallet connection, contract interaction    |
-| Auth          | CDP Wallet + SIWE        | Wallet-based authentication (social login) |
-| UI            | Tailwind CSS + shadcn/ui | Component library                          |
-| Flow Editor   | ReactFlow                | Narrative node visualization               |
+| Layer         | Technology               | Purpose                                 |
+| ------------- | ------------------------ | --------------------------------------- |
+| Bundler       | Vite                     | Dev server (port 3001), build           |
+| Routing       | TanStack Router          | File-based routing (`src/routes/`)      |
+| Data Fetching | TanStack Query + tRPC    | Server state management                 |
+| Web3          | wagmi + Dynamic Labs     | Wallet connection, contract interaction |
+| Auth          | Dynamic Labs + SIWE      | Wallet-based authentication             |
+| UI            | Tailwind CSS + shadcn/ui | Component library                       |
+| Flow Editor   | ReactFlow                | Narrative node visualization            |
 
 ### Route Map
 

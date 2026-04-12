@@ -26,7 +26,7 @@ The result: money that should be moving is not. The platform has at least seven 
 
 ## Vision
 
-Open a universe on mobile. See its storefront. Buy what you want — episode NFT, subscription, merch, canon license, ad slot — in under three taps with your CDP embedded wallet. As a creator, open your Seller Hub and see: total earned this month, breakdown by stream, pending payouts, one-tap listing tools, and your sponsor inbox. Both sides of the market live in one app. Neither requires a desktop.
+Open a universe on mobile. See its storefront. Buy what you want — episode NFT, subscription, merch, canon license, ad slot — in under three taps with your connected wallet. As a creator, open your Seller Hub and see: total earned this month, breakdown by stream, pending payouts, one-tap listing tools, and your sponsor inbox. Both sides of the market live in one app. Neither requires a desktop.
 
 ---
 
@@ -36,7 +36,7 @@ Open a universe on mobile. See its storefront. Buy what you want — episode NFT
 Building a narrative universe on LOAR. Primarily on mobile. Posts updates, manages listings, responds to collab proposals, and checks earnings while commuting. Cannot be asked to open a laptop to list an NFT or see their revenue.
 
 **Primary buyer persona — narrative fan ("The Collector"):**
-Discovered a universe through social, Workstream 2 explore feed, or word of mouth. Wants to own a piece of it. Has a CDP wallet or can create one in-app. Comfortable spending ETH in small amounts. Does not need to understand Web3 to complete a purchase.
+Discovered a universe through social, Workstream 2 explore feed, or word of mouth. Wants to own a piece of it. Has a connected wallet or can create one in-app. Comfortable spending ETH in small amounts. Does not need to understand Web3 to complete a purchase.
 
 **Secondary buyer persona — brand sponsor ("The Sponsor"):**
 Marketing team for a brand. Looking for niche narrative audiences on emerging platforms. Wants to place a product, character, or audio mention inside a specific universe. Needs to browse available ad slots, understand the audience size, submit a bid, and receive a pitch-ready impression report.
@@ -48,15 +48,15 @@ Has an established universe and wants to expand by bringing in guest creators. N
 
 ## Success Metrics
 
-| Metric | Target (90 days post-launch) |
-|--------|------------------------------|
-| Creators who view Seller Hub at least once per week | >60% of active creators |
-| Average time from "open universe storefront" to completed purchase | <90 seconds |
-| Completed NFT mint transactions via mobile (not web) | >40% of total mints |
-| Creator subscription tier configuration rate | >50% of universe owners configure at least one paid tier |
-| Sponsor bids submitted via mobile ad slot browser | >10 per month |
-| Open collab calls with at least one applicant | >20 per month |
-| Creator payout awareness (viewed earnings at least once) | >80% of earners |
+| Metric                                                             | Target (90 days post-launch)                             |
+| ------------------------------------------------------------------ | -------------------------------------------------------- |
+| Creators who view Seller Hub at least once per week                | >60% of active creators                                  |
+| Average time from "open universe storefront" to completed purchase | <90 seconds                                              |
+| Completed NFT mint transactions via mobile (not web)               | >40% of total mints                                      |
+| Creator subscription tier configuration rate                       | >50% of universe owners configure at least one paid tier |
+| Sponsor bids submitted via mobile ad slot browser                  | >10 per month                                            |
+| Open collab calls with at least one applicant                      | >20 per month                                            |
+| Creator payout awareness (viewed earnings at least once)           | >80% of earners                                          |
 
 ---
 
@@ -98,7 +98,7 @@ The Market tab in the mobile app is split into two perspectives, toggled at the 
 
 The Buy perspective is universe-centric. A universe's storefront is the primary unit of commerce. A fan arrives at a storefront either from the Explore tab (Workstream 2) or from a direct share link. Every monetization option the creator has configured is presented on one scrollable page, organized in sections. Nothing is hidden behind tabs. If a section is empty (no subscription tiers configured, no merch listed), it is omitted rather than shown empty.
 
-The purchase flow is three steps for every item type: (1) item detail sheet slides up, (2) confirm + sign with CDP wallet, (3) success screen with share prompt. Gas is shown in ETH and approximate USD. If the user's balance is insufficient, the flow surfaces a fiat on-ramp placeholder ("Add funds — coming soon").
+The purchase flow is three steps for every item type: (1) item detail sheet slides up, (2) confirm + sign with connected wallet, (3) success screen with share prompt. Gas is shown in ETH and approximate USD. If the user's balance is insufficient, the flow surfaces a fiat on-ramp placeholder ("Add funds — coming soon").
 
 ### Sell perspective
 
@@ -290,7 +290,7 @@ The existing `collabs.propose` is a direct proposal — you must know the collab
 - **Navigation:** Expo Router (file-based, mirrors TanStack Router conventions from the web app)
 - **State / data fetching:** TanStack Query — same query keys and cache invalidation logic as the web app where endpoints are shared
 - **tRPC client:** `@trpc/react-query` — reuse `apps/web/src/utils/trpc.ts` pattern, extract to a shared `packages/trpc-client` package (or duplicate and keep in sync until package extraction is prioritized)
-- **Auth:** CDP Embedded Wallet (same SIWE JWT flow as web app — `useWalletAuth` hook adapted for React Native). CDP's React Native SDK or a WebView bridge for the embedded wallet modal.
+- **Auth:** Dynamic Labs wallet (same SIWE JWT flow as web app — `useWalletAuth` hook adapted for React Native). Dynamic's React Native SDK or a WebView bridge for the wallet modal.
 - **Contracts:** wagmi — confirm React Native compatibility; fallback to `viem` direct calls if wagmi's React hooks don't support RN. Contract ABIs from `packages/abis`.
 - **Charts:** `react-native-gifted-charts` — lightweight, no native dependencies beyond React Native core
 - **File handling:** `expo-document-picker` for merch image uploads, `expo-sharing` for sponsor pitch card export
@@ -300,67 +300,67 @@ The existing `collabs.propose` is a direct proposal — you must know the collab
 
 The following tRPC procedures are called exactly as-is from the mobile client. No backend changes required for these paths:
 
-| Procedure | Used in |
-|-----------|---------|
-| `nft.createEpisodeListing` | FR-2.1 |
-| `nft.deactivateEpisode` | FR-2.3 |
-| `nft.getEpisodesByUniverse` | FR-1.3, FR-2.3 |
-| `nft.recordMint` | FR-1.3 |
-| `nft.getCharactersByUniverse` | FR-3.2 |
-| `nft.createCharacterNFT` | FR-3.1 |
-| `subscriptions.configureTier` | FR-4.1 |
-| `subscriptions.getTiers` | FR-1.4, FR-4.3 |
-| `subscriptions.getUniverseStats` | FR-4.2 |
-| `subscriptions.subscribe` | FR-4.3 |
-| `subscriptions.cancel` | FR-4.3 |
-| `subscriptions.hasAccess` | FR-4.4 |
-| `subscriptions.mySubscriptions` | FR-4.3 |
-| `licensing.createMerch` | FR-5.1 |
-| `licensing.getMerch` | FR-1.5 |
-| `licensing.getOrders` | FR-5.2 |
-| `licensing.purchaseMerch` | FR-1.5 |
-| `licensing.myMerch` | FR-5.2 |
-| `licensing.recordRoyalty` | FR-5.4 (server-side) |
-| `licensing.createLicense` | FR-7.2 |
-| `licensing.activateLicense` | FR-7.3 |
-| `licensing.getLicenses` | FR-7 |
-| `marketplace.submit` | FR-6.1 |
-| `marketplace.vote` | FR-6.2 |
-| `marketplace.finalize` | FR-6.3 |
-| `marketplace.licenseCanon` | FR-6.4 |
-| `marketplace.getByUniverse` | FR-6 |
-| `marketplace.getCanon` | FR-1.6 |
-| `marketplace.getSubmission` | FR-6.5 |
-| `marketplace.getVotes` | FR-6.2 |
-| `marketplace.getPlatformFee` | FR-6.4 |
-| `marketplace.mySubmissions` | FR-6.5 |
-| `ads.createSlot` | FR-8.1 |
-| `ads.getBids` | FR-8.2 |
-| `ads.acceptBid` | FR-8.2 |
-| `ads.placeBid` | FR-8.3 |
-| `ads.recordImpression` | background, server-side |
-| `ads.getSlotsByUniverse` | FR-1.8, FR-8.3 |
-| `ads.getSponsorships` | FR-8.5 |
-| `ads.mySponsorships` | FR-8.5 |
-| `collabs.propose` | FR-9.4 |
-| `collabs.accept` | FR-9.5 |
-| `collabs.activate` | FR-9.5 |
-| `collabs.complete` | FR-9.5 |
-| `collabs.cancel` | FR-9.5 |
-| `collabs.getByUniverse` | FR-9.6 |
-| `collabs.getCollab` | FR-9.6 |
-| `collabs.getEpisodes` | FR-9.6 |
-| `collabs.recordEpisode` | FR-9.5 |
-| `collabs.myCollabs` | FR-9.6 |
-| `universeTreasury.getPoolBalance` | FR-10.5 |
-| `universeTreasury.getPoolHistory` | FR-10 |
-| `analytics.getUniverseMetrics` | FR-12.1 |
-| `analytics.getEpisodeMetrics` | FR-12.2 |
-| `analytics.getRecentActivity` | FR-10.4 |
-| `analytics.getTrending` | FR-12.3 |
-| `analytics.exportUniverseData` | FR-10.6 |
-| `credits.getBalance` | Seller Hub sidebar |
-| `profiles.getByUid` | Storefront creator card |
+| Procedure                         | Used in                 |
+| --------------------------------- | ----------------------- |
+| `nft.createEpisodeListing`        | FR-2.1                  |
+| `nft.deactivateEpisode`           | FR-2.3                  |
+| `nft.getEpisodesByUniverse`       | FR-1.3, FR-2.3          |
+| `nft.recordMint`                  | FR-1.3                  |
+| `nft.getCharactersByUniverse`     | FR-3.2                  |
+| `nft.createCharacterNFT`          | FR-3.1                  |
+| `subscriptions.configureTier`     | FR-4.1                  |
+| `subscriptions.getTiers`          | FR-1.4, FR-4.3          |
+| `subscriptions.getUniverseStats`  | FR-4.2                  |
+| `subscriptions.subscribe`         | FR-4.3                  |
+| `subscriptions.cancel`            | FR-4.3                  |
+| `subscriptions.hasAccess`         | FR-4.4                  |
+| `subscriptions.mySubscriptions`   | FR-4.3                  |
+| `licensing.createMerch`           | FR-5.1                  |
+| `licensing.getMerch`              | FR-1.5                  |
+| `licensing.getOrders`             | FR-5.2                  |
+| `licensing.purchaseMerch`         | FR-1.5                  |
+| `licensing.myMerch`               | FR-5.2                  |
+| `licensing.recordRoyalty`         | FR-5.4 (server-side)    |
+| `licensing.createLicense`         | FR-7.2                  |
+| `licensing.activateLicense`       | FR-7.3                  |
+| `licensing.getLicenses`           | FR-7                    |
+| `marketplace.submit`              | FR-6.1                  |
+| `marketplace.vote`                | FR-6.2                  |
+| `marketplace.finalize`            | FR-6.3                  |
+| `marketplace.licenseCanon`        | FR-6.4                  |
+| `marketplace.getByUniverse`       | FR-6                    |
+| `marketplace.getCanon`            | FR-1.6                  |
+| `marketplace.getSubmission`       | FR-6.5                  |
+| `marketplace.getVotes`            | FR-6.2                  |
+| `marketplace.getPlatformFee`      | FR-6.4                  |
+| `marketplace.mySubmissions`       | FR-6.5                  |
+| `ads.createSlot`                  | FR-8.1                  |
+| `ads.getBids`                     | FR-8.2                  |
+| `ads.acceptBid`                   | FR-8.2                  |
+| `ads.placeBid`                    | FR-8.3                  |
+| `ads.recordImpression`            | background, server-side |
+| `ads.getSlotsByUniverse`          | FR-1.8, FR-8.3          |
+| `ads.getSponsorships`             | FR-8.5                  |
+| `ads.mySponsorships`              | FR-8.5                  |
+| `collabs.propose`                 | FR-9.4                  |
+| `collabs.accept`                  | FR-9.5                  |
+| `collabs.activate`                | FR-9.5                  |
+| `collabs.complete`                | FR-9.5                  |
+| `collabs.cancel`                  | FR-9.5                  |
+| `collabs.getByUniverse`           | FR-9.6                  |
+| `collabs.getCollab`               | FR-9.6                  |
+| `collabs.getEpisodes`             | FR-9.6                  |
+| `collabs.recordEpisode`           | FR-9.5                  |
+| `collabs.myCollabs`               | FR-9.6                  |
+| `universeTreasury.getPoolBalance` | FR-10.5                 |
+| `universeTreasury.getPoolHistory` | FR-10                   |
+| `analytics.getUniverseMetrics`    | FR-12.1                 |
+| `analytics.getEpisodeMetrics`     | FR-12.2                 |
+| `analytics.getRecentActivity`     | FR-10.4                 |
+| `analytics.getTrending`           | FR-12.3                 |
+| `analytics.exportUniverseData`    | FR-10.6                 |
+| `credits.getBalance`              | Seller Hub sidebar      |
+| `profiles.getByUid`               | Storefront creator card |
 
 ### New Backend Work Required
 
@@ -375,14 +375,16 @@ The following endpoints do not exist and must be built. These are listed in depe
 **Procedure type:** `protectedProcedure` — scoped to authenticated user
 
 **Input:**
+
 ```ts
 z.object({
   universeId: z.string(),
   range: z.enum(['7d', '30d', '90d', 'all']).default('30d'),
-})
+});
 ```
 
 **Output:** Aggregated earnings object:
+
 ```ts
 {
   totalEthWei: string,
@@ -415,14 +417,16 @@ z.object({
 **Procedure type:** `protectedProcedure` (seller) and `publicProcedure` (for sponsor pitch card share link)
 
 **Input:**
+
 ```ts
 z.object({
   slotId: z.string(),
   range: z.enum(['7d', '30d', '90d', 'all']).default('30d'),
-})
+});
 ```
 
 **Output:**
+
 ```ts
 {
   slotId: string,
@@ -444,30 +448,33 @@ z.object({
 **Location:** `apps/server/src/routers/licensing/licensing.routes.ts`
 
 **`requestLicense` — protectedProcedure:**
+
 ```ts
 z.object({
   universeId: z.string(),
   intendedUse: z.enum(['streaming', 'merch', 'gaming', 'comic', 'audio', 'other']),
   territory: z.string().max(200),
-  proposedTerm: z.string().max(200),  // e.g. "12 months", "perpetual"
-  proposedFeeEth: z.string(),          // decimal string, e.g. "0.5"
+  proposedTerm: z.string().max(200), // e.g. "12 months", "perpetual"
+  proposedFeeEth: z.string(), // decimal string, e.g. "0.5"
   message: z.string().max(1000).optional(),
-})
+});
 ```
 
 Creates a document in a new `licenseRequests` Firestore collection with status `pending`. Notifies the universe creator (write to a notifications collection or trigger a push notification via NEW-5).
 
 **`getLicenseRequests` — protectedProcedure:**
+
 ```ts
 z.object({
   universeId: z.string(),
   status: z.enum(['pending', 'countered', 'accepted', 'rejected', 'all']).default('pending'),
-})
+});
 ```
 
 Returns requests where the authenticated user is the universe creator. Adds `creatorUid` check.
 
 **`respondToLicenseRequest` — protectedProcedure:**
+
 ```ts
 z.object({
   requestId: z.string(),
@@ -486,21 +493,23 @@ On `accept`: calls through to `createLicense` logic internally, marks request as
 **Location:** New file `apps/server/src/routers/tips/tips.routes.ts`
 
 **`recordTip` — protectedProcedure:**
+
 ```ts
 z.object({
   universeId: z.string(),
-  creatorAddress: z.string(),   // recipient wallet, verified against universe owner
+  creatorAddress: z.string(), // recipient wallet, verified against universe owner
   amountWei: z.string(),
   txHash: z.string(),
   message: z.string().max(140).optional(),
-})
+});
 ```
 
 Writes to a `tipRecords` Firestore collection. Verifies that `creatorAddress` matches the universe's owner address (prevents misdirected tip records). Updates the `creatorEarnings` summary document (see NEW-1). Triggers a push notification to the creator (see NEW-5).
 
 **`getByUniverse` — protectedProcedure (creator-only view):**
+
 ```ts
-z.object({ universeId: z.string(), limit: z.number().default(50) })
+z.object({ universeId: z.string(), limit: z.number().default(50) });
 ```
 
 Returns tip records for the universe ordered by `createdAt` desc. Only accessible to the universe owner.
@@ -514,46 +523,50 @@ Returns tip records for the universe ordered by `createdAt` desc. Only accessibl
 **Location:** `apps/server/src/routers/collabs/collabs.routes.ts`
 
 **`createOpenCall` — protectedProcedure:**
+
 ```ts
 z.object({
   universeId: z.string(),
   title: z.string().min(1).max(200),
   description: z.string().min(10).max(2000),
   role: z.enum(['writer', 'artist', 'voice_actor', 'worldbuilder', 'other']),
-  revSplitBps: z.number().min(100).max(5000),  // 1%–50% to collaborator
+  revSplitBps: z.number().min(100).max(5000), // 1%–50% to collaborator
   episodeCount: z.number().min(1),
-  deadline: z.string(),  // ISO date
-})
+  deadline: z.string(), // ISO date
+});
 ```
 
 Writes to new `collabOpenCalls` collection with status `open`.
 
 **`listOpenCalls` — publicProcedure:**
+
 ```ts
 z.object({
   role: z.enum(['writer', 'artist', 'voice_actor', 'worldbuilder', 'other']).optional(),
   minRevSplitBps: z.number().optional(),
   limit: z.number().min(1).max(50).default(20),
-  cursor: z.string().optional(),   // Firestore pagination cursor
-})
+  cursor: z.string().optional(), // Firestore pagination cursor
+});
 ```
 
 Returns open calls ordered by `createdAt` desc. Filters by role and minimum rev split if provided. Deadline must be in the future (server-side filter).
 
 **`applyToCall` — protectedProcedure:**
+
 ```ts
 z.object({
   callId: z.string(),
   message: z.string().max(1000),
   portfolioUrl: z.string().url().optional(),
-})
+});
 ```
 
 Writes to new `collabApplications` collection. One application per user per call (duplicate check). Notifies call creator.
 
 **`getApplications` — protectedProcedure:**
+
 ```ts
-z.object({ callId: z.string() })
+z.object({ callId: z.string() });
 ```
 
 Returns applications for a call. Verified that authenticated user owns the universe the call belongs to.
@@ -568,15 +581,15 @@ Not a tRPC procedure — a server-side utility called by mutation handlers.
 
 When the following events occur, a push notification is dispatched to the relevant user's registered Expo push token (stored in a `pushTokens/{uid}` Firestore document when the user grants notification permission in the mobile app):
 
-| Event | Recipient | Message |
-|-------|-----------|---------|
-| Tip received | Creator | "[address] tipped [amount] ETH" |
-| License request received | Creator | "[address] requested a license for [universe]" |
-| License response received | Requester | "Creator responded to your license request" |
-| Ad bid received | Creator | "[brand] placed a [amount] ETH bid on your [slot type] slot" |
-| Collab application received | Call creator | "New applicant for your [role] collab call" |
-| Collab application accepted | Applicant | "Your collab application was accepted" |
-| Canon submission finalized | Submitter | "Your submission was [ACCEPTED/REJECTED]" |
+| Event                       | Recipient    | Message                                                      |
+| --------------------------- | ------------ | ------------------------------------------------------------ |
+| Tip received                | Creator      | "[address] tipped [amount] ETH"                              |
+| License request received    | Creator      | "[address] requested a license for [universe]"               |
+| License response received   | Requester    | "Creator responded to your license request"                  |
+| Ad bid received             | Creator      | "[brand] placed a [amount] ETH bid on your [slot type] slot" |
+| Collab application received | Call creator | "New applicant for your [role] collab call"                  |
+| Collab application accepted | Applicant    | "Your collab application was accepted"                       |
+| Canon submission finalized  | Submitter    | "Your submission was [ACCEPTED/REJECTED]"                    |
 
 Uses Expo Push Notification API (`https://exp.host/--/api/v2/push/send`). Dispatch is fire-and-forget (non-fatal failure). Token registration endpoint: `notifications.registerToken` (simple write to `pushTokens` collection; no business logic).
 
@@ -586,21 +599,21 @@ Uses Expo Push Notification API (`https://exp.host/--/api/v2/push/send`). Dispat
 
 #### New Firestore Collections
 
-| Collection | Written by | Read by |
-|------------|-----------|---------|
-| `tipRecords` | `tips.recordTip` | `tips.getByUniverse`, `seller.getEarningsSummary` |
-| `creatorEarnings` | All payment mutations (updated inline) | `seller.getEarningsSummary` |
-| `licenseRequests` | `licensing.requestLicense` | `licensing.getLicenseRequests`, `licensing.respondToLicenseRequest` |
-| `collabOpenCalls` | `collabs.createOpenCall` | `collabs.listOpenCalls` |
-| `collabApplications` | `collabs.applyToCall` | `collabs.getApplications` |
-| `pushTokens` | `notifications.registerToken` | notification dispatch service |
+| Collection           | Written by                             | Read by                                                             |
+| -------------------- | -------------------------------------- | ------------------------------------------------------------------- |
+| `tipRecords`         | `tips.recordTip`                       | `tips.getByUniverse`, `seller.getEarningsSummary`                   |
+| `creatorEarnings`    | All payment mutations (updated inline) | `seller.getEarningsSummary`                                         |
+| `licenseRequests`    | `licensing.requestLicense`             | `licensing.getLicenseRequests`, `licensing.respondToLicenseRequest` |
+| `collabOpenCalls`    | `collabs.createOpenCall`               | `collabs.listOpenCalls`                                             |
+| `collabApplications` | `collabs.applyToCall`                  | `collabs.getApplications`                                           |
+| `pushTokens`         | `notifications.registerToken`          | notification dispatch service                                       |
 
 #### Modified Collections / Documents
 
-| Collection | Change |
-|------------|--------|
-| `adImpressions` | Add `episodeId` field (new field on `ads.recordImpression` input) |
-| `subscriptionRevenue` | Add `creatorUid` field for earnings aggregation query (was implicit via `universeId`) |
+| Collection              | Change                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `adImpressions`         | Add `episodeId` field (new field on `ads.recordImpression` input)                               |
+| `subscriptionRevenue`   | Add `creatorUid` field for earnings aggregation query (was implicit via `universeId`)           |
 | `sponsorships` (active) | Add `impressionCount` denormalized field, updated by `ads.recordImpression` server-side trigger |
 
 #### No Schema Migrations Required for Existing Collections
@@ -615,74 +628,74 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 
 ### Buy-side screens
 
-| Screen | Route | Primary data |
-|--------|-------|-------------|
-| Market home (Buy toggle) | `/market/` | `analytics.getTrending`, `nft.getEpisodesByUniverse` (featured) |
-| Universe Storefront | `/market/universe/[universeId]` | Multiple — see FR-1 |
-| Episode NFT detail + mint | `/market/universe/[universeId]/episode/[episodeId]` | `nft.getEpisodesByUniverse` |
-| Character NFT detail + mint | `/market/universe/[universeId]/character/[characterId]` | `nft.getCharactersByUniverse` |
-| Subscription tiers + subscribe | `/market/universe/[universeId]/subscribe` | `subscriptions.getTiers` |
-| Merch item detail + buy | `/market/universe/[universeId]/merch/[itemId]` | `licensing.getMerch` |
-| Canon submission detail + vote | `/market/universe/[universeId]/canon/[submissionId]` | `marketplace.getSubmission`, `marketplace.getVotes` |
-| License canon flow | `/market/universe/[universeId]/canon/[submissionId]/license` | `marketplace.getPlatformFee` |
-| Request IP license form | `/market/universe/[universeId]/license-request` | `licensing.requestLicense` (new) |
-| Ad slot browser | `/market/universe/[universeId]/sponsor` | `ads.getSlotsByUniverse` |
-| Place ad bid form | `/market/universe/[universeId]/sponsor/[slotId]/bid` | `ads.placeBid` |
-| Collab feed (open calls) | `/market/collabs` | `collabs.listOpenCalls` (new) |
-| Collab call detail + apply | `/market/collabs/[callId]` | `collabs.applyToCall` (new) |
-| My purchased NFTs | `/market/my/nfts` | `nft.getEpisodesByUniverse` filtered by owner wallet |
-| My subscriptions | `/market/my/subscriptions` | `subscriptions.mySubscriptions` |
-| My collab applications | `/market/my/collabs` | `collabs.myCollabs` |
-| My active sponsorships | `/market/my/sponsorships` | `ads.mySponsorships` |
-| My licenses (as licensee) | `/market/my/licenses` | `licensing.getLicenses` |
-| Tip confirmation sheet | (bottom sheet, modal) | `tips.recordTip` (new) |
+| Screen                         | Route                                                        | Primary data                                                    |
+| ------------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Market home (Buy toggle)       | `/market/`                                                   | `analytics.getTrending`, `nft.getEpisodesByUniverse` (featured) |
+| Universe Storefront            | `/market/universe/[universeId]`                              | Multiple — see FR-1                                             |
+| Episode NFT detail + mint      | `/market/universe/[universeId]/episode/[episodeId]`          | `nft.getEpisodesByUniverse`                                     |
+| Character NFT detail + mint    | `/market/universe/[universeId]/character/[characterId]`      | `nft.getCharactersByUniverse`                                   |
+| Subscription tiers + subscribe | `/market/universe/[universeId]/subscribe`                    | `subscriptions.getTiers`                                        |
+| Merch item detail + buy        | `/market/universe/[universeId]/merch/[itemId]`               | `licensing.getMerch`                                            |
+| Canon submission detail + vote | `/market/universe/[universeId]/canon/[submissionId]`         | `marketplace.getSubmission`, `marketplace.getVotes`             |
+| License canon flow             | `/market/universe/[universeId]/canon/[submissionId]/license` | `marketplace.getPlatformFee`                                    |
+| Request IP license form        | `/market/universe/[universeId]/license-request`              | `licensing.requestLicense` (new)                                |
+| Ad slot browser                | `/market/universe/[universeId]/sponsor`                      | `ads.getSlotsByUniverse`                                        |
+| Place ad bid form              | `/market/universe/[universeId]/sponsor/[slotId]/bid`         | `ads.placeBid`                                                  |
+| Collab feed (open calls)       | `/market/collabs`                                            | `collabs.listOpenCalls` (new)                                   |
+| Collab call detail + apply     | `/market/collabs/[callId]`                                   | `collabs.applyToCall` (new)                                     |
+| My purchased NFTs              | `/market/my/nfts`                                            | `nft.getEpisodesByUniverse` filtered by owner wallet            |
+| My subscriptions               | `/market/my/subscriptions`                                   | `subscriptions.mySubscriptions`                                 |
+| My collab applications         | `/market/my/collabs`                                         | `collabs.myCollabs`                                             |
+| My active sponsorships         | `/market/my/sponsorships`                                    | `ads.mySponsorships`                                            |
+| My licenses (as licensee)      | `/market/my/licenses`                                        | `licensing.getLicenses`                                         |
+| Tip confirmation sheet         | (bottom sheet, modal)                                        | `tips.recordTip` (new)                                          |
 
 ### Sell-side screens
 
-| Screen | Route | Primary data |
-|--------|-------|-------------|
-| Seller Hub (earnings dashboard) | `/market/sell/[universeId]` | `seller.getEarningsSummary` (new) |
-| Episode NFT management | `/market/sell/[universeId]/episodes` | `nft.getEpisodesByUniverse` |
-| Create/edit NFT listing | `/market/sell/[universeId]/episodes/[episodeId]/list` | `nft.createEpisodeListing` |
-| Bulk episode listing | `/market/sell/[universeId]/episodes/bulk-list` | `nft.createEpisodeListing` (batched) |
-| Character NFT management | `/market/sell/[universeId]/characters` | `nft.getCharactersByUniverse` |
-| Create character NFT | `/market/sell/[universeId]/characters/create` | `nft.createCharacterNFT` |
-| Subscription tier config | `/market/sell/[universeId]/subscriptions` | `subscriptions.configureTier`, `subscriptions.getUniverseStats` |
-| Merch management | `/market/sell/[universeId]/merch` | `licensing.myMerch`, `licensing.getOrders` |
-| Create merch item | `/market/sell/[universeId]/merch/create` | `licensing.createMerch` |
-| Canon management + finalize | `/market/sell/[universeId]/canon` | `marketplace.getByUniverse`, `marketplace.finalize` |
-| Ad slot manager | `/market/sell/[universeId]/ads` | `ads.getSlotsByUniverse`, `ads.getBids` |
-| Create ad slot | `/market/sell/[universeId]/ads/create` | `ads.createSlot` |
-| Sponsor inbox (bid review) | `/market/sell/[universeId]/ads/[slotId]/bids` | `ads.getBids`, `ads.acceptBid` |
-| Impression report + pitch card | `/market/sell/[universeId]/ads/[slotId]/impressions` | `ads.getImpressions` (new) |
-| License request inbox | `/market/sell/[universeId]/license-requests` | `licensing.getLicenseRequests` (new) |
-| License request detail + respond | `/market/sell/[universeId]/license-requests/[requestId]` | `licensing.respondToLicenseRequest` (new) |
-| Collab management | `/market/sell/[universeId]/collabs` | `collabs.getByUniverse`, `collabs.myCollabs` |
-| Post open collab call | `/market/sell/[universeId]/collabs/open-call` | `collabs.createOpenCall` (new) |
-| Collab applications inbox | `/market/sell/[universeId]/collabs/[callId]/applications` | `collabs.getApplications` (new) |
-| Analytics overview | `/market/sell/[universeId]/analytics` | `analytics.getUniverseMetrics`, `analytics.getTrending` |
-| Episode analytics | `/market/sell/[universeId]/analytics/episodes/[episodeId]` | `analytics.getEpisodeMetrics` |
-| Earnings export | `/market/sell/[universeId]/analytics/export` | `analytics.exportUniverseData` |
-| Tips received | `/market/sell/[universeId]/tips` | `tips.getByUniverse` (new) |
-| Pending payouts | `/market/sell/[universeId]/payouts` | `universeTreasury.getPoolBalance`, `collabs.getByUniverse` |
+| Screen                           | Route                                                      | Primary data                                                    |
+| -------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
+| Seller Hub (earnings dashboard)  | `/market/sell/[universeId]`                                | `seller.getEarningsSummary` (new)                               |
+| Episode NFT management           | `/market/sell/[universeId]/episodes`                       | `nft.getEpisodesByUniverse`                                     |
+| Create/edit NFT listing          | `/market/sell/[universeId]/episodes/[episodeId]/list`      | `nft.createEpisodeListing`                                      |
+| Bulk episode listing             | `/market/sell/[universeId]/episodes/bulk-list`             | `nft.createEpisodeListing` (batched)                            |
+| Character NFT management         | `/market/sell/[universeId]/characters`                     | `nft.getCharactersByUniverse`                                   |
+| Create character NFT             | `/market/sell/[universeId]/characters/create`              | `nft.createCharacterNFT`                                        |
+| Subscription tier config         | `/market/sell/[universeId]/subscriptions`                  | `subscriptions.configureTier`, `subscriptions.getUniverseStats` |
+| Merch management                 | `/market/sell/[universeId]/merch`                          | `licensing.myMerch`, `licensing.getOrders`                      |
+| Create merch item                | `/market/sell/[universeId]/merch/create`                   | `licensing.createMerch`                                         |
+| Canon management + finalize      | `/market/sell/[universeId]/canon`                          | `marketplace.getByUniverse`, `marketplace.finalize`             |
+| Ad slot manager                  | `/market/sell/[universeId]/ads`                            | `ads.getSlotsByUniverse`, `ads.getBids`                         |
+| Create ad slot                   | `/market/sell/[universeId]/ads/create`                     | `ads.createSlot`                                                |
+| Sponsor inbox (bid review)       | `/market/sell/[universeId]/ads/[slotId]/bids`              | `ads.getBids`, `ads.acceptBid`                                  |
+| Impression report + pitch card   | `/market/sell/[universeId]/ads/[slotId]/impressions`       | `ads.getImpressions` (new)                                      |
+| License request inbox            | `/market/sell/[universeId]/license-requests`               | `licensing.getLicenseRequests` (new)                            |
+| License request detail + respond | `/market/sell/[universeId]/license-requests/[requestId]`   | `licensing.respondToLicenseRequest` (new)                       |
+| Collab management                | `/market/sell/[universeId]/collabs`                        | `collabs.getByUniverse`, `collabs.myCollabs`                    |
+| Post open collab call            | `/market/sell/[universeId]/collabs/open-call`              | `collabs.createOpenCall` (new)                                  |
+| Collab applications inbox        | `/market/sell/[universeId]/collabs/[callId]/applications`  | `collabs.getApplications` (new)                                 |
+| Analytics overview               | `/market/sell/[universeId]/analytics`                      | `analytics.getUniverseMetrics`, `analytics.getTrending`         |
+| Episode analytics                | `/market/sell/[universeId]/analytics/episodes/[episodeId]` | `analytics.getEpisodeMetrics`                                   |
+| Earnings export                  | `/market/sell/[universeId]/analytics/export`               | `analytics.exportUniverseData`                                  |
+| Tips received                    | `/market/sell/[universeId]/tips`                           | `tips.getByUniverse` (new)                                      |
+| Pending payouts                  | `/market/sell/[universeId]/payouts`                        | `universeTreasury.getPoolBalance`, `collabs.getByUniverse`      |
 
 ---
 
 ## Dependencies
 
-| Dependency | Owner | Blocking |
-|------------|-------|---------|
-| CDP Embedded Wallet React Native SDK (or WebView bridge) | Coinbase/external | Auth flow, all wallet transactions |
-| `packages/abis` current build (EpisodeNFT.sol, CharacterNFT.sol, Universe.sol ABIs) | Internal (contracts team) | All on-chain write actions |
-| wagmi RN compatibility or viem fallback decision | Internal (client team) | All on-chain reads/writes |
-| NEW-1 `seller.getEarningsSummary` | Internal (backend team) | Seller Hub headline — cannot ship Seller Hub without this |
-| NEW-2 `ads.getImpressions` | Internal (backend team) | Sponsor pitch card, impression report |
-| NEW-3 `licensing.requestLicense` / `getLicenseRequests` / `respondToLicenseRequest` | Internal (backend team) | IP licensing buyer flow |
-| NEW-4 `tips.recordTip` / `getByUniverse` | Internal (backend team) | Tip flow |
-| NEW-5 `collabs.createOpenCall` / `listOpenCalls` / `applyToCall` / `getApplications` | Internal (backend team) | Collab marketplace discovery |
-| NEW-6 push notification service | Internal (backend team) | Non-blocking for launch; required for seller inbox alerts |
-| Rights classification migration (`fun` → `fan`, `monetized` → `original`) | Internal (backend team) | Rights-gating logic throughout (FR-1.2, FR-2.4, FR-7.4, FR-11.4) |
-| Workstream 2 (Explore) | Internal (mobile team) | Universe Storefront linked from Explore cards; deeplinks must resolve |
+| Dependency                                                                           | Owner                     | Blocking                                                              |
+| ------------------------------------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------- |
+| Dynamic Labs React Native SDK (or WebView bridge)                                    | Dynamic/external          | Auth flow, all wallet transactions                                    |
+| `packages/abis` current build (EpisodeNFT.sol, CharacterNFT.sol, Universe.sol ABIs)  | Internal (contracts team) | All on-chain write actions                                            |
+| wagmi RN compatibility or viem fallback decision                                     | Internal (client team)    | All on-chain reads/writes                                             |
+| NEW-1 `seller.getEarningsSummary`                                                    | Internal (backend team)   | Seller Hub headline — cannot ship Seller Hub without this             |
+| NEW-2 `ads.getImpressions`                                                           | Internal (backend team)   | Sponsor pitch card, impression report                                 |
+| NEW-3 `licensing.requestLicense` / `getLicenseRequests` / `respondToLicenseRequest`  | Internal (backend team)   | IP licensing buyer flow                                               |
+| NEW-4 `tips.recordTip` / `getByUniverse`                                             | Internal (backend team)   | Tip flow                                                              |
+| NEW-5 `collabs.createOpenCall` / `listOpenCalls` / `applyToCall` / `getApplications` | Internal (backend team)   | Collab marketplace discovery                                          |
+| NEW-6 push notification service                                                      | Internal (backend team)   | Non-blocking for launch; required for seller inbox alerts             |
+| Rights classification migration (`fun` → `fan`, `monetized` → `original`)            | Internal (backend team)   | Rights-gating logic throughout (FR-1.2, FR-2.4, FR-7.4, FR-11.4)      |
+| Workstream 2 (Explore)                                                               | Internal (mobile team)    | Universe Storefront linked from Explore cards; deeplinks must resolve |
 
 ---
 
@@ -691,6 +704,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 ### M1 — Buy-side foundation (weeks 1–3)
 
 **Deliverables:**
+
 - Universe Storefront screen (FR-1) — static layout, all sections, no purchase actions wired
 - Episode NFT section: mint flow end-to-end (FR-1.3, FR-3.2)
 - Subscription section: subscribe flow end-to-end (FR-1.4)
@@ -706,6 +720,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 ### M2 — Seller Hub and earnings (weeks 4–6)
 
 **Deliverables:**
+
 - Seller Hub screen with universe picker (FR-10)
 - Earnings headline, stream breakdown, revenue chart (FR-10.1–10.3)
 - Recent transactions list (FR-10.4)
@@ -720,6 +735,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 ### M3 — Merch, canon, and direct tips (weeks 7–9)
 
 **Deliverables:**
+
 - Merch create, manage, buy (FR-5)
 - Canon submit, vote, finalize, license (FR-6)
 - Direct tip send + record (FR-11)
@@ -733,6 +749,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 ### M4 — Ad slots and sponsor tools (weeks 10–11)
 
 **Deliverables:**
+
 - Ad slot creation and management (FR-8.1–8.2)
 - Sponsor bid flow (FR-8.3)
 - Impression report + pitch card (FR-8.4)
@@ -745,6 +762,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 ### M5 — IP licensing negotiation and collab marketplace (weeks 12–14)
 
 **Deliverables:**
+
 - License request form for buyers (FR-7.1)
 - License request inbox and response flow for sellers (FR-7.2–7.4)
 - Open collab call creation and feed (FR-9.1–9.2)
@@ -760,6 +778,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 ### M6 — Polish and analytics (weeks 15–16)
 
 **Deliverables:**
+
 - Full analytics screens (FR-12)
 - Sponsor pitch card export (FR-8.4 + FR-12.4)
 - Character appearance royalty claim flow (FR-3.3, requires `nft.claimCharacterRoyalties` new procedure)
@@ -773,25 +792,16 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 The workstream is shippable when all of the following are true:
 
 **Buyer experience:**
+
 1. A first-time user (wallet not connected) can browse a universe storefront without connecting a wallet and see all listed items.
-2. A user who connects a CDP wallet can mint an Episode NFT from a universe they do not own, and the transaction confirms on Sepolia within 30 seconds of tapping "Confirm and Mint."
+2. A user who connects a connected wallet can mint an Episode NFT from a universe they do not own, and the transaction confirms on Sepolia within 30 seconds of tapping "Confirm and Mint."
 3. A user can subscribe to a paid tier and `subscriptions.hasAccess` returns `true` for that user/universe combination immediately after the subscription transaction confirms.
 4. A user can send a tip and the creator sees it in their Seller Hub recent transactions within 5 seconds of transaction confirmation.
 5. A user can submit a canon entry, vote on another entry, and license an accepted entry — all from mobile.
 
-**Seller experience:**
-6. A creator who owns at least one universe with completed transactions sees a non-zero earnings total on the Seller Hub headline for the correct time range.
-7. A creator can list an Episode NFT (single) from mobile, and the listing appears on the universe storefront within 10 seconds.
-8. A creator can configure a subscription tier from mobile, and `subscriptions.getTiers` returns the new tier immediately.
-9. A creator can create an ad slot, receive a mock bid, and accept it — all from mobile.
-10. A creator can post an open collab call and an applicant can apply — both from mobile.
+**Seller experience:** 6. A creator who owns at least one universe with completed transactions sees a non-zero earnings total on the Seller Hub headline for the correct time range. 7. A creator can list an Episode NFT (single) from mobile, and the listing appears on the universe storefront within 10 seconds. 8. A creator can configure a subscription tier from mobile, and `subscriptions.getTiers` returns the new tier immediately. 9. A creator can create an ad slot, receive a mock bid, and accept it — all from mobile. 10. A creator can post an open collab call and an applicant can apply — both from mobile.
 
-**Quality gates:**
-11. All screens render without crashes on iOS 16+ and Android 13+.
-12. All network errors surface a non-empty error message (no silent blank screens).
-13. All purchase flows (mint, subscribe, tip, merch buy, canon license, ad bid) show a transaction confirmation screen after on-chain success and a transaction failure screen with a retry option after on-chain failure.
-14. Rights classification gate: no fan-lane universe shows any purchase CTA anywhere in the Market tab. Tested with a universe where `classification === 'fan'`.
-15. No tRPC call is made without a valid JWT in the Authorization header. Unauthenticated access to protected procedures returns 401, not a crash.
+**Quality gates:** 11. All screens render without crashes on iOS 16+ and Android 13+. 12. All network errors surface a non-empty error message (no silent blank screens). 13. All purchase flows (mint, subscribe, tip, merch buy, canon license, ad bid) show a transaction confirmation screen after on-chain success and a transaction failure screen with a retry option after on-chain failure. 14. Rights classification gate: no fan-lane universe shows any purchase CTA anywhere in the Market tab. Tested with a universe where `classification === 'fan'`. 15. No tRPC call is made without a valid JWT in the Authorization header. Unauthenticated access to protected procedures returns 401, not a crash.
 
 ---
 
@@ -820,6 +830,7 @@ The workstream is shippable when all of the following are true:
 **Universe Storefront initial render (all sections except NFT images):** target ≤ 800ms from screen mount to all section headers and text content visible. Images (episode artwork, merch thumbnails) are lazy-loaded and do not block this target.
 
 **`nft.getEpisodesByUniverse` + `subscriptions.getTiers` + `ads.getSlotsByUniverse` parallel load:**
+
 - p50: 280ms
 - p95: 700ms
 - p99: 1400ms
@@ -828,7 +839,7 @@ All three calls are fired in parallel via `Promise.all` at storefront mount. The
 
 **Episode detail sheet open:** target ≤ 200ms from tap to sheet fully expanded. The episode data is already resident in the React Query cache from the `getEpisodesByUniverse` call — no network round trip. Sheet animation budget: 200ms at 60fps.
 
-**Mint transaction submit to Sepolia:** 1500ms–4000ms expected range. This covers: wagmi `estimateGas` call (~500ms on Sepolia RPC), user confirmation in the embedded wallet UI (~0ms for CDP embedded wallet, no separate approval screen), and `writeContract` broadcast (~800ms–3000ms depending on Sepolia mempool congestion). Display "Submitting…" spinner during this window. If `estimateGas` has not returned in 5000ms, surface the gas estimation failure error (see Section 3).
+**Mint transaction submit to Sepolia:** 1500ms–4000ms expected range. This covers: wagmi `estimateGas` call (~500ms on Sepolia RPC), user confirmation in the embedded wallet UI (~0ms for connected wallet, no separate approval screen), and `writeContract` broadcast (~800ms–3000ms depending on Sepolia mempool congestion). Display "Submitting…" spinner during this window. If `estimateGas` has not returned in 5000ms, surface the gas estimation failure error (see Section 3).
 
 **Mint confirmation (2 block confirmations on Sepolia):** 24–36 seconds expected. Sepolia block time is ~12 seconds. Two confirmations = ~24 seconds minimum. Display a live "Waiting for confirmation (0/2)… (1/2)…" progress indicator. After 120 seconds with no confirmation, surface the on-chain tx timeout error state (see Section 3) — do not block the UI; allow the user to navigate away with the transaction tracked in a persistent "Pending Transactions" banner.
 
@@ -837,6 +848,7 @@ All three calls are fired in parallel via `Promise.all` at storefront mount. The
 #### Sell-side Critical Path (Seller Hub)
 
 **`seller.getEarningsSummary` API SLA:**
+
 - p50: 350ms
 - p95: 1200ms
 - p99: 2800ms
@@ -858,6 +870,7 @@ This procedure fans out across 7 Firestore collections: `episodeMints` (NFT reve
 #### Impression Report
 
 **`ads.getImpressions` API SLA:**
+
 - p50: 180ms
 - p95: 600ms
 
@@ -908,6 +921,7 @@ This reads the `adImpressions` sub-collection for a given slot. On slots with hi
 **`licensing.respondToLicenseRequest` — must be the universe owner:** read the license request document to get `universeId`. Read the universe document. Verify `universe.ownerAddress === ctx.user.address`. If not, return 403 with `"Only the universe owner can respond to license requests"`. This check must happen before any mutation — do not mutate first and check after.
 
 **Counter-offer round limit:** the licensing flow allows one round of counter-offer. State transitions:
+
 - `pending` → `accepted` (owner accepts)
 - `pending` → `rejected` (owner rejects)
 - `pending` → `countered` (owner sends counter with modified terms)
@@ -919,6 +933,7 @@ After a license request enters `countered` status, the requester may only Accept
 #### Ad Slot Bidding
 
 **Creative URL validation:** `ads.placeBid` accepts a `creativeUrl` field. The Zod input schema enforces:
+
 - `z.string().url()` — must be a valid URL
 - `.refine(url => url.startsWith('https://'), "Creative URL must use HTTPS")`
 - No further domain allowlisting is implemented in v1. Content moderation is manual: the universe owner reviews the creative (image/video URL) in their sponsor inbox before accepting the bid. The `ads.acceptBid` endpoint does not auto-approve; it is always creator-initiated. Document this in the `ads.routes.ts` file as: `// Creative URL moderation is manual in v1. Creator reviews before accepting. No automated content scanning.`
@@ -951,21 +966,21 @@ The `classification` field on universe documents must be treated as `'fan'` when
 
 ### 3. Error Taxonomy and Handling Strategy
 
-| Error | Examples | Client behavior | User message | Retry? |
-|---|---|---|---|---|
-| Mint transaction reverted | Max supply reached after user started checkout; price changed on-chain | Dismiss mint confirmation sheet. Refresh `getEpisodesByUniverse` to show current supply. Show sold-out state on the episode card. Fire `mint_failed` analytics event with `reason: 'reverted'`. | "This episode is sold out. The last edition was minted while you were checking out." | No — redirect to sold-out state. The "Mint" button becomes "Sold Out" (disabled). |
-| Mint gas estimation failure | Sepolia RPC timeout during `estimateGas`; RPC returns an error | Auto-retry `estimateGas` once after 2 seconds. If retry fails, show inline error in the confirmation sheet. Do not close the sheet — the user may try again manually. | "We couldn't estimate gas right now. The Sepolia network may be congested. Try again in a moment." | Auto-retry once automatically; then user-initiated via "Try Again" button in sheet. |
-| Insufficient ETH balance for mint | `estimateGas` succeeds but wallet balance < price + estimated gas | Dismiss the confirmation sheet. Show an "Add Funds" bottom sheet with the shortfall amount ("You need ~0.02 ETH more to mint this episode") and a "Copy Wallet Address" button. Fire `mint_failed` analytics event with `reason: 'insufficient_balance'`. | "Your wallet doesn't have enough ETH. You need [X] ETH to mint this episode." | No — show "Add funds" state with wallet address copyable. |
-| Subscription already active | Duplicate `subscribe` call (user double-tapped; or previously subscribed and re-subscribing) | The `subscriptions.subscribe` tRPC call returns a specific error code (`SUBSCRIPTION_ALREADY_ACTIVE`). Client redirects to the "Manage Subscription" sheet for that tier instead of showing an error. No error toast is shown. | (No error toast) — the manage sheet opens, showing the existing subscription with next billing date. | No — redirect to manage. |
-| Seller Hub partial failure | `seller.getEarningsSummary` — 2 of 7 sub-calls time out (e.g., `licensingFees` and `treasuryDistributions` timeout at 2000ms) | Render the Seller Hub with available streams. Each timed-out stream renders a "Unavailable" card with a grey placeholder and a "Retry" chip. The headline total excludes the timed-out streams and shows a "(Partial)" label next to the total. A `seller_earnings_partial` analytics event fires with the list of unavailable streams. | "Some earnings data is unavailable. Tap Retry to reload the missing streams." (shown as inline card text, not a toast) | Background auto-retry after 30 seconds; also user-initiated via "Retry" chip per stream. |
-| Bulk listing partial failure | 7 of 10 episode listings succeed; 3 fail (e.g., Firestore write timeout on episodes 4, 7, and 10) | Stop the progress indicator. Show a results sheet: "7 episodes listed successfully. 3 failed." with a list of the failed episodes by title. Each failed episode has an individual "Retry" button. Successfully listed episodes are not re-submitted. | "3 episodes couldn't be listed. Tap Retry next to each one to try again." | User-initiated per-item retry. The retry calls `nft.createEpisodeListing` for that single episode only. |
-| Collab application duplicate | User taps "Apply" on a call they already applied to (race between UI state and server state) | The client maintains a local `appliedCallIds: Set<string>` in Zustand store, hydrated from `collabs.getMyApplications` on mount. The "Apply" button is disabled for calls in this set. If the server returns a duplicate error (`DUPLICATE_APPLICATION`), show a toast and disable the button retroactively. | "You've already applied to this collab call." | N/A — the application already exists. Navigate to the application detail instead. |
-| License request for fan-lane universe | `licensing.requestLicense` returns 403 because `classification === 'fan'` | This should not be reachable via the normal UI (rights gate suppresses the CTA). If reached (e.g., via a stale client), show an error sheet. Fire `rights_gate_hit` analytics event. | "This universe hasn't been cleared for licensing. The creator needs to complete the rights classification process first." | No. Dismiss the sheet. |
-| Direct tip tx rejected by wallet | User tapped cancel in the CDP embedded wallet confirmation UI; or wallet returned a user-rejected error code (`4001`) | Dismiss the tip sheet silently. Do not show an error toast. Return the user to the storefront tip section with the tip amount cleared. Fire `tip_failed` analytics event with `reason: 'wallet_cancelled'`. | (No message — silent dismiss. The user knows they cancelled.) | No — dismiss silently. |
-| Direct tip tx confirmed but `recordTip` fails | Network drop after tx broadcast and 2-block confirmation; tRPC call to `tips.recordTip` returns a network error or 5xx | Store the txHash, creatorAddress, amountWei, universeId, and timestamp in AsyncStorage under the key `pending_tip_records` as a JSON array. Show a brief toast. On every subsequent app foreground event (`AppState` change to `active`), the app checks `pending_tip_records` and retries `recordTip` for each pending entry. After 3 failed retries per entry, the entry moves to `failed_tip_records` and the user sees a persistent alert: "We couldn't log your tip. Please contact support." with the txHash displayed and a "Copy Tx Hash" button. | Toast: "Your tip was sent on-chain. We'll finish recording it shortly." Persistent alert after 3 failures: "We couldn't log your tip to [Creator]. Your ETH was sent successfully. Contact support with your transaction ID: [txHash]." | Auto-retry on every app foreground event, up to 3 times per record. After 3 failures: surface persistent alert, no more auto-retry. |
-| Impression report data unavailable | `ads.getImpressions` returns an empty result set for a newly created slot (0 impressions recorded) | Render the impression report screen in a clean "No data yet" empty state. Do not show an error. Include a "How impressions are tracked" info link. | "No impressions recorded yet. Impressions appear here once your ad is live and views are recorded." | N/A — this is a valid empty state, not an error. |
-| Merch order submitted, fulfillment unknown | Creator never ships; buyer has no tracking | The app does not track fulfillment status in v1. The order record in Firestore has `status: 'pending_fulfillment'` and is never updated by the platform. The buyer's purchase history shows the order with a disclosure. | Disclosure shown at checkout: "Fulfillment is managed directly by the creator. LOAR does not track shipping or guarantee delivery timelines." Order history shows: "Status: Fulfillment managed by creator." | N/A — out of scope for v1. |
-| On-chain tx timeout | Transaction broadcast to Sepolia but no confirmation in 120 seconds | Stop the confirmation spinner. Show a "Pending" state with an Etherscan link (`https://sepolia.etherscan.io/tx/{txHash}`). The transaction is NOT marked failed — it may still confirm. The user can navigate away; the pending state persists in a "Pending Transactions" banner at the top of the Market tab. When Ponder detects the confirmation, the banner resolves automatically. | "Your transaction is taking longer than expected. It's still pending on Sepolia. [View on Etherscan ↗]" | User-initiated only — the Etherscan link lets the user monitor progress. The app will auto-resolve when Ponder indexes the confirmation. |
+| Error                                         | Examples                                                                                                                      | Client behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | User message                                                                                                                                                                                                                            | Retry?                                                                                                                                   |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Mint transaction reverted                     | Max supply reached after user started checkout; price changed on-chain                                                        | Dismiss mint confirmation sheet. Refresh `getEpisodesByUniverse` to show current supply. Show sold-out state on the episode card. Fire `mint_failed` analytics event with `reason: 'reverted'`.                                                                                                                                                                                                                                                                                                                                                           | "This episode is sold out. The last edition was minted while you were checking out."                                                                                                                                                    | No — redirect to sold-out state. The "Mint" button becomes "Sold Out" (disabled).                                                        |
+| Mint gas estimation failure                   | Sepolia RPC timeout during `estimateGas`; RPC returns an error                                                                | Auto-retry `estimateGas` once after 2 seconds. If retry fails, show inline error in the confirmation sheet. Do not close the sheet — the user may try again manually.                                                                                                                                                                                                                                                                                                                                                                                     | "We couldn't estimate gas right now. The Sepolia network may be congested. Try again in a moment."                                                                                                                                      | Auto-retry once automatically; then user-initiated via "Try Again" button in sheet.                                                      |
+| Insufficient ETH balance for mint             | `estimateGas` succeeds but wallet balance < price + estimated gas                                                             | Dismiss the confirmation sheet. Show an "Add Funds" bottom sheet with the shortfall amount ("You need ~0.02 ETH more to mint this episode") and a "Copy Wallet Address" button. Fire `mint_failed` analytics event with `reason: 'insufficient_balance'`.                                                                                                                                                                                                                                                                                                 | "Your wallet doesn't have enough ETH. You need [X] ETH to mint this episode."                                                                                                                                                           | No — show "Add funds" state with wallet address copyable.                                                                                |
+| Subscription already active                   | Duplicate `subscribe` call (user double-tapped; or previously subscribed and re-subscribing)                                  | The `subscriptions.subscribe` tRPC call returns a specific error code (`SUBSCRIPTION_ALREADY_ACTIVE`). Client redirects to the "Manage Subscription" sheet for that tier instead of showing an error. No error toast is shown.                                                                                                                                                                                                                                                                                                                            | (No error toast) — the manage sheet opens, showing the existing subscription with next billing date.                                                                                                                                    | No — redirect to manage.                                                                                                                 |
+| Seller Hub partial failure                    | `seller.getEarningsSummary` — 2 of 7 sub-calls time out (e.g., `licensingFees` and `treasuryDistributions` timeout at 2000ms) | Render the Seller Hub with available streams. Each timed-out stream renders a "Unavailable" card with a grey placeholder and a "Retry" chip. The headline total excludes the timed-out streams and shows a "(Partial)" label next to the total. A `seller_earnings_partial` analytics event fires with the list of unavailable streams.                                                                                                                                                                                                                   | "Some earnings data is unavailable. Tap Retry to reload the missing streams." (shown as inline card text, not a toast)                                                                                                                  | Background auto-retry after 30 seconds; also user-initiated via "Retry" chip per stream.                                                 |
+| Bulk listing partial failure                  | 7 of 10 episode listings succeed; 3 fail (e.g., Firestore write timeout on episodes 4, 7, and 10)                             | Stop the progress indicator. Show a results sheet: "7 episodes listed successfully. 3 failed." with a list of the failed episodes by title. Each failed episode has an individual "Retry" button. Successfully listed episodes are not re-submitted.                                                                                                                                                                                                                                                                                                      | "3 episodes couldn't be listed. Tap Retry next to each one to try again."                                                                                                                                                               | User-initiated per-item retry. The retry calls `nft.createEpisodeListing` for that single episode only.                                  |
+| Collab application duplicate                  | User taps "Apply" on a call they already applied to (race between UI state and server state)                                  | The client maintains a local `appliedCallIds: Set<string>` in Zustand store, hydrated from `collabs.getMyApplications` on mount. The "Apply" button is disabled for calls in this set. If the server returns a duplicate error (`DUPLICATE_APPLICATION`), show a toast and disable the button retroactively.                                                                                                                                                                                                                                              | "You've already applied to this collab call."                                                                                                                                                                                           | N/A — the application already exists. Navigate to the application detail instead.                                                        |
+| License request for fan-lane universe         | `licensing.requestLicense` returns 403 because `classification === 'fan'`                                                     | This should not be reachable via the normal UI (rights gate suppresses the CTA). If reached (e.g., via a stale client), show an error sheet. Fire `rights_gate_hit` analytics event.                                                                                                                                                                                                                                                                                                                                                                      | "This universe hasn't been cleared for licensing. The creator needs to complete the rights classification process first."                                                                                                               | No. Dismiss the sheet.                                                                                                                   |
+| Direct tip tx rejected by wallet              | User tapped cancel in the connected wallet confirmation UI; or wallet returned a user-rejected error code (`4001`)            | Dismiss the tip sheet silently. Do not show an error toast. Return the user to the storefront tip section with the tip amount cleared. Fire `tip_failed` analytics event with `reason: 'wallet_cancelled'`.                                                                                                                                                                                                                                                                                                                                               | (No message — silent dismiss. The user knows they cancelled.)                                                                                                                                                                           | No — dismiss silently.                                                                                                                   |
+| Direct tip tx confirmed but `recordTip` fails | Network drop after tx broadcast and 2-block confirmation; tRPC call to `tips.recordTip` returns a network error or 5xx        | Store the txHash, creatorAddress, amountWei, universeId, and timestamp in AsyncStorage under the key `pending_tip_records` as a JSON array. Show a brief toast. On every subsequent app foreground event (`AppState` change to `active`), the app checks `pending_tip_records` and retries `recordTip` for each pending entry. After 3 failed retries per entry, the entry moves to `failed_tip_records` and the user sees a persistent alert: "We couldn't log your tip. Please contact support." with the txHash displayed and a "Copy Tx Hash" button. | Toast: "Your tip was sent on-chain. We'll finish recording it shortly." Persistent alert after 3 failures: "We couldn't log your tip to [Creator]. Your ETH was sent successfully. Contact support with your transaction ID: [txHash]." | Auto-retry on every app foreground event, up to 3 times per record. After 3 failures: surface persistent alert, no more auto-retry.      |
+| Impression report data unavailable            | `ads.getImpressions` returns an empty result set for a newly created slot (0 impressions recorded)                            | Render the impression report screen in a clean "No data yet" empty state. Do not show an error. Include a "How impressions are tracked" info link.                                                                                                                                                                                                                                                                                                                                                                                                        | "No impressions recorded yet. Impressions appear here once your ad is live and views are recorded."                                                                                                                                     | N/A — this is a valid empty state, not an error.                                                                                         |
+| Merch order submitted, fulfillment unknown    | Creator never ships; buyer has no tracking                                                                                    | The app does not track fulfillment status in v1. The order record in Firestore has `status: 'pending_fulfillment'` and is never updated by the platform. The buyer's purchase history shows the order with a disclosure.                                                                                                                                                                                                                                                                                                                                  | Disclosure shown at checkout: "Fulfillment is managed directly by the creator. LOAR does not track shipping or guarantee delivery timelines." Order history shows: "Status: Fulfillment managed by creator."                            | N/A — out of scope for v1.                                                                                                               |
+| On-chain tx timeout                           | Transaction broadcast to Sepolia but no confirmation in 120 seconds                                                           | Stop the confirmation spinner. Show a "Pending" state with an Etherscan link (`https://sepolia.etherscan.io/tx/{txHash}`). The transaction is NOT marked failed — it may still confirm. The user can navigate away; the pending state persists in a "Pending Transactions" banner at the top of the Market tab. When Ponder detects the confirmation, the banner resolves automatically.                                                                                                                                                                  | "Your transaction is taking longer than expected. It's still pending on Sepolia. [View on Etherscan ↗]"                                                                                                                                 | User-initiated only — the Etherscan link lets the user monitor progress. The app will auto-resolve when Ponder indexes the confirmation. |
 
 **Recovery mechanism for `recordTip` failure (detailed spec):**
 
@@ -1012,6 +1027,7 @@ Coverage target: **80%** of all new Workstream 3 client-side modules and all new
 12. **`collabs.applyToCall` — duplicate rejection**: apply to a call with `userId: 'user-A'`. Apply again with the same `userId` and `callId`. Assert the second call returns a `DUPLICATE_APPLICATION` error code without creating a second application document.
 
 **Mocks required:**
+
 - `wagmi.writeContract` — mock via `vi.mock('wagmi')` with a controllable `Promise` factory
 - `expo-sharing` — mock `shareAsync` to capture the file path and return immediately
 - `victory-native` — mock the entire module to render a `<View testID="chart" />` in unit test environments (Victory Native has native dependencies that break Jest)
@@ -1023,6 +1039,7 @@ Coverage target: **80%** of all new Workstream 3 client-side modules and all new
 10 specific integration tests run against a Firestore emulator (port 8080) and a Hono test server instance:
 
 **Firestore emulator seed for all tests:** the emulator is seeded before each test suite with:
+
 - `universes/{testUniverseId}`: `{ ownerAddress: '0xCreator', classification: 'original', name: 'Test Universe' }`
 - `universes/{fanUniverseId}`: `{ ownerAddress: '0xCreator', classification: 'fan', name: 'Fan Universe' }`
 - `users/{testUserId}`: `{ walletAddress: '0xCreator' }`
@@ -1066,18 +1083,20 @@ Update `licenseRequests/{testRequestId}` in the emulator to `status: 'countered'
 8 Maestro flows. Flow files live in `apps/mobile/e2e/workstream3/`.
 
 **Flow 1 (buy-side full path): Storefront → Episode Detail → Mint → Portfolio**
+
 1. Launch app, authenticate as buyer wallet
 2. Navigate to universe storefront for `testUniverseId`
 3. Assert all storefront sections visible (NFTs, subscriptions, tips)
 4. Tap episode card for `testEpisodeId`
 5. Assert episode detail sheet opens with price and supply
-6. Tap "Mint" → confirm in CDP wallet
+6. Tap "Mint" → confirm in connected wallet
 7. Assert transaction confirmation screen shows tx hash
 8. Navigate to Portfolio (Workstream 2 screen)
 9. Assert the minted episode NFT appears in the owned collection
-This flow requires Sepolia testnet with funded test wallet. Estimated duration: 60–90 seconds.
+   This flow requires Sepolia testnet with funded test wallet. Estimated duration: 60–90 seconds.
 
 **Flow 2 (sell-side full path): Create Episode Listing → Appears on Storefront**
+
 1. Launch app, authenticate as creator wallet
 2. Navigate to Sell → Seller Hub → Episode NFTs section → "Add Episode"
 3. Fill title, description, price (0.01 ETH), max supply (100)
@@ -1085,17 +1104,19 @@ This flow requires Sepolia testnet with funded test wallet. Estimated duration: 
 5. Assert success toast "Episode listed"
 6. Navigate to universe storefront (Buy perspective)
 7. Assert the new episode card appears in the NFT section
-This flow tests end-to-end storefront cache invalidation.
+   This flow tests end-to-end storefront cache invalidation.
 
 **Flow 3 (direct tip): Send Tip → Creator Receives Push Notification**
+
 1. Launch app on physical test device (Device A) as buyer, push notifications granted
 2. Launch app on physical test device (Device B) as creator
 3. On Device A: open storefront, scroll to Tips section, tap "Send Tip", select 0.01 ETH preset, confirm
 4. Assert Device A shows "Tip sent!" success state
 5. Assert Device B receives push notification within 10 seconds: "You received a 0.01 ETH tip from [buyer]"
-This flow requires two physical devices and real-time FCM delivery. Flagged as physical-device-only.
+   This flow requires two physical devices and real-time FCM delivery. Flagged as physical-device-only.
 
 **Flow 4 (collab marketplace): Post Open Call → Apply → Accept**
+
 1. Launch app as creator, navigate to Sell → Collab Calls → "Post Open Call"
 2. Fill role (Writer), revenue split (15%), episode count (5), description
 3. Tap "Post Call" → assert success
@@ -1108,6 +1129,7 @@ This flow requires two physical devices and real-time FCM delivery. Flagged as p
 10. Tap "Accept" → assert status updates to "Active"
 
 **Flow 5 (rights gate): No Purchase CTAs on Fan-Lane Universe Storefront**
+
 1. Launch app as buyer
 2. Navigate to storefront for a universe with `classification: 'fan'`
 3. Assert: no "Mint" buttons present
@@ -1118,6 +1140,7 @@ This flow requires two physical devices and real-time FCM delivery. Flagged as p
 8. Tap every tappable element — none should open a purchase flow
 
 **Flow 6 (seller hub): Earnings Summary Loads and Chart Is Interactive**
+
 1. Launch app as creator with seeded earnings data (at least 30 days of test transactions)
 2. Navigate to Sell → Seller Hub
 3. Assert headline total is non-zero
@@ -1127,6 +1150,7 @@ This flow requires two physical devices and real-time FCM delivery. Flagged as p
 7. Tap stream breakdown card for "Episode NFTs" — assert stream detail sheet opens
 
 **Flow 7 (ad slot): Browse Slot → Place Bid → Creator Accepts**
+
 1. Launch as sponsor (buyer) account
 2. Navigate to a universe storefront → scroll to "Sponsor This Universe" section
 3. Tap "View Ad Slots" → assert slot list loads
@@ -1138,6 +1162,7 @@ This flow requires two physical devices and real-time FCM delivery. Flagged as p
 9. Tap "Accept Bid" → assert slot status updates to "Sponsored"
 
 **Flow 8 (subscription): Subscribe to Tier → Manage Subscription**
+
 1. Launch as buyer
 2. Navigate to storefront → subscriptions section
 3. Tap "Collector" tier card → assert tier detail sheet opens
@@ -1148,12 +1173,14 @@ This flow requires two physical devices and real-time FCM delivery. Flagged as p
 8. Tap "Manage" → assert subscription management sheet opens with "Cancel" option
 
 **Device matrix:**
+
 - iOS 16+ simulator (Xcode): Flows 1, 2, 4, 5, 6, 7, 8
 - Android 13+ emulator (AVD): Flows 1, 2, 4, 5, 6, 7, 8
 - Physical iOS device (iPhone 12+): Flow 3 (push notification) + Flow 1 (full mint with real wallet)
 - Physical Android device (Pixel 6+): Flow 3 (push notification)
 
 **CI integration:**
+
 - **Block PR merge:** Flows 5 (rights gate) and 6 (seller hub load) run on every PR in CI (simulator only, no wallet interaction). These are fast and do not require funded wallets.
 - **Run on merge to main:** Flows 1, 2, 4, 7, 8 run on merge using a funded Sepolia test wallet. These may take 2–3 minutes per flow due to Sepolia confirmation times.
 - **Pre-release only:** Flow 3 (physical device push notification) runs manually in the pre-release checklist. Not automated in CI due to physical device requirement.
@@ -1170,16 +1197,18 @@ This is a public endpoint (no authentication required to browse open calls). Sim
 
 **Universe Storefront — 1000 concurrent views:**
 Simulate 1000 concurrent `storefront.get({ universeId: 'popularUniverse' })` requests (same universe). Test two scenarios:
+
 - Cache hit: the `storefrontCache/{universeId}` document exists and is fresh. Pass criteria: p95 < 200ms (single Firestore read from cache document).
 - Cache miss: the cache document is deleted before the test. Pass criteria: p95 < 1500ms (fan-out reads for all sections). Verify the cache is rebuilt by the first request (or a dedicated cache-warming job) and subsequent requests hit the cache.
 
 **NFT mint — 50 concurrent mints (max supply = 50):**
 Simulate 50 concurrent calls to `nft.recordMint`, each with a unique (but pre-confirmed on Sepolia) txHash, for the same episodeId with `maxSupply: 50`. All 50 transactions were broadcast to Sepolia separately and confirmed. The test verifies:
+
 - Exactly 50 `mintedCount` increments are written to Firestore (no lost writes due to concurrent increment races — use Firestore `FieldValue.increment(1)` which is atomic).
 - No `mintedCount` exceeds 50 after all 50 calls complete.
 - All 50 `recordMint` calls return 200 (not 429 or 500).
 - The `processedTxHashes` collection contains exactly 50 entries after the test.
-Note: the contract prevents over-minting on-chain. This test specifically targets the off-chain Firestore write path for correctness under concurrency.
+  Note: the contract prevents over-minting on-chain. This test specifically targets the off-chain Firestore write path for correctness under concurrency.
 
 ---
 
@@ -1190,30 +1219,37 @@ Note: the contract prevents over-minting on-chain. This test specifically target
 All metrics exported via OpenTelemetry to the platform's observability backend (Grafana Cloud or equivalent).
 
 **`seller.getEarningsSummary` latency:**
+
 - Export histogram: `seller_earnings_summary_duration_ms` with labels `{ universe_id (sampled), partial: boolean }`
 - Export per-sub-call breakdown: `seller_earnings_subcall_duration_ms` with labels `{ stream: 'episodeMints' | 'subscriptionPayments' | 'licensingFees' | 'adPayments' | 'collabPayments' | 'treasuryDistributions' | 'tipPayments', status: 'ok' | 'timed_out' | 'error' }`
 - Export counter: `seller_earnings_partial_total` — increments whenever any sub-call returns non-ok status. Labels: `{ stream }`
 
 **Mint recording rate:**
+
 - Export counter: `nft_record_mint_success_total` — increments on each successful `recordMint`
 - Export counter: `nft_onchain_mint_events_total` — increments on each Ponder `Mint` event handler execution
 - Divergence ratio computed in alerting rules: `(nft_onchain_mint_events_total - nft_record_mint_success_total) / nft_onchain_mint_events_total` — target < 1%
 
 **Tip recording:**
+
 - Export counter: `tips_record_tip_success_total`
 - Export counter: `tips_record_tip_failure_total` with labels `{ reason: 'rpc_verification_failed' | 'firestore_error' | 'network_error' | 'rate_limited' }`
 - Export gauge: `tips_pending_async_storage_records` — surfaced via a health check endpoint `GET /health/tips-pending` that reads from a Firestore document `systemHealth/tipsPendingCount` (updated by a background job that aggregates client-reported pending counts via a lightweight beacon endpoint `POST /api/tip-recovery-beacon`)
 
 **Canon finalization lag:**
+
 - Export gauge: `canon_submissions_past_deadline_unfinalized` — computed by a Bun cron job (every 10 minutes) that counts `canonSubmissions` documents where `votingDeadline < now()` and `status === 'VOTING'`. High values indicate creator friction (creators not finalizing).
 
 **Collab call fill rate:**
+
 - Export gauge: `collab_calls_with_applicants_ratio` — computed hourly: `count(calls with ≥1 application) / count(open calls)`. Tracked as a platform health metric.
 
 **License request response time:**
+
 - Export histogram: `licensing_request_response_time_hours` — time delta between `requestedAt` and `respondedAt` on license request documents, recorded by the `respondToLicenseRequest` handler.
 
 **`ads.getImpressions` metrics:**
+
 - Export histogram: `ads_get_impressions_duration_ms`
 - Export counter: `ads_get_impressions_empty_total` — increments when the result has `totalImpressions === 0`
 
@@ -1222,16 +1258,20 @@ All metrics exported via OpenTelemetry to the platform's observability backend (
 All client metrics sent to the analytics pipeline (Mixpanel or Amplitude) via the same event-batching layer used for product analytics.
 
 **Storefront section load time:**
+
 - On storefront mount, start a timer per section. When each section's React Query data resolves (transitions from `isLoading: true` to `isLoading: false`), emit `storefront_section_loaded` with `{ section, duration_ms }`. Each section is timed independently.
 
 **Storefront-to-purchase conversion funnel:**
+
 - `storefront_viewed` → `item_tapped` → `confirm_shown` → `purchase_completed`
 - Funnel is tracked per-session with a session ID. Drop-off at each step is computed in the analytics dashboard.
 
 **Seller Hub tab view rate:**
+
 - `seller_hub_viewed` events are aggregated per-user per-week. Creators who emit at least one `seller_hub_viewed` event in a 7-day window are counted as "engaged sellers."
 
 **Rights gate hit rate:**
+
 - `rights_gate_hit` events (see Section 6) are aggregated by `cta_suppressed`. High hit rates for specific CTAs indicate either a mismatch between creator intent and classification, or a classification bug.
 
 #### Alerting
@@ -1261,6 +1301,7 @@ Alerts are configured in Grafana (or equivalent) with PagerDuty routing.
 #### Dashboards
 
 **Dashboard 1: Storefront Commerce (daily)**
+
 - Storefront views (total and by universe — top 20)
 - Conversion funnel: views → item tapped → confirm shown → purchase completed (with drop-off % at each step)
 - NFT mint rate (mints per storefront view)
@@ -1269,12 +1310,14 @@ Alerts are configured in Grafana (or equivalent) with PagerDuty routing.
 - 30-day trend for each conversion metric
 
 **Dashboard 2: Seller Hub Health**
+
 - `getEarningsSummary` p50/p95/p99 latency (time-series)
 - Per-sub-call partial failure rate (stacked bar by stream, daily)
 - Total earnings recorded per day across all streams (platform-wide)
 - Creator Seller Hub adoption rate: % of universe owners who opened Seller Hub in the last 7 days
 
 **Dashboard 3: Market Integrity**
+
 - Mint recording divergence rate (time-series, alert threshold marked at 1%)
 - Tip pending record count (gauge, alert threshold marked at 100)
 - Rights gate rejection rate by endpoint (bar chart: `createEpisodeListing`, `requestLicense`, `recordTip`, `configureTier`)
@@ -1638,24 +1681,25 @@ storefront_rights_badge_tapped
 
 All flags are managed via the platform's feature flag service (LaunchDarkly or a Firestore-backed flag document at `featureFlags/workstream3`). Flag state is fetched at app launch and cached in-memory for the session. Flags default to `false` (off) in all environments unless explicitly enabled.
 
-| Flag | Kill switch type | Degraded state when off | Notes |
-|---|---|---|---|
-| `storefront_v1` | Soft disable | Universe profile page shows "Shop coming soon" placeholder | Master gate for the entire storefront surface |
-| `episode_nft_mint` | Hard kill | "Mint" button hidden; episode cards show price but no action | Hard because a bug here burns real ETH |
-| `subscription_purchase` | Hard kill | Subscription tier cards shown (read-only), "Subscribe" button hidden | Hard because a bug here charges real ETH |
-| `merch_purchase` | Soft disable | Merch section hidden entirely | Soft — no on-chain money, Stripe handles refunds |
-| `canon_marketplace` | Soft disable | Canon section hidden on storefront | Soft — no direct money movement |
-| `ip_licensing_requests` | Soft disable | Licensing section shown read-only; "Request License" CTA hidden | Soft — licensing fees are off-chain in v1 |
-| `ad_slot_bidding` | Hard kill | Ad slot section shown (read-only); bid button hidden | Hard because bids involve ETH |
-| `direct_tips` | Hard kill | Tips section hidden entirely; "Send Tip" CTA removed | **HARDEST kill switch in the workstream.** A bug here means real ETH is transferred but not recorded. Disable immediately on any tip recording divergence alert. |
-| `collab_marketplace` | Soft disable | Collab feed accessible (read-only); "Apply" and "Post Call" hidden | Soft — no direct money in apply flow |
-| `seller_hub_v1` | Soft disable | Sell tab shows "Seller Hub coming soon" | Master gate for seller-side |
-| `earnings_summary` | Soft disable | Seller Hub shows "Earnings data loading…" indefinitely | Fallback while `getEarningsSummary` is being stabilized |
-| `bulk_episode_listing` | Soft disable | Only single episode listing available; bulk selection UI hidden | Soft — degrades gracefully to single-item flow |
-| `impression_report` | Soft disable | Ad slot detail shows "Impression reporting coming soon" | Soft — read-only feature |
-| `sponsor_pitch_card` | Soft disable | Export button hidden on impression report screen | Soft — no money involved |
+| Flag                    | Kill switch type | Degraded state when off                                              | Notes                                                                                                                                                            |
+| ----------------------- | ---------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storefront_v1`         | Soft disable     | Universe profile page shows "Shop coming soon" placeholder           | Master gate for the entire storefront surface                                                                                                                    |
+| `episode_nft_mint`      | Hard kill        | "Mint" button hidden; episode cards show price but no action         | Hard because a bug here burns real ETH                                                                                                                           |
+| `subscription_purchase` | Hard kill        | Subscription tier cards shown (read-only), "Subscribe" button hidden | Hard because a bug here charges real ETH                                                                                                                         |
+| `merch_purchase`        | Soft disable     | Merch section hidden entirely                                        | Soft — no on-chain money, Stripe handles refunds                                                                                                                 |
+| `canon_marketplace`     | Soft disable     | Canon section hidden on storefront                                   | Soft — no direct money movement                                                                                                                                  |
+| `ip_licensing_requests` | Soft disable     | Licensing section shown read-only; "Request License" CTA hidden      | Soft — licensing fees are off-chain in v1                                                                                                                        |
+| `ad_slot_bidding`       | Hard kill        | Ad slot section shown (read-only); bid button hidden                 | Hard because bids involve ETH                                                                                                                                    |
+| `direct_tips`           | Hard kill        | Tips section hidden entirely; "Send Tip" CTA removed                 | **HARDEST kill switch in the workstream.** A bug here means real ETH is transferred but not recorded. Disable immediately on any tip recording divergence alert. |
+| `collab_marketplace`    | Soft disable     | Collab feed accessible (read-only); "Apply" and "Post Call" hidden   | Soft — no direct money in apply flow                                                                                                                             |
+| `seller_hub_v1`         | Soft disable     | Sell tab shows "Seller Hub coming soon"                              | Master gate for seller-side                                                                                                                                      |
+| `earnings_summary`      | Soft disable     | Seller Hub shows "Earnings data loading…" indefinitely               | Fallback while `getEarningsSummary` is being stabilized                                                                                                          |
+| `bulk_episode_listing`  | Soft disable     | Only single episode listing available; bulk selection UI hidden      | Soft — degrades gracefully to single-item flow                                                                                                                   |
+| `impression_report`     | Soft disable     | Ad slot detail shows "Impression reporting coming soon"              | Soft — read-only feature                                                                                                                                         |
+| `sponsor_pitch_card`    | Soft disable     | Export button hidden on impression report screen                     | Soft — no money involved                                                                                                                                         |
 
 **Hard vs. soft distinction:**
+
 - Hard kill switch: when the flag is turned off, the feature disappears immediately with no user-facing explanation. The UI renders as if the feature does not exist. Used when a live bug would cause real ETH to be transferred, not recorded, or incorrectly attributed.
 - Soft disable: when the flag is turned off, the feature shows a "coming soon" state or is hidden. Used when the risk is UX degradation, not financial loss.
 
@@ -1665,6 +1709,7 @@ All flags are managed via the platform's feature flag service (LaunchDarkly or a
 
 **Internal alpha (week 1–2 before any external access):**
 Test these specific money flows internally with team wallets on Sepolia:
+
 1. Mint a single episode NFT end-to-end (broadcast → confirm → recordMint → portfolio reflects ownership)
 2. Mint 50 episodes at full max supply — verify exact sell-out behavior
 3. Send a 0.001 ETH tip to a team creator wallet — verify `recordTip` succeeds and earnings appear in Seller Hub
@@ -1677,12 +1722,14 @@ Test these specific money flows internally with team wallets on Sepolia:
 No external user (not even closed beta invitees) accesses the market surface until all 8 flows pass on Sepolia with team wallets.
 
 **Closed beta (weeks 3–4):**
+
 - Invite up to 50 creators and 100 fans from the waitlist.
 - Transaction cap: **0.1 ETH per user per day** (combined across all transaction types). This cap is enforced in the `subscriptions.subscribe`, `tips.recordTip`, and `ads.placeBid` handlers via a daily-spend tracker in Firestore (`dailySpend/{userId}_{date}`). On Sepolia this is testnet ETH, but the discipline establishes the pattern for mainnet migration.
 - Monitor: mint divergence rate, tip recording rate, seller hub adoption, any P1 alert triggers.
 - End of closed beta go/no-go gate: mint recording divergence < 0.5% over 7 days, tip recording success rate > 98% over 7 days, zero P1 alerts unresolved.
 
 **Open beta:**
+
 - Lift the 0.1 ETH/day transaction cap.
 - Remove closed beta invite requirement — any user can access the market surface.
 - Continue monitoring all P1 and P2 metrics.
@@ -1690,6 +1737,7 @@ No external user (not even closed beta invitees) accesses the market surface unt
 
 **GA (general availability) go/no-go criteria:**
 All of the following must be true simultaneously for 7 consecutive days:
+
 - Mint recording divergence < 0.1% (on-chain mints not reflected in Firestore)
 - Tip recording success rate > 99%
 - `seller.getEarningsSummary` p95 < 2000ms
@@ -1700,6 +1748,7 @@ All of the following must be true simultaneously for 7 consecutive days:
 #### A/B Tests
 
 **Test 1: Storefront section order — tips first vs. NFTs first**
+
 - Control: NFTs section appears first on the storefront scroll
 - Variant: Tips section appears first ("Support this creator" CTA at top)
 - Allocation: 50/50 random split, assigned at universe storefront view
@@ -1709,6 +1758,7 @@ All of the following must be true simultaneously for 7 consecutive days:
 - Decision: run for 4 weeks minimum. If tips-first lifts total conversion without significantly reducing NFT mints, adopt it as default.
 
 **Test 2: Seller Hub default period — 30d vs. 7d**
+
 - Control: Seller Hub opens with 30-day period selected
 - Variant: Seller Hub opens with 7-day period selected
 - Allocation: 50/50 split, assigned to creator accounts at first Seller Hub open
@@ -1717,6 +1767,7 @@ All of the following must be true simultaneously for 7 consecutive days:
 - Decision: the period that results in longer time-on-screen with lower override rate is the better default for comprehension.
 
 **Test 3: Collab call feed sort order — by recency vs. by revenue split offered**
+
 - Control: collab calls sorted by `createdAt` descending (newest first)
 - Variant: collab calls sorted by `revSplitBps` descending (highest revenue share first)
 - Allocation: 50/50 split per user session
@@ -1731,12 +1782,14 @@ All UI-only features (storefront display, seller hub view, collab feed, impressi
 
 **On-chain features — what rollback can and cannot do:**
 For mint, tip, subscription, and ad bid features: an OTA update or flag disable can hide the UI immediately. It cannot undo on-chain transactions. A user who has already sent ETH has sent it — that is permanent. Rollback actions are limited to:
+
 - Hiding the UI for new transactions (prevent more ETH from being spent)
 - Manually correcting off-chain Firestore records (if `recordMint` wrote incorrect data)
 - Re-indexing from Ponder (if Firestore diverged from the chain)
 
 **Incident response for mint over-recording or incorrect `recordMint`:**
 If a bug causes `mintedCount` to be incorrect in Firestore (e.g., duplicate increments, missed increments):
+
 1. Disable `episode_nft_mint` flag immediately.
 2. Identify the block range of the incident (from timestamps of incorrect `recordMint` calls).
 3. Run `npx ponder dev` pointing at the staging Firestore project with `fromBlock` set to the incident start block. Ponder will re-process all `Mint` events from that block and overwrite `mintedCount` with the on-chain truth.
@@ -1746,6 +1799,7 @@ If a bug causes `mintedCount` to be incorrect in Firestore (e.g., duplicate incr
 
 **`seller.getEarningsSummary` running-total reconciliation:**
 The `creatorEarnings/{uid}_{universeId}` document is a pre-aggregated running total updated by each payment mutation. If a payment mutation fails to update it (e.g., a Firestore write error in the mutation handler), the running total becomes stale. Reconciliation job specification:
+
 - **Trigger:** manual CLI command `npx ts-node scripts/reconcile-earnings.ts --universeId <id>` or a scheduled Cloud Function (Pub/Sub trigger, daily at 02:00 UTC).
 - **Logic:** for each `creatorEarnings` document, re-sum the source collections (`episodeMints`, `subscriptionPayments`, `licensingFees`, `adPayments`, `collabPayments`, `treasuryDistributions`, `tipPayments`) filtered by `universeId` and `creatorUid`. Compare the computed sum to the running total. If divergence > 0.0001 ETH, overwrite the running total document with the recomputed value and log the divergence to `earningsReconciliationLog` with the before/after amounts and timestamp.
 - **Alert:** if the reconciliation job finds any divergence > 0.001 ETH on any universe, emit a P2 alert to the monitoring channel.
@@ -1758,6 +1812,7 @@ The `creatorEarnings/{uid}_{universeId}` document is a pre-aggregated running to
 
 **Universe Storefront linear navigation order:**
 The full storefront must be navigable top-to-bottom by VoiceOver (iOS) and TalkBack (Android) in the following focus order:
+
 1. Universe header (artwork — announce as "Universe artwork for [name]", `accessibilityRole="image"`)
 2. Universe name (heading, `accessibilityRole="header"`)
 3. Rights classification badge (e.g., "Original IP — this universe is creator-owned and available for purchase", `accessibilityRole="text"`)
@@ -1788,11 +1843,13 @@ If max supply is unlimited: `"Episode [title]. [price] ETH to mint. Unlimited su
 If already subscribed: `"[tier name] tier. Currently subscribed. Renews [date]. Double-tap to manage your subscription."`
 
 **Mint confirmation sheet focus management:**
+
 - When the sheet opens: `autoFocus` on the sheet title element (`accessibilityRole="header"`). On iOS, this is implemented by calling `.focus()` on the title ref inside the `onOpen` callback of the bottom sheet library. On Android, use `AccessibilityInfo.setAccessibilityFocus(findNodeHandle(titleRef.current))`.
 - When the sheet closes (success, failure, or user dismissal): focus is programmatically returned to the "Mint" button that opened the sheet. This is tracked via a `lastFocusedRef` that captures the Mint button's ref before the sheet opens.
 
 **Revenue chart accessibility (Seller Hub):**
 Victory Native charts do not expose individual data points to the accessibility tree by default. The chart renders as a single unlabeled SVG element to VoiceOver. Specification for accessible alternative:
+
 - Add a "View as table" toggle button above the chart (`accessibilityLabel="View earnings as data table"`).
 - When toggled to table view, the chart is unmounted and replaced with a `FlatList` where each item represents one day of data.
 - Each `FlatList` item has `accessibilityRole="row"` and `accessibilityLabel` pattern: `"[Day, Month DD]: [X.XXXX] ETH"`.
@@ -1800,6 +1857,7 @@ Victory Native charts do not expose individual data points to the accessibility 
 - The toggle persists per-session (stored in component state, not AsyncStorage — resets on each Seller Hub open).
 
 **Direct tip amount selector:**
+
 - Preset amounts (e.g., 0.001 ETH, 0.005 ETH, 0.01 ETH) each have `accessibilityLabel`: `"[X] ETH — approximately $[Y] USD. Double-tap to select."` The USD equivalent is computed from a cached ETH price (refreshed on screen mount via a lightweight price API call; if unavailable, omit the USD portion).
 - Custom amount `TextInput`: `accessibilityLabel="Enter custom tip amount in ETH"`. As the user types, the `accessibilityValue={{ text: `${inputValue} ETH` }}` prop updates to announce the current value to the screen reader.
 - Selected state: the selected preset has `accessibilityState={{ selected: true }}`.
@@ -1807,6 +1865,7 @@ Victory Native charts do not expose individual data points to the accessibility 
 #### Motor Accessibility
 
 **Minimum touch target sizes:**
+
 - "Mint" button: minimum 44×44pt. The button text area may be smaller for visual design — use `hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}` to extend the hit area without changing the visual size.
 - "Subscribe" button: minimum 44×44pt with `hitSlop` as needed.
 - "Send Tip" button: minimum 44×44pt.
@@ -1815,9 +1874,10 @@ Victory Native charts do not expose individual data points to the accessibility 
 
 **Bottom sheet dismissal:**
 Every bottom sheet in Workstream 3 purchase flows (episode detail, mint confirmation, subscription detail, tip sheet, license request, ad bid, collab application, merch detail) must provide BOTH:
+
 1. A visible close button (✕ icon, 44×44pt tap target) in the top-right corner of the sheet, `accessibilityLabel="Close"`.
 2. Swipe-to-dismiss gesture.
-The swipe gesture alone is not sufficient — users who cannot perform precise swipe gestures must be able to dismiss via button tap.
+   The swipe gesture alone is not sufficient — users who cannot perform precise swipe gestures must be able to dismiss via button tap.
 
 **Collab application form submit button visibility:**
 The "Submit Application" button must be visible without scrolling on a 375pt-wide screen (iPhone SE 3rd generation viewport). Design constraint: the form fields above the button (role description, pitch text area) must not exceed the available vertical space. The pitch text area uses a fixed height of 120pt (approximately 5 lines) rather than expanding dynamically, to keep the submit button visible at all times on 375pt-wide devices. Test this constraint in every UI review using the iPhone SE simulator.
@@ -1826,14 +1886,16 @@ The "Submit Application" button must be visible without scrolling on a 375pt-wid
 
 **Rights classification badges:**
 The three rights classification states (fan, original, licensed) must be distinguishable by shape and icon in addition to color:
+
 - Fan lane: star icon (⭐) + "Fan Creation" label + yellow/amber color
 - Original IP: crown icon (👑) + "Original IP" label + blue/indigo color
 - Licensed: handshake icon (🤝) + "Licensed" label + green color
-Each badge renders: `[icon] [label]` — the icon and label are always present. Color is additive, not the primary differentiator. When iOS Color Filters is set to grayscale (Settings → Accessibility → Display & Text Size → Color Filters → Grayscale), the fan/original/licensed states remain distinguishable by icon shape and text.
+  Each badge renders: `[icon] [label]` — the icon and label are always present. Color is additive, not the primary differentiator. When iOS Color Filters is set to grayscale (Settings → Accessibility → Display & Text Size → Color Filters → Grayscale), the fan/original/licensed states remain distinguishable by icon shape and text.
 
 **Revenue chart bars — colorblind-accessible patterns:**
 The 7 revenue streams in the Seller Hub stacked bar chart use distinct colors. For color-blind accessibility (deuteranopia affects ~8% of males), each stream must ALSO be distinguishable without relying on color alone.
 Victory Native does not natively support bar hatching/fill patterns. The fallback specification:
+
 - Each stream bar has a distinct colored border (2pt width) in addition to its fill color. Borders use colors that remain distinguishable in deuteranopia simulations.
 - Each bar segment, when tapped, shows a tooltip that includes the stream name (text label) — not just the color legend.
 - The "View as table" accessible alternative (Section 8 above) provides a fully color-free fallback for users who cannot distinguish the chart colors.
@@ -1842,6 +1904,7 @@ If a future Victory Native version adds pattern fills, migrate to: `episodeMints
 
 **Earnings text contrast:**
 All ETH amount values displayed in the Seller Hub (headline total, per-stream amounts, individual transaction amounts) must meet WCAG AA contrast ratio of 4.5:1 against their background in both dark mode and light mode.
+
 - Light mode: ETH amounts rendered in `#1A1A2E` on `#FFFFFF` background — contrast ratio 18.5:1 (passes)
 - Dark mode: ETH amounts rendered in `#F0F0FF` on `#0A0A1A` background — verify in contrast checker before each design system update
 - The `accessibilityLabel` for ETH amounts always spells out the full value including units: "zero point zero one ETH" for `0.01 ETH` — do not rely on the screen reader's number parsing for financial values.
@@ -1849,6 +1912,7 @@ All ETH amount values displayed in the Seller Hub (headline total, per-stream am
 #### Accessibility Testing Protocol
 
 **VoiceOver (iOS) full mint flow audit — required before every release candidate:**
+
 1. Enable VoiceOver on iPhone simulator (iOS 16+)
 2. Navigate to Universe Storefront
 3. Verify linear focus order matches the specified order in Section 8
@@ -1859,9 +1923,10 @@ All ETH amount values displayed in the Seller Hub (headline total, per-stream am
 8. Close confirmation sheet — verify focus returns to Mint button
 9. Navigate to subscription section — verify tier card labels
 10. Navigate to tips section — verify preset amount labels include USD equivalent
-Document any VoiceOver regressions as blocking release issues.
+    Document any VoiceOver regressions as blocking release issues.
 
 **TalkBack (Android) Seller Hub → Earnings tab audit — required before every release candidate:**
+
 1. Enable TalkBack on Android emulator (API 33+)
 2. Navigate to Seller Hub
 3. Verify headline total is announced correctly with ETH denomination
@@ -1870,6 +1935,7 @@ Document any VoiceOver regressions as blocking release issues.
 6. Navigate to "Export CSV" button — verify label and activation
 
 **iOS Color Filters grayscale test — required before every release candidate:**
+
 1. Enable Settings → Accessibility → Display & Text Size → Color Filters → Grayscale on iPhone simulator
 2. Open Universe Storefront
 3. Verify rights classification badge is distinguishable by icon + text (not just color)
@@ -1883,26 +1949,27 @@ Document any VoiceOver regressions as blocking release issues.
 
 Rate limits are enforced via an in-process rate limiter in the Hono middleware layer, backed by a Redis sorted-set implementation (or Firestore atomic counters as a fallback if Redis is not available in the deployment environment). Rate limit state is stored per-user via the JWT `uid`.
 
-| Endpoint | Burst limit | Sustained limit | Key | Client behavior | Notes |
-|---|---|---|---|---|---|
-| `nft.mintContent` (via wagmi, not tRPC) | N/A — contract limits | N/A | on-chain | N/A | `EpisodeNFT.sol` enforces max supply and price on-chain; no server-side rate limiting applicable |
-| `nft.recordMint` | 10/min | 50/hour | per-user (`uid`) | Silent retry only if the call was part of the pending-record recovery flow; for normal calls, show a toast "Please wait before recording another mint" | Idempotency for same txHash (see below) |
-| `nft.createEpisodeListing` | 20/min (to support bulk flow of 10 at ~2/min pace) | 100/day | per-user | Show per-item error in bulk progress list: "[Episode title] — Too many requests. Retry." | Daily cap prevents listing spam |
-| `subscriptions.subscribe` | 5/min | — | per-user | Disable "Subscribe" button for a 30-second cooldown period after each call (successful or failed). Show countdown timer in button: "Try again in [N]s" | |
-| `licensing.requestLicense` | 3/min | 10/hour | per-user | Show cooldown timer in the request form: "You can send another request in [N] seconds." Disable submit button during cooldown. | 10/hour prevents license request spam toward creators |
-| `tips.recordTip` | 10/min | — | per-user | Silent retry — the tip was real and must be recorded. Do not surface a rate limit error to the user; queue the retry after 10 seconds. | The retry mechanism must not count against the rate limit for the same txHash (idempotency) |
-| `ads.placeBid` | 5/min | — | per-user | Disable "Place Bid" button for 15 seconds after each bid attempt. Show brief "Bid submitted — you can bid again shortly." | |
-| `collabs.applyToCall` | 5/min | — | per-user | Show cooldown: "You can apply to another call in [N] seconds." | Per-call application is already gated by the duplicate check |
-| `collabs.createOpenCall` | 3/hour | 10/day | per-user | Hard error returned to client: display an error sheet "You can post at most 3 collab calls per hour. Try again in [N] minutes." Do not disable the button — show the error on tap. | Anti-spam for the public collab feed |
-| `marketplace.submit` | 5/hour | — | per-user | Hard error: "You can submit at most 5 canon proposals per hour." Error sheet with time until reset. | |
-| `marketplace.vote` | 20/min | — | per-user | Debounce at client: enforce a 1-second delay between vote taps. If the server returns 429, suppress the error toast and revert the optimistic update silently. Display "Voting too quickly — slow down." as a brief inline message. | High vote frequency is expected from engaged fans |
-| `seller.getEarningsSummary` | 10/min | — | per-user | Return a cached result with a `stale: true` flag in the response. Client displays a small "Refreshed [N] minutes ago" indicator next to the headline. Do not show an error — stale data is better than no data. | Caching (Section 10) is the primary defense; rate limiting is the backstop |
+| Endpoint                                | Burst limit                                        | Sustained limit | Key              | Client behavior                                                                                                                                                                                                                     | Notes                                                                                            |
+| --------------------------------------- | -------------------------------------------------- | --------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `nft.mintContent` (via wagmi, not tRPC) | N/A — contract limits                              | N/A             | on-chain         | N/A                                                                                                                                                                                                                                 | `EpisodeNFT.sol` enforces max supply and price on-chain; no server-side rate limiting applicable |
+| `nft.recordMint`                        | 10/min                                             | 50/hour         | per-user (`uid`) | Silent retry only if the call was part of the pending-record recovery flow; for normal calls, show a toast "Please wait before recording another mint"                                                                              | Idempotency for same txHash (see below)                                                          |
+| `nft.createEpisodeListing`              | 20/min (to support bulk flow of 10 at ~2/min pace) | 100/day         | per-user         | Show per-item error in bulk progress list: "[Episode title] — Too many requests. Retry."                                                                                                                                            | Daily cap prevents listing spam                                                                  |
+| `subscriptions.subscribe`               | 5/min                                              | —               | per-user         | Disable "Subscribe" button for a 30-second cooldown period after each call (successful or failed). Show countdown timer in button: "Try again in [N]s"                                                                              |                                                                                                  |
+| `licensing.requestLicense`              | 3/min                                              | 10/hour         | per-user         | Show cooldown timer in the request form: "You can send another request in [N] seconds." Disable submit button during cooldown.                                                                                                      | 10/hour prevents license request spam toward creators                                            |
+| `tips.recordTip`                        | 10/min                                             | —               | per-user         | Silent retry — the tip was real and must be recorded. Do not surface a rate limit error to the user; queue the retry after 10 seconds.                                                                                              | The retry mechanism must not count against the rate limit for the same txHash (idempotency)      |
+| `ads.placeBid`                          | 5/min                                              | —               | per-user         | Disable "Place Bid" button for 15 seconds after each bid attempt. Show brief "Bid submitted — you can bid again shortly."                                                                                                           |                                                                                                  |
+| `collabs.applyToCall`                   | 5/min                                              | —               | per-user         | Show cooldown: "You can apply to another call in [N] seconds."                                                                                                                                                                      | Per-call application is already gated by the duplicate check                                     |
+| `collabs.createOpenCall`                | 3/hour                                             | 10/day          | per-user         | Hard error returned to client: display an error sheet "You can post at most 3 collab calls per hour. Try again in [N] minutes." Do not disable the button — show the error on tap.                                                  | Anti-spam for the public collab feed                                                             |
+| `marketplace.submit`                    | 5/hour                                             | —               | per-user         | Hard error: "You can submit at most 5 canon proposals per hour." Error sheet with time until reset.                                                                                                                                 |                                                                                                  |
+| `marketplace.vote`                      | 20/min                                             | —               | per-user         | Debounce at client: enforce a 1-second delay between vote taps. If the server returns 429, suppress the error toast and revert the optimistic update silently. Display "Voting too quickly — slow down." as a brief inline message. | High vote frequency is expected from engaged fans                                                |
+| `seller.getEarningsSummary`             | 10/min                                             | —               | per-user         | Return a cached result with a `stale: true` flag in the response. Client displays a small "Refreshed [N] minutes ago" indicator next to the headline. Do not show an error — stale data is better than no data.                     | Caching (Section 10) is the primary defense; rate limiting is the backstop                       |
 
 **`nft.recordMint` idempotency and rate limiting:**
 The rate limiter for `recordMint` must treat repeated calls with the same `txHash` as a no-op, not as a rate-limited request. Implementation: before incrementing the rate limit counter, check the `processedTxHashes` collection. If the `txHash` is already present, return 200 immediately without incrementing the counter. Only increment the rate limit counter for genuinely new `txHash` values. This ensures the pending-record recovery flow (which retries on every app foreground) does not exhaust the rate limit for users whose `recordTip` or `recordMint` legitimately failed on the first attempt.
 
 **Rate limit response format:**
 All rate-limited responses return HTTP 429 with a JSON body:
+
 ```json
 {
   "error": "RATE_LIMITED",
@@ -1910,13 +1977,16 @@ All rate-limited responses return HTTP 429 with a JSON body:
   "endpoint": "nft.createEpisodeListing"
 }
 ```
+
 The `retryAfterSeconds` field is used by the client to display countdown timers and schedule automatic retries where applicable.
 
 **Redis key schema for rate limits:**
+
 ```
 rate:uid:{userId}:endpoint:{endpointName}:burst     → sorted set (timestamp → count)
 rate:uid:{userId}:endpoint:{endpointName}:sustained → sorted set (timestamp → count)
 ```
+
 Keys expire automatically (TTL = sustained window duration × 2). On Redis unavailability (connection error), the rate limiter fails open (allows the request) and logs a warning. Rate limiting is a quality-of-service control, not a security control — security is enforced by authentication and server-side validation.
 
 ---
@@ -1929,31 +1999,32 @@ Server-side cache uses Firestore documents as the cache store (keys in `serverCa
 
 #### Cache Table
 
-| Data | Client TTL | Server TTL | Invalidation trigger | SWR? | Notes |
-|---|---|---|---|---|---|
-| Universe Storefront (all sections, via `storefrontCache` document) | 2 min | 60s | `nft.createEpisodeListing`, `nft.deactivateEpisode`, `subscriptions.configureTier`, `licensing.createMerch`, `marketplace.finalize` (ACCEPTED), `ads.createSlot`, `ads.acceptBid` | Yes | Server cache keyed by `universeId`. Client SWR: show stale data immediately, refetch in background. |
-| `nft.getEpisodesByUniverse` | 2 min | 60s | Ponder `Mint` event handler (decrements supply in Firestore); `nft.createEpisodeListing` (adds new episode) | Yes | Short TTL because supply remaining changes on every mint. Client shows optimistic supply decrement for the user's own mint session. |
-| `subscriptions.getTiers` | 10 min | 5 min | `subscriptions.configureTier` | Yes | Tier configuration changes are infrequent (weekly or less). |
-| `licensing.getMerch` (by universe) | 10 min | 5 min | `licensing.createMerch`, merch item deactivation | Yes | |
-| `marketplace.getCanon` (by universe) | 5 min | 2 min | `marketplace.submit`, `marketplace.finalize` | Yes | Submission status changes trigger cache invalidation. |
-| `ads.getSlotsByUniverse` | 5 min | 2 min | `ads.createSlot`, `ads.acceptBid`, `ads.deactivateSlot` | Yes | |
-| `seller.getEarningsSummary` | 2 min | 30s | Any payment mutation (`recordMint`, `recordTip`, `subscribe`, payment webhook from Stripe for merch) | Yes | Most critical to be fresh for creator trust. Short server TTL despite fan-out cost. Cache hit rate must be > 80% to avoid Firestore overload — 30s TTL means at most 2 Firestore fan-out reads per creator per minute. |
-| `analytics.getUniverseMetrics` | 5 min | 2 min | `analytics.recordEngagement`, `analytics.recordView` | Yes | |
-| `collabs.listOpenCalls` | 5 min | 2 min | `collabs.createOpenCall`, call deadline passing (evaluated at query time), `collabs.closeCall` | Yes | Public endpoint, high-traffic. Aggressive server cache. Cache key includes sort parameter and page number. |
-| `ads.getImpressions` | 5 min | 60s | `ads.recordImpression` | Yes | Impression counts are append-only — cache is valid until a new impression is recorded. For high-impression slots (> 10,000), use the pre-aggregated `impressionSummary` document. |
-| `licensing.getLicenseRequests` (creator inbox) | 3 min | 90s | `licensing.requestLicense`, `licensing.respondToLicenseRequest` | Yes | Creator needs to see new requests promptly. |
-| `collabs.getMyApplications` (buyer) | 5 min | 2 min | `collabs.applyToCall`, `collabs.acceptApplication` | Yes | Used to populate the `appliedCallIds` set for duplicate prevention. |
+| Data                                                               | Client TTL | Server TTL | Invalidation trigger                                                                                                                                                              | SWR? | Notes                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------ | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Universe Storefront (all sections, via `storefrontCache` document) | 2 min      | 60s        | `nft.createEpisodeListing`, `nft.deactivateEpisode`, `subscriptions.configureTier`, `licensing.createMerch`, `marketplace.finalize` (ACCEPTED), `ads.createSlot`, `ads.acceptBid` | Yes  | Server cache keyed by `universeId`. Client SWR: show stale data immediately, refetch in background.                                                                                                                    |
+| `nft.getEpisodesByUniverse`                                        | 2 min      | 60s        | Ponder `Mint` event handler (decrements supply in Firestore); `nft.createEpisodeListing` (adds new episode)                                                                       | Yes  | Short TTL because supply remaining changes on every mint. Client shows optimistic supply decrement for the user's own mint session.                                                                                    |
+| `subscriptions.getTiers`                                           | 10 min     | 5 min      | `subscriptions.configureTier`                                                                                                                                                     | Yes  | Tier configuration changes are infrequent (weekly or less).                                                                                                                                                            |
+| `licensing.getMerch` (by universe)                                 | 10 min     | 5 min      | `licensing.createMerch`, merch item deactivation                                                                                                                                  | Yes  |                                                                                                                                                                                                                        |
+| `marketplace.getCanon` (by universe)                               | 5 min      | 2 min      | `marketplace.submit`, `marketplace.finalize`                                                                                                                                      | Yes  | Submission status changes trigger cache invalidation.                                                                                                                                                                  |
+| `ads.getSlotsByUniverse`                                           | 5 min      | 2 min      | `ads.createSlot`, `ads.acceptBid`, `ads.deactivateSlot`                                                                                                                           | Yes  |                                                                                                                                                                                                                        |
+| `seller.getEarningsSummary`                                        | 2 min      | 30s        | Any payment mutation (`recordMint`, `recordTip`, `subscribe`, payment webhook from Stripe for merch)                                                                              | Yes  | Most critical to be fresh for creator trust. Short server TTL despite fan-out cost. Cache hit rate must be > 80% to avoid Firestore overload — 30s TTL means at most 2 Firestore fan-out reads per creator per minute. |
+| `analytics.getUniverseMetrics`                                     | 5 min      | 2 min      | `analytics.recordEngagement`, `analytics.recordView`                                                                                                                              | Yes  |                                                                                                                                                                                                                        |
+| `collabs.listOpenCalls`                                            | 5 min      | 2 min      | `collabs.createOpenCall`, call deadline passing (evaluated at query time), `collabs.closeCall`                                                                                    | Yes  | Public endpoint, high-traffic. Aggressive server cache. Cache key includes sort parameter and page number.                                                                                                             |
+| `ads.getImpressions`                                               | 5 min      | 60s        | `ads.recordImpression`                                                                                                                                                            | Yes  | Impression counts are append-only — cache is valid until a new impression is recorded. For high-impression slots (> 10,000), use the pre-aggregated `impressionSummary` document.                                      |
+| `licensing.getLicenseRequests` (creator inbox)                     | 3 min      | 90s        | `licensing.requestLicense`, `licensing.respondToLicenseRequest`                                                                                                                   | Yes  | Creator needs to see new requests promptly.                                                                                                                                                                            |
+| `collabs.getMyApplications` (buyer)                                | 5 min      | 2 min      | `collabs.applyToCall`, `collabs.acceptApplication`                                                                                                                                | Yes  | Used to populate the `appliedCallIds` set for duplicate prevention.                                                                                                                                                    |
 
 #### Storefront Server-side Cache Architecture
 
 The Universe Storefront is the highest-read surface in the system. A single popular universe may receive hundreds of concurrent storefront views. To avoid fan-out Firestore reads on every view, a pre-computed cache document is maintained at `storefrontCache/{universeId}`.
 
 **Cache document structure:**
+
 ```typescript
 interface StorefrontCacheDocument {
   universeId: string;
   cachedAt: Timestamp;
-  ttlSeconds: number;  // 60
+  ttlSeconds: number; // 60
   data: {
     episodes: EpisodeListing[];
     subscriptionTiers: SubscriptionTier[];
@@ -1968,6 +2039,7 @@ interface StorefrontCacheDocument {
 ```
 
 **Cache read flow in `storefront.get` handler:**
+
 1. Read `storefrontCache/{universeId}`.
 2. If the document exists and `cachedAt + ttlSeconds > now()`, return `document.data` directly. No further Firestore reads.
 3. If the document is missing or stale, execute the full fan-out read (episodes, tiers, merch, canon, slots, universe metadata). Write the result to `storefrontCache/{universeId}` with `cachedAt = now()`. Return the freshly computed data.
@@ -1976,6 +2048,7 @@ interface StorefrontCacheDocument {
 Each mutation handler that affects storefront data deletes (or overwrites) `storefrontCache/{universeId}` as the last operation before returning the response. The delete is a Firestore `doc.delete()` call. If this write fails, log the error but do not fail the mutation — a stale cache document is acceptable; a failed mutation is not.
 
 Affected mutations:
+
 - `nft.createEpisodeListing`: delete cache after the episode is written to Firestore.
 - `nft.deactivateEpisode`: delete cache.
 - `subscriptions.configureTier`: delete cache.
@@ -1986,22 +2059,20 @@ Affected mutations:
 
 **Cache warming:**
 A `warmStorefrontCache()` function is called:
+
 1. On Hono server startup (via the `onStarted` lifecycle hook or a startup script) for the top 100 universes by `viewCount` in the `universes` collection.
 2. Via a Bun cron job scheduled at 5-minute intervals: `Bun.serve` supports `import { CronJob } from 'bun'` — schedule `warmStorefrontCache()` every 300 seconds.
 
 `warmStorefrontCache()` implementation:
+
 ```typescript
 async function warmStorefrontCache(): Promise<void> {
-  const top100 = await db.collection('universes')
-    .orderBy('viewCount', 'desc')
-    .limit(100)
-    .get();
-  
-  await Promise.allSettled(
-    top100.docs.map(doc => computeAndWriteStorefrontCache(doc.id))
-  );
+  const top100 = await db.collection('universes').orderBy('viewCount', 'desc').limit(100).get();
+
+  await Promise.allSettled(top100.docs.map((doc) => computeAndWriteStorefrontCache(doc.id)));
 }
 ```
+
 Individual universe cache misses in `warmStorefrontCache` are caught and logged — one universe failing to warm must not block the others. The function completes in < 30 seconds for 100 universes (100 fan-out reads in parallel, each ~200ms).
 
 #### On-chain State Freshness
@@ -2010,15 +2081,13 @@ On-chain state (supply remaining, subscription access) is authoritative. The tRP
 
 **Optimistic update after user's own mint:**
 When the user successfully mints an episode, the client immediately applies an optimistic update to the React Query cache for `nft.getEpisodesByUniverse`:
+
 ```typescript
 queryClient.setQueryData(['episodes', universeId], (old: EpisodeListing[]) =>
-  old.map(ep =>
-    ep.id === mintedEpisodeId
-      ? { ...ep, mintedCount: ep.mintedCount + 1 }
-      : ep
-  )
+  old.map((ep) => (ep.id === mintedEpisodeId ? { ...ep, mintedCount: ep.mintedCount + 1 } : ep))
 );
 ```
+
 This optimistic decrement is applied regardless of whether the Ponder indexer has caught up. When the real data arrives (on next SWR refetch), the true value from Ponder overwrites the optimistic value. If the true value is ≥ the optimistic value (expected), the transition is seamless. If the true value is lower (indicating the optimistic update was premature — e.g., a Ponder reorg), the value reverts gracefully.
 
 **Subscription access optimistic update:**

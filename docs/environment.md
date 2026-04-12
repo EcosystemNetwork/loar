@@ -105,13 +105,11 @@ When `REDIS_URL` is not set, the server uses an in-memory rate limiter (suitable
 | `PINATA_GATEWAY_URL`        | server | Pinata gateway URL for content retrieval                             |
 | `STORAGE_PROVIDER_PRIORITY` | server | Comma-separated priority order (e.g. `walrus,ipfs,synapse,firebase`) |
 
-### Coinbase Developer Platform (Optional)
+### Dynamic Labs (Optional)
 
-| Variable              | App | Description                            |
-| --------------------- | --- | -------------------------------------- |
-| `VITE_CDP_PROJECT_ID` | web | Coinbase Developer Platform project ID |
-| `VITE_CDP_API_KEY`    | web | CDP API key                            |
-| `VITE_CDP_API_SECRET` | web | CDP API secret                         |
+| Variable                      | App | Description                                              |
+| ----------------------------- | --- | -------------------------------------------------------- |
+| `VITE_DYNAMIC_ENVIRONMENT_ID` | web | Dynamic Labs environment ID (from dashboard.dynamic.xyz) |
 
 ### Contracts / Foundry (Optional)
 

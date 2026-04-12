@@ -69,6 +69,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     error NotPlatform();
     error NotLicensor();
+    error NotLicensee();
     error NotUniverseCreator();
     error InvalidStatus();
     error TransferFailed();
@@ -159,8 +160,8 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function activateLicense(uint256 licenseId) external payable nonReentrant whenNotPaused {
         License storage lic = licenses[licenseId];
         if (lic.status != LicenseStatus.PROPOSED) revert InvalidStatus();
-        require(msg.sender == lic.licensee, "Not licensee");
-        require(msg.value >= lic.upfrontFee, "Insufficient upfront fee");
+        if (msg.sender != lic.licensee) revert NotLicensee();
+        if (msg.value < lic.upfrontFee) revert InsufficientPayment();
 
         uint256 duration = lic.endTime;
         lic.startTime = block.timestamp;
@@ -175,10 +176,12 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         emit LicenseActivated(licenseId);
     }
 
-    /// @notice Pay ongoing royalties for an active license
-    function payRoyalty(uint256 licenseId) external payable whenNotPaused {
+    /// @notice Pay ongoing royalties for an active license (licensee or platform only)
+    function payRoyalty(uint256 licenseId) external payable nonReentrant whenNotPaused {
         License storage lic = licenses[licenseId];
-        require(lic.status == LicenseStatus.ACTIVE, "Not active");
+        if (lic.status != LicenseStatus.ACTIVE) revert InvalidStatus();
+        // Only the licensee or platform can pay royalties to prevent accidental fund transfers
+        if (msg.sender != lic.licensee && msg.sender != platform) revert NotLicensee();
 
         lic.totalRoyalties += msg.value;
 

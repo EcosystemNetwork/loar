@@ -70,7 +70,9 @@ export function Web3ModeProvider({ children }: { children: ReactNode }) {
       // Always update localStorage as fallback
       try {
         localStorage.setItem(STORAGE_KEY, String(enabled));
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       setLocalMode(enabled);
 
       // Persist to profile if authenticated

@@ -89,6 +89,16 @@ const METADATA_LABELS: Record<string, string> = {
   influence: 'Influence / Reach',
 };
 
+const safeUrl = (url: string | null | undefined): string | undefined => {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 function EntityPage() {
   const { id } = Route.useParams();
   const { address } = useAccount();
@@ -103,6 +113,8 @@ function EntityPage() {
     queryKey: ['entity', id],
     queryFn: () => trpcClient.entities.get.query({ entityId: id }),
   });
+
+  const { data: mediaAttachments = [] } = useMediaAttachments('entity', id);
 
   if (isLoading) {
     return (
@@ -129,7 +141,6 @@ function EntityPage() {
   const kindLabel = KIND_LABELS[entity.kind] ?? entity.kind;
   const metadataEntries = Object.entries(entity.metadata ?? {}).filter(([, v]) => v);
   const isOwner = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
-  const { data: mediaAttachments = [] } = useMediaAttachments('entity', id);
 
   const handleGenerateBio = async () => {
     setGenerating(true);
@@ -143,7 +154,10 @@ function EntityPage() {
       await trpcClient.entities.update.mutate({
         entityId: id,
         description: profile.description,
-        metadata: { ...(entity.metadata ?? {}), ...profile.metadata },
+        metadata: { ...(entity.metadata ?? {}), ...profile.metadata } as Record<
+          string,
+          string | number | boolean | null
+        >,
       });
       queryClient.invalidateQueries({ queryKey: ['entity', id] });
       toast.success('AI bio generated and saved!');
@@ -166,12 +180,12 @@ function EntityPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — image + metadata */}
         <div className="space-y-4">
-          {entity.imageUrl && (
+          {safeUrl(entity.imageUrl) && (
             <Card>
               <CardContent className="p-4">
                 <div className="aspect-square w-full overflow-hidden rounded-lg">
                   <img
-                    src={entity.imageUrl}
+                    src={safeUrl(entity.imageUrl)}
                     alt={entity.name}
                     className="w-full h-full object-cover"
                   />

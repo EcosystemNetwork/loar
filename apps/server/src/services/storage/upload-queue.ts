@@ -25,6 +25,7 @@ export interface UploadJob {
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [2_000, 5_000, 15_000]; // Exponential-ish backoff
 const JOB_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_QUEUE_SIZE = 1000;
 
 export class UploadQueue {
   private static instance: UploadQueue | null = null;
@@ -39,7 +40,7 @@ export class UploadQueue {
 
   private constructor() {
     // Periodic cleanup of old completed/failed jobs
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    setInterval(() => this.cleanup(), 1 * 60 * 1000);
   }
 
   /** Enqueue an upload from URL. Returns job ID immediately. */
@@ -49,6 +50,10 @@ export class UploadQueue {
     mimeType: string,
     userId: string
   ): Promise<string> {
+    if (this.jobs.size >= MAX_QUEUE_SIZE) {
+      throw new Error(`Upload queue is full (${MAX_QUEUE_SIZE} jobs). Try again later.`);
+    }
+
     const jobId = crypto.randomUUID();
     const now = Date.now();
 
@@ -81,6 +86,10 @@ export class UploadQueue {
     mimeType: string,
     userId: string
   ): Promise<string> {
+    if (this.jobs.size >= MAX_QUEUE_SIZE) {
+      throw new Error(`Upload queue is full (${MAX_QUEUE_SIZE} jobs). Try again later.`);
+    }
+
     const jobId = crypto.randomUUID();
     const now = Date.now();
 
