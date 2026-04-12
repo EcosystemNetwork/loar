@@ -6,7 +6,7 @@
  * use wagmi hooks generated from ContentLicensing.sol ABI.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { trpc } from '../utils/trpc';
+import { trpcClient } from '../utils/trpc';
 
 /** Register content for sale/rent/license */
 export function useRegisterContent() {
@@ -25,7 +25,7 @@ export function useRegisterContent() {
       licenseFee?: string;
       licenseRoyaltyBps?: number;
       txHash?: string;
-    }) => trpc.contentLicensing.register.mutate(input),
+    }) => trpcClient.contentLicensing.register.mutate(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['contentLicensing', 'universe', variables.universeId],
@@ -45,7 +45,7 @@ export function useUpdatePricing() {
       rentPricePerDay?: string;
       licenseFee?: string;
       licenseRoyaltyBps?: number;
-    }) => trpc.contentLicensing.updatePricing.mutate(input),
+    }) => trpcClient.contentLicensing.updatePricing.mutate(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contentLicensing'] });
     },
@@ -57,7 +57,7 @@ export function useDeactivateContent() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (registrationId: string) =>
-      trpc.contentLicensing.deactivate.mutate({ registrationId }),
+      trpcClient.contentLicensing.deactivate.mutate({ registrationId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contentLicensing'] });
     },
@@ -75,7 +75,7 @@ export function useRecordDeal() {
       pricePaid: string;
       durationDays?: number;
       txHash: string;
-    }) => trpc.contentLicensing.recordDeal.mutate(input),
+    }) => trpcClient.contentLicensing.recordDeal.mutate(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contentLicensing'] });
     },
@@ -86,7 +86,8 @@ export function useRecordDeal() {
 export function useContentLicensingByContent(contentHash: string | undefined) {
   return useQuery({
     queryKey: ['contentLicensing', 'content', contentHash],
-    queryFn: () => (contentHash ? trpc.contentLicensing.getByContent.query({ contentHash }) : null),
+    queryFn: () =>
+      contentHash ? trpcClient.contentLicensing.getByContent.query({ contentHash }) : null,
     enabled: !!contentHash,
   });
 }
@@ -94,13 +95,17 @@ export function useContentLicensingByContent(contentHash: string | undefined) {
 /** List licensable content in a universe */
 export function useContentByUniverse(
   universeId: string | undefined,
-  options?: { dealType?: 'BUY' | 'RENT' | 'LICENSE'; sortBy?: string; limit?: number }
+  options?: {
+    dealType?: 'BUY' | 'RENT' | 'LICENSE';
+    sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
+    limit?: number;
+  }
 ) {
   return useQuery({
     queryKey: ['contentLicensing', 'universe', universeId, options],
     queryFn: () =>
       universeId
-        ? trpc.contentLicensing.getByUniverse.query({
+        ? trpcClient.contentLicensing.getByUniverse.query({
             universeId,
             ...options,
           })
@@ -113,7 +118,7 @@ export function useContentByUniverse(
 export function useMyRegisteredContent(limit?: number) {
   return useQuery({
     queryKey: ['contentLicensing', 'creator', limit],
-    queryFn: () => trpc.contentLicensing.getByCreator.query({ limit: limit || 20 }),
+    queryFn: () => trpcClient.contentLicensing.getByCreator.query({ limit: limit || 20 }),
   });
 }
 
@@ -121,6 +126,6 @@ export function useMyRegisteredContent(limit?: number) {
 export function useMyDeals(limit?: number) {
   return useQuery({
     queryKey: ['contentLicensing', 'myDeals', limit],
-    queryFn: () => trpc.contentLicensing.myDeals.query({ limit: limit || 20 }),
+    queryFn: () => trpcClient.contentLicensing.myDeals.query({ limit: limit || 20 }),
   });
 }

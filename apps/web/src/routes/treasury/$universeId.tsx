@@ -36,7 +36,7 @@ function TreasuryPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link to={`/universe/${universeId}`}>
+            <Link to={`/universe/${universeId}` as any}>
               <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Universe

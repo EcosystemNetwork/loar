@@ -12,19 +12,20 @@ initFirebase();
 const { validateEnv } = await import('./lib/env');
 const env = validateEnv();
 
-import { serve } from '@hono/node-server';
-import { trpcServer } from '@hono/trpc-server';
-import { createContext } from './lib/context';
-import { appRouter } from './routers/index';
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
-import { imageRouter } from './routes/image';
-import { authRoutes } from './routes/auth';
-import { verifyAuth } from './lib/auth';
-import { securityHeaders } from './middleware/security-headers';
-import { rateLimiter, aiRateLimiter } from './middleware/rate-limit';
-import { errorHandler } from './middleware/error-handler';
+// Dynamic imports — must load after dotenv.config() above
+const { serve } = await import('@hono/node-server');
+const { trpcServer } = await import('@hono/trpc-server');
+const { createContext } = await import('./lib/context');
+const { appRouter } = await import('./routers/index');
+const { Hono } = await import('hono');
+const { cors } = await import('hono/cors');
+const { logger } = await import('hono/logger');
+const { imageRouter } = await import('./routes/image');
+const { authRoutes } = await import('./routes/auth');
+const { verifyAuth } = await import('./lib/auth');
+const { securityHeaders } = await import('./middleware/security-headers');
+const { rateLimiter, aiRateLimiter } = await import('./middleware/rate-limit');
+const { errorHandler } = await import('./middleware/error-handler');
 
 const app = new Hono();
 
@@ -49,11 +50,14 @@ app.use(
   '/*',
   cors({
     origin: (origin) => {
-      if (!origin) return allowedOrigins[0]; // non-browser requests
-      return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+      // Non-browser requests (curl, server-to-server) have no Origin header.
+      // Allow them through CORS — auth middleware handles access control.
+      if (!origin) return allowedOrigins[0];
+      // Reject unknown origins instead of falling back to a default
+      return allowedOrigins.includes(origin) ? origin : null;
     },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,
   })
 );
@@ -71,7 +75,9 @@ app.route('/images', imageRouter);
 
 // Direct file upload endpoint (multipart form, bypasses tRPC for large files)
 app.post('/api/upload', async (c) => {
-  const user = await verifyAuth(c.req.raw.headers);
+  const { getCookie } = await import('hono/cookie');
+  const cookieToken = getCookie(c, 'siwe-session');
+  const user = await verifyAuth(c.req.raw.headers, cookieToken);
   if (!user) {
     return c.json({ code: 'UNAUTHORIZED', message: 'Authentication required' }, 401);
   }

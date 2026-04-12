@@ -68,7 +68,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 type Tab = 'licenses' | 'merch';
 
 function LicensingHubPage() {
-  const { isConnected, uid } = useWalletAuth();
+  const { isConnected, address: uid } = useWalletAuth();
   const [tab, setTab] = useState<Tab>('licenses');
 
   // Fetch all licenses where the user is the licensor

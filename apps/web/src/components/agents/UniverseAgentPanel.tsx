@@ -49,8 +49,8 @@ export function UniverseAgentPanel({ universeId, isAdmin }: Props) {
           <Briefcase className="h-5 w-5 text-violet-400" />
           Talent Agent
         </h3>
-        {assignments?.talentAgentUid ? (
-          <TalentAgentCard uid={assignments.talentAgentUid} />
+        {(assignments as any)?.talentAgentUid ? (
+          <TalentAgentCard uid={(assignments as any).talentAgentUid} />
         ) : (
           <Card className="p-4 text-center text-zinc-500">
             <p>No talent agent assigned</p>
@@ -123,7 +123,7 @@ function TalentAgentCard({ uid }: { uid: string }) {
   if (!agent) return null;
 
   return (
-    <Link to={`/agents/${uid}`}>
+    <Link to={`/agents/${uid}` as any}>
       <Card className="flex items-center gap-4 p-4 transition-colors hover:border-violet-500/50">
         {(agent as any).avatarUrl ? (
           <img
@@ -178,7 +178,7 @@ function AIAgentCard({
 
   const handleRunPipeline = async (pipelineId: string) => {
     try {
-      const result = await runPipeline.mutateAsync({ pipelineId });
+      const result = (await runPipeline.mutateAsync({ pipelineId })) as any;
       toast.success(`Pipeline started: ${result.runId}`);
     } catch (err: any) {
       toast.error(err.message);

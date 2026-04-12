@@ -32,7 +32,7 @@ export interface EvmAddresses {
 
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000' as `0x${string}`;
 
-export const EVM_ADDRESSES: Record<SupportedEvmChainId, EvmAddresses> = {
+export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> = {
   11155111: {
     universeManager: '0x66f289658Ce5FD0Bb1022251Ea4604f6B0c4D7cE',
     loarToken: '0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F',
@@ -58,7 +58,7 @@ export const EVM_ADDRESSES: Record<SupportedEvmChainId, EvmAddresses> = {
 };
 
 export function getEvmAddresses(chainId: number): EvmAddresses | null {
-  return EVM_ADDRESSES[chainId as SupportedEvmChainId] ?? null;
+  return (EVM_ADDRESSES as Record<number, EvmAddresses | undefined>)[chainId] ?? null;
 }
 
 /**

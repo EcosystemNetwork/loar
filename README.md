@@ -31,24 +31,24 @@ We classify every feature by what actually works end-to-end today, not what has 
 
 ### LIVE (Working end-to-end)
 
-| Feature                        | What Works Today                                                                                                     |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| **Wallet Auth (SIWE)**         | CDP Embedded Wallet (Google/Apple/passkeys/email) → SIWE signature → JWT. Full social login, no seed phrase required |
-| **Universe Creation**          | Two-step wizard: deploy Universe contract + governance token + Uniswap v4 pool                                       |
-| **Narrative Timeline Editor**  | ReactFlow-based visual story builder. Create, link, and branch narrative nodes                                       |
-| **AI Video Generation**        | 4 providers (Veo3, Kling, Wan2.5, Sora) via FAL AI. 1-60s duration, configurable                                     |
-| **AI Image Generation**        | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                                                  |
-| **Model Routing (Smart Auto)** | Auto-selects best model by quality/speed/cost. Manual override available. 14 models, cost tracked per generation     |
-| **Quest & Affiliate System**   | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards         |
-| **AI Wiki Generation**         | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                    |
-| **On-Chain Node Storage**      | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                          |
-| **Decentralized Storage**      | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Storacha > Firebase                                          |
-| **Creator Profiles**           | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                 |
-| **Content Upload**             | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                |
-| **Content Discovery**          | Search/filter by classification, media type, tags. Creator gallery + content feed                                    |
-| **Character Wiki**             | Browse, search, filter characters by collection/traits. Individual character pages                                   |
-| **Blockchain Indexer**         | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                                                    |
-| **ETH Purchase Flow**          | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order         |
+| Feature                        | What Works Today                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| **Wallet Auth (SIWE)**         | Dynamic Labs wallet connection (EVM) → SIWE signature → JWT. Connect any Ethereum wallet, no seed phrase required |
+| **Universe Creation**          | Two-step wizard: deploy Universe contract + governance token + Uniswap v4 pool                                    |
+| **Narrative Timeline Editor**  | ReactFlow-based visual story builder. Create, link, and branch narrative nodes                                    |
+| **AI Video Generation**        | 4 providers (Veo3, Kling, Wan2.5, Sora) via FAL AI. 1-60s duration, configurable                                  |
+| **AI Image Generation**        | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                                               |
+| **Model Routing (Smart Auto)** | Auto-selects best model by quality/speed/cost. Manual override available. 14 models, cost tracked per generation  |
+| **Quest & Affiliate System**   | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards      |
+| **AI Wiki Generation**         | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                 |
+| **On-Chain Node Storage**      | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                       |
+| **Decentralized Storage**      | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Storacha > Firebase                                       |
+| **Creator Profiles**           | Username, bio, themes (5 options), social links, privacy controls, public portfolios                              |
+| **Content Upload**             | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection             |
+| **Content Discovery**          | Search/filter by classification, media type, tags. Creator gallery + content feed                                 |
+| **Character Wiki**             | Browse, search, filter characters by collection/traits. Individual character pages                                |
+| **Blockchain Indexer**         | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                                                 |
+| **ETH Purchase Flow**          | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order      |
 
 ### PARTIAL (Backend + contracts exist, frontend not fully wired)
 
@@ -71,7 +71,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 | **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus`                                                                                                      | Frontend still uses old `fun`/`monetized` labels. UI badges not yet migrated                             |
 | **Worldbuilding Studio**  | `/create` hub + per-kind forms. Wiki at `/wiki` with tabbed entity browsing + detail pages (`/wiki/entity/$id`)                                                                                                    | No `/wiki/$kind` filter routes                                                                           |
 | **Content Moderation**    | Flag system, admin review queue, DMCA intake (`/dmca`), immutable audit log. `contentStatus` gates commercial transactions                                                                                         | Admin UI at `/admin/moderation`. No auto-flag threshold, no counter-notice workflow (manual review only) |
-| **Mobile App**            | Expo 52 / React Native (iOS + Android). Portfolio, tokens, earnings, collections, profile tabs. CDP wallet auth                                                                                                    | Beta — not yet published to App Store / Play Store                                                       |
+| **Mobile App**            | Expo 52 / React Native (iOS + Android). Portfolio, tokens, earnings, collections, profile tabs. Wallet auth                                                                                                        | Beta — not yet published to App Store / Play Store                                                       |
 
 ### PLANNED (Not implemented)
 
@@ -90,7 +90,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 ```
                  ┌─────────────────────────────────────────────────┐
                  │                    Frontend                      │
-                 │  React 18 + Vite + TanStack Router + wagmi      │
+                 │  React 18 + Vite + TanStack Router + wagmi       │
                  │  Port 3001                                       │
                  └──────────┬──────────────────┬───────────────────┘
                             │ tRPC              │ wagmi
@@ -113,18 +113,18 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
               └──────────────────┘
 ```
 
-| App              | Stack                                                    | Description                               |
-| ---------------- | -------------------------------------------------------- | ----------------------------------------- |
-| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, RainbowKit | Frontend SPA                              |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (25+ routers, 150+ procedures) |
-| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37+ tables)     |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                                | Smart contracts (Sepolia)                 |
-| `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app (CDP wallet auth)       |
-| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                  |
+| App              | Stack                                                      | Description                               |
+| ---------------- | ---------------------------------------------------------- | ----------------------------------------- |
+| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, Dynamic Labs | Frontend SPA                              |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                     | API server (25+ routers, 150+ procedures) |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                      | Blockchain event indexer (37+ tables)     |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                                  | Smart contracts (Sepolia)                 |
+| `apps/mobile`    | Expo 52, React Native, NativeWind                          | iOS + Android app                         |
+| `packages/abis`  | Auto-generated wagmi hooks                                 | Shared contract bindings                  |
 
 ### Key Flows
 
-**Auth:** CDP Embedded Wallet (Google/Apple/passkeys/email) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure
+**Auth:** Dynamic Labs Wallet (EVM) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure
 
 **Content Creation:** AI Generate > Decentralized Storage (SHA-256 dedup) > On-Chain Hash > Ponder Index
 

@@ -78,7 +78,10 @@ export const marketplaceRouter = router({
       z.object({
         submissionId: z.string(),
         support: z.boolean(),
-        weight: z.string(), // token balance as string
+        weight: z.string().refine((w) => {
+          const num = parseFloat(w);
+          return !isNaN(num) && num > 0 && num <= 10_000_000_000;
+        }, 'Vote weight must be between 0 and 10B'),
         txHash: z.string().optional(),
       })
     )
@@ -90,6 +93,9 @@ export const marketplaceRouter = router({
         .get();
 
       if (!existingVote.empty) throw new Error('Already voted on this submission');
+
+      const weightNum = parseFloat(input.weight);
+      if (isNaN(weightNum) || weightNum <= 0) throw new Error('Invalid vote weight');
 
       // Record vote
       const voteData = {
@@ -110,7 +116,6 @@ export const marketplaceRouter = router({
       if (!subDoc.exists) throw new Error('Submission not found');
 
       const sub = subDoc.data()!;
-      const weightNum = parseFloat(input.weight);
       await subRef.update({
         votesFor: input.support ? (sub.votesFor || 0) + weightNum : sub.votesFor || 0,
         votesAgainst: !input.support ? (sub.votesAgainst || 0) + weightNum : sub.votesAgainst || 0,

@@ -85,7 +85,7 @@ make test           # Smart contract tests
 make lint           # Linting
 ```
 
-Note: There are pre-existing type errors in the web app (GenerativeMedia, GovernanceSidebar, cdp-auth). These do not block development.
+Note: There are pre-existing type errors in the web app (GenerativeMedia, GovernanceSidebar, flow components). These do not block development.
 
 ## Pull Request Process
 

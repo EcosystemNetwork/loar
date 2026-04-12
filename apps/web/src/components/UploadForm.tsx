@@ -17,7 +17,7 @@ import {
 import { toast } from 'sonner';
 import { useState, useRef, useCallback } from 'react';
 import { MediaAttachPanel } from '@/components/MediaAttachPanel';
-import { getSiweToken } from '@/lib/wallet-auth';
+// Session cookie sent automatically via xhr.withCredentials
 import {
   Upload as UploadIcon,
   Sparkles,
@@ -111,18 +111,61 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
 
   const uploadFile = useCallback(async (file: File) => {
     const ALLOWED_MIME = new Set([
-      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff', 'image/bmp',
-      'image/avif', 'image/heic', 'image/heif', 'image/svg+xml',
-      'image/vnd.adobe.photoshop', 'image/x-xcf', 'application/postscript',
-      'model/gltf+json', 'model/gltf-binary', 'model/obj', 'model/stl',
-      'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/aac',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-matroska',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/tiff',
+      'image/bmp',
+      'image/avif',
+      'image/heic',
+      'image/heif',
+      'image/svg+xml',
+      'image/vnd.adobe.photoshop',
+      'image/x-xcf',
+      'application/postscript',
+      'model/gltf+json',
+      'model/gltf-binary',
+      'model/obj',
+      'model/stl',
+      'audio/mpeg',
+      'audio/wav',
+      'audio/ogg',
+      'audio/flac',
+      'audio/aac',
       'application/pdf',
     ]);
     const ALLOWED_BINARY_EXT = new Set([
-      'blend', 'fbx', 'ma', 'mb', 'c4d', 'zpr', 'ztl', 'dae', 'abc', '3ds', 'lwo',
-      'psd', 'psb', 'kra', 'clip', 'procreate', 'sketch', 'afdesign', 'afphoto', 'afpub', 'cdr',
-      'exr', 'hdr', 'tga', 'dds',
+      'blend',
+      'fbx',
+      'ma',
+      'mb',
+      'c4d',
+      'zpr',
+      'ztl',
+      'dae',
+      'abc',
+      '3ds',
+      'lwo',
+      'psd',
+      'psb',
+      'kra',
+      'clip',
+      'procreate',
+      'sketch',
+      'afdesign',
+      'afphoto',
+      'afpub',
+      'cdr',
+      'exr',
+      'hdr',
+      'tga',
+      'dds',
     ]);
     const fileExt = file.name.split('.').pop()?.toLowerCase() ?? '';
     const isOctetStream = file.type === 'application/octet-stream' || file.type === '';
@@ -152,9 +195,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${import.meta.env.VITE_SERVER_URL}/api/upload`);
-
-    const token = getSiweToken();
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.withCredentials = true; // send httpOnly session cookie
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));

@@ -159,7 +159,7 @@ export function useCreateEntity(universeAddress: string | undefined) {
       parentId?: string | null;
       nodeIds?: number[];
       imageUrl?: string | null;
-      metadata?: Record<string, unknown>;
+      metadata?: Record<string, string | number | boolean | null>;
     }) =>
       trpcClient.entities.create.mutate({
         ...input,
@@ -183,7 +183,7 @@ export function useUpdateEntity(universeAddress: string | undefined) {
       parentId?: string | null;
       nodeIds?: number[];
       imageUrl?: string | null;
-      metadata?: Record<string, unknown>;
+      metadata?: Record<string, string | number | boolean | null>;
     }) =>
       trpcClient.entities.update.mutate({
         ...input,

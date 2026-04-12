@@ -5,7 +5,7 @@
  * creator portfolios, and commissions.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { trpc } from '../utils/trpc';
+import { trpcClient } from '../utils/trpc';
 
 /** Browse content with filters */
 export function useGalleryBrowse(options: {
@@ -18,7 +18,7 @@ export function useGalleryBrowse(options: {
 }) {
   return useQuery({
     queryKey: ['gallery', 'browse', options],
-    queryFn: () => trpc.gallery.browse.query(options),
+    queryFn: () => trpcClient.gallery.browse.query(options),
   });
 }
 
@@ -26,7 +26,7 @@ export function useGalleryBrowse(options: {
 export function useGalleryTrending(universeId?: string, limit?: number) {
   return useQuery({
     queryKey: ['gallery', 'trending', universeId, limit],
-    queryFn: () => trpc.gallery.trending.query({ universeId, limit }),
+    queryFn: () => trpcClient.gallery.trending.query({ universeId, limit }),
   });
 }
 
@@ -34,7 +34,7 @@ export function useGalleryTrending(universeId?: string, limit?: number) {
 export function useGalleryFeatured(universeId: string | undefined) {
   return useQuery({
     queryKey: ['gallery', 'featured', universeId],
-    queryFn: () => (universeId ? trpc.gallery.featured.query({ universeId }) : []),
+    queryFn: () => (universeId ? trpcClient.gallery.featured.query({ universeId }) : []),
     enabled: !!universeId,
   });
 }
@@ -44,7 +44,7 @@ export function useSetFeatured() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { universeId: string; contentIds: string[]; expiresAt?: Date }) =>
-      trpc.gallery.setFeatured.mutate(input),
+      trpcClient.gallery.setFeatured.mutate(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['gallery', 'featured', variables.universeId] });
     },
@@ -55,7 +55,8 @@ export function useSetFeatured() {
 export function useCreatorPortfolio(creatorUid: string | undefined, limit?: number) {
   return useQuery({
     queryKey: ['gallery', 'portfolio', creatorUid, limit],
-    queryFn: () => (creatorUid ? trpc.gallery.creatorPortfolio.query({ creatorUid, limit }) : null),
+    queryFn: () =>
+      creatorUid ? trpcClient.gallery.creatorPortfolio.query({ creatorUid, limit }) : null,
     enabled: !!creatorUid,
   });
 }
@@ -70,7 +71,7 @@ export function useRequestCommission() {
       mediaType: string;
       budget?: string;
       universeId?: string;
-    }) => trpc.gallery.requestCommission.mutate(input),
+    }) => trpcClient.gallery.requestCommission.mutate(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gallery', 'commissions'] });
     },
@@ -81,7 +82,7 @@ export function useRequestCommission() {
 export function useMyCommissions(direction: 'received' | 'sent' = 'received', limit?: number) {
   return useQuery({
     queryKey: ['gallery', 'commissions', direction, limit],
-    queryFn: () => trpc.gallery.myCommissions.query({ direction, limit }),
+    queryFn: () => trpcClient.gallery.myCommissions.query({ direction, limit }),
   });
 }
 
@@ -90,7 +91,7 @@ export function useRespondToCommission() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { commissionId: string; accept: boolean; responseMessage?: string }) =>
-      trpc.gallery.respondToCommission.mutate(input),
+      trpcClient.gallery.respondToCommission.mutate(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gallery', 'commissions'] });
     },

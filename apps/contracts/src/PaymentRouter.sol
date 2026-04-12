@@ -50,10 +50,10 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     );
     event Claimed(address indexed creator, uint256 amount);
     event LoarClaimed(address indexed creator, uint256 amount);
-    event TreasuryUpdated(address oldTreasury, address newTreasury);
-    event DefaultFeeUpdated(uint16 newFeeBps);
-    event LoarTokenUpdated(address newToken);
-    event LoarFeeDiscountUpdated(uint16 newDiscountBps);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event DefaultFeeUpdated(uint16 indexed newFeeBps);
+    event LoarTokenUpdated(address indexed newToken);
+    event LoarFeeDiscountUpdated(uint16 indexed newDiscountBps);
 
     error ZeroAddress();
     error NothingToClaim();

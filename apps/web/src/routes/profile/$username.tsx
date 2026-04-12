@@ -31,31 +31,32 @@ export const Route = createFileRoute('/profile/$username')({
 
 /** Platform display config: label, URL builder */
 const SOCIAL_PLATFORMS: Record<string, { label: string; url: (v: string) => string }> = {
-  twitter: { label: 'X', url: (v) => `https://x.com/${v}` },
-  instagram: { label: 'Instagram', url: (v) => `https://instagram.com/${v}` },
-  tiktok: { label: 'TikTok', url: (v) => `https://tiktok.com/@${v}` },
+  twitter: { label: 'X', url: (v) => `https://x.com/${encodeURIComponent(v)}` },
+  instagram: { label: 'Instagram', url: (v) => `https://instagram.com/${encodeURIComponent(v)}` },
+  tiktok: { label: 'TikTok', url: (v) => `https://tiktok.com/@${encodeURIComponent(v)}` },
   youtube: {
     label: 'YouTube',
-    url: (v) => (v.startsWith('http') ? v : `https://youtube.com/@${v}`),
+    url: (v) => (v.startsWith('http') ? v : `https://youtube.com/@${encodeURIComponent(v)}`),
   },
-  twitch: { label: 'Twitch', url: (v) => `https://twitch.tv/${v}` },
-  discord: { label: 'Discord', url: (v) => `https://discord.com/users/${v}` },
-  telegram: { label: 'Telegram', url: (v) => `https://t.me/${v}` },
-  bluesky: { label: 'Bluesky', url: (v) => `https://bsky.app/profile/${v}` },
-  farcaster: { label: 'Farcaster', url: (v) => `https://warpcast.com/${v}` },
-  lens: { label: 'Lens', url: (v) => `https://hey.xyz/u/${v}` },
-  github: { label: 'GitHub', url: (v) => `https://github.com/${v}` },
+  twitch: { label: 'Twitch', url: (v) => `https://twitch.tv/${encodeURIComponent(v)}` },
+  discord: { label: 'Discord', url: (v) => `https://discord.com/users/${encodeURIComponent(v)}` },
+  telegram: { label: 'Telegram', url: (v) => `https://t.me/${encodeURIComponent(v)}` },
+  bluesky: { label: 'Bluesky', url: (v) => `https://bsky.app/profile/${encodeURIComponent(v)}` },
+  farcaster: { label: 'Farcaster', url: (v) => `https://warpcast.com/${encodeURIComponent(v)}` },
+  lens: { label: 'Lens', url: (v) => `https://hey.xyz/u/${encodeURIComponent(v)}` },
+  github: { label: 'GitHub', url: (v) => `https://github.com/${encodeURIComponent(v)}` },
   linkedin: {
     label: 'LinkedIn',
-    url: (v) => (v.startsWith('http') ? v : `https://linkedin.com/in/${v}`),
+    url: (v) => (v.startsWith('http') ? v : `https://linkedin.com/in/${encodeURIComponent(v)}`),
   },
   spotify: {
     label: 'Spotify',
-    url: (v) => (v.startsWith('http') ? v : `https://open.spotify.com/artist/${v}`),
+    url: (v) =>
+      v.startsWith('http') ? v : `https://open.spotify.com/artist/${encodeURIComponent(v)}`,
   },
   soundcloud: {
     label: 'SoundCloud',
-    url: (v) => (v.startsWith('http') ? v : `https://soundcloud.com/${v}`),
+    url: (v) => (v.startsWith('http') ? v : `https://soundcloud.com/${encodeURIComponent(v)}`),
   },
 };
 
@@ -139,9 +140,24 @@ function ProfilePage() {
     );
   }
 
+  const safeUrl = (url: string | undefined): string | null => {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const safeHexColor = (color: string | undefined, fallback = '#8b5cf6'): string => {
+    if (!color) return fallback;
+    return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color) ? color : fallback;
+  };
+
   const layout = (profile as any).layout || {};
   const themeClass = THEME_CLASSES[layout.theme || 'default'] || '';
-  const accentColor = layout.accentColor || '#8b5cf6';
+  const accentColor = safeHexColor(layout.accentColor);
   const socialLinks = (profile as any).socialLinks || {};
   const customLinks: { label: string; url: string }[] = ((profile as any).customLinks || []).filter(
     (link: { url: string }) => {
@@ -173,8 +189,8 @@ function ProfilePage() {
       <div
         className="h-48 md:h-64 relative"
         style={{
-          background: layout.bannerUrl
-            ? `url(${layout.bannerUrl}) center/cover`
+          background: safeUrl(layout.bannerUrl)
+            ? `url(${safeUrl(layout.bannerUrl)}) center/cover`
             : `linear-gradient(135deg, ${accentColor}40, ${accentColor}10)`,
         }}
       >
@@ -189,9 +205,9 @@ function ProfilePage() {
             className="w-32 h-32 rounded-full border-4 border-background bg-muted flex items-center justify-center text-3xl font-bold overflow-hidden"
             style={{ borderColor: accentColor }}
           >
-            {(profile as any).avatarUrl ? (
+            {safeUrl((profile as any).avatarUrl) ? (
               <img
-                src={(profile as any).avatarUrl}
+                src={safeUrl((profile as any).avatarUrl)!}
                 alt={profile.displayName}
                 className="w-full h-full object-cover"
               />

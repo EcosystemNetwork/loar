@@ -159,8 +159,14 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
         uint256 bonusFromDiscount = 0;
         if (discountToken != address(0) && holderDiscountBps[discountToken] > 0) {
-            if (IERC20(discountToken).balanceOf(msg.sender) > 0) {
-                bonusFromDiscount = (pkg.credits * holderDiscountBps[discountToken]) / 10000;
+            // Wrap in try/catch to prevent DoS via malicious token contracts
+            // that revert or consume excessive gas in balanceOf()
+            try IERC20(discountToken).balanceOf(msg.sender) returns (uint256 bal) {
+                if (bal > 0) {
+                    bonusFromDiscount = (pkg.credits * holderDiscountBps[discountToken]) / 10000;
+                }
+            } catch {
+                // Token call failed — skip discount, proceed without bonus
             }
         }
 

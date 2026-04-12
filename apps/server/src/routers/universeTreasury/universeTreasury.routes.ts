@@ -31,7 +31,7 @@ const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
 /** Allowed chain IDs for treasury payment verification. */
-const ALLOWED_CHAIN_IDS = new Set([sepolia.id, baseSepolia.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
 
 function getTreasuryChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
@@ -344,7 +344,17 @@ export const universeTreasuryRouter = router({
         cost: z.number().min(1).max(100_000),
         generationId: z.string().max(200).optional(),
         modelId: z.string().max(100).optional(),
-        metadata: z.record(z.string().max(100), z.string().max(500)).optional(),
+        metadata: z
+          .record(
+            z
+              .string()
+              .min(1)
+              .max(50)
+              .regex(/^[a-zA-Z0-9_-]+$/),
+            z.string().max(500)
+          )
+          .optional()
+          .refine((val) => !val || Object.keys(val).length <= 20, 'Max 20 metadata fields'),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -375,8 +385,9 @@ export const universeTreasuryRouter = router({
           });
         }
 
-        // Enforce monthly allowance inside transaction (skip for admin)
-        if (!isAdmin && membership.monthlyAllowance > 0) {
+        // Enforce monthly allowance and track spending for non-admins (inside transaction).
+        // Always track spend even when monthlyAllowance is 0 (unlimited) for audit purposes.
+        if (!isAdmin) {
           const memberDocId = `${universeId}-${callerUid}`;
           const memberRef = db.collection('universeTeamMembers').doc(memberDocId);
           const memberSnap = await tx.get(memberRef);
@@ -388,13 +399,18 @@ export const universeTreasuryRouter = router({
             periodStart.getMonth() === now.getMonth();
           const usedThisMonth = sameMonth ? memberData.creditsUsedThisMonth || 0 : 0;
 
-          if (usedThisMonth + input.cost > memberData.monthlyAllowance) {
+          // Enforce cap only when a non-zero allowance is set (0 = unlimited)
+          if (
+            memberData.monthlyAllowance > 0 &&
+            usedThisMonth + input.cost > memberData.monthlyAllowance
+          ) {
             throw new TRPCError({
               code: 'BAD_REQUEST',
               message: `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, requested: ${input.cost}`,
             });
           }
 
+          // Always update spend tracking for audit trail
           tx.update(memberRef, {
             creditsUsedThisMonth: usedThisMonth + input.cost,
             allowancePeriodStart: sameMonth ? memberData.allowancePeriodStart : now,

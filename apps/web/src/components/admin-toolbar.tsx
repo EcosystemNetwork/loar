@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useWalletAuth, getSiweToken } from '@/lib/wallet-auth';
+import { useWalletAuth, getSiweAddress } from '@/lib/wallet-auth';
 import { useRouterState } from '@tanstack/react-router';
 import { useAccount, useChainId, useBalance } from 'wagmi';
 import { Button } from './ui/button';
@@ -116,13 +116,17 @@ function getStorageUsage(): { local: number; session: number; cookies: number } 
       const key = localStorage.key(i)!;
       local += key.length + (localStorage.getItem(key)?.length ?? 0);
     }
-  } catch {}
+  } catch {
+    /* ignore */
+  }
   try {
     for (let i = 0; i < sessionStorage.length; i++) {
       const key = sessionStorage.key(i)!;
       session += key.length + (sessionStorage.getItem(key)?.length ?? 0);
     }
-  } catch {}
+  } catch {
+    /* ignore */
+  }
   const cookies = document.cookie.length;
   return { local: local * 2, session: session * 2, cookies: cookies * 2 }; // *2 for UTF-16
 }
@@ -245,7 +249,9 @@ export default function AdminToolbar() {
       });
       lcpObs.observe({ type: 'largest-contentful-paint', buffered: true });
       observers.push(lcpObs);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     try {
       const fidObs = new PerformanceObserver((list) => {
@@ -257,7 +263,9 @@ export default function AdminToolbar() {
       });
       fidObs.observe({ type: 'first-input', buffered: true });
       observers.push(fidObs);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     try {
       let clsValue = 0;
@@ -269,7 +277,9 @@ export default function AdminToolbar() {
       });
       clsObs.observe({ type: 'layout-shift', buffered: true });
       observers.push(clsObs);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     try {
       const inpObs = new PerformanceObserver((list) => {
@@ -281,7 +291,9 @@ export default function AdminToolbar() {
       });
       inpObs.observe({ type: 'event', buffered: true });
       observers.push(inpObs);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     return () => observers.forEach((o) => o.disconnect());
   }, [open]);
@@ -341,7 +353,9 @@ export default function AdminToolbar() {
 
     try {
       observer.observe({ type: 'resource', buffered: true });
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     return () => observer.disconnect();
   }, [open]);
@@ -382,7 +396,7 @@ export default function AdminToolbar() {
     VITE_SERVER_URL: import.meta.env.VITE_SERVER_URL,
     VITE_PONDER_URL: import.meta.env.VITE_PONDER_URL,
     VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    VITE_CDP_PROJECT_ID: import.meta.env.VITE_CDP_PROJECT_ID,
+    VITE_DYNAMIC_ENVIRONMENT_ID: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID,
     MODE: import.meta.env.MODE,
     DEV: import.meta.env.DEV ? 'true' : 'false',
     PROD: import.meta.env.PROD ? 'true' : 'false',
@@ -949,13 +963,13 @@ export default function AdminToolbar() {
                   size="sm"
                   className="h-6 text-[10px] bg-zinc-800 border-zinc-700"
                   onClick={() => {
-                    const token = getSiweToken();
-                    if (token) copyToClipboard(token, 'SIWE token');
-                    else toast.info('No SIWE token found');
+                    const addr = getSiweAddress();
+                    if (addr) copyToClipboard(addr, 'Wallet address');
+                    else toast.info('No session found');
                   }}
                 >
                   <Copy className="h-3 w-3 mr-1" />
-                  Copy SIWE Token
+                  Copy Address
                 </Button>
               </div>
             </div>

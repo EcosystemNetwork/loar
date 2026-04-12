@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { UploadForm } from '@/components/UploadForm';
@@ -6,6 +6,12 @@ import { Loader2 } from 'lucide-react';
 
 export const Route = createFileRoute('/upload')({
   component: UploadPage,
+  beforeLoad: async () => {
+    const address = typeof window !== 'undefined' ? localStorage.getItem('siwe-address') : null;
+    if (!address) {
+      throw redirect({ to: '/login', search: { redirect: '/upload' } });
+    }
+  },
 });
 
 function UploadPage() {

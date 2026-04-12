@@ -87,7 +87,7 @@ export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardPr
         {/* Creator */}
         {content.creatorAddress && (
           <Link
-            to={`/profile/${content.creatorUid || content.creatorAddress}`}
+            to={`/profile/${content.creatorUid || content.creatorAddress}` as any}
             className="text-xs text-muted-foreground hover:text-foreground truncate block"
           >
             by {content.creatorAddress.slice(0, 6)}...{content.creatorAddress.slice(-4)}
