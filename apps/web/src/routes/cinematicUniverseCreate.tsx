@@ -9,9 +9,10 @@
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAccount, useBalance, useChainId, useWaitForTransactionReceipt } from 'wagmi';
+import { useBalance, useChainId, useWaitForTransactionReceipt } from 'wagmi';
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import { useSwitchNetwork } from '@dynamic-labs/sdk-react-core';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,7 +72,7 @@ enum DeploymentStep {
 }
 
 function CinematicUniverseCreate() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { primaryWallet } = useDynamicContext();
@@ -367,7 +368,7 @@ function CinematicUniverseCreate() {
   }
 
   const handleCreateUniverse = async () => {
-    if (!isConnected || !address) {
+    if (!isAuthenticated || !address) {
       alert('Please connect your wallet first');
       return;
     }
@@ -464,7 +465,7 @@ function CinematicUniverseCreate() {
   };
 
   // Not connected state
-  if (!isConnected) {
+  if (!isAuthenticated && !isAuthenticating && !primaryWallet) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
@@ -477,6 +478,15 @@ function CinematicUniverseCreate() {
             <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // Wallet connected but SIWE still authenticating — show loading
+  if ((!isAuthenticated && isAuthenticating) || (!isConnected && primaryWallet)) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

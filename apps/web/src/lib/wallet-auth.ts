@@ -7,8 +7,9 @@
  *
  * Flow: connect wallet → fetch nonce → sign SIWE message → server sets cookie
  */
-import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
 
 const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
@@ -193,10 +194,16 @@ export function useWalletAuth() {
   const { address, isConnected, chain } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
+  const { handleLogOut } = useDynamicContext();
   const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Track whether user rejected SIWE to prevent auto-sign-in loop
+  const rejectedRef = useRef(false);
+  // Track the last address we auto-signed for to avoid duplicate attempts
+  const autoSignedForRef = useRef<string | null>(null);
 
   const isAuthenticated = Boolean(isConnected && address && storedAddress);
 
@@ -206,6 +213,7 @@ export function useWalletAuth() {
 
     setIsAuthenticating(true);
     setError(null);
+    rejectedRef.current = false;
 
     try {
       const nonce = await fetchNonce();
@@ -217,10 +225,13 @@ export function useWalletAuth() {
       const signature = await signMessageAsync({ message });
       const result = await verifySignature(message, signature);
       setSession(result.address, result.expiresAt);
+      autoSignedForRef.current = address.toLowerCase();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Sign-in failed';
-      // Don't set error for user rejections
-      if (!msg.includes('User rejected') && !msg.includes('user rejected')) {
+      // Track user rejections to prevent auto-sign-in loop
+      if (msg.includes('User rejected') || msg.includes('user rejected')) {
+        rejectedRef.current = true;
+      } else {
         setError(msg);
       }
     } finally {
@@ -231,22 +242,38 @@ export function useWalletAuth() {
   /** Disconnect wallet, revoke JWT server-side, and clear SIWE session. */
   const signOut = useCallback(() => {
     clearSiweSession(true); // revoke = true
+    rejectedRef.current = false;
+    autoSignedForRef.current = null;
     disconnect();
-  }, [disconnect]);
+    // Also disconnect Dynamic Labs to keep UI in sync
+    handleLogOut?.().catch(() => {});
+  }, [disconnect, handleLogOut]);
 
   // Auto-clear session if wallet disconnects or address changes
   useEffect(() => {
     if (!isConnected || !address) {
       if (storedAddress) clearSiweSession();
+      rejectedRef.current = false;
+      autoSignedForRef.current = null;
     } else if (storedAddress && storedAddress.toLowerCase() !== address.toLowerCase()) {
-      // Address changed — clear old session
+      // Address changed — clear old session and reset rejection flag for new address
       clearSiweSession();
+      rejectedRef.current = false;
+      autoSignedForRef.current = null;
     }
   }, [isConnected, address, storedAddress]);
 
   // Auto-trigger SIWE sign-in when wallet connects without an existing session
   useEffect(() => {
-    if (isConnected && address && chain && !storedAddress && !isAuthenticating) {
+    if (
+      isConnected &&
+      address &&
+      chain &&
+      !storedAddress &&
+      !isAuthenticating &&
+      !rejectedRef.current &&
+      autoSignedForRef.current !== address.toLowerCase()
+    ) {
       signIn();
     }
   }, [isConnected, address, chain, storedAddress, isAuthenticating, signIn]);

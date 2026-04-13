@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { useQuery } from '@tanstack/react-query';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { trpc } from '../../utils/trpc';
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/governance/$universeId')({
 
 function GovernancePage() {
   const { universeId } = Route.useParams();
-  const { address } = useAccount();
+  const { address, isAuthenticated } = useWalletAuth();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
 
@@ -66,7 +66,7 @@ function GovernancePage() {
               Propose and vote on changes to Universe #{universeId}
             </p>
           </div>
-          {address && (
+          {isAuthenticated && (
             <button
               onClick={() => setShowCreateDialog(true)}
               className="px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors"

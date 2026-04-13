@@ -30,7 +30,7 @@ import {
   ExternalLink,
   AlertTriangle,
 } from 'lucide-react';
-import { useAccount } from 'wagmi';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DirectUpload } from '@/components/DirectUpload';
@@ -49,7 +49,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 function BountyDetailPage() {
   const { bountyId } = Route.useParams();
-  const { address } = useAccount();
+  const { address } = useWalletAuth();
   const queryClient = useQueryClient();
 
   // Submit form state

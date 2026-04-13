@@ -17,7 +17,7 @@ import {
   Upload,
   ExternalLink,
 } from 'lucide-react';
-import { useAccount } from 'wagmi';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 
@@ -36,7 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function MyBountiesPage() {
-  const { address } = useAccount();
+  const { address, isAuthenticated } = useWalletAuth();
   const [tab, setTab] = useState('posted');
 
   const { data: myBounties, isLoading: bountiesLoading } = useQuery({
@@ -51,7 +51,7 @@ function MyBountiesPage() {
     enabled: !!address,
   });
 
-  if (!address) {
+  if (!isAuthenticated) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

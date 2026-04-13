@@ -63,7 +63,7 @@ const RIGHTS_LABELS: Record<string, string> = {
 };
 
 function MarketPage() {
-  const { isConnected } = useWalletAuth();
+  const { isAuthenticated } = useWalletAuth();
   const [search, setSearch] = useState('');
   const [productType, setProductType] = useState('ALL');
   const [rightsLane, setRightsLane] = useState('all');
@@ -93,7 +93,7 @@ function MarketPage() {
                 {stats?.universeCount ?? 0} universes · {stats?.totalMints ?? 0} mints
               </p>
             </div>
-            {isConnected && (
+            {isAuthenticated && (
               <Link to="/sell">
                 <Button size="sm" variant="outline" className="gap-1">
                   <Plus className="w-4 h-4" />
@@ -213,7 +213,7 @@ function MarketPage() {
             <div className="text-center py-12 text-muted-foreground">
               <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-medium">No listings found</p>
-              {isConnected && (
+              {isAuthenticated && (
                 <Link to="/sell/new">
                   <Button variant="outline" size="sm" className="mt-3">
                     Create a listing

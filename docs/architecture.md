@@ -21,7 +21,6 @@ graph TD
         OPENAI[OpenAI<br/>Storyline Generation]
         PINATA[Pinata<br/>Hot Storage]
         LIGHTHOUSE[Lighthouse<br/>Filecoin/IPFS]
-        STORACHA[Storacha<br/>Archive Storage]
     end
 
     subgraph Blockchain
@@ -38,8 +37,6 @@ graph TD
     SERVER --> OPENAI
     SERVER --> PINATA
     SERVER --> LIGHTHOUSE
-    SERVER --> STORACHA
-
     INDEXER -->|RPC polling| SEPOLIA
 
     MCP -->|X-API-Key| SERVER

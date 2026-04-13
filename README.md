@@ -42,7 +42,7 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Quest & Affiliate System**   | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards      |
 | **AI Wiki Generation**         | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                 |
 | **On-Chain Node Storage**      | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                       |
-| **Decentralized Storage**      | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Storacha > Firebase                                       |
+| **Decentralized Storage**      | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Firebase                                                  |
 | **Creator Profiles**           | Username, bio, themes (5 options), social links, privacy controls, public portfolios                              |
 | **Content Upload**             | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection             |
 | **Content Discovery**          | Search/filter by classification, media type, tags. Creator gallery + content feed                                 |

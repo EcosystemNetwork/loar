@@ -57,10 +57,10 @@ function RouteComponent() {
 
   // Redirect unauthenticated users to login
   useEffect(() => {
-    if (!isConnected && !isAuthenticating) {
+    if (!isAuthenticated && !isAuthenticating) {
       navigate({ to: '/login', search: { redirect: '/dashboard' } });
     }
-  }, [isConnected, isAuthenticating, navigate]);
+  }, [isAuthenticated, isAuthenticating, navigate]);
 
   // Fetch user's universes (by creator address)
   const { data: myUniverses, isLoading: isLoadingMine } = useQuery({
