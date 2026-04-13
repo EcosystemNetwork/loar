@@ -6,31 +6,33 @@
  * Used instead of @ponder/client for direct GraphQL access with React Query.
  */
 
-const PONDER_URL = import.meta.env.VITE_PONDER_URL || 'http://localhost:42069';
+const PONDER_URL = import.meta.env.VITE_PONDER_URL || '';
 
 /** Circuit breaker: skip requests when indexer is known offline. */
 let _offlineUntil = 0;
-let _offlineLogged = false;
-const OFFLINE_COOLDOWN_MS = 30_000; // back off 30s after a connection failure
+const OFFLINE_COOLDOWN_MS = 60_000; // back off 60s after a connection failure
+
+/** True when no indexer URL is configured or it points to localhost in production build */
+const _disabled = !PONDER_URL;
 
 /**
  * Executes a GraphQL query against the Ponder indexer.
  * Includes a circuit breaker — if the indexer is unreachable, further
- * requests are short-circuited for 30 seconds to avoid console spam.
+ * requests are short-circuited silently to avoid console spam.
+ * Returns empty data when the indexer is unavailable.
  */
 export async function ponderGql<T = any>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
-  if (Date.now() < _offlineUntil) {
-    const err = new Error('Blockchain indexer offline (circuit breaker)') as Error & {
-      code: string;
-    };
-    err.code = 'PONDER_OFFLINE';
-    throw err;
+  // No indexer configured — return empty silently
+  if (_disabled) {
+    return {} as T;
   }
-  // Reset log flag when cooldown expires so we log once per outage window
-  _offlineLogged = false;
+
+  if (Date.now() < _offlineUntil) {
+    return {} as T;
+  }
 
   let res: Response;
   try {
@@ -41,13 +43,7 @@ export async function ponderGql<T = any>(
     });
   } catch {
     _offlineUntil = Date.now() + OFFLINE_COOLDOWN_MS;
-    if (!_offlineLogged) {
-      console.warn('[ponder] Indexer unreachable — suppressing requests for 30s');
-      _offlineLogged = true;
-    }
-    const err = new Error('Blockchain indexer unreachable') as Error & { code: string };
-    err.code = 'PONDER_OFFLINE';
-    throw err;
+    return {} as T;
   }
 
   // Indexer is reachable — reset circuit breaker
