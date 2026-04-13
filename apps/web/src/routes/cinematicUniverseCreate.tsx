@@ -72,7 +72,7 @@ enum DeploymentStep {
 }
 
 function CinematicUniverseCreate() {
-  const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
+  const { address, isConnected, isAuthenticated, isAuthenticating, signIn } = useWalletAuth();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { primaryWallet } = useDynamicContext();
@@ -368,9 +368,19 @@ function CinematicUniverseCreate() {
   }
 
   const handleCreateUniverse = async () => {
-    if (!isAuthenticated || !address) {
+    if (!address) {
       alert('Please connect your wallet first');
       return;
+    }
+
+    // Trigger SIWE sign-in if wallet is connected but not authenticated
+    if (!isAuthenticated) {
+      try {
+        await signIn();
+      } catch {
+        alert('Please sign the message in your wallet to continue');
+        return;
+      }
     }
 
     if (!isSupportedChain(chainId)) {
