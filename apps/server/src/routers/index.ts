@@ -80,6 +80,7 @@ import { contentLicensingRouter } from './contentLicensing/contentLicensing.rout
 import { galleryRouter } from './gallery/gallery.routes';
 import { moderationRouter } from './moderation/moderation.routes';
 import { stripeRouter } from './credits/stripe.routes';
+import { pricingRouter } from './pricing/pricing.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -227,6 +228,9 @@ export const appRouter = router({
   aiAgents: aiAgentsRouter,
   aiPipelines: aiPipelinesRouter,
   apiKeys: apiKeysRouter,
+
+  // ── Pricing ────────────────────────────────────────────────────────
+  pricing: pricingRouter,
 
   // ── Universe Creator Studio ────────────────────────────────────────
   splits: splitsRouter,

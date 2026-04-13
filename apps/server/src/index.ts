@@ -216,6 +216,7 @@ app.get('/', (c) => {
 
 app.get('/health', async (c) => {
   const { firebaseAvailable } = await import('./lib/firebase');
+  const { getPricingStatus } = await import('./services/pricing/heartbeat');
 
   const checks = {
     firebase: firebaseAvailable ? 'ok' : 'degraded',
@@ -231,6 +232,7 @@ app.get('/health', async (c) => {
     uptime: Math.floor(process.uptime()),
     env: env.NODE_ENV,
     checks,
+    pricing: getPricingStatus(),
   });
 });
 
@@ -241,6 +243,11 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Promise Rejection at:', promise, 'Reason:', reason);
 });
+
+// Start pricing heartbeat (12-hour cycle)
+import('./services/pricing/heartbeat')
+  .then(({ startPricingHeartbeat }) => startPricingHeartbeat())
+  .catch((err) => console.warn('[pricing] Failed to start heartbeat:', err));
 
 const port = env.PORT;
 
