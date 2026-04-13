@@ -49,6 +49,7 @@ export const entitiesRouter = router({
           .optional(),
         monetized: z.boolean().default(false),
         rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
+        unstoppableDomain: z.string().max(100).nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -67,6 +68,7 @@ export const entitiesRouter = router({
           metadata: input.metadata,
           monetized: input.monetized,
           rightsDeclaration: input.rightsDeclaration ?? null,
+          unstoppableDomain: input.unstoppableDomain ?? null,
         },
         ctx.user.address
       );
@@ -164,6 +166,7 @@ export const entitiesRouter = router({
           .optional(),
         monetized: z.boolean().optional(),
         rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
+        unstoppableDomain: z.string().max(100).nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {

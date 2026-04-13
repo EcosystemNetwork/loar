@@ -471,6 +471,7 @@ function EntityCreateForm() {
   const [artworkPrompt, setArtworkPrompt] = useState('');
   const [showArtwork, setShowArtwork] = useState(false);
   const [generatingArt, setGeneratingArt] = useState(false);
+  const [unstoppableDomain, setUnstoppableDomain] = useState('');
 
   const handleGenerateAI = async () => {
     if (!name.trim()) {
@@ -548,6 +549,7 @@ function EntityCreateForm() {
         metadata: metadata as Record<string, string | number | boolean | null>,
         monetized,
         rightsDeclaration: monetized ? rightsDeclaration : null,
+        unstoppableDomain: unstoppableDomain.trim() || null,
       });
 
       toast.success(`${label} created!`);
@@ -793,6 +795,29 @@ function EntityCreateForm() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Unstoppable Domain (optional) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Unstoppable Domain</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Optionally attach an Unstoppable Domains name to this {label.toLowerCase()} (e.g.
+              mycharacter.crypto, myplace.x).
+            </p>
+            <Input
+              placeholder="e.g. mycharacter.crypto"
+              value={unstoppableDomain}
+              onChange={(e) => setUnstoppableDomain(e.target.value)}
+              maxLength={100}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Supports .crypto, .nft, .x, .wallet, .bitcoin, .dao, .888 and more. This is optional —
+              you can add or change it later.
+            </p>
           </CardContent>
         </Card>
 

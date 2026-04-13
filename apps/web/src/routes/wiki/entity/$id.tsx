@@ -217,6 +217,14 @@ function EntityPage() {
                   </Link>
                 </div>
               )}
+              {(entity as any).unstoppableDomain && (
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-muted-foreground">Domain</span>
+                  <span className="text-xs font-medium text-primary">
+                    {(entity as any).unstoppableDomain}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
                 <span>{new Date(entity.createdAt).toLocaleDateString()}</span>

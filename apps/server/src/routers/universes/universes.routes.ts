@@ -32,6 +32,8 @@ const createUniverseSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .optional(),
+  /** Optional Unstoppable Domains name for this universe (e.g. "myuniverse.crypto"). */
+  unstoppableDomain: z.string().max(100).nullish(),
 });
 
 const getUniverseSchema = z.object({
@@ -82,6 +84,7 @@ export const universesRouter = router({
       description: input.description,
       onChainUniverseId: input.onChainUniverseId,
       mintTxHash: input.mintTxHash,
+      unstoppableDomain: input.unstoppableDomain ?? null,
     });
   }),
 
@@ -204,6 +207,26 @@ export const universesRouter = router({
         owners: safeInfo?.owners ?? [],
         threshold: safeInfo?.threshold ?? 0,
       };
+    }),
+
+  /** Set or clear an Unstoppable Domains name for a universe. Admin only. */
+  setUnstoppableDomain: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        unstoppableDomain: z.string().max(100).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can set the domain');
+      }
+      await db.collection('cinematicUniverses').doc(universeId).update({
+        unstoppableDomain: input.unstoppableDomain,
+        updated_at: new Date(),
+      });
+      return { ok: true };
     }),
 
   /** Update the access model for a universe (admin only). */

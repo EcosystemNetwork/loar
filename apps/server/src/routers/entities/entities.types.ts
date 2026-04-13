@@ -152,6 +152,8 @@ export interface Entity {
   monetized: boolean;
   /** Rights declaration — required when monetized is true. */
   rightsDeclaration: RightsDeclaration | null;
+  /** Optional Unstoppable Domains name (e.g. "mycharacter.crypto"). */
+  unstoppableDomain: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -171,6 +173,8 @@ export interface CreateEntityInput {
   monetized?: boolean;
   /** Required when monetized is true. Must be 'original' or 'licensed'. */
   rightsDeclaration?: RightsDeclaration | null;
+  /** Optional Unstoppable Domains name (e.g. "mycharacter.crypto"). */
+  unstoppableDomain?: string | null;
 }
 
 /** Input for updating an existing entity. */
@@ -184,4 +188,6 @@ export interface UpdateEntityInput {
   metadata?: Record<string, unknown>;
   monetized?: boolean;
   rightsDeclaration?: RightsDeclaration | null;
+  /** Optional Unstoppable Domains name (e.g. "mycharacter.crypto"). */
+  unstoppableDomain?: string | null;
 }

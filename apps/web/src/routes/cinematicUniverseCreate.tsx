@@ -9,7 +9,13 @@
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
+import {
+  useBalance,
+  useChainId,
+  useWaitForTransactionReceipt,
+  useSwitchChain,
+  useSignMessage,
+} from 'wagmi';
 import { useIsAutoConnecting } from 'thirdweb/react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
@@ -76,6 +82,7 @@ function CinematicUniverseCreate() {
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { switchChain } = useSwitchChain();
+  const { signMessageAsync } = useSignMessage();
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -312,18 +319,31 @@ function CinematicUniverseCreate() {
 
     // Register universe in Firestore using parsed values directly (not stale state)
     if (address && parsedUniverseAddress) {
-      trpcClient.universes.create
-        .mutate({
-          address: parsedUniverseAddress,
-          creator: safeAddress ?? address,
-          tokenAddress: '0x0000000000000000000000000000000000000000',
-          governanceAddress: '0x0000000000000000000000000000000000000000',
-          imageUrl: imageUrl,
-          description: description,
-          onChainUniverseId: parsedUniverseId?.toString(),
-          mintTxHash: hash,
-        } as any)
-        .catch((err: unknown) => console.error('Failed to register universe:', err));
+      (async () => {
+        try {
+          const creator = safeAddress ?? address;
+          // Fetch server-issued nonce and sign a message to prove wallet ownership
+          const { nonce } = await trpcClient.universes.getNonce.query();
+          const message = `Register universe ${parsedUniverseAddress} created by ${creator} with nonce ${nonce} at ${Date.now()}`;
+          const signature = await signMessageAsync({ message });
+
+          await trpcClient.universes.create.mutate({
+            address: parsedUniverseAddress,
+            creator,
+            tokenAddress: '0x0000000000000000000000000000000000000000',
+            governanceAddress: '0x0000000000000000000000000000000000000000',
+            imageUrl: imageUrl,
+            description: description,
+            onChainUniverseId: parsedUniverseId?.toString(),
+            mintTxHash: hash,
+            signature,
+            message,
+            nonce,
+          });
+        } catch (err) {
+          console.error('Failed to register universe:', err);
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txSuccess, txReceipt, hash]);

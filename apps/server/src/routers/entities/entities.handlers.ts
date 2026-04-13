@@ -108,6 +108,7 @@ export async function createEntity(
     creator,
     monetized,
     rightsDeclaration: monetized ? input.rightsDeclaration! : null,
+    unstoppableDomain: input.unstoppableDomain ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -262,6 +263,7 @@ export async function updateEntity(
   } else if (input.rightsDeclaration !== undefined) {
     updates.rightsDeclaration = input.rightsDeclaration;
   }
+  if (input.unstoppableDomain !== undefined) updates.unstoppableDomain = input.unstoppableDomain;
 
   await ref.update(updates);
 

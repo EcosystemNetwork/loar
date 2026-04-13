@@ -107,6 +107,7 @@ export interface Entity {
   creator: string;
   monetized: boolean;
   rightsDeclaration: RightsDeclaration | null;
+  unstoppableDomain: string | null;
   createdAt: string;
   updatedAt: string;
 }

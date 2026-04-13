@@ -20,6 +20,7 @@ interface CreateUniverseInput {
   description: string;
   onChainUniverseId?: string;
   mintTxHash?: string;
+  unstoppableDomain?: string | null;
 }
 
 /** Firestore collection name kept as 'cinematicUniverses' for data continuity. */
@@ -46,6 +47,7 @@ export async function createUniverse(input: CreateUniverseInput) {
       description: input.description,
       onChainUniverseId: input.onChainUniverseId ?? null,
       mintTxHash: input.mintTxHash ?? null,
+      unstoppableDomain: input.unstoppableDomain ?? null,
       hasPrivateSection: true,
       isMultiSig: false,
       multiSigAddress: null,
