@@ -40,8 +40,8 @@ const SWAP_ROUTER_ABI = [
 
 // Swap router addresses per chain (null = not deployed → fallback to Uniswap link)
 const SWAP_ROUTER_ADDRESSES: Record<number, Address | null> = {
-  11155111: '0xcC7fDa435ba32655Dd30868Ec8CCa5DdE992660D', // Sepolia
-  84532: '0xa72fC9Fd44f29751d37a0A4E26888F956281F1cd', // Base Sepolia
+  11155111: '0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5', // Sepolia
+  84532: '0x69c2aA66B3bB3e5f6658Dc2a77022558e7022398', // Base Sepolia
   8453: null, // Base mainnet — deploy before mainnet launch
 };
 

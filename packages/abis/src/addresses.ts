@@ -9,8 +9,8 @@ export const UniverseManager = {
 export type UniverseManagerChainId = keyof typeof UniverseManager;
 
 export const UniverseTokenDeployer = {
-  '11155111': '0xa2556B55C834504b2d71ECa8D1c1295e19D31BEf',
-  '84532': '0xEC9455F29A5a7A2a5F496bB7D4B428A1df3850dF',
+  '11155111': '0x3341674801438162e2EFFFcF3Fa68664763641c8', // V2 with vesting
+  '84532': '0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5', // V2 with vesting
 } as const;
 
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
@@ -37,15 +37,15 @@ export const LoarHookStaticFee = {
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
 
 export const LoarSwapRouter = {
-  '11155111': '0xcC7fDa435ba32655Dd30868Ec8CCa5DdE992660D',
-  '84532': '0xa72fC9Fd44f29751d37a0A4E26888F956281F1cd',
+  '11155111': '0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5',
+  '84532': '0x69c2aA66B3bB3e5f6658Dc2a77022558e7022398',
 } as const;
 
 export type LoarSwapRouterChainId = keyof typeof LoarSwapRouter;
 
 export const TokenVesting = {
-  '11155111': '0xDE9257B07CD06f13516e1F539f660b038603A3bB',
-  '84532': '0xF2c3d5D97743cc00151292B11382E3b0b3a50869',
+  '11155111': '0x5d74D9e42a52D04DEC9F895F2c9D2e14b1DdCD64',
+  '84532': '0x36E25222f7E5C6f4dC8f918B68C61da83330C97F',
 } as const;
 
 export type TokenVestingChainId = keyof typeof TokenVesting;
