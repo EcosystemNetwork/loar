@@ -56,13 +56,7 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-router': ['@tanstack/react-router', '@tanstack/react-query'],
-          'vendor-web3': [
-            'wagmi',
-            'viem',
-            '@dynamic-labs/sdk-react-core',
-            '@dynamic-labs/ethereum',
-            '@dynamic-labs/wagmi-connector',
-          ],
+          'vendor-web3': ['wagmi', 'viem', 'thirdweb'],
           'vendor-ui': [
             'lucide-react',
             'radix-ui',

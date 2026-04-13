@@ -12,9 +12,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@dynamic-labs/ethereum": "^4.76.0",
-    "@dynamic-labs/sdk-react-core": "^4.76.0",
-    "@dynamic-labs/wagmi-connector": "^4.76.0",
     "@loar/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-select": "^2.2.6",
@@ -41,6 +38,7 @@
     "reactflow": "^11.11.4",
     "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",
+    "thirdweb": "^5.119.4",
     "viem": "~2.47.6",
     "wagmi": "^2.19.5",
     "zod": "^4.0.2"

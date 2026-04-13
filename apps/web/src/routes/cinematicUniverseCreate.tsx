@@ -9,9 +9,7 @@
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useBalance, useChainId, useWaitForTransactionReceipt } from 'wagmi';
-import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
-import { useSwitchNetwork } from '@dynamic-labs/sdk-react-core';
+import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,8 +73,7 @@ function CinematicUniverseCreate() {
   const { address, isConnected, isAuthenticated, isAuthenticating, signIn } = useWalletAuth();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
-  const { primaryWallet } = useDynamicContext();
-  const switchNetwork = useSwitchNetwork();
+  const { switchChain } = useSwitchChain();
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -162,20 +159,13 @@ function CinematicUniverseCreate() {
 
   // Auto-switch to supported chain if on wrong network
   useEffect(() => {
-    if (isConnected && !isSupportedChain(chainId) && primaryWallet) {
-      switchNetwork({ wallet: primaryWallet, network: SUPPORTED_CHAIN_IDS[0] }).catch((err) =>
-        console.error('Auto network switch failed:', err)
-      );
+    if (isConnected && !isSupportedChain(chainId)) {
+      switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
     }
-  }, [isConnected, chainId, primaryWallet, switchNetwork]);
+  }, [isConnected, chainId, switchChain]);
 
-  const handleSwitchNetwork = async () => {
-    if (!primaryWallet) return;
-    try {
-      await switchNetwork({ wallet: primaryWallet, network: SUPPORTED_CHAIN_IDS[0] });
-    } catch (error) {
-      console.error('Failed to switch network:', error);
-    }
+  const handleSwitchNetwork = () => {
+    switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
   };
 
   // Cover image generation mutation
@@ -475,7 +465,7 @@ function CinematicUniverseCreate() {
   };
 
   // Not connected state — need at least a wallet for contract calls
-  if (!isConnected && !primaryWallet) {
+  if (!isConnected) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
