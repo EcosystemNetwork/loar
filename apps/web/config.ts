@@ -7,7 +7,6 @@
 
 import { createConfig, http } from 'wagmi';
 import { sepolia, base, baseSepolia } from 'wagmi/chains';
-import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
 import { SUPPORTED_EVM_CHAIN_IDS } from './src/configs/chains';
 
 const allChains = {
@@ -26,14 +25,12 @@ const transports = Object.fromEntries(chains.map((c) => [c.id, http()])) as Reco
   ReturnType<typeof http>
 >;
 
+// Connectors are intentionally omitted — thirdweb's ConnectButton manages
+// wallet connections (injected, WalletConnect, Coinbase, etc.) and syncs
+// state into wagmi automatically.  Declaring wagmi connectors here would
+// double-register them, causing each to probe/initialize on page load and
+// trigger browser popup-blocked warnings.
 export const config = createConfig({
   chains: chains as unknown as readonly [(typeof chains)[0], ...typeof chains],
-  connectors: [
-    injected(),
-    coinbaseWallet({ appName: 'LOAR' }),
-    ...(import.meta.env.VITE_WALLETCONNECT_PROJECT_ID
-      ? [walletConnect({ projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID })]
-      : []),
-  ],
   transports: transports as any,
 });
