@@ -2,22 +2,22 @@ import { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
-import { hasSession } from '../../lib/wallet-auth';
+import { useWalletAuth } from '../../lib/wallet-auth';
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const queryClient = useQueryClient();
-  const isAuthed = hasSession();
+  const { isAuthenticated } = useWalletAuth();
 
   const { data: unreadData } = useQuery(
     trpc.social.getUnreadCount.queryOptions(undefined, {
       refetchInterval: 30_000,
-      enabled: isAuthed,
+      enabled: isAuthenticated,
     })
   );
 
   const { data: notificationsData } = useQuery(
-    trpc.social.getNotifications.queryOptions({ limit: 10 }, { enabled: isOpen })
+    trpc.social.getNotifications.queryOptions({ limit: 10 }, { enabled: isOpen && isAuthenticated })
   );
 
   const markRead = useMutation(

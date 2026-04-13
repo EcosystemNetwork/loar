@@ -45,6 +45,7 @@ export function WalletWrapper({ children, queryClient }: WalletProviderProps) {
       settings={{
         environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID || '',
         walletConnectors: [EthereumWalletConnectors],
+        logLevel: 'silent',
         overrides: {
           evmNetworks: filterNetworks,
         },
