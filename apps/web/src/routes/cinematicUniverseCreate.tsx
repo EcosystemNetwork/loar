@@ -35,6 +35,13 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { SafeSetup } from '@/components/SafeSetup';
 import { parseEther, decodeEventLog } from 'viem';
@@ -137,6 +144,7 @@ function CinematicUniverseCreate() {
   // Cover image generation state
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverModel, setCoverModel] = useState<string>('fal-ai/nano-banana');
 
   // Hooks
   const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } =
@@ -169,7 +177,7 @@ function CinematicUniverseCreate() {
 
       const result = await trpcClient.fal.generateImage.mutate({
         prompt,
-        model: 'fal-ai/nano-banana',
+        model: coverModel as any,
         imageSize: 'landscape_16_9',
       });
 
@@ -563,6 +571,32 @@ function CinematicUniverseCreate() {
                       )}
                     </Button>
                   </div>
+                  <Select
+                    value={coverModel}
+                    onValueChange={setCoverModel}
+                    disabled={deploymentStep !== DeploymentStep.IDLE}
+                  >
+                    <SelectTrigger className="mt-2 h-9 text-xs">
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fal-ai/nano-banana">Nano Banana</SelectItem>
+                      <SelectItem value="fal-ai/nano-banana-2">Nano Banana 2</SelectItem>
+                      <SelectItem value="fal-ai/nano-banana-pro">Nano Banana Pro</SelectItem>
+                      <SelectItem value="fal-ai/flux/schnell">Flux Schnell</SelectItem>
+                      <SelectItem value="fal-ai/flux/dev">Flux Dev</SelectItem>
+                      <SelectItem value="fal-ai/flux-pro">Flux Pro</SelectItem>
+                      <SelectItem value="fal-ai/flux-pro/v1.1">Flux Pro v1.1</SelectItem>
+                      <SelectItem value="fal-ai/flux-2-pro">Flux 2 Pro</SelectItem>
+                      <SelectItem value="fal-ai/flux-pro/kontext">Flux Pro Kontext</SelectItem>
+                      <SelectItem value="fal-ai/recraft/v4/pro/text-to-image">
+                        Recraft v4 Pro
+                      </SelectItem>
+                      <SelectItem value="fal-ai/ideogram/v3/generate">Ideogram v3</SelectItem>
+                      <SelectItem value="fal-ai/wan/v2.7/text-to-image">Wan v2.7</SelectItem>
+                      <SelectItem value="fal-ai/qwen-image">Qwen Image</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
