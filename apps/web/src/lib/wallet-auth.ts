@@ -9,7 +9,6 @@
  */
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
-import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
 
 const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
@@ -194,7 +193,6 @@ export function useWalletAuth() {
   const { address, isConnected, chain } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
-  const { handleLogOut } = useDynamicContext();
   const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -244,10 +242,9 @@ export function useWalletAuth() {
     clearSiweSession(true); // revoke = true
     rejectedRef.current = false;
     autoSignedForRef.current = null;
+    // wagmi disconnect triggers DynamicWagmiConnector to sync Dynamic's UI state
     disconnect();
-    // Also disconnect Dynamic Labs to keep UI in sync
-    handleLogOut?.().catch(() => {});
-  }, [disconnect, handleLogOut]);
+  }, [disconnect]);
 
   // Auto-clear session if wallet disconnects or address changes
   useEffect(() => {
