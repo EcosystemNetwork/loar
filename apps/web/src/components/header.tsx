@@ -1,8 +1,9 @@
 /**
  * Site Header
  *
- * Sticky top navigation bar with logo, page links, wallet connect button,
- * sign-out action, and theme toggle. Collapses nav links on mobile.
+ * Sticky top navigation bar with logo, primary links, "More" dropdown
+ * for secondary pages, wallet connect, and theme toggle.
+ * Collapses all links on mobile.
  */
 
 import { Link, useMatchRoute } from '@tanstack/react-router';
@@ -12,23 +13,48 @@ import { Web3ModeToggle } from './web3-mode-toggle';
 import { ModeToggle } from './mode-toggle';
 import { NotificationBell } from './social/NotificationBell';
 import { Button } from './ui/button';
-import { Menu, X } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { useVocab } from '@/hooks/use-vocab';
+
+const primaryLinks = [
+  { to: '/discover', label: 'Discover' },
+  { to: '/create', label: 'Create' },
+  { to: '/gallery', label: 'Gallery' },
+  { to: '/tokens', label: 'Launchpad' },
+  { to: '/credits', label: 'Credits' },
+  { to: '/dashboard', label: 'Dashboard' },
+];
+
+const moreLinks = [
+  { to: '/wiki', label: 'Wiki' },
+  { to: '/market', label: 'Marketplace' },
+  { to: '/bounties', label: 'Bounties' },
+  { to: '/staking', label: 'Staking' },
+  { to: '/agents', label: 'Agents' },
+  { to: '/activity', label: 'Activity' },
+  { to: '/my-works', label: 'My Works' },
+  { to: '/sell', label: 'Sell' },
+  { to: '/licensing', label: 'Licensing' },
+  { to: '/collabs', label: 'Collabs' },
+  { to: '/ads', label: 'Ads' },
+  { to: '/sandbox', label: 'Sandbox' },
+  { to: '/docs', label: 'Docs' },
+];
+
+const allLinks = [...primaryLinks, ...moreLinks];
 
 export default function Header() {
   const matchRoute = useMatchRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const v = useVocab();
 
-  const links: Array<{ to: string; label: string }> = [
-    { to: '/discover', label: 'Discover' },
-    { to: '/create', label: 'Create' },
-    { to: '/gallery', label: 'Gallery' },
-    { to: '/tokens', label: 'Launchpad' },
-    { to: '/credits', label: 'Credits' },
-    { to: '/dashboard', label: 'Dashboard' },
-  ];
+  const moreIsActive = moreLinks.some(({ to }) => matchRoute({ to, fuzzy: true }));
 
   return (
     <header className="border-b bg-card/50 backdrop-blur-xl sticky top-0 z-50">
@@ -40,7 +66,7 @@ export default function Header() {
               <img src="/loarlogo.svg" alt="LOAR Logo" className="h-9 w-auto object-contain" />
             </Link>
             <nav className="hidden lg:flex items-center gap-1">
-              {links.map(({ to, label }) => {
+              {primaryLinks.map(({ to, label }) => {
                 const isActive = matchRoute({ to, fuzzy: true });
                 return (
                   <Link
@@ -56,6 +82,36 @@ export default function Header() {
                   </Link>
                 );
               })}
+
+              {/* More dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                      moreIsActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    More
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  {moreLinks.map(({ to, label }, i) => (
+                    <DropdownMenuItem key={to} asChild>
+                      <Link
+                        to={to}
+                        className={`w-full cursor-pointer ${
+                          matchRoute({ to, fuzzy: true }) ? 'text-primary font-medium' : ''
+                        }`}
+                      >
+                        {label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
 
@@ -78,10 +134,10 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Navigation — shows all links flat */}
         {mobileOpen && (
           <nav className="lg:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3">
-            {links.map(({ to, label }) => {
+            {allLinks.map(({ to, label }) => {
               const isActive = matchRoute({ to, fuzzy: true });
               return (
                 <Link
