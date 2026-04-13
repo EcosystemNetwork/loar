@@ -106,6 +106,18 @@ export async function refreshSession(): Promise<boolean> {
   }
 }
 
+// Verify session on page load — clear stale localStorage if server cookie is gone.
+if (typeof window !== 'undefined' && localStorage.getItem(ADDRESS_KEY)) {
+  fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data.authenticated) {
+        clearSiweSession();
+      }
+    })
+    .catch(() => {});
+}
+
 // Proactive session refresh — refresh 1 hour before expiry.
 // JWT has 24h TTL, so refresh at the 23h mark.
 setInterval(
