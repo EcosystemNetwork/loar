@@ -464,8 +464,8 @@ function CinematicUniverseCreate() {
     }
   };
 
-  // Not connected state
-  if (!isAuthenticated && !isAuthenticating && !primaryWallet) {
+  // Not connected state — need at least a wallet for contract calls
+  if (!isConnected && !primaryWallet) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
@@ -478,15 +478,6 @@ function CinematicUniverseCreate() {
             <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  // Wallet connected but SIWE still authenticating — show loading
-  if ((!isAuthenticated && isAuthenticating) || (!isConnected && primaryWallet)) {
-    return (
-      <div className="h-full flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
