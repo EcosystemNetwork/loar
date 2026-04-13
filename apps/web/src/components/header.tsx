@@ -22,19 +22,12 @@ export default function Header() {
   const v = useVocab();
 
   const links: Array<{ to: string; label: string }> = [
-    { to: '/dashboard', label: 'Dashboard' },
     { to: '/discover', label: 'Discover' },
-    { to: '/tokens', label: 'Launchpad' },
-    { to: '/bounties', label: 'Bounties' },
-    { to: '/staking', label: v('staking') },
     { to: '/create', label: 'Create' },
-    { to: '/wiki', label: 'Wiki' },
     { to: '/gallery', label: 'Gallery' },
-    { to: '/market', label: 'Slop Market' },
+    { to: '/tokens', label: 'Launchpad' },
     { to: '/credits', label: 'Credits' },
-    { to: '/activity', label: 'Activity' },
-    { to: '/sandbox', label: 'Sandbox' },
-    { to: '/docs', label: 'Docs' },
+    { to: '/dashboard', label: 'Dashboard' },
   ];
 
   return (
