@@ -35,8 +35,27 @@ if (!VALID_CHAINS.includes(PONDER_CHAIN as any)) {
   process.exit(1);
 }
 
+/** Free public RPCs as last-resort fallbacks per chain */
+const PUBLIC_FALLBACKS: Record<(typeof VALID_CHAINS)[number], string[]> = {
+  sepolia: [
+    'https://rpc.sepolia.org',
+    'https://ethereum-sepolia-rpc.publicnode.com',
+    'https://sepolia.drpc.org',
+  ],
+  'base-sepolia': [
+    'https://sepolia.base.org',
+    'https://base-sepolia-rpc.publicnode.com',
+    'https://base-sepolia.drpc.org',
+  ],
+};
+
+const userFallbacks = (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean);
+
 export const env = {
   PONDER_RPC_URL: process.env.PONDER_RPC_URL_2 as string,
-  PONDER_RPC_FALLBACKS: (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean),
+  PONDER_RPC_FALLBACKS: [
+    ...userFallbacks,
+    ...PUBLIC_FALLBACKS[PONDER_CHAIN as (typeof VALID_CHAINS)[number]],
+  ],
   PONDER_CHAIN: PONDER_CHAIN as (typeof VALID_CHAINS)[number],
 } as const;

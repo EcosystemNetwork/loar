@@ -73,7 +73,7 @@ export default createConfig({
     [chainName]: {
       id: chainConfig.chain.id,
       rpc: [env.PONDER_RPC_URL, ...env.PONDER_RPC_FALLBACKS].filter(Boolean),
-      maxRequestsPerSecond: 4,
+      maxRequestsPerSecond: 25,
     },
   },
   contracts: {
