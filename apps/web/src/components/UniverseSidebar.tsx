@@ -37,6 +37,7 @@ import { useChainId } from 'wagmi';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { getExplorerAddressUrl } from '@/configs/chains';
+import { openExternal } from '@/utils/open-external';
 import { TokenSwapWidget } from '@/components/TokenSwapWidget';
 import { SubscribeDialog } from '@/components/SubscribeDialog';
 import { UniverseAccessSettings } from '@/components/UniverseAccessSettings';
@@ -258,7 +259,7 @@ export function UniverseSidebar({
                       size="sm"
                       className="w-full mt-2 h-7 text-xs border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50"
                       onClick={() =>
-                        window.open(getExplorerAddressUrl(chainId, finalUniverse.address), '_blank')
+                        openExternal(getExplorerAddressUrl(chainId, finalUniverse.address))
                       }
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
@@ -302,10 +303,7 @@ export function UniverseSidebar({
                     size="sm"
                     className="w-full mt-2 h-7 text-xs border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
                     onClick={() =>
-                      window.open(
-                        getExplorerAddressUrl(chainId, finalUniverse.tokenAddress),
-                        '_blank'
-                      )
+                      openExternal(getExplorerAddressUrl(chainId, finalUniverse.tokenAddress))
                     }
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />

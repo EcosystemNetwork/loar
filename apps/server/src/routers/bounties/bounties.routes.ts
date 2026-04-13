@@ -101,7 +101,7 @@ export const bountiesRouter = router({
     .input(
       z.object({
         bountyId: z.string(),
-        contentUrl: z.string(), // IPFS/storage URL of submission
+        contentUrl: z.string().url(), // IPFS/storage URL of submission
         contentHash: z.string().optional(),
         description: z.string().max(2000),
       })

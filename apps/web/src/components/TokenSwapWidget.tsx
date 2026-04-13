@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Link } from '@tanstack/react-router';
+import { openExternal } from '@/utils/open-external';
 
 interface TokenSwapWidgetProps {
   universeAddress: string;
@@ -83,7 +84,7 @@ export function TokenSwapWidget({
           variant="outline"
           size="sm"
           className="h-8 w-8 p-0 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/50 text-green-700 dark:text-green-300"
-          onClick={() => window.open(swapUrl, '_blank')}
+          onClick={() => openExternal(swapUrl)}
         >
           <ArrowUpDown className="h-3 w-3" />
         </Button>
@@ -119,7 +120,7 @@ export function TokenSwapWidget({
               className="text-[10px] h-7 border-amber-200 dark:border-amber-700"
               onClick={() => {
                 const url = `${swapUrl}&exactAmount=${val}&exactField=input`;
-                window.open(url, '_blank');
+                openExternal(url);
               }}
             >
               {val} ETH
@@ -137,7 +138,7 @@ export function TokenSwapWidget({
           <Button
             className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs"
             size="sm"
-            onClick={() => window.open(swapUrl, '_blank')}
+            onClick={() => openExternal(swapUrl)}
           >
             <ArrowUpDown className="h-3 w-3 mr-1" />
             Swap
@@ -230,7 +231,7 @@ export function TokenSwapWidget({
         className="w-full h-11 bg-green-600 hover:bg-green-500 text-white font-bold"
         onClick={() => {
           const url = buyAmount ? `${swapUrl}&exactAmount=${buyAmount}&exactField=input` : swapUrl;
-          window.open(url, '_blank');
+          openExternal(url);
         }}
         disabled={!buyAmount || Number(buyAmount) <= 0}
       >

@@ -212,7 +212,7 @@ export async function verifyApiKey(
 
   if (existing && now - existing.windowStart < windowMs) {
     if (existing.count >= keyDoc.rateLimitPerMinute) {
-      return null; // Rate limited
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'API key rate limit exceeded' });
     }
     existing.count++;
   } else {

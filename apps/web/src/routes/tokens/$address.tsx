@@ -1,11 +1,9 @@
 /**
- * Token Detail Page — Analytics, swap interface, holders, and activity feed.
- *
- * /tokens/:address — Deep dive into a universe token with price chart,
- * holder distribution, and integrated swap widget.
+ * Token Detail Page — Full analytics, native swap, comments, holders,
+ * candlestick chart, watchlist, share, creator link, maturity progress.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   useTokenDetail,
   useSwapHistory,
@@ -18,6 +16,9 @@ import {
   timeAgo,
 } from '@/hooks/useTokens';
 import { getSwapUrl } from '@/hooks/useTokenSwap';
+import { useSwapExecution } from '@/hooks/useSwapExecution';
+import { CandlestickChart } from '@/components/tokens/CandlestickChart';
+import { TokenComments } from '@/components/tokens/TokenComments';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +31,6 @@ import {
   Copy,
   CheckCircle2,
   ExternalLink,
-  Flame,
   Loader2,
   PieChart,
   TrendingUp,
@@ -38,9 +38,21 @@ import {
   Zap,
   ArrowUpRight,
   ArrowDownRight,
+  Target,
+  Share2,
+  Star,
+  StarOff,
+  AlertTriangle,
+  Clock,
+  MessageCircle,
+  Bookmark,
+  User,
 } from 'lucide-react';
 import { useChainId, useAccount, useBalance } from 'wagmi';
 import { getExplorerAddressUrl } from '@/configs/chains';
+import { openExternal } from '@/utils/open-external';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
 
 export const Route = createFileRoute('/tokens/$address')({
   component: TokenDetailPage,
@@ -51,6 +63,8 @@ function TokenDetailPage() {
   const chainId = useChainId();
   const { address: userAddress } = useAccount();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [shareToast, setShareToast] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: tokenData, isLoading: tokenLoading } = useTokenDetail(tokenAddress);
   const token = tokenData?.token;
@@ -58,12 +72,45 @@ function TokenDetailPage() {
 
   const { data: pool } = usePoolData(token?.poolId);
   const { data: universe } = useUniverseForToken(token?.universeAddress);
-  const { data: swaps, isLoading: swapsLoading } = useSwapHistory(token?.poolId, 100);
+  const { data: swaps, isLoading: swapsLoading } = useSwapHistory(token?.poolId, 200);
+
+  // Watchlist state
+  const { data: isWatching } = useQuery({
+    queryKey: ['token-watching', tokenAddress],
+    queryFn: () => trpcClient.tokenSocial.isWatching.query({ tokenAddress }),
+    enabled: !!userAddress,
+    staleTime: 30_000,
+  });
+
+  const watchMutation = useMutation({
+    mutationFn: () =>
+      isWatching
+        ? trpcClient.tokenSocial.unwatch.mutate({ tokenAddress })
+        : trpcClient.tokenSocial.watch.mutate({
+            tokenAddress,
+            tokenSymbol: token?.symbol,
+          }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['token-watching', tokenAddress] });
+    },
+  });
 
   const copyAddress = (addr: string) => {
     navigator.clipboard.writeText(addr);
     setCopiedAddress(addr);
     setTimeout(() => setCopiedAddress(null), 2000);
+  };
+
+  const shareToken = () => {
+    const url = window.location.href;
+    const text = `Check out $${token?.symbol} on LOAR`;
+    if (navigator.share) {
+      navigator.share({ title: text, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 2000);
+    }
   };
 
   // Calculate current price from pool data
@@ -73,7 +120,7 @@ function TokenDetailPage() {
     return null;
   }, [pool]);
 
-  // Price chart data from swaps
+  // Chart data from swaps
   const chartData = useMemo(() => {
     if (!swaps?.length) return [];
     return swaps
@@ -83,6 +130,7 @@ function TokenDetailPage() {
         timestamp: s.timestamp,
         price: priceFromTick(s.tick),
         isBuy: BigInt(s.amount0) > 0n,
+        ethAmount: Math.abs(Number(BigInt(s.amount1))) / 1e18,
       }));
   }, [swaps]);
 
@@ -106,6 +154,35 @@ function TokenDetailPage() {
       topHolderPct: Number((topBalance * 10000n) / totalSupply) / 100,
     };
   }, [holders]);
+
+  const marketCap = currentPrice != null ? currentPrice * 100_000_000_000 : null;
+  const totalSwaps = swaps?.length ?? 0;
+
+  // Maturity milestones
+  const milestones = [
+    { label: 'First trade', met: totalSwaps >= 1 },
+    { label: '10 holders', met: holderStats.total >= 10 },
+    { label: '50 swaps', met: totalSwaps >= 50 },
+    { label: '100 holders', met: holderStats.total >= 100 },
+    { label: '500 swaps', met: totalSwaps >= 500 },
+  ];
+  const milestonesCompleted = milestones.filter((m) => m.met).length;
+
+  // Safety checks
+  const safetyWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    if (holderStats.topHolderPct > 50) {
+      warnings.push(`Top holder owns ${holderStats.topHolderPct.toFixed(1)}% of supply`);
+    }
+    if (token && totalSwaps < 5 && holderStats.total < 3) {
+      warnings.push('Very early token — low liquidity and few holders');
+    }
+    // No vesting detected (creator got tokens immediately)
+    if (token) {
+      warnings.push('Creator allocation is not vested — tokens were distributed immediately');
+    }
+    return warnings;
+  }, [holderStats, token, totalSwaps]);
 
   if (tokenLoading) {
     return (
@@ -197,24 +274,92 @@ function TokenDetailPage() {
               </div>
             </div>
           </div>
-          {universe && (
-            <Link to="/universe/$id" params={{ id: token.universeAddress }}>
-              <Button variant="outline" size="sm" className="gap-2">
-                View Universe
-                <ExternalLink className="h-3 w-3" />
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2">
+            {/* Watchlist */}
+            {userAddress && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => watchMutation.mutate()}
+                disabled={watchMutation.isPending}
+              >
+                {isWatching ? (
+                  <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+                ) : (
+                  <StarOff className="h-3.5 w-3.5" />
+                )}
+                {isWatching ? 'Watching' : 'Watch'}
+              </Button>
+            )}
+
+            {/* Share */}
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={shareToken}>
+              <Share2 className="h-3.5 w-3.5" />
+              {shareToast ? 'Copied!' : 'Share'}
+            </Button>
+
+            {/* Portfolio */}
+            <Link to="/tokens/portfolio">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Bookmark className="h-3.5 w-3.5" />
+                Portfolio
               </Button>
             </Link>
-          )}
+
+            {/* Universe */}
+            {universe && (
+              <Link to="/universe/$id" params={{ id: token.universeAddress }}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  View Universe
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
+        {/* Safety Warnings */}
+        {safetyWarnings.length > 0 && (
+          <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="space-y-1">
+                {safetyWarnings.map((w, i) => (
+                  <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
+                    {w}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-xs text-muted-foreground">Price</p>
               <p className="text-lg font-bold tabular-nums">
                 {currentPrice
-                  ? `${currentPrice < 0.001 ? currentPrice.toExponential(2) : currentPrice.toFixed(6)}`
+                  ? currentPrice < 0.001
+                    ? currentPrice.toExponential(2)
+                    : currentPrice.toFixed(6)
+                  : '--'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">ETH</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Market Cap</p>
+              <p className="text-lg font-bold tabular-nums">
+                {marketCap != null && marketCap > 0
+                  ? marketCap >= 1000
+                    ? `${(marketCap / 1000).toFixed(1)}K`
+                    : marketCap.toFixed(2)
                   : '--'}
               </p>
               <p className="text-[10px] text-muted-foreground">ETH</p>
@@ -230,7 +375,7 @@ function TokenDetailPage() {
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-xs text-muted-foreground">Swaps</p>
-              <p className="text-lg font-bold">{swaps?.length ?? 0}</p>
+              <p className="text-lg font-bold">{totalSwaps}</p>
               <p className="text-[10px] text-muted-foreground">total trades</p>
             </CardContent>
           </Card>
@@ -253,12 +398,12 @@ function TokenDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Chart + Activity */}
+          {/* Left: Chart + Trades + Comments */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Price Chart */}
+            {/* Candlestick Chart */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-primary" />
                     <h3 className="font-semibold">Price History</h3>
@@ -272,31 +417,7 @@ function TokenDetailPage() {
                     </span>
                   )}
                 </div>
-
-                {/* Simple bar chart from swap data */}
-                {chartData.length === 0 ? (
-                  <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-                    No trading activity yet
-                  </div>
-                ) : (
-                  <div className="h-48 flex items-end gap-px">
-                    {chartData.slice(-60).map((d, i) => {
-                      const maxPrice = Math.max(...chartData.slice(-60).map((c) => c.price));
-                      const minPrice = Math.min(...chartData.slice(-60).map((c) => c.price));
-                      const range = maxPrice - minPrice || 1;
-                      const height = ((d.price - minPrice) / range) * 100;
-
-                      return (
-                        <div
-                          key={i}
-                          className={`flex-1 rounded-t-sm transition-all ${d.isBuy ? 'bg-green-500/80' : 'bg-red-500/80'} hover:opacity-70`}
-                          style={{ height: `${Math.max(height, 4)}%` }}
-                          title={`${new Date(d.timestamp * 1000).toLocaleString()}\nPrice: ${d.price.toExponential(3)} ETH\n${d.isBuy ? 'Buy' : 'Sell'}`}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+                <CandlestickChart data={chartData} />
               </CardContent>
             </Card>
 
@@ -317,7 +438,6 @@ function TokenDetailPage() {
                   <p className="text-center py-8 text-sm text-muted-foreground">No trades yet</p>
                 ) : (
                   <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                    {/* Header */}
                     <div className="grid grid-cols-5 gap-2 text-[10px] text-muted-foreground font-semibold uppercase px-2 pb-1 border-b">
                       <span>Type</span>
                       <span>Amount</span>
@@ -357,9 +477,16 @@ function TokenDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Comments */}
+            <Card>
+              <CardContent className="p-4">
+                <TokenComments tokenAddress={tokenAddress} />
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Right: Swap + Holders */}
+          {/* Right: Swap + Info + Holders */}
           <div className="space-y-6">
             {/* Swap Card */}
             <Card className="border-primary/30">
@@ -368,13 +495,73 @@ function TokenDetailPage() {
                   <ArrowUpDown className="h-4 w-4 text-primary" />
                   <h3 className="font-semibold">Trade ${token.symbol}</h3>
                 </div>
-
                 <SwapInterface
                   tokenAddress={token.id}
                   tokenSymbol={token.symbol}
                   swapUrl={swapUrl}
                   currentPrice={currentPrice}
                 />
+              </CardContent>
+            </Card>
+
+            {/* Token Maturity */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm">Token Maturity</h3>
+                  <Badge variant="outline" className="text-[10px] ml-auto">
+                    {milestonesCompleted}/{milestones.length}
+                  </Badge>
+                </div>
+                <div className="h-2 bg-secondary rounded-full overflow-hidden mb-3">
+                  <div
+                    className="h-full rounded-full transition-all bg-gradient-to-r from-amber-500 via-green-500 to-emerald-500"
+                    style={{ width: `${(milestonesCompleted / milestones.length) * 100}%` }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  {milestones.map((m, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          m.met ? 'bg-green-500 text-white' : 'bg-secondary text-muted-foreground'
+                        }`}
+                      >
+                        {m.met ? (
+                          <CheckCircle2 className="h-3 w-3" />
+                        ) : (
+                          <span className="text-[9px]">{i + 1}</span>
+                        )}
+                      </div>
+                      <span className={m.met ? 'text-foreground' : 'text-muted-foreground'}>
+                        {m.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Creator Info */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Creator
+                </h3>
+                <Link to="/tokens/creator/$address" params={{ address: token.deployer }}>
+                  <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary/60" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-xs truncate">{token.deployer}</p>
+                      <p className="text-[10px] text-muted-foreground">View all tokens</p>
+                    </div>
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </Link>
               </CardContent>
             </Card>
 
@@ -385,7 +572,6 @@ function TokenDetailPage() {
                   <Zap className="h-4 w-4" />
                   Token Info
                 </h3>
-
                 <div className="space-y-2 text-xs">
                   <InfoRow
                     label="Contract"
@@ -423,13 +609,18 @@ function TokenDetailPage() {
                     copied={copiedAddress}
                   />
                 </div>
-
                 <div className="flex flex-wrap gap-1.5 pt-2">
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <Zap className="h-2.5 w-2.5" /> LP Locked Forever
                   </Badge>
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <Users className="h-2.5 w-2.5" /> Governance Token
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] gap-1 text-amber-600 border-amber-300"
+                  >
+                    <AlertTriangle className="h-2.5 w-2.5" /> No Vesting
                   </Badge>
                 </div>
               </CardContent>
@@ -445,7 +636,6 @@ function TokenDetailPage() {
                     {holderStats.total}
                   </Badge>
                 </div>
-
                 {holders.length === 0 ? (
                   <p className="text-center py-4 text-xs text-muted-foreground">
                     No holders indexed yet
@@ -455,19 +645,27 @@ function TokenDetailPage() {
                     {holders.slice(0, 20).map((holder, i) => {
                       const totalSupply = 100_000_000_000n * 10n ** 18n;
                       const pct = Number((BigInt(holder.balance) * 10000n) / totalSupply) / 100;
+                      const isHighConcentration = pct > 30;
                       return (
                         <div key={holder.id} className="flex items-center gap-2 text-xs">
                           <span className="w-5 text-muted-foreground text-right">#{i + 1}</span>
                           <span className="font-mono flex-1 truncate text-[10px]">
-                            {holder.holderAddress.slice(0, 8)}...{holder.holderAddress.slice(-6)}
+                            {holder.holderAddress.slice(0, 8)}...
+                            {holder.holderAddress.slice(-6)}
                           </span>
                           <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-primary rounded-full"
+                              className={`h-full rounded-full ${
+                                isHighConcentration ? 'bg-amber-500' : 'bg-primary'
+                              }`}
                               style={{ width: `${Math.min(pct, 100)}%` }}
                             />
                           </div>
-                          <span className="w-14 text-right tabular-nums font-medium">
+                          <span
+                            className={`w-14 text-right tabular-nums font-medium ${
+                              isHighConcentration ? 'text-amber-500' : ''
+                            }`}
+                          >
                             {pct.toFixed(1)}%
                           </span>
                         </div>
@@ -509,7 +707,7 @@ function TokenDetailPage() {
   );
 }
 
-// ─── Swap Interface ────────────────────────────────────────────────────
+// ─── Swap Interface ───────────────────────────────────────────────────
 
 function SwapInterface({
   tokenAddress,
@@ -526,25 +724,67 @@ function SwapInterface({
   const [amount, setAmount] = useState('');
   const { address } = useAccount();
   const { data: ethBalance } = useBalance({ address });
+  const { executeSwap, status, txHash, error, isNativeSwapAvailable, reset } = useSwapExecution();
 
   const estimatedOutput = useMemo(() => {
     if (!amount || !currentPrice || isNaN(Number(amount))) return null;
     const val = Number(amount);
     if (mode === 'buy') {
-      // ETH in -> tokens out
       return currentPrice > 0 ? val / currentPrice : 0;
     } else {
-      // tokens in -> ETH out
       return val * currentPrice;
     }
   }, [amount, currentPrice, mode]);
 
+  const handleSwap = async () => {
+    const result = await executeSwap({
+      tokenAddress,
+      tokenSymbol,
+      poolKey: null, // Will fallback to Uniswap link until router is deployed
+      mode,
+      amount,
+    });
+
+    if (result && !result.fallback && result.txHash) {
+      // Record trade for PnL tracking
+      try {
+        const ethAmt = Number(amount);
+        const tokenAmt = estimatedOutput ?? 0;
+        const price = currentPrice ?? 0;
+        if (ethAmt > 0 && price > 0) {
+          await trpcClient.tokenSocial.recordTrade.mutate({
+            tokenAddress,
+            tokenSymbol,
+            type: mode,
+            ethAmount: ethAmt,
+            tokenAmount: mode === 'buy' ? tokenAmt : ethAmt,
+            pricePerToken: price,
+            txHash: result.txHash,
+          });
+        }
+      } catch {
+        // PnL tracking is best-effort
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Native swap badge */}
+      {isNativeSwapAvailable && (
+        <div className="flex items-center gap-1.5 text-[10px] text-green-600 dark:text-green-400">
+          <Zap className="h-2.5 w-2.5" />
+          Native swap — trades execute in-app
+        </div>
+      )}
+
       {/* Buy/Sell Toggle */}
       <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg">
         <button
-          onClick={() => setMode('buy')}
+          onClick={() => {
+            setMode('buy');
+            reset();
+          }}
           className={`py-2 text-sm font-semibold rounded-md transition-all ${
             mode === 'buy'
               ? 'bg-green-500 text-white shadow-sm'
@@ -554,7 +794,10 @@ function SwapInterface({
           Buy
         </button>
         <button
-          onClick={() => setMode('sell')}
+          onClick={() => {
+            setMode('sell');
+            reset();
+          }}
           className={`py-2 text-sm font-semibold rounded-md transition-all ${
             mode === 'sell'
               ? 'bg-red-500 text-white shadow-sm'
@@ -583,7 +826,10 @@ function SwapInterface({
             type="number"
             placeholder="0.0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              reset();
+            }}
             className="h-12 text-lg font-mono pr-16"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
@@ -629,31 +875,46 @@ function SwapInterface({
         </div>
       )}
 
-      {/* Swap Button — links to Uniswap with pre-filled amounts */}
+      {/* Tx status */}
+      {status === 'pending' && txHash && (
+        <div className="p-2 bg-blue-500/10 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Transaction pending...
+        </div>
+      )}
+      {status === 'error' && error && (
+        <div className="p-2 bg-red-500/10 rounded-lg text-xs text-red-600 dark:text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Swap Button */}
       <Button
-        className={`w-full h-12 text-base font-bold ${mode === 'buy' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`}
-        onClick={() => {
-          const url =
-            mode === 'buy'
-              ? `${swapUrl}${amount ? `&exactAmount=${amount}&exactField=input` : ''}`
-              : `${swapUrl.replace('inputCurrency=ETH&outputCurrency=', `inputCurrency=${tokenAddress}&outputCurrency=`).replace(`outputCurrency=${tokenAddress}`, 'outputCurrency=ETH')}${amount ? `&exactAmount=${amount}&exactField=input` : ''}`;
-          window.open(url, '_blank');
-        }}
-        disabled={!amount || Number(amount) <= 0}
+        className={`w-full h-12 text-base font-bold ${
+          mode === 'buy' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'
+        }`}
+        onClick={handleSwap}
+        disabled={!amount || Number(amount) <= 0 || status === 'confirming' || status === 'pending'}
       >
-        <ArrowUpDown className="h-5 w-5 mr-2" />
+        {status === 'confirming' ? (
+          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+        ) : (
+          <ArrowUpDown className="h-5 w-5 mr-2" />
+        )}
         {mode === 'buy' ? `Buy $${tokenSymbol}` : `Sell $${tokenSymbol}`}
-        <ExternalLink className="h-3 w-3 ml-2 opacity-50" />
+        {!isNativeSwapAvailable && <ExternalLink className="h-3 w-3 ml-2 opacity-50" />}
       </Button>
 
       <p className="text-[10px] text-center text-muted-foreground">
-        Swaps execute on Uniswap v4. LP is permanently locked.
+        {isNativeSwapAvailable
+          ? 'Swaps execute on-chain via LoarSwapRouter. LP is permanently locked.'
+          : 'Swaps execute on Uniswap v4. LP is permanently locked.'}
       </p>
     </div>
   );
 }
 
-// ─── Helper Components ─────────────────────────────────────────────────
+// ─── Helper Components ────────────────────────────────────────────────
 
 function InfoRow({
   label,

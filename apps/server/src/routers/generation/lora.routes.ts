@@ -9,6 +9,7 @@ import { protectedProcedure, publicProcedure, router, requirePermission } from '
 import { db } from '../../lib/firebase';
 import { TRPCError } from '@trpc/server';
 import { FieldValue } from 'firebase-admin/firestore';
+import { logFailedRefund } from '../../lib/refund-audit';
 
 const loraModelsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -179,13 +180,40 @@ export const loraRouter = router({
                   modelUrl: result.diffusers_lora_file?.url,
                 };
               } else if (status.status === 'FAILED') {
+                // Refund training credits on FAL failure
+                const alreadyRefunded = model.creditsRefunded === true;
+                if (!alreadyRefunded) {
+                  try {
+                    await db!
+                      .collection('userCredits')
+                      .doc(ctx.user.uid)
+                      .update({
+                        balance: FieldValue.increment(TRAINING_COST_CREDITS),
+                        totalSpent: FieldValue.increment(-TRAINING_COST_CREDITS),
+                        updatedAt: new Date(),
+                      });
+                  } catch (refundErr) {
+                    console.error(
+                      `CRITICAL: LoRA training refund failed for ${ctx.user.uid}:`,
+                      refundErr
+                    );
+                    await logFailedRefund({
+                      userId: ctx.user.uid,
+                      credits: TRAINING_COST_CREDITS,
+                      source: 'lora.getTrainingStatus',
+                      generationId: input.modelId,
+                      error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+                    });
+                  }
+                }
                 await loraModelsCol()
                   .doc(input.modelId)
                   .update({
                     status: 'failed',
+                    creditsRefunded: true,
                     error: status.error || 'Training failed',
                   });
-                return { ...model, status: 'failed' };
+                return { ...model, status: 'failed', creditsRefunded: true };
               }
             } catch {
               // Polling failed — return current status

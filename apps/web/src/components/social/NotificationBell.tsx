@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
@@ -30,6 +30,22 @@ export function NotificationBell() {
   );
 
   const unreadCount = unreadData?.count ?? 0;
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape key
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    },
+    [isOpen]
+  );
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   return (
     <div className="relative">
@@ -40,6 +56,9 @@ export function NotificationBell() {
             markRead.mutate({ all: true });
           }
         }}
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
         className="relative p-2 text-zinc-400 hover:text-white transition-colors"
       >
         <Bell className="w-5 h-5" />
@@ -56,7 +75,12 @@ export function NotificationBell() {
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
           {/* Dropdown */}
-          <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div
+            ref={dropdownRef}
+            role="menu"
+            aria-label="Notifications"
+            className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden"
+          >
             <div className="px-4 py-3 border-b border-zinc-800 flex justify-between items-center">
               <h3 className="font-semibold text-white text-sm">Notifications</h3>
               {unreadCount > 0 && (

@@ -236,17 +236,47 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit ContentLicensed(dealId, contentHash, msg.sender, msg.value, endTime);
     }
 
-    /// @notice Pay ongoing royalty for a LICENSE deal
+    error DealExpired();
+
+    /// @notice Pay ongoing royalty for a LICENSE deal.
+    /// @dev Enforces endTime — auto-expires the deal if past deadline.
     function payRoyalty(uint256 dealId) external payable nonReentrant {
         Deal storage deal = deals[dealId];
         if (deal.dealType != DealType.LICENSE) revert DealNotActive();
         if (deal.status != DealStatus.ACTIVE) revert DealNotActive();
-        if (block.timestamp > deal.endTime) revert DealNotActive();
+
+        // Enforce expiry — auto-transition to EXPIRED, revert with clear error
+        if (deal.endTime > 0 && block.timestamp > deal.endTime) {
+            deal.status = DealStatus.EXPIRED;
+            revert DealExpired();
+        }
 
         ContentRegistration storage reg = registrations[deal.contentHash];
         _routePayment(reg.splitEntityHash, msg.value);
 
         emit RoyaltyPaid(dealId, msg.value);
+    }
+
+    /// @notice Check if a user has active access to rented/licensed content
+    /// @dev Auto-expires deals past their endTime
+    function checkAccess(bytes32 contentHash, address user) external returns (bool hasAccess) {
+        uint256[] storage dealIds = _contentDeals[contentHash];
+        for (uint256 i = dealIds.length; i > 0; i--) {
+            Deal storage deal = deals[dealIds[i - 1]];
+            if (deal.buyer != user) continue;
+            if (deal.status != DealStatus.ACTIVE) continue;
+
+            // BUY deals never expire
+            if (deal.dealType == DealType.BUY) return true;
+
+            // RENT/LICENSE — check expiry, auto-expire if past
+            if (deal.endTime > 0 && block.timestamp > deal.endTime) {
+                deal.status = DealStatus.EXPIRED;
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     // ── Management ──────────────────────────────────────────────────────
@@ -291,6 +321,21 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     function getContentDeals(bytes32 contentHash) external view returns (uint256[] memory) {
         return _contentDeals[contentHash];
+    }
+
+    /// @notice Paginated deal query for a content piece
+    function getContentDealsPaginated(bytes32 contentHash, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = _contentDeals[contentHash];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
     }
 
     function getRegistration(bytes32 contentHash) external view returns (ContentRegistration memory) {

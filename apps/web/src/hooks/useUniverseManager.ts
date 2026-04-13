@@ -1,6 +1,6 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { universeManagerAbi } from '@loar/abis/generated';
-import { UniverseManager } from '@loar/abis/addresses';
+import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
 
 /**
  * Hook for interacting with the UniverseManager contract (launchpad)
@@ -152,9 +152,13 @@ export function useUniverseManager() {
  * Uses the deployed hook, locker, and paired token addresses from packages/abis/addresses
  */
 export function useDefaultDeploymentConfig() {
+  const chainId = useChainId();
+  const chainKey = String(chainId) as keyof typeof LoarHookStaticFee;
+
   return {
-    defaultHook: '0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc' as `0x${string}`, // LoarHookStaticFee (Sepolia)
-    defaultLocker: '0xc00225D9463C15280748dC2E21D8D8625982Ad54' as `0x${string}`, // LoarLpLockerMultiple (Sepolia)
+    defaultHook: (LoarHookStaticFee[chainKey] ?? LoarHookStaticFee['11155111']) as `0x${string}`,
+    defaultLocker: (LoarLpLockerMultiple[chainKey] ??
+      LoarLpLockerMultiple['11155111']) as `0x${string}`,
     defaultPairedToken: '0x0000000000000000000000000000000000000000' as `0x${string}`, // ETH or WETH
     defaultTickSpacing: 60,
     defaultTickIfToken0IsLoar: -887220, // Example starting tick

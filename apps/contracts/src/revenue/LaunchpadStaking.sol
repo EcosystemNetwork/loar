@@ -383,6 +383,12 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     // ── Admin ───────────────────────────────────────────────────
 
+    event TierConfigChanged(Tier indexed tier, uint256 minStake, uint16 weight, uint16 feeDiscountBps, uint16 curationBoost, bool priorityQueue);
+    event MinLockPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+    event EarlyUnstakePenaltyChanged(uint16 oldPenaltyBps, uint16 newPenaltyBps);
+    event TreasuryChanged(address indexed oldTreasury, address indexed newTreasury);
+    event LiquidityPoolChanged(address indexed oldPool, address indexed newPool);
+
     function setTierConfig(Tier tier, uint256 minStake, uint16 weight, uint16 feeDiscountBps, uint16 curationBoost, bool priorityQueue) external onlyOwner {
         require(tier != Tier.NONE, "Cannot configure NONE tier");
         tierConfigs[tier] = TierConfig({
@@ -392,24 +398,33 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             curationBoost: curationBoost,
             priorityQueue: priorityQueue
         });
+        emit TierConfigChanged(tier, minStake, weight, feeDiscountBps, curationBoost, priorityQueue);
     }
 
     function setMinLockPeriod(uint256 newPeriod) external onlyOwner {
         require(newPeriod <= 90 days, "Max 90 days");
+        uint256 oldPeriod = minLockPeriod;
         minLockPeriod = newPeriod;
+        emit MinLockPeriodChanged(oldPeriod, newPeriod);
     }
 
     function setEarlyUnstakePenalty(uint16 newPenaltyBps) external onlyOwner {
         require(newPenaltyBps <= 2000, "Max 20%");
+        uint16 oldBps = earlyUnstakePenaltyBps;
         earlyUnstakePenaltyBps = newPenaltyBps;
+        emit EarlyUnstakePenaltyChanged(oldBps, newPenaltyBps);
     }
 
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
+        address old = treasury;
         treasury = newTreasury;
+        emit TreasuryChanged(old, newTreasury);
     }
 
     function setLiquidityPool(address newPool) external onlyOwner {
+        address old = liquidityPool;
         liquidityPool = newPool;
+        emit LiquidityPoolChanged(old, newPool);
     }
 }

@@ -3,6 +3,7 @@
  * Records views, mints, trending data. Valuable for AI training and studios.
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
@@ -171,7 +172,23 @@ export const analyticsRouter = router({
         dateTo: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      // Verify caller owns/created this universe before exporting data
+      const universesCol = db!.collection('cinematicUniverses');
+      const universeDoc = await universesCol.doc(input.universeId).get();
+      if (universeDoc.exists) {
+        const universeData = universeDoc.data();
+        if (
+          universeData?.creatorUid !== ctx.user.uid &&
+          universeData?.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()
+        ) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only the universe creator can export analytics',
+          });
+        }
+      }
+
       const dateFrom = input.dateFrom ? new Date(input.dateFrom) : new Date(0);
       const dateTo = input.dateTo ? new Date(input.dateTo) : new Date();
 

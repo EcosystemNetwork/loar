@@ -30,6 +30,7 @@ import {
 import { trackQuests, trackModelUsage } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
+import { logFailedRefund } from '../../lib/refund-audit';
 import type {
   VideoGenerationRecord,
   RoutingMode,
@@ -620,6 +621,13 @@ export const generationRouter = router({
             `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
             refundErr
           );
+          logFailedRefund({
+            userId: ctx.user.uid,
+            credits: creditsCharged,
+            source: 'generation.generate',
+            generationId,
+            error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+          });
         }
 
         await generationsCol().doc(generationId).update({

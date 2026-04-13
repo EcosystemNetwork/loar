@@ -119,8 +119,14 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
         _setTokenURI(tokenId, metadataURI);
         _setTokenRoyalty(tokenId, msg.sender, royaltyBps);
 
-        if (msg.value > 0) {
-            paymentRouter.route{value: msg.value}(msg.sender, platformFeeBps);
+        // Route exact mint price; refund excess
+        if (mintPrice > 0) {
+            paymentRouter.route{value: mintPrice}(msg.sender, platformFeeBps);
+        }
+        uint256 excess = msg.value - mintPrice;
+        if (excess > 0) {
+            (bool refunded,) = msg.sender.call{value: excess}("");
+            if (!refunded) revert InsufficientPayment(); // reuse error for refund fail
         }
 
         emit EntityMinted(tokenId, universeId, kind, name, msg.sender, contentHash);

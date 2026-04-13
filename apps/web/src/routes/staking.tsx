@@ -185,9 +185,17 @@ function StakingPage() {
                   </div>
                   <Button
                     className="w-full bg-green-600 hover:bg-green-500"
-                    disabled={!stakeAmount || Number(stakeAmount) <= 0}
+                    disabled={!stakeAmount || Number(stakeAmount) <= 0 || syncMutation.isPending}
+                    onClick={() => {
+                      const amount = Number(stakeAmount);
+                      if (amount > 0) {
+                        const currentStaked = (profile as any)?.stakedAmount ?? 0;
+                        syncMutation.mutate({ stakedAmount: currentStaked + amount });
+                        setStakeAmount('');
+                      }
+                    }}
                   >
-                    {v('stake')}{' '}
+                    {syncMutation.isPending ? 'Staking...' : v('stake')}{' '}
                     {stakeAmount ? `${Number(stakeAmount).toLocaleString()} $LOAR` : ''}
                   </Button>
                   <p className="text-[10px] text-muted-foreground">
@@ -210,9 +218,19 @@ function StakingPage() {
                   <Button
                     variant="outline"
                     className="w-full text-red-500 border-red-500/30 hover:bg-red-500/10"
-                    disabled={!unstakeAmount || Number(unstakeAmount) <= 0}
+                    disabled={
+                      !unstakeAmount || Number(unstakeAmount) <= 0 || syncMutation.isPending
+                    }
+                    onClick={() => {
+                      const amount = Number(unstakeAmount);
+                      const currentStaked = (profile as any)?.stakedAmount ?? 0;
+                      if (amount > 0 && amount <= currentStaked) {
+                        syncMutation.mutate({ stakedAmount: currentStaked - amount });
+                        setUnstakeAmount('');
+                      }
+                    }}
                   >
-                    {v('unstake')}{' '}
+                    {syncMutation.isPending ? 'Unstaking...' : v('unstake')}{' '}
                     {unstakeAmount ? `${Number(unstakeAmount).toLocaleString()} $LOAR` : ''}
                   </Button>
                   <p className="text-[10px] text-muted-foreground">

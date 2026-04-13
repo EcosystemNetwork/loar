@@ -593,6 +593,12 @@ export const questsRouter = router({
   unlockReferralReward: protectedProcedure
     .input(z.object({ referredUserId: z.string() }))
     .mutation(async ({ input, ctx }) => {
+      // Only the referred user themselves can trigger reward unlock
+      // (called when they perform a gated action like purchase or mint)
+      if (input.referredUserId !== ctx.user.uid) {
+        return { ok: false, reason: 'Only the referred user can unlock their referral reward' };
+      }
+
       // Find the pending referral record for this referee
       const pendingSnap = await affiliateRewardsCol()
         .where('referredUserId', '==', input.referredUserId)

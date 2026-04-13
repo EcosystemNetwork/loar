@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title StoryBounties
 /// @notice Creators post $LOAR bounties for specific content requests.
@@ -47,6 +48,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     IERC20 public loarToken;
+    IPaymentRouter public paymentRouter;
     address public treasury;
     address public platform;
 
@@ -106,6 +108,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         platformFeeBps = 500;       // 5%
         cancellationFeeBps = 200;   // 2%
         minBountyAmount = 10e18;    // 10 $LOAR minimum
+        // PaymentRouter set post-init via setPaymentRouter() if available
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -164,12 +167,20 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         b.claimedBy = winner;
         b.submissionHash = submissionHash;
 
-        // Pay winner
-        loarToken.safeTransfer(winner, winnerReward);
-
-        // Platform fee
-        if (platformFee > 0) {
-            loarToken.safeTransfer(treasury, platformFee);
+        // Route winner payout through PaymentRouter if available, otherwise direct transfer
+        if (address(paymentRouter) != address(0)) {
+            loarToken.safeApprove(address(paymentRouter), winnerReward);
+            paymentRouter.routeLoar(winner, 0, winnerReward); // 0 fee — already deducted
+            if (platformFee > 0) {
+                loarToken.safeApprove(address(paymentRouter), platformFee);
+                paymentRouter.routeLoarToTreasury(platformFee);
+            }
+        } else {
+            // Fallback: direct transfer (pre-PaymentRouter deployment)
+            loarToken.safeTransfer(winner, winnerReward);
+            if (platformFee > 0) {
+                loarToken.safeTransfer(treasury, platformFee);
+            }
         }
 
         totalDistributed += winnerReward;
@@ -218,6 +229,21 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         return universeBounties[universeId];
     }
 
+    /// @notice Paginated bounty query — avoids gas limit on large arrays
+    function getUniverseBountiesPaginated(uint256 universeId, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = universeBounties[universeId];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
+    }
+
     function getBounty(uint256 bountyId) external view returns (Bounty memory) {
         return bounties[bountyId];
     }
@@ -246,4 +272,14 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function setPlatform(address newPlatform) external onlyOwner {
         platform = newPlatform;
     }
+
+    /// @notice Set PaymentRouter for consistent revenue routing
+    function setPaymentRouter(address _paymentRouter) external onlyOwner {
+        paymentRouter = IPaymentRouter(_paymentRouter);
+    }
+
+    event PlatformFeeChanged(uint16 oldBps, uint16 newBps);
+    event CancellationFeeChanged(uint16 oldBps, uint16 newBps);
+    event MinBountyChanged(uint256 oldMin, uint256 newMin);
+    event TreasuryChanged(address indexed oldTreasury, address indexed newTreasury);
 }

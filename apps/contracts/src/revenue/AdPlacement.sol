@@ -231,4 +231,24 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     function getUniverseSlots(uint256 universeId) external view returns (uint256[] memory) {
         return universeSlots[universeId];
     }
+
+    /// @notice Paginated ad slot query
+    function getUniverseSlotsPaginated(uint256 universeId, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = universeSlots[universeId];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
+    }
+
+    /// @notice Get total slot count for a universe
+    function getSlotCount(uint256 universeId) external view returns (uint256) {
+        return universeSlots[universeId].length;
+    }
 }

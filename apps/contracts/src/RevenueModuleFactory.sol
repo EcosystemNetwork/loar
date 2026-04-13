@@ -132,22 +132,51 @@ contract RevenueModuleFactory is Ownable {
 
     // ── Admin ──
 
-    function setPlatform(address p) external onlyOwner { if (p == address(0)) revert ZeroAddress(); platform = p; }
-    function setRightsRegistry(address r) external onlyOwner { if (r == address(0)) revert ZeroAddress(); rightsRegistry = r; }
-    function setPaymentRouter(address r) external onlyOwner { if (r == address(0)) revert ZeroAddress(); paymentRouter = r; }
+    event PlatformChanged(address indexed oldPlatform, address indexed newPlatform);
+    event RightsRegistryChanged(address indexed oldRegistry, address indexed newRegistry);
+    event PaymentRouterChanged(address indexed oldRouter, address indexed newRouter);
+    event EpisodeFeesChanged(uint16 platformFeeBps, uint16 royaltyBps);
+    event CharacterAppearanceFeeChanged(uint16 feeBps);
+    event EntityFeesChanged(uint16 platformFeeBps, uint16 royaltyBps);
+
+    function setPlatform(address p) external onlyOwner {
+        if (p == address(0)) revert ZeroAddress();
+        address old = platform;
+        platform = p;
+        emit PlatformChanged(old, p);
+    }
+
+    function setRightsRegistry(address r) external onlyOwner {
+        if (r == address(0)) revert ZeroAddress();
+        address old = rightsRegistry;
+        rightsRegistry = r;
+        emit RightsRegistryChanged(old, r);
+    }
+
+    function setPaymentRouter(address r) external onlyOwner {
+        if (r == address(0)) revert ZeroAddress();
+        address old = paymentRouter;
+        paymentRouter = r;
+        emit PaymentRouterChanged(old, r);
+    }
 
     function setEpisodeFees(uint16 pfBps, uint16 rBps) external onlyOwner {
         if (pfBps > MAX_FEE_BPS || rBps > MAX_FEE_BPS) revert FeeTooHigh();
-        episodePlatformFeeBps = pfBps; episodeRoyaltyBps = rBps;
+        episodePlatformFeeBps = pfBps;
+        episodeRoyaltyBps = rBps;
+        emit EpisodeFeesChanged(pfBps, rBps);
     }
 
     function setCharacterAppearanceFee(uint16 feeBps) external onlyOwner {
         if (feeBps > MAX_FEE_BPS) revert FeeTooHigh();
         characterAppearanceFeeBps = feeBps;
+        emit CharacterAppearanceFeeChanged(feeBps);
     }
 
     function setEntityFees(uint16 pfBps, uint16 rBps) external onlyOwner {
         if (pfBps > MAX_FEE_BPS || rBps > MAX_FEE_BPS) revert FeeTooHigh();
-        entityPlatformFeeBps = pfBps; entityRoyaltyBps = rBps;
+        entityPlatformFeeBps = pfBps;
+        entityRoyaltyBps = rBps;
+        emit EntityFeesChanged(pfBps, rBps);
     }
 }

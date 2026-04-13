@@ -4,6 +4,7 @@
  * Fetches all token data from the Ponder indexer for the launchpad and token detail pages.
  */
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import {
   ponderGql,
   ponderQueryDefaults,
@@ -301,4 +302,167 @@ export function timeAgo(timestamp: number): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return new Date(timestamp * 1000).toLocaleDateString();
+}
+
+// ─── Enriched token list for launchpad ────────────────────────────────
+
+export interface EnrichedToken extends Token {
+  price: number | null;
+  priceChange24h: number | null;
+  volume24h: number;
+  swapCount24h: number;
+  totalSwaps: number;
+  holderCount: number;
+  sparkline: number[];
+  marketCap: number | null;
+}
+
+const TOTAL_SUPPLY = 100_000_000_000; // 100B tokens per universe
+
+/**
+ * Fetches tokens with enriched analytics: price, 24h change, volume,
+ * holder counts, sparkline data, and market cap. Used by the launchpad listing.
+ */
+export function useTokenListData() {
+  const tokensQuery = useAllTokens();
+
+  // Fetch all pools to get current prices
+  const poolsQuery = useQuery({
+    queryKey: ['all-pools'],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        pools: { items: PoolData[] };
+      }>(`query {
+        pools(limit: 200) {
+          items {
+            poolId currency0 currency1 fee tickSpacing hooks sqrtPriceX96 tick creationBlock
+          }
+        }
+      }`);
+      return data.pools?.items ?? [];
+    },
+    ...ponderQueryDefaults,
+  });
+
+  // Fetch recent swaps (expanded limit for volume + sparkline)
+  const swapsQuery = useQuery({
+    queryKey: ['all-recent-swaps-enriched'],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        swaps: { items: Swap[] };
+      }>(`query {
+        swaps(orderBy: "timestamp", orderDirection: "desc", limit: 500) {
+          items {
+            id poolId sender amount0 amount1 tick timestamp
+          }
+        }
+      }`);
+      return data.swaps?.items ?? [];
+    },
+    ...ponderQueryDefaults,
+    refetchInterval: 10_000,
+  });
+
+  // Fetch all holder records to count per token
+  const holdersQuery = useQuery({
+    queryKey: ['all-holder-counts'],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        tokenHolders: { items: { tokenAddress: string }[] };
+      }>(`query {
+        tokenHolders(limit: 1000) {
+          items { tokenAddress }
+        }
+      }`);
+      return data.tokenHolders?.items ?? [];
+    },
+    ...ponderQueryDefaults,
+  });
+
+  const enrichedTokens = useMemo((): EnrichedToken[] => {
+    if (!tokensQuery.data) return [];
+
+    // Index pools by poolId
+    const poolMap = new Map<string, PoolData>();
+    for (const pool of poolsQuery.data ?? []) {
+      poolMap.set(pool.poolId, pool);
+    }
+
+    const allSwaps = swapsQuery.data ?? [];
+    const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+
+    // Group swaps by poolId
+    const swapsByPool = new Map<string, Swap[]>();
+    for (const swap of allSwaps) {
+      const list = swapsByPool.get(swap.poolId) ?? [];
+      list.push(swap);
+      swapsByPool.set(swap.poolId, list);
+    }
+
+    // Count holders per token address (lowercased)
+    const holderCounts = new Map<string, number>();
+    for (const h of holdersQuery.data ?? []) {
+      const key = h.tokenAddress.toLowerCase();
+      holderCounts.set(key, (holderCounts.get(key) ?? 0) + 1);
+    }
+
+    return tokensQuery.data.map((token) => {
+      const pool = poolMap.get(token.poolId);
+      const tokenSwaps = swapsByPool.get(token.poolId) ?? [];
+      const recentSwaps = tokenSwaps.filter((s) => s.timestamp >= oneDayAgo);
+
+      // Current price from pool
+      let price: number | null = null;
+      if (pool?.sqrtPriceX96) price = priceFromSqrtX96(pool.sqrtPriceX96);
+      else if (pool?.tick != null) price = priceFromTick(pool.tick);
+
+      // 24h price change
+      let priceChange24h: number | null = null;
+      if (recentSwaps.length >= 2 && price) {
+        const oldestPrice = priceFromTick(recentSwaps[recentSwaps.length - 1].tick);
+        if (oldestPrice > 0) {
+          priceChange24h = ((price - oldestPrice) / oldestPrice) * 100;
+        }
+      }
+
+      // 24h volume (sum of absolute ETH moved)
+      let volume24h = 0;
+      for (const s of recentSwaps) {
+        volume24h += Math.abs(Number(BigInt(s.amount1))) / 1e18;
+      }
+
+      // Sparkline: last 20 swap prices, oldest→newest
+      const sparkline = tokenSwaps
+        .slice(0, 20)
+        .reverse()
+        .map((s) => priceFromTick(s.tick));
+
+      // Market cap = price * total supply
+      const marketCap = price != null ? price * TOTAL_SUPPLY : null;
+
+      return {
+        ...token,
+        price,
+        priceChange24h,
+        volume24h,
+        swapCount24h: recentSwaps.length,
+        totalSwaps: tokenSwaps.length,
+        holderCount: holderCounts.get(token.id.toLowerCase()) ?? 0,
+        sparkline,
+        marketCap,
+      };
+    });
+  }, [tokensQuery.data, poolsQuery.data, swapsQuery.data, holdersQuery.data]);
+
+  // Total market cap across all tokens
+  const totalMarketCap = useMemo(() => {
+    return enrichedTokens.reduce((sum, t) => sum + (t.marketCap ?? 0), 0);
+  }, [enrichedTokens]);
+
+  return {
+    data: enrichedTokens,
+    isLoading: tokensQuery.isLoading,
+    recentSwaps: swapsQuery.data ?? [],
+    totalMarketCap,
+  };
 }

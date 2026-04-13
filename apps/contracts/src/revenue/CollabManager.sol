@@ -212,4 +212,24 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function getUniverseCollabs(uint256 universeId) external view returns (uint256[] memory) {
         return universeCollabs[universeId];
     }
+
+    /// @notice Paginated collab query
+    function getUniverseCollabsPaginated(uint256 universeId, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = universeCollabs[universeId];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
+    }
+
+    /// @notice Get total collab count for a universe
+    function getCollabCount(uint256 universeId) external view returns (uint256) {
+        return universeCollabs[universeId].length;
+    }
 }

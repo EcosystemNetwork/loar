@@ -35,3 +35,17 @@ export const LoarHookStaticFee = {
 } as const;
 
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
+
+export const LoarSwapRouter = {
+  '11155111': '0xcC7fDa435ba32655Dd30868Ec8CCa5DdE992660D',
+  '84532': '0xa72fC9Fd44f29751d37a0A4E26888F956281F1cd',
+} as const;
+
+export type LoarSwapRouterChainId = keyof typeof LoarSwapRouter;
+
+export const TokenVesting = {
+  '11155111': '0xDE9257B07CD06f13516e1F539f660b038603A3bB',
+  '84532': '0xF2c3d5D97743cc00151292B11382E3b0b3a50869',
+} as const;
+
+export type TokenVestingChainId = keyof typeof TokenVesting;

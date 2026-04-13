@@ -32,11 +32,12 @@ import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { validateUploadUrl } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
+import { logFailedRefund } from '../../lib/refund-audit';
 
-// ── Pricing constants ─────────────────────────────────────────────────
+// ── Pricing — loaded from platform config (admin-configurable) ────────
 
-const FIAT_MARGIN = 1.35;
-const LOAR_MARGIN = 1.25;
+import { getPlatformConfig } from '../../services/platformConfig';
+
 const LOAR_TO_USD = 0.01;
 
 // Provider cost per character (USD)
@@ -51,14 +52,18 @@ const SOUND_EFFECT_COST_USD = 0.08;
 const VOICE_DESIGN_COST_USD = 0.08;
 const INSTANT_CLONE_COST_USD = 0.09;
 
-function withFiat(usd: number) {
-  return Math.round(usd * FIAT_MARGIN * 100) / 100;
+async function getMargins() {
+  const cfg = await getPlatformConfig();
+  return { fiatMargin: cfg.fiatMargin, loarMargin: cfg.loarMargin };
 }
-function withLoar(usd: number) {
-  return Math.round(usd * LOAR_MARGIN * 100) / 100;
+function withFiat(usd: number, fiatMargin = 1.35) {
+  return Math.round(usd * fiatMargin * 100) / 100;
 }
-function toCredits(usd: number) {
-  return Math.ceil(withFiat(usd) / LOAR_TO_USD);
+function withLoar(usd: number, loarMargin = 1.25) {
+  return Math.round(usd * loarMargin * 100) / 100;
+}
+function toCredits(usd: number, fiatMargin = 1.35) {
+  return Math.ceil(withFiat(usd, fiatMargin) / LOAR_TO_USD);
 }
 
 // ── Collections ───────────────────────────────────────────────────────
@@ -94,7 +99,7 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
   });
 }
 
-async function refundCredits(userId: string, credits: number): Promise<void> {
+async function refundCredits(userId: string, credits: number, genId?: string): Promise<void> {
   const ref = userCreditsCol().doc(userId);
   try {
     await ref.update({
@@ -104,6 +109,13 @@ async function refundCredits(userId: string, credits: number): Promise<void> {
     });
   } catch (err) {
     console.error(`CRITICAL: Voice credit refund failed for ${userId}:`, err);
+    logFailedRefund({
+      userId,
+      credits,
+      source: 'voice',
+      generationId: genId ?? 'unknown',
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
   }
 }
 
@@ -202,11 +214,12 @@ export const voiceRouter = router({
       const genId = randomUUID();
       const startTime = Date.now();
 
+      const { fiatMargin, loarMargin } = await getMargins();
       const charCost = CHAR_COST[input.modelId];
       const providerCost = charCost * input.text.length;
-      const fiatPrice = withFiat(providerCost);
-      const loarPrice = withLoar(providerCost);
-      const credits = toCredits(providerCost);
+      const fiatPrice = withFiat(providerCost, fiatMargin);
+      const loarPrice = withLoar(providerCost, loarMargin);
+      const credits = toCredits(providerCost, fiatMargin);
 
       // Save initial record
       await voiceGenerationsCol()
@@ -279,7 +292,7 @@ export const voiceRouter = router({
           fiatPriceUsd: fiatPrice,
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -303,8 +316,9 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
-      const credits = toCredits(SOUND_EFFECT_COST_USD);
+      const credits = toCredits(SOUND_EFFECT_COST_USD, fiatMargin);
 
       await voiceGenerationsCol()
         .doc(genId)
@@ -315,8 +329,8 @@ export const voiceRouter = router({
           type: 'sound_effect',
           prompt: input.text,
           providerCostUsd: SOUND_EFFECT_COST_USD,
-          fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD),
-          loarPriceUsd: withLoar(SOUND_EFFECT_COST_USD),
+          fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD, fiatMargin),
+          loarPriceUsd: withLoar(SOUND_EFFECT_COST_USD, loarMargin),
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -362,10 +376,10 @@ export const voiceRouter = router({
           status: 'completed' as const,
           audioUrl,
           creditsCharged: credits,
-          fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD),
+          fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD, fiatMargin),
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -393,8 +407,9 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
-      const credits = toCredits(VOICE_DESIGN_COST_USD);
+      const credits = toCredits(VOICE_DESIGN_COST_USD, fiatMargin);
 
       await voiceGenerationsCol()
         .doc(genId)
@@ -404,8 +419,8 @@ export const voiceRouter = router({
           type: 'voice_design',
           name: input.name,
           providerCostUsd: VOICE_DESIGN_COST_USD,
-          fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD),
-          loarPriceUsd: withLoar(VOICE_DESIGN_COST_USD),
+          fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD, fiatMargin),
+          loarPriceUsd: withLoar(VOICE_DESIGN_COST_USD, loarMargin),
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -447,10 +462,10 @@ export const voiceRouter = router({
           audioUrl,
           name: input.name,
           creditsCharged: credits,
-          fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD),
+          fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD, fiatMargin),
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -474,8 +489,9 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
-      const credits = toCredits(INSTANT_CLONE_COST_USD);
+      const credits = toCredits(INSTANT_CLONE_COST_USD, fiatMargin);
 
       await voiceGenerationsCol()
         .doc(genId)
@@ -485,8 +501,8 @@ export const voiceRouter = router({
           type: 'instant_clone',
           name: input.name,
           providerCostUsd: INSTANT_CLONE_COST_USD,
-          fiatPriceUsd: withFiat(INSTANT_CLONE_COST_USD),
-          loarPriceUsd: withLoar(INSTANT_CLONE_COST_USD),
+          fiatPriceUsd: withFiat(INSTANT_CLONE_COST_USD, fiatMargin),
+          loarPriceUsd: withLoar(INSTANT_CLONE_COST_USD, loarMargin),
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -531,7 +547,7 @@ export const voiceRouter = router({
           creditsCharged: credits,
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -560,7 +576,8 @@ export const voiceRouter = router({
         modelId: voiceModelSchema.optional(),
       })
     )
-    .query(({ input }) => {
+    .query(async ({ input }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       let providerCost: number;
 
       switch (input.type) {
@@ -583,9 +600,9 @@ export const voiceRouter = router({
 
       return {
         providerCostUsd: providerCost,
-        fiatPriceUsd: withFiat(providerCost),
-        loarPriceUsd: withLoar(providerCost),
-        credits: toCredits(providerCost),
+        fiatPriceUsd: withFiat(providerCost, fiatMargin),
+        loarPriceUsd: withLoar(providerCost, loarMargin),
+        credits: toCredits(providerCost, fiatMargin),
       };
     }),
 

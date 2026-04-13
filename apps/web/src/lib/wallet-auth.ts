@@ -120,8 +120,8 @@ if (typeof window !== 'undefined' && localStorage.getItem(ADDRESS_KEY)) {
       }
     })
     .catch(() => {
-      // Server unreachable — clear stale session to be safe
-      clearSiweSession();
+      // Server unreachable — keep the existing session rather than logging users out
+      // on transient network errors. The session will be validated on the next request.
     })
     .finally(() => {
       _sessionValidated = true;

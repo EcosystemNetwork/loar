@@ -8,13 +8,22 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { createPublicClient, http, parseEther, type Hash } from 'viem';
-import { sepolia } from 'viem/chains';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
+import { recordRevenueEvent } from '../../services/revenue-recorder';
 
 const sepoliaClient = createPublicClient({
   chain: sepolia,
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
+const baseSepoliaClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+});
+function getChainClient(chainId?: number) {
+  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  return sepoliaClient;
+}
 
 export const PRODUCT_TYPES = [
   'EPISODE_NFT',
@@ -210,6 +219,7 @@ export const listingsRouter = router({
         listingId: z.string(),
         quantity: z.number().min(1).default(1),
         txHash: z.string().optional(),
+        chainId: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -252,8 +262,9 @@ export const listingsRouter = router({
         }
 
         try {
-          const tx = await sepoliaClient.getTransaction({ hash: input.txHash as Hash });
-          const receipt = await sepoliaClient.getTransactionReceipt({ hash: input.txHash as Hash });
+          const client = getChainClient(input.chainId);
+          const tx = await client.getTransaction({ hash: input.txHash as Hash });
+          const receipt = await client.getTransactionReceipt({ hash: input.txHash as Hash });
 
           if (receipt.status !== 'success') {
             throwApiError('BAD_REQUEST', 'Payment transaction was reverted on-chain');
@@ -330,6 +341,26 @@ export const listingsRouter = router({
 
         return { orderId: orderRef.id, ...order };
       });
+
+      // Auto-record revenue for the seller
+      const revenueSource =
+        result.productType === 'MERCH'
+          ? 'merch'
+          : result.productType === 'CANON_LICENSE'
+            ? 'canon_royalties'
+            : result.productType === 'IP_LICENSE'
+              ? 'licensing'
+              : result.productType === 'SUBSCRIPTION_TIER'
+                ? 'subscriptions'
+                : ('nft_sales' as const);
+
+      recordRevenueEvent({
+        creatorUid: result.sellerUid,
+        source: revenueSource,
+        amountWei: result.price?.toString() ?? '0',
+        universeId: result.universeId,
+        metadata: { listingId: input.listingId, orderId: result.orderId },
+      }).catch(() => {});
 
       return result;
     }),

@@ -1,11 +1,15 @@
 /**
  * Licensing Router — IP licensing and merchandise management
- * License universes to external platforms, manage merch
+ * License universes to external platforms, manage merch.
+ *
+ * Revenue auto-recording: activateLicense, recordRoyalty, and purchaseMerch
+ * all feed the revenue dashboard automatically via recordRevenueEvent.
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { resolveActingUid } from '../../services/agentAuth';
+import { recordRevenueEvent } from '../../services/revenue-recorder';
 
 const licensesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -86,6 +90,18 @@ export const licensingRouter = router({
         updatedAt: new Date(),
       });
 
+      // Auto-record upfront fee as licensing revenue
+      if (data.upfrontFee && data.upfrontFee !== '0') {
+        recordRevenueEvent({
+          creatorUid: data.licensorUid,
+          creatorAddress: data.licensorAddress,
+          source: 'licensing',
+          amountWei: data.upfrontFee,
+          universeId: data.universeId,
+          metadata: { licenseId: input.licenseId, type: 'upfront_fee' },
+        }).catch(() => {});
+      }
+
       return { ok: true, startTime, endTime };
     }),
 
@@ -106,8 +122,19 @@ export const licensingRouter = router({
       const data = doc.data()!;
       await ref.update({
         totalRoyalties: (BigInt(data.totalRoyalties || '0') + BigInt(input.amount)).toString(),
+        lastRoyaltyAt: new Date(),
         updatedAt: new Date(),
       });
+
+      // Auto-record royalty as licensing revenue
+      recordRevenueEvent({
+        creatorUid: data.licensorUid,
+        creatorAddress: data.licensorAddress,
+        source: 'licensing',
+        amountWei: input.amount,
+        universeId: data.universeId,
+        metadata: { licenseId: input.licenseId, type: 'royalty', period: input.period ?? '' },
+      }).catch(() => {});
 
       return { ok: true };
     }),
@@ -189,20 +216,32 @@ export const licensingRouter = router({
         updatedAt: new Date(),
       });
 
+      const totalPrice = (BigInt(data.price) * BigInt(input.quantity)).toString();
       const order = {
         merchId: input.merchId,
         buyerUid: ctx.user.uid,
         buyerAddress: ctx.user.address || null,
         quantity: input.quantity,
-        totalPrice: (BigInt(data.price) * BigInt(input.quantity)).toString(),
+        totalPrice,
         shippingAddress: input.shippingAddress || null,
         txHash: input.txHash,
+        fulfillmentStatus: 'PENDING' as const,
         status: 'CONFIRMED' as const,
         createdAt: new Date(),
       };
 
-      const ref = await merchOrdersCol().add(order);
-      return { id: ref.id, ...order };
+      const orderRef = await merchOrdersCol().add(order);
+
+      // Auto-record merch revenue for creator
+      recordRevenueEvent({
+        creatorUid: data.creatorUid,
+        source: 'merch',
+        amountWei: totalPrice,
+        universeId: data.universeId,
+        metadata: { merchId: input.merchId, orderId: orderRef.id },
+      }).catch(() => {});
+
+      return { id: orderRef.id, ...order };
     }),
 
   getMerch: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
@@ -235,4 +274,98 @@ export const licensingRouter = router({
 
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }),
+
+  // ---- Merch Fulfillment Tracking ----
+
+  /** Seller updates the fulfillment status of a merch order */
+  updateFulfillment: protectedProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        fulfillmentStatus: z.enum(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']),
+        trackingNumber: z.string().optional(),
+        trackingUrl: z.string().url().optional(),
+        carrier: z.string().optional(),
+        notes: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const orderRef = merchOrdersCol().doc(input.orderId);
+      const orderDoc = await orderRef.get();
+      if (!orderDoc.exists) throw new Error('Order not found');
+
+      // Verify the seller owns the merch item
+      const orderData = orderDoc.data()!;
+      const merchDoc = await merchCol().doc(orderData.merchId).get();
+      if (!merchDoc.exists) throw new Error('Merch item not found');
+      if (merchDoc.data()?.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
+
+      const updates: Record<string, unknown> = {
+        fulfillmentStatus: input.fulfillmentStatus,
+        updatedAt: new Date(),
+      };
+      if (input.trackingNumber) updates.trackingNumber = input.trackingNumber;
+      if (input.trackingUrl) updates.trackingUrl = input.trackingUrl;
+      if (input.carrier) updates.carrier = input.carrier;
+      if (input.notes) updates.fulfillmentNotes = input.notes;
+      if (input.fulfillmentStatus === 'SHIPPED') updates.shippedAt = new Date();
+      if (input.fulfillmentStatus === 'DELIVERED') updates.deliveredAt = new Date();
+
+      await orderRef.update(updates);
+      return { ok: true, fulfillmentStatus: input.fulfillmentStatus };
+    }),
+
+  /** Get orders for a specific merch item (seller view) */
+  getMerchOrders: protectedProcedure
+    .input(
+      z.object({
+        merchId: z.string(),
+        fulfillmentStatus: z
+          .enum(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'ALL'])
+          .default('ALL'),
+        limit: z.number().default(50),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      // Verify the seller owns the merch
+      const merchDoc = await merchCol().doc(input.merchId).get();
+      if (!merchDoc.exists) throw new Error('Merch not found');
+      if (merchDoc.data()?.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
+
+      let query: FirebaseFirestore.Query = merchOrdersCol()
+        .where('merchId', '==', input.merchId)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit);
+
+      if (input.fulfillmentStatus !== 'ALL') {
+        query = merchOrdersCol()
+          .where('merchId', '==', input.merchId)
+          .where('fulfillmentStatus', '==', input.fulfillmentStatus)
+          .orderBy('createdAt', 'desc')
+          .limit(input.limit);
+      }
+
+      const snap = await query.get();
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }),
+
+  /** Buyer: track my merch order fulfillment */
+  getOrderTracking: protectedProcedure
+    .input(z.object({ orderId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const doc = await merchOrdersCol().doc(input.orderId).get();
+      if (!doc.exists) throw new Error('Order not found');
+      const data = doc.data()!;
+      if (data.buyerUid !== ctx.user.uid) throw new Error('Not authorized');
+
+      return {
+        id: doc.id,
+        fulfillmentStatus: data.fulfillmentStatus || 'PENDING',
+        trackingNumber: data.trackingNumber || null,
+        trackingUrl: data.trackingUrl || null,
+        carrier: data.carrier || null,
+        shippedAt: data.shippedAt || null,
+        deliveredAt: data.deliveredAt || null,
+      };
+    }),
 });

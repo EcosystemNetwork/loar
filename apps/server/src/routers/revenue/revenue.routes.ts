@@ -5,9 +5,21 @@
  * historical snapshots for charts. Tracks on-chain claim history.
  */
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { createPublicClient, http } from 'viem';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { protectedProcedure, adminProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
+
+const sepoliaClient = createPublicClient({
+  chain: sepolia,
+  transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
+});
+const baseSepoliaClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+});
 
 const snapshotsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -31,6 +43,7 @@ const REVENUE_SOURCES = [
   'appearance_fees',
 ] as const;
 
+type RevenueSource = (typeof REVENUE_SOURCES)[number];
 const revenueSourceEnum = z.enum(REVENUE_SOURCES);
 
 export const revenueRouter = router({
@@ -112,20 +125,54 @@ export const revenueRouter = router({
       }));
     }),
 
-  /** Record an on-chain claim from PaymentRouter */
+  /** Record an on-chain claim from PaymentRouter — verifies tx succeeded */
   recordClaim: protectedProcedure
     .input(
       z.object({
         amountWei: z.string(),
-        txHash: z.string(),
+        txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash'),
+        chainId: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Deduplicate: reject if this txHash was already recorded
+      const existingSnap = await claimHistoryCol()
+        .where('txHash', '==', input.txHash)
+        .limit(1)
+        .get();
+      if (!existingSnap.empty) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Claim already recorded for this transaction',
+        });
+      }
+
+      // Verify the transaction succeeded on-chain
+      const client = input.chainId === baseSepolia.id ? baseSepoliaClient : sepoliaClient;
+      try {
+        const receipt = await client.getTransactionReceipt({
+          hash: input.txHash as `0x${string}`,
+        });
+        if (receipt.status !== 'success') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Claim transaction was reverted on-chain',
+          });
+        }
+      } catch (err: any) {
+        if (err instanceof TRPCError) throw err;
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Claim transaction not found on-chain',
+        });
+      }
+
       await claimHistoryCol().add({
         creatorUid: ctx.user.uid,
         creatorAddress: ctx.user.address?.toLowerCase(),
         amountWei: input.amountWei,
         txHash: input.txHash,
+        onChainVerified: true,
         claimedAt: new Date(),
       });
       return { ok: true };
@@ -199,10 +246,109 @@ export const revenueRouter = router({
       return { ok: true };
     }),
 
-  /** Admin: Manually trigger daily snapshot aggregation */
-  snapshotDaily: adminProcedure.mutation(async () => {
-    // This would aggregate from other collections (orders, subscriptions, etc.)
-    // into revenueSnapshots. For now, snapshots are built incrementally via recordRevenue.
-    return { ok: true, message: 'Snapshots are built incrementally via recordRevenue' };
-  }),
+  /** Admin: Manually trigger daily snapshot aggregation.
+   *  Scans orders, subscription revenue, merch orders, content deals, and
+   *  marketplace sales from the last N days and backfills revenueSnapshots. */
+  snapshotDaily: adminProcedure
+    .input(z.object({ days: z.number().min(1).max(90).default(1) }))
+    .mutation(async ({ input }) => {
+      const since = new Date();
+      since.setDate(since.getDate() - input.days);
+
+      const collections: {
+        col: string;
+        sourceType: RevenueSource;
+        amountField: string;
+        creatorField: string;
+        addressField?: string;
+        universeField?: string;
+      }[] = [
+        {
+          col: 'orders',
+          sourceType: 'nft_sales',
+          amountField: 'price',
+          creatorField: 'sellerUid',
+          addressField: 'sellerAddress',
+          universeField: 'universeId',
+        },
+        {
+          col: 'subscriptionRevenue',
+          sourceType: 'subscriptions',
+          amountField: 'amountWei',
+          creatorField: 'creatorUid',
+          addressField: 'creatorAddress',
+          universeField: 'universeId',
+        },
+        {
+          col: 'merchOrders',
+          sourceType: 'merch',
+          amountField: 'totalPrice',
+          creatorField: 'sellerUid',
+          universeField: 'universeId',
+        },
+        {
+          col: 'contentDeals',
+          sourceType: 'licensing',
+          amountField: 'pricePaid',
+          creatorField: 'sellerUid',
+          universeField: 'universeId',
+        },
+        {
+          col: 'marketplaceSales',
+          sourceType: 'canon_royalties',
+          amountField: 'creatorReceivable',
+          creatorField: 'creatorUid',
+          universeField: 'universeId',
+        },
+      ];
+
+      let totalRecorded = 0;
+
+      for (const {
+        col,
+        sourceType,
+        amountField,
+        creatorField,
+        addressField,
+        universeField,
+      } of collections) {
+        try {
+          const snap = await db.collection(col).where('createdAt', '>=', since).get();
+
+          for (const doc of snap.docs) {
+            const data = doc.data();
+            const creator = data[creatorField];
+            const amount = data[amountField];
+            if (!creator || !amount || amount === '0') continue;
+
+            const date = (data.createdAt?.toDate?.() ?? new Date()).toISOString().split('T')[0];
+            const docId = `${creator}_${date}_${sourceType}`;
+            const amountNum =
+              typeof amount === 'string' ? Number(BigInt(amount)) / 1e18 : Number(amount);
+
+            await snapshotsCol()
+              .doc(docId)
+              .set(
+                {
+                  creatorUid: creator,
+                  creatorAddress: addressField ? (data[addressField]?.toLowerCase() ?? null) : null,
+                  universeId: universeField ? (data[universeField] ?? null) : null,
+                  date,
+                  source: sourceType,
+                  amountEth: FieldValue.increment(amountNum),
+                  count: FieldValue.increment(1),
+                  updatedAt: new Date(),
+                },
+                { merge: true }
+              );
+            totalRecorded++;
+          }
+        } catch (err) {
+          // Collection may not exist yet — skip silently
+          console.warn(`[revenue snapshot] Skipped ${col}:`, err);
+        }
+      }
+
+      return { ok: true, totalRecorded, days: input.days };
+    }),
 });

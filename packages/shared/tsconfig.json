@@ -13,10 +13,5 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src"],
-  "references": [
-    {
-      "path": "../../apps/server"
-    }
-  ]
+  "include": ["src"]
 }

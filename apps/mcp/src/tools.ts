@@ -378,6 +378,165 @@ const discoverTalentAgents: ToolDefinition = {
   },
 };
 
+// ── Pipeline Step Tools (Internal actions for AI agent pipeline steps) ──
+
+const generateVoice: ToolDefinition = {
+  name: 'loar_generate_voice',
+  description: 'Generate voice audio from text using ElevenLabs TTS',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'Text to synthesize' },
+      voiceId: { type: 'string', description: 'ElevenLabs voice ID' },
+      modelId: { type: 'string', description: 'TTS model ID (optional)' },
+      entityId: { type: 'string', description: 'Entity to attach audio to (optional)' },
+    },
+    required: ['text', 'voiceId'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('voice.synthesize', args);
+  },
+};
+
+const generate3D: ToolDefinition = {
+  name: 'loar_generate_3d',
+  description: 'Generate a 3D model from text or image via Meshy',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'Text prompt for 3D generation' },
+      imageUrl: { type: 'string', description: 'Reference image URL (for image-to-3D)' },
+      entityId: { type: 'string', description: 'Entity to attach model to (optional)' },
+    },
+    required: ['prompt'],
+  },
+  handler: async (client, args) => {
+    if (args.imageUrl) {
+      return client.mutate('threed.imageToModel', args);
+    }
+    return client.mutate('threed.textToPreview', args);
+  },
+};
+
+const generateSoundEffect: ToolDefinition = {
+  name: 'loar_generate_sound_effect',
+  description: 'Generate a sound effect from a text description',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'Description of the sound effect' },
+      durationSeconds: { type: 'number', description: 'Duration in seconds (optional)' },
+      entityId: { type: 'string', description: 'Entity to attach audio to (optional)' },
+    },
+    required: ['prompt'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('voice.soundEffect', args);
+  },
+};
+
+const createContent: ToolDefinition = {
+  name: 'loar_create_content',
+  description: 'Create a content item (episode, artwork, etc.) in the gallery',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'Content title' },
+      description: { type: 'string', description: 'Content description' },
+      mediaUrl: { type: 'string', description: 'URL of the media file' },
+      mediaType: {
+        type: 'string',
+        description: 'Media type (image, video, audio, model)',
+        enum: ['image', 'video', 'audio', 'model'],
+      },
+      universeId: { type: 'string', description: 'Universe to associate with (optional)' },
+      classification: {
+        type: 'string',
+        description: 'Rights classification',
+        enum: ['fan', 'original', 'licensed'],
+      },
+    },
+    required: ['title', 'mediaUrl', 'mediaType'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('content.create', args);
+  },
+};
+
+const mintContentNFT: ToolDefinition = {
+  name: 'loar_mint_content_nft',
+  description: 'Mint gallery content as an NFT (pins to IPFS and creates listing)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      contentId: { type: 'string', description: 'Content item ID from gallery' },
+      mintPrice: { type: 'string', description: 'Mint price in wei (default 0)' },
+      maxSupply: { type: 'number', description: 'Max editions (0 = unlimited)' },
+      royaltyBps: { type: 'number', description: 'Royalty basis points (default 500 = 5%)' },
+    },
+    required: ['contentId'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('nft.mintContent', args);
+  },
+};
+
+const createListing: ToolDefinition = {
+  name: 'loar_create_listing',
+  description: 'Create a marketplace listing for an NFT, merch, subscription, or license',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      productType: {
+        type: 'string',
+        description: 'Product type',
+        enum: [
+          'EPISODE_NFT',
+          'CHARACTER_NFT',
+          'ARTIFACT',
+          'SUBSCRIPTION_TIER',
+          'CANON_LICENSE',
+          'MERCH',
+          'SPONSORED_SLOT',
+          'IP_LICENSE',
+        ],
+      },
+      title: { type: 'string', description: 'Listing title' },
+      description: { type: 'string', description: 'Listing description' },
+      price: { type: 'string', description: 'Price (in wei for ETH/LOAR)' },
+      currency: {
+        type: 'string',
+        description: 'Currency',
+        enum: ['ETH', 'LOAR', 'CREDITS', 'USD'],
+      },
+      universeId: { type: 'string', description: 'Universe ID (optional)' },
+      publishImmediately: { type: 'boolean', description: 'Publish immediately (default false)' },
+    },
+    required: ['productType', 'title', 'price'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('listings.create', args);
+  },
+};
+
+const recordEpisode: ToolDefinition = {
+  name: 'loar_record_collab_episode',
+  description: 'Record an episode produced by a collaboration',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      collabId: { type: 'string', description: 'Collaboration ID' },
+      episodeTitle: { type: 'string', description: 'Episode title' },
+      episodeUrl: { type: 'string', description: 'URL to the episode content' },
+      revenueWei: { type: 'string', description: 'Revenue generated in wei' },
+    },
+    required: ['collabId', 'episodeTitle'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('collabs.recordEpisode', args);
+  },
+};
+
 // ── Credit Tools ───────────────────────────────────────────────────────
 
 const getCredits: ToolDefinition = {
@@ -420,6 +579,14 @@ export const ALL_TOOLS: ToolDefinition[] = [
   discoverProfiles,
   // Talent Agents
   discoverTalentAgents,
+  // Pipeline Step Tools (for AI agent pipeline execution)
+  generateVoice,
+  generate3D,
+  generateSoundEffect,
+  createContent,
+  mintContentNFT,
+  createListing,
+  recordEpisode,
   // Credits
   getCredits,
 ];

@@ -6,19 +6,23 @@
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const sandboxCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
+  if (!db)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase not configured' });
   return db.collection('sandboxDrafts');
 };
 const contentCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
+  if (!db)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase not configured' });
   return db.collection('content');
 };
 const profilesCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
+  if (!db)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase not configured' });
   return db.collection('profiles');
 };
 
@@ -66,8 +70,9 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const ref = sandboxCol().doc(input.id);
       const snap = await ref.get();
-      if (!snap.exists) throw new Error('Draft not found');
-      if (snap.data()?.creatorAddress !== ctx.user.address) throw new Error('Unauthorized');
+      if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Draft not found' });
+      if (snap.data()?.creatorAddress !== ctx.user.address)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
 
       const updates: Record<string, any> = { updatedAt: new Date() };
       if (input.title !== undefined) updates.title = input.title;
@@ -85,8 +90,9 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const ref = sandboxCol().doc(input.id);
       const snap = await ref.get();
-      if (!snap.exists) throw new Error('Draft not found');
-      if (snap.data()?.creatorAddress !== ctx.user.address) throw new Error('Unauthorized');
+      if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Draft not found' });
+      if (snap.data()?.creatorAddress !== ctx.user.address)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
       await ref.delete();
       return { ok: true };
     }),
@@ -133,11 +139,13 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const ref = sandboxCol().doc(input.draftId);
       const snap = await ref.get();
-      if (!snap.exists) throw new Error('Draft not found');
+      if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Draft not found' });
 
       const draft = snap.data()!;
-      if (draft.creatorAddress !== ctx.user.address) throw new Error('Unauthorized');
-      if (draft.status === 'promoted') throw new Error('Draft already promoted');
+      if (draft.creatorAddress !== ctx.user.address)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
+      if (draft.status === 'promoted')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Draft already promoted' });
 
       // Create content item in the gallery
       const now = new Date();
@@ -189,10 +197,13 @@ export const sandboxRouter = router({
     }),
 
   // Get a single draft
-  getDraft: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
+  getDraft: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ input, ctx }) => {
     const snap = await sandboxCol().doc(input.id).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
+    if (d.creatorAddress !== ctx.user.address) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
+    }
     return {
       id: snap.id,
       title: d.title as string,

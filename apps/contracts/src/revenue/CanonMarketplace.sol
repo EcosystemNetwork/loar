@@ -284,6 +284,21 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         return canonSubmissions[universeId];
     }
 
+    /// @notice Paginated canon submission query
+    function getCanonSubmissionsPaginated(uint256 universeId, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = canonSubmissions[universeId];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
+    }
+
     /// @notice Get submission count for a universe
     function getSubmissionCount(uint256 universeId) external view returns (uint256) {
         return canonSubmissions[universeId].length;

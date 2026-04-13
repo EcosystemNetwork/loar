@@ -43,6 +43,7 @@ import {
 } from '../../services/image-models';
 import { trackQuests } from '../../services/quest-tracker';
 import { createAttachment } from '../media/media.handlers';
+import { logFailedRefund } from '../../lib/refund-audit';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
 
 // ── Collections ───────────────────────────────────────────────────────
@@ -363,6 +364,13 @@ export const imageRouter = router({
             });
           } catch (refundErr) {
             console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
+            logFailedRefund({
+              userId: ctx.user.uid,
+              credits: totalCredits,
+              source: 'image.generate',
+              generationId: genId,
+              error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+            });
           }
 
           await imageGenerationsCol().doc(genId).update({
@@ -433,6 +441,13 @@ export const imageRouter = router({
             });
           } catch (refundErr) {
             console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
+            logFailedRefund({
+              userId: ctx.user.uid,
+              credits: totalCredits,
+              source: 'image.generate',
+              generationId: genId,
+              error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+            });
           }
 
           await imageGenerationsCol().doc(genId).update({

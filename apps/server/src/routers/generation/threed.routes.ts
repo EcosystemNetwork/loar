@@ -26,12 +26,13 @@ import { meshyService } from '../../services/meshy';
 import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
+import { logFailedRefund } from '../../lib/refund-audit';
 import type { MeshyTaskOutput } from '../../services/meshy';
 
-// ── Pricing ───────────────────────────────────────────────────────────
+// ── Pricing — loaded from platform config (admin-configurable) ────────
 
-const FIAT_MARGIN = 1.35;
-const LOAR_MARGIN = 1.25;
+import { getPlatformConfig } from '../../services/platformConfig';
+
 const LOAR_TO_USD = 0.01;
 
 const COSTS = {
@@ -40,14 +41,18 @@ const COSTS = {
   image_to_3d: 0.15,
 };
 
-function withFiat(usd: number) {
-  return Math.round(usd * FIAT_MARGIN * 100) / 100;
+async function getMargins() {
+  const cfg = await getPlatformConfig();
+  return { fiatMargin: cfg.fiatMargin, loarMargin: cfg.loarMargin };
 }
-function withLoar(usd: number) {
-  return Math.round(usd * LOAR_MARGIN * 100) / 100;
+function withFiat(usd: number, fiatMargin = 1.35) {
+  return Math.round(usd * fiatMargin * 100) / 100;
 }
-function toCredits(usd: number) {
-  return Math.ceil(withFiat(usd) / LOAR_TO_USD);
+function withLoar(usd: number, loarMargin = 1.25) {
+  return Math.round(usd * loarMargin * 100) / 100;
+}
+function toCredits(usd: number, fiatMargin = 1.35) {
+  return Math.ceil(withFiat(usd, fiatMargin) / LOAR_TO_USD);
 }
 
 // ── Collections ───────────────────────────────────────────────────────
@@ -83,7 +88,7 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
   });
 }
 
-async function refundCredits(userId: string, credits: number): Promise<void> {
+async function refundCredits(userId: string, credits: number, genId?: string): Promise<void> {
   const ref = userCreditsCol().doc(userId);
   try {
     await ref.update({
@@ -93,6 +98,13 @@ async function refundCredits(userId: string, credits: number): Promise<void> {
     });
   } catch (err) {
     console.error(`CRITICAL: 3D credit refund failed for ${userId}:`, err);
+    logFailedRefund({
+      userId,
+      credits,
+      source: 'threed',
+      generationId: genId ?? 'unknown',
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
   }
 }
 
@@ -215,7 +227,7 @@ async function completeThreeDTask(opts: {
       type: opts.generationType,
     });
   } catch (error) {
-    await refundCredits(opts.userId, opts.credits);
+    await refundCredits(opts.userId, opts.credits, opts.genId);
     await threeDGenCol()
       .doc(opts.genId)
       .update({
@@ -249,9 +261,10 @@ export const threedRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
       const cost = COSTS.text_preview;
-      const credits = toCredits(cost);
+      const credits = toCredits(cost, fiatMargin);
 
       await threeDGenCol()
         .doc(genId)
@@ -264,8 +277,8 @@ export const threedRouter = router({
           prompt: input.prompt,
           artStyle: input.artStyle || 'realistic',
           providerCostUsd: cost,
-          fiatPriceUsd: withFiat(cost),
-          loarPriceUsd: withLoar(cost),
+          fiatPriceUsd: withFiat(cost, fiatMargin),
+          loarPriceUsd: withLoar(cost, loarMargin),
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -303,10 +316,10 @@ export const threedRouter = router({
           status: 'running' as const,
           meshyTaskId: taskId,
           creditsCharged: credits,
-          fiatPriceUsd: withFiat(cost),
+          fiatPriceUsd: withFiat(cost, fiatMargin),
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await threeDGenCol()
           .doc(genId)
           .update({
@@ -331,6 +344,7 @@ export const threedRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       // Look up the preview task to get the Meshy task ID
       const previewDoc = await threeDGenCol().doc(input.previewGenerationId).get();
       if (!previewDoc.exists) throw new Error('Preview generation not found');
@@ -342,7 +356,7 @@ export const threedRouter = router({
 
       const genId = randomUUID();
       const cost = COSTS.text_refine;
-      const credits = toCredits(cost);
+      const credits = toCredits(cost, fiatMargin);
 
       await threeDGenCol()
         .doc(genId)
@@ -354,8 +368,8 @@ export const threedRouter = router({
           previewGenerationId: input.previewGenerationId,
           previewMeshyTaskId: previewData.meshyTaskId,
           providerCostUsd: cost,
-          fiatPriceUsd: withFiat(cost),
-          loarPriceUsd: withLoar(cost),
+          fiatPriceUsd: withFiat(cost, fiatMargin),
+          loarPriceUsd: withLoar(cost, loarMargin),
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -390,10 +404,10 @@ export const threedRouter = router({
           status: 'running' as const,
           meshyTaskId: taskId,
           creditsCharged: credits,
-          fiatPriceUsd: withFiat(cost),
+          fiatPriceUsd: withFiat(cost, fiatMargin),
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await threeDGenCol()
           .doc(genId)
           .update({
@@ -419,9 +433,10 @@ export const threedRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
       const cost = COSTS.image_to_3d;
-      const credits = toCredits(cost);
+      const credits = toCredits(cost, fiatMargin);
       const isMulti = input.imageUrls.length > 1;
 
       await threeDGenCol()
@@ -434,8 +449,8 @@ export const threedRouter = router({
           type: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
           imageUrls: input.imageUrls,
           providerCostUsd: cost,
-          fiatPriceUsd: withFiat(cost),
-          loarPriceUsd: withLoar(cost),
+          fiatPriceUsd: withFiat(cost, fiatMargin),
+          loarPriceUsd: withLoar(cost, loarMargin),
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -482,10 +497,10 @@ export const threedRouter = router({
           status: 'running' as const,
           meshyTaskId: taskId,
           creditsCharged: credits,
-          fiatPriceUsd: withFiat(cost),
+          fiatPriceUsd: withFiat(cost, fiatMargin),
         };
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits);
+        await refundCredits(ctx.user.uid, credits, genId);
         await threeDGenCol()
           .doc(genId)
           .update({
@@ -541,13 +556,14 @@ export const threedRouter = router({
         type: z.enum(['text_preview', 'text_refine', 'image_to_3d']),
       })
     )
-    .query(({ input }) => {
+    .query(async ({ input }) => {
+      const { fiatMargin, loarMargin } = await getMargins();
       const cost = COSTS[input.type];
       return {
         providerCostUsd: cost,
-        fiatPriceUsd: withFiat(cost),
-        loarPriceUsd: withLoar(cost),
-        credits: toCredits(cost),
+        fiatPriceUsd: withFiat(cost, fiatMargin),
+        loarPriceUsd: withLoar(cost, loarMargin),
+        credits: toCredits(cost, fiatMargin),
       };
     }),
 });

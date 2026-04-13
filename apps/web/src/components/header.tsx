@@ -128,6 +128,9 @@ export default function Header() {
               size="icon"
               className="lg:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
@@ -136,7 +139,11 @@ export default function Header() {
 
         {/* Mobile Navigation — shows all links flat */}
         {mobileOpen && (
-          <nav className="lg:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3">
+          <nav
+            id="mobile-nav"
+            aria-label="Mobile navigation"
+            className="lg:hidden mt-3 pb-1 flex flex-col gap-1 border-t pt-3"
+          >
             {allLinks.map(({ to, label }) => {
               const isActive = matchRoute({ to, fuzzy: true });
               return (

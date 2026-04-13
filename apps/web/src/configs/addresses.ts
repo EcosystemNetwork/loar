@@ -22,6 +22,8 @@ export interface EvmAddresses {
   loarHook: `0x${string}`;
   lpLocker: `0x${string}`;
   feeLocker: `0x${string}`;
+  swapRouter: `0x${string}`;
+  tokenVesting: `0x${string}`;
   // Beacon addresses (for upgrades, not direct interaction)
   episodeEditionBeacon: `0x${string}`;
   characterBeacon: `0x${string}`;
@@ -49,6 +51,8 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
     loarHook: '0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc',
     lpLocker: '0xc00225D9463C15280748dC2E21D8D8625982Ad54',
     feeLocker: '0x1E10b62bd2817d0C2414909027E1E63653fcCd8e',
+    swapRouter: '0xcC7fDa435ba32655Dd30868Ec8CCa5DdE992660D',
+    tokenVesting: '0xDE9257B07CD06f13516e1F539f660b038603A3bB',
     episodeEditionBeacon: '0x14742D6BB8eeE513D0D70a235d8B4d801F19F9ed',
     characterBeacon: '0x0BEcc54417e9AaC9289C748eb72ECBb55292756f',
     entityBeacon: '0xF951065C7d4d28805188F60a3F8bd398B7776EC8',

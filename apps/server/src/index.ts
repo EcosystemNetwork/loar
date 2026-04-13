@@ -194,6 +194,72 @@ app.post('/api/upload', async (c) => {
   }
 });
 
+// ── Public DMCA takedown REST endpoint (no auth required) ───────────
+// External reporters can't use tRPC, so this mirrors moderation.submitTakedown as REST.
+// Strict rate limit: 5 requests per minute per IP to prevent mass-flagging abuse
+app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 5 }));
+app.post('/api/takedown', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { contentId, claimantName, claimantEmail, copyrightWork, explanation, goodFaith } = body;
+
+    if (!contentId || !claimantName || !claimantEmail || !copyrightWork || !explanation) {
+      return c.json(
+        {
+          code: 'BAD_REQUEST',
+          message:
+            'Missing required fields: contentId, claimantName, claimantEmail, copyrightWork, explanation',
+        },
+        400
+      );
+    }
+    if (!goodFaith) {
+      return c.json({ code: 'BAD_REQUEST', message: 'Good faith declaration required' }, 400);
+    }
+
+    const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
+    if (!fbAvail || !fireDb) {
+      return c.json({ code: 'SERVICE_UNAVAILABLE', message: 'Service not available' }, 503);
+    }
+
+    const now = new Date();
+    const request = {
+      contentId,
+      claimantName,
+      claimantEmail,
+      copyrightWork,
+      explanation,
+      status: 'pending',
+      createdAt: now.toISOString(),
+    };
+
+    const ref = await fireDb.collection('takedownRequests').add(request);
+
+    // Auto-flag the content
+    await fireDb
+      .collection('content')
+      .doc(contentId)
+      .update({
+        contentStatus: 'flagged',
+        contentStatusUpdatedAt: now.toISOString(),
+        contentStatusUpdatedBy: 'dmca_takedown',
+      })
+      .catch(() => {});
+
+    return c.json({
+      id: ref.id,
+      status: 'pending',
+      message: 'Takedown request received. We will review within 72 hours.',
+    });
+  } catch (error) {
+    console.error('DMCA takedown error:', error);
+    return c.json(
+      { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to process takedown request' },
+      500
+    );
+  }
+});
+
 // Stricter rate limits for AI generation endpoints: 10 requests/min per IP per endpoint
 app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));

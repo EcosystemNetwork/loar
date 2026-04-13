@@ -211,9 +211,16 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         if (loarToken.balanceOf(msg.sender) < loarAmount) revert InsufficientLoarBalance();
         if (loarToken.allowance(msg.sender, address(this)) < loarAmount) revert InsufficientLoarAllowance();
 
-        // Transfer $LOAR to treasury
-        bool success = loarToken.transferFrom(msg.sender, treasury, loarAmount);
-        if (!success) revert TransferFailed();
+        // Route $LOAR through PaymentRouter for consistent revenue accounting
+        if (address(paymentRouter) != address(0)) {
+            loarToken.transferFrom(msg.sender, address(this), loarAmount);
+            loarToken.approve(address(paymentRouter), loarAmount);
+            paymentRouter.routeLoarToTreasury(loarAmount);
+        } else {
+            // Fallback: direct treasury transfer (pre-PaymentRouter)
+            bool success = loarToken.transferFrom(msg.sender, treasury, loarAmount);
+            if (!success) revert TransferFailed();
+        }
 
         // $LOAR buyers get a bonus on top of the package bonus
         uint256 loarBonus = pkg.credits / 10; // Extra 10% credits for $LOAR payments

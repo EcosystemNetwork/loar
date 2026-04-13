@@ -218,7 +218,10 @@ export const aiPipelinesRouter = router({
       const doc = await pipelineRunsCol().doc(input.runId).get();
       if (!doc.exists) return null;
       const data = doc.data();
-      if (data?.userId !== ctx.user.uid) {
+      // Ownership: match against the pipeline's creator via the agent
+      const pipelineDoc = data?.pipelineId ? await pipelinesCol().doc(data.pipelineId).get() : null;
+      const pipelineOwner = pipelineDoc?.data()?.createdByUid;
+      if (pipelineOwner !== ctx.user.uid) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your pipeline run' });
       }
       return { id: doc.id, ...data };
@@ -232,9 +235,17 @@ export const aiPipelinesRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
+      // Verify caller owns the pipeline before listing its runs
+      const pipelineDoc = await pipelinesCol().doc(input.pipelineId).get();
+      if (!pipelineDoc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Pipeline not found' });
+      }
+      if (pipelineDoc.data()?.createdByUid !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the pipeline owner' });
+      }
+
       const snapshot = await pipelineRunsCol()
         .where('pipelineId', '==', input.pipelineId)
-        .where('userId', '==', ctx.user.uid)
         .orderBy('startedAt', 'desc')
         .limit(input.limit)
         .get();

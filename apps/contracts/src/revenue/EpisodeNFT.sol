@@ -116,12 +116,17 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
         _setTokenURI(tokenId, tokenURI_);
         _setTokenRoyalty(tokenId, ep.creator, defaultRoyaltyBps);
 
-        // Route payment through PaymentRouter
-        if (msg.value > 0) {
-            paymentRouter.route{value: msg.value}(ep.creator, platformFeeBps);
+        // Route exact mint price through PaymentRouter; refund excess
+        if (ep.mintPrice > 0) {
+            paymentRouter.route{value: ep.mintPrice}(ep.creator, platformFeeBps);
+        }
+        uint256 excess = msg.value - ep.mintPrice;
+        if (excess > 0) {
+            (bool refunded,) = msg.sender.call{value: excess}("");
+            if (!refunded) revert TransferFailed();
         }
 
-        emit EpisodeMinted(tokenId, episodeId, msg.sender, msg.value);
+        emit EpisodeMinted(tokenId, episodeId, msg.sender, ep.mintPrice);
     }
 
     /// @notice Deactivate episode listing

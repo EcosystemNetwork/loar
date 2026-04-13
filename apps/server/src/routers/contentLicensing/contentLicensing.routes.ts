@@ -10,6 +10,7 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { computeEntityHash } from '../../services/split-orchestrator';
+import { recordRevenueEvent } from '../../services/revenue-recorder';
 
 const registrationsCol = () => {
   if (!db)
@@ -157,6 +158,16 @@ export const contentLicensingRouter = router({
           updatedAt: now,
         });
 
+      // Auto-record revenue for the content creator
+      recordRevenueEvent({
+        creatorUid: regData.creatorUid,
+        creatorAddress: regData.creatorAddress,
+        source: 'licensing',
+        amountWei: input.pricePaid,
+        universeId: regData.universeId,
+        metadata: { dealType: input.dealType, registrationId: input.registrationId },
+      }).catch(() => {});
+
       return { id: ref.id, ...deal };
     }),
 
@@ -244,5 +255,167 @@ export const contentLicensingRouter = router({
         .get();
 
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }),
+
+  // ---- Buyer-initiated license requests ----
+
+  /** Buyer requests a license from a content creator */
+  requestLicense: protectedProcedure
+    .input(
+      z.object({
+        registrationId: z.string(),
+        dealType: dealTypeEnum,
+        proposedPrice: z.string(),
+        durationDays: z.number().int().optional(),
+        message: z.string().max(2000).default(''),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const regDoc = await registrationsCol().doc(input.registrationId).get();
+      if (!regDoc.exists)
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
+
+      const regData = regDoc.data()!;
+      if (!regData.active)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Content is no longer available' });
+
+      // Can't request your own content
+      if (regData.creatorUid === ctx.user.uid)
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot request license for your own content',
+        });
+
+      const request = {
+        registrationId: input.registrationId,
+        contentHash: regData.contentHash,
+        contentId: regData.contentId,
+        universeId: regData.universeId,
+        dealType: input.dealType,
+        proposedPrice: input.proposedPrice,
+        durationDays: input.durationDays ?? null,
+        message: input.message,
+        buyerUid: ctx.user.uid,
+        buyerAddress: ctx.user.address || null,
+        sellerUid: regData.creatorUid,
+        status: 'PENDING' as const, // PENDING | APPROVED | REJECTED | COMPLETED
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const ref = await db.collection('licenseRequests').add(request);
+      return { id: ref.id, ...request };
+    }),
+
+  /** Seller approves or rejects a license request */
+  respondToRequest: protectedProcedure
+    .input(
+      z.object({
+        requestId: z.string(),
+        action: z.enum(['APPROVED', 'REJECTED']),
+        counterPrice: z.string().optional(),
+        message: z.string().max(2000).default(''),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const reqRef = db.collection('licenseRequests').doc(input.requestId);
+      const reqDoc = await reqRef.get();
+      if (!reqDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Request not found' });
+
+      const reqData = reqDoc.data()!;
+      if (reqData.sellerUid !== ctx.user.uid)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the content owner' });
+      if (reqData.status !== 'PENDING')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Request is no longer pending' });
+
+      await reqRef.update({
+        status: input.action,
+        counterPrice: input.counterPrice ?? null,
+        responseMessage: input.message,
+        respondedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return { ok: true, status: input.action };
+    }),
+
+  /** Get license requests for my content (as seller) */
+  myIncomingRequests: protectedProcedure
+    .input(
+      z.object({
+        status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'ALL']).default('PENDING'),
+        limit: z.number().int().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      let query: FirebaseFirestore.Query = db
+        .collection('licenseRequests')
+        .where('sellerUid', '==', ctx.user.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit);
+
+      if (input.status !== 'ALL') {
+        query = db
+          .collection('licenseRequests')
+          .where('sellerUid', '==', ctx.user.uid)
+          .where('status', '==', input.status)
+          .orderBy('createdAt', 'desc')
+          .limit(input.limit);
+      }
+
+      const snap = await query.get();
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }),
+
+  /** Get license requests I've made (as buyer) */
+  myOutgoingRequests: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(50).default(20) }))
+    .query(async ({ ctx, input }) => {
+      const snap = await db
+        .collection('licenseRequests')
+        .where('buyerUid', '==', ctx.user.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit)
+        .get();
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }),
+
+  // ---- Rental access check with expiry enforcement ----
+
+  /** Check if a user has active access to rented content */
+  checkAccess: publicProcedure
+    .input(
+      z.object({
+        contentHash: z.string(),
+        buyerUid: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const snap = await dealsCol()
+        .where('contentHash', '==', input.contentHash)
+        .where('buyerUid', '==', input.buyerUid)
+        .where('status', '==', 'ACTIVE')
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get();
+
+      if (snap.empty) return { hasAccess: false, reason: 'no_deal' };
+
+      const deal = snap.docs[0].data();
+
+      // BUY deals never expire
+      if (deal.dealType === 'BUY') return { hasAccess: true, dealType: 'BUY' };
+
+      // RENT/LICENSE deals expire based on endTime
+      if (deal.endTime) {
+        const endTime = deal.endTime.toDate ? deal.endTime.toDate() : new Date(deal.endTime);
+        if (endTime < new Date()) {
+          // Auto-expire: mark deal as EXPIRED
+          await dealsCol().doc(snap.docs[0].id).update({ status: 'EXPIRED' });
+          return { hasAccess: false, reason: 'expired', expiredAt: endTime.toISOString() };
+        }
+      }
+
+      return { hasAccess: true, dealType: deal.dealType };
     }),
 });

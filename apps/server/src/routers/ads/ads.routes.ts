@@ -2,6 +2,7 @@
  * Ads Router — Programmatic product placement and sponsorship management
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
@@ -64,15 +65,15 @@ export const adsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const slotRef = adSlotsCol().doc(input.slotId);
       const slotDoc = await slotRef.get();
-      if (!slotDoc.exists) throw new Error('Slot not found');
+      if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
       const slot = slotDoc.data()!;
-      if (!slot.active) throw new Error('Slot not active');
+      if (!slot.active) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Slot not active' });
 
       if (BigInt(input.amount) <= BigInt(slot.currentBid || '0')) {
-        throw new Error('Bid too low');
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bid too low' });
       }
       if (BigInt(input.amount) < BigInt(slot.minBid)) {
-        throw new Error('Below minimum bid');
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Below minimum bid' });
       }
 
       // Record bid
@@ -101,10 +102,11 @@ export const adsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const slotRef = adSlotsCol().doc(input.slotId);
       const slotDoc = await slotRef.get();
-      if (!slotDoc.exists) throw new Error('Slot not found');
+      if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
       const slot = slotDoc.data()!;
-      if (slot.creatorUid !== ctx.user.uid) throw new Error('Not authorized');
-      if (!slot.currentBidder) throw new Error('No bids');
+      if (slot.creatorUid !== ctx.user.uid)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      if (!slot.currentBidder) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No bids' });
 
       const sponsorship = {
         slotId: input.slotId,
@@ -134,14 +136,25 @@ export const adsRouter = router({
 
   recordImpression: protectedProcedure
     .input(z.object({ sponsorshipId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = sponsorshipsCol().doc(input.sponsorshipId);
       const doc = await ref.get();
-      if (!doc.exists) throw new Error('Sponsorship not found');
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
 
+      // Only the sponsor or the universe slot creator can record impressions
       const data = doc.data()!;
-      const newImpressions = (data.impressions || 0) + 1;
-      const newRemaining = (data.episodesRemaining || 0) - 1;
+      const slotDoc = await adSlotsCol().doc(data.slotId).get();
+      const slotCreator = slotDoc.data()?.creatorUid;
+      if (data.sponsorUid !== ctx.user.uid && slotCreator !== ctx.user.uid) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Not authorized to record impressions for this sponsorship',
+        });
+      }
+
+      const sData = doc.data()!;
+      const newImpressions = (sData.impressions || 0) + 1;
+      const newRemaining = (sData.episodesRemaining || 0) - 1;
 
       await ref.update({
         impressions: newImpressions,

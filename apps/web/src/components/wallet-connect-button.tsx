@@ -2,7 +2,8 @@
  * Wallet Connect Button
  *
  * Renders thirdweb's ConnectButton for multi-chain wallet connection.
- * Uses inline modal (connectModal.size: "compact") to avoid browser popup blockers.
+ * Uses inline modal (connectModal.size: "compact") and redirect auth mode
+ * to avoid browser popup blockers.
  * After wallet connection, the existing SIWE auth flow triggers automatically
  * via useWalletAuth (unchanged).
  */
@@ -15,7 +16,12 @@ import { sepolia, baseSepolia, base } from 'thirdweb/chains';
 const supportedChains = [sepolia, baseSepolia, base];
 
 const wallets = [
-  inAppWallet(),
+  inAppWallet({
+    auth: {
+      options: ['email', 'google', 'apple', 'phone', 'passkey'],
+      mode: 'redirect',
+    },
+  }),
   createWallet('io.metamask'),
   createWallet('com.coinbase.wallet'),
   createWallet('me.rainbow'),

@@ -48,8 +48,21 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
     error FeeTooHigh();
     error ContentNotMonetizable();
     error WrongUniverse();
+    error InsufficientPayment();
+    error CharacterNotActive();
 
     uint16 public constant MAX_FEE_BPS = 5000;
+
+    /// @notice Mapping from characterId to mint price (0 = free)
+    mapping(uint256 => uint256) public characterMintPrice;
+    /// @notice Mapping from characterId to max supply (0 = 1-of-1)
+    mapping(uint256 => uint256) public characterMaxSupply;
+    /// @notice Mapping from characterId to minted count
+    mapping(uint256 => uint256) public characterMinted;
+    /// @notice Mapping from characterId to active status
+    mapping(uint256 => bool) public characterActive;
+    /// @notice Claimable royalties per owner address (from appearance rewards)
+    mapping(address => uint256) public claimableRoyalties;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() ERC721("LOAR Characters", "CHARACTER") { _disableInitializers(); }
@@ -70,12 +83,20 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         appearanceFeeBps = _appearanceFeeBps;
     }
 
-    /// @notice Mint a new character NFT
+    /// @notice Create a new character listing (free or paid). Creator becomes first owner.
+    /// @param _universeId Universe this character belongs to
+    /// @param name Unique character name within the universe
+    /// @param visualHash Hash of the character visual description/image
+    /// @param metadataURI IPFS URI for NFT metadata
+    /// @param mintPrice ETH price for additional mints (0 = free, only creator gets one)
+    /// @param maxSupply Max editions (0 = 1-of-1, only creator mint)
     function createCharacter(
         uint256 _universeId,
         string calldata name,
         bytes32 visualHash,
-        string calldata metadataURI
+        string calldata metadataURI,
+        uint256 mintPrice,
+        uint256 maxSupply
     ) external returns (uint256 characterId) {
         if (_universeId != universeId) revert WrongUniverse();
         if (!rightsRegistry.isMonetizable(visualHash)) revert ContentNotMonetizable();
@@ -94,6 +115,11 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
             accumulatedRoyalties: 0
         });
 
+        characterMintPrice[characterId] = mintPrice;
+        characterMaxSupply[characterId] = maxSupply;
+        characterMinted[characterId] = 1; // creator gets the first one
+        characterActive[characterId] = true;
+
         _safeMint(msg.sender, characterId);
         _setTokenURI(characterId, metadataURI);
         _setTokenRoyalty(characterId, msg.sender, 500); // 5% secondary royalty
@@ -101,7 +127,41 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         emit CharacterCreated(characterId, universeId, name, msg.sender);
     }
 
-    /// @notice Record a character appearance in an episode and distribute reward
+    /// @notice Mint (purchase) a character NFT edition. Payment routed through PaymentRouter.
+    /// @param characterId The character to mint an edition of
+    /// @param tokenURI_ Metadata URI for this specific edition token
+    function mintCharacter(uint256 characterId, string calldata tokenURI_) external payable nonReentrant returns (uint256 tokenId) {
+        if (!characterActive[characterId]) revert CharacterNotActive();
+        uint256 maxSup = characterMaxSupply[characterId];
+        if (maxSup > 0 && characterMinted[characterId] >= maxSup) revert CharacterExists();
+        uint256 price = characterMintPrice[characterId];
+        if (msg.value < price) revert InsufficientPayment();
+
+        tokenId = ++nextCharacterId; // reuse counter for token IDs
+        characterMinted[characterId]++;
+
+        _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, tokenURI_);
+        _setTokenRoyalty(tokenId, characters[characterId].creator, 500);
+
+        // Route payment to creator through PaymentRouter
+        if (msg.value > 0) {
+            uint256 excess = msg.value - price;
+            paymentRouter.route{value: price}(characters[characterId].creator, appearanceFeeBps);
+            // Refund excess ETH
+            if (excess > 0) {
+                (bool refunded,) = msg.sender.call{value: excess}("");
+                if (!refunded) revert TransferFailed();
+            }
+        }
+
+        emit EpisodeMinted(tokenId, characterId, msg.sender, price);
+    }
+
+    // Reuse EpisodeMinted event shape for character mints
+    event EpisodeMinted(uint256 indexed tokenId, uint256 indexed characterId, address buyer, uint256 price);
+
+    /// @notice Record a character appearance in an episode and accrue reward for owner
     /// @dev Called by the platform when an episode featuring this character is minted
     function recordAppearance(uint256 characterId, uint256 episodeId) external payable {
         require(msg.sender == platform, "Only platform");
@@ -109,12 +169,31 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         c.appearanceCount++;
         c.accumulatedRoyalties += msg.value;
 
-        // Route reward to character owner via PaymentRouter (0 fee — platform already took its cut)
+        // Accrue claimable royalties for the current owner
         if (msg.value > 0) {
-            paymentRouter.route{value: msg.value}(ownerOf(characterId), 0);
+            address charOwner = ownerOf(characterId);
+            claimableRoyalties[charOwner] += msg.value;
+            // Route reward through PaymentRouter (0 fee — platform already took its cut)
+            paymentRouter.route{value: msg.value}(charOwner, 0);
         }
 
         emit CharacterAppearance(characterId, episodeId, msg.value);
+    }
+
+    /// @notice Claim accumulated appearance royalties
+    /// @dev Royalties are routed through PaymentRouter on appearance, so the owner
+    ///      claims from PaymentRouter. This function resets the tracked amount.
+    function claimRoyalties() external nonReentrant {
+        uint256 amount = claimableRoyalties[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        claimableRoyalties[msg.sender] = 0;
+        emit RoyaltyClaimed(0, msg.sender, amount);
+    }
+
+    /// @notice Deactivate character (creator only)
+    function deactivateCharacter(uint256 characterId) external {
+        if (characters[characterId].creator != msg.sender) revert NotOwner();
+        characterActive[characterId] = false;
     }
 
     /// @notice Get all characters in a universe

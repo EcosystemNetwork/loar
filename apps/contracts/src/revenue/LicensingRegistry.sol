@@ -176,10 +176,18 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         emit LicenseActivated(licenseId);
     }
 
+    error LicenseExpired();
+
     /// @notice Pay ongoing royalties for an active license (licensee or platform only)
+    /// @dev Reverts if the license has expired — prevents paying royalties to stale deals
     function payRoyalty(uint256 licenseId) external payable nonReentrant whenNotPaused {
         License storage lic = licenses[licenseId];
         if (lic.status != LicenseStatus.ACTIVE) revert InvalidStatus();
+        // Enforce expiry — cannot pay royalties to an expired license
+        if (lic.endTime > 0 && block.timestamp > lic.endTime) {
+            lic.status = LicenseStatus.EXPIRED;
+            revert LicenseExpired();
+        }
         // Only the licensee or platform can pay royalties to prevent accidental fund transfers
         if (msg.sender != lic.licensee && msg.sender != platform) revert NotLicensee();
 
@@ -247,7 +255,42 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         return universeLicenses[universeId];
     }
 
+    /// @notice Paginated license query — avoids gas limit on large arrays
+    function getUniverseLicensesPaginated(uint256 universeId, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = universeLicenses[universeId];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
+    }
+
     function getUniverseMerch(uint256 universeId) external view returns (uint256[] memory) {
         return universeMerch[universeId];
+    }
+
+    /// @notice Paginated merch query
+    function getUniverseMerchPaginated(uint256 universeId, uint256 offset, uint256 limit)
+        external view returns (uint256[] memory ids, uint256 total)
+    {
+        uint256[] storage all = universeMerch[universeId];
+        total = all.length;
+        if (offset >= total) return (new uint256[](0), total);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = all[i];
+        }
+    }
+
+    /// @notice Count total licenses and merch for a universe
+    function getUniverseCounts(uint256 universeId) external view returns (uint256 licenseCount, uint256 merchCount) {
+        return (universeLicenses[universeId].length, universeMerch[universeId].length);
     }
 }

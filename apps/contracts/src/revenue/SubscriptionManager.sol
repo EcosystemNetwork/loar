@@ -159,16 +159,20 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
         uint256 startTime = block.timestamp;
         if (sub.expiresAt > block.timestamp) {
-            // Extend existing subscription
+            // Extend existing subscription — still active
             startTime = sub.expiresAt;
             // If changing tiers on an active subscription, adjust counts
             if (sub.tier != tier) {
-                subscriberCount[universeId][sub.tier]--;
+                if (subscriberCount[universeId][sub.tier] > 0) {
+                    subscriberCount[universeId][sub.tier]--;
+                }
                 subscriberCount[universeId][tier]++;
             }
         } else if (sub.expiresAt > 0) {
-            // Previous subscription expired, decrement old tier count
-            subscriberCount[universeId][sub.tier]--;
+            // Previous subscription expired — safe decrement (guard underflow)
+            if (subscriberCount[universeId][sub.tier] > 0) {
+                subscriberCount[universeId][sub.tier]--;
+            }
             subscriberCount[universeId][tier]++;
         } else {
             // Brand new subscriber

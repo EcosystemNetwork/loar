@@ -20,6 +20,7 @@ import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as DocsRouteImport } from './routes/docs'
+import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CreditsRouteImport } from './routes/credits'
@@ -38,6 +39,7 @@ import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AdsIndexRouteImport } from './routes/ads/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$universeId'
+import { Route as TokensPortfolioRouteImport } from './routes/tokens/portfolio'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SellNewRouteImport } from './routes/sell/new'
@@ -64,6 +66,7 @@ import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
 import { Route as UniverseIdGalleryRouteImport } from './routes/universe/$id/gallery'
+import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
 const VideosRoute = VideosRouteImport.update({
@@ -119,6 +122,11 @@ const GalleryRoute = GalleryRouteImport.update({
 const DocsRoute = DocsRouteImport.update({
   id: '/docs',
   path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DmcaRoute = DmcaRouteImport.update({
+  id: '/dmca',
+  path: '/dmca',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DiscoverRoute = DiscoverRouteImport.update({
@@ -209,6 +217,11 @@ const UniverseIdRoute = UniverseIdRouteImport.update({
 const TreasuryUniverseIdRoute = TreasuryUniverseIdRouteImport.update({
   id: '/treasury/$universeId',
   path: '/treasury/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TokensPortfolioRoute = TokensPortfolioRouteImport.update({
+  id: '/tokens/portfolio',
+  path: '/tokens/portfolio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TokensAddressRoute = TokensAddressRouteImport.update({
@@ -341,6 +354,11 @@ const UniverseIdGalleryRoute = UniverseIdGalleryRouteImport.update({
   path: '/gallery',
   getParentRoute: () => UniverseIdRoute,
 } as any)
+const TokensCreatorAddressRoute = TokensCreatorAddressRouteImport.update({
+  id: '/tokens/creator/$address',
+  path: '/tokens/creator/$address',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   id: '/event/$universe/$event',
   path: '/event/$universe/$event',
@@ -355,6 +373,7 @@ export interface FileRoutesByFullPath {
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
+  '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
   '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
@@ -388,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/portfolio': typeof TokensPortfolioRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/ads/': typeof AdsIndexRoute
@@ -400,6 +420,7 @@ export interface FileRoutesByFullPath {
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -413,6 +434,7 @@ export interface FileRoutesByTo {
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
+  '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
   '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
@@ -446,6 +468,7 @@ export interface FileRoutesByTo {
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/portfolio': typeof TokensPortfolioRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/ads': typeof AdsIndexRoute
@@ -458,6 +481,7 @@ export interface FileRoutesByTo {
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -472,6 +496,7 @@ export interface FileRoutesById {
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
+  '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
   '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
@@ -505,6 +530,7 @@ export interface FileRoutesById {
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/portfolio': typeof TokensPortfolioRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/ads/': typeof AdsIndexRoute
@@ -517,6 +543,7 @@ export interface FileRoutesById {
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -532,6 +559,7 @@ export interface FileRouteTypes {
     | '/credits'
     | '/dashboard'
     | '/discover'
+    | '/dmca'
     | '/docs'
     | '/gallery'
     | '/login'
@@ -565,6 +593,7 @@ export interface FileRouteTypes {
     | '/sell/new'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/portfolio'
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/ads/'
@@ -577,6 +606,7 @@ export interface FileRouteTypes {
     | '/tokens/'
     | '/wiki/'
     | '/event/$universe/$event'
+    | '/tokens/creator/$address'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
@@ -590,6 +620,7 @@ export interface FileRouteTypes {
     | '/credits'
     | '/dashboard'
     | '/discover'
+    | '/dmca'
     | '/docs'
     | '/gallery'
     | '/login'
@@ -623,6 +654,7 @@ export interface FileRouteTypes {
     | '/sell/new'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/portfolio'
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/ads'
@@ -635,6 +667,7 @@ export interface FileRouteTypes {
     | '/tokens'
     | '/wiki'
     | '/event/$universe/$event'
+    | '/tokens/creator/$address'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
@@ -648,6 +681,7 @@ export interface FileRouteTypes {
     | '/credits'
     | '/dashboard'
     | '/discover'
+    | '/dmca'
     | '/docs'
     | '/gallery'
     | '/login'
@@ -681,6 +715,7 @@ export interface FileRouteTypes {
     | '/sell/new'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/portfolio'
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/ads/'
@@ -693,6 +728,7 @@ export interface FileRouteTypes {
     | '/tokens/'
     | '/wiki/'
     | '/event/$universe/$event'
+    | '/tokens/creator/$address'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
@@ -707,6 +743,7 @@ export interface RootRouteChildren {
   CreditsRoute: typeof CreditsRoute
   DashboardRoute: typeof DashboardRoute
   DiscoverRoute: typeof DiscoverRoute
+  DmcaRoute: typeof DmcaRoute
   DocsRoute: typeof DocsRoute
   GalleryRoute: typeof GalleryRoute
   LoginRoute: typeof LoginRoute
@@ -740,6 +777,7 @@ export interface RootRouteChildren {
   SellNewRoute: typeof SellNewRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
+  TokensPortfolioRoute: typeof TokensPortfolioRoute
   TreasuryUniverseIdRoute: typeof TreasuryUniverseIdRoute
   UniverseIdRoute: typeof UniverseIdRouteWithChildren
   AdsIndexRoute: typeof AdsIndexRoute
@@ -752,6 +790,7 @@ export interface RootRouteChildren {
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
+  TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
   WikiEntityIdRoute: typeof WikiEntityIdRoute
 }
@@ -833,6 +872,13 @@ declare module '@tanstack/react-router' {
       path: '/docs'
       fullPath: '/docs'
       preLoaderRoute: typeof DocsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dmca': {
+      id: '/dmca'
+      path: '/dmca'
+      fullPath: '/dmca'
+      preLoaderRoute: typeof DmcaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/discover': {
@@ -959,6 +1005,13 @@ declare module '@tanstack/react-router' {
       path: '/treasury/$universeId'
       fullPath: '/treasury/$universeId'
       preLoaderRoute: typeof TreasuryUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tokens/portfolio': {
+      id: '/tokens/portfolio'
+      path: '/tokens/portfolio'
+      fullPath: '/tokens/portfolio'
+      preLoaderRoute: typeof TokensPortfolioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tokens/$address': {
@@ -1143,6 +1196,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdGalleryRouteImport
       parentRoute: typeof UniverseIdRoute
     }
+    '/tokens/creator/$address': {
+      id: '/tokens/creator/$address'
+      path: '/tokens/creator/$address'
+      fullPath: '/tokens/creator/$address'
+      preLoaderRoute: typeof TokensCreatorAddressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/event/$universe/$event': {
       id: '/event/$universe/$event'
       path: '/event/$universe/$event'
@@ -1175,6 +1235,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreditsRoute: CreditsRoute,
   DashboardRoute: DashboardRoute,
   DiscoverRoute: DiscoverRoute,
+  DmcaRoute: DmcaRoute,
   DocsRoute: DocsRoute,
   GalleryRoute: GalleryRoute,
   LoginRoute: LoginRoute,
@@ -1208,6 +1269,7 @@ const rootRouteChildren: RootRouteChildren = {
   SellNewRoute: SellNewRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,
+  TokensPortfolioRoute: TokensPortfolioRoute,
   TreasuryUniverseIdRoute: TreasuryUniverseIdRoute,
   UniverseIdRoute: UniverseIdRouteWithChildren,
   AdsIndexRoute: AdsIndexRoute,
@@ -1220,6 +1282,7 @@ const rootRouteChildren: RootRouteChildren = {
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
+  TokensCreatorAddressRoute: TokensCreatorAddressRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
   WikiEntityIdRoute: WikiEntityIdRoute,
 }

@@ -81,6 +81,7 @@ import { galleryRouter } from './gallery/gallery.routes';
 import { moderationRouter } from './moderation/moderation.routes';
 import { stripeRouter } from './credits/stripe.routes';
 import { pricingRouter } from './pricing/pricing.routes';
+import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -99,7 +100,7 @@ export const appRouter = router({
   trackWalletLogin: publicProcedure
     .input(
       z.object({
-        address: z.string(),
+        address: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid Ethereum address'),
         chainId: z.number(),
         connector: z.string().optional(),
       })
@@ -237,6 +238,9 @@ export const appRouter = router({
   universeGenConfig: universeGenConfigRouter,
   contentLicensing: contentLicensingRouter,
   gallery: galleryRouter,
+
+  // ── Token Social (comments, watchlist, portfolio) ──────────────────
+  tokenSocial: tokenSocialRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -136,12 +136,6 @@ function UniverseTimelineEditor() {
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  // Debug: Log when generatedVideoUrl changes
-  useEffect(() => {
-    console.log('generatedVideoUrl changed to:', generatedVideoUrl);
-    console.log('Stack trace:', new Error().stack);
-  }, [generatedVideoUrl]);
-
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
 
@@ -158,7 +152,6 @@ function UniverseTimelineEditor() {
       const found = universes.find((u: any) => u.id === id);
 
       if (found) {
-        console.log('Found universe in localStorage:', found);
         return found;
       }
 
@@ -170,7 +163,6 @@ function UniverseTimelineEditor() {
           if (!response.ok) return null;
           const data = await response.json();
           if (data.universe) {
-            console.log('Found universe in indexer:', data.universe);
             return {
               id: data.universe.id,
               name: data.universe.name,
@@ -211,11 +203,6 @@ function UniverseTimelineEditor() {
   const timelineContractAddress = isBlockchainUniverse
     ? id // Use the universe ID as the contract address
     : universe?.address || undefined; // For non-blockchain universes, use the stored address
-
-  console.log('Universe ID:', id);
-  console.log('Is Blockchain Universe:', isBlockchainUniverse);
-  console.log('Timeline Contract Address:', timelineContractAddress);
-  console.log('Chain ID:', chainId);
 
   // Blockchain data fetching - using extracted hook
   const {
@@ -259,7 +246,7 @@ function UniverseTimelineEditor() {
     isLoading: isLoadingCharacters,
     refetch: refetchCharacters,
   } = useQuery({
-    queryKey: ['characters'],
+    queryKey: ['characters', id],
     queryFn: () => trpcClient.wiki.characters.query(),
   });
 
@@ -291,7 +278,6 @@ function UniverseTimelineEditor() {
       return result;
     },
     onSuccess: async (data) => {
-      console.log('Character generated:', data);
       setIsGeneratingCharacter(false);
 
       // Store generated character for preview
@@ -322,8 +308,6 @@ function UniverseTimelineEditor() {
       return result;
     },
     onSuccess: async (data) => {
-      console.log('Character saved to database:', data);
-
       // Add to selected characters
       if (data.characterId) {
         setSelectedCharacters((prev) => [...prev, data.characterId!]);
@@ -406,7 +390,6 @@ function UniverseTimelineEditor() {
       const publicUrl = manifest.uploads[0]?.url;
       if (publicUrl) {
         setUploadedUrl(publicUrl);
-        console.log('Image uploaded to decentralized storage:', publicUrl);
       } else {
         throw new Error('No URL returned from storage');
       }
@@ -452,10 +435,6 @@ function UniverseTimelineEditor() {
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
-    console.log('🔵 handleAddEvent called:', {
-      type,
-      nodeId,
-    });
     setAdditionType(type);
     setSourceNodeId(nodeId || null);
     setVideoTitle('');
@@ -490,24 +469,6 @@ function UniverseTimelineEditor() {
     const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
     const referenceNode = sourceNode || lastEventNode;
 
-    // Debug: Log what we found for the source node
-    console.log('handleCreateEvent sourceNode lookup:', {
-      sourceNodeId,
-      foundSourceNode: sourceNode
-        ? {
-            id: sourceNode.id,
-            eventId: sourceNode.data.eventId,
-            position: sourceNode.position,
-          }
-        : null,
-      allSceneNodes: nodes
-        .filter((n) => n.data.nodeType === 'scene')
-        .map((n) => ({
-          id: n.id,
-          eventId: n.data.eventId,
-        })),
-    });
-
     // Generate appropriate event ID based on addition type - Keep universe branch logic
     let newEventId: string;
     let newAddId: string;
@@ -526,12 +487,6 @@ function UniverseTimelineEditor() {
       const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
       newEventId = `${sourceEventId}${branchLetter}`;
       newAddId = `add-${newEventId}`;
-
-      console.log('Creating branch:', {
-        sourceEventId,
-        existingBranches: existingBranches.map((n) => n.data.eventId),
-        newEventId,
-      });
     } else {
       // For linear continuation, determine if we're continuing a branch or main timeline
       const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
@@ -548,7 +503,6 @@ function UniverseTimelineEditor() {
         }, null);
 
         const lastEventId = lastNode?.data.eventId?.toString();
-        console.log('Last event ID for continuation:', lastEventId);
 
         if (lastEventId && /[a-z]/.test(lastEventId)) {
           // We're continuing a branch (e.g., from "1b" to "1c")
@@ -573,18 +527,6 @@ function UniverseTimelineEditor() {
       newAddId = `add-${newEventId}`;
     }
 
-    console.log('handleCreateEvent debug:', {
-      additionType,
-      sourceNodeId,
-      newEventId,
-      sourceNode: sourceNode
-        ? { id: sourceNode.id, position: sourceNode.position, eventId: sourceNode.data.eventId }
-        : null,
-      referenceNode: referenceNode
-        ? { id: referenceNode.id, position: referenceNode.position }
-        : null,
-    });
-
     // Calculate position based on addition type and depth in tree
     let newEventPosition;
     let newAddPosition;
@@ -606,14 +548,6 @@ function UniverseTimelineEditor() {
       // Use same X as linear continuation would use
       newEventPosition = { x: sourceNode.position.x + horizontalSpacing, y: branchY };
       newAddPosition = { x: sourceNode.position.x + horizontalSpacing * 2, y: branchY };
-
-      console.log('Branch positioning:', {
-        sourceNodeX: sourceNode.position.x,
-        sourceChildren: sourceChildren.length,
-        branchIndex,
-        newX: newEventPosition.x,
-        newY: branchY,
-      });
     } else {
       // Linear addition to the right of the reference node (or source node)
       if (referenceNode) {
@@ -714,13 +648,6 @@ function UniverseTimelineEditor() {
     setEventCounter((prev) => prev + 1);
 
     // Save event data to localStorage for ALL events (not just branched)
-    console.log('🔍 Checking if should save event:', {
-      newEventId,
-      additionType,
-      isBranched: /[a-z]/.test(newEventId),
-      hasVideo: !!generatedVideoUrl,
-      hasImage: !!generatedImageUrl,
-    });
 
     // Save ALL events to localStorage for now (easier debugging)
     const eventData = {
@@ -767,13 +694,6 @@ function UniverseTimelineEditor() {
 
     eventsData[newEventId] = eventData;
     localStorage.setItem(storageKey, JSON.stringify(eventsData));
-
-    console.log('💾 Saved event to localStorage:', {
-      key: storageKey,
-      eventId: newEventId,
-      eventData,
-      allEvents: eventsData,
-    });
 
     // Close dialog and reset
     setShowVideoDialog(false);
@@ -847,17 +767,6 @@ function UniverseTimelineEditor() {
       const eventLabel = getEventLabel(nodeId, parentId, layout.nodesByParent);
 
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
-
-      // Debug: Log the node creation data
-      console.log(`Creating node ${nodeId} (${eventLabel}):`, {
-        blockchainNodeId: nodeId,
-        eventLabel,
-        url,
-        description,
-        previousNode,
-        parentId,
-        position,
-      });
 
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
@@ -977,14 +886,6 @@ function UniverseTimelineEditor() {
         const universeId = node.data.universeId || id;
         // Use blockchainNodeId if available (for blockchain nodes), otherwise use eventId
         const eventId = node.data.blockchainNodeId || node.data.eventId;
-
-        console.log('🎯 Node clicked:', {
-          eventId: node.data.eventId,
-          blockchainNodeId: node.data.blockchainNodeId,
-          selectedEventId: eventId,
-          label: node.data.label,
-          universeId,
-        });
 
         if (eventId && universeId) {
           navigate({ to: `/event/${universeId}/${eventId}` });

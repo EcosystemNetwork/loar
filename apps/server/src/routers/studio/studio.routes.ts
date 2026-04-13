@@ -55,6 +55,8 @@ import {
 } from '../../services/video-models';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
+import { logFailedRefund } from '../../lib/refund-audit';
+import { createAttachment } from '../media/media.handlers';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -160,6 +162,13 @@ async function refundCredits(userId: string, credits: number): Promise<void> {
     });
   } catch (err) {
     console.error(`CRITICAL: Studio pack credit refund failed for ${userId}:`, err);
+    logFailedRefund({
+      userId,
+      credits,
+      source: 'studio',
+      generationId: 'pack',
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
   }
 }
 
@@ -623,28 +632,31 @@ async function runPackJob(
     // Attach completed assets to entity via mediaAttachments
     if (result.status === 'completed' && result.urls?.length) {
       for (const url of result.urls) {
-        await db.collection('mediaAttachments').add({
-          creator: userId,
-          targetType: 'entity',
-          targetId: input.entityId,
-          targetName: input.entityName,
-          url,
-          category: CAPABILITY_MODALITY[capability],
-          label: capability,
-          studioJobId: jobId,
-          contentHash: '',
-          originalFilename: url.split('/').pop() || capability,
-          mimeType:
+        try {
+          const mimeType =
             result.modality === 'video'
               ? 'video/mp4'
               : result.modality === 'voice'
                 ? 'audio/mpeg'
                 : result.modality === '3d'
                   ? 'model/gltf-binary'
-                  : 'image/jpeg',
-          size: 0,
-          createdAt: new Date(),
-        });
+                  : 'image/jpeg';
+          await createAttachment(userId, {
+            contentHash: `studio:${jobId}:${capability}:${url.split('/').pop() || ''}`,
+            originalFilename: url.split('/').pop() || capability,
+            mimeType,
+            size: 0,
+            url,
+            targetType: 'entity',
+            targetId: input.entityId,
+            targetName: input.entityName,
+            category: CAPABILITY_MODALITY[capability] as any,
+            label: capability,
+            generationId: jobId,
+          });
+        } catch (attachErr) {
+          console.error(`Failed to attach studio asset ${capability}:`, attachErr);
+        }
       }
     }
 
