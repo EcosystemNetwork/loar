@@ -46,7 +46,7 @@ interface CollabForm {
 
 export function ProposeCollabPage() {
   const navigate = useNavigate();
-  const { isConnected } = useWalletAuth();
+  const { isAuthenticated } = useWalletAuth();
   const proposeCollab = useProposeCollab();
   const [step, setStep] = useState<Step>('universes');
   const [form, setForm] = useState<CollabForm>({
@@ -92,7 +92,7 @@ export function ProposeCollabPage() {
   }
 
   async function handlePropose() {
-    if (!isConnected) {
+    if (!isAuthenticated) {
       toast.error('Connect your wallet first');
       return;
     }
@@ -333,7 +333,7 @@ export function ProposeCollabPage() {
                 size="lg"
                 className="w-full"
                 onClick={handlePropose}
-                disabled={proposeCollab.isPending || !isConnected}
+                disabled={proposeCollab.isPending || !isAuthenticated}
               >
                 {proposeCollab.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -342,7 +342,7 @@ export function ProposeCollabPage() {
                 )}
                 Send Proposal
               </Button>
-              {!isConnected && (
+              {!isAuthenticated && (
                 <p className="text-xs text-center text-muted-foreground">
                   Connect your wallet to propose
                 </p>

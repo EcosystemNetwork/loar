@@ -2,7 +2,7 @@
  * Layer 4 — storage
  * Checks: uploadDirect (base64 tiny PNG), resolve contentHash, getManifest.
  * Identifies: StorageManager misconfiguration, Firebase Storage failure,
- *             Pinata/Lighthouse/Storacha credential issues.
+ *             Pinata/Lighthouse credential issues.
  *
  * All checks use the protected tRPC procedures — requires a valid JWT.
  */

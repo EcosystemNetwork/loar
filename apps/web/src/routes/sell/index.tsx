@@ -35,14 +35,14 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 };
 
 function SellPage() {
-  const { isConnected } = useWalletAuth();
+  const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const v = useVocab();
   const { data: active = [], isLoading: loadingActive } = useMyListings('ACTIVE');
   const { data: drafts = [], isLoading: loadingDrafts } = useMyListings('DRAFT');
   const { data: sold = [], isLoading: loadingSold } = useMyListings('SOLD_OUT');
   const delist = useDelistListing();
 
-  if (!isConnected) {
+  if (!isAuthenticated && !isAuthenticating) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
         <Store className="w-12 h-12 text-muted-foreground opacity-30" />

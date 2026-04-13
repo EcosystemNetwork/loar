@@ -23,7 +23,7 @@ import {
   BarChart3,
   Users,
 } from 'lucide-react';
-import { useAccount } from 'wagmi';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useVocab } from '@/hooks/use-vocab';
@@ -57,7 +57,7 @@ const TIER_ICONS: Record<string, typeof Shield> = {
 };
 
 function StakingPage() {
-  const { address } = useAccount();
+  const { address, isAuthenticated } = useWalletAuth();
   const queryClient = useQueryClient();
   const v = useVocab();
   const [stakeAmount, setStakeAmount] = useState('');
@@ -66,7 +66,7 @@ function StakingPage() {
   const { data: profile, isLoading } = useQuery({
     queryKey: ['staking-profile'],
     queryFn: () => trpcClient.staking.getProfile.query(),
-    enabled: !!address,
+    enabled: isAuthenticated,
   });
 
   const { data: tiers } = useQuery({
