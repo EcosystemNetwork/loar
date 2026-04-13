@@ -281,6 +281,7 @@ export function useWalletAuth() {
     clearSiweSession(true); // revoke = true
     rejectedRef.current = false;
     autoSignedForRef.current = null;
+    // wagmi disconnect triggers DynamicWagmiConnector to sync Dynamic's UI state
     disconnect();
   }, [disconnect]);
 
