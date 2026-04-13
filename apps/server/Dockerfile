@@ -8,7 +8,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
+COPY apps/mcp/package.json ./apps/mcp/
+COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
+COPY packages/shared/package.json ./packages/shared/
 
 # Install dependencies
 # Create a fake .git so husky's prepare script doesn't fail, then clean up
@@ -38,7 +41,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
+COPY apps/mcp/package.json ./apps/mcp/
+COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
+COPY packages/shared/package.json ./packages/shared/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
