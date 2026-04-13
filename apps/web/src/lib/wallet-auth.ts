@@ -107,15 +107,33 @@ export async function refreshSession(): Promise<boolean> {
 }
 
 // Verify session on page load — clear stale localStorage if server cookie is gone.
+// Exported so components can wait for validation before trusting isAuthenticated.
+let _sessionValidated = false;
+export let sessionValidationDone: Promise<void>;
+
 if (typeof window !== 'undefined' && localStorage.getItem(ADDRESS_KEY)) {
-  fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
+  sessionValidationDone = fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
     .then((res) => res.json())
     .then((data) => {
       if (!data.authenticated) {
         clearSiweSession();
       }
     })
-    .catch(() => {});
+    .catch(() => {
+      // Server unreachable — clear stale session to be safe
+      clearSiweSession();
+    })
+    .finally(() => {
+      _sessionValidated = true;
+    });
+} else {
+  sessionValidationDone = Promise.resolve();
+  _sessionValidated = true;
+}
+
+/** Whether the initial session validation has completed. */
+export function isSessionValidated(): boolean {
+  return _sessionValidated;
 }
 
 // Proactive session refresh — refresh 1 hour before expiry.
@@ -204,6 +222,7 @@ async function verifySignature(
 export function useWalletAuth() {
   const { address, isConnected, chain } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const [validated, setValidated] = useState(_sessionValidated);
   const { disconnect } = useDisconnect();
   const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -215,7 +234,15 @@ export function useWalletAuth() {
   // Track the last address we auto-signed for to avoid duplicate attempts
   const autoSignedForRef = useRef<string | null>(null);
 
-  const isAuthenticated = Boolean(isConnected && address && storedAddress);
+  // Wait for session validation before trusting localStorage
+  useEffect(() => {
+    if (!validated) {
+      sessionValidationDone.then(() => setValidated(true));
+    }
+  }, [validated]);
+
+  // Only trust isAuthenticated after session validation completes
+  const isAuthenticated = validated && Boolean(isConnected && address && storedAddress);
 
   /** Perform the SIWE sign-in handshake. */
   const signIn = useCallback(async () => {

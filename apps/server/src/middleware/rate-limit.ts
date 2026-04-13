@@ -165,6 +165,9 @@ function getClientKey(c: Context): string {
 
 export function rateLimiter(opts: { windowMs: number; max: number }) {
   return async (c: Context, next: Next) => {
+    // Don't rate-limit CORS preflight requests
+    if (c.req.method === 'OPTIONS') return next();
+
     const key = getClientKey(c);
     const result = await getStore().consume(key, opts.windowMs, opts.max);
 

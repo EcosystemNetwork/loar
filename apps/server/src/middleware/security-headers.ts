@@ -38,11 +38,10 @@ export async function securityHeaders(c: Context, next: Next) {
   const nonce = randomBytes(16).toString('base64');
   c.set('cspNonce', nonce);
 
-  await next();
-
+  // Set security headers BEFORE the handler runs so they're always included
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
-  c.header('X-XSS-Protection', '0'); // Deprecated; CSP is the real protection
+  c.header('X-XSS-Protection', '0');
   c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.header(
@@ -50,7 +49,7 @@ export async function securityHeaders(c: Context, next: Next) {
     [
       "default-src 'self'",
       `script-src 'self' 'nonce-${nonce}'`,
-      "style-src 'self' 'unsafe-inline'", // many UI libs need inline styles
+      "style-src 'self' 'unsafe-inline'",
       `connect-src ${TRUSTED_CONNECT}`,
       `img-src ${TRUSTED_IMG}`,
       "font-src 'self'",
@@ -65,4 +64,6 @@ export async function securityHeaders(c: Context, next: Next) {
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   c.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   c.header('Cross-Origin-Resource-Policy', 'cross-origin');
+
+  await next();
 }
