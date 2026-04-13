@@ -9,7 +9,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/indexer/package.json ./apps/indexer/
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
+COPY apps/mcp/package.json ./apps/mcp/
+COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
+COPY packages/shared/package.json ./packages/shared/
 
 # Remove vitest from indexer devDeps (conflicts with Ponder's vite-node) and skip husky
 RUN npm pkg set scripts.prepare="echo skip"
