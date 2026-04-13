@@ -294,7 +294,8 @@ function EntityPage() {
                     <Link to="/upload" className="text-primary hover:underline">
                       Upload a file
                     </Link>{' '}
-                    to attach artwork, music, sound effects, 3D models, or design files.
+                    to attach artwork, 3D models, textures, animations, rigs, video, music, sound
+                    effects, or design files. Generate 3D models and they'll auto-attach here.
                   </p>
                 )}
               </CardContent>

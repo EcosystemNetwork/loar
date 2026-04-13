@@ -1,10 +1,6 @@
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import type {
-  MediaAttachment,
-  CreateAttachmentInput,
-  UpdateAttachmentInput,
-} from './media.types';
+import type { MediaAttachment, CreateAttachmentInput, UpdateAttachmentInput } from './media.types';
 
 const col = () => db.collection('mediaAttachments');
 
@@ -22,6 +18,12 @@ function docToAttachment(doc: FirebaseFirestore.DocumentSnapshot): MediaAttachme
     targetName: d.targetName ?? '',
     category: d.category,
     label: d.label ?? '',
+    subCategory: d.subCategory ?? null,
+    version: d.version ?? 1,
+    variantOf: d.variantOf ?? null,
+    variantLabel: d.variantLabel ?? null,
+    sortOrder: d.sortOrder ?? 0,
+    generationId: d.generationId ?? null,
     creator: d.creator,
     createdAt: d.createdAt?.toDate?.() ?? new Date(d.createdAt),
     updatedAt: d.updatedAt?.toDate?.() ?? new Date(d.updatedAt),
@@ -34,7 +36,18 @@ export async function createAttachment(
 ): Promise<MediaAttachment> {
   const id = randomUUID();
   const now = new Date();
-  const data = { ...input, creator: creator.toLowerCase(), createdAt: now, updatedAt: now };
+  const data = {
+    ...input,
+    subCategory: input.subCategory ?? null,
+    version: input.version ?? 1,
+    variantOf: input.variantOf ?? null,
+    variantLabel: input.variantLabel ?? null,
+    sortOrder: input.sortOrder ?? 0,
+    generationId: input.generationId ?? null,
+    creator: creator.toLowerCase(),
+    createdAt: now,
+    updatedAt: now,
+  };
   await col().doc(id).set(data);
   return { id, ...data };
 }
@@ -60,6 +73,21 @@ export async function getAttachmentsByCreator(creator: string): Promise<MediaAtt
   return snap.docs.map(docToAttachment);
 }
 
+/** Get all variants of a specific attachment (same variantOf chain). */
+export async function getVariants(attachmentId: string): Promise<MediaAttachment[]> {
+  // Get variants where variantOf points to this attachment
+  const snap = await col().where('variantOf', '==', attachmentId).orderBy('version', 'asc').get();
+  const variants = snap.docs.map(docToAttachment);
+
+  // Also include the original attachment itself
+  const originalDoc = await col().doc(attachmentId).get();
+  if (originalDoc.exists) {
+    variants.unshift(docToAttachment(originalDoc));
+  }
+
+  return variants;
+}
+
 export async function updateAttachment(
   creator: string,
   input: UpdateAttachmentInput
@@ -73,10 +101,44 @@ export async function updateAttachment(
   return docToAttachment(await ref.get());
 }
 
+/** Batch-update sort order for multiple attachments. */
+export async function reorderAttachments(
+  creator: string,
+  items: { id: string; sortOrder: number }[]
+): Promise<void> {
+  const batch = db.batch();
+  for (const item of items) {
+    const ref = col().doc(item.id);
+    batch.update(ref, { sortOrder: item.sortOrder, updatedAt: new Date() });
+  }
+  await batch.commit();
+}
+
 export async function deleteAttachment(creator: string, id: string): Promise<void> {
   const ref = col().doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Attachment not found');
   if (snap.data()!.creator !== creator.toLowerCase()) throw new Error('Not authorized');
   await ref.delete();
+}
+
+/** Get the next version number for a given target + category. */
+export async function getNextVersion(
+  targetType: string,
+  targetId: string,
+  category: string,
+  variantOf?: string | null
+): Promise<number> {
+  let query = col()
+    .where('targetType', '==', targetType)
+    .where('targetId', '==', targetId)
+    .where('category', '==', category);
+
+  if (variantOf) {
+    query = query.where('variantOf', '==', variantOf);
+  }
+
+  const snap = await query.orderBy('version', 'desc').limit(1).get();
+  if (snap.empty) return 1;
+  return (snap.docs[0].data().version ?? 0) + 1;
 }

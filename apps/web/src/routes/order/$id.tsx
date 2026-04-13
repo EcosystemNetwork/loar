@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOrder } from '@/hooks/useListings';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute('/order/$id')({
   component: OrderConfirmationPage,
@@ -38,9 +39,7 @@ function OrderConfirmationPage() {
 
         <div>
           <h1 className="text-2xl font-bold">Purchase Complete!</h1>
-          <p className="text-muted-foreground mt-1">
-            Your item has been added to your vault.
-          </p>
+          <p className="text-muted-foreground mt-1">Your item has been added to your vault.</p>
         </div>
 
         {/* Order details */}
@@ -53,7 +52,11 @@ function OrderConfirmationPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                   {o.thumbnailUrl ? (
-                    <img src={o.thumbnailUrl} alt={o.title} className="w-full h-full object-cover" />
+                    <img
+                      src={o.thumbnailUrl}
+                      alt={o.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <Package className="w-5 h-5 text-muted-foreground opacity-30" />
                   )}
@@ -88,7 +91,26 @@ function OrderConfirmationPage() {
               Continue Shopping
             </Button>
           </Link>
-          <Button variant="ghost" className="w-full gap-2">
+          <Button
+            variant="ghost"
+            className="w-full gap-2"
+            onClick={async () => {
+              const url = window.location.href;
+              const title = o?.title
+                ? `I just got "${o.title}" on LOAR!`
+                : 'Check out my purchase on LOAR!';
+              if (navigator.share) {
+                try {
+                  await navigator.share({ title, url });
+                } catch {
+                  /* cancelled */
+                }
+              } else {
+                await navigator.clipboard.writeText(url);
+                toast.success('Link copied to clipboard');
+              }
+            }}
+          >
             <Share2 className="w-4 h-4" />
             Share Purchase
           </Button>

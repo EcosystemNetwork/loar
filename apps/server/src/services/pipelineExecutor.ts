@@ -9,6 +9,7 @@
  */
 import { db } from '../lib/firebase';
 import { TRPCError } from '@trpc/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import {
   PERMISSION_ACTION_MAP,
   type AIAgentPermission,
@@ -61,12 +62,26 @@ const ACTION_REGISTRY: Record<string, ActionHandler> = {
     return { output: { id: ref.id, ...entity }, creditsUsed: 0 };
   },
 
-  'entities.update': async (input, _ctx) => {
+  'entities.update': async (input, ctx) => {
     const entityId = input.entityId as string;
     if (!entityId) throw new Error('entityId required');
 
+    // Whitelist allowed fields to prevent privilege escalation
+    const ALLOWED_FIELDS = ['name', 'description', 'parentId', 'imageUrl', 'metadata', 'kind'];
+    const updates: Record<string, unknown> = {};
+    for (const field of ALLOWED_FIELDS) {
+      if (input[field] !== undefined) {
+        updates[field] = input[field];
+      }
+    }
+
     const ref = db.collection('entities').doc(entityId);
-    const { entityId: _, ...updates } = input;
+    const existing = (await ref.get()).data();
+    if (!existing) throw new Error('Entity not found');
+    if (existing.creator !== ctx.createdByUid) {
+      throw new Error('Agent can only update entities created by its owner');
+    }
+
     await ref.update({ ...updates, updatedAt: new Date() });
 
     return { output: { id: entityId, updated: true }, creditsUsed: 0 };
@@ -409,16 +424,13 @@ export async function executePipeline(
     }
   }
 
-  // Update agent stats
+  // Update agent stats atomically to prevent race conditions
   await aiAgentsCol()
     .doc(agentContext.agentId)
     .update({
       lastRunAt: new Date(),
-      totalRunCount:
-        (await aiAgentsCol().doc(agentContext.agentId).get()).data()?.totalRunCount + 1 || 1,
-      creditBudgetSpent:
-        ((await aiAgentsCol().doc(agentContext.agentId).get()).data()?.creditBudgetSpent || 0) +
-        totalCreditsUsed,
+      totalRunCount: FieldValue.increment(1),
+      creditBudgetSpent: FieldValue.increment(totalCreditsUsed),
       updatedAt: new Date(),
     });
 

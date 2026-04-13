@@ -56,7 +56,7 @@ export const SECONDARY_KINDS: EntityKind[] = ['reality', 'dimension', 'plane', '
 export const ENTITY_LABELS: Record<EntityKind, string> = {
   person: 'Person',
   place: 'Place',
-  thing: 'Thing',
+  thing: 'Thing / Artifact',
   faction: 'Faction',
   event: 'Event',
   lore: 'Lore',
@@ -122,33 +122,30 @@ export function useEntities(universeAddress: string | undefined, kind?: EntityKi
   });
 }
 
-/** Get a single entity by ID. */
-export function useEntity(universeAddress: string | undefined, entityId: string | undefined) {
+/** Get a single entity by ID. universeAddress is optional (deprecated). */
+export function useEntity(entityId: string | undefined, universeAddress?: string) {
   return useQuery({
     ...trpc.entities.get.queryOptions({
-      universeAddress: universeAddress as `0x${string}`,
       entityId: entityId!,
+      universeAddress: universeAddress as `0x${string}` | undefined,
     }),
-    enabled: !!universeAddress && !!entityId,
+    enabled: !!entityId,
   });
 }
 
-/** Get direct children of an entity. */
-export function useChildEntities(
-  universeAddress: string | undefined,
-  parentId: string | undefined
-) {
+/** Get direct children of an entity. universeAddress is optional (deprecated). */
+export function useChildEntities(parentId: string | undefined, universeAddress?: string) {
   return useQuery({
     ...trpc.entities.children.queryOptions({
-      universeAddress: universeAddress as `0x${string}`,
       parentId: parentId!,
+      universeAddress: universeAddress as `0x${string}` | undefined,
     }),
-    enabled: !!universeAddress && !!parentId,
+    enabled: !!parentId,
   });
 }
 
 /** Create a new entity. Invalidates entity queries on success. */
-export function useCreateEntity(universeAddress: string | undefined) {
+export function useCreateEntity(universeAddress?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -160,10 +157,12 @@ export function useCreateEntity(universeAddress: string | undefined) {
       nodeIds?: number[];
       imageUrl?: string | null;
       metadata?: Record<string, string | number | boolean | null>;
+      monetized?: boolean;
+      rightsDeclaration?: RightsDeclaration | null;
     }) =>
       trpcClient.entities.create.mutate({
         ...input,
-        universeAddress: universeAddress as `0x${string}`,
+        universeAddress: universeAddress as `0x${string}` | undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['entities']] });
@@ -172,7 +171,7 @@ export function useCreateEntity(universeAddress: string | undefined) {
 }
 
 /** Update an existing entity. */
-export function useUpdateEntity(universeAddress: string | undefined) {
+export function useUpdateEntity(universeAddress?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -184,10 +183,12 @@ export function useUpdateEntity(universeAddress: string | undefined) {
       nodeIds?: number[];
       imageUrl?: string | null;
       metadata?: Record<string, string | number | boolean | null>;
+      monetized?: boolean;
+      rightsDeclaration?: RightsDeclaration | null;
     }) =>
       trpcClient.entities.update.mutate({
         ...input,
-        universeAddress: universeAddress as `0x${string}`,
+        universeAddress: universeAddress as `0x${string}` | undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['entities']] });
@@ -196,13 +197,13 @@ export function useUpdateEntity(universeAddress: string | undefined) {
 }
 
 /** Delete an entity. */
-export function useDeleteEntity(universeAddress: string | undefined) {
+export function useDeleteEntity(universeAddress?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (entityId: string) =>
       trpcClient.entities.delete.mutate({
-        universeAddress: universeAddress as `0x${string}`,
+        universeAddress: universeAddress as `0x${string}` | undefined,
         entityId,
       }),
     onSuccess: () => {
@@ -212,14 +213,14 @@ export function useDeleteEntity(universeAddress: string | undefined) {
 }
 
 /** Associate an on-chain node with an entity. */
-export function useAddNodeToEntity(universeAddress: string | undefined) {
+export function useAddNodeToEntity(universeAddress?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (input: { entityId: string; nodeId: number }) =>
       trpcClient.entities.addNode.mutate({
         ...input,
-        universeAddress: universeAddress as `0x${string}`,
+        universeAddress: universeAddress as `0x${string}` | undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['entities']] });
@@ -228,14 +229,14 @@ export function useAddNodeToEntity(universeAddress: string | undefined) {
 }
 
 /** Remove an on-chain node from an entity. */
-export function useRemoveNodeFromEntity(universeAddress: string | undefined) {
+export function useRemoveNodeFromEntity(universeAddress?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (input: { entityId: string; nodeId: number }) =>
       trpcClient.entities.removeNode.mutate({
         ...input,
-        universeAddress: universeAddress as `0x${string}`,
+        universeAddress: universeAddress as `0x${string}` | undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['entities']] });

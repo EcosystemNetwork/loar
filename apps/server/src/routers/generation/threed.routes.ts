@@ -24,6 +24,9 @@ import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { meshyService } from '../../services/meshy';
 import { trackQuests } from '../../services/quest-tracker';
+import { FieldValue } from 'firebase-admin/firestore';
+import { createAttachment } from '../media/media.handlers';
+import type { MeshyTaskOutput } from '../../services/meshy';
 
 // ── Pricing ───────────────────────────────────────────────────────────
 
@@ -83,12 +86,145 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
 async function refundCredits(userId: string, credits: number): Promise<void> {
   const ref = userCreditsCol().doc(userId);
   try {
-    const doc = await ref.get();
-    if (doc.exists) {
-      await ref.update({ balance: (doc.data()?.balance || 0) + credits, updatedAt: new Date() });
-    }
+    await ref.update({
+      balance: FieldValue.increment(credits),
+      totalSpent: FieldValue.increment(-credits),
+      updatedAt: new Date(),
+    });
   } catch (err) {
     console.error(`CRITICAL: 3D credit refund failed for ${userId}:`, err);
+  }
+}
+
+// ── Auto-attach helper ───────────────────────────────────────────────
+
+async function autoAttach3DModel(opts: {
+  creator: string;
+  entityId: string | null;
+  generationId: string;
+  modelUrls: MeshyTaskOutput;
+  thumbnailUrl?: string;
+  type: string;
+}) {
+  if (!opts.entityId) return; // No entity to attach to
+
+  // Look up entity name for the attachment record
+  let targetName = '';
+  try {
+    const entityDoc = await db.collection('entities').doc(opts.entityId).get();
+    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+  } catch {
+    // Best-effort — continue even if entity lookup fails
+  }
+
+  // Attach each model format (glb, fbx, usdz, obj) as a separate attachment
+  const modelEntries: [string, string][] = [
+    ['glb', opts.modelUrls.glb],
+    ['fbx', opts.modelUrls.fbx],
+    ['obj', opts.modelUrls.obj],
+    ['mtl', opts.modelUrls.mtl],
+    ['usdz', opts.modelUrls.usdz],
+  ].filter((e): e is [string, string] => !!e[1]);
+
+  for (const [format, url] of modelEntries) {
+    try {
+      const subCategory =
+        opts.type === 'text_preview'
+          ? 'preview'
+          : opts.type === 'text_refine'
+            ? 'high_poly'
+            : 'game_ready';
+      await createAttachment(opts.creator, {
+        contentHash: `gen:${opts.generationId}:${format}`,
+        originalFilename: `model.${format}`,
+        mimeType: format === 'glb' ? 'model/gltf-binary' : `model/${format}`,
+        size: 0,
+        url,
+        targetType: 'entity',
+        targetId: opts.entityId,
+        targetName,
+        category: '3d',
+        label: `${opts.type.replace(/_/g, ' ')} — ${format.toUpperCase()}`,
+        subCategory,
+        generationId: opts.generationId,
+      });
+    } catch (err) {
+      console.error(`Failed to auto-attach 3D model (${format}):`, err);
+    }
+  }
+
+  // Attach thumbnail as an image if available
+  if (opts.thumbnailUrl) {
+    try {
+      await createAttachment(opts.creator, {
+        contentHash: `gen:${opts.generationId}:thumbnail`,
+        originalFilename: 'thumbnail.png',
+        mimeType: 'image/png',
+        size: 0,
+        url: opts.thumbnailUrl,
+        targetType: 'entity',
+        targetId: opts.entityId,
+        targetName,
+        category: 'image',
+        label: '3D model thumbnail',
+        subCategory: 'concept_art',
+        generationId: opts.generationId,
+      });
+    } catch (err) {
+      console.error('Failed to auto-attach 3D thumbnail:', err);
+    }
+  }
+}
+
+// ── Background completion handler ─────────────────────────────────────
+
+async function completeThreeDTask(opts: {
+  genId: string;
+  userId: string;
+  entityId: string | null;
+  meshyTaskId: string;
+  meshyTaskType: 'text-to-3d' | 'image-to-3d';
+  generationType: string;
+  credits: number;
+  timeoutMs: number;
+}) {
+  try {
+    const task = await meshyService.waitForTask(
+      opts.meshyTaskId,
+      opts.meshyTaskType,
+      opts.timeoutMs
+    );
+
+    trackQuests(opts.userId, [{ questId: 'first_3d_generation' }]);
+
+    await threeDGenCol().doc(opts.genId).update({
+      status: 'completed',
+      meshyTaskId: opts.meshyTaskId,
+      modelUrls: task.modelUrls,
+      thumbnailUrl: task.thumbnailUrl,
+      videoUrl: task.videoUrl,
+      completedAt: new Date(),
+    });
+
+    await autoAttach3DModel({
+      creator: opts.userId,
+      entityId: opts.entityId,
+      generationId: opts.genId,
+      modelUrls: task.modelUrls ?? ({} as MeshyTaskOutput),
+      thumbnailUrl: task.thumbnailUrl,
+      type: opts.generationType,
+    });
+  } catch (error) {
+    await refundCredits(opts.userId, opts.credits);
+    await threeDGenCol()
+      .doc(opts.genId)
+      .update({
+        status: 'failed',
+        creditsRefunded: true,
+        failureReason: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date(),
+      });
+    console.error(`3D generation ${opts.genId} failed:`, error);
   }
 }
 
@@ -148,27 +284,24 @@ export const threedRouter = router({
           targetPolycount: input.targetPolycount,
         });
 
-        // Poll for completion (max 10 min for preview)
-        const task = await meshyService.waitForTask(taskId, 'text-to-3d', 10 * 60 * 1000);
+        await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
 
-        trackQuests(ctx.user.uid, [{ questId: 'first_3d_generation' }]);
-
-        await threeDGenCol().doc(genId).update({
-          status: 'completed',
+        // Fire-and-forget: complete in background, client polls via getTask
+        completeThreeDTask({
+          genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || null,
           meshyTaskId: taskId,
-          modelUrls: task.modelUrls,
-          thumbnailUrl: task.thumbnailUrl,
-          videoUrl: task.videoUrl,
-          completedAt: new Date(),
-        });
+          meshyTaskType: 'text-to-3d',
+          generationType: 'text_preview',
+          credits,
+          timeoutMs: 10 * 60 * 1000,
+        }).catch((err) => console.error(`Background 3D preview ${genId} error:`, err));
 
         return {
           generationId: genId,
-          status: 'completed' as const,
+          status: 'running' as const,
           meshyTaskId: taskId,
-          modelUrls: task.modelUrls,
-          thumbnailUrl: task.thumbnailUrl,
-          videoUrl: task.videoUrl,
           creditsCharged: credits,
           fiatPriceUsd: withFiat(cost),
         };
@@ -178,6 +311,7 @@ export const threedRouter = router({
           .doc(genId)
           .update({
             status: 'failed',
+            creditsRefunded: true,
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
@@ -188,6 +322,7 @@ export const threedRouter = router({
   // ── Text-to-3D refine ─────────────────────────────────────────────────
 
   textTo3DRefine: protectedProcedure
+    .use(requirePermission('generation.3d'))
     .input(
       z.object({
         previewGenerationId: z.string().min(1), // LOAR generation ID from textTo3DPreview
@@ -236,25 +371,24 @@ export const threedRouter = router({
           textureRichness: input.textureRichness,
         });
 
-        // Refine can take up to 15 min
-        const task = await meshyService.waitForTask(taskId, 'text-to-3d', 15 * 60 * 1000);
+        await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
 
-        await threeDGenCol().doc(genId).update({
-          status: 'completed',
+        // Fire-and-forget: complete in background, client polls via getTask
+        completeThreeDTask({
+          genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || previewData.entityId || null,
           meshyTaskId: taskId,
-          modelUrls: task.modelUrls,
-          thumbnailUrl: task.thumbnailUrl,
-          videoUrl: task.videoUrl,
-          completedAt: new Date(),
-        });
+          meshyTaskType: 'text-to-3d',
+          generationType: 'text_refine',
+          credits,
+          timeoutMs: 15 * 60 * 1000,
+        }).catch((err) => console.error(`Background 3D refine ${genId} error:`, err));
 
         return {
           generationId: genId,
-          status: 'completed' as const,
+          status: 'running' as const,
           meshyTaskId: taskId,
-          modelUrls: task.modelUrls,
-          thumbnailUrl: task.thumbnailUrl,
-          videoUrl: task.videoUrl,
           creditsCharged: credits,
           fiatPriceUsd: withFiat(cost),
         };
@@ -264,6 +398,7 @@ export const threedRouter = router({
           .doc(genId)
           .update({
             status: 'failed',
+            creditsRefunded: true,
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
@@ -328,24 +463,24 @@ export const threedRouter = router({
           taskId = result.taskId;
         }
 
-        const task = await meshyService.waitForTask(taskId, 'image-to-3d', 15 * 60 * 1000);
+        await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
 
-        await threeDGenCol().doc(genId).update({
-          status: 'completed',
+        // Fire-and-forget: complete in background, client polls via getTask
+        completeThreeDTask({
+          genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || null,
           meshyTaskId: taskId,
-          modelUrls: task.modelUrls,
-          thumbnailUrl: task.thumbnailUrl,
-          videoUrl: task.videoUrl,
-          completedAt: new Date(),
-        });
+          meshyTaskType: 'image-to-3d',
+          generationType: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
+          credits,
+          timeoutMs: 15 * 60 * 1000,
+        }).catch((err) => console.error(`Background 3D image-to-3d ${genId} error:`, err));
 
         return {
           generationId: genId,
-          status: 'completed' as const,
+          status: 'running' as const,
           meshyTaskId: taskId,
-          modelUrls: task.modelUrls,
-          thumbnailUrl: task.thumbnailUrl,
-          videoUrl: task.videoUrl,
           creditsCharged: credits,
           fiatPriceUsd: withFiat(cost),
         };
@@ -355,6 +490,7 @@ export const threedRouter = router({
           .doc(genId)
           .update({
             status: 'failed',
+            creditsRefunded: true,
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });

@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { createAIAgentSchema, updateAIAgentSchema } from './aiAgents.types';
 import { allocateCreditsToAgent, getAgentCreditStats } from '../../services/aiAgentCredits';
 import { emitActivity } from '../../services/activity';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const aiAgentsCol = () => {
   if (!db)
@@ -234,12 +235,11 @@ export const aiAgentsRouter = router({
 
       const result = await allocateCreditsToAgent(ctx.user.uid, input.agentId, input.amount);
 
-      // Update agent budget tracking
-      const data = agentDoc.data()!;
+      // Update agent budget tracking atomically
       await aiAgentsCol()
         .doc(input.agentId)
         .update({
-          creditBudgetTotal: (data.creditBudgetTotal || 0) + input.amount,
+          creditBudgetTotal: FieldValue.increment(input.amount),
           updatedAt: new Date(),
         });
 

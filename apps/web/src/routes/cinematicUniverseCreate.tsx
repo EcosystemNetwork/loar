@@ -99,37 +99,27 @@ function CinematicUniverseCreate() {
     field: 'lp' | 'creator' | 'treasury' | 'community',
     value: number
   ) => {
-    const current = {
-      lp: lpBps,
-      creator: creatorBps,
-      treasury: treasuryBps,
-      community: communityBps,
+    // Build the proposed state with the new value applied
+    const proposed = {
+      lp: field === 'lp' ? value : lpBps,
+      creator: field === 'creator' ? value : creatorBps,
+      treasury: field === 'treasury' ? value : treasuryBps,
+      community: field === 'community' ? value : communityBps,
     };
-    current[field] = value;
-    const remainder = 10000 - current.lp - current.creator - current.treasury - current.community;
 
-    // Auto-balance: distribute remainder to community
-    if (field !== 'community') {
-      const newCommunity = communityBps + remainder;
-      if (newCommunity >= 0 && newCommunity <= 10000) {
-        setCommunityBps(newCommunity);
-      }
+    // Auto-balance: absorb the difference into a counterpart field
+    const balanceField = field === 'community' ? 'lp' : 'community';
+    const remainder =
+      10000 - proposed.lp - proposed.creator - proposed.treasury - proposed.community;
+    const adjusted = proposed[balanceField] + remainder;
+    if (adjusted >= 0 && adjusted <= 10000) {
+      proposed[balanceField] = adjusted;
     }
 
-    switch (field) {
-      case 'lp':
-        setLpBps(value);
-        break;
-      case 'creator':
-        setCreatorBps(value);
-        break;
-      case 'treasury':
-        setTreasuryBps(value);
-        break;
-      case 'community':
-        setCommunityBps(value);
-        break;
-    }
+    setLpBps(proposed.lp);
+    setCreatorBps(proposed.creator);
+    setTreasuryBps(proposed.treasury);
+    setCommunityBps(proposed.community);
   };
 
   // Deployment state
@@ -156,6 +146,10 @@ function CinematicUniverseCreate() {
     useUniverseManager();
   const defaultConfig = useDefaultDeploymentConfig();
   const { isSuccess: txSuccess, data: txReceipt } = useWaitForTransactionReceipt({ hash });
+
+  // Track which tx hash each effect has already processed to prevent double-firing
+  const processedUniverseHash = useRef<string | null>(null);
+  const processedTokenHash = useRef<string | null>(null);
 
   // Auto-switch to supported chain if on wrong network
   useEffect(() => {
@@ -275,9 +269,17 @@ function CinematicUniverseCreate() {
     if (coverFileRef.current) coverFileRef.current.value = '';
   };
 
-  // Watch for transaction success and update deployment step
-  if (txSuccess && txReceipt && deploymentStep === DeploymentStep.CREATING_UNIVERSE) {
+  // Watch for universe creation transaction success
+  useEffect(() => {
+    if (!txSuccess || !txReceipt || !hash) return;
+    if (deploymentStep !== DeploymentStep.CREATING_UNIVERSE) return;
+    if (processedUniverseHash.current === hash) return; // Already processed this tx
+    processedUniverseHash.current = hash;
+
     // Parse UniverseCreated event from receipt logs
+    let parsedUniverseAddress: `0x${string}` | null = null;
+    let parsedUniverseId: bigint | null = null;
+
     for (const log of txReceipt.logs) {
       try {
         const decoded = decodeEventLog({
@@ -287,39 +289,50 @@ function CinematicUniverseCreate() {
         });
         if (decoded.eventName === 'UniverseCreated') {
           const args = decoded.args as { universe: string; creator: string };
-          setUniverseAddress(args.universe as `0x${string}`);
+          parsedUniverseAddress = args.universe as `0x${string}`;
         }
         if (decoded.eventName === 'UniverseMintFee') {
           const args = decoded.args as { universeId: bigint };
-          setUniverseId(args.universeId);
+          parsedUniverseId = args.universeId;
         }
       } catch {
         // Not a UniverseManager event, skip
       }
     }
+
+    if (parsedUniverseAddress) {
+      setUniverseAddress(parsedUniverseAddress);
+    }
+    if (parsedUniverseId !== null) {
+      setUniverseId(parsedUniverseId);
+    }
     setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
 
-    // Register universe in Firestore
-    if (address && universeAddress) {
+    // Register universe in Firestore using parsed values directly (not stale state)
+    if (address && parsedUniverseAddress) {
       trpcClient.universes.create
         .mutate({
-          address: universeAddress,
+          address: parsedUniverseAddress,
           creator: safeAddress ?? address,
           tokenAddress: '0x0000000000000000000000000000000000000000',
           governanceAddress: '0x0000000000000000000000000000000000000000',
           imageUrl: imageUrl,
           description: description,
-          signature: '',
-          message: '',
-          nonce: '',
-          onChainUniverseId: universeId?.toString(),
+          onChainUniverseId: parsedUniverseId?.toString(),
           mintTxHash: hash,
         } as any)
-        .catch((err) => console.error('Failed to register universe:', err));
+        .catch((err: unknown) => console.error('Failed to register universe:', err));
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txSuccess, txReceipt, hash]);
 
-  if (txSuccess && txReceipt && deploymentStep === DeploymentStep.DEPLOYING_TOKEN) {
+  // Watch for token deployment transaction success
+  useEffect(() => {
+    if (!txSuccess || !txReceipt || !hash) return;
+    if (deploymentStep !== DeploymentStep.DEPLOYING_TOKEN) return;
+    if (processedTokenHash.current === hash) return; // Already processed this tx
+    processedTokenHash.current = hash;
+
     // Parse TokenCreated event for token + governor addresses
     let parsedTokenAddress: `0x${string}` | undefined;
     let parsedGovernorAddress: `0x${string}` | undefined;
@@ -335,13 +348,14 @@ function CinematicUniverseCreate() {
           const args = decoded.args as { tokenAddress: string; governor: string };
           parsedTokenAddress = args.tokenAddress as `0x${string}`;
           parsedGovernorAddress = args.governor as `0x${string}`;
-          setTokenAddress(parsedTokenAddress);
-          setGovernorAddress(parsedGovernorAddress);
         }
       } catch {
         // Not a UniverseManager event, skip
       }
     }
+
+    if (parsedTokenAddress) setTokenAddress(parsedTokenAddress);
+    if (parsedGovernorAddress) setGovernorAddress(parsedGovernorAddress);
     setDeploymentStep(DeploymentStep.COMPLETED);
 
     // Update Firestore with real token and governance addresses
@@ -353,9 +367,12 @@ function CinematicUniverseCreate() {
           governanceAddress: parsedGovernorAddress,
           tokenDeployTxHash: hash,
         })
-        .catch((err) => console.error('Failed to finalize token deployment in Firestore:', err));
+        .catch((err: unknown) =>
+          console.error('Failed to finalize token deployment in Firestore:', err)
+        );
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txSuccess, txReceipt, hash]);
 
   const handleCreateUniverse = async () => {
     if (!address) {
@@ -374,7 +391,7 @@ function CinematicUniverseCreate() {
     }
 
     if (!isSupportedChain(chainId)) {
-      alert('Wrong Network! Please switch to Sepolia.');
+      alert('Wrong Network! Please switch to a supported network.');
       return;
     }
 
@@ -487,13 +504,15 @@ function CinematicUniverseCreate() {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-700 rounded-lg shadow-2xl">
-          <p className="text-yellow-100 font-medium">Wrong Network! Please switch to Sepolia.</p>
+          <p className="text-yellow-100 font-medium">
+            Wrong Network! Please switch to a supported network.
+          </p>
         </div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
             <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-600" />
             <h2 className="text-2xl font-bold">Wrong Network</h2>
-            <p className="text-muted-foreground">Please switch to Sepolia</p>
+            <p className="text-muted-foreground">Please switch to a supported network</p>
             <Button size="lg" onClick={handleSwitchNetwork}>
               <Rocket className="h-5 w-5 mr-2" />
               Switch Network

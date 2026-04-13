@@ -34,7 +34,10 @@ export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimeline
     setIsLoading(true);
 
     try {
-      // Mock blockchain interaction - in real implementation this would call smart contract
+      // TODO: Replace with real smart contract interaction
+      console.warn(
+        '[CreateTimelineNode] Using mock implementation — node is not persisted on-chain'
+      );
       const mockNodeId = Math.floor(Math.random() * 10000) + previousNodeId + 1;
 
       // Simulate API delay
@@ -47,6 +50,8 @@ export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimeline
       setPlot('');
     } catch (error) {
       console.error('Failed to create timeline node:', error);
+      // Surface error to user
+      alert('Failed to create timeline event. Please try again.');
     } finally {
       setIsLoading(false);
     }

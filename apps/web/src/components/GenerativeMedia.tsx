@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { trpcClient } from '../utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 
 interface ImageResult {
   status: string;
@@ -66,7 +67,13 @@ export function GenerativeMedia() {
     }) => trpcClient.fal.veo3ImageToVideo.mutate(input),
   });
 
+  const { isAuthenticated } = useWalletAuth();
+
   const handleGenerate = async () => {
+    if (!isAuthenticated) {
+      setContent({ isGenerating: false, error: 'Please connect your wallet and sign in first.' });
+      return;
+    }
     setContent({ isGenerating: true });
 
     try {

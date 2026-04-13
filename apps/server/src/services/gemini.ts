@@ -422,14 +422,14 @@ export async function improveImagePrompt(
   if (characterContext && characterContext.length > 0) {
     characterInfo = '\n\nCHARACTERS IN THIS SCENE:\n';
     characterContext.forEach((char) => {
-      characterInfo += `- ${char.name}: ${char.description}\n`;
+      characterInfo += `- ${sanitizeForPrompt(char.name, 200)}: ${sanitizeForPrompt(char.description, 2000)}\n`;
     });
   }
 
   const prompt = `You are a professional visual artist and image generation expert. Your task is to take a simple image description and transform it into a detailed, single-frame visual description perfect for image generation.
 
 USER'S BASIC IDEA:
-${userPrompt}
+${sanitizeForPrompt(userPrompt)}
 ${characterInfo}
 
 YOUR TASK:
@@ -509,17 +509,17 @@ export async function improveVideoPrompt(
   if (characterContext && characterContext.length > 0) {
     characterInfo = '\n\nCHARACTERS IN THIS SCENE:\n';
     characterContext.forEach((char) => {
-      characterInfo += `- ${char.name}: ${char.description}\n`;
+      characterInfo += `- ${sanitizeForPrompt(char.name, 200)}: ${sanitizeForPrompt(char.description, 2000)}\n`;
     });
   }
 
   let previousEventInfo = '';
   if (previousEventContext) {
     previousEventInfo = `\n\nPREVIOUS EVENT CONTEXT:\n`;
-    previousEventInfo += `Title: ${previousEventContext.title}\n`;
-    previousEventInfo += `Summary: ${previousEventContext.summary}\n`;
+    previousEventInfo += `Title: ${sanitizeForPrompt(previousEventContext.title, 500)}\n`;
+    previousEventInfo += `Summary: ${sanitizeForPrompt(previousEventContext.summary, 2000)}\n`;
     if (previousEventContext.plot) {
-      previousEventInfo += `What happened: ${previousEventContext.plot}\n`;
+      previousEventInfo += `What happened: ${sanitizeForPrompt(previousEventContext.plot, 2000)}\n`;
     }
     previousEventInfo += `\nNote: This new scene should continue naturally from the previous event.\n`;
   }
@@ -527,7 +527,7 @@ export async function improveVideoPrompt(
   const prompt = `You are a professional cinematographer and video director. Your task is to take a simple video description and transform it into a detailed shot-by-shot sequence with professional camera angles and cuts.
 
 USER'S BASIC IDEA:
-${userPrompt}
+${sanitizeForPrompt(userPrompt)}
 ${characterInfo}${previousEventInfo}
 
 YOUR TASK:
@@ -656,8 +656,8 @@ export async function generateEntityProfile(
 
   const prompt = `You are a worldbuilding AI creating a detailed profile for a fictional ${entityKind}.
 
-ENTITY NAME: ${entityName}
-USER HINT: ${userHint || '(no additional context)'}
+ENTITY NAME: ${sanitizeForPrompt(entityName, 200)}
+USER HINT: ${sanitizeForPrompt(userHint || '(no additional context)', 1000)}
 
 YOUR TASK:
 1. Write a compelling 2–4 paragraph "description" for this ${entityKind}. Encyclopedic tone, no headers, no lists — flowing paragraphs only.

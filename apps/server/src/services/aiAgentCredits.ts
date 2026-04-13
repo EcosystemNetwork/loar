@@ -7,6 +7,7 @@
  */
 import { db } from '../lib/firebase';
 import { TRPCError } from '@trpc/server';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const userCreditsCol = () => {
   if (!db)
@@ -121,11 +122,8 @@ export async function refundAgentCredits(agentId: string, amount: number): Promi
 
   try {
     const ref = aiAgentCreditsCol().doc(agentId);
-    const doc = await ref.get();
-    if (!doc.exists) return;
-
     await ref.update({
-      balance: (doc.data()?.balance ?? 0) + amount,
+      balance: FieldValue.increment(amount),
       updatedAt: new Date(),
     });
   } catch (err) {

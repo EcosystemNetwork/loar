@@ -5,9 +5,10 @@
  * train a LoRA model on FAL (~5-10 min), then use it for consistent generation.
  */
 import { z } from 'zod';
-import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { TRPCError } from '@trpc/server';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const loraModelsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -24,6 +25,7 @@ const TRAINING_COST_CREDITS = 75;
 export const loraRouter = router({
   /** Start LoRA training for a character */
   startTraining: protectedProcedure
+    .use(requirePermission('generation.image'))
     .input(
       z.object({
         characterId: z.string(),
@@ -38,15 +40,23 @@ export const loraRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Check credits
-      const creditsDoc = await db!.collection('userCredits').doc(ctx.user.uid).get();
-      const balance = creditsDoc.exists ? creditsDoc.data()?.balance || 0 : 0;
-      if (balance < TRAINING_COST_CREDITS) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Insufficient credits. Need ${TRAINING_COST_CREDITS}, have ${balance}`,
+      // Deduct credits transactionally BEFORE calling FAL
+      const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
+      await db!.runTransaction(async (tx) => {
+        const doc = await tx.get(userCreditsRef);
+        const balance = doc.exists ? doc.data()?.balance || 0 : 0;
+        if (balance < TRAINING_COST_CREDITS) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Insufficient credits. Need ${TRAINING_COST_CREDITS}, have ${balance}`,
+          });
+        }
+        tx.update(userCreditsRef, {
+          balance: balance - TRAINING_COST_CREDITS,
+          totalSpent: (doc.data()?.totalSpent || 0) + TRAINING_COST_CREDITS,
+          updatedAt: new Date(),
         });
-      }
+      });
 
       // Create model record
       const modelRef = await loraModelsCol().add({
@@ -82,7 +92,7 @@ export const loraRouter = router({
         });
 
         if (!response.ok) {
-          throw new Error(`FAL API error: ${response.status} ${response.statusText}`);
+          throw new Error(`FAL training request failed (${response.status})`);
         }
 
         const result = await response.json();
@@ -96,17 +106,15 @@ export const loraRouter = router({
           createdAt: new Date(),
         });
 
-        // Deduct credits
-        await db!
-          .collection('userCredits')
-          .doc(ctx.user.uid)
-          .update({
-            balance: balance - TRAINING_COST_CREDITS,
-          });
-
         return { modelId: modelRef.id, status: 'training' };
       } catch (err) {
-        // Mark as failed if training kickoff fails
+        // Refund credits atomically on failure
+        await userCreditsRef.update({
+          balance: FieldValue.increment(TRAINING_COST_CREDITS),
+          totalSpent: FieldValue.increment(-TRAINING_COST_CREDITS),
+          updatedAt: new Date(),
+        });
+        // Mark as failed
         await modelRef.update({ status: 'failed', error: (err as Error).message });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -191,6 +199,7 @@ export const loraRouter = router({
 
   /** Generate image using a trained LoRA model */
   generateWithLora: protectedProcedure
+    .use(requirePermission('generation.image'))
     .input(
       z.object({
         modelId: z.string(),
@@ -201,6 +210,8 @@ export const loraRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const LORA_GEN_CREDITS = 3;
+
       // Get the model
       const modelDoc = await loraModelsCol().doc(input.modelId).get();
       if (!modelDoc.exists) {
@@ -218,46 +229,67 @@ export const loraRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Model not ready' });
       }
 
-      // Check credits (3 credits per image)
-      const creditsDoc = await db!.collection('userCredits').doc(ctx.user.uid).get();
-      const balance = creditsDoc.exists ? creditsDoc.data()?.balance || 0 : 0;
-      if (balance < 3) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Insufficient credits' });
-      }
+      // Deduct credits transactionally BEFORE generation
+      const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
+      await db!.runTransaction(async (tx) => {
+        const doc = await tx.get(userCreditsRef);
+        const balance = doc.exists ? doc.data()?.balance || 0 : 0;
+        if (balance < LORA_GEN_CREDITS) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Insufficient credits' });
+        }
+        tx.update(userCreditsRef, {
+          balance: balance - LORA_GEN_CREDITS,
+          totalSpent: (doc.data()?.totalSpent || 0) + LORA_GEN_CREDITS,
+          updatedAt: new Date(),
+        });
+      });
 
       const FAL_KEY = process.env.FAL_KEY;
       if (!FAL_KEY)
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'FAL_KEY not set' });
 
-      // Generate with LoRA
-      const response = await fetch('https://fal.run/fal-ai/flux-lora', {
-        method: 'POST',
-        headers: {
-          Authorization: `Key ${FAL_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: `${model.triggerWord} ${input.prompt}`,
-          loras: [{ path: model.modelUrl, scale: 1.0 }],
-          image_size: { width: input.width, height: input.height },
-          num_images: 1,
-        }),
-      });
-
-      const result = await response.json();
-
-      // Deduct credits
-      await db!
-        .collection('userCredits')
-        .doc(ctx.user.uid)
-        .update({
-          balance: balance - 3,
+      try {
+        // Generate with LoRA
+        const response = await fetch('https://fal.run/fal-ai/flux-lora', {
+          method: 'POST',
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: `${model.triggerWord} ${input.prompt}`,
+            loras: [{ path: model.modelUrl, scale: 1.0 }],
+            image_size: { width: input.width, height: input.height },
+            num_images: 1,
+          }),
         });
 
-      return {
-        imageUrl: result.images?.[0]?.url,
-        seed: result.seed,
-      };
+        if (!response.ok) {
+          throw new Error(`FAL generation failed (${response.status})`);
+        }
+
+        const result = await response.json();
+        const imageUrl = result.images?.[0]?.url;
+        if (!imageUrl) {
+          throw new Error('FAL returned no image');
+        }
+
+        return {
+          imageUrl,
+          seed: result.seed,
+        };
+      } catch (err) {
+        // Refund credits atomically on failure
+        await userCreditsRef.update({
+          balance: FieldValue.increment(LORA_GEN_CREDITS),
+          totalSpent: FieldValue.increment(-LORA_GEN_CREDITS),
+          updatedAt: new Date(),
+        });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `LoRA generation failed: ${(err as Error).message}`,
+        });
+      }
     }),
 
   /** List user's LoRA models */
@@ -271,7 +303,7 @@ export const loraRouter = router({
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }),
 
-  /** List LoRA models for a specific character */
+  /** List LoRA models for a specific character (public — excludes sensitive fields) */
   listByCharacter: publicProcedure
     .input(z.object({ characterId: z.string() }))
     .query(async ({ input }) => {
@@ -282,6 +314,16 @@ export const loraRouter = router({
         .limit(5)
         .get();
 
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          characterId: data.characterId,
+          universeId: data.universeId,
+          triggerWord: data.triggerWord,
+          status: data.status,
+          createdAt: data.createdAt,
+        };
+      });
     }),
 });

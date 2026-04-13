@@ -29,6 +29,9 @@ import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
+import { FieldValue } from 'firebase-admin/firestore';
+import { validateUploadUrl } from '../../lib/url-validator';
+import { createAttachment } from '../media/media.handlers';
 
 // ── Pricing constants ─────────────────────────────────────────────────
 
@@ -94,10 +97,11 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
 async function refundCredits(userId: string, credits: number): Promise<void> {
   const ref = userCreditsCol().doc(userId);
   try {
-    const doc = await ref.get();
-    if (doc.exists) {
-      await ref.update({ balance: (doc.data()?.balance || 0) + credits, updatedAt: new Date() });
-    }
+    await ref.update({
+      balance: FieldValue.increment(credits),
+      totalSpent: FieldValue.increment(-credits),
+      updatedAt: new Date(),
+    });
   } catch (err) {
     console.error(`CRITICAL: Voice credit refund failed for ${userId}:`, err);
   }
@@ -112,6 +116,60 @@ async function uploadAudio(
 ): Promise<string> {
   const key = await firebaseStorageService.upload(buffer, filename);
   return firebaseStorageService.getPublicUrl(key);
+}
+
+// ── Fetch with timeout ───────────────────────────────────────────────
+
+const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
+
+async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Auto-attach helper ───────────────────────────────────────────────
+
+async function autoAttachAudio(opts: {
+  creator: string;
+  entityId: string | undefined;
+  generationId: string;
+  audioUrl: string;
+  label: string;
+  category: 'sound' | 'music' | 'video';
+}) {
+  if (!opts.entityId) return;
+
+  let targetName = '';
+  try {
+    const entityDoc = await db.collection('entities').doc(opts.entityId).get();
+    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+  } catch {
+    // Best-effort
+  }
+
+  try {
+    await createAttachment(opts.creator, {
+      contentHash: `gen:${opts.generationId}:audio`,
+      originalFilename: `generation-${opts.generationId}.mp3`,
+      mimeType: 'audio/mpeg',
+      size: 0,
+      url: opts.audioUrl,
+      targetType: 'entity',
+      targetId: opts.entityId,
+      targetName,
+      category: opts.category,
+      label: opts.label,
+      generationId: opts.generationId,
+    });
+  } catch (err) {
+    console.error('Failed to auto-attach audio:', err);
+  }
 }
 
 // ── Router ────────────────────────────────────────────────────────────
@@ -201,6 +259,16 @@ export const voiceRouter = router({
           completedAt: new Date(),
         });
 
+        // Auto-attach TTS audio to entity
+        autoAttachAudio({
+          creator: ctx.user.uid,
+          entityId: input.entityId,
+          generationId: genId,
+          audioUrl,
+          label: `TTS — ${input.text.slice(0, 60)}`,
+          category: 'sound',
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
@@ -226,6 +294,7 @@ export const voiceRouter = router({
   // ── Sound effects ─────────────────────────────────────────────────────
 
   soundEffect: protectedProcedure
+    .use(requirePermission('generation.voice'))
     .input(
       z.object({
         text: z.string().min(1).max(500),
@@ -278,6 +347,16 @@ export const voiceRouter = router({
           completedAt: new Date(),
         });
 
+        // Auto-attach sound effect to entity
+        autoAttachAudio({
+          creator: ctx.user.uid,
+          entityId: input.entityId,
+          generationId: genId,
+          audioUrl,
+          label: `SFX — ${input.text.slice(0, 60)}`,
+          category: 'sound',
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
@@ -301,6 +380,7 @@ export const voiceRouter = router({
   // ── Voice design ──────────────────────────────────────────────────────
 
   designVoice: protectedProcedure
+    .use(requirePermission('generation.voice'))
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -385,6 +465,7 @@ export const voiceRouter = router({
   // ── Instant voice clone ───────────────────────────────────────────────
 
   cloneVoice: protectedProcedure
+    .use(requirePermission('generation.voice'))
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -416,10 +497,11 @@ export const voiceRouter = router({
       try {
         await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
-        // Fetch audio buffers from URLs
+        // Fetch audio buffers from URLs (validate SSRF + enforce 30s timeout per URL)
         const audioBuffers = await Promise.all(
           input.audioUrls.map(async (url) => {
-            const res = await fetch(url);
+            await validateUploadUrl(url);
+            const res = await fetchWithTimeout(url);
             if (!res.ok) throw new Error(`Failed to fetch audio from ${url}`);
             return Buffer.from(await res.arrayBuffer());
           })

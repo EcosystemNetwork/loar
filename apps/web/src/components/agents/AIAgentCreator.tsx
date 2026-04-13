@@ -86,14 +86,26 @@ export function AIAgentCreator({ universeId, onClose, onCreated }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Create AI Agent"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Bot className="h-5 w-5 text-cyan-400" />
             Create AI Agent
           </h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+          <button onClick={onClose} className="text-zinc-400 hover:text-white" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>

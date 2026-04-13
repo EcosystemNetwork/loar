@@ -25,6 +25,7 @@ import {
   assertMintEligible,
 } from './entities.handlers';
 import { geminiService } from '../../services/gemini';
+import { db } from '../../lib/firebase';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
 
@@ -122,10 +123,11 @@ export const entitiesRouter = router({
       z.object({
         creator: z.string().min(1),
         kind: entityKindSchema.optional(),
+        limit: z.number().int().positive().max(200).default(100),
       })
     )
     .query(async ({ input }) => {
-      const entities = await getEntitiesByCreator(input.creator, input.kind);
+      const entities = await getEntitiesByCreator(input.creator, input.kind, input.limit);
       return { entities, total: entities.length };
     }),
 
@@ -136,10 +138,11 @@ export const entitiesRouter = router({
         parentId: z.string().min(1),
         /** @deprecated No longer needed — kept for backwards compatibility. */
         universeAddress: ethereumAddress.optional(),
+        limit: z.number().int().positive().max(200).default(100),
       })
     )
     .query(async ({ input }) => {
-      const children = await getChildEntities(input.parentId);
+      const children = await getChildEntities(input.parentId, input.limit);
       return { children, total: children.length };
     }),
 
@@ -170,16 +173,13 @@ export const entitiesRouter = router({
         throw new Error('Forbidden: only the entity creator can update it');
       }
       const { entityId, universeAddress: _unused, ...updates } = input;
-      const entity = await updateEntity(entityId, {
-        ...updates,
-        parentId: updates.parentId ?? undefined,
-        imageUrl: updates.imageUrl ?? undefined,
-      });
+      const entity = await updateEntity(entityId, updates);
       return { success: true, data: entity };
     }),
 
   /** Delete an entity. Only the creator can delete. Fails if it has children. */
   delete: protectedProcedure
+    .use(requirePermission('entities.update'))
     .input(
       z.object({
         entityId: z.string().min(1),
@@ -197,8 +197,9 @@ export const entitiesRouter = router({
       return { success: true };
     }),
 
-  /** Associate an on-chain node ID with this entity. */
+  /** Associate an on-chain node ID with this entity. Only the creator can do this. */
   addNode: protectedProcedure
+    .use(requirePermission('entities.update'))
     .input(
       z.object({
         entityId: z.string().min(1),
@@ -207,13 +208,19 @@ export const entitiesRouter = router({
         universeAddress: ethereumAddress.optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can modify node associations');
+      }
       const entity = await addNodeToEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
     }),
 
-  /** Remove an on-chain node ID from this entity. */
+  /** Remove an on-chain node ID from this entity. Only the creator can do this. */
   removeNode: protectedProcedure
+    .use(requirePermission('entities.update'))
     .input(
       z.object({
         entityId: z.string().min(1),
@@ -222,7 +229,12 @@ export const entitiesRouter = router({
         universeAddress: ethereumAddress.optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can modify node associations');
+      }
       const entity = await removeNodeFromEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
     }),
@@ -253,7 +265,30 @@ export const entitiesRouter = router({
         hint: z.string().max(1000).default(''),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Rate-limit: max 20 profile generations per user per hour
+      if (db) {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const recentCount = await db
+          .collection('profileGenerations')
+          .where('userId', '==', ctx.user.uid)
+          .where('createdAt', '>=', oneHourAgo)
+          .count()
+          .get();
+        if (recentCount.data().count >= 20) {
+          throw new Error(
+            'Rate limit exceeded: max 20 AI profile generations per hour. Please wait before trying again.'
+          );
+        }
+        // Track this generation
+        await db.collection('profileGenerations').add({
+          userId: ctx.user.uid,
+          name: input.name,
+          kind: input.kind,
+          createdAt: new Date(),
+        });
+      }
+
       const profile = await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
       return profile;
     }),

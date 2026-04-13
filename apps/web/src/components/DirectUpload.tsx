@@ -175,6 +175,8 @@ export function DirectUpload({
         });
 
         const previewUrl = URL.createObjectURL(file);
+        // Revoke after a delay to allow the parent to copy/use the URL
+        setTimeout(() => URL.revokeObjectURL(previewUrl), 60000);
         onUploadComplete(result.manifest, previewUrl);
 
         toast.success('Upload complete!', {
@@ -283,7 +285,10 @@ export function DirectUpload({
           </svg>
           <p className="text-sm text-muted-foreground">{label}</p>
           <p className="text-xs text-muted-foreground">
-            {acceptedTypes.map((t) => t.split('/')[1]).join(', ')} up to {maxSizeMB}MB
+            {acceptedTypes
+              .map((t) => (t.includes('/') ? t.split('/')[1] : t.replace('.', '')))
+              .join(', ')}{' '}
+            up to {maxSizeMB}MB
           </p>
         </div>
       )}

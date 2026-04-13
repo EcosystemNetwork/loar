@@ -30,6 +30,11 @@ const profilesCol = () => {
   return db.collection('profiles');
 };
 
+const likesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('likes');
+};
+
 export const socialRouter = router({
   // ── Follows ──────────────────────────────────────────────────────────
 
@@ -340,4 +345,50 @@ export const socialRouter = router({
 
     return { count: snapshot.data().count };
   }),
+
+  // ── Likes ─────────────────────────────────────────────────────────────
+
+  /** Like a content item (listing, entity, etc.) */
+  like: protectedProcedure
+    .input(z.object({ targetId: z.string(), targetType: z.enum(['listing', 'entity', 'content']) }))
+    .mutation(async ({ ctx, input }) => {
+      const docId = `${ctx.user.uid}_${input.targetId}`;
+      const existing = await likesCol().doc(docId).get();
+      if (existing.exists) return { ok: true, alreadyLiked: true };
+
+      await likesCol().doc(docId).set({
+        uid: ctx.user.uid,
+        targetId: input.targetId,
+        targetType: input.targetType,
+        createdAt: new Date(),
+      });
+
+      return { ok: true };
+    }),
+
+  /** Unlike a content item */
+  unlike: protectedProcedure
+    .input(z.object({ targetId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const docId = `${ctx.user.uid}_${input.targetId}`;
+      await likesCol().doc(docId).delete();
+      return { ok: true };
+    }),
+
+  /** Check if current user has liked a target */
+  isLiked: protectedProcedure
+    .input(z.object({ targetId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const docId = `${ctx.user.uid}_${input.targetId}`;
+      const doc = await likesCol().doc(docId).get();
+      return { liked: doc.exists };
+    }),
+
+  /** Get like count for a target */
+  getLikeCount: publicProcedure
+    .input(z.object({ targetId: z.string() }))
+    .query(async ({ input }) => {
+      const snapshot = await likesCol().where('targetId', '==', input.targetId).count().get();
+      return { count: snapshot.data().count };
+    }),
 });

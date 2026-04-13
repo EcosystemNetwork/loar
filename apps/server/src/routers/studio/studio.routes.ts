@@ -40,6 +40,7 @@
  *   studio.estimatePackCost   — Pre-flight cost for a capability set
  */
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -152,10 +153,11 @@ async function refundCredits(userId: string, credits: number): Promise<void> {
   if (credits <= 0) return;
   const ref = db.collection('userCredits').doc(userId);
   try {
-    const doc = await ref.get();
-    if (doc.exists) {
-      await ref.update({ balance: (doc.data()?.balance || 0) + credits, updatedAt: new Date() });
-    }
+    await ref.update({
+      balance: FieldValue.increment(credits),
+      totalSpent: FieldValue.increment(-credits),
+      updatedAt: new Date(),
+    });
   } catch (err) {
     console.error(`CRITICAL: Studio pack credit refund failed for ${userId}:`, err);
   }
@@ -259,16 +261,16 @@ async function runVideoTask(
   }
 }
 
-async function runSoundTask(
-  capability: Capability,
-  prompt: string
-): Promise<TaskResult> {
+async function runSoundTask(capability: Capability, prompt: string): Promise<TaskResult> {
   const modality = 'voice';
   const creditsUsed = toCredits(CAPABILITY_COST_USD[capability]);
 
   try {
     const result = await elevenLabsService.soundEffect({ text: prompt, durationSeconds: 3 });
-    const key = await firebaseStorageService.upload(result.audioBuffer, `studio-sfx-${randomUUID()}.mp3`);
+    const key = await firebaseStorageService.upload(
+      result.audioBuffer,
+      `studio-sfx-${randomUUID()}.mp3`
+    );
     const url = firebaseStorageService.getPublicUrl(key);
 
     return { capability, status: 'completed', modality, urls: [url], creditsUsed };
@@ -293,7 +295,10 @@ async function runVoiceTask(
 
   try {
     const result = await elevenLabsService.textToSpeech({ text, voiceId });
-    const key = await firebaseStorageService.upload(result.audioBuffer, `studio-tts-${randomUUID()}.mp3`);
+    const key = await firebaseStorageService.upload(
+      result.audioBuffer,
+      `studio-tts-${randomUUID()}.mp3`
+    );
     const url = firebaseStorageService.getPublicUrl(key);
 
     return { capability, status: 'completed', modality, urls: [url], creditsUsed };
@@ -433,6 +438,14 @@ export const studioRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify entity exists before charging
+      const entityDoc = await db.collection('entities').doc(input.entityId).get();
+      if (!entityDoc.exists) {
+        throw new Error(
+          `Entity "${input.entityId}" not found. Cannot create asset pack for a non-existent entity.`
+        );
+      }
+
       const jobId = randomUUID();
 
       // Estimate total credits upfront
@@ -443,29 +456,33 @@ export const studioRouter = router({
       const totalCredits = toCredits(totalProviderCost);
 
       // Create job record
-      await studioJobsCol().doc(jobId).set({
-        id: jobId,
-        userId: ctx.user.uid,
-        entityId: input.entityId,
-        entityKind: input.entityKind,
-        entityName: input.entityName,
-        capabilities: input.capabilities,
-        status: 'running',
-        totalCreditsCharged: totalCredits,
-        totalFiatPriceUsd: withFiat(totalProviderCost),
-        tasks: [],
-        createdAt: new Date(),
-      });
+      await studioJobsCol()
+        .doc(jobId)
+        .set({
+          id: jobId,
+          userId: ctx.user.uid,
+          entityId: input.entityId,
+          entityKind: input.entityKind,
+          entityName: input.entityName,
+          capabilities: input.capabilities,
+          status: 'running',
+          totalCreditsCharged: totalCredits,
+          totalFiatPriceUsd: withFiat(totalProviderCost),
+          tasks: [],
+          createdAt: new Date(),
+        });
 
       // Deduct credits upfront
       try {
         await deductCredits(ctx.user.uid, totalCredits);
       } catch (err) {
-        await studioJobsCol().doc(jobId).update({
-          status: 'failed',
-          failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
-          completedAt: new Date(),
-        });
+        await studioJobsCol()
+          .doc(jobId)
+          .update({
+            status: 'failed',
+            failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
+            completedAt: new Date(),
+          });
         throw err;
       }
 
@@ -565,8 +582,7 @@ async function runPackJob(
 
       case 'voice': {
         const text =
-          input.voiceText ||
-          `${input.entityName}. ${input.entityDescription.slice(0, 150)}`;
+          input.voiceText || `${input.entityName}. ${input.entityDescription.slice(0, 150)}`;
         const voiceId = input.voiceId || 'pNInz6obpgDQGcFmaJgB'; // default ElevenLabs Adam
         result = await runVoiceTask(capability, text, voiceId);
         break;
@@ -618,9 +634,14 @@ async function runPackJob(
           studioJobId: jobId,
           contentHash: '',
           originalFilename: url.split('/').pop() || capability,
-          mimeType: result.modality === 'video' ? 'video/mp4' :
-                    result.modality === 'voice' ? 'audio/mpeg' :
-                    result.modality === '3d' ? 'model/gltf-binary' : 'image/jpeg',
+          mimeType:
+            result.modality === 'video'
+              ? 'video/mp4'
+              : result.modality === 'voice'
+                ? 'audio/mpeg'
+                : result.modality === '3d'
+                  ? 'model/gltf-binary'
+                  : 'image/jpeg',
           size: 0,
           createdAt: new Date(),
         });
@@ -644,16 +665,17 @@ async function runPackJob(
 
   const completedCount = results.filter((r) => r.status === 'completed').length;
   const jobStatus =
-    completedCount === 0 ? 'failed' :
-    completedCount < results.length ? 'partial' : 'completed';
+    completedCount === 0 ? 'failed' : completedCount < results.length ? 'partial' : 'completed';
 
   trackQuests(userId, [{ questId: 'first_studio_pack' }]);
 
-  await studioJobsCol().doc(jobId).update({
-    status: jobStatus,
-    tasks: results,
-    totalCreditsActuallyUsed: creditsActuallyUsed,
-    totalCreditsRefunded: creditsToRefund > 0 ? creditsToRefund : 0,
-    completedAt: new Date(),
-  });
+  await studioJobsCol()
+    .doc(jobId)
+    .update({
+      status: jobStatus,
+      tasks: results,
+      totalCreditsActuallyUsed: creditsActuallyUsed,
+      totalCreditsRefunded: creditsToRefund > 0 ? creditsToRefund : 0,
+      completedAt: new Date(),
+    });
 }

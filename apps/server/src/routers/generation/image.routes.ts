@@ -31,6 +31,7 @@ import { falService } from '../../services/fal';
 import { db } from '../../lib/firebase';
 import { geminiService } from '../../services/gemini';
 import { wrapError } from '../../lib/errors';
+import { FieldValue } from 'firebase-admin/firestore';
 import {
   routeImageModel,
   validateImageModelSelection,
@@ -41,6 +42,7 @@ import {
   IMAGE_MODELS,
 } from '../../services/image-models';
 import { trackQuests } from '../../services/quest-tracker';
+import { createAttachment } from '../media/media.handlers';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
 
 // ── Collections ───────────────────────────────────────────────────────
@@ -132,6 +134,46 @@ async function attemptFallback(
     }
   }
   return null;
+}
+
+// ── Auto-attach helper ───────────────────────────────────────────────
+
+async function autoAttachImages(opts: {
+  creator: string;
+  entityId: string | undefined;
+  generationId: string;
+  imageUrls: string[];
+  prompt: string;
+}) {
+  if (!opts.entityId) return;
+
+  let targetName = '';
+  try {
+    const entityDoc = await db.collection('entities').doc(opts.entityId).get();
+    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+  } catch {
+    // Best-effort
+  }
+
+  for (let i = 0; i < opts.imageUrls.length; i++) {
+    try {
+      await createAttachment(opts.creator, {
+        contentHash: `gen:${opts.generationId}:img${i}`,
+        originalFilename: `generation-${opts.generationId}-${i}.png`,
+        mimeType: 'image/png',
+        size: 0,
+        url: opts.imageUrls[i],
+        targetType: 'entity',
+        targetId: opts.entityId,
+        targetName,
+        category: 'image',
+        label: opts.prompt.slice(0, 80),
+        generationId: opts.generationId,
+      });
+    } catch (err) {
+      console.error(`Failed to auto-attach image ${i}:`, err);
+    }
+  }
 }
 
 // ── Router ────────────────────────────────────────────────────────────
@@ -283,6 +325,15 @@ export const imageRouter = router({
                 latencyMs,
                 completedAt: new Date(),
               });
+              // Auto-attach fallback images to entity
+              autoAttachImages({
+                creator: ctx.user.uid,
+                entityId: input.entityId,
+                generationId: genId,
+                imageUrls: fallback.imageUrls,
+                prompt: input.prompt,
+              });
+
               return {
                 generationId: genId,
                 status: 'completed' as const,
@@ -300,15 +351,28 @@ export const imageRouter = router({
             }
           }
 
-          await imageGenerationsCol()
-            .doc(genId)
-            .update({
-              status: 'failed',
-              failureReason: result.error || 'Image generation failed',
-              latencyMs: Date.now() - startTime,
-              completedAt: new Date(),
+          // All generation paths failed — refund and report failure
+          const failLatencyMs = Date.now() - startTime;
+          const failReason = result.error || 'Image generation failed';
+
+          try {
+            await userCreditsRef.update({
+              balance: FieldValue.increment(totalCredits),
+              totalSpent: FieldValue.increment(-totalCredits),
+              updatedAt: new Date(),
             });
-          throw new Error(result.error || 'Image generation failed');
+          } catch (refundErr) {
+            console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
+          }
+
+          await imageGenerationsCol().doc(genId).update({
+            status: 'failed',
+            creditsRefunded: true,
+            failureReason: failReason,
+            latencyMs: failLatencyMs,
+            completedAt: new Date(),
+          });
+          throw new Error(failReason);
         }
 
         markImageProviderHealthy(model.provider);
@@ -330,6 +394,15 @@ export const imageRouter = router({
           completedAt: new Date(),
         });
 
+        // Auto-attach images to entity
+        autoAttachImages({
+          creator: ctx.user.uid,
+          entityId: input.entityId,
+          generationId: genId,
+          imageUrls,
+          prompt: input.prompt,
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
@@ -347,25 +420,29 @@ export const imageRouter = router({
         const latencyMs = Date.now() - startTime;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        // Refund credits
-        try {
-          const refundDoc = await userCreditsRef.get();
-          if (refundDoc.exists) {
+        // Check durable refund flag — skip if already refunded by inline failure path
+        const genDoc = await imageGenerationsCol().doc(genId).get();
+        const alreadyRefunded = genDoc.exists && genDoc.data()?.creditsRefunded === true;
+
+        if (!alreadyRefunded) {
+          try {
             await userCreditsRef.update({
-              balance: (refundDoc.data()?.balance || 0) + totalCredits,
+              balance: FieldValue.increment(totalCredits),
+              totalSpent: FieldValue.increment(-totalCredits),
               updatedAt: new Date(),
             });
+          } catch (refundErr) {
+            console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
           }
-        } catch (refundErr) {
-          console.error(`CRITICAL: Image credit refund failed for ${ctx.user.uid}:`, refundErr);
-        }
 
-        await imageGenerationsCol().doc(genId).update({
-          status: 'failed',
-          failureReason: errorMessage,
-          latencyMs,
-          completedAt: new Date(),
-        });
+          await imageGenerationsCol().doc(genId).update({
+            status: 'failed',
+            creditsRefunded: true,
+            failureReason: errorMessage,
+            latencyMs,
+            completedAt: new Date(),
+          });
+        }
         throw error;
       }
     }),

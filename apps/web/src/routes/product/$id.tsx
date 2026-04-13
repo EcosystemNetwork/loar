@@ -23,11 +23,12 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { trpcClient } from '@/utils/trpc';
+import { trpc, trpcClient } from '@/utils/trpc';
 import { useWriteContract, useSendTransaction } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { BuyNFTDialog } from '@/components/BuyNFTDialog';
 import { useVocab } from '@/hooks/use-vocab';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -67,6 +68,59 @@ function ProductDetailPage() {
   const [showNftBuy, setShowNftBuy] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
+  const queryClient = useQueryClient();
+
+  // Like system
+  const { data: likedData } = useQuery(
+    trpc.social.isLiked.queryOptions({ targetId: id }, { enabled: isConnected })
+  );
+  const { data: likeCountData } = useQuery(trpc.social.getLikeCount.queryOptions({ targetId: id }));
+  const isLiked = likedData?.liked ?? false;
+  const likeCount = likeCountData?.count ?? 0;
+
+  const likeMutation = useMutation(
+    trpc.social.like.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [['social', 'isLiked']] });
+        queryClient.invalidateQueries({ queryKey: [['social', 'getLikeCount']] });
+      },
+    })
+  );
+  const unlikeMutation = useMutation(
+    trpc.social.unlike.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [['social', 'isLiked']] });
+        queryClient.invalidateQueries({ queryKey: [['social', 'getLikeCount']] });
+      },
+    })
+  );
+
+  function handleLike() {
+    if (!isConnected) {
+      toast.error('Connect your wallet to like items');
+      return;
+    }
+    if (isLiked) {
+      unlikeMutation.mutate({ targetId: id });
+    } else {
+      likeMutation.mutate({ targetId: id, targetType: 'listing' });
+    }
+  }
+
+  async function handleShare() {
+    const url = window.location.href;
+    const title = listing ? (listing as any).title : 'Check this out on LOAR';
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // User cancelled share — ignore
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied to clipboard');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -170,7 +224,7 @@ function ProductDetailPage() {
           </Button>
         </button>
         <span className="font-semibold truncate flex-1">{l.title}</span>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare}>
           <Share2 className="w-4 h-4" />
         </Button>
       </div>
@@ -204,8 +258,17 @@ function ProductDetailPage() {
         <div>
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-xl font-bold leading-tight">{l.title}</h1>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <Heart className="w-4 h-4" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={handleLike}
+              disabled={likeMutation.isPending || unlikeMutation.isPending}
+            >
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+              {likeCount > 0 && (
+                <span className="text-xs text-muted-foreground ml-0.5">{likeCount}</span>
+              )}
             </Button>
           </div>
           <div className="flex flex-wrap gap-2 mt-2">

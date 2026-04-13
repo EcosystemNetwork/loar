@@ -28,6 +28,8 @@ import {
   markProviderHealthy,
 } from '../../services/video-models';
 import { trackQuests, trackModelUsage } from '../../services/quest-tracker';
+import { FieldValue } from 'firebase-admin/firestore';
+import { createAttachment } from '../media/media.handlers';
 import type {
   VideoGenerationRecord,
   RoutingMode,
@@ -61,6 +63,7 @@ const generateInputSchema = z.object({
   routingMode: routingModeSchema.default('auto'),
   selectedModelId: z.string().optional(),
   allowFallback: z.boolean().default(true),
+  entityId: z.string().optional(),
   universeId: z.string().optional(),
 
   // Model-specific optional params
@@ -111,6 +114,44 @@ async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void
       createdAt: record.createdAt,
       completedAt: record.completedAt || null,
     });
+}
+
+// ── Auto-attach helper ───────────────────────────────────────────────
+
+async function autoAttachVideo(opts: {
+  creator: string;
+  entityId: string | undefined;
+  generationId: string;
+  videoUrl: string;
+  prompt: string;
+}) {
+  if (!opts.entityId) return;
+
+  let targetName = '';
+  try {
+    const entityDoc = await db.collection('entities').doc(opts.entityId).get();
+    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+  } catch {
+    // Best-effort
+  }
+
+  try {
+    await createAttachment(opts.creator, {
+      contentHash: `gen:${opts.generationId}:video`,
+      originalFilename: `generation-${opts.generationId}.mp4`,
+      mimeType: 'video/mp4',
+      size: 0,
+      url: opts.videoUrl,
+      targetType: 'entity',
+      targetId: opts.entityId,
+      targetName,
+      category: 'video',
+      label: opts.prompt.slice(0, 80),
+      generationId: opts.generationId,
+    });
+  } catch (err) {
+    console.error('Failed to auto-attach video:', err);
+  }
 }
 
 // ── Router ────────────────────────────────────────────────────────────
@@ -262,6 +303,9 @@ export const generationRouter = router({
       const generationId = randomUUID();
       const startTime = Date.now();
 
+      // Preserve the user's original prompt before universe config modifies it
+      const originalPrompt = input.prompt;
+
       // ── Universe Gen Config enforcement ─────────────────────────────
       let genConfig: any = null;
       if (input.universeId && db) {
@@ -389,9 +433,10 @@ export const generationRouter = router({
       }
 
       // ── Build initial record ────────────────────────────────────────
-      const record: VideoGenerationRecord = {
+      const record: VideoGenerationRecord & { entityId?: string; originalPrompt?: string } = {
         id: generationId,
         userId: ctx.user.uid,
+        entityId: input.entityId,
         universeId: input.universeId,
         routingMode: input.routingMode,
         requestedModelId,
@@ -399,6 +444,7 @@ export const generationRouter = router({
         provider: model.provider,
         status: 'queued',
         prompt: input.prompt,
+        originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
         mode: input.mode,
         durationSec: input.durationSec,
         resolution: input.resolution,
@@ -477,6 +523,15 @@ export const generationRouter = router({
                   completedAt: new Date(),
                 });
 
+              // Auto-attach fallback video to entity
+              autoAttachVideo({
+                creator: ctx.user.uid,
+                entityId: input.entityId,
+                generationId,
+                videoUrl: fallbackResult.videoUrl,
+                prompt: originalPrompt,
+              });
+
               return {
                 generationId,
                 status: 'completed' as const,
@@ -490,6 +545,7 @@ export const generationRouter = router({
                 creditsCharged,
                 fiatPriceUsd,
                 wasFallback: true,
+                originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
               };
             }
           }
@@ -525,6 +581,15 @@ export const generationRouter = router({
           completedAt: new Date(),
         });
 
+        // Auto-attach video to entity
+        autoAttachVideo({
+          creator: ctx.user.uid,
+          entityId: input.entityId,
+          generationId,
+          videoUrl: result.videoUrl,
+          prompt: originalPrompt,
+        });
+
         return {
           generationId,
           status: 'completed' as const,
@@ -536,21 +601,20 @@ export const generationRouter = router({
           creditsCharged,
           fiatPriceUsd,
           wasFallback: false,
+          originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
         };
       } catch (error) {
         const latencyMs = Date.now() - startTime;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        // Refund credits on failure (restore balance only, don't touch totalSpent)
+        // Refund credits atomically on failure
         try {
-          const refundDoc = await userCreditsRef.get();
-          if (refundDoc.exists) {
-            await userCreditsRef.update({
-              balance: (refundDoc.data()?.balance || 0) + creditsCharged,
-              updatedAt: new Date(),
-            });
-            console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
-          }
+          await userCreditsRef.update({
+            balance: FieldValue.increment(creditsCharged),
+            totalSpent: FieldValue.increment(-creditsCharged),
+            updatedAt: new Date(),
+          });
+          console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
         } catch (refundErr) {
           console.error(
             `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
@@ -588,6 +652,7 @@ export const generationRouter = router({
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(20),
+        entityId: z.string().optional(),
         universeId: z.string().optional(),
       })
     )
@@ -597,7 +662,13 @@ export const generationRouter = router({
         .orderBy('createdAt', 'desc')
         .limit(input.limit);
 
-      if (input.universeId) {
+      if (input.entityId) {
+        query = generationsCol()
+          .where('userId', '==', ctx.user.uid)
+          .where('entityId', '==', input.entityId)
+          .orderBy('createdAt', 'desc')
+          .limit(input.limit);
+      } else if (input.universeId) {
         query = generationsCol()
           .where('userId', '==', ctx.user.uid)
           .where('universeId', '==', input.universeId)

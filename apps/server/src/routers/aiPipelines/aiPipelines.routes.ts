@@ -217,7 +217,11 @@ export const aiPipelinesRouter = router({
     .query(async ({ input, ctx }) => {
       const doc = await pipelineRunsCol().doc(input.runId).get();
       if (!doc.exists) return null;
-      return { id: doc.id, ...doc.data() };
+      const data = doc.data();
+      if (data?.userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your pipeline run' });
+      }
+      return { id: doc.id, ...data };
     }),
 
   listRuns: protectedProcedure
@@ -227,9 +231,10 @@ export const aiPipelinesRouter = router({
         limit: z.number().min(1).max(50).default(20),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const snapshot = await pipelineRunsCol()
         .where('pipelineId', '==', input.pipelineId)
+        .where('userId', '==', ctx.user.uid)
         .orderBy('startedAt', 'desc')
         .limit(input.limit)
         .get();

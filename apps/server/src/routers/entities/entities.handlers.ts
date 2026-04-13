@@ -160,31 +160,49 @@ export async function getEntitiesByKind(kind: EntityKind, limit = 100): Promise<
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
-export async function getEntitiesByCreator(creator: string, kind?: EntityKind): Promise<Entity[]> {
+export async function getEntitiesByCreator(
+  creator: string,
+  kind?: EntityKind,
+  limit = 100
+): Promise<Entity[]> {
   let query: FirebaseFirestore.Query = entitiesCol()
     .where('creator', '==', creator)
-    .orderBy('createdAt', 'desc');
+    .orderBy('createdAt', 'desc')
+    .limit(limit);
 
   if (kind) {
     query = entitiesCol()
       .where('creator', '==', creator)
       .where('kind', '==', kind)
-      .orderBy('createdAt', 'desc');
+      .orderBy('createdAt', 'desc')
+      .limit(limit);
   }
 
   const snapshot = await query.get();
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
-export async function getChildEntities(parentId: string): Promise<Entity[]>;
+export async function getChildEntities(parentId: string, limit?: number): Promise<Entity[]>;
 /** @deprecated universeAddress no longer needed */
 export async function getChildEntities(
   universeAddress: string,
   parentId: string
 ): Promise<Entity[]>;
-export async function getChildEntities(first: string, second?: string): Promise<Entity[]> {
-  const parentId = second ?? first;
-  const snapshot = await entitiesCol().where('parentId', '==', parentId).orderBy('createdAt').get();
+export async function getChildEntities(first: string, second?: string | number): Promise<Entity[]> {
+  let parentId: string;
+  let limit = 100;
+  if (typeof second === 'string') {
+    // Legacy: getChildEntities(universeAddress, parentId)
+    parentId = second;
+  } else {
+    parentId = first;
+    if (typeof second === 'number') limit = second;
+  }
+  const snapshot = await entitiesCol()
+    .where('parentId', '==', parentId)
+    .orderBy('createdAt')
+    .limit(limit)
+    .get();
 
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }

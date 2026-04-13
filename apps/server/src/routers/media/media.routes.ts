@@ -6,6 +6,14 @@
  *   - universe  — a deployed Universe contract address
  *   - entity    — any worldbuilding entity (person, place, thing, etc.)
  *
+ * Attachments support:
+ *   - Categories: image, video, music, sound, environment, 3d, texture,
+ *     animation, rig, document, design, other
+ *   - Sub-categories: finer classification (e.g. diffuse/normal for textures)
+ *   - Versioning: track iterations of the same asset
+ *   - Variants: group alternate styles (anime vs realistic, battle armor vs casual)
+ *   - Sort ordering: manual asset arrangement within categories
+ *
  * Attachments are stored in the `mediaAttachments` Firestore collection.
  */
 import { z } from 'zod';
@@ -15,7 +23,9 @@ import {
   createAttachment,
   getAttachmentsByTarget,
   getAttachmentsByCreator,
+  getVariants,
   updateAttachment,
+  reorderAttachments,
   deleteAttachment,
 } from './media.handlers';
 
@@ -37,6 +47,12 @@ export const mediaRouter = router({
         targetName: z.string(),
         category: mediaCategoryEnum,
         label: z.string(),
+        subCategory: z.string().nullish(),
+        version: z.number().int().positive().optional(),
+        variantOf: z.string().nullish(),
+        variantLabel: z.string().nullish(),
+        sortOrder: z.number().int().optional(),
+        generationId: z.string().nullish(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -76,13 +92,25 @@ export const mediaRouter = router({
       return getAttachmentsByCreator(input.creator);
     }),
 
-  /** Update an attachment's label, category, or re-attach to a different target. */
+  /** Get all variants of a specific attachment. */
+  variants: publicProcedure
+    .input(z.object({ attachmentId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      return getVariants(input.attachmentId);
+    }),
+
+  /** Update an attachment's label, category, variant info, or re-attach to a different target. */
   update: protectedProcedure
     .input(
       z.object({
         id: z.string().min(1),
         category: mediaCategoryEnum.optional(),
         label: z.string().optional(),
+        subCategory: z.string().nullish(),
+        version: z.number().int().positive().optional(),
+        variantOf: z.string().nullish(),
+        variantLabel: z.string().nullish(),
+        sortOrder: z.number().int().optional(),
         targetType: targetTypeEnum.optional(),
         targetId: z.string().optional(),
         targetName: z.string().optional(),
@@ -93,5 +121,25 @@ export const mediaRouter = router({
         throw new Error('Wallet address is required to update media');
       }
       return updateAttachment(ctx.user.address, input);
+    }),
+
+  /** Batch-update sort order for multiple attachments at once. */
+  reorder: protectedProcedure
+    .input(
+      z.object({
+        items: z.array(
+          z.object({
+            id: z.string().min(1),
+            sortOrder: z.number().int(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.address) {
+        throw new Error('Wallet address is required to reorder media');
+      }
+      await reorderAttachments(ctx.user.address, input.items);
+      return { ok: true };
     }),
 });

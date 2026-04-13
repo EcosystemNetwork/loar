@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Workflow, Plus, Trash2, ArrowDown, X, GripVertical } from 'lucide-react';
 
 const AVAILABLE_ACTIONS = [
@@ -58,8 +58,15 @@ export function PipelineBuilder({ aiAgentId, onClose, onCreated }: Props) {
     },
   ]);
 
+  const stepCounter = useRef(1);
+  const [configInputs, setConfigInputs] = useState<Record<number, { key: string; val: string }>>(
+    {}
+  );
+  const [mapInputs, setMapInputs] = useState<Record<number, { key: string; val: string }>>({});
+
   const addStep = () => {
-    const stepNum = steps.length + 1;
+    stepCounter.current += 1;
+    const stepNum = stepCounter.current;
     setSteps((prev) => [
       ...prev,
       {
@@ -128,14 +135,26 @@ export function PipelineBuilder({ aiAgentId, onClose, onCreated }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Build Pipeline"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Workflow className="h-5 w-5 text-cyan-400" />
             Build Pipeline
           </h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+          <button onClick={onClose} className="text-zinc-400 hover:text-white" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -198,27 +217,34 @@ export function PipelineBuilder({ aiAgentId, onClose, onCreated }: Props) {
                       <Input
                         placeholder="key"
                         className="w-24 text-xs"
-                        id={`config-key-${index}`}
+                        value={configInputs[index]?.key ?? ''}
+                        onChange={(e) =>
+                          setConfigInputs((prev) => ({
+                            ...prev,
+                            [index]: { key: e.target.value, val: prev[index]?.val ?? '' },
+                          }))
+                        }
                       />
                       <Input
                         placeholder="value"
                         className="flex-1 text-xs"
-                        id={`config-val-${index}`}
+                        value={configInputs[index]?.val ?? ''}
+                        onChange={(e) =>
+                          setConfigInputs((prev) => ({
+                            ...prev,
+                            [index]: { key: prev[index]?.key ?? '', val: e.target.value },
+                          }))
+                        }
                       />
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const keyEl = document.getElementById(
-                            `config-key-${index}`
-                          ) as HTMLInputElement;
-                          const valEl = document.getElementById(
-                            `config-val-${index}`
-                          ) as HTMLInputElement;
-                          if (keyEl?.value && valEl?.value) {
-                            addConfigField(index, keyEl.value, valEl.value);
-                            keyEl.value = '';
-                            valEl.value = '';
+                          const key = configInputs[index]?.key;
+                          const val = configInputs[index]?.val;
+                          if (key && val) {
+                            addConfigField(index, key, val);
+                            setConfigInputs((prev) => ({ ...prev, [index]: { key: '', val: '' } }));
                           }
                         }}
                       >
@@ -246,27 +272,34 @@ export function PipelineBuilder({ aiAgentId, onClose, onCreated }: Props) {
                         <Input
                           placeholder="param"
                           className="w-24 text-xs"
-                          id={`map-key-${index}`}
+                          value={mapInputs[index]?.key ?? ''}
+                          onChange={(e) =>
+                            setMapInputs((prev) => ({
+                              ...prev,
+                              [index]: { key: e.target.value, val: prev[index]?.val ?? '' },
+                            }))
+                          }
                         />
                         <Input
                           placeholder="step_1.id"
                           className="flex-1 text-xs"
-                          id={`map-val-${index}`}
+                          value={mapInputs[index]?.val ?? ''}
+                          onChange={(e) =>
+                            setMapInputs((prev) => ({
+                              ...prev,
+                              [index]: { key: prev[index]?.key ?? '', val: e.target.value },
+                            }))
+                          }
                         />
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            const keyEl = document.getElementById(
-                              `map-key-${index}`
-                            ) as HTMLInputElement;
-                            const valEl = document.getElementById(
-                              `map-val-${index}`
-                            ) as HTMLInputElement;
-                            if (keyEl?.value && valEl?.value) {
-                              addInputMapping(index, keyEl.value, valEl.value);
-                              keyEl.value = '';
-                              valEl.value = '';
+                            const key = mapInputs[index]?.key;
+                            const val = mapInputs[index]?.val;
+                            if (key && val) {
+                              addInputMapping(index, key, val);
+                              setMapInputs((prev) => ({ ...prev, [index]: { key: '', val: '' } }));
                             }
                           }}
                         >

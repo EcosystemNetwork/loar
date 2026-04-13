@@ -8,6 +8,9 @@ export type MediaCategory =
   | 'sound'
   | 'environment'
   | '3d'
+  | 'texture'
+  | 'animation'
+  | 'rig'
   | 'document'
   | 'design'
   | 'other';
@@ -26,6 +29,12 @@ export interface MediaAttachment {
   targetName: string;
   category: MediaCategory;
   label: string;
+  subCategory: string | null;
+  version: number;
+  variantOf: string | null;
+  variantLabel: string | null;
+  sortOrder: number;
+  generationId: string | null;
   creator: string;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +45,14 @@ export function useMediaAttachments(targetType: AttachmentTargetType, targetId: 
     queryKey: ['mediaAttachments', targetType, targetId],
     queryFn: () => trpcClient.media.listByTarget.query({ targetType, targetId }),
     enabled: !!targetId,
+  });
+}
+
+export function useMediaVariants(attachmentId: string | null) {
+  return useQuery({
+    queryKey: ['mediaVariants', attachmentId],
+    queryFn: () => trpcClient.media.variants.query({ attachmentId: attachmentId! }),
+    enabled: !!attachmentId,
   });
 }
 
@@ -53,6 +70,12 @@ export function useAttachMedia() {
       targetName: string;
       category: MediaCategory;
       label: string;
+      subCategory?: string | null;
+      version?: number;
+      variantOf?: string | null;
+      variantLabel?: string | null;
+      sortOrder?: number;
+      generationId?: string | null;
     }) => trpcClient.media.attach.mutate(input),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['mediaAttachments', vars.targetType, vars.targetId] });
@@ -78,6 +101,11 @@ export function useUpdateMediaAttachment() {
       id: string;
       category?: MediaCategory;
       label?: string;
+      subCategory?: string | null;
+      version?: number;
+      variantOf?: string | null;
+      variantLabel?: string | null;
+      sortOrder?: number;
       targetType?: AttachmentTargetType;
       targetId?: string;
       targetName?: string;
@@ -86,4 +114,52 @@ export function useUpdateMediaAttachment() {
       qc.invalidateQueries({ queryKey: ['mediaAttachments'] });
     },
   });
+}
+
+export function useReorderMedia() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { items: { id: string; sortOrder: number }[] }) =>
+      trpcClient.media.reorder.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mediaAttachments'] });
+    },
+  });
+}
+
+/** Group attachments by category, respecting sortOrder within each group. */
+export function groupByCategory(attachments: MediaAttachment[]) {
+  const groups: Partial<Record<MediaCategory, MediaAttachment[]>> = {};
+  for (const att of attachments) {
+    if (!groups[att.category]) groups[att.category] = [];
+    groups[att.category]!.push(att);
+  }
+  // Sort within each category by sortOrder, then by createdAt desc
+  for (const items of Object.values(groups)) {
+    items!.sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
+  return groups;
+}
+
+/** Group attachments that share a variantOf chain (variants of the same base asset). */
+export function groupByVariant(attachments: MediaAttachment[]) {
+  const roots: MediaAttachment[] = [];
+  const variantMap = new Map<string, MediaAttachment[]>();
+
+  for (const att of attachments) {
+    if (att.variantOf) {
+      if (!variantMap.has(att.variantOf)) variantMap.set(att.variantOf, []);
+      variantMap.get(att.variantOf)!.push(att);
+    } else {
+      roots.push(att);
+    }
+  }
+
+  return roots.map((root) => ({
+    root,
+    variants: variantMap.get(root.id) ?? [],
+  }));
 }
