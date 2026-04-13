@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { useChainId, useAccount } from 'wagmi';
 import { getExplorerAddressUrl } from '@/configs/chains';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 export const Route = createFileRoute('/tokens/')({
   component: TokenLaunchpad,
@@ -311,9 +312,10 @@ function TokenLaunchpad() {
                               )}
                             </div>
                             <div className="flex items-center justify-between mt-0.5">
-                              <span className="font-mono text-[10px] text-muted-foreground">
-                                {swap.sender.slice(0, 6)}...{swap.sender.slice(-4)}
-                              </span>
+                              <AddressDisplay
+                                address={swap.sender}
+                                className="text-[10px] text-muted-foreground"
+                              />
                               <span className="text-[10px] text-muted-foreground">
                                 {timeAgo(swap.timestamp)}
                               </span>

@@ -9,6 +9,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
+import { useActiveAccount } from 'thirdweb/react';
 
 const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
@@ -220,7 +221,12 @@ async function verifySignature(
 // ── React hook ──────────────────────────────────────────────────
 
 export function useWalletAuth() {
-  const { address, isConnected, chain } = useAccount();
+  const { address: wagmiAddress, isConnected: wagmiConnected, chain } = useAccount();
+  const thirdwebAccount = useActiveAccount();
+  // Thirdweb manages wallet connections; wagmi may not have synced yet.
+  // Use thirdweb as fallback source of truth for address and connection state.
+  const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
+  const isConnected = wagmiConnected || !!thirdwebAccount;
   const { signMessageAsync } = useSignMessage();
   const [validated, setValidated] = useState(_sessionValidated);
   const { disconnect } = useDisconnect();

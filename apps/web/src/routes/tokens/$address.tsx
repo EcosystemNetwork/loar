@@ -53,6 +53,8 @@ import { getExplorerAddressUrl } from '@/configs/chains';
 import { openExternal } from '@/utils/open-external';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
+import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 
 export const Route = createFileRoute('/tokens/$address')({
   component: TokenDetailPage,
@@ -464,9 +466,10 @@ function TokenDetailPage() {
                           <span className="font-mono text-[10px]">
                             {priceFromTick(swap.tick).toExponential(2)}
                           </span>
-                          <span className="font-mono text-[10px] text-muted-foreground">
-                            {swap.sender.slice(0, 6)}...{swap.sender.slice(-4)}
-                          </span>
+                          <AddressDisplay
+                            address={swap.sender}
+                            className="text-[10px] text-muted-foreground"
+                          />
                           <span className="text-[10px] text-muted-foreground text-right">
                             {timeAgo(swap.timestamp)}
                           </span>
@@ -556,7 +559,11 @@ function TokenDetailPage() {
                       <User className="h-4 w-4 text-primary/60" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs truncate">{token.deployer}</p>
+                      <AddressDisplay
+                        address={token.deployer}
+                        className="text-xs"
+                        truncate={false}
+                      />
                       <p className="text-[10px] text-muted-foreground">View all tokens</p>
                     </div>
                     <ExternalLink className="h-3 w-3 text-muted-foreground" />
@@ -649,10 +656,10 @@ function TokenDetailPage() {
                       return (
                         <div key={holder.id} className="flex items-center gap-2 text-xs">
                           <span className="w-5 text-muted-foreground text-right">#{i + 1}</span>
-                          <span className="font-mono flex-1 truncate text-[10px]">
-                            {holder.holderAddress.slice(0, 8)}...
-                            {holder.holderAddress.slice(-6)}
-                          </span>
+                          <AddressDisplay
+                            address={holder.holderAddress}
+                            className="flex-1 truncate text-[10px]"
+                          />
                           <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full ${

@@ -15,15 +15,10 @@ import { ConnectButton } from 'thirdweb/react';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { useAccount } from 'wagmi';
 import { thirdwebClient } from '@/lib/thirdweb';
+import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 import { sepolia, baseSepolia, base } from 'thirdweb/chains';
 
 const supportedChains = [sepolia, baseSepolia, base];
-
-/** Truncate address for display: 0x1234...abcd */
-function shortAddr(addr?: string) {
-  if (!addr) return '';
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
 
 interface WalletConnectButtonProps {
   size?: 'sm' | 'lg';
@@ -32,6 +27,8 @@ interface WalletConnectButtonProps {
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
   const { address } = useAccount();
+  const { name: udName, avatar: udAvatar } = useUnstoppableDomain(address);
+  const displayName = formatDisplayName(address, udName);
 
   const wallets = useMemo(
     () => [
@@ -61,12 +58,12 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
         // Without these, thirdweb tries to resolve ENS on mainnet which fails
         // on Sepolia/Base and spams "Failed to resolve" console errors.
         detailsButton={{
-          connectedAccountName: shortAddr(address),
-          connectedAccountAvatarUrl: undefined,
+          connectedAccountName: displayName,
+          connectedAccountAvatarUrl: udAvatar ?? undefined,
         }}
         detailsModal={{
-          connectedAccountName: shortAddr(address),
-          connectedAccountAvatarUrl: undefined,
+          connectedAccountName: displayName,
+          connectedAccountAvatarUrl: udAvatar ?? undefined,
         }}
       />
     </div>

@@ -10,6 +10,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
+import { useIsAutoConnecting } from 'thirdweb/react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +72,7 @@ enum DeploymentStep {
 
 function CinematicUniverseCreate() {
   const { address, isConnected, isAuthenticated, isAuthenticating, signIn } = useWalletAuth();
+  const isAutoConnecting = useIsAutoConnecting();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { switchChain } = useSwitchChain();
@@ -480,6 +482,17 @@ function CinematicUniverseCreate() {
       setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
     }
   };
+
+  // Wait for thirdweb to finish reconnecting the previously-connected wallet
+  // before showing the connect prompt (avoids a flash of "Connect Your Wallet"
+  // when the user is actually already connected).
+  if (isAutoConnecting) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // Not connected state — need at least a wallet for contract calls
   if (!isConnected) {

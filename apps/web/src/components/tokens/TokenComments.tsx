@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useAccount } from 'wagmi';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -245,9 +246,10 @@ function CommentItem({
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {comment.authorAddress.slice(0, 6)}...{comment.authorAddress.slice(-4)}
-            </span>
+            <AddressDisplay
+              address={comment.authorAddress}
+              className="text-[10px] text-muted-foreground"
+            />
             <span className="text-[10px] text-muted-foreground">
               {formatTime(comment.createdAt)}
             </span>
@@ -330,7 +332,10 @@ function CommentItem({
             <div key={reply.id} className="text-xs">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="font-mono text-[10px] text-muted-foreground">
-                  {reply.authorAddress.slice(0, 6)}...{reply.authorAddress.slice(-4)}
+                  <AddressDisplay
+                    address={reply.authorAddress}
+                    className="text-[10px] text-muted-foreground"
+                  />
                 </span>
                 <span className="text-[10px] text-muted-foreground">
                   {formatTime(reply.createdAt)}
