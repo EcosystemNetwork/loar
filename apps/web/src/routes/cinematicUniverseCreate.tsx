@@ -8,7 +8,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAccount, useBalance, useChainId, useWaitForTransactionReceipt } from 'wagmi';
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import { useSwitchNetwork } from '@dynamic-labs/sdk-react-core';
@@ -31,10 +31,20 @@ import {
   PieChart,
   Sliders,
   Info,
+  Upload,
+  Link,
+  X,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { SafeSetup } from '@/components/SafeSetup';
 import { parseEther, decodeEventLog } from 'viem';
@@ -134,9 +144,14 @@ function CinematicUniverseCreate() {
   // Multi-sig Safe state
   const [safeAddress, setSafeAddress] = useState<`0x${string}` | null>(null);
 
-  // Cover image generation state
+  // Cover image state
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverModel, setCoverModel] = useState<string>('fal-ai/nano-banana');
+  const [coverInputMode, setCoverInputMode] = useState<'upload' | 'url' | 'generate'>('upload');
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   // Hooks
   const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } =
@@ -169,7 +184,7 @@ function CinematicUniverseCreate() {
 
       const result = await trpcClient.fal.generateImage.mutate({
         prompt,
-        model: 'fal-ai/nano-banana',
+        model: coverModel as any,
         imageSize: 'landscape_16_9',
       });
 
@@ -199,6 +214,74 @@ function CinematicUniverseCreate() {
     } finally {
       setIsGeneratingCover(false);
     }
+  };
+
+  const handleCoverUpload = useCallback(async (file: File) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload an image file (JPEG, PNG, GIF, WebP, or AVIF)');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image must be under 10MB');
+      return;
+    }
+
+    setIsUploadingCover(true);
+    setUploadProgress(0);
+
+    try {
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const result = await new Promise<{ manifest: { uploads: { url: string }[] } }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          });
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch {
+                reject(new Error('Invalid response'));
+              }
+            } else {
+              try {
+                const err = JSON.parse(xhr.responseText);
+                reject(new Error(err.message || `Upload failed (${xhr.status})`));
+              } catch {
+                reject(new Error(`Upload failed (${xhr.status})`));
+              }
+            }
+          });
+          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.open('POST', `${serverUrl}/api/upload`);
+          xhr.withCredentials = true;
+          xhr.send(formData);
+        }
+      );
+
+      const uploadedUrl = result.manifest.uploads[0]?.url;
+      if (uploadedUrl) {
+        setImageUrl(uploadedUrl);
+        setCoverPreview(URL.createObjectURL(file));
+      }
+    } catch (err) {
+      console.error('Cover upload failed:', err);
+      alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsUploadingCover(false);
+      setUploadProgress(0);
+    }
+  }, []);
+
+  const handleClearCover = () => {
+    setImageUrl('');
+    setCoverPreview(null);
+    if (coverFileRef.current) coverFileRef.current.value = '';
   };
 
   // Watch for transaction success and update deployment step
@@ -529,40 +612,185 @@ function CinematicUniverseCreate() {
                 </div>
 
                 <div>
-                  <Label htmlFor="imageUrl" className="text-sm font-semibold mb-2 block">
-                    Cover Image
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="imageUrl"
-                      placeholder="Enter image URL or generate one"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      disabled={deploymentStep !== DeploymentStep.IDLE}
-                      className="h-11 flex-1"
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleGenerateCover}
-                      disabled={
-                        isGeneratingCover || deploymentStep !== DeploymentStep.IDLE || !universeName
-                      }
-                      variant="outline"
-                      className="h-11"
-                    >
-                      {isGeneratingCover ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Generate
-                        </>
+                  <Label className="text-sm font-semibold mb-2 block">Cover Image</Label>
+
+                  {/* Cover preview */}
+                  {coverPreview && (
+                    <div className="relative mb-2 rounded-lg overflow-hidden border">
+                      <img
+                        src={coverPreview}
+                        alt="Cover preview"
+                        className="w-full h-32 object-cover"
+                      />
+                      {deploymentStep === DeploymentStep.IDLE && (
+                        <button
+                          type="button"
+                          onClick={handleClearCover}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       )}
-                    </Button>
+                    </div>
+                  )}
+
+                  {/* Mode tabs */}
+                  <div className="flex gap-1 mb-2">
+                    {(
+                      [
+                        { key: 'upload', label: 'Upload', icon: Upload },
+                        { key: 'url', label: 'URL', icon: Link },
+                        { key: 'generate', label: 'AI Generate', icon: Sparkles },
+                      ] as const
+                    ).map(({ key, label, icon: Icon }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setCoverInputMode(key)}
+                        disabled={deploymentStep !== DeploymentStep.IDLE}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          coverInputMode === key
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        } disabled:opacity-50`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </button>
+                    ))}
                   </div>
+
+                  {/* Upload mode */}
+                  {coverInputMode === 'upload' && (
+                    <div>
+                      <input
+                        ref={coverFileRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp,image/avif"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleCoverUpload(file);
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+                      <div
+                        onClick={() => !isUploadingCover && coverFileRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files[0];
+                          if (file) handleCoverUpload(file);
+                        }}
+                        className={`cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-colors hover:border-primary/50 ${
+                          isUploadingCover ? 'pointer-events-none opacity-70' : ''
+                        }`}
+                      >
+                        {isUploadingCover ? (
+                          <div className="space-y-2">
+                            <Loader2 className="h-5 w-5 mx-auto animate-spin text-primary" />
+                            <div className="w-full bg-muted rounded-full h-1.5">
+                              <div
+                                className="bg-primary h-1.5 rounded-full transition-all"
+                                style={{ width: `${uploadProgress}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Uploading... {uploadProgress}%
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload className="h-5 w-5 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">
+                              Drop an image or click to browse
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60">
+                              JPEG, PNG, GIF, WebP, AVIF — max 10MB
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* URL mode */}
+                  {coverInputMode === 'url' && (
+                    <Input
+                      placeholder="https://example.com/cover.jpg"
+                      value={imageUrl}
+                      onChange={(e) => {
+                        setImageUrl(e.target.value);
+                        setCoverPreview(e.target.value || null);
+                      }}
+                      disabled={deploymentStep !== DeploymentStep.IDLE}
+                      className="h-11"
+                    />
+                  )}
+
+                  {/* AI Generate mode */}
+                  {coverInputMode === 'generate' && (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Select
+                          value={coverModel}
+                          onValueChange={setCoverModel}
+                          disabled={deploymentStep !== DeploymentStep.IDLE}
+                        >
+                          <SelectTrigger className="h-11 flex-1 text-xs">
+                            <SelectValue placeholder="Select model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fal-ai/nano-banana">Nano Banana</SelectItem>
+                            <SelectItem value="fal-ai/nano-banana-2">Nano Banana 2</SelectItem>
+                            <SelectItem value="fal-ai/nano-banana-pro">Nano Banana Pro</SelectItem>
+                            <SelectItem value="fal-ai/flux/schnell">Flux Schnell</SelectItem>
+                            <SelectItem value="fal-ai/flux/dev">Flux Dev</SelectItem>
+                            <SelectItem value="fal-ai/flux-pro">Flux Pro</SelectItem>
+                            <SelectItem value="fal-ai/flux-pro/v1.1">Flux Pro v1.1</SelectItem>
+                            <SelectItem value="fal-ai/flux-2-pro">Flux 2 Pro</SelectItem>
+                            <SelectItem value="fal-ai/flux-pro/kontext">
+                              Flux Pro Kontext
+                            </SelectItem>
+                            <SelectItem value="fal-ai/recraft/v4/pro/text-to-image">
+                              Recraft v4 Pro
+                            </SelectItem>
+                            <SelectItem value="fal-ai/ideogram/v3/generate">Ideogram v3</SelectItem>
+                            <SelectItem value="fal-ai/wan/v2.7/text-to-image">Wan v2.7</SelectItem>
+                            <SelectItem value="fal-ai/qwen-image">Qwen Image</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          onClick={handleGenerateCover}
+                          disabled={
+                            isGeneratingCover ||
+                            deploymentStep !== DeploymentStep.IDLE ||
+                            !universeName
+                          }
+                          variant="outline"
+                          className="h-11"
+                        >
+                          {isGeneratingCover ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Generate
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {!universeName && (
+                        <p className="text-xs text-muted-foreground">
+                          Enter a universe name above to generate a cover
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
