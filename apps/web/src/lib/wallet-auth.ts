@@ -207,7 +207,7 @@ export function useWalletAuth() {
 
   /** Perform the SIWE sign-in handshake. */
   const signIn = useCallback(async () => {
-    if (!address || !chain) return;
+    if (!address) return;
 
     setIsAuthenticating(true);
     setError(null);
@@ -218,7 +218,7 @@ export function useWalletAuth() {
       const message = buildSiweMessage({
         address,
         nonce,
-        chainId: chain.id,
+        chainId: chain?.id ?? 1,
       });
       const signature = await signMessageAsync({ message });
       const result = await verifySignature(message, signature);
@@ -235,7 +235,7 @@ export function useWalletAuth() {
     } finally {
       setIsAuthenticating(false);
     }
-  }, [address, chain, signMessageAsync]);
+  }, [address, chain?.id, signMessageAsync]);
 
   /** Disconnect wallet, revoke JWT server-side, and clear SIWE session. */
   const signOut = useCallback(() => {
@@ -265,7 +265,6 @@ export function useWalletAuth() {
     if (
       isConnected &&
       address &&
-      chain &&
       !storedAddress &&
       !isAuthenticating &&
       !rejectedRef.current &&
@@ -273,7 +272,7 @@ export function useWalletAuth() {
     ) {
       signIn();
     }
-  }, [isConnected, address, chain, storedAddress, isAuthenticating, signIn]);
+  }, [isConnected, address, storedAddress, isAuthenticating, signIn]);
 
   return {
     address,
