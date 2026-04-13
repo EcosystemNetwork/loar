@@ -4,7 +4,7 @@
  * Three-tab layout: Drafts | Vault | Notes
  * Wrapped by PrivateSectionGuard for access control.
  */
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { usePrivateAccess, type AccessLevel } from '../../hooks/usePrivateAccess';
 import { PrivateSectionGuard } from './PrivateSectionGuard';
 import { DraftWorkspace } from './DraftWorkspace';
@@ -17,7 +17,7 @@ interface PrivateSectionProps {
   universeId: string;
 }
 
-const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'drafts',
     label: 'Drafts',

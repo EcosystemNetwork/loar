@@ -30,7 +30,7 @@ const baseSepoliaClient = createPublicClient({
 });
 
 /** Allowed chain IDs for on-chain payment verification. */
-const ALLOWED_CHAIN_IDS = new Set([sepolia.id, baseSepolia.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
 
 // ── RPC response cache (prevents DoS via repeated verification calls) ───
 const TX_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -100,10 +100,11 @@ async function verifyEthPayment(
   const client = getChainClient(chainId);
   const chainName = getChainName(chainId);
 
-  let tx: Awaited<ReturnType<typeof client.getTransaction>>;
+  let tx: any;
   try {
-    tx = await getCachedOrFetch(`tx-${paymentRef}`, () =>
-      client.getTransaction({ hash: paymentRef as Hash })
+    tx = await getCachedOrFetch(
+      `tx-${paymentRef}`,
+      () => client.getTransaction({ hash: paymentRef as Hash }) as any
     );
   } catch {
     throw new Error(
@@ -568,7 +569,17 @@ export const creditsRouter = router({
         universeId: z.string().max(200).optional(),
         generationId: z.string().max(200).optional(),
         modelId: z.string().max(100).optional(),
-        metadata: z.record(z.string().max(100), z.string().max(500)).optional(),
+        metadata: z
+          .record(
+            z
+              .string()
+              .min(1)
+              .max(50)
+              .regex(/^[a-zA-Z0-9_-]+$/),
+            z.string().max(500)
+          )
+          .optional()
+          .refine((val) => !val || Object.keys(val).length <= 20, 'Max 20 metadata fields'),
         /**
          * When true and universeId is set, deduct from the universe's shared
          * credit pool (funded from the universe treasury) instead of the
@@ -586,14 +597,13 @@ export const creditsRouter = router({
         const universeId = input.universeId.toLowerCase();
         const callerUid = ctx.user.uid.toLowerCase();
 
-        // Verify the caller is the admin or an active team member
-        const [universeDoc, memberDoc] = await Promise.all([
-          db.collection('cinematicUniverses').doc(universeId).get(),
+        // Use isUniverseAdmin which correctly handles Safe multi-sig universes
+        const { isUniverseAdmin } = await import('../../lib/safe-admin');
+        const [isAdmin, memberDoc] = await Promise.all([
+          isUniverseAdmin(universeId, callerUid),
           db.collection('universeTeamMembers').doc(`${universeId}-${callerUid}`).get(),
         ]);
 
-        const adminUid = (universeDoc.data()?.creator as string | undefined)?.toLowerCase();
-        const isAdmin = adminUid === callerUid;
         const membership = memberDoc.exists ? memberDoc.data()! : null;
         const isMember = !!membership && membership.status === 'active';
 
@@ -614,8 +624,9 @@ export const creditsRouter = router({
             );
           }
 
-          // Enforce monthly allowance for non-admins (inside transaction)
-          if (!isAdmin && membership!.monthlyAllowance > 0) {
+          // Enforce monthly allowance and track spending for non-admins (inside transaction).
+          // Always track spend even when monthlyAllowance is 0 (unlimited) for audit purposes.
+          if (!isAdmin && membership) {
             const memberDocId = `${universeId}-${callerUid}`;
             const memberRef = db.collection('universeTeamMembers').doc(memberDocId);
             const memberSnap = await tx.get(memberRef);
@@ -627,12 +638,17 @@ export const creditsRouter = router({
               periodStart.getMonth() === now.getMonth();
             const usedThisMonth = sameMonth ? memberData.creditsUsedThisMonth || 0 : 0;
 
-            if (usedThisMonth + cost > memberData.monthlyAllowance) {
+            // Enforce cap only when a non-zero allowance is set (0 = unlimited)
+            if (
+              memberData.monthlyAllowance > 0 &&
+              usedThisMonth + cost > memberData.monthlyAllowance
+            ) {
               throw new Error(
                 `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, need: ${cost}`
               );
             }
 
+            // Always update spend tracking for audit trail
             tx.update(memberRef, {
               creditsUsedThisMonth: usedThisMonth + cost,
               allowancePeriodStart: sameMonth ? memberData.allowancePeriodStart : now,

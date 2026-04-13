@@ -107,10 +107,30 @@ export const adminRouter = router({
   // ── Audit history ─────────────────────────────────────────────────
 
   getConfigAudit: adminProcedure
-    .input(z.object({ limit: z.number().min(1).max(100).default(50) }))
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
-      const snapshot = await configAuditCol().orderBy('changedAt', 'desc').limit(input.limit).get();
+      let query = configAuditCol().orderBy('changedAt', 'desc');
 
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      // Cursor-based pagination: start after the given document
+      if (input.cursor) {
+        const cursorDoc = await configAuditCol().doc(input.cursor).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
+        }
+      }
+
+      const snapshot = await query.limit(input.limit).get();
+      const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const nextCursor =
+        snapshot.docs.length === input.limit
+          ? snapshot.docs[snapshot.docs.length - 1].id
+          : undefined;
+
+      return { items, nextCursor };
     }),
 });

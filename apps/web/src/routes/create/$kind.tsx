@@ -545,7 +545,7 @@ function EntityCreateForm() {
         description,
         kind: typedKind,
         imageUrl: imageUrl || null,
-        metadata,
+        metadata: metadata as Record<string, string | number | boolean | null>,
         monetized,
         rightsDeclaration: monetized ? rightsDeclaration : null,
       });

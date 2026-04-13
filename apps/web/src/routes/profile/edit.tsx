@@ -4,7 +4,7 @@
  * Lets users customize their profile: display name, username, bio,
  * avatar, privacy settings, layout/theme, social links, and tags.
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
@@ -44,6 +44,12 @@ import { useWeb3Mode } from '@/lib/web3-mode';
 
 export const Route = createFileRoute('/profile/edit')({
   component: ProfileEditor,
+  beforeLoad: async () => {
+    const address = typeof window !== 'undefined' ? localStorage.getItem('siwe-address') : null;
+    if (!address) {
+      throw redirect({ to: '/login', search: { redirect: '/profile/edit' } });
+    }
+  },
 });
 
 const THEMES = [

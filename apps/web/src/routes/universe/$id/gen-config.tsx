@@ -20,7 +20,7 @@ function GenConfigPage() {
     <div className="container mx-auto px-4 py-6 max-w-3xl">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <Link to={`/universe/${id}`}>
+        <Link to={`/universe/${id}` as any}>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
           </Button>

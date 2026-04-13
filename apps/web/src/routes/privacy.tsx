@@ -185,7 +185,7 @@ function PrivacyPage() {
               </a>
               <br />
               DMCA requests:{' '}
-              <Link to="/dmca" className="text-primary underline">
+              <Link to={'/dmca' as any} className="text-primary underline">
                 /dmca
               </Link>
             </p>

@@ -305,7 +305,9 @@ export class FalService {
         try {
           new URL(trimmedUrl);
           validImageUrls.push(trimmedUrl);
-        } catch (urlError) {}
+        } catch {
+          /* invalid URL, skip */
+        }
       }
 
       if (validImageUrls.length === 0) {

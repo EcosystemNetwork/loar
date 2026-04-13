@@ -22,10 +22,13 @@ const chains = SUPPORTED_EVM_CHAIN_IDS.map((id) => allChains[id]);
 /** Default chain used for contract interactions and wallet prompts. */
 export const defaultChain = chains[0];
 
-const transports = Object.fromEntries(chains.map((c) => [c.id, http()]));
+const transports = Object.fromEntries(chains.map((c) => [c.id, http()])) as Record<
+  (typeof chains)[number]['id'],
+  ReturnType<typeof http>
+>;
 
 export const config = createConfig({
   chains: chains as unknown as readonly [(typeof chains)[0], ...typeof chains],
   multiInjectedProviderDiscovery: false,
-  transports,
+  transports: transports as any,
 });

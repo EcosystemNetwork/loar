@@ -345,10 +345,10 @@ Memory is measured via the Hermes profiler in development and via device vitals 
 - JWTs issued after SIWE sign-in have a 24-hour expiry on the server (`exp` claim). The mobile client stores the JWT in `expo-secure-store` (never AsyncStorage — see storage policy below).
 - The client tracks JWT expiry locally by decoding the `exp` claim at login time and storing the expiry timestamp alongside the token in SecureStore.
 - A TanStack Query `queryClient` error handler intercepts any tRPC response with `UNAUTHORIZED` (HTTP 401 or tRPC error code `UNAUTHORIZED`). On this error, the client attempts a silent re-auth:
-  1. The CDP Embedded Wallet SDK is called to re-sign a fresh SIWE message (it can do this silently if the user's embedded wallet session is still valid — no UI shown).
+  1. The wallet SDK is called to re-sign a fresh SIWE message (it can do this silently if the user's embedded wallet session is still valid — no UI shown).
   2. The new SIWE signature is sent to `auth.siweLogin` to obtain a fresh JWT.
   3. The failed query is automatically retried with the new token.
-  4. If the embedded wallet session is also expired (CDP SDK returns an error), the user is shown the auth screen with a `"Your session expired. Please sign in again."` message. No data is lost — draft state is persisted to AsyncStorage before redirecting.
+  4. If the embedded wallet session is also expired (wallet SDK returns an error), the user is shown the auth screen with a `"Your session expired. Please sign in again."` message. No data is lost — draft state is persisted to AsyncStorage before redirecting.
 - Proactive refresh: 30 minutes before JWT expiry (i.e., at the 23.5-hour mark), the client silently refreshes the token in the background if the app is in the foreground. This prevents mid-session 401s for active users.
 
 #### Signature Replay Prevention (SIWE Nonce Handling)
@@ -392,17 +392,17 @@ Certificate pinning is not implemented in Workstream 1. Rationale: the LOAR back
 
 The rule is: **anything that grants access or proves identity goes in SecureStore; everything else goes in AsyncStorage.**
 
-| Data                                                   | Storage                                                        |
-| ------------------------------------------------------ | -------------------------------------------------------------- |
-| JWT (SIWE session token)                               | `expo-secure-store` — hardware-backed on supported devices     |
-| Wallet private key / CDP embedded wallet session token | CDP SDK manages this internally (SecureStore-backed on mobile) |
-| SIWE nonce                                             | In-memory only, never persisted                                |
-| Feed cache (paginated clip list)                       | AsyncStorage via TanStack Query's `AsyncStoragePersister`      |
-| Draft content (unsaved quick-create forms)             | AsyncStorage                                                   |
-| Notification preferences                               | AsyncStorage                                                   |
-| User settings (font size, reduced motion preference)   | AsyncStorage                                                   |
-| Universe preview cache                                 | AsyncStorage                                                   |
-| Analytics event queue (offline buffer)                 | AsyncStorage                                                   |
+| Data                                                 | Storage                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| JWT (SIWE session token)                             | `expo-secure-store` — hardware-backed on supported devices        |
+| Wallet session token                                 | Wallet SDK manages this internally (SecureStore-backed on mobile) |
+| SIWE nonce                                           | In-memory only, never persisted                                   |
+| Feed cache (paginated clip list)                     | AsyncStorage via TanStack Query's `AsyncStoragePersister`         |
+| Draft content (unsaved quick-create forms)           | AsyncStorage                                                      |
+| Notification preferences                             | AsyncStorage                                                      |
+| User settings (font size, reduced motion preference) | AsyncStorage                                                      |
+| Universe preview cache                               | AsyncStorage                                                      |
+| Analytics event queue (offline buffer)               | AsyncStorage                                                      |
 
 SecureStore is synchronous on Android (using the Android Keystore) and uses iOS Keychain on iOS. The JWT is encrypted at rest via the platform's hardware security module where available.
 
@@ -493,7 +493,7 @@ Specific E2E flows:
 3. **Quick-create person flow from clip**: On a clip belonging to Universe A, tap the "+" / "Create from this" button. Select "Add Person". Verify the form is pre-populated with Universe A's `universeId`. Fill in `name`. Submit. Verify: a success toast is shown, the form closes, and the new entity appears in the universe's wiki under "People".
 4. **Branch/remix flow**: On a clip, tap the "Branch" button in the right rail. Verify the branch creation sheet opens with `sourceContentId` pre-filled. Enter a prompt. Submit. Verify: a new draft content document appears in the user's profile drafts section.
 5. **Offline feed behavior**: Enable airplane mode. Relaunch the app. Verify: cached clips from the last session are shown. Verify: swipe beyond cached clips shows the "No connection" inline state. Re-enable network. Verify: pull-to-refresh loads new clips.
-6. **Auth expiry recovery**: Inject an expired JWT into SecureStore. Launch the app. Verify: the feed attempts to load, receives a 401, silently re-authenticates via CDP SDK, and loads the feed without showing an error to the user.
+6. **Auth expiry recovery**: Inject an expired JWT into SecureStore. Launch the app. Verify: the feed attempts to load, receives a 401, silently re-authenticates via wallet SDK, and loads the feed without showing an error to the user.
 
 CI triggers:
 

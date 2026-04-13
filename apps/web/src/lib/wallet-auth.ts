@@ -1,20 +1,21 @@
 /**
  * Wallet-based authentication using SIWE (Sign-In With Ethereum).
  *
- * Replaces Firebase Auth on the frontend. Works with Coinbase Smart Wallet
- * social logins (Google, passkeys, email) via wagmi.
+ * Session tokens are stored in httpOnly cookies (set by the server).
+ * The client only stores the wallet address and session expiry for UI purposes.
+ * This prevents XSS attacks from stealing session tokens.
  *
- * Flow: connect wallet → fetch nonce → sign SIWE message → verify → store JWT
+ * Flow: connect wallet → fetch nonce → sign SIWE message → server sets cookie
  */
 import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
 
-const TOKEN_KEY = 'siwe-token';
 const ADDRESS_KEY = 'siwe-address';
+const EXPIRY_KEY = 'siwe-expiry';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
-// ── Token storage (reactive via useSyncExternalStore) ───────────
+// ── Auth state (reactive via useSyncExternalStore) ────────────
 
 let listeners: Array<() => void> = [];
 
@@ -30,59 +31,72 @@ function subscribe(listener: () => void) {
 }
 
 function getSnapshot(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(ADDRESS_KEY);
 }
 
 function getServerSnapshot(): string | null {
   return null;
 }
 
-/** Get the current SIWE session token (synchronous, for tRPC headers). */
-export function getSiweToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-/** Get the authenticated wallet address. */
+/** Get the authenticated wallet address (for UI display). */
 export function getSiweAddress(): string | null {
   return localStorage.getItem(ADDRESS_KEY);
 }
 
-function setSession(token: string, address: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+/**
+ * Check if the client believes it has a valid session.
+ * Note: the actual token is in an httpOnly cookie — this is just a UI hint.
+ */
+export function hasSession(): boolean {
+  const address = localStorage.getItem(ADDRESS_KEY);
+  const expiry = localStorage.getItem(EXPIRY_KEY);
+  if (!address || !expiry) return false;
+  return Date.now() < Number(expiry);
+}
+
+/**
+ * @deprecated Use `hasSession()` instead. Kept for backward compatibility
+ * with code that checks for a token string. Returns a truthy placeholder
+ * when a session exists, null otherwise.
+ */
+export function getSiweToken(): string | null {
+  return hasSession() ? '__httpOnly__' : null;
+}
+
+function setSession(address: string, expiresAt: number) {
   localStorage.setItem(ADDRESS_KEY, address);
+  localStorage.setItem(EXPIRY_KEY, String(expiresAt));
   emitChange();
 }
 
-/** Clear the SIWE session from localStorage and optionally revoke server-side. */
+/** Clear the SIWE session from local state and optionally revoke server-side. */
 export function clearSiweSession(revoke = false) {
-  const token = localStorage.getItem(TOKEN_KEY);
-  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ADDRESS_KEY);
+  localStorage.removeItem(EXPIRY_KEY);
   emitChange();
 
-  // Fire-and-forget server-side revocation
-  if (revoke && token) {
+  // Fire-and-forget server-side revocation (clears httpOnly cookie)
+  if (revoke) {
     fetch(`${SERVER_URL}/auth/revoke`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     }).catch(() => {}); // Best-effort
   }
 }
 
-/** Refresh the session token. Returns true if refreshed, false if expired. */
+/** Refresh the session cookie. Returns true if refreshed, false if expired. */
 export async function refreshSession(): Promise<boolean> {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) return false;
+  if (!hasSession()) return false;
 
   try {
     const res = await fetch(`${SERVER_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     });
     if (!res.ok) return false;
     const data = await res.json();
-    if (data.token) {
-      localStorage.setItem(TOKEN_KEY, data.token);
+    if (data.ok && data.expiresAt) {
+      localStorage.setItem(EXPIRY_KEY, String(data.expiresAt));
       emitChange();
       return true;
     }
@@ -96,42 +110,30 @@ export async function refreshSession(): Promise<boolean> {
 // JWT has 24h TTL, so refresh at the 23h mark.
 setInterval(
   async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return;
+    const expiry = localStorage.getItem(EXPIRY_KEY);
+    if (!expiry) return;
 
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiresIn = payload.exp * 1000 - Date.now();
-      if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
-        await refreshSession();
-      }
-    } catch {
-      clearSiweSession();
+    const expiresIn = Number(expiry) - Date.now();
+    if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
+      await refreshSession();
     }
   },
   5 * 60 * 1000
 );
 
 // Refresh token when user returns to a backgrounded tab.
-// setInterval doesn't fire reliably in inactive tabs, so this
-// catches expired-or-nearly-expired tokens on tab focus.
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return;
+    const expiry = localStorage.getItem(EXPIRY_KEY);
+    if (!expiry) return;
 
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiresIn = payload.exp * 1000 - Date.now();
-      if (expiresIn <= 0) {
-        clearSiweSession();
-      } else if (expiresIn < 60 * 60 * 1000) {
-        const ok = await refreshSession();
-        if (!ok) clearSiweSession();
-      }
-    } catch {
+    const expiresIn = Number(expiry) - Date.now();
+    if (expiresIn <= 0) {
       clearSiweSession();
+    } else if (expiresIn < 60 * 60 * 1000) {
+      const ok = await refreshSession();
+      if (!ok) clearSiweSession();
     }
   });
 }
@@ -142,7 +144,7 @@ function buildSiweMessage(params: { address: string; nonce: string; chainId: num
   const domain = window.location.host;
   const uri = window.location.origin;
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+  const expiresAt = new Date(now.getTime() + 2 * 60 * 1000); // 2 minutes (matches server nonce TTL)
 
   return [
     `${domain} wants you to sign in with your Ethereum account:`,
@@ -162,7 +164,7 @@ function buildSiweMessage(params: { address: string; nonce: string; chainId: num
 // ── SIWE handshake ──────────────────────────────────────────────
 
 async function fetchNonce(): Promise<string> {
-  const res = await fetch(`${SERVER_URL}/auth/nonce`);
+  const res = await fetch(`${SERVER_URL}/auth/nonce`, { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to fetch nonce');
   const data = await res.json();
   return data.nonce;
@@ -171,10 +173,11 @@ async function fetchNonce(): Promise<string> {
 async function verifySignature(
   message: string,
   signature: string
-): Promise<{ token: string; address: string }> {
+): Promise<{ address: string; expiresAt: number }> {
   const res = await fetch(`${SERVER_URL}/auth/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // receive and store httpOnly cookie
     body: JSON.stringify({ message, signature }),
   });
   if (!res.ok) {
@@ -190,12 +193,12 @@ export function useWalletAuth() {
   const { address, isConnected, chain } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
-  const token = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isAuthenticated = Boolean(isConnected && address && token);
+  const isAuthenticated = Boolean(isConnected && address && storedAddress);
 
   /** Perform the SIWE sign-in handshake. */
   const signIn = useCallback(async () => {
@@ -213,7 +216,7 @@ export function useWalletAuth() {
       });
       const signature = await signMessageAsync({ message });
       const result = await verifySignature(message, signature);
-      setSession(result.token, result.address);
+      setSession(result.address, result.expiresAt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Sign-in failed';
       // Don't set error for user rejections
@@ -233,21 +236,20 @@ export function useWalletAuth() {
 
   // Auto-clear session if wallet disconnects or address changes
   useEffect(() => {
-    const storedAddress = getSiweAddress();
     if (!isConnected || !address) {
-      if (token) clearSiweSession();
+      if (storedAddress) clearSiweSession();
     } else if (storedAddress && storedAddress.toLowerCase() !== address.toLowerCase()) {
       // Address changed — clear old session
       clearSiweSession();
     }
-  }, [isConnected, address, token]);
+  }, [isConnected, address, storedAddress]);
 
   // Auto-trigger SIWE sign-in when wallet connects without an existing session
   useEffect(() => {
-    if (isConnected && address && chain && !token && !isAuthenticating) {
+    if (isConnected && address && chain && !storedAddress && !isAuthenticating) {
       signIn();
     }
-  }, [isConnected, address, chain, token, isAuthenticating, signIn]);
+  }, [isConnected, address, chain, storedAddress, isAuthenticating, signIn]);
 
   return {
     address,

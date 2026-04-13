@@ -51,6 +51,7 @@ if (!jwtSecretRaw || jwtSecretRaw.length < 32) {
 }
 const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
 const JWT_ISSUER = 'loar-server';
+const JWT_AUDIENCE = 'loar-app';
 const JWT_EXPIRY = '24h';
 
 /** Allowed SIWE domains. Add production domain when deploying. */
@@ -63,14 +64,14 @@ export interface SiweSessionPayload extends JWTPayload {
   iat: number;
 }
 
-/** Generate a cryptographically random nonce and store it with a 5-minute TTL. */
+/** Generate a cryptographically random nonce and store it with a 2-minute TTL. */
 export async function generateNonce(): Promise<string> {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
   const now = new Date();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
   const col1 = getNoncesCol();
   if (col1) {
@@ -104,7 +105,8 @@ export async function consumeNonce(nonce: string): Promise<void> {
 /** Verify a SIWE message signature and consume the nonce. Returns the checksummed address. */
 export async function verifySiweSignature(
   message: string,
-  signature: `0x${string}`
+  signature: `0x${string}`,
+  requestOrigin?: string
 ): Promise<string> {
   // Extract and validate domain from the SIWE message (line 1)
   const lines = message.split('\n');
@@ -114,6 +116,22 @@ export async function verifySiweSignature(
     const messageDomain = domainMatch[1];
     if (!ALLOWED_DOMAINS.has(messageDomain)) {
       throw new Error(`SIWE domain "${messageDomain}" is not allowed`);
+    }
+
+    // Cross-check SIWE domain against the request Origin header to prevent
+    // an attacker signing a message with domain "loar.fun" from "evil.com"
+    if (requestOrigin) {
+      try {
+        const originHost = new URL(requestOrigin).hostname;
+        if (messageDomain !== originHost && originHost !== 'localhost') {
+          throw new Error(
+            `SIWE domain "${messageDomain}" does not match request origin "${originHost}"`
+          );
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('does not match')) throw e;
+        // Malformed origin — skip cross-check (CORS will block anyway)
+      }
     }
   }
 
@@ -155,14 +173,18 @@ export async function verifySiweSignature(
 
   const col2 = getNoncesCol();
   if (col2) {
-    const nonceDoc = await col2.doc(nonce).get();
-    if (!nonceDoc.exists) throw new Error('Unknown nonce');
+    // Atomic nonce consumption via Firestore transaction to prevent race conditions
+    await db.runTransaction(async (transaction) => {
+      const nonceRef = col2.doc(nonce);
+      const nonceDoc = await transaction.get(nonceRef);
+      if (!nonceDoc.exists) throw new Error('Unknown nonce');
 
-    const nonceData = nonceDoc.data()!;
-    if (nonceData.used) throw new Error('Nonce already used');
-    if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Nonce expired');
+      const nonceData = nonceDoc.data()!;
+      if (nonceData.used) throw new Error('Nonce already used');
+      if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Nonce expired');
 
-    await col2.doc(nonce).update({ used: true });
+      transaction.update(nonceRef, { used: true });
+    });
   } else {
     const nonceData = memoryNonces.get(nonce);
     if (!nonceData) throw new Error('Unknown nonce');
@@ -188,6 +210,7 @@ export async function issueSessionToken(address: string): Promise<string> {
   return new SignJWT({ sub: getAddress(address) })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
     .setIssuedAt()
     .setJti(jti)
     .setExpirationTime(JWT_EXPIRY)
@@ -196,14 +219,16 @@ export async function issueSessionToken(address: string): Promise<string> {
 
 // ── Token blacklist (in-memory, or Firestore if available) ──────────────
 // Used to revoke tokens before they expire naturally.
-const memoryBlacklist = new Set<string>();
+const memoryBlacklist = new Map<string, number>();
 
-// Clean up expired blacklist entries every 30 minutes
+// Clean up in-memory blacklist every 30 minutes. Evict entries older than
+// 24 h (JWT TTL) instead of clearing everything when the set gets large.
 setInterval(
   () => {
-    // In-memory entries auto-expire when the JWT itself expires.
-    // We just clear the whole set periodically since stale entries are harmless.
-    if (memoryBlacklist.size > 10_000) memoryBlacklist.clear();
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000; // JWT TTL
+    for (const [jti, revokedAt] of memoryBlacklist) {
+      if (revokedAt < cutoff) memoryBlacklist.delete(jti);
+    }
   },
   30 * 60 * 1000
 );
@@ -214,7 +239,7 @@ export async function revokeToken(jti: string): Promise<void> {
   if (col) {
     await col.doc(jti).set({ revokedAt: new Date() });
   } else {
-    memoryBlacklist.add(jti);
+    memoryBlacklist.set(jti, Date.now());
   }
 }
 
@@ -233,6 +258,7 @@ export async function verifySessionToken(token: string): Promise<SiweSessionPayl
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     });
 
     // Check revocation if token has a jti
@@ -266,7 +292,7 @@ export function buildSiweMessage(params: {
   statement?: string;
 }): string {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+  const expiresAt = new Date(now.getTime() + 2 * 60 * 1000);
   return [
     `${params.domain} wants you to sign in with your Ethereum account:`,
     params.address,

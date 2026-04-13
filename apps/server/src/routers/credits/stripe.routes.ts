@@ -21,6 +21,7 @@ export function getStripe() {
 
   try {
     // Dynamic import to avoid crash if stripe package not installed
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Stripe = require('stripe');
     stripe = new Stripe(key, { apiVersion: '2024-12-18.acacia' });
     return stripe;

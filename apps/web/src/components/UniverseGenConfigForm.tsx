@@ -50,17 +50,18 @@ export function UniverseGenConfigForm({ universeAddress }: UniverseGenConfigForm
   // Load existing config
   useEffect(() => {
     if (existingConfig) {
-      setStyleGuide(existingConfig.styleGuide || '');
-      setNegativePrompts(existingConfig.negativePrompts || []);
-      setDefaultPromptPrefix(existingConfig.defaultPromptPrefix || '');
-      setDefaultPromptSuffix(existingConfig.defaultPromptSuffix || '');
-      setLoreRules(existingConfig.loreRules || []);
-      setCreditMultiplier(existingConfig.creditMultiplier || 1.0);
-      setMinCreditsPerGen(existingConfig.minCreditsPerGen || 0);
-      setAccessType(existingConfig.accessType || 'PUBLIC');
-      setWhitelistedAddresses(existingConfig.whitelistedAddresses || []);
-      setRequiredTokenBalance(existingConfig.requiredTokenBalance || 0);
-      setUniverseCreatorSplitBps(existingConfig.universeCreatorSplitBps ?? 2000);
+      const cfg = existingConfig as any;
+      setStyleGuide(cfg.styleGuide || '');
+      setNegativePrompts(cfg.negativePrompts || []);
+      setDefaultPromptPrefix(cfg.defaultPromptPrefix || '');
+      setDefaultPromptSuffix(cfg.defaultPromptSuffix || '');
+      setLoreRules(cfg.loreRules || []);
+      setCreditMultiplier(cfg.creditMultiplier || 1.0);
+      setMinCreditsPerGen(cfg.minCreditsPerGen || 0);
+      setAccessType(cfg.accessType || 'PUBLIC');
+      setWhitelistedAddresses(cfg.whitelistedAddresses || []);
+      setRequiredTokenBalance(cfg.requiredTokenBalance || 0);
+      setUniverseCreatorSplitBps(cfg.universeCreatorSplitBps ?? 2000);
     }
   }, [existingConfig]);
 

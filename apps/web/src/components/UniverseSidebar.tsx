@@ -372,7 +372,7 @@ export function UniverseSidebar({
               )}
 
               {/* Gallery button */}
-              <Link to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gallery`}>
+              <Link to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gallery` as any}>
                 <Button
                   variant="outline"
                   size="sm"
@@ -385,7 +385,9 @@ export function UniverseSidebar({
 
               {/* Gen Config button - only show for universe admin */}
               {isBlockchainUniverse && (
-                <Link to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gen-config`}>
+                <Link
+                  to={`/universe/${finalUniverse?.address || finalUniverse?.id}/gen-config` as any}
+                >
                   <Button
                     variant="outline"
                     size="sm"
@@ -399,7 +401,7 @@ export function UniverseSidebar({
 
               {/* Treasury button */}
               {isBlockchainUniverse && (
-                <Link to={`/treasury/${finalUniverse?.address || finalUniverse?.id}`}>
+                <Link to={`/treasury/${finalUniverse?.address || finalUniverse?.id}` as any}>
                   <Button
                     variant="outline"
                     size="sm"

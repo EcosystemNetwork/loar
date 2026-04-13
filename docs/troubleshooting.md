@@ -178,14 +178,9 @@ The web app has known type errors in these files:
 
 - `GenerativeMedia.tsx`
 - `GovernanceSidebar.tsx`
-- `cdp-auth-button.tsx`
 - Various flow components
 
 These are pre-existing and do not block development. They will not prevent `vite dev` from running — only `tsc --noEmit` will report them.
-
-### `@coinbase/cdp-react` not found
-
-This package is referenced in code but not installed. It's a known issue. Ignore the import error if you're not working on Coinbase integration.
 
 ## Build Warnings
 

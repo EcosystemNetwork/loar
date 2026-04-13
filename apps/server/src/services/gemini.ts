@@ -6,18 +6,20 @@ import { validateUploadUrl } from '../lib/url-validator';
  * Sanitize user-supplied text before interpolating into AI prompts.
  * Strips common prompt injection patterns while preserving legitimate content.
  */
-function sanitizeForPrompt(text: string): string {
+function sanitizeForPrompt(text: string, maxLen = 5000): string {
   return (
     text
-      // Collapse multiple newlines to prevent instruction boundary spoofing
       .replace(/\n{3,}/g, '\n\n')
-      // Strip common injection prefixes
-      .replace(/^(system|assistant|user)\s*:/gim, '[filtered]:')
-      // Strip "ignore previous instructions" patterns
-      .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, '[filtered]')
-      .replace(/ignore\s+(all\s+)?above/gi, '[filtered]')
-      // Limit length to prevent context flooding
-      .slice(0, 5000)
+      // Strip role-prefix injection attempts (case-insensitive)
+      .replace(/(^|\n)\s*(system|assistant|user|human)\s*:/gim, '$1[filtered]:')
+      // Strip common injection phrases
+      .replace(
+        /\b(ignore|forget|disregard|override)\s+(all\s+)?(previous|above|prior|earlier)\s+(instructions?|prompts?|context|rules?)\b/gi,
+        '[filtered]'
+      )
+      // Strip HTML/XML tags
+      .replace(/<\/?[a-z][^>]*>/gi, '')
+      .slice(0, maxLen)
   );
 }
 
@@ -197,7 +199,14 @@ Output valid JSON only. Be precise and factual.`;
     await validateUploadUrl(videoUrl);
     // Download video to buffer first (required for uploadFile)
     console.log(`📤 Downloading video: ${videoUrl}`);
-    const videoResponse = await fetch(videoUrl);
+    const videoController = new AbortController();
+    const videoTimeoutId = setTimeout(() => videoController.abort(), 60_000);
+    let videoResponse: Response;
+    try {
+      videoResponse = await fetch(videoUrl, { signal: videoController.signal });
+    } finally {
+      clearTimeout(videoTimeoutId);
+    }
     if (!videoResponse.ok) {
       throw new Error(`Failed to download video: ${videoResponse.statusText}`);
     }
@@ -354,14 +363,22 @@ Generate a detailed visual description in plain text (no JSON, no formatting).`;
   try {
     // SSRF validation before downloading external URL
     await validateUploadUrl(imageUrl);
+    // Download image with timeout
+    const imgController = new AbortController();
+    const imgTimeoutId = setTimeout(() => imgController.abort(), 60_000);
+    let imageBase64: string;
+    try {
+      const imgResponse = await fetch(imageUrl, { signal: imgController.signal });
+      imageBase64 = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
+    } finally {
+      clearTimeout(imgTimeoutId);
+    }
     // Generate content with image
     const result = await model.generateContent([
       {
         inlineData: {
           mimeType: 'image/png',
-          data: await fetch(imageUrl)
-            .then((r) => r.arrayBuffer())
-            .then((b) => Buffer.from(b).toString('base64')),
+          data: imageBase64,
         },
       },
       { text: prompt },

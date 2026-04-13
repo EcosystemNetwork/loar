@@ -134,7 +134,7 @@ function RootComponent() {
                   <Link to="/privacy" className="hover:text-foreground transition-colors">
                     Privacy Policy
                   </Link>
-                  <Link to="/dmca" className="hover:text-foreground transition-colors">
+                  <Link to={'/dmca' as any} className="hover:text-foreground transition-colors">
                     DMCA
                   </Link>
                 </div>

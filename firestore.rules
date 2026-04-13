@@ -1,0 +1,97 @@
+rules_version = '2';
+
+// LOAR Firestore Security Rules
+//
+// All writes go through the server (Firebase Admin SDK), which bypasses these rules.
+// These rules protect against direct client-side access via the Firebase web SDK.
+// Policy: deny all client writes, allow only specific client reads where needed.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Default: deny everything ────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Public reads (no auth required) ─────────────────────────────
+
+    // Universe metadata is public (name, description, image, creator)
+    match /cinematicUniverses/{universeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Credit packages are public (pricing info)
+    match /creditPackages/{packageId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Platform config (margins, pricing) is public
+    match /platformConfig/{configId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Public entity/wiki data
+    match /entities/{entityId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Content metadata is public
+    match /content/{contentId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // User profiles are public (display name, bio, social links)
+    match /profiles/{profileId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Universe credit pool balance is public
+    match /universeCredits/{universeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ── Authenticated reads (user can read their own data) ──────────
+
+    // User's own credit balance
+    match /userCredits/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // User's own credit transactions
+    match /creditTransactions/{txId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // User's own API keys
+    match /apiKeys/{keyId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ── Server-only collections (no client access) ──────────────────
+    // These are explicitly denied by the default rule above, listed here
+    // for documentation purposes:
+    //
+    // siweNonces          — nonce storage for SIWE auth
+    // revokedTokens       — JWT blacklist
+    // storageManifests    — decentralized storage tracking
+    // costLedger          — AI generation cost tracking
+    // flags               — content moderation flags
+    // takedownRequests    — DMCA/takedown requests
+    // contentAuditLog     — immutable audit trail (append-only on server)
+    // configAuditLog      — admin config change history
+    // universeCreditTransactions — universe pool audit trail
+    // universeTeamMembers — team membership (server manages)
+    // pendingPurchases    — Stripe purchase flow state
+  }
+}

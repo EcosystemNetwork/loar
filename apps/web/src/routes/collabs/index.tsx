@@ -70,7 +70,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 type Tab = 'active' | 'proposals' | 'history';
 
 function CollabsHubPage() {
-  const { isConnected, uid } = useWalletAuth();
+  const { isConnected, address: uid } = useWalletAuth();
   const [tab, setTab] = useState<Tab>('active');
   const { data: collabs, isLoading } = useMyCollabs();
   const acceptCollab = useAcceptCollab();

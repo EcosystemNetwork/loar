@@ -318,17 +318,17 @@ Each service receives only the secrets it needs. The tables below list the exact
 
 Set these in **Vercel → Settings → Environment Variables**. All are `VITE_` prefixed and safe to expose publicly — they are baked into the JS bundle.
 
-| Variable                  | Required    | Notes                               |
-| ------------------------- | ----------- | ----------------------------------- |
-| `VITE_SERVER_URL`         | ✅          | Backend API URL                     |
-| `VITE_PONDER_URL`         | recommended | Indexer GraphQL URL                 |
-| `VITE_LOAR_TOKEN_ADDRESS` | recommended | $LOAR token contract                |
-| `VITE_TREASURY_ADDRESS`   | recommended | Treasury wallet                     |
-| `VITE_CDP_PROJECT_ID`     | optional    | Coinbase project ID only            |
-| `VITE_FIREBASE_*`         | optional    | Firebase web client config (6 vars) |
-| `VITE_ADMIN_ADDRESSES`    | optional    | Comma-separated admin wallets       |
+| Variable                      | Required    | Notes                               |
+| ----------------------------- | ----------- | ----------------------------------- |
+| `VITE_SERVER_URL`             | ✅          | Backend API URL                     |
+| `VITE_PONDER_URL`             | recommended | Indexer GraphQL URL                 |
+| `VITE_LOAR_TOKEN_ADDRESS`     | recommended | $LOAR token contract                |
+| `VITE_TREASURY_ADDRESS`       | recommended | Treasury wallet                     |
+| `VITE_DYNAMIC_ENVIRONMENT_ID` | optional    | Dynamic Labs environment ID         |
+| `VITE_FIREBASE_*`             | optional    | Firebase web client config (6 vars) |
+| `VITE_ADMIN_ADDRESSES`        | optional    | Comma-separated admin wallets       |
 
-> ⚠ Never add `CDP_API_KEY`, `CDP_API_SECRET`, `FIREBASE_SERVICE_ACCOUNT`, or any server secret to Vercel — those belong on the server only.
+> ⚠ Never add `FIREBASE_SERVICE_ACCOUNT` or any server secret to Vercel — those belong on the server only.
 
 ### Docker / VPS (server)
 

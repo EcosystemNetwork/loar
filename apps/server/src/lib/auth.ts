@@ -1,9 +1,10 @@
 /**
  * Authentication Verification
  *
- * Supports two auth methods:
- * 1. SIWE JWT (wallet users) — Authorization: Bearer <jwt>
- * 2. API Key (programmatic agents) — X-API-Key: loar_<agentId>_<hex>
+ * Supports three auth methods (checked in order):
+ * 1. API Key (programmatic agents) — X-API-Key: loar_<agentId>_<hex>
+ * 2. httpOnly cookie (browser users) — Cookie: siwe-session=<jwt>
+ * 3. Bearer token (legacy/mobile) — Authorization: Bearer <jwt>
  *
  * Returns a normalized AuthUser for use in tRPC context.
  */
@@ -22,7 +23,12 @@ export interface AuthUser {
   apiKeyPermissions?: string[];
 }
 
-export async function verifyAuth(headers: Headers): Promise<AuthUser | null> {
+/**
+ * Verify auth from request headers and optional cookie token.
+ * @param headers — raw request headers
+ * @param cookieToken — JWT from httpOnly `siwe-session` cookie (extracted by caller)
+ */
+export async function verifyAuth(headers: Headers, cookieToken?: string): Promise<AuthUser | null> {
   // 1. Try API key first (X-API-Key header)
   const apiKey = headers.get('X-API-Key');
   if (apiKey) {
@@ -38,17 +44,27 @@ export async function verifyAuth(headers: Headers): Promise<AuthUser | null> {
     return null; // Invalid API key — don't fall through to JWT
   }
 
-  // 2. Try SIWE JWT (Authorization: Bearer <token>)
-  const token = headers.get('Authorization')?.replace('Bearer ', '');
-  if (!token) return null;
+  // 2. Try httpOnly cookie token (preferred for browser sessions)
+  if (cookieToken) {
+    const payload = await verifySessionToken(cookieToken);
+    if (payload?.sub) {
+      return {
+        uid: payload.sub.toLowerCase(),
+        address: payload.sub,
+      };
+    }
+  }
 
-  const payload = await verifySessionToken(token);
-  if (payload?.sub) {
-    const uid = payload.sub.toLowerCase();
-    return {
-      uid,
-      address: payload.sub,
-    };
+  // 3. Fall back to Authorization: Bearer <token> (mobile, legacy clients)
+  const bearerToken = headers.get('Authorization')?.replace('Bearer ', '');
+  if (bearerToken) {
+    const payload = await verifySessionToken(bearerToken);
+    if (payload?.sub) {
+      return {
+        uid: payload.sub.toLowerCase(),
+        address: payload.sub,
+      };
+    }
   }
 
   return null;

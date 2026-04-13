@@ -1,43 +1,37 @@
-// Auto-generated from deployments — do not edit directly.
+// Auto-generated from deployment manifests — do not edit directly.
 // To update: pnpm sync:addresses
-//
-// Chain IDs:
-//   11155111 = Sepolia (testnet)
-//   84532    = Base Sepolia (testnet)
-//   8453     = Base (mainnet) — addresses TBD after mainnet deployment
 
 export const UniverseManager = {
-  '11155111': '0x7af142BbD14CaEECdA68f948F467Da0257f6B114',
-  '84532': '0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f',
-  // '8453': '0x...',  // Base mainnet — deploy and fill
+  '11155111': '0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce',
+  '84532': '0x46ce7cd72763B784977349686AEa72B84d3F86B6',
 } as const;
 
 export type UniverseManagerChainId = keyof typeof UniverseManager;
 
 export const UniverseTokenDeployer = {
-  '11155111': '0xE34DAB193105F3d7ec6EE4E6172cbE6213108d8B',
-  '84532': '0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6',
+  '11155111': '0xa2556B55C834504b2d71ECa8D1c1295e19D31BEf',
+  '84532': '0xEC9455F29A5a7A2a5F496bB7D4B428A1df3850dF',
 } as const;
 
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
 
 export const LoarFeeLocker = {
-  '11155111': '0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f',
-  '84532': '0xf97b6900f5573cba7dcE4e58e5118b403E098434',
+  '11155111': '0x1E10b62bd2817d0C2414909027E1E63653fcCd8e',
+  '84532': '0x0a66152096f37F83D41c56534022e746B159b052',
 } as const;
 
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
 
 export const LoarLpLockerMultiple = {
-  '11155111': '0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6',
-  '84532': '0x91D581cFdda6F1AC4cA211d8A05B31BeFcEF2882',
+  '11155111': '0xc00225D9463C15280748dC2E21D8D8625982Ad54',
+  '84532': '0x6FB4b73B1e980217010d20B7DA065b06EA7802B6',
 } as const;
 
 export type LoarLpLockerMultipleChainId = keyof typeof LoarLpLockerMultiple;
 
 export const LoarHookStaticFee = {
-  '11155111': '0xa66407B5a48C5CbFF4055Ca50f6189575CC2A8cC',
-  '84532': '0x31D8C79D81517a967175E1723d777c6B4AD568CC',
+  '11155111': '0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc',
+  '84532': '0xAC0C66fc1A9daE256ba91797D5B3E4fe4938a8Cc',
 } as const;
 
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;

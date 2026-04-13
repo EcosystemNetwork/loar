@@ -6,13 +6,13 @@
  * to check access and see constraints.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { trpc } from '../utils/trpc';
+import { trpcClient } from '../utils/trpc';
 
 /** Get generation config for a universe */
 export function useUniverseGenConfig(universeId: string | undefined) {
   return useQuery({
     queryKey: ['universeGenConfig', universeId],
-    queryFn: () => (universeId ? trpc.universeGenConfig.get.query({ universeId }) : null),
+    queryFn: () => (universeId ? trpcClient.universeGenConfig.get.query({ universeId }) : null),
     enabled: !!universeId,
   });
 }
@@ -39,7 +39,7 @@ export function useUpsertGenConfig() {
       whitelistedAddresses?: string[];
       requiredTokenBalance?: number;
       universeCreatorSplitBps?: number;
-    }) => trpc.universeGenConfig.upsert.mutate(input),
+    }) => trpcClient.universeGenConfig.upsert.mutate(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['universeGenConfig', variables.universeAddress] });
     },
@@ -50,7 +50,8 @@ export function useUpsertGenConfig() {
 export function useCheckGenAccess(universeId: string | undefined) {
   return useQuery({
     queryKey: ['universeGenConfig', 'checkAccess', universeId],
-    queryFn: () => (universeId ? trpc.universeGenConfig.checkAccess.query({ universeId }) : null),
+    queryFn: () =>
+      universeId ? trpcClient.universeGenConfig.checkAccess.query({ universeId }) : null,
     enabled: !!universeId,
   });
 }
@@ -60,7 +61,7 @@ export function useApprovedModels(universeId: string | undefined) {
   return useQuery({
     queryKey: ['universeGenConfig', 'approvedModels', universeId],
     queryFn: () =>
-      universeId ? trpc.universeGenConfig.getApprovedModels.query({ universeId }) : null,
+      universeId ? trpcClient.universeGenConfig.getApprovedModels.query({ universeId }) : null,
     enabled: !!universeId,
   });
 }

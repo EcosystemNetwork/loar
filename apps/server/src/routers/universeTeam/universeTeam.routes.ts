@@ -79,7 +79,12 @@ export const universeTeamRouter = router({
       }
 
       const docId = `${input.universeId.toLowerCase()}-${input.memberUid.toLowerCase()}`;
-      await teamCol().doc(docId).update({ status: 'removed', updatedAt: new Date() });
+      await teamCol().doc(docId).update({
+        status: 'removed',
+        updatedAt: new Date(),
+        creditsUsedThisMonth: 0,
+        allowancePeriodStart: null,
+      });
 
       return { ok: true };
     }),

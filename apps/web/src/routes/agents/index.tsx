@@ -121,7 +121,7 @@ function AgentDiscoveryPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {data.agents.map((agent: any) => (
-            <Link key={agent.uid || agent.id} to={`/agents/${agent.uid || agent.id}`}>
+            <Link key={agent.uid || agent.id} to={`/agents/${agent.uid || agent.id}` as any}>
               <Card className="p-5 transition-colors hover:border-violet-500/50 hover:bg-zinc-900/50">
                 <div className="flex items-start gap-4">
                   {agent.avatarUrl ? (

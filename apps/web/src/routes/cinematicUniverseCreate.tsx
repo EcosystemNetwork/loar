@@ -235,11 +235,12 @@ function CinematicUniverseCreate() {
           governanceAddress: '0x0000000000000000000000000000000000000000',
           imageUrl: imageUrl,
           description: description,
-          signature: '', // Will be set during Firestore create
+          signature: '',
           message: '',
+          nonce: '',
           onChainUniverseId: universeId?.toString(),
           mintTxHash: hash,
-        })
+        } as any)
         .catch((err) => console.error('Failed to register universe:', err));
     }
   }
@@ -307,7 +308,7 @@ function CinematicUniverseCreate() {
         description: description,
         nodeCreationOptions: 0, // OPEN - anyone can create nodes
         nodeVisibilityOptions: 0, // PUBLIC - all nodes visible
-        initialOwner: address,
+        initialOwner: address as `0x${string}`,
         safeAddress: safeAddress ?? undefined,
       });
     } catch (error) {
@@ -338,7 +339,7 @@ function CinematicUniverseCreate() {
       await deployUniverseToken(
         {
           tokenConfig: {
-            tokenAdmin: address,
+            tokenAdmin: address as `0x${string}`,
             name: universeName,
             symbol: tokenSymbol,
             imageURL: imageUrl,
@@ -354,8 +355,8 @@ function CinematicUniverseCreate() {
           },
           lockerConfig: {
             locker: defaultConfig.defaultLocker,
-            rewardAdmins: [address],
-            rewardRecipients: [address],
+            rewardAdmins: [address as `0x${string}`],
+            rewardRecipients: [address as `0x${string}`],
             rewardBps: [1000],
             tickLower: [-887220],
             tickUpper: [887220],

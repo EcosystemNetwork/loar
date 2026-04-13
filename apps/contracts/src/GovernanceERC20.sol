@@ -14,8 +14,8 @@ contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
     string public imageUrl;
     string public metadata;
     string public context;
-    address public admin;
-    address public universe;
+    address public immutable admin;
+    address public constant universe = address(0);
 
     constructor(
         string memory _name,

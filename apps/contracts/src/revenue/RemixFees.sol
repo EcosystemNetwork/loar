@@ -70,6 +70,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     event DefaultRemixFeeUpdated(uint256 oldFee, uint256 newFee);
 
     error ZeroAddress();
+    error NotAuthorized();
     error NotCreatorOrPlatform();
     error FeeBelowMinimum();
 
@@ -115,7 +116,8 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         address originalCreator,
         uint256 universeId
     ) external nonReentrant {
-        require(msg.sender == platform || msg.sender == owner(), "Unauthorized");
+        if (msg.sender != platform && msg.sender != owner()) revert NotAuthorized();
+        if (remixer == address(0) || originalCreator == address(0)) revert ZeroAddress();
 
         // Skip if remixer is the original creator (no self-fee)
         if (remixer == originalCreator) return;
