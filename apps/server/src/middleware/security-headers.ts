@@ -63,6 +63,6 @@ export async function securityHeaders(c: Context, next: Next) {
     ].join('; ')
   );
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  c.header('Cross-Origin-Opener-Policy', 'same-origin');
-  c.header('Cross-Origin-Resource-Policy', 'same-origin');
+  c.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  c.header('Cross-Origin-Resource-Policy', 'cross-origin');
 }
