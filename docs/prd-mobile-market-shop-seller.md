@@ -290,7 +290,7 @@ The existing `collabs.propose` is a direct proposal — you must know the collab
 - **Navigation:** Expo Router (file-based, mirrors TanStack Router conventions from the web app)
 - **State / data fetching:** TanStack Query — same query keys and cache invalidation logic as the web app where endpoints are shared
 - **tRPC client:** `@trpc/react-query` — reuse `apps/web/src/utils/trpc.ts` pattern, extract to a shared `packages/trpc-client` package (or duplicate and keep in sync until package extraction is prioritized)
-- **Auth:** Dynamic Labs wallet (same SIWE JWT flow as web app — `useWalletAuth` hook adapted for React Native). Dynamic's React Native SDK or a WebView bridge for the wallet modal.
+- **Auth:** thirdweb wallet (same SIWE JWT flow as web app — `useWalletAuth` hook adapted for React Native). thirdweb's React Native SDK or a WebView bridge for the wallet modal.
 - **Contracts:** wagmi — confirm React Native compatibility; fallback to `viem` direct calls if wagmi's React hooks don't support RN. Contract ABIs from `packages/abis`.
 - **Charts:** `react-native-gifted-charts` — lightweight, no native dependencies beyond React Native core
 - **File handling:** `expo-document-picker` for merch image uploads, `expo-sharing` for sponsor pitch card export
@@ -685,7 +685,7 @@ The Market tab in the mobile app is one of the root tabs (alongside Explore and 
 
 | Dependency                                                                           | Owner                     | Blocking                                                              |
 | ------------------------------------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------- |
-| Dynamic Labs React Native SDK (or WebView bridge)                                    | Dynamic/external          | Auth flow, all wallet transactions                                    |
+| thirdweb React Native SDK (or WebView bridge)                                        | thirdweb/external         | Auth flow, all wallet transactions                                    |
 | `packages/abis` current build (EpisodeNFT.sol, CharacterNFT.sol, Universe.sol ABIs)  | Internal (contracts team) | All on-chain write actions                                            |
 | wagmi RN compatibility or viem fallback decision                                     | Internal (client team)    | All on-chain reads/writes                                             |
 | NEW-1 `seller.getEarningsSummary`                                                    | Internal (backend team)   | Seller Hub headline — cannot ship Seller Hub without this             |

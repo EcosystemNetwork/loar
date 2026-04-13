@@ -27,7 +27,7 @@ Audit-driven checklist. Items are grouped by launch phase.
 
 - [ ] **#19 Privacy Policy** — Replace placeholder at `/privacy` with reviewed legal text
   - Data collection summary already drafted (wallet addresses, content, transactions)
-  - Third-party service disclosures included (FAL, OpenAI, Stripe, Dynamic, Firebase)
+  - Third-party service disclosures included (FAL, OpenAI, Stripe, thirdweb, Firebase)
   - Fill in [DATE] and [EMAIL] placeholders
 
 - [ ] **#4 DMCA Agent** — Register a designated DMCA agent with the US Copyright Office

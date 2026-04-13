@@ -100,8 +100,7 @@ function PrivacyPage() {
                 when available
               </li>
               <li>
-                <strong>Wallet connection</strong> (Dynamic Labs) — facilitates wallet
-                authentication
+                <strong>Wallet connection</strong> (thirdweb) — facilitates wallet authentication
               </li>
               <li>
                 <strong>Infrastructure</strong> (Google Cloud / Firebase) — hosts backend services

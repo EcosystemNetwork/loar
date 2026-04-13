@@ -9,7 +9,7 @@ Step-by-step from zero to a monetizable cinematic universe. Each step notes what
 **Route:** `/login`
 **Status:** LIVE
 
-1. Click "Connect Wallet" — Dynamic Labs widget opens
+1. Click "Connect Wallet" — thirdweb wallet modal opens
 2. Choose wallet (MetaMask, WalletConnect, Coinbase, etc.)
 3. Sign the SIWE (Sign-In with Ethereum) message
 4. Server verifies signature, issues JWT session token

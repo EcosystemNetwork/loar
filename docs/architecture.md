@@ -29,7 +29,7 @@ graph TD
 
     WEB -->|tRPC over HTTP| SERVER
     WEB -->|GraphQL| INDEXER
-    WEB -->|wagmi + Dynamic Labs| SEPOLIA
+    WEB -->|wagmi + thirdweb| SEPOLIA
 
     SERVER --> FIREBASE
     SERVER --> FAL
@@ -61,11 +61,11 @@ See [docs/agents.md](agents.md) for full documentation.
 sequenceDiagram
     participant User
     participant Web as Web App
-    participant Wallet as Dynamic Labs Wallet
+    participant Wallet as thirdweb Wallet
     participant Server as API Server
 
     User->>Web: Connect wallet (MetaMask, WalletConnect, etc.)
-    Web->>Wallet: Connect via Dynamic Labs
+    Web->>Wallet: Connect via thirdweb
     Wallet-->>Web: Wallet address (0x...)
     Web->>Wallet: Sign SIWE message
     Wallet-->>Web: Signature
@@ -171,8 +171,8 @@ _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved
 | Bundler       | Vite                     | Dev server (port 3001), build           |
 | Routing       | TanStack Router          | File-based routing (`src/routes/`)      |
 | Data Fetching | TanStack Query + tRPC    | Server state management                 |
-| Web3          | wagmi + Dynamic Labs     | Wallet connection, contract interaction |
-| Auth          | Dynamic Labs + SIWE      | Wallet-based authentication             |
+| Web3          | wagmi + thirdweb         | Wallet connection, contract interaction |
+| Auth          | thirdweb + SIWE          | Wallet-based authentication             |
 | UI            | Tailwind CSS + shadcn/ui | Component library                       |
 | Flow Editor   | ReactFlow                | Narrative node visualization            |
 

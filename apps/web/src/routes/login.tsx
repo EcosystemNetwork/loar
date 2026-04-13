@@ -1,7 +1,7 @@
 /**
  * Login Route
  *
- * Dynamic Labs EVM sign-in (Sepolia).
+ * Wallet sign-in via thirdweb + SIWE.
  * After wallet connect + SIWE verification, redirects to ?redirect param or /dashboard.
  */
 
@@ -68,7 +68,7 @@ function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-xs text-muted-foreground">Powered by Dynamic</p>
+        <p className="text-xs text-muted-foreground">Powered by thirdweb</p>
       </div>
     </div>
   );

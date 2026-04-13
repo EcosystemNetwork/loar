@@ -396,7 +396,6 @@ export default function AdminToolbar() {
     VITE_SERVER_URL: import.meta.env.VITE_SERVER_URL,
     VITE_PONDER_URL: import.meta.env.VITE_PONDER_URL,
     VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    VITE_DYNAMIC_ENVIRONMENT_ID: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID,
     MODE: import.meta.env.MODE,
     DEV: import.meta.env.DEV ? 'true' : 'false',
     PROD: import.meta.env.PROD ? 'true' : 'false',

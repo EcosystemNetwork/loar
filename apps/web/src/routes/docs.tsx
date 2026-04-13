@@ -223,7 +223,7 @@ function DocsPage() {
             <h3 className="text-foreground font-semibold mt-4">Data Flow</h3>
             <CodeBlock>{`User (Browser)
   │
-  ├─► Frontend (React + Wagmi) ──► Wallet (Dynamic Labs)
+  ├─► Frontend (React + Wagmi) ──► Wallet (thirdweb)
   │     │                                    │
   │     ├─► tRPC Client ──────────► Server (Hono + tRPC)
   │     │                              │
@@ -249,7 +249,7 @@ function DocsPage() {
               rows={[
                 [
                   'Frontend',
-                  'React 18, Vite 6, TailwindCSS v4, TanStack Router/Query, Wagmi, Dynamic Labs',
+                  'React 18, Vite 6, TailwindCSS v4, TanStack Router/Query, Wagmi, thirdweb',
                 ],
                 ['Backend', 'Hono, tRPC, Firebase Admin, Node.js 20'],
                 ['Contracts', 'Solidity 0.8.30+, Foundry, OpenZeppelin, Uniswap v4'],
@@ -281,7 +281,7 @@ function DocsPage() {
                   'HomeComponent',
                   'Landing page with universe explorer, activity feed, trending tokens',
                 ],
-                ['/login', 'LoginPage', 'Dynamic Labs wallet connection (EVM) with SIWE sign-in'],
+                ['/login', 'LoginPage', 'thirdweb wallet connection (EVM) with SIWE sign-in'],
                 [
                   '/dashboard',
                   'Dashboard',
@@ -320,7 +320,7 @@ function DocsPage() {
                 ['SceneEditor / SceneBuilder', 'Visual scene composition and editing tools'],
                 ['GenerativeMedia', 'AI image/video generation UI with model selection'],
                 ['GovernanceSidebar', 'Governance proposal creation and voting interface'],
-                ['WalletConnectButton', 'Dynamic Labs wallet connection widget'],
+                ['WalletConnectButton', 'thirdweb wallet connection widget'],
               ]}
             />
 
@@ -365,7 +365,7 @@ function DocsPage() {
               </li>
               <li>
                 <strong className="text-foreground">Auth state:</strong>{' '}
-                <Code>useWalletAuth()</Code> hook backed by Dynamic Labs + SIWE
+                <Code>useWalletAuth()</Code> hook backed by thirdweb + SIWE
               </li>
             </ul>
           </Section>

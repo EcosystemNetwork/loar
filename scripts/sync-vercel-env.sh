@@ -84,9 +84,6 @@ add_env "VITE_PONDER_URL"               "https://idx.loar.fun"
 add_env "VITE_LOAR_TOKEN_ADDRESS"       "0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F"
 add_env "VITE_TREASURY_ADDRESS"         "0x116C28e6DCABCa363f83217C712d79DCE168d90e"
 
-# ── Dynamic Labs ─────────────────────────────────────────────
-add_env "VITE_DYNAMIC_ENVIRONMENT_ID"   "b369e283-d48e-4cc3-9ebb-7c4622484cee"
-
 # ── SUI ──────────────────────────────────────────────────────
 add_env "VITE_SUI_NETWORK"              "testnet"
 
