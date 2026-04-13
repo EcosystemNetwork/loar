@@ -70,7 +70,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 type Tab = 'active' | 'proposals' | 'history';
 
 function CollabsHubPage() {
-  const { isConnected, address: uid } = useWalletAuth();
+  const { isAuthenticated, address: uid } = useWalletAuth();
   const [tab, setTab] = useState<Tab>('active');
   const { data: collabs, isLoading } = useMyCollabs();
   const acceptCollab = useAcceptCollab();
@@ -127,7 +127,7 @@ function CollabsHubPage() {
                 Cross-universe partnerships with shared revenue
               </p>
             </div>
-            {isConnected && (
+            {isAuthenticated && (
               <Link to="/collabs/new">
                 <Button size="sm" className="gap-1">
                   <Plus className="w-4 h-4" />
@@ -166,7 +166,7 @@ function CollabsHubPage() {
           ))}
         </div>
 
-        {!isConnected ? (
+        {!isAuthenticated ? (
           <div className="text-center py-16 text-muted-foreground">
             <Handshake className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Connect your wallet</p>

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const VALID_STORAGE_PROVIDERS = ['pinata', 'lighthouse', 'storacha', 'firebase'] as const;
+const VALID_STORAGE_PROVIDERS = ['pinata', 'lighthouse', 'firebase'] as const;
 
 const envSchema = z.object({
   // ── Core ──────────────────────────────────────────────────────────────────
@@ -76,10 +76,6 @@ const envSchema = z.object({
   // ── Storage — Lighthouse ──────────────────────────────────────────────────
   LIGHTHOUSE_API_KEY: z.string().optional(),
 
-  // ── Storage — Storacha ────────────────────────────────────────────────────
-  STORACHA_KEY: z.string().optional(),
-  STORACHA_PROOF: z.string().optional(),
-
   // ── Indexer RPC (fallback) ─────────────────────────────────────────────────
   /** Used as fallback when RPC_URL is unset. Shared with the Ponder indexer. */
   PONDER_RPC_URL_2: z.string().url('PONDER_RPC_URL_2 must be a valid URL').optional(),
@@ -88,7 +84,7 @@ const envSchema = z.object({
   STORAGE_PROVIDER_PRIORITY: z
     .string()
     .optional()
-    .transform((v) => v ?? 'pinata,lighthouse,storacha,firebase')
+    .transform((v) => v ?? 'pinata,lighthouse,firebase')
     .refine((v) => v.split(',').every((p) => VALID_STORAGE_PROVIDERS.includes(p.trim() as never)), {
       message: `STORAGE_PROVIDER_PRIORITY must be a comma-separated list of: ${VALID_STORAGE_PROVIDERS.join(', ')}`,
     }),

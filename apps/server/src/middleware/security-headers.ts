@@ -18,7 +18,6 @@ const TRUSTED_CONNECT = [
   'https://*.firebaseio.com',
   'https://firestore.googleapis.com',
   'https://*.googleapis.com',
-  'https://*.w3s.link',
   'https://rpc.sepolia.org',
   'https://sepolia.base.org',
 ].join(' ');
@@ -30,7 +29,6 @@ const TRUSTED_IMG = [
   'blob:',
   'https://*.pinata.cloud',
   'https://gateway.pinata.cloud',
-  'https://*.ipfs.w3s.link',
   'https://*.lighthouse.storage',
   'https://firebasestorage.googleapis.com',
 ].join(' ');

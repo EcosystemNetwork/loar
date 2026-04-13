@@ -3,6 +3,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { hasSession } from '@/lib/wallet-auth';
 
 // ---- Episode NFTs ----
 
@@ -113,6 +114,7 @@ export function useCreditBalance() {
   return useQuery({
     queryKey: ['credit-balance'],
     queryFn: () => trpcClient.credits.getBalance.query(),
+    enabled: hasSession(),
   });
 }
 

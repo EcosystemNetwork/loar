@@ -10,7 +10,6 @@
  * Sources (2026-Q1):
  *   Pinata       – $0.20/GB/month (hot IPFS pinning, includes bandwidth)
  *   Lighthouse   – Filecoin deal price ≈ $0.002/GB/month (Mainnet estimate)
- *   Storacha     – free ≤5 GB/mo, then ~$3/100 GB/mo ≈ $0.03/GB/mo
  *   Firebase     – $0.026/GB/month (Cloud Storage Standard)
  *   Synapse      – Filecoin Calibration testnet (no real cost, negligible)
  */
@@ -25,7 +24,6 @@ export interface ProviderCostRate {
 export const STORAGE_COST_RATES: Record<string, ProviderCostRate> = {
   pinata: { uploadCostPerMb: 0, monthlyCostPerMb: 0.000195 }, // $0.20/GB
   lighthouse: { uploadCostPerMb: 0, monthlyCostPerMb: 0.000002 }, // $0.002/GB
-  storacha: { uploadCostPerMb: 0, monthlyCostPerMb: 0.0000286 }, // $0.03/GB
   firebase: { uploadCostPerMb: 0.00001, monthlyCostPerMb: 0.0000254 }, // $0.026/GB + egress
   synapse: { uploadCostPerMb: 0, monthlyCostPerMb: 0 }, // testnet
 };

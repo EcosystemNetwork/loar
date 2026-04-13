@@ -79,7 +79,7 @@ function PrivacyPage() {
             <ul className="list-disc pl-6 space-y-1">
               <li>Pinata (IPFS) for public content delivery</li>
               <li>Lighthouse (Filecoin) for permanent and encrypted storage</li>
-              <li>Storacha for archive redundancy</li>
+              <li>Firebase Storage as availability fallback</li>
             </ul>
             <p className="mt-2">
               Content stored on decentralized networks may be cached or replicated by third-party

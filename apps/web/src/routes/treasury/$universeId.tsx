@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { useQuery } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,7 +21,7 @@ export const Route = createFileRoute('/treasury/$universeId')({
 
 function TreasuryPage() {
   const { universeId } = Route.useParams();
-  const { address } = useAccount();
+  const { address, isAuthenticated } = useWalletAuth();
   const [showFundDialog, setShowFundDialog] = useState(false);
   const [creditSharePct, setCreditSharePct] = useState(70);
 
@@ -57,7 +57,7 @@ function TreasuryPage() {
               </p>
             </div>
           </div>
-          {address && (
+          {isAuthenticated && (
             <Button
               onClick={() => setShowFundDialog(true)}
               className="bg-emerald-600 hover:bg-emerald-700"

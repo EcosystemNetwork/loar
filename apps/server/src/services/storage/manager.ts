@@ -9,7 +9,6 @@ import type {
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
 import { PinataProvider } from './ipfs';
 import { LighthouseProvider } from './lighthouse';
-import { StorachaProvider } from './storacha';
 import { FirebaseAdapter } from './firebase-adapter';
 import { getCostLedger } from './cost-ledger';
 
@@ -27,11 +26,10 @@ function buildProviders(): StorageProvider[] {
   const all: StorageProvider[] = [
     new PinataProvider(),
     new LighthouseProvider(),
-    new StorachaProvider(),
     new FirebaseAdapter(),
   ];
 
-  // Allow reordering via env: "pinata,lighthouse,storacha,firebase"
+  // Allow reordering via env: "pinata,lighthouse,firebase"
   const order = process.env.STORAGE_PROVIDER_PRIORITY?.split(',').map((s) =>
     s.trim().toLowerCase()
   );

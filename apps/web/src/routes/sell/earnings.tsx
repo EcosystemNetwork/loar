@@ -15,11 +15,11 @@ export const Route = createFileRoute('/sell/earnings')({
 });
 
 function SellerEarningsPage() {
-  const { isConnected } = useWalletAuth();
+  const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const v = useVocab();
   const { data: stats, isLoading } = useSellerStats();
 
-  if (!isConnected) {
+  if (!isAuthenticated && !isAuthenticating) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
         <p className="text-muted-foreground">Connect your wallet to view earnings</p>

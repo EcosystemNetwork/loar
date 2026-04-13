@@ -189,7 +189,7 @@ function DocsPage() {
                 ['Token Governance', 'ERC20 governance tokens with proposal voting per universe'],
                 [
                   'Decentralized Storage',
-                  'Multi-provider (Pinata, Lighthouse, Storacha, Firebase) with fallback',
+                  'Multi-provider (Pinata, Lighthouse, Firebase) with fallback',
                 ],
                 ['Uniswap v4 Hooks', 'Custom liquidity hooks for tokenized narratives'],
                 ['Blockchain Indexing', 'Real-time event indexing with Ponder + GraphQL API'],
@@ -232,7 +232,6 @@ function DocsPage() {
   │     │                              └─► Storage Manager
   │     │                                    ├─► Pinata (IPFS)
   │     │                                    ├─► Lighthouse (Filecoin)
-  │     │                                    ├─► Storacha (Archive)
   │     │                                    └─► Firebase Storage
   │     │
   │     └─► Ponder GraphQL ────────► Indexer (Ponder)
@@ -255,7 +254,7 @@ function DocsPage() {
                 ['Backend', 'Hono, tRPC, Firebase Admin, Node.js 20'],
                 ['Contracts', 'Solidity 0.8.30+, Foundry, OpenZeppelin, Uniswap v4'],
                 ['Indexer', 'Ponder v0.15, PostgreSQL, GraphQL'],
-                ['Storage', 'Pinata (IPFS), Lighthouse (Filecoin), Storacha, Firebase Storage'],
+                ['Storage', 'Pinata (IPFS), Lighthouse (Filecoin), Firebase Storage'],
                 ['AI', 'FAL (Flux, Veo3, Kling, Wan25, Sora), Google Gemini, OpenAI'],
                 ['Auth', 'SIWE (Sign-In with Ethereum) + JWT sessions'],
                 ['Database', 'Firebase Firestore'],
@@ -621,7 +620,6 @@ const { universes } = await ponderGql(\`{
                   'Hot storage and public content delivery (highest priority)',
                 ],
                 ['Lighthouse', 'Filecoin', 'Permanent storage with token-gated encryption'],
-                ['Storacha', 'IPFS + Filecoin', 'Redundancy and archival storage'],
                 ['Firebase Storage', 'Google Cloud', 'Fast fallback for availability'],
               ]}
             />
@@ -1311,7 +1309,7 @@ const { universes } = await ponderGql(\`{
               rows={[
                 [
                   'Video/image files',
-                  'Pinata, Lighthouse, Storacha, Firebase',
+                  'Pinata, Lighthouse, Firebase',
                   'Hash the retrieved file and compare to on-chain contentHash',
                 ],
                 [
@@ -1797,11 +1795,9 @@ writeContract({
                 ['PINATA_JWT', '', 'Pinata IPFS API token'],
                 ['PINATA_GATEWAY_URL', '', 'Pinata IPFS gateway URL'],
                 ['LIGHTHOUSE_API_KEY', '', 'Lighthouse Filecoin API key'],
-                ['STORACHA_KEY', '', 'Storacha DID key'],
-                ['STORACHA_PROOF', '', 'Storacha delegation proof (base64)'],
                 [
                   'STORAGE_PROVIDER_PRIORITY',
-                  'pinata,lighthouse,storacha,firebase',
+                  'pinata,lighthouse,firebase',
                   'Provider priority order',
                 ],
               ]}

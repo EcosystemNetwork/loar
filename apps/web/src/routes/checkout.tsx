@@ -49,7 +49,7 @@ export const Route = createFileRoute('/checkout')({
 function CheckoutPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: '/checkout' });
-  const { isConnected, address } = useWalletAuth();
+  const { isAuthenticated, isConnected, address } = useWalletAuth();
   const v = useVocab();
   const [processing, setProcessing] = useState(false);
   const { writeContractAsync } = useWriteContract();
@@ -69,7 +69,7 @@ function CheckoutPage() {
   const isFree = displayPrice === '0' || displayPrice === '';
 
   async function handleConfirm() {
-    if (!isConnected) {
+    if (!isAuthenticated) {
       toast.error('Connect your wallet first');
       return;
     }
