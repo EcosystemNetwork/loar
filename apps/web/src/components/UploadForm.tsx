@@ -194,7 +194,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
     formData.append('file', file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${import.meta.env.VITE_SERVER_URL}/api/upload`);
+    xhr.open('POST', `${import.meta.env.VITE_SERVER_URL || ''}/api/upload`);
     xhr.withCredentials = true; // send httpOnly session cookie
 
     xhr.upload.onprogress = (e) => {

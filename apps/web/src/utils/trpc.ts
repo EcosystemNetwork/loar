@@ -77,7 +77,7 @@ export const queryClient = new QueryClient({
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: `${import.meta.env.VITE_SERVER_URL}/trpc`,
+      url: `${import.meta.env.VITE_SERVER_URL || ''}/trpc`,
       // httpOnly cookie is sent automatically via credentials: 'include'
       fetch(url, options) {
         return fetch(url, { ...options, credentials: 'include' });

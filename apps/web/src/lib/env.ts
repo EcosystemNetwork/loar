@@ -6,8 +6,8 @@ import { z } from 'zod';
  * Never add secrets here — VITE_ vars are baked into the JS bundle.
  */
 const envSchema = z.object({
-  // ── Required ──────────────────────────────────────────────────────────────
-  VITE_SERVER_URL: z.string().min(1, 'VITE_SERVER_URL is required'),
+  // ── Server URL (falls back to relative path if unset) ─────────────────────
+  VITE_SERVER_URL: z.string().optional(),
 
   // ── Optional endpoints ────────────────────────────────────────────────────
   VITE_PONDER_URL: z.string().optional(),
@@ -51,9 +51,7 @@ export function validateWebEnv(): WebEnv {
       .join('\n');
     const msg = `Environment validation failed:\n${errors}\n\nCheck apps/web/.env.example for required variables.`;
 
-    if (import.meta.env.PROD) {
-      throw new Error(msg);
-    }
+    // Log but don't crash — missing optional vars shouldn't kill the app
     console.error(`[env] ${msg}`);
   }
 
