@@ -9,14 +9,8 @@
 
 import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  useBalance,
-  useChainId,
-  useWaitForTransactionReceipt,
-  useSwitchChain,
-  useSignMessage,
-} from 'wagmi';
-import { useIsAutoConnecting } from 'thirdweb/react';
+import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
+import { useIsAutoConnecting, useActiveAccount } from 'thirdweb/react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,7 +75,7 @@ function CinematicUniverseCreate() {
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { switchChain } = useSwitchChain();
-  const { signMessageAsync } = useSignMessage();
+  const thirdwebAccount = useActiveAccount();
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -232,6 +226,16 @@ function CinematicUniverseCreate() {
 
     try {
       const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+
+      // Pre-flight: verify session cookie is valid before uploading
+      const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
+      if (!meRes.ok || !(await meRes.json()).authenticated) {
+        alert('Session expired. Please sign in again.');
+        setIsUploadingCover(false);
+        setUploadProgress(0);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 
@@ -330,7 +334,8 @@ function CinematicUniverseCreate() {
           // Fetch server-issued nonce and sign a message to prove wallet ownership
           const { nonce } = await trpcClient.universes.getNonce.query();
           const message = `Register universe ${parsedUniverseAddress} created by ${creator} with nonce ${nonce} at ${Date.now()}`;
-          const signature = await signMessageAsync({ message });
+          if (!thirdwebAccount) throw new Error('Wallet not connected');
+          const signature = await thirdwebAccount.signMessage({ message });
 
           await trpcClient.universes.create.mutate({
             address: parsedUniverseAddress,

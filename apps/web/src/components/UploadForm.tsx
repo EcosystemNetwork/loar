@@ -184,6 +184,21 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
     setUploadProgress(0);
     setUploadError('');
 
+    // Pre-flight: verify session cookie is valid before uploading
+    const serverUrl = import.meta.env.VITE_SERVER_URL || '';
+    try {
+      const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
+      if (!meRes.ok || !(await meRes.json()).authenticated) {
+        setUploadError('Session expired. Please sign in again.');
+        setUploadState('error');
+        return;
+      }
+    } catch {
+      setUploadError('Could not verify session. Please try again.');
+      setUploadState('error');
+      return;
+    }
+
     if (file.type.startsWith('video/')) {
       setMediaType('video');
     } else if (file.type.startsWith('image/')) {
@@ -194,7 +209,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
     formData.append('file', file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${import.meta.env.VITE_SERVER_URL || ''}/api/upload`);
+    xhr.open('POST', `${serverUrl}/api/upload`);
     xhr.withCredentials = true; // send httpOnly session cookie
 
     xhr.upload.onprogress = (e) => {

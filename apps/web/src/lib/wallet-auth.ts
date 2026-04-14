@@ -8,7 +8,7 @@
  * Flow: connect wallet → fetch nonce → sign SIWE message → server sets cookie
  */
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
+import { useAccount, useDisconnect } from 'wagmi';
 import { useActiveAccount } from 'thirdweb/react';
 
 const ADDRESS_KEY = 'siwe-address';
@@ -227,7 +227,6 @@ export function useWalletAuth() {
   // Use thirdweb as fallback source of truth for address and connection state.
   const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
   const isConnected = wagmiConnected || !!thirdwebAccount;
-  const { signMessageAsync } = useSignMessage();
   const [validated, setValidated] = useState(_sessionValidated);
   const { disconnect } = useDisconnect();
   const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -252,7 +251,7 @@ export function useWalletAuth() {
 
   /** Perform the SIWE sign-in handshake. */
   const signIn = useCallback(async () => {
-    if (!address) return;
+    if (!address || !thirdwebAccount) return;
 
     setIsAuthenticating(true);
     setError(null);
@@ -265,7 +264,9 @@ export function useWalletAuth() {
         nonce,
         chainId: chain?.id ?? 1,
       });
-      const signature = await signMessageAsync({ message });
+      // Use thirdweb's account.signMessage — wagmi has no connectors
+      // configured so wagmi's useSignMessage cannot sign.
+      const signature = await thirdwebAccount.signMessage({ message });
       const result = await verifySignature(message, signature);
       setSession(result.address, result.expiresAt);
       autoSignedForRef.current = address.toLowerCase();
@@ -277,10 +278,12 @@ export function useWalletAuth() {
       } else {
         setError(msg);
       }
+      // Mark this address as attempted so auto-sign-in doesn't retry in a loop
+      autoSignedForRef.current = address.toLowerCase();
     } finally {
       setIsAuthenticating(false);
     }
-  }, [address, chain?.id, signMessageAsync]);
+  }, [address, chain?.id, thirdwebAccount]);
 
   /** Disconnect wallet, revoke JWT server-side, and clear SIWE session. */
   const signOut = useCallback(() => {
@@ -304,11 +307,13 @@ export function useWalletAuth() {
     }
   }, [isConnected, address, storedAddress]);
 
-  // Auto-trigger SIWE sign-in when wallet connects without an existing session
+  // Auto-trigger SIWE sign-in when wallet connects without an existing session.
+  // Requires thirdwebAccount to be available so signIn has a signer.
   useEffect(() => {
     if (
       isConnected &&
       address &&
+      thirdwebAccount &&
       !storedAddress &&
       !isAuthenticating &&
       !rejectedRef.current &&
@@ -316,7 +321,7 @@ export function useWalletAuth() {
     ) {
       signIn();
     }
-  }, [isConnected, address, storedAddress, isAuthenticating, signIn]);
+  }, [isConnected, address, thirdwebAccount, storedAddress, isAuthenticating, signIn]);
 
   return {
     address,

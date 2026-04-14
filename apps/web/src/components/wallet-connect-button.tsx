@@ -26,6 +26,11 @@ interface WalletConnectButtonProps {
   className?: string;
 }
 
+// Transparent 1x1 PNG — used as avatar fallback so thirdweb skips ENS/social
+// resolution (which fails on non-mainnet chains and spams the console).
+const FALLBACK_AVATAR =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==';
+
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
   const { address } = useAccount();
   const { name: udName, avatar: udAvatar } = useUnstoppableDomain(address);
@@ -61,11 +66,11 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
         // attempting mainnet ENS lookups entirely.
         detailsButton={{
           connectedAccountName: displayName,
-          connectedAccountAvatarUrl: udAvatar || '',
+          connectedAccountAvatarUrl: udAvatar || FALLBACK_AVATAR,
         }}
         detailsModal={{
           connectedAccountName: displayName,
-          connectedAccountAvatarUrl: udAvatar || '',
+          connectedAccountAvatarUrl: udAvatar || FALLBACK_AVATAR,
         }}
         connectButton={{
           label: 'Connect Wallet',
