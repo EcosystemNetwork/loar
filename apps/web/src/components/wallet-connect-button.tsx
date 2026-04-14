@@ -55,9 +55,10 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
         wallets={wallets}
         theme="dark"
         connectModal={{ size: 'compact' }}
-        // Disable ENS resolution by providing explicit name/avatar overrides.
-        // Without these, thirdweb tries to resolve ENS on mainnet which fails
-        // on Sepolia/Base and spams "Failed to resolve" console errors.
+        // Suppress ENS/social avatar resolution — the app runs on Base/Sepolia,
+        // not mainnet, so these lookups always fail with console errors.
+        // Setting explicit name/avatar + disabling social profiles prevents
+        // thirdweb from attempting mainnet ENS resolution.
         detailsButton={{
           connectedAccountName: displayName,
           connectedAccountAvatarUrl: udAvatar ?? undefined,
@@ -66,6 +67,11 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
           connectedAccountName: displayName,
           connectedAccountAvatarUrl: udAvatar ?? undefined,
         }}
+        connectButton={{
+          label: 'Connect Wallet',
+        }}
+        // Disable social profiles to prevent ENS/avatar resolution attempts
+        socialProfiles={false}
       />
     </div>
   );
