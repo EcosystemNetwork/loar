@@ -8,9 +8,10 @@
  * redirect back to the create hub.
  */
 import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
@@ -462,6 +463,25 @@ function EntityCreateForm() {
   const { universe: universeAddress } = useSearch({ from: '/create/$kind' });
   const navigate = useNavigate();
   const { address } = useAccount();
+  const { isAuthenticated, isAuthenticating } = useWalletAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: `/create/${kind}` } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate, kind]);
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Fetch universe info when scoped to a universe
   const { data: universeResult } = useQuery({

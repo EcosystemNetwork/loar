@@ -2,7 +2,7 @@
  * Create Listing — mobile multi-step listing flow
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -115,11 +115,29 @@ const STEP_LABELS: Record<Step, string> = {
 
 function CreateListingPage() {
   const navigate = useNavigate();
-  const { isConnected } = useWalletAuth();
+  const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const isAutoConnecting = useIsAutoConnecting();
   const v = useVocab();
   const create = useCreateListing();
   const [step, setStep] = useState<Step>('type');
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/sell/new' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
+  if (isAuthenticating || isAutoConnecting) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
   const [form, setForm] = useState<FormData>({
     productType: '',
     title: '',

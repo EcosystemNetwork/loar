@@ -1,38 +1,33 @@
-import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { UploadForm } from '@/components/UploadForm';
 import { Loader2 } from 'lucide-react';
 
 export const Route = createFileRoute('/upload')({
   component: UploadPage,
-  beforeLoad: async () => {
-    const address = typeof window !== 'undefined' ? localStorage.getItem('siwe-address') : null;
-    if (!address) {
-      throw redirect({ to: '/login', search: { redirect: '/upload' } });
-    }
-  },
 });
 
 function UploadPage() {
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/upload' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
   if (isAuthenticating) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin border-b-2 border-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <h2 className="text-xl font-semibold">Connect your wallet to upload content</h2>
-        <WalletConnectButton size="lg" />
-      </div>
-    );
+    return null;
   }
 
   return (

@@ -8,7 +8,7 @@
  *   4. confirm    — Review + publish
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -79,9 +79,27 @@ interface SlotForm {
 
 export function CreateAdSlotPage() {
   const navigate = useNavigate();
-  const { isConnected } = useWalletAuth();
+  const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const createSlot = useCreateAdSlot();
   const [step, setStep] = useState<Step>('placement');
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/ads/new' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
   const [form, setForm] = useState<SlotForm>({
     placementType: '',
     universeId: '',

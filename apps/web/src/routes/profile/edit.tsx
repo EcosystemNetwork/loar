@@ -4,12 +4,11 @@
  * Lets users customize their profile: display name, username, bio,
  * avatar, privacy settings, layout/theme, social links, and tags.
  */
-import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 
-import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,12 +43,6 @@ import { useWeb3Mode } from '@/lib/web3-mode';
 
 export const Route = createFileRoute('/profile/edit')({
   component: ProfileEditor,
-  beforeLoad: async () => {
-    const address = typeof window !== 'undefined' ? localStorage.getItem('siwe-address') : null;
-    if (!address) {
-      throw redirect({ to: '/login', search: { redirect: '/profile/edit' } });
-    }
-  },
 });
 
 const THEMES = [
@@ -71,6 +64,12 @@ function ProfileEditor() {
   const { web3Mode, setWeb3Mode } = useWeb3Mode();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/profile/edit' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
 
   const isAuthed = isAuthenticated;
   const authLoading = isAuthenticating;
@@ -264,18 +263,7 @@ function ProfileEditor() {
   }
 
   if (!isAuthed) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div
-          className="flex flex-col items-center justify-center gap-4"
-          style={{ minHeight: 'calc(100vh - 64px)' }}
-        >
-          <h2 className="text-xl font-semibold">Connect your wallet to create a profile</h2>
-          <p className="text-muted-foreground">Sign in with your wallet or email to get started</p>
-          <WalletConnectButton size="lg" />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

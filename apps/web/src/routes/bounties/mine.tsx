@@ -1,8 +1,8 @@
 /**
  * My Bounties — Dashboard for bounties you posted and submissions you made.
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,8 +36,15 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function MyBountiesPage() {
-  const { address, isAuthenticated } = useWalletAuth();
+  const { address, isAuthenticated, isAuthenticating } = useWalletAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState('posted');
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/bounties/mine' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
 
   const { data: myBounties, isLoading: bountiesLoading } = useQuery({
     queryKey: ['my-bounties'],
@@ -51,14 +58,16 @@ function MyBountiesPage() {
     enabled: !!address,
   });
 
-  if (!isAuthenticated) {
+  if (isAuthenticating) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-        <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Connect your wallet</h2>
-        <p className="text-muted-foreground">Sign in to see your bounties and submissions.</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   const openCount = myBounties?.filter((b: any) => b.status === 'open').length ?? 0;

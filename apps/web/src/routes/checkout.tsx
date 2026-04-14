@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -49,11 +49,29 @@ export const Route = createFileRoute('/checkout')({
 function CheckoutPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: '/checkout' });
-  const { isAuthenticated, isConnected, address } = useWalletAuth();
+  const { isAuthenticated, isAuthenticating, isConnected, address } = useWalletAuth();
   const v = useVocab();
   const [processing, setProcessing] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/checkout' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const { listingId, productType, title, price, currency } = search;
 

@@ -7,7 +7,7 @@
  * Includes AI-powered cover image generation via fal.ai.
  */
 
-import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
+import { createFileRoute, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
 import { useIsAutoConnecting, useActiveAccount } from 'thirdweb/react';
@@ -71,11 +71,30 @@ enum DeploymentStep {
 
 function CinematicUniverseCreate() {
   const { address, isConnected, isAuthenticated, isAuthenticating, signIn } = useWalletAuth();
+  const navigate = useNavigate();
   const isAutoConnecting = useIsAutoConnecting();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { switchChain } = useSwitchChain();
   const thirdwebAccount = useActiveAccount();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating && !isAutoConnecting) {
+      navigate({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
+    }
+  }, [isAuthenticated, isAuthenticating, isAutoConnecting, navigate]);
+
+  if (isAuthenticating || isAutoConnecting) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Form state
   const [universeName, setUniverseName] = useState('');

@@ -3,14 +3,15 @@
  *
  * Admin-only page. Shows pending flags, takedown requests, and audit log.
  */
-import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import {
   Shield,
@@ -32,24 +33,48 @@ export const Route = createFileRoute('/admin/moderation')({
 });
 
 function ModerationDashboard() {
+  const { isAuthenticated, isAuthenticating } = useWalletAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('flags');
+
+  // Redirect unauthenticated users to login
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/admin/moderation' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const { data: flags, isLoading: loadingFlags } = useQuery({
     queryKey: ['mod-flags'],
     queryFn: () =>
       trpcClient.moderation.reviewQueue.query({ type: 'flags', status: 'pending', limit: 50 }),
+    enabled: isAuthenticated,
   });
 
   const { data: takedowns, isLoading: loadingTakedowns } = useQuery({
     queryKey: ['mod-takedowns'],
     queryFn: () =>
       trpcClient.moderation.reviewQueue.query({ type: 'takedowns', status: 'pending', limit: 50 }),
+    enabled: isAuthenticated,
   });
 
   const { data: auditLog } = useQuery({
     queryKey: ['mod-audit'],
     queryFn: () => trpcClient.moderation.auditLog.query({ limit: 50 }),
+    enabled: isAuthenticated,
   });
 
   const updateStatusMutation = useMutation({

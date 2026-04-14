@@ -67,6 +67,17 @@ function RootPending() {
 }
 
 function RootError({ error }: { error: Error }) {
+  // Auto-reload once on chunk load failures (stale cache after redeployment)
+  const isChunkError =
+    error?.message?.includes('Failed to fetch dynamically imported module') ||
+    error?.message?.includes('Importing a module script failed');
+  if (isChunkError && !sessionStorage.getItem('chunk_reload')) {
+    sessionStorage.setItem('chunk_reload', '1');
+    window.location.reload();
+    return null;
+  }
+  sessionStorage.removeItem('chunk_reload');
+
   return (
     <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
       <h1 className="text-2xl font-bold">Something went wrong</h1>

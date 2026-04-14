@@ -8,14 +8,13 @@ import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Grid3x3,
@@ -56,6 +55,12 @@ function MyWorksPage() {
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/my-works' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<Classification>('all');
@@ -106,12 +111,7 @@ function MyWorksPage() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <h2 className="text-xl font-semibold">Connect your wallet to view your works</h2>
-        <WalletConnectButton size="lg" />
-      </div>
-    );
+    return null;
   }
 
   return (

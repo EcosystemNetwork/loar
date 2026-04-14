@@ -9,12 +9,19 @@ import {
   useAgentCommissionStats,
 } from '@/hooks/useTalentAgents';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useState } from 'react';
-import { Briefcase, Users, DollarSign, FileText, TrendingUp, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Briefcase,
+  Users,
+  DollarSign,
+  FileText,
+  TrendingUp,
+  ArrowLeft,
+  Loader2,
+} from 'lucide-react';
 
 export const Route = createFileRoute('/agents/dashboard')({
   component: AgentDashboardPage,
@@ -22,21 +29,29 @@ export const Route = createFileRoute('/agents/dashboard')({
 
 function AgentDashboardPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useWalletAuth();
+  const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const { data: profile, isLoading: profileLoading } = useMyAgentProfile();
   const { data: clients } = useAgentClients();
   const { data: contracts } = useMyContracts('ALL');
   const { data: commissionStats } = useAgentCommissionStats();
   const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'commissions'>('clients');
 
-  if (!isAuthenticated) {
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/agents/dashboard' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
+  if (isAuthenticating) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Card className="p-8 text-center">
-          <WalletConnectButton />
-        </Card>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   if (profileLoading) {

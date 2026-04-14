@@ -4,8 +4,8 @@
  * Tiers unlock: fee discounts, priority AI queue, curation mining boosts,
  * and priority allocation on new universe token launches.
  */
-import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,11 +57,30 @@ const TIER_ICONS: Record<string, typeof Shield> = {
 };
 
 function StakingPage() {
-  const { address, isAuthenticated } = useWalletAuth();
+  const { address, isAuthenticated, isAuthenticating } = useWalletAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const v = useVocab();
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating) {
+      navigate({ to: '/login', search: { redirect: '/staking' } });
+    }
+  }, [isAuthenticated, isAuthenticating, navigate]);
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['staking-profile'],

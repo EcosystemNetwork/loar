@@ -13,6 +13,12 @@
 import { validateWebEnv } from './lib/env';
 validateWebEnv();
 
+// Auto-reload when a deployed chunk is missing (stale cache after redeployment)
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault();
+  window.location.reload();
+});
+
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import ReactDOM from 'react-dom/client';
 import Loader from './components/loader';
