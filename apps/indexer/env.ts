@@ -25,9 +25,9 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-/** Which chain to index: "sepolia" (default) or "base-sepolia" */
+/** Which chain to index: "sepolia" (default), "base-sepolia", or "base" */
 const PONDER_CHAIN = (process.env.PONDER_CHAIN ?? 'sepolia').toLowerCase();
-const VALID_CHAINS = ['sepolia', 'base-sepolia'] as const;
+const VALID_CHAINS = ['sepolia', 'base-sepolia', 'base'] as const;
 if (!VALID_CHAINS.includes(PONDER_CHAIN as any)) {
   console.error(
     `\n❌ Invalid PONDER_CHAIN="${PONDER_CHAIN}". Must be one of: ${VALID_CHAINS.join(', ')}\n`
@@ -47,6 +47,7 @@ const PUBLIC_FALLBACKS: Record<(typeof VALID_CHAINS)[number], string[]> = {
     'https://base-sepolia-rpc.publicnode.com',
     'https://base-sepolia.drpc.org',
   ],
+  base: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com', 'https://base.drpc.org'],
 };
 
 const userFallbacks = (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean);

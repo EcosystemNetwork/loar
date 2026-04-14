@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useAdSlots, useMySponsorships } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
 
 export const Route = createFileRoute('/ads/')({
@@ -113,9 +114,7 @@ function AdsHubPage() {
         </div>
 
         {/* Browse tab */}
-        {tab === 'browse' && (
-          <BrowseTab typeFilter={typeFilter} setTypeFilter={setTypeFilter} />
-        )}
+        {tab === 'browse' && <BrowseTab typeFilter={typeFilter} setTypeFilter={setTypeFilter} />}
 
         {/* Campaigns tab */}
         {tab === 'campaigns' && (
@@ -220,7 +219,9 @@ function PlacementTypeCard({
   return (
     <Card className={`transition-opacity ${active ? 'opacity-100' : 'opacity-40'}`}>
       <CardContent className="p-3">
-        <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border mb-2 ${color}`}>
+        <div
+          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border mb-2 ${color}`}
+        >
           {icon}
           {label}
         </div>
@@ -268,6 +269,16 @@ function CampaignsTab({
   isLoading: boolean;
   isConnected: boolean;
 }) {
+  const isAutoConnecting = useIsAutoConnecting();
+
+  if (isAutoConnecting) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -293,7 +304,9 @@ function CampaignsTab({
         <p className="font-medium">No active campaigns</p>
         <p className="text-sm mt-1 mb-4">Win a slot auction to run your first campaign</p>
         <Link to="/market">
-          <Button variant="outline" size="sm">Browse Universes</Button>
+          <Button variant="outline" size="sm">
+            Browse Universes
+          </Button>
         </Link>
       </div>
     );
@@ -311,7 +324,9 @@ function CampaignsTab({
             Active
           </h2>
           <div className="space-y-3">
-            {active.map((s) => <SponsorshipCard key={s.id} s={s} />)}
+            {active.map((s) => (
+              <SponsorshipCard key={s.id} s={s} />
+            ))}
           </div>
         </section>
       )}
@@ -322,7 +337,9 @@ function CampaignsTab({
             Ended
           </h2>
           <div className="space-y-3">
-            {ended.map((s) => <SponsorshipCard key={s.id} s={s} />)}
+            {ended.map((s) => (
+              <SponsorshipCard key={s.id} s={s} />
+            ))}
           </div>
         </section>
       )}

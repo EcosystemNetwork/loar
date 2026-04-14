@@ -88,6 +88,23 @@ const envSchema = z.object({
     .refine((v) => v.split(',').every((p) => VALID_STORAGE_PROVIDERS.includes(p.trim() as never)), {
       message: `STORAGE_PROVIDER_PRIORITY must be a comma-separated list of: ${VALID_STORAGE_PROVIDERS.join(', ')}`,
     }),
+
+  // ── Contract addresses (used by various routers) ────────────────────────
+  PLATFORM_TREASURY_ADDRESS: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'PLATFORM_TREASURY_ADDRESS must be a valid Ethereum address')
+    .optional(),
+  SPLIT_ROUTER_ADDRESS: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'SPLIT_ROUTER_ADDRESS must be a valid Ethereum address')
+    .optional(),
+  LAUNCHPAD_STAKING_ADDRESS: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'LAUNCHPAD_STAKING_ADDRESS must be a valid Ethereum address')
+    .optional(),
+
+  // ── Auth domains ────────────────────────────────────────────────────────
+  SIWE_ALLOWED_DOMAINS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

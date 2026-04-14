@@ -62,7 +62,10 @@ const profileSchema = z.object({
     .array(
       z.object({
         label: z.string().min(1).max(30),
-        url: z.string().url(),
+        url: z
+          .string()
+          .url()
+          .refine((u) => u.startsWith('https://'), { message: 'Links must use HTTPS' }),
       })
     )
     .max(10)
@@ -127,28 +130,34 @@ export const profilesRouter = router({
   /** Create or update the current user's profile */
   upsert: protectedProcedure.input(profileSchema).mutation(async ({ ctx, input }) => {
     const usernameLower = input.username.toLowerCase();
-
-    // Check username uniqueness (excluding current user)
-    const existing = await profilesCol().where('username', '==', usernameLower).limit(1).get();
-
-    if (!existing.empty && existing.docs[0].id !== ctx.user.uid) {
-      throw new Error('Username is already taken');
-    }
-
     const now = new Date();
-    const ref = profilesCol().doc(ctx.user.uid);
-    const doc = await ref.get();
 
-    const profileData = {
-      ...input,
-      username: usernameLower,
-      uid: ctx.user.uid,
-      updatedAt: now,
-      ...(doc.exists ? {} : { createdAt: now }),
-    };
+    // Use a transaction to prevent username race conditions
+    const result = await db!.runTransaction(async (txn) => {
+      const existingSnap = await txn.get(
+        profilesCol().where('username', '==', usernameLower).limit(1)
+      );
 
-    await ref.set(profileData, { merge: true });
-    return { id: ctx.user.uid, ...profileData };
+      if (!existingSnap.empty && existingSnap.docs[0].id !== ctx.user.uid) {
+        throw new Error('Username is already taken');
+      }
+
+      const ref = profilesCol().doc(ctx.user.uid);
+      const doc = await txn.get(ref);
+
+      const profileData = {
+        ...input,
+        username: usernameLower,
+        uid: ctx.user.uid,
+        updatedAt: now,
+        ...(doc.exists ? {} : { createdAt: now }),
+      };
+
+      txn.set(ref, profileData, { merge: true });
+      return { id: ctx.user.uid, ...profileData };
+    });
+
+    return result;
   }),
 
   /** Update just the layout/theme settings */

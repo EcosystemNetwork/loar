@@ -140,7 +140,6 @@ function EventPage() {
         });
         return result;
       } catch (error) {
-        console.error('Failed to fetch wiki:', error);
         return null;
       }
     },
@@ -156,7 +155,6 @@ function EventPage() {
         const result = await trpcClient.wiki.characters.query();
         return result;
       } catch (error) {
-        console.error('Failed to fetch characters:', error);
         return null;
       }
     },

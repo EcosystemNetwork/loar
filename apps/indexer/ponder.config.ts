@@ -21,7 +21,7 @@ import {
 } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, baseSepolia, base } from 'viem/chains';
 import { getAddress } from 'viem/utils';
 
 // ── Chain config (driven by PONDER_CHAIN env var) ───────────────────────────
@@ -37,6 +37,12 @@ const CHAIN_CONFIGS = {
     chain: baseSepolia,
     poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408' as `0x${string}`,
     deploymentFile: 'base-sepolia.json',
+  },
+  base: {
+    chainName: 'base' as const,
+    chain: base,
+    poolManager: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70' as `0x${string}`, // Uniswap v4 PoolManager on Base
+    deploymentFile: 'base.json',
   },
 } as const;
 

@@ -175,7 +175,7 @@ function UniverseTimelineEditor() {
             };
           }
         } catch (error) {
-          console.error('Error fetching from indexer:', error);
+          // Indexer fetch failed; fall through to return null
         }
       }
 
@@ -289,7 +289,6 @@ function UniverseTimelineEditor() {
       });
     },
     onError: (error) => {
-      console.error('Character generation failed:', error);
       alert('Failed to generate character. Please try again.');
       setIsGeneratingCharacter(false);
     },
@@ -321,7 +320,6 @@ function UniverseTimelineEditor() {
       await refetchCharacters();
     },
     onError: (error) => {
-      console.error('Failed to save character:', error);
       alert('Failed to save character to database. Please try again.');
     },
   });
@@ -394,7 +392,6 @@ function UniverseTimelineEditor() {
         throw new Error('No URL returned from storage');
       }
     } catch (error) {
-      console.error('Error uploading to storage:', error);
       alert('Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);

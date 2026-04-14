@@ -30,7 +30,7 @@ import { db, firebaseAvailable } from '../lib/firebase';
 
 // ── Domain routers ──────────────────────────────────────────────────────
 import { universesRouter } from './universes/universes.routes';
-import { cinematicUniversesRouter } from './cinematicUniverses/cinematicUniverses.index'; // @deprecated alias
+import { cinematicUniversesRouter } from './cinematicUniverses/cinematicUniverses.index'; // @deprecated — use universes.*
 import { contentRouter } from './content/content.routes';
 import { wikiRouter } from './content/wiki.routes';
 import { generationRouter } from './generation/generation.routes';
@@ -147,7 +147,7 @@ export const appRouter = router({
 
   // ── Universes domain ────────────────────────────────────────────────
   universes: universesRouter,
-  cinematicUniverses: cinematicUniversesRouter, // @deprecated — use universes.*
+  cinematicUniverses: cinematicUniversesRouter, // @deprecated — frontend still references; migrate to universes.*
   collabs: collabsRouter,
   universeTeam: universeTeamRouter,
   universeTreasury: universeTreasuryRouter,
@@ -163,7 +163,7 @@ export const appRouter = router({
   image: imageRouter,
   voice: voiceRouter,
   threed: threedRouter,
-  fal: falRouter, // @deprecated — backward compat; migrate to generation.* + image.*
+  fal: falRouter, // @deprecated — frontend still references; migrate to generation.* + image.*
   lora: loraRouter,
 
   // ── Studio OS ────────────────────────────────────────────────────────

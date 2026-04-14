@@ -34,7 +34,6 @@ import {
   Sparkles,
   Image as ImageIcon,
   ArrowLeft,
-  PieChart,
   Sliders,
   Info,
   Upload,
@@ -191,7 +190,6 @@ function CinematicUniverseCreate() {
       }
     },
     onError: (error: any) => {
-      console.error('Cover generation failed:', error);
       const msg = error?.message || 'Unknown error';
       alert(`Failed to generate cover: ${msg}`);
     },
@@ -264,7 +262,6 @@ function CinematicUniverseCreate() {
         setCoverPreview(URL.createObjectURL(file));
       }
     } catch (err) {
-      console.error('Cover upload failed:', err);
       alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsUploadingCover(false);
@@ -341,7 +338,7 @@ function CinematicUniverseCreate() {
             nonce,
           });
         } catch (err) {
-          console.error('Failed to register universe:', err);
+          // Registration error is non-blocking; universe was already created on-chain
         }
       })();
     }
@@ -389,9 +386,9 @@ function CinematicUniverseCreate() {
           governanceAddress: parsedGovernorAddress,
           tokenDeployTxHash: hash,
         })
-        .catch((err: unknown) =>
-          console.error('Failed to finalize token deployment in Firestore:', err)
-        );
+        .catch(() => {
+          // Firestore finalization error is non-blocking; token was already deployed on-chain
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txSuccess, txReceipt, hash]);
@@ -435,7 +432,6 @@ function CinematicUniverseCreate() {
         safeAddress: safeAddress ?? undefined,
       });
     } catch (error) {
-      console.error('Universe creation failed:', error);
       alert(
         `Universe creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -497,7 +493,6 @@ function CinematicUniverseCreate() {
         parseEther('0.01')
       );
     } catch (error) {
-      console.error('Token deployment failed:', error);
       alert(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
     }

@@ -1,6 +1,14 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useReadContract,
+  useChainId,
+  useAccount,
+} from 'wagmi';
+import { useActiveAccount } from 'thirdweb/react';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
+import { isSupportedChain } from '@/configs/chains';
 
 /**
  * Hook for interacting with the UniverseManager contract (launchpad)
@@ -11,10 +19,34 @@ import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/
  */
 export function useUniverseManager() {
   const chainId = useChainId();
+  const { isConnected: wagmiConnected } = useAccount();
+  const thirdwebAccount = useActiveAccount();
+  const isConnected = wagmiConnected || !!thirdwebAccount;
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const contractAddress = UniverseManager[String(chainId) as keyof typeof UniverseManager];
+
+  if (!contractAddress) {
+    return {
+      createUniverse: async () => {
+        throw new Error(`UniverseManager not deployed on chain ${chainId}`);
+      },
+      deployUniverseToken: async () => {
+        throw new Error(`UniverseManager not deployed on chain ${chainId}`);
+      },
+      useGetUniverseData: (_universeId?: bigint) => ({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      }),
+      hash: undefined,
+      isPending: false,
+      isConfirming: false,
+      isSuccess: false,
+      error: new Error(`UniverseManager not deployed on chain ${chainId}`),
+    } as any;
+  }
 
   /**
    * Step 1: Create a new Universe contract
@@ -31,6 +63,9 @@ export function useUniverseManager() {
     /** Optional Safe multi-sig address — if set, used as initialOwner instead */
     safeAddress?: `0x${string}`;
   }) => {
+    if (!isConnected) throw new Error('Wallet not connected');
+    if (!isSupportedChain(chainId))
+      throw new Error(`Unsupported chain ${chainId}. Please switch to a supported network.`);
     const owner = config.safeAddress ?? config.initialOwner;
     writeContract({
       address: contractAddress as `0x${string}`,
@@ -93,6 +128,9 @@ export function useUniverseManager() {
     universeId: bigint,
     value: bigint
   ) => {
+    if (!isConnected) throw new Error('Wallet not connected');
+    if (!isSupportedChain(chainId))
+      throw new Error(`Unsupported chain ${chainId}. Please switch to a supported network.`);
     const allocationConfig = config.allocationConfig ?? {
       lpBps: 8000,
       creatorBps: 1000,
@@ -156,9 +194,8 @@ export function useDefaultDeploymentConfig() {
   const chainKey = String(chainId) as keyof typeof LoarHookStaticFee;
 
   return {
-    defaultHook: (LoarHookStaticFee[chainKey] ?? LoarHookStaticFee['11155111']) as `0x${string}`,
-    defaultLocker: (LoarLpLockerMultiple[chainKey] ??
-      LoarLpLockerMultiple['11155111']) as `0x${string}`,
+    defaultHook: (LoarHookStaticFee[chainKey] ?? undefined) as `0x${string}` | undefined,
+    defaultLocker: (LoarLpLockerMultiple[chainKey] ?? undefined) as `0x${string}` | undefined,
     defaultPairedToken: '0x0000000000000000000000000000000000000000' as `0x${string}`, // ETH or WETH
     defaultTickSpacing: 60,
     defaultTickIfToken0IsLoar: -887220, // Example starting tick

@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import { useCreateListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useIsAutoConnecting } from 'thirdweb/react';
 import { toast } from 'sonner';
 import { useVocab } from '@/hooks/use-vocab';
 
@@ -115,6 +116,7 @@ const STEP_LABELS: Record<Step, string> = {
 function CreateListingPage() {
   const navigate = useNavigate();
   const { isConnected } = useWalletAuth();
+  const isAutoConnecting = useIsAutoConnecting();
   const v = useVocab();
   const create = useCreateListing();
   const [step, setStep] = useState<Step>('type');
@@ -182,6 +184,26 @@ function CreateListingPage() {
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to create listing');
     }
+  }
+
+  if (isAutoConnecting) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <ShoppingBag className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Connect your wallet</p>
+          <p className="text-sm mt-1">to create a new listing</p>
+        </div>
+      </div>
+    );
   }
 
   return (

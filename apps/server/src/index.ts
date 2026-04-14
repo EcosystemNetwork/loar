@@ -74,6 +74,8 @@ app.route('/auth', authRoutes);
 app.route('/images', imageRouter);
 
 // Direct file upload endpoint (multipart form, bypasses tRPC for large files)
+// Stricter rate limit: 10 uploads per minute per IP
+app.use('/api/upload', rateLimiter({ windowMs: 60_000, max: 10 }));
 app.post('/api/upload', async (c) => {
   const { getCookie } = await import('hono/cookie');
   const cookieToken = getCookie(c, 'siwe-session');

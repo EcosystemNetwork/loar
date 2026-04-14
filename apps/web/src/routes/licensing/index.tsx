@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useMyMerch, useMerchOrders } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -149,6 +150,16 @@ function LicensingHubPage() {
 }
 
 function LicensesTab({ isConnected }: { isConnected: boolean }) {
+  const isAutoConnecting = useIsAutoConnecting();
+
+  if (isAutoConnecting) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -250,6 +261,16 @@ function MerchTab({
   isLoading: boolean;
   isConnected: boolean;
 }) {
+  const isAutoConnecting = useIsAutoConnecting();
+
+  if (isAutoConnecting) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="text-center py-16 text-muted-foreground">

@@ -6,6 +6,7 @@
  */
 import { useState, useCallback } from 'react';
 import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useActiveAccount } from 'thirdweb/react';
 import { parseEther, encodeFunctionData, type Address } from 'viem';
 import { getSwapUrl } from '@/hooks/useTokenSwap';
 import { openExternal } from '@/utils/open-external';
@@ -62,7 +63,9 @@ export interface SwapConfig {
 
 export function useSwapExecution() {
   const chainId = useChainId();
-  const { address } = useAccount();
+  const { address: wagmiAddress } = useAccount();
+  const thirdwebAccount = useActiveAccount();
+  const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
   const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
     'idle'
   );
@@ -148,7 +151,17 @@ export function useSwapExecution() {
           return { fallback: true };
         }
       } catch (err: any) {
-        const msg = err?.shortMessage ?? err?.message ?? 'Swap failed';
+        // Distinguish user rejection from real errors
+        const message = err?.shortMessage ?? err?.message ?? 'Swap failed';
+        if (message.includes('User rejected') || message.includes('user rejected')) {
+          setStatus('idle');
+          return { fallback: false, error: undefined };
+        }
+        const msg = message.includes('insufficient funds')
+          ? 'Insufficient balance for this swap'
+          : message.includes('exceeds balance')
+            ? 'Token balance too low'
+            : message;
         setError(msg);
         setStatus('error');
         return { fallback: false, error: msg };

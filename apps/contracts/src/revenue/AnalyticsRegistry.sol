@@ -48,6 +48,11 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     event EpisodeViewed(uint256 indexed universeId, uint256 indexed episodeId, uint256 totalViews);
     event CharacterTrending(uint256 indexed universeId, uint256 indexed characterId, uint256 popularity);
     event DataExportRequested(address indexed requester, uint256 universeId, uint256 timestamp);
+    event MintRecorded(uint256 indexed universeId, uint256 indexed episodeId, uint256 totalMints);
+    event EngagementRecorded(uint256 indexed universeId, uint256 indexed episodeId, bool isLike);
+    event SubscriberUpdated(uint256 indexed universeId, bool added, uint256 totalSubscribers);
+    event VoteRecorded(uint256 indexed universeId, uint256 totalVotes);
+    event TrendingUpdated(uint256[] universeIds);
 
     error NotPlatform();
 
@@ -64,6 +69,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     constructor() { _disableInitializers(); }
 
     function initialize(address _platform) external initializer {
+        require(_platform != address(0), "Zero address");
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         platform = _platform;
@@ -85,6 +91,8 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         episodeMetrics[universeId][episodeId].mints++;
         universeMetrics[universeId].totalMints++;
         universeMetrics[universeId].lastUpdated = block.timestamp;
+
+        emit MintRecorded(universeId, episodeId, universeMetrics[universeId].totalMints);
     }
 
     /// @notice Record engagement (like/share)
@@ -94,6 +102,8 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         } else {
             episodeMetrics[universeId][episodeId].shares++;
         }
+
+        emit EngagementRecorded(universeId, episodeId, isLike);
     }
 
     /// @notice Update character popularity
@@ -131,11 +141,15 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         } else if (universeMetrics[universeId].totalSubscribers > 0) {
             universeMetrics[universeId].totalSubscribers--;
         }
+
+        emit SubscriberUpdated(universeId, added, universeMetrics[universeId].totalSubscribers);
     }
 
     /// @notice Record vote activity
     function recordVote(uint256 universeId) external onlyPlatform {
         universeMetrics[universeId].totalVotes++;
+
+        emit VoteRecorded(universeId, universeMetrics[universeId].totalVotes);
     }
 
     uint256 public constant MAX_TRENDING = 100;
@@ -144,6 +158,8 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function setTrending(uint256[] calldata universeIds) external onlyPlatform {
         require(universeIds.length <= MAX_TRENDING, "Too many trending");
         trendingUniverseIds = universeIds;
+
+        emit TrendingUpdated(universeIds);
     }
 
     /// @notice Request data export (emits event for off-chain processing)

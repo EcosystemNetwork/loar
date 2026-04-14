@@ -385,15 +385,20 @@ export const creditsRouter = router({
 
   purchaseWithFiat: protectedProcedure
     .input(
-      z.object({
-        packageId: z.string(),
-        paymentMethod: z.enum(['card', 'eth', 'crypto']),
-        /** For card: Stripe payment intent ID. For ETH/crypto: tx hash */
-        paymentRef: z.string(),
-        amountPaid: z.string().optional(), // wei for ETH, USD cents for card
-        /** Chain ID for on-chain payment verification (required for eth/crypto) */
-        chainId: z.number().optional(),
-      })
+      z
+        .object({
+          packageId: z.string(),
+          paymentMethod: z.enum(['card', 'eth', 'crypto']),
+          /** For card: Stripe payment intent ID. For ETH/crypto: tx hash */
+          paymentRef: z.string(),
+          amountPaid: z.string().optional(), // wei for ETH, USD cents for card
+          /** Chain ID for on-chain payment verification (required for eth/crypto) */
+          chainId: z.number().optional(),
+        })
+        .refine((data) => data.paymentMethod === 'card' || data.chainId !== undefined, {
+          message: 'chainId is required for ETH/crypto payments',
+          path: ['chainId'],
+        })
     )
     .mutation(async ({ input, ctx }) => {
       // Use live pricing so ETH amounts reflect current ETH/USD rate

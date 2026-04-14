@@ -46,9 +46,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // User profiles are public (display name, bio, social links)
+    // User profiles — public fields only (visibility-filtered reads happen server-side)
+    // Read allowed for profile discovery; write always denied (server-only via Admin SDK)
     match /profiles/{profileId} {
-      allow read: if true;
+      allow read: if resource == null || resource.data.visibility != 'private'
+                   || (request.auth != null && request.auth.uid == profileId);
       allow write: if false;
     }
 
