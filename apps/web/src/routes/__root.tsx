@@ -117,11 +117,13 @@ function RootComponent() {
           ) : (
             <>
               <Header />
-              {/* Testnet warning banner */}
-              <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">
-                <strong>Testnet</strong> — This is a testnet deployment. Funds and tokens have no
-                real value.
-              </div>
+              {/* Testnet warning banner — only visible in testnet mode */}
+              {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
+                <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">
+                  <strong>Testnet</strong> — This is a testnet deployment. Funds and tokens have no
+                  real value.
+                </div>
+              )}
               <main className="flex-1">
                 <Outlet />
               </main>

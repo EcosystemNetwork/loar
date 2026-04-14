@@ -8,6 +8,7 @@
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { CHAIN_NAMES, SUPPORTED_CHAIN_IDS } from '@/configs/chains';
 import { useEffect } from 'react';
 import { z } from 'zod';
 
@@ -58,11 +59,11 @@ function LoginPage() {
           <div className="space-y-3 pt-2">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <div className="flex-1 border-t" />
-              <span>Ethereum (Sepolia)</span>
+              <span>{CHAIN_NAMES[SUPPORTED_CHAIN_IDS[0]] ?? 'Ethereum'}</span>
               <div className="flex-1 border-t" />
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Sign in with any Ethereum wallet. Currently on Sepolia testnet.
+              Sign in with any Ethereum wallet.
             </p>
           </div>
         </div>
