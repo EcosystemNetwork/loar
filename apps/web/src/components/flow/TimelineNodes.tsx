@@ -39,6 +39,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   const [isLoadingStorage, setIsLoadingStorage] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+  const [videoError, setVideoError] = useState(false);
 
   // Storage URLs are direct HTTP URLs, no conversion needed
   useEffect(() => {
@@ -148,7 +149,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 </div>
               </div>
             )}
-            {displayVideoUrl ? (
+            {displayVideoUrl && !videoError ? (
               <>
                 <video
                   ref={setVideoElement}
@@ -158,21 +159,9 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   muted
                   loop
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevent node click when using video controls
+                    e.stopPropagation();
                   }}
-                  onError={(e) => {
-                    // Show fallback on error
-                    const video = e.target as HTMLVideoElement;
-                    const container = video.parentElement;
-                    if (container) {
-                      container.innerHTML = `
-                        <div class="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
-                          <div class="text-white text-3xl mb-2">🎬</div>
-                          <div class="text-white text-sm">Video unavailable</div>
-                        </div>
-                      `;
-                    }
-                  }}
+                  onError={() => setVideoError(true)}
                 >
                   <source src={displayVideoUrl} type="video/mp4" />
                   <source src={displayVideoUrl} />

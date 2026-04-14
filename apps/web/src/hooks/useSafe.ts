@@ -11,9 +11,19 @@
  */
 import { useCallback, useState } from 'react';
 import { useWalletClient, usePublicClient, useChainId } from 'wagmi';
-import Safe from '@safe-global/protocol-kit';
-import SafeApiKit from '@safe-global/api-kit';
-import { type MetaTransactionData, OperationType } from '@safe-global/types-kit';
+import { type MetaTransactionData } from '@safe-global/types-kit';
+
+// Lazy-load heavy Safe SDKs to avoid bundling ethers + node builtins
+// in the initial page load (they use node-fetch/stream/http internally).
+async function loadSafe() {
+  const { default: Safe } = await import('@safe-global/protocol-kit');
+  return Safe;
+}
+async function loadSafeApiKit(chainId: number) {
+  const { default: SafeApiKit } = await import('@safe-global/api-kit');
+  return new SafeApiKit({ chainId: BigInt(chainId) });
+}
+const OperationType = { Call: 0, DelegateCall: 1 } as const;
 
 // Safe Transaction Service URLs per chain
 const TX_SERVICE_URLS: Record<number, string> = {
@@ -48,12 +58,12 @@ export function useSafe() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const getApiKit = useCallback(() => {
+  const getApiKit = useCallback(async () => {
     const txServiceUrl = TX_SERVICE_URLS[chainId];
     if (!txServiceUrl) {
       throw new Error(`Safe Transaction Service not available for chain ${chainId}`);
     }
-    return new SafeApiKit({ chainId: BigInt(chainId) });
+    return loadSafeApiKit(chainId);
   }, [chainId]);
 
   /**
@@ -71,7 +81,9 @@ export function useSafe() {
       setError(null);
 
       try {
-        const protocolKit = await Safe.init({
+        const protocolKit = await (
+          await loadSafe()
+        ).init({
           provider: walletClient.transport,
           signer: walletClient.account.address,
           predictedSafe: {
@@ -117,7 +129,9 @@ export function useSafe() {
     async (safeAddress: string): Promise<SafeInfo> => {
       if (!walletClient) throw new Error('Wallet not connected');
 
-      const protocolKit = await Safe.init({
+      const protocolKit = await (
+        await loadSafe()
+      ).init({
         provider: walletClient.transport,
         signer: walletClient.account.address,
         safeAddress,
@@ -154,13 +168,15 @@ export function useSafe() {
       setError(null);
 
       try {
-        const protocolKit = await Safe.init({
+        const protocolKit = await (
+          await loadSafe()
+        ).init({
           provider: walletClient.transport,
           signer: walletClient.account.address,
           safeAddress,
         });
 
-        const apiKit = getApiKit();
+        const apiKit = await getApiKit();
 
         const metaTx: MetaTransactionData = {
           to: tx.to,
@@ -207,14 +223,16 @@ export function useSafe() {
       setError(null);
 
       try {
-        const protocolKit = await Safe.init({
+        const protocolKit = await (
+          await loadSafe()
+        ).init({
           provider: walletClient.transport,
           signer: walletClient.account.address,
           safeAddress,
         });
 
         const signature = await protocolKit.signHash(safeTxHash);
-        const apiKit = getApiKit();
+        const apiKit = await getApiKit();
 
         await apiKit.confirmTransaction(safeTxHash, signature.data);
       } catch (err) {
@@ -239,13 +257,15 @@ export function useSafe() {
       setError(null);
 
       try {
-        const protocolKit = await Safe.init({
+        const protocolKit = await (
+          await loadSafe()
+        ).init({
           provider: walletClient.transport,
           signer: walletClient.account.address,
           safeAddress,
         });
 
-        const apiKit = getApiKit();
+        const apiKit = await getApiKit();
         const safeTx = await apiKit.getTransaction(safeTxHash);
 
         const execResult = await protocolKit.executeTransaction(safeTx);
@@ -272,7 +292,7 @@ export function useSafe() {
    */
   const getPendingTransactions = useCallback(
     async (safeAddress: string): Promise<PendingSafeTransaction[]> => {
-      const apiKit = getApiKit();
+      const apiKit = await getApiKit();
       const response = await apiKit.getPendingTransactions(safeAddress);
 
       return response.results.map((tx: any) => ({
