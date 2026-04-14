@@ -26,7 +26,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
+import { useReadContract, useWriteContract, usePublicClient } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { universeGovernorAbi, governanceErc20Abi, universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 import { encodeFunctionData, keccak256, encodeAbiParameters } from 'viem';
@@ -235,7 +236,7 @@ export function GovernanceSidebar({
 
       alert(`Successfully delegated tokens! Transaction: ${txHash}`);
     } catch (error) {
-      console.error('Error delegating tokens:', error);
+      // Error surfaced via alert
       alert(
         'Failed to delegate tokens: ' + (error instanceof Error ? error.message : 'Unknown error')
       );
@@ -253,7 +254,7 @@ export function GovernanceSidebar({
           const block = await publicClient.getBlockNumber();
           setCurrentBlock(block);
         } catch (error) {
-          console.error('Error fetching block number:', error);
+          // Silently retry on next interval
         }
       }
     };
@@ -358,7 +359,7 @@ export function GovernanceSidebar({
 
       setProposals(proposals.reverse()); // Show newest first
     } catch (error) {
-      console.error('Error fetching proposals from events:', error);
+      // Error handled by loading state
     } finally {
       setIsLoadingProposals(false);
     }
@@ -441,7 +442,7 @@ export function GovernanceSidebar({
         fetchProposalsFromEvents();
       }, 5000);
     } catch (error) {
-      console.error('Error creating proposal:', error);
+      // Error surfaced via alert
       alert(
         'Failed to create proposal: ' + (error instanceof Error ? error.message : 'Unknown error')
       );
@@ -492,7 +493,7 @@ export function GovernanceSidebar({
           fetchProposalsFromEvents();
         }, 5000);
       } catch (error) {
-        console.error('Error voting:', error);
+        // Error surfaced via alert
         alert('Failed to cast vote: ' + (error instanceof Error ? error.message : 'Unknown error'));
       }
     },
@@ -539,7 +540,7 @@ export function GovernanceSidebar({
           onRefresh?.(); // Also refresh the timeline to show canon changes
         }, 5000);
       } catch (error) {
-        console.error('Error executing proposal:', error);
+        // Error surfaced via alert
         alert(
           'Failed to execute proposal: ' +
             (error instanceof Error ? error.message : 'Unknown error')
@@ -885,10 +886,7 @@ export function GovernanceSidebar({
                                               return `${remaining.toString()} blocks left`;
                                             }
                                           } catch (error) {
-                                            console.error('Block calculation error:', error, {
-                                              currentBlock,
-                                              endBlock: proposal.endBlock,
-                                            });
+                                            // Block calculation failed, show fallback
                                             return 'Loading...';
                                           }
                                         })()}
@@ -903,7 +901,7 @@ export function GovernanceSidebar({
                                         const endBlockBig = BigInt(proposal.endBlock.toString());
                                         return currentBlockBig >= endBlockBig;
                                       } catch (error) {
-                                        console.error('Block comparison error:', error);
+                                        // Block comparison failed, default to not ended
                                         return false;
                                       }
                                     })() ? (
@@ -942,7 +940,7 @@ export function GovernanceSidebar({
                                                   Math.max(0, Number(percentage.toString()))
                                                 );
                                               } catch (error) {
-                                                console.error('Progress calculation error:', error);
+                                                // Progress calculation failed, default to 0
                                                 return 0;
                                               }
                                             })()}%`,
@@ -982,7 +980,7 @@ export function GovernanceSidebar({
                                     const endBlockBig = BigInt(proposal.endBlock.toString());
                                     return currentBlockBig >= endBlockBig;
                                   } catch (error) {
-                                    console.error('Final block comparison error:', error);
+                                    // Block comparison failed, default to not ended
                                     return false;
                                   }
                                 })() && (

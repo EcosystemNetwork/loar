@@ -57,16 +57,10 @@ export function useVideoGeneration({
   // Video generation mutation with multiple models
   const generateVideoMutation = useMutation({
     mutationFn: async ({ imageUrl, prompt }: { imageUrl: string; prompt?: string }) => {
-      console.log('Generating video with:', {
-        imageUrl,
-        prompt: prompt || videoDescription,
-        model: selectedVideoModel,
-      });
-
       const finalPrompt = videoPrompt.trim() || prompt || videoDescription;
 
       if (selectedVideoModel === 'fal-veo3') {
-        const result = await trpcClient.fal.generateVideo.mutate({
+        const result = await trpcClient.generation.generateVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
           model: 'fal-ai/veo3.1/fast/image-to-video',
@@ -75,10 +69,9 @@ export function useVideoGeneration({
           motionStrength: 127,
           negativePrompt: negativePrompt || undefined,
         });
-        console.log('Veo3.1 video result:', result);
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-kling') {
-        const result = await trpcClient.fal.klingVideo.mutate({
+        const result = await trpcClient.generation.klingVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
           duration:
@@ -87,10 +80,9 @@ export function useVideoGeneration({
           negativePrompt: negativePrompt || undefined,
           cfgScale: 0.5,
         });
-        console.log('Kling video result:', result);
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-wan25') {
-        const result = await trpcClient.fal.wan25ImageToVideo.mutate({
+        const result = await trpcClient.generation.wan25ImageToVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
           duration:
@@ -99,10 +91,9 @@ export function useVideoGeneration({
           negativePrompt: negativePrompt || undefined,
           enablePromptExpansion: true,
         });
-        console.log('Wan25 video result:', result);
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-sora') {
-        const result = await trpcClient.fal.soraImageToVideo.mutate({
+        const result = await trpcClient.generation.soraImageToVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
           duration:
@@ -114,7 +105,6 @@ export function useVideoGeneration({
           aspectRatio: videoRatio === '1:1' ? 'auto' : videoRatio,
           resolution: 'auto',
         });
-        console.log('Sora video result:', result);
         return { videoUrl: result.videoUrl };
       }
 
@@ -140,8 +130,6 @@ export function useVideoGeneration({
       }
     },
     onError: (error) => {
-      console.error('Error generating video:', error);
-
       // Extract error message
       let errorMessage = 'Failed to generate video. Please try again.';
       let errorTitle = 'Video Generation Failed';
@@ -272,21 +260,13 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           const textToVideoModel = modelMap[selectedVideoModel] || 'fal-ai/veo3.1/fast';
           const modelName = modelNames[selectedVideoModel] || 'AI';
 
-          console.log('🎬 Text-to-video mode:', {
-            selectedModel: selectedVideoModel,
-            actualModel: textToVideoModel,
-            prompt: videoDescription,
-            duration: selectedVideoDuration,
-            aspectRatio: videoRatio,
-          });
-
           setStatusMessage({
             type: 'info',
             title: 'Generating Video',
             description: `Creating your video with ${modelName}...`,
           });
 
-          const result = await trpcClient.fal.generateVideo.mutate({
+          const result = await trpcClient.generation.generateVideo.mutate({
             prompt: videoDescription,
             model: textToVideoModel as any,
             duration: selectedVideoDuration,
@@ -306,12 +286,6 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           // Image-to-video mode: Use image-to-video models
           const imageUrlToUse = uploadedUrl || generatedImageUrl;
 
-          console.log('=== IMAGE-TO-VIDEO GENERATION DEBUG ===');
-          console.log('Image URL:', imageUrlToUse);
-          console.log('Video Description:', videoDescription);
-          console.log('Model:', selectedVideoModel);
-          console.log('===============================');
-
           setStatusMessage({
             type: 'info',
             title: 'Animating Video',
@@ -324,7 +298,6 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           });
         }
       } catch (error) {
-        console.error('Error:', error);
         setStatusMessage({
           type: 'error',
           title: 'Generation Failed',

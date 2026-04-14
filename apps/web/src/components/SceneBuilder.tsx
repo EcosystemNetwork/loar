@@ -88,7 +88,9 @@ export function SceneBuilder({
     if (!video) return;
 
     if (isPlaying) {
-      video.play().catch((err) => console.error('Play error:', err));
+      video.play().catch(() => {
+        /* Autoplay prevented */
+      });
     } else {
       video.pause();
     }

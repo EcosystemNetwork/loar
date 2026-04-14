@@ -257,7 +257,7 @@ function UniverseTimelineEditor() {
       characterName: string;
       userDescription: string;
     }) => {
-      const result = await trpcClient.fal.analyzeCharacter.mutate(input);
+      const result = await trpcClient.image.analyzeCharacter.mutate(input);
       return result;
     },
   });
@@ -271,7 +271,7 @@ function UniverseTimelineEditor() {
       saveToDatabase?: boolean;
       detailedVisualDescription?: string;
     }) => {
-      const result = await trpcClient.fal.generateCharacter.mutate({
+      const result = await trpcClient.image.generateCharacter.mutate({
         ...input,
         saveToDatabase: input.saveToDatabase ?? false, // Use input value or default to false
       });
@@ -303,7 +303,7 @@ function UniverseTimelineEditor() {
       style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk';
       detailedVisualDescription?: string;
     }) => {
-      const result = await trpcClient.fal.saveCharacter.mutate(input);
+      const result = await trpcClient.image.saveCharacter.mutate(input);
       return result;
     },
     onSuccess: async (data) => {

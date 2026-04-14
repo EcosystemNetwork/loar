@@ -40,18 +40,18 @@ describe('Top-level procedures', () => {
 });
 
 // ---------------------------------------------------------------------------
-// cinematicUniverses
+// universes
 // ---------------------------------------------------------------------------
-describe('cinematicUniverses router', () => {
+describe('universes router', () => {
   it('getAll is public and returns a result', async () => {
     const caller = createPublicCaller();
-    const result = await caller.cinematicUniverses.getAll();
+    const result = await caller.universes.getAll();
     expect(result).toBeDefined();
   });
 
   it('get rejects empty id', async () => {
     const caller = createPublicCaller();
-    await expect(caller.cinematicUniverses.get({ id: '' })).rejects.toThrow();
+    await expect(caller.universes.get({ id: '' })).rejects.toThrow();
   });
 });
 
@@ -118,22 +118,19 @@ describe('content router', () => {
 });
 
 // ---------------------------------------------------------------------------
-// fal
+// image + generation (replaced deprecated fal router)
 // ---------------------------------------------------------------------------
-describe('fal router', () => {
-  it('testConnection requires authentication', async () => {
-    const caller = createPublicCaller();
-    await expect(caller.fal.testConnection()).rejects.toThrow();
-  });
-
+describe('image router', () => {
   it('generateImage rejects unauthenticated callers', async () => {
     const caller = createPublicCaller();
-    await expect(caller.fal.generateImage({ prompt: 'test' })).rejects.toThrow(TRPCError);
+    await expect(caller.image.generateImage({ prompt: 'test' })).rejects.toThrow(TRPCError);
   });
+});
 
+describe('generation router', () => {
   it('getStatus is public', async () => {
     const caller = createPublicCaller();
-    const result = await caller.fal.getStatus({ id: 'test-id' });
+    const result = await caller.generation.getStatus({ id: 'test-id' });
     expect(result).toBeDefined();
   });
 });

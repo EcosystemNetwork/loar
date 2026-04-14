@@ -3,13 +3,8 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  useAccount,
-  useChainId,
-  useReadContract,
-  useSendTransaction,
-  useWriteContract,
-} from 'wagmi';
+import { useChainId, useReadContract, useSendTransaction, useWriteContract } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, parseUnits, formatUnits, type Address } from 'viem';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';

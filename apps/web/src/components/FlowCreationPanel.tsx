@@ -239,7 +239,7 @@ export function FlowCreationPanel({
         setGeneratedImageUrl(frameUrl);
       }
     } catch (error) {
-      console.error('Error extracting frame:', error);
+      // Error handled by UI state
     } finally {
       setIsExtractingFrame(false);
     }
@@ -291,7 +291,7 @@ export function FlowCreationPanel({
         setVideoDescription(improvedPrompt);
       }
     } catch (error) {
-      console.error('Error improving prompt:', error);
+      // Error handled by UI state
     } finally {
       setIsImprovingPrompt(false);
     }
@@ -331,7 +331,7 @@ export function FlowCreationPanel({
         setQuickCharPreview(generatedChar.imageUrl);
       }
     } catch (error) {
-      console.error('Failed to generate character:', error);
+      // Error surfaced via statusMessage
       if (setStatusMessage) {
         setStatusMessage({
           type: 'error',
@@ -350,27 +350,18 @@ export function FlowCreationPanel({
 
     setIsSavingQuickChar(true);
     try {
-      console.log('💾 Saving character to database with params:', {
-        name: quickCharName,
-        description: quickCharDescription,
-        style: quickCharStyle,
-        saveToDatabase: true,
-      });
-
       // Step 1: Analyze character image with Gemini (if available)
       let detailedVisualDescription: string | undefined;
       if (analyzeCharacterMutation) {
         try {
-          console.log('🎨 Analyzing character image with Gemini...');
           const analysisResult = await analyzeCharacterMutation.mutateAsync({
             imageUrl: quickCharPreview,
             characterName: quickCharName,
             userDescription: quickCharDescription,
           });
           detailedVisualDescription = analysisResult.detailedVisualDescription;
-          console.log('✅ Gemini analysis complete:', detailedVisualDescription);
         } catch (analysisError) {
-          console.warn('⚠️ Gemini analysis failed, continuing without it:', analysisError);
+          // Gemini analysis failed, continuing without detailed description
           // Continue without detailed description - it's optional
         }
       }
@@ -384,11 +375,8 @@ export function FlowCreationPanel({
         detailedVisualDescription,
       });
 
-      console.log('✅ Character save result:', result);
-
       // Refetch characters to update the list
       if (refetchCharacters) {
-        console.log('🔄 Refetching characters list...');
         await refetchCharacters();
       }
 
@@ -408,7 +396,7 @@ export function FlowCreationPanel({
         });
       }
     } catch (error) {
-      console.error('❌ Failed to save character:', error);
+      // Error surfaced via statusMessage
       if (setStatusMessage) {
         setStatusMessage({
           type: 'error',

@@ -5,9 +5,13 @@
  */
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { trpcClient } from '@/utils/trpc';
-import { useAttachMedia, type MediaCategory, type AttachmentTargetType } from '@/hooks/useMediaAttachments';
+import {
+  useAttachMedia,
+  type MediaCategory,
+  type AttachmentTargetType,
+} from '@/hooks/useMediaAttachments';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,9 +46,7 @@ function inferCategory(mimeType: string, filename: string): MediaCategory {
     return '3d';
   if (/\.(blend|fbx|ma|mb|c4d|dae|abc|3ds|lwo|zpr|ztl)$/i.test(filename)) return '3d';
   if (
-    /\.(psd|psb|ai|eps|xcf|kra|clip|procreate|sketch|afdesign|afphoto|afpub|cdr)$/i.test(
-      filename
-    )
+    /\.(psd|psb|ai|eps|xcf|kra|clip|procreate|sketch|afdesign|afphoto|afpub|cdr)$/i.test(filename)
   )
     return 'design';
   if (/\.(exr|hdr|tga|dds)$/i.test(filename)) return 'image';
@@ -181,9 +183,7 @@ export function MediaAttachPanel({
           <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder={
-              targetType === 'universe'
-                ? 'Search universes…'
-                : 'Search people, places, factions…'
+              targetType === 'universe' ? 'Search universes…' : 'Search people, places, factions…'
             }
             className="pl-8 h-8 text-sm"
             value={search}

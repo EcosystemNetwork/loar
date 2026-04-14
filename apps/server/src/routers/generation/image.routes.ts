@@ -13,9 +13,9 @@
  *   image.listModels    — Model catalog for UI display.
  *   image.history       — User's generation history.
  *
- *   image.generateImage   — Raw fal call (backward compat, no billing).
- *   image.editImage       — Raw fal edit (backward compat).
- *   image.imageToImage    — Raw fal img2img (backward compat).
+ *   image.generateImage   — Raw fal call (legacy, credit-billed).
+ *   image.editImage       — Raw fal edit (legacy, credit-billed).
+ *   image.imageToImage    — Raw fal img2img (legacy, credit-billed).
  *   image.generateCharacter / analyzeCharacter / saveCharacter — character tools.
  */
 import {
@@ -25,6 +25,7 @@ import {
   adminProcedure,
   requirePermission,
 } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
@@ -333,7 +334,7 @@ export const imageRouter = router({
                 generationId: genId,
                 imageUrls: fallback.imageUrls,
                 prompt: input.prompt,
-              });
+              }).catch((err) => console.error('[image] side-effect failed:', err.message));
 
               return {
                 generationId: genId,
@@ -388,11 +389,15 @@ export const imageRouter = router({
         const imageUrls = result.images.map((img) => img.url);
 
         // Fire-and-forget quest tracking
-        trackQuests(ctx.user.uid, [
-          { questId: 'first_image_generation' },
-          { questId: 'daily_generation' },
-          { questId: 'generate_10_images' },
-        ]);
+        try {
+          trackQuests(ctx.user.uid, [
+            { questId: 'first_image_generation' },
+            { questId: 'daily_generation' },
+            { questId: 'generate_10_images' },
+          ]);
+        } catch (err: any) {
+          console.error('[image] quest tracking failed:', err.message);
+        }
 
         await imageGenerationsCol().doc(genId).update({
           status: 'completed',
@@ -409,7 +414,7 @@ export const imageRouter = router({
           generationId: genId,
           imageUrls,
           prompt: input.prompt,
-        });
+        }).catch((err) => console.error('[image] side-effect failed:', err.message));
 
         return {
           generationId: genId,
@@ -632,9 +637,9 @@ export const imageRouter = router({
       return { ok: true, modelId: input.modelId, applied: update };
     }),
 
-  // ── Backward-compat raw endpoints (admin-only — no credit billing) ───
+  // ── Backward-compat raw endpoints (legacy endpoints — user-facing with credit billing) ───
 
-  generateImage: adminProcedure
+  generateImage: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1, 'Prompt is required'),
@@ -667,6 +672,19 @@ export const imageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const cost = 3;
+      if (db) {
+        const userRef = db.collection('userCredits').doc(ctx.user.uid);
+        const userDoc = await userRef.get();
+        const balance = userDoc.data()?.balance || 0;
+        if (balance < cost) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+          });
+        }
+        await userRef.update({ balance: balance - cost, updatedAt: new Date() });
+      }
       const startTime = Date.now();
       const result = await falService.generateImage(input);
       if (result.status === 'completed' && result.imageUrl) {
@@ -693,7 +711,7 @@ export const imageRouter = router({
       return result;
     }),
 
-  editImage: adminProcedure
+  editImage: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1, 'Edit prompt is required'),
@@ -708,6 +726,19 @@ export const imageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const cost = 3;
+      if (db) {
+        const userRef = db.collection('userCredits').doc(ctx.user.uid);
+        const userDoc = await userRef.get();
+        const balance = userDoc.data()?.balance || 0;
+        if (balance < cost) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+          });
+        }
+        await userRef.update({ balance: balance - cost, updatedAt: new Date() });
+      }
       const startTime = Date.now();
       const result = await falService.editImage(input);
       if (result.status === 'completed' && result.imageUrl) {
@@ -736,7 +767,7 @@ export const imageRouter = router({
       return result;
     }),
 
-  imageToImage: adminProcedure
+  imageToImage: protectedProcedure
     .input(
       z.object({
         prompt: z.string().min(1).max(2000),
@@ -756,6 +787,19 @@ export const imageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const cost = 3;
+      if (db) {
+        const userRef = db.collection('userCredits').doc(ctx.user.uid);
+        const userDoc = await userRef.get();
+        const balance = userDoc.data()?.balance || 0;
+        if (balance < cost) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+          });
+        }
+        await userRef.update({ balance: balance - cost, updatedAt: new Date() });
+      }
       const startTime = Date.now();
       const result = await falService.imageToImage(input);
       if (result.status === 'completed' && result.imageUrl) {

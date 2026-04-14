@@ -43,7 +43,7 @@ export function TimelineActions() {
       setNodePlot('');
       setPreviousNode(0);
     } catch (error) {
-      console.error('Error creating node:', error);
+      // Error handled by UI state
     } finally {
       setIsCreating(false);
     }

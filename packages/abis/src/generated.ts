@@ -6,6 +6,1126 @@ import {
 } from 'wagmi/codegen';
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AdPlacement
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const adPlacementAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'UPGRADE_INTERFACE_VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'slotId', internalType: 'uint256', type: 'uint256' }],
+    name: 'acceptBid',
+    outputs: [{ name: 'sponsorshipId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'adSlots',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'placementType',
+        internalType: 'enum AdPlacement.PlacementType',
+        type: 'uint8',
+      },
+      { name: 'minBid', internalType: 'uint256', type: 'uint256' },
+      { name: 'currentBid', internalType: 'uint256', type: 'uint256' },
+      { name: 'currentBidder', internalType: 'address', type: 'address' },
+      { name: 'metadata', internalType: 'string', type: 'string' },
+      { name: 'episodesRemaining', internalType: 'uint256', type: 'uint256' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'slotId', internalType: 'uint256', type: 'uint256' }],
+    name: 'bid',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'placementType',
+        internalType: 'enum AdPlacement.PlacementType',
+        type: 'uint8',
+      },
+      { name: 'minBid', internalType: 'uint256', type: 'uint256' },
+      { name: 'episodes', internalType: 'uint256', type: 'uint256' },
+      { name: 'metadata', internalType: 'string', type: 'string' },
+    ],
+    name: 'createAdSlot',
+    outputs: [{ name: 'slotId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getSlotCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getUniverseSlots',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getUniverseSlotsPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextSlotId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextSponsorshipId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'pendingWithdrawals',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'sponsorshipId', internalType: 'uint256', type: 'uint256' }],
+    name: 'recordImpression',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+    ],
+    name: 'registerUniverse',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'sponsorships',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'adSlotId', internalType: 'uint256', type: 'uint256' },
+      { name: 'sponsor', internalType: 'address', type: 'address' },
+      { name: 'totalPaid', internalType: 'uint256', type: 'uint256' },
+      { name: 'impressions', internalType: 'uint256', type: 'uint256' },
+      { name: 'startedAt', internalType: 'uint256', type: 'uint256' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'universeCreators',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'universeSlots',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'withdrawRefund',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'placementType',
+        internalType: 'enum AdPlacement.PlacementType',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'minBid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'AdSlotCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'bidder',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'BidPlaced',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sponsorshipId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'totalImpressions',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'ImpressionRecorded',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'bidder',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RefundWithdrawn',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sponsorshipId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'sponsor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'SponsorshipActivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'UniverseRegistered',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'Upgraded',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  { type: 'error', inputs: [], name: 'BidTooLow' },
+  {
+    type: 'error',
+    inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
+    name: 'ERC1967InvalidImplementation',
+  },
+  { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'NoPendingWithdrawal' },
+  { type: 'error', inputs: [], name: 'NoRevenue' },
+  { type: 'error', inputs: [], name: 'NotCreator' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotPlatform' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'SlotNotActive' },
+  { type: 'error', inputs: [], name: 'TransferFailed' },
+  { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
+  {
+    type: 'error',
+    inputs: [{ name: 'slot', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UUPSUnsupportedProxiableUUID',
+  },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CanonMarketplace
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const canonMarketplaceAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'UPGRADE_INTERFACE_VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'canonLicenseFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'canonSubmissions',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claimRefund',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'claimableRefunds',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'creatorHeldAmount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'submissionId', internalType: 'uint256', type: 'uint256' }],
+    name: 'finalize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getCanonSubmissions',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getCanonSubmissionsPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getSubmissionCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'address', type: 'address' },
+    ],
+    name: 'hasVoted',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_rightsRegistry', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+      { name: '_canonLicenseFeeBps', internalType: 'uint16', type: 'uint16' },
+      { name: '_minSubmissionFee', internalType: 'uint256', type: 'uint256' },
+      { name: '_votingDuration', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'submissionId', internalType: 'uint256', type: 'uint256' }],
+    name: 'licenseCanon',
+    outputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'licenses',
+    outputs: [
+      { name: 'submissionId', internalType: 'uint256', type: 'uint256' },
+      { name: 'licensee', internalType: 'address', type: 'address' },
+      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+      { name: 'grantedAt', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'minSubmissionFee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextLicenseId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextSubmissionId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rightsRegistry',
+    outputs: [{ name: '', internalType: 'contract IRightsRegistry', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'submissions',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeToken', internalType: 'address', type: 'address' },
+      {
+        name: 'submissionType',
+        internalType: 'enum CanonMarketplace.SubmissionType',
+        type: 'uint8',
+      },
+      {
+        name: 'status',
+        internalType: 'enum CanonMarketplace.SubmissionStatus',
+        type: 'uint8',
+      },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: 'submissionFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'votesFor', internalType: 'uint256', type: 'uint256' },
+      { name: 'votesAgainst', internalType: 'uint256', type: 'uint256' },
+      { name: 'votingDeadline', internalType: 'uint256', type: 'uint256' },
+      { name: 'createdAt', internalType: 'uint256', type: 'uint256' },
+      { name: 'snapshotBlock', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeToken', internalType: 'address', type: 'address' },
+      {
+        name: 'subType',
+        internalType: 'enum CanonMarketplace.SubmissionType',
+        type: 'uint8',
+      },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+    ],
+    name: 'submit',
+    outputs: [{ name: 'submissionId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'submissionId', internalType: 'uint256', type: 'uint256' },
+      { name: 'support', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'vote',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'address', type: 'address' },
+    ],
+    name: 'voteWeight',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'votingDuration',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'licensee',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
+    ],
+    name: 'CanonLicensed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+    ],
+    name: 'CanonSubmissionAccepted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RefundClaimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'SubmissionAccepted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'subType',
+        internalType: 'enum CanonMarketplace.SubmissionType',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+    ],
+    name: 'SubmissionCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'SubmissionRejected',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'Upgraded',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'voter',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      { name: 'support', internalType: 'bool', type: 'bool', indexed: false },
+      {
+        name: 'weight',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'VoteCast',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  { type: 'error', inputs: [], name: 'AlreadyVoted' },
+  { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
+  {
+    type: 'error',
+    inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
+    name: 'ERC1967InvalidImplementation',
+  },
+  { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientFee' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'InvalidStatus' },
+  { type: 'error', inputs: [], name: 'InvalidToken' },
+  { type: 'error', inputs: [], name: 'NoBalance' },
+  { type: 'error', inputs: [], name: 'NoVotingPower' },
+  { type: 'error', inputs: [], name: 'NotCreator' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NothingToClaim' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'TransferFailed' },
+  { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
+  {
+    type: 'error',
+    inputs: [{ name: 'slot', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UUPSUnsupportedProxiableUUID',
+  },
+  { type: 'error', inputs: [], name: 'VotingNotActive' },
+  { type: 'error', inputs: [], name: 'VotingNotEnded' },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CharacterNFT
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,11 +1164,39 @@ export const characterNftAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'characterActive',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: '', internalType: 'uint256', type: 'uint256' },
       { name: '', internalType: 'bytes32', type: 'bytes32' },
     ],
     name: 'characterByName',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'characterMaxSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'characterMintPrice',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'characterMinted',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -72,14 +1220,37 @@ export const characterNftAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'claimRoyalties',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'claimableRoyalties',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: '_universeId', internalType: 'uint256', type: 'uint256' },
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'visualHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxSupply', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'createCharacter',
     outputs: [{ name: 'characterId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'characterId', internalType: 'uint256', type: 'uint256' }],
+    name: 'deactivateCharacter',
+    outputs: [],
     stateMutability: 'nonpayable',
   },
   {
@@ -122,6 +1293,16 @@ export const characterNftAbi = [
     name: 'isApprovedForAll',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'characterId', internalType: 'uint256', type: 'uint256' },
+      { name: 'tokenURI_', internalType: 'string', type: 'string' },
+    ],
+    name: 'mintCharacter',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -404,6 +1585,37 @@ export const characterNftAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'characterId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'EpisodeMinted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'version',
         internalType: 'uint64',
         type: 'uint64',
@@ -466,6 +1678,7 @@ export const characterNftAbi = [
     name: 'Transfer',
   },
   { type: 'error', inputs: [], name: 'CharacterExists' },
+  { type: 'error', inputs: [], name: 'CharacterNotActive' },
   { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
   {
     type: 'error',
@@ -554,6 +1767,7 @@ export const characterNftAbi = [
     name: 'ERC721OutOfBoundsIndex',
   },
   { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientPayment' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
   { type: 'error', inputs: [], name: 'NotInitializing' },
   { type: 'error', inputs: [], name: 'NotOwner' },
@@ -561,6 +1775,1083 @@ export const characterNftAbi = [
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   { type: 'error', inputs: [], name: 'TransferFailed' },
   { type: 'error', inputs: [], name: 'WrongUniverse' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CollabManager
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const collabManagerAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'UPGRADE_INTERFACE_VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256' }],
+    name: 'acceptCollab',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256' }],
+    name: 'activateCollab',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256' }],
+    name: 'cancelCollab',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'collabs',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeA', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeB', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposer', internalType: 'address', type: 'address' },
+      { name: 'acceptor', internalType: 'address', type: 'address' },
+      {
+        name: 'status',
+        internalType: 'enum CollabManager.CollabStatus',
+        type: 'uint8',
+      },
+      { name: 'revenueShareBps', internalType: 'uint256', type: 'uint256' },
+      { name: 'totalRevenue', internalType: 'uint256', type: 'uint256' },
+      { name: 'startTime', internalType: 'uint256', type: 'uint256' },
+      { name: 'endTime', internalType: 'uint256', type: 'uint256' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: 'episodeCount', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256' }],
+    name: 'completeCollab',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getCollabCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getUniverseCollabs',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getUniverseCollabsPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_universeManager', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextCollabId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeA', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeB', internalType: 'uint256', type: 'uint256' },
+      { name: 'revenueShareBps', internalType: 'uint256', type: 'uint256' },
+      { name: 'duration', internalType: 'uint256', type: 'uint256' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: 'targetAcceptor', internalType: 'address', type: 'address' },
+    ],
+    name: 'proposeCollab',
+    outputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256' }],
+    name: 'recordCollabRevenue',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'universeCollabs',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeManager',
+    outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'acceptor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'CollabAccepted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'startTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'endTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CollabActivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'CollabCancelled',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'totalRevenue',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CollabCompleted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'episodeCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'revenue',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CollabEpisodeCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeA',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'universeB',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'proposer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'CollabProposed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amountA',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amountB',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RevenueDistributed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'Upgraded',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  { type: 'error', inputs: [], name: 'CollabNotActive' },
+  {
+    type: 'error',
+    inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
+    name: 'ERC1967InvalidImplementation',
+  },
+  { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'InvalidStatus' },
+  { type: 'error', inputs: [], name: 'NotAcceptor' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotPlatform' },
+  { type: 'error', inputs: [], name: 'NotProposer' },
+  { type: 'error', inputs: [], name: 'NotUniverseBAdmin' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'TransferFailed' },
+  { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
+  {
+    type: 'error',
+    inputs: [{ name: 'slot', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UUPSUnsupportedProxiableUUID',
+  },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ContentLicensing
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const contentLicensingAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'UPGRADE_INTERFACE_VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'buyContent',
+    outputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'user', internalType: 'address', type: 'address' },
+    ],
+    name: 'checkAccess',
+    outputs: [{ name: 'hasAccess', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'contentOwner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'deactivateContent',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'deals',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'splitEntityHash', internalType: 'bytes32', type: 'bytes32' },
+      {
+        name: 'dealType',
+        internalType: 'enum ContentLicensing.DealType',
+        type: 'uint8',
+      },
+      {
+        name: 'status',
+        internalType: 'enum ContentLicensing.DealStatus',
+        type: 'uint8',
+      },
+      { name: 'buyer', internalType: 'address', type: 'address' },
+      { name: 'pricePaid', internalType: 'uint256', type: 'uint256' },
+      { name: 'startTime', internalType: 'uint256', type: 'uint256' },
+      { name: 'endTime', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'getContentDeals',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getContentDealsPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'getRegistration',
+    outputs: [
+      {
+        name: '',
+        internalType: 'struct ContentLicensing.ContentRegistration',
+        type: 'tuple',
+        components: [
+          { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'creator', internalType: 'address', type: 'address' },
+          { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+          { name: 'splitEntityHash', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'buyPrice', internalType: 'uint256', type: 'uint256' },
+          { name: 'rentPricePerDay', internalType: 'uint256', type: 'uint256' },
+          { name: 'licenseFee', internalType: 'uint256', type: 'uint256' },
+          { name: 'licenseRoyaltyBps', internalType: 'uint16', type: 'uint16' },
+          { name: 'active', internalType: 'bool', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_splitRouter', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
+    name: 'isDealActive',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'durationDays', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'licenseContent',
+    outputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextDealId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
+    name: 'payRoyalty',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'splitEntityHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'buyPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'rentPricePerDay', internalType: 'uint256', type: 'uint256' },
+      { name: 'licenseFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'licenseRoyaltyBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'registerContent',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'registrations',
+    outputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'splitEntityHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'buyPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'rentPricePerDay', internalType: 'uint256', type: 'uint256' },
+      { name: 'licenseFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'licenseRoyaltyBps', internalType: 'uint16', type: 'uint16' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'durationDays', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'rentContent',
+    outputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newFeeBps', internalType: 'uint16', type: 'uint16' }],
+    name: 'setPlatformFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'splitRouter',
+    outputs: [{ name: '', internalType: 'contract ISplitRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'splitToContent',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'buyPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'rentPricePerDay', internalType: 'uint256', type: 'uint256' },
+      { name: 'licenseFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'licenseRoyaltyBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'updatePricing',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'ContentBought',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+    ],
+    name: 'ContentDeactivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'endTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'ContentLicensed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'splitEntityHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+    ],
+    name: 'ContentRegistered',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'endTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'ContentRented',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+    ],
+    name: 'PricingUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RoyaltyPaid',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'Upgraded',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  { type: 'error', inputs: [], name: 'AlreadyRegistered' },
+  { type: 'error', inputs: [], name: 'ContentNotActive' },
+  { type: 'error', inputs: [], name: 'DealExpired' },
+  { type: 'error', inputs: [], name: 'DealNotActive' },
+  {
+    type: 'error',
+    inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
+    name: 'ERC1967InvalidImplementation',
+  },
+  { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientPayment' },
+  { type: 'error', inputs: [], name: 'InvalidDuration' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'NotCreator' },
+  { type: 'error', inputs: [], name: 'NotForRent' },
+  { type: 'error', inputs: [], name: 'NotForSale' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotLicensable' },
+  { type: 'error', inputs: [], name: 'NotRegistered' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'SplitRouterFailed' },
+  { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
+  {
+    type: 'error',
+    inputs: [{ name: 'slot', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UUPSUnsupportedProxiableUUID',
+  },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+  { type: 'error', inputs: [], name: 'ZeroHash' },
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1081,6 +3372,1548 @@ export const creditManagerAbi = [
     name: 'UUPSUnsupportedProxiableUUID',
   },
   { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EntityEditionNFT
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const entityEditionNftAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'accounts', internalType: 'address[]', type: 'address[]' },
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+    ],
+    name: 'balanceOfBatch',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+      },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxSupply', internalType: 'uint256', type: 'uint256' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+    ],
+    name: 'createEdition',
+    outputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256' }],
+    name: 'deactivate',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'editions',
+    outputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+      },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxSupply', internalType: 'uint256', type: 'uint256' },
+      { name: 'minted', internalType: 'uint256', type: 'uint256' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+      },
+      { name: 'startId', internalType: 'uint256', type: 'uint256' },
+      { name: 'count', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getByUniverse',
+    outputs: [{ name: 'ids', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_rightsRegistry', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+      { name: '_royaltyBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'editionId', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextEditionId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rightsRegistry',
+    outputs: [{ name: '', internalType: 'contract IRightsRegistry', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'royaltyBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'salePrice', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'royaltyInfo',
+    outputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'values', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeBatchTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newFeeBps', internalType: 'uint16', type: 'uint16' }],
+    name: 'setPlatformFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256' }],
+    name: 'uri',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+        indexed: false,
+      },
+      { name: 'name', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'mintPrice',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'maxSupply',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'EditionCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'EditionDeactivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'EditionMinted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'ids',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'values',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+    ],
+    name: 'TransferBatch',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'TransferSingle',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'value', internalType: 'string', type: 'string', indexed: false },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: true },
+    ],
+    name: 'URI',
+  },
+  { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'balance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC1155InsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'idsLength', internalType: 'uint256', type: 'uint256' },
+      { name: 'valuesLength', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC1155InvalidArrayLength',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidOperator',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'owner', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC1155MissingApprovalForAll',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'numerator', internalType: 'uint256', type: 'uint256' },
+      { name: 'denominator', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC2981InvalidDefaultRoyalty',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC2981InvalidDefaultRoyaltyReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'numerator', internalType: 'uint256', type: 'uint256' },
+      { name: 'denominator', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC2981InvalidTokenRoyalty',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'receiver', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC2981InvalidTokenRoyaltyReceiver',
+  },
+  { type: 'error', inputs: [], name: 'EditionNotActive' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientPayment' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'MaxSupplyReached' },
+  { type: 'error', inputs: [], name: 'NotCreatorOrPlatform' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotPlatform' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'RefundFailed' },
+  { type: 'error', inputs: [], name: 'WrongUniverse' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EntityNFT
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const entityNftAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'entities',
+    outputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+      },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint8', type: 'uint8' },
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'entityByName',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getApproved',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+      },
+      { name: 'startId', internalType: 'uint256', type: 'uint256' },
+      { name: 'count', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getByUniverse',
+    outputs: [{ name: 'ids', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_rightsRegistry', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+      { name: '_royaltyBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+      },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+    ],
+    name: 'mint',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextTokenId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ownerOf',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rightsRegistry',
+    outputs: [{ name: '', internalType: 'contract IRightsRegistry', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'royaltyBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'salePrice', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'royaltyInfo',
+    outputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newFeeBps', internalType: 'uint16', type: 'uint16' }],
+    name: 'setPlatformFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenByIndex',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'tokenOfOwnerByIndex',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenURI',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: '_fromTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: '_toTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'BatchMetadataUpdate',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+        indexed: false,
+      },
+      { name: 'name', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+    ],
+    name: 'EntityMinted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: '_tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'MetadataUpdate',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Transfer',
+  },
+  { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'numerator', internalType: 'uint256', type: 'uint256' },
+      { name: 'denominator', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC2981InvalidDefaultRoyalty',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC2981InvalidDefaultRoyaltyReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'numerator', internalType: 'uint256', type: 'uint256' },
+      { name: 'denominator', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC2981InvalidTokenRoyalty',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'receiver', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC2981InvalidTokenRoyaltyReceiver',
+  },
+  { type: 'error', inputs: [], name: 'ERC721EnumerableForbiddenBatchMint' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'owner', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC721IncorrectOwner',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC721InsufficientApproval',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOperator',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ERC721NonexistentToken',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC721OutOfBoundsIndex',
+  },
+  { type: 'error', inputs: [], name: 'EntityExists' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientPayment' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotPlatform' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'WrongUniverse' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EpisodeEditionCollection
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const episodeEditionCollectionAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'accounts', internalType: 'address[]', type: 'address[]' },
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+    ],
+    name: 'balanceOfBatch',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'nodeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxSupply', internalType: 'uint256', type: 'uint256' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+    ],
+    name: 'createEdition',
+    outputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256' }],
+    name: 'deactivateEdition',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'editions',
+    outputs: [
+      { name: 'nodeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxSupply', internalType: 'uint256', type: 'uint256' },
+      { name: 'minted', internalType: 'uint256', type: 'uint256' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_universeId', internalType: 'uint256', type: 'uint256' },
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_rightsRegistry', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+      { name: '_royaltyBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'editionId', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextEditionId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rightsRegistry',
+    outputs: [{ name: '', internalType: 'contract IRightsRegistry', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'royaltyBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'salePrice', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'royaltyInfo',
+    outputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'values', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeBatchTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newFeeBps', internalType: 'uint16', type: 'uint16' }],
+    name: 'setPlatformFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256' }],
+    name: 'uri',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'nodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'mintPrice',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'maxSupply',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'EditionCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'EditionDeactivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'EditionMinted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'ids',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'values',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+    ],
+    name: 'TransferBatch',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'TransferSingle',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'value', internalType: 'string', type: 'string', indexed: false },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: true },
+    ],
+    name: 'URI',
+  },
+  { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'balance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC1155InsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'idsLength', internalType: 'uint256', type: 'uint256' },
+      { name: 'valuesLength', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC1155InvalidArrayLength',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidOperator',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC1155InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'owner', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC1155MissingApprovalForAll',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'numerator', internalType: 'uint256', type: 'uint256' },
+      { name: 'denominator', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC2981InvalidDefaultRoyalty',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC2981InvalidDefaultRoyaltyReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'numerator', internalType: 'uint256', type: 'uint256' },
+      { name: 'denominator', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC2981InvalidTokenRoyalty',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'receiver', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC2981InvalidTokenRoyaltyReceiver',
+  },
+  { type: 'error', inputs: [], name: 'EditionNotActive' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientPayment' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'MaxSupplyReached' },
+  { type: 'error', inputs: [], name: 'NotCreator' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotPlatform' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'RefundFailed' },
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2465,6 +6298,25 @@ export const launchpadStakingAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'oldPenaltyBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newPenaltyBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'EarlyUnstakePenaltyChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'version',
         internalType: 'uint64',
         type: 'uint64',
@@ -2472,6 +6324,44 @@ export const launchpadStakingAbi = [
       },
     ],
     name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'LiquidityPoolChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldPeriod',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newPeriod',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'MinLockPeriodChanged',
   },
   {
     type: 'event',
@@ -2531,6 +6421,68 @@ export const launchpadStakingAbi = [
       },
     ],
     name: 'TierChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tier',
+        internalType: 'enum LaunchpadStaking.Tier',
+        type: 'uint8',
+        indexed: true,
+      },
+      {
+        name: 'minStake',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'weight',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'feeDiscountBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'curationBoost',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'priorityQueue',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
+    ],
+    name: 'TierConfigChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TreasuryChanged',
   },
   {
     type: 'event',
@@ -2702,6 +6654,593 @@ export const launchpadStakingAbi = [
   },
   { type: 'error', inputs: [], name: 'ZeroAddress' },
   { type: 'error', inputs: [], name: 'ZeroAmount' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LicensingRegistry
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const licensingRegistryAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'UPGRADE_INTERFACE_VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256' }],
+    name: 'activateLicense',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'licenseType',
+        internalType: 'enum LicensingRegistry.LicenseType',
+        type: 'uint8',
+      },
+      { name: 'licensee', internalType: 'address', type: 'address' },
+      { name: 'upfrontFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'royaltyBps', internalType: 'uint16', type: 'uint16' },
+      { name: 'duration', internalType: 'uint256', type: 'uint256' },
+      { name: 'terms', internalType: 'string', type: 'string' },
+    ],
+    name: 'createLicense',
+    outputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: 'price', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'createMerch',
+    outputs: [{ name: 'merchId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getUniverseCounts',
+    outputs: [
+      { name: 'licenseCount', internalType: 'uint256', type: 'uint256' },
+      { name: 'merchCount', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getUniverseLicenses',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getUniverseLicensesPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getUniverseMerch',
+    outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getUniverseMerchPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_platform', internalType: 'address', type: 'address' },
+      { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'licenses',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'licenseType',
+        internalType: 'enum LicensingRegistry.LicenseType',
+        type: 'uint8',
+      },
+      {
+        name: 'status',
+        internalType: 'enum LicensingRegistry.LicenseStatus',
+        type: 'uint8',
+      },
+      { name: 'licensor', internalType: 'address', type: 'address' },
+      { name: 'licensee', internalType: 'address', type: 'address' },
+      { name: 'upfrontFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'royaltyBps', internalType: 'uint16', type: 'uint16' },
+      { name: 'totalRoyalties', internalType: 'uint256', type: 'uint256' },
+      { name: 'startTime', internalType: 'uint256', type: 'uint256' },
+      { name: 'endTime', internalType: 'uint256', type: 'uint256' },
+      { name: 'terms', internalType: 'string', type: 'string' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'merchItems',
+    outputs: [
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'metadataURI', internalType: 'string', type: 'string' },
+      { name: 'price', internalType: 'uint256', type: 'uint256' },
+      { name: 'sold', internalType: 'uint256', type: 'uint256' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextLicenseId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextMerchId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256' }],
+    name: 'payRoyalty',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platform',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'platformFeeBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'merchId', internalType: 'uint256', type: 'uint256' }],
+    name: 'purchaseMerch',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+    ],
+    name: 'registerUniverse',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256' }],
+    name: 'revokeLicense',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'universeCreators',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'universeLicenses',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'universeMerch',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'LicenseActivated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'licenseType',
+        internalType: 'enum LicensingRegistry.LicenseType',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'licensee',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'upfrontFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'LicenseCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'LicenseRevoked',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'merchId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      { name: 'name', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'MerchCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'merchId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'MerchSold',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RoyaltyPaid',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'UniverseRegistered',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'Upgraded',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
+    name: 'ERC1967InvalidImplementation',
+  },
+  { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InsufficientPayment' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'InvalidStatus' },
+  { type: 'error', inputs: [], name: 'LicenseExpired' },
+  { type: 'error', inputs: [], name: 'MerchNotActive' },
+  { type: 'error', inputs: [], name: 'NoRevenue' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotLicensee' },
+  { type: 'error', inputs: [], name: 'NotLicensor' },
+  { type: 'error', inputs: [], name: 'NotPlatform' },
+  { type: 'error', inputs: [], name: 'NotUniverseCreator' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'TransferFailed' },
+  { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
+  {
+    type: 'error',
+    inputs: [{ name: 'slot', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UUPSUnsupportedProxiableUUID',
+  },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3252,6 +7791,229 @@ export const loarBurnerAbi = [
     name: 'UUPSUnsupportedProxiableUUID',
   },
   { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LoarFaucet
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const loarFaucetAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_loarToken', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'user', internalType: 'address', type: 'address' }],
+    name: 'canClaim',
+    outputs: [
+      { name: 'ok', internalType: 'bool', type: 'bool' },
+      { name: 'availableAt', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claim',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claimAmount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'cooldown',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'drain',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'faucetBalance',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'lastClaimed',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'loarToken',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newAmount', internalType: 'uint256', type: 'uint256' }],
+    name: 'setClaimAmount',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newCooldown', internalType: 'uint256', type: 'uint256' }],
+    name: 'setCooldown',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'ClaimAmountUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'user', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Claimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldCooldown',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newCooldown',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CooldownUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Drained',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'availableAt', internalType: 'uint256', type: 'uint256' }],
+    name: 'CooldownNotElapsed',
+  },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'InsufficientFaucetBalance' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6167,6 +10929,262 @@ export const remixFeesAbi = [
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RightsRegistry
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const rightsRegistryAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'UPGRADE_INTERFACE_VERSION',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'reason', internalType: 'string', type: 'string' },
+    ],
+    name: 'freeze',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_platform', internalType: 'address', type: 'address' }],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'isMonetizable',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'operators',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'rights',
+    outputs: [
+      {
+        name: '',
+        internalType: 'enum IRightsRegistry.RightsType',
+        type: 'uint8',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'authorized', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setOperator',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      {
+        name: 'rightsType',
+        internalType: 'enum IRightsRegistry.RightsType',
+        type: 'uint8',
+      },
+    ],
+    name: 'setRights',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'reason',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+    ],
+    name: 'ContentFrozen',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'authorized',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
+    ],
+    name: 'OperatorUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'rightsType',
+        internalType: 'enum IRightsRegistry.RightsType',
+        type: 'uint8',
+        indexed: false,
+      },
+    ],
+    name: 'RightsSet',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'Upgraded',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  { type: 'error', inputs: [], name: 'AlreadyFrozen' },
+  {
+    type: 'error',
+    inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
+    name: 'ERC1967InvalidImplementation',
+  },
+  { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'NotInitializing' },
+  { type: 'error', inputs: [], name: 'NotOperator' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
+  {
+    type: 'error',
+    inputs: [{ name: 'slot', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UUPSUnsupportedProxiableUUID',
+  },
+  { type: 'error', inputs: [], name: 'ZeroHash' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SlopMarket
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -6502,6 +11520,268 @@ export const slopMarketAbi = [
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SplitRouter
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const splitRouterAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_paymentRouter', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_RECIPIENTS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'entityHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'getSplits',
+    outputs: [
+      {
+        name: '',
+        internalType: 'struct SplitRouter.Split[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'recipient', internalType: 'address', type: 'address' },
+          { name: 'bps', internalType: 'uint16', type: 'uint16' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'entityHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'owner_', internalType: 'address', type: 'address' },
+    ],
+    name: 'registerSplitOwner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'registrars',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'entityHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'platformFeeBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'routeWithSplits',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_paymentRouter', internalType: 'address', type: 'address' }],
+    name: 'setPaymentRouter',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'registrar', internalType: 'address', type: 'address' },
+      { name: 'authorized', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setRegistrar',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'entityHash', internalType: 'bytes32', type: 'bytes32' },
+      {
+        name: 'splits',
+        internalType: 'struct SplitRouter.Split[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'recipient', internalType: 'address', type: 'address' },
+          { name: 'bps', internalType: 'uint16', type: 'uint16' },
+        ],
+      },
+    ],
+    name: 'setSplits',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'splitOwner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'entityHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'newOwner', internalType: 'address', type: 'address' },
+    ],
+    name: 'transferSplitOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'registrar',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'authorized',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
+    ],
+    name: 'RegistrarUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'entityHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'totalAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'recipientCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformFeeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'SplitPayment',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'entityHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipientCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'SplitsConfigured',
+  },
+  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'InvalidSplitTotal' },
+  { type: 'error', inputs: [], name: 'NoSplitsConfigured' },
+  { type: 'error', inputs: [], name: 'NotRegistrar' },
+  { type: 'error', inputs: [], name: 'NotSplitOwner' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'TooManyRecipients' },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // StoryBounties
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -6632,6 +11912,20 @@ export const storyBountiesAbi = [
   {
     type: 'function',
     inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getUniverseBountiesPaginated',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: '_loarToken', internalType: 'address', type: 'address' },
       { name: '_treasury', internalType: 'address', type: 'address' },
       { name: '_platform', internalType: 'address', type: 'address' },
@@ -6666,6 +11960,13 @@ export const storyBountiesAbi = [
     inputs: [],
     name: 'owner',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paymentRouter',
+    outputs: [{ name: '', internalType: 'contract IPaymentRouter', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -6707,6 +12008,13 @@ export const storyBountiesAbi = [
     type: 'function',
     inputs: [{ name: 'newMin', internalType: 'uint256', type: 'uint256' }],
     name: 'setMinBountyAmount',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_paymentRouter', internalType: 'address', type: 'address' }],
+    name: 'setPaymentRouter',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -6885,6 +12193,25 @@ export const storyBountiesAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'oldBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'CancellationFeeChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'version',
         internalType: 'uint64',
         type: 'uint64',
@@ -6892,6 +12219,25 @@ export const storyBountiesAbi = [
       },
     ],
     name: 'Initialized',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldMin',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newMin',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'MinBountyChanged',
   },
   {
     type: 'event',
@@ -6911,6 +12257,44 @@ export const storyBountiesAbi = [
       },
     ],
     name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'PlatformFeeChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TreasuryChanged',
   },
   {
     type: 'event',
@@ -9704,6 +15088,961 @@ export const universeTokenDeployerAbi = [
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__
+ */
+export const useAdPlacement_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useAdPlacement_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
+ */
+export const useAdPlacement_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'UPGRADE_INTERFACE_VERSION',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"adSlots"`
+ */
+export const useAdPlacement_AdSlots_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'adSlots',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"getSlotCount"`
+ */
+export const useAdPlacement_GetSlotCount_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'getSlotCount',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"getUniverseSlots"`
+ */
+export const useAdPlacement_GetUniverseSlots_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'getUniverseSlots',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"getUniverseSlotsPaginated"`
+ */
+export const useAdPlacement_GetUniverseSlotsPaginated_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'getUniverseSlotsPaginated',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"nextSlotId"`
+ */
+export const useAdPlacement_NextSlotId_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'nextSlotId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"nextSponsorshipId"`
+ */
+export const useAdPlacement_NextSponsorshipId_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'nextSponsorshipId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"owner"`
+ */
+export const useAdPlacement_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"paused"`
+ */
+export const useAdPlacement_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'paused',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useAdPlacement_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"pendingWithdrawals"`
+ */
+export const useAdPlacement_PendingWithdrawals_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'pendingWithdrawals',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"platform"`
+ */
+export const useAdPlacement_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useAdPlacement_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"proxiableUUID"`
+ */
+export const useAdPlacement_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'proxiableUUID',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"sponsorships"`
+ */
+export const useAdPlacement_Sponsorships_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'sponsorships',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"universeCreators"`
+ */
+export const useAdPlacement_UniverseCreators_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'universeCreators',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"universeSlots"`
+ */
+export const useAdPlacement_UniverseSlots_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'universeSlots',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__
+ */
+export const useAdPlacement_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"acceptBid"`
+ */
+export const useAdPlacement_AcceptBid_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'acceptBid',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"bid"`
+ */
+export const useAdPlacement_Bid_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'bid',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"createAdSlot"`
+ */
+export const useAdPlacement_CreateAdSlot_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'createAdSlot',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useAdPlacement_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"pause"`
+ */
+export const useAdPlacement_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"recordImpression"`
+ */
+export const useAdPlacement_RecordImpression_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'recordImpression',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"registerUniverse"`
+ */
+export const useAdPlacement_RegisterUniverse_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'registerUniverse',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useAdPlacement_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useAdPlacement_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useAdPlacement_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useAdPlacement_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"withdrawRefund"`
+ */
+export const useAdPlacement_WithdrawRefund_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'withdrawRefund',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__
+ */
+export const useAdPlacement_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"acceptBid"`
+ */
+export const useAdPlacement_AcceptBid_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'acceptBid',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"bid"`
+ */
+export const useAdPlacement_Bid_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'bid',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"createAdSlot"`
+ */
+export const useAdPlacement_CreateAdSlot_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'createAdSlot',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useAdPlacement_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"pause"`
+ */
+export const useAdPlacement_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"recordImpression"`
+ */
+export const useAdPlacement_RecordImpression_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'recordImpression',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"registerUniverse"`
+ */
+export const useAdPlacement_RegisterUniverse_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'registerUniverse',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useAdPlacement_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useAdPlacement_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useAdPlacement_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useAdPlacement_UpgradeToAndCall_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"withdrawRefund"`
+ */
+export const useAdPlacement_WithdrawRefund_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'withdrawRefund',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__
+ */
+export const useAdPlacement_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"AdSlotCreated"`
+ */
+export const useAdPlacement_AdSlotCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'AdSlotCreated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"BidPlaced"`
+ */
+export const useAdPlacement_BidPlaced_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'BidPlaced',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"ImpressionRecorded"`
+ */
+export const useAdPlacement_ImpressionRecorded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'ImpressionRecorded',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useAdPlacement_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useAdPlacement_OwnershipTransferred_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'OwnershipTransferred',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useAdPlacement_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"RefundWithdrawn"`
+ */
+export const useAdPlacement_RefundWithdrawn_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'RefundWithdrawn',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"SponsorshipActivated"`
+ */
+export const useAdPlacement_SponsorshipActivated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'SponsorshipActivated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"UniverseRegistered"`
+ */
+export const useAdPlacement_UniverseRegistered_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'UniverseRegistered',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useAdPlacement_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'Unpaused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"Upgraded"`
+ */
+export const useAdPlacement_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'Upgraded',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__
+ */
+export const useCanonMarketplace_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useCanonMarketplace_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
+ */
+export const useCanonMarketplace_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract(
+  {
+    abi: canonMarketplaceAbi,
+    functionName: 'UPGRADE_INTERFACE_VERSION',
+  }
+);
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"canonLicenseFeeBps"`
+ */
+export const useCanonMarketplace_CanonLicenseFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'canonLicenseFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"canonSubmissions"`
+ */
+export const useCanonMarketplace_CanonSubmissions_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'canonSubmissions',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"claimableRefunds"`
+ */
+export const useCanonMarketplace_ClaimableRefunds_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'claimableRefunds',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"creatorHeldAmount"`
+ */
+export const useCanonMarketplace_CreatorHeldAmount_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'creatorHeldAmount',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"getCanonSubmissions"`
+ */
+export const useCanonMarketplace_GetCanonSubmissions_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'getCanonSubmissions',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"getCanonSubmissionsPaginated"`
+ */
+export const useCanonMarketplace_GetCanonSubmissionsPaginated_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: canonMarketplaceAbi,
+    functionName: 'getCanonSubmissionsPaginated',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"getSubmissionCount"`
+ */
+export const useCanonMarketplace_GetSubmissionCount_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'getSubmissionCount',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"hasVoted"`
+ */
+export const useCanonMarketplace_HasVoted_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'hasVoted',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"licenses"`
+ */
+export const useCanonMarketplace_Licenses_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'licenses',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"minSubmissionFee"`
+ */
+export const useCanonMarketplace_MinSubmissionFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'minSubmissionFee',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"nextLicenseId"`
+ */
+export const useCanonMarketplace_NextLicenseId_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'nextLicenseId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"nextSubmissionId"`
+ */
+export const useCanonMarketplace_NextSubmissionId_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'nextSubmissionId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"owner"`
+ */
+export const useCanonMarketplace_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"paused"`
+ */
+export const useCanonMarketplace_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'paused',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useCanonMarketplace_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"platform"`
+ */
+export const useCanonMarketplace_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useCanonMarketplace_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"proxiableUUID"`
+ */
+export const useCanonMarketplace_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'proxiableUUID',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"rightsRegistry"`
+ */
+export const useCanonMarketplace_RightsRegistry_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'rightsRegistry',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"submissions"`
+ */
+export const useCanonMarketplace_Submissions_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'submissions',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"voteWeight"`
+ */
+export const useCanonMarketplace_VoteWeight_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'voteWeight',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"votingDuration"`
+ */
+export const useCanonMarketplace_VotingDuration_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'votingDuration',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__
+ */
+export const useCanonMarketplace_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"claimRefund"`
+ */
+export const useCanonMarketplace_ClaimRefund_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'claimRefund',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"finalize"`
+ */
+export const useCanonMarketplace_Finalize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'finalize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useCanonMarketplace_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"licenseCanon"`
+ */
+export const useCanonMarketplace_LicenseCanon_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'licenseCanon',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"pause"`
+ */
+export const useCanonMarketplace_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useCanonMarketplace_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"submit"`
+ */
+export const useCanonMarketplace_Submit_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'submit',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useCanonMarketplace_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useCanonMarketplace_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useCanonMarketplace_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"vote"`
+ */
+export const useCanonMarketplace_Vote_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'vote',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__
+ */
+export const useCanonMarketplace_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"claimRefund"`
+ */
+export const useCanonMarketplace_ClaimRefund_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'claimRefund',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"finalize"`
+ */
+export const useCanonMarketplace_Finalize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'finalize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useCanonMarketplace_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"licenseCanon"`
+ */
+export const useCanonMarketplace_LicenseCanon_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'licenseCanon',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"pause"`
+ */
+export const useCanonMarketplace_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useCanonMarketplace_RenounceOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: canonMarketplaceAbi,
+    functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"submit"`
+ */
+export const useCanonMarketplace_Submit_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'submit',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useCanonMarketplace_TransferOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: canonMarketplaceAbi,
+    functionName: 'transferOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useCanonMarketplace_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useCanonMarketplace_UpgradeToAndCall_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: canonMarketplaceAbi,
+    functionName: 'upgradeToAndCall',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"vote"`
+ */
+export const useCanonMarketplace_Vote_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'vote',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__
+ */
+export const useCanonMarketplace_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"CanonLicensed"`
+ */
+export const useCanonMarketplace_CanonLicensed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'CanonLicensed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"CanonSubmissionAccepted"`
+ */
+export const useCanonMarketplace_CanonSubmissionAccepted_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: canonMarketplaceAbi,
+    eventName: 'CanonSubmissionAccepted',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useCanonMarketplace_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useCanonMarketplace_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: canonMarketplaceAbi,
+    eventName: 'OwnershipTransferred',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useCanonMarketplace_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"RefundClaimed"`
+ */
+export const useCanonMarketplace_RefundClaimed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'RefundClaimed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"SubmissionAccepted"`
+ */
+export const useCanonMarketplace_SubmissionAccepted_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: canonMarketplaceAbi,
+    eventName: 'SubmissionAccepted',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"SubmissionCreated"`
+ */
+export const useCanonMarketplace_SubmissionCreated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: canonMarketplaceAbi,
+    eventName: 'SubmissionCreated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"SubmissionRejected"`
+ */
+export const useCanonMarketplace_SubmissionRejected_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: canonMarketplaceAbi,
+    eventName: 'SubmissionRejected',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useCanonMarketplace_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'Unpaused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"Upgraded"`
+ */
+export const useCanonMarketplace_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'Upgraded',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `eventName` set to `"VoteCast"`
+ */
+export const useCanonMarketplace_VoteCast_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: canonMarketplaceAbi,
+  eventName: 'VoteCast',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__
  */
 export const useCharacterNft_undefined_read = /*#__PURE__*/ createUseReadContract({
@@ -9735,6 +16074,14 @@ export const useCharacterNft_BalanceOf_read = /*#__PURE__*/ createUseReadContrac
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characterActive"`
+ */
+export const useCharacterNft_CharacterActive_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'characterActive',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characterByName"`
  */
 export const useCharacterNft_CharacterByName_read = /*#__PURE__*/ createUseReadContract({
@@ -9743,11 +16090,43 @@ export const useCharacterNft_CharacterByName_read = /*#__PURE__*/ createUseReadC
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characterMaxSupply"`
+ */
+export const useCharacterNft_CharacterMaxSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'characterMaxSupply',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characterMintPrice"`
+ */
+export const useCharacterNft_CharacterMintPrice_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'characterMintPrice',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characterMinted"`
+ */
+export const useCharacterNft_CharacterMinted_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'characterMinted',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characters"`
  */
 export const useCharacterNft_Characters_read = /*#__PURE__*/ createUseReadContract({
   abi: characterNftAbi,
   functionName: 'characters',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"claimableRoyalties"`
+ */
+export const useCharacterNft_ClaimableRoyalties_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'claimableRoyalties',
 });
 
 /**
@@ -9902,6 +16281,14 @@ export const useCharacterNft_Approve_write = /*#__PURE__*/ createUseWriteContrac
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"claimRoyalties"`
+ */
+export const useCharacterNft_ClaimRoyalties_write = /*#__PURE__*/ createUseWriteContract({
+  abi: characterNftAbi,
+  functionName: 'claimRoyalties',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"createCharacter"`
  */
 export const useCharacterNft_CreateCharacter_write = /*#__PURE__*/ createUseWriteContract({
@@ -9910,11 +16297,27 @@ export const useCharacterNft_CreateCharacter_write = /*#__PURE__*/ createUseWrit
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"deactivateCharacter"`
+ */
+export const useCharacterNft_DeactivateCharacter_write = /*#__PURE__*/ createUseWriteContract({
+  abi: characterNftAbi,
+  functionName: 'deactivateCharacter',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"initialize"`
  */
 export const useCharacterNft_Initialize_write = /*#__PURE__*/ createUseWriteContract({
   abi: characterNftAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"mintCharacter"`
+ */
+export const useCharacterNft_MintCharacter_write = /*#__PURE__*/ createUseWriteContract({
+  abi: characterNftAbi,
+  functionName: 'mintCharacter',
 });
 
 /**
@@ -9965,6 +16368,14 @@ export const useCharacterNft_Approve_simulate = /*#__PURE__*/ createUseSimulateC
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"claimRoyalties"`
+ */
+export const useCharacterNft_ClaimRoyalties_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: characterNftAbi,
+  functionName: 'claimRoyalties',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"createCharacter"`
  */
 export const useCharacterNft_CreateCharacter_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -9973,11 +16384,29 @@ export const useCharacterNft_CreateCharacter_simulate = /*#__PURE__*/ createUseS
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"deactivateCharacter"`
+ */
+export const useCharacterNft_DeactivateCharacter_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: characterNftAbi,
+    functionName: 'deactivateCharacter',
+  }
+);
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"initialize"`
  */
 export const useCharacterNft_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: characterNftAbi,
   functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"mintCharacter"`
+ */
+export const useCharacterNft_MintCharacter_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: characterNftAbi,
+  functionName: 'mintCharacter',
 });
 
 /**
@@ -10060,6 +16489,14 @@ export const useCharacterNft_CharacterCreated_watch = /*#__PURE__*/ createUseWat
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link characterNftAbi}__ and `eventName` set to `"EpisodeMinted"`
+ */
+export const useCharacterNft_EpisodeMinted_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: characterNftAbi,
+  eventName: 'EpisodeMinted',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link characterNftAbi}__ and `eventName` set to `"Initialized"`
  */
 export const useCharacterNft_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -10089,6 +16526,910 @@ export const useCharacterNft_RoyaltyClaimed_watch = /*#__PURE__*/ createUseWatch
 export const useCharacterNft_Transfer_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: characterNftAbi,
   eventName: 'Transfer',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__
+ */
+export const useCollabManager_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useCollabManager_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
+ */
+export const useCollabManager_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'UPGRADE_INTERFACE_VERSION',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"collabs"`
+ */
+export const useCollabManager_Collabs_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'collabs',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"getCollabCount"`
+ */
+export const useCollabManager_GetCollabCount_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'getCollabCount',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"getUniverseCollabs"`
+ */
+export const useCollabManager_GetUniverseCollabs_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'getUniverseCollabs',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"getUniverseCollabsPaginated"`
+ */
+export const useCollabManager_GetUniverseCollabsPaginated_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: collabManagerAbi,
+    functionName: 'getUniverseCollabsPaginated',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"nextCollabId"`
+ */
+export const useCollabManager_NextCollabId_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'nextCollabId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"owner"`
+ */
+export const useCollabManager_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"paused"`
+ */
+export const useCollabManager_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'paused',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useCollabManager_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"platform"`
+ */
+export const useCollabManager_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useCollabManager_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"proxiableUUID"`
+ */
+export const useCollabManager_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'proxiableUUID',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"universeCollabs"`
+ */
+export const useCollabManager_UniverseCollabs_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'universeCollabs',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"universeManager"`
+ */
+export const useCollabManager_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: collabManagerAbi,
+  functionName: 'universeManager',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__
+ */
+export const useCollabManager_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"acceptCollab"`
+ */
+export const useCollabManager_AcceptCollab_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'acceptCollab',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"activateCollab"`
+ */
+export const useCollabManager_ActivateCollab_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'activateCollab',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"cancelCollab"`
+ */
+export const useCollabManager_CancelCollab_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'cancelCollab',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"completeCollab"`
+ */
+export const useCollabManager_CompleteCollab_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'completeCollab',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useCollabManager_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"pause"`
+ */
+export const useCollabManager_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"proposeCollab"`
+ */
+export const useCollabManager_ProposeCollab_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'proposeCollab',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"recordCollabRevenue"`
+ */
+export const useCollabManager_RecordCollabRevenue_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'recordCollabRevenue',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useCollabManager_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useCollabManager_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useCollabManager_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useCollabManager_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
+  abi: collabManagerAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__
+ */
+export const useCollabManager_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"acceptCollab"`
+ */
+export const useCollabManager_AcceptCollab_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'acceptCollab',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"activateCollab"`
+ */
+export const useCollabManager_ActivateCollab_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'activateCollab',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"cancelCollab"`
+ */
+export const useCollabManager_CancelCollab_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'cancelCollab',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"completeCollab"`
+ */
+export const useCollabManager_CompleteCollab_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'completeCollab',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useCollabManager_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"pause"`
+ */
+export const useCollabManager_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"proposeCollab"`
+ */
+export const useCollabManager_ProposeCollab_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'proposeCollab',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"recordCollabRevenue"`
+ */
+export const useCollabManager_RecordCollabRevenue_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: collabManagerAbi,
+    functionName: 'recordCollabRevenue',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useCollabManager_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useCollabManager_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useCollabManager_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link collabManagerAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useCollabManager_UpgradeToAndCall_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: collabManagerAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__
+ */
+export const useCollabManager_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"CollabAccepted"`
+ */
+export const useCollabManager_CollabAccepted_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'CollabAccepted',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"CollabActivated"`
+ */
+export const useCollabManager_CollabActivated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'CollabActivated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"CollabCancelled"`
+ */
+export const useCollabManager_CollabCancelled_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'CollabCancelled',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"CollabCompleted"`
+ */
+export const useCollabManager_CollabCompleted_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'CollabCompleted',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"CollabEpisodeCreated"`
+ */
+export const useCollabManager_CollabEpisodeCreated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: collabManagerAbi,
+    eventName: 'CollabEpisodeCreated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"CollabProposed"`
+ */
+export const useCollabManager_CollabProposed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'CollabProposed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useCollabManager_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useCollabManager_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: collabManagerAbi,
+    eventName: 'OwnershipTransferred',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useCollabManager_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"RevenueDistributed"`
+ */
+export const useCollabManager_RevenueDistributed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'RevenueDistributed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useCollabManager_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'Unpaused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link collabManagerAbi}__ and `eventName` set to `"Upgraded"`
+ */
+export const useCollabManager_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: collabManagerAbi,
+  eventName: 'Upgraded',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__
+ */
+export const useContentLicensing_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useContentLicensing_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
+ */
+export const useContentLicensing_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract(
+  {
+    abi: contentLicensingAbi,
+    functionName: 'UPGRADE_INTERFACE_VERSION',
+  }
+);
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"contentOwner"`
+ */
+export const useContentLicensing_ContentOwner_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'contentOwner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"deals"`
+ */
+export const useContentLicensing_Deals_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'deals',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"getContentDeals"`
+ */
+export const useContentLicensing_GetContentDeals_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'getContentDeals',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"getContentDealsPaginated"`
+ */
+export const useContentLicensing_GetContentDealsPaginated_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: contentLicensingAbi,
+    functionName: 'getContentDealsPaginated',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"getRegistration"`
+ */
+export const useContentLicensing_GetRegistration_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'getRegistration',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"isDealActive"`
+ */
+export const useContentLicensing_IsDealActive_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'isDealActive',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"nextDealId"`
+ */
+export const useContentLicensing_NextDealId_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'nextDealId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"owner"`
+ */
+export const useContentLicensing_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useContentLicensing_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"platform"`
+ */
+export const useContentLicensing_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useContentLicensing_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"proxiableUUID"`
+ */
+export const useContentLicensing_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'proxiableUUID',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"registrations"`
+ */
+export const useContentLicensing_Registrations_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'registrations',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"splitRouter"`
+ */
+export const useContentLicensing_SplitRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'splitRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"splitToContent"`
+ */
+export const useContentLicensing_SplitToContent_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'splitToContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__
+ */
+export const useContentLicensing_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"buyContent"`
+ */
+export const useContentLicensing_BuyContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'buyContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"checkAccess"`
+ */
+export const useContentLicensing_CheckAccess_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'checkAccess',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"deactivateContent"`
+ */
+export const useContentLicensing_DeactivateContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'deactivateContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useContentLicensing_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"licenseContent"`
+ */
+export const useContentLicensing_LicenseContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'licenseContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"payRoyalty"`
+ */
+export const useContentLicensing_PayRoyalty_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'payRoyalty',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"registerContent"`
+ */
+export const useContentLicensing_RegisterContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'registerContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useContentLicensing_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"rentContent"`
+ */
+export const useContentLicensing_RentContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'rentContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useContentLicensing_SetPlatformFee_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'setPlatformFee',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useContentLicensing_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"updatePricing"`
+ */
+export const useContentLicensing_UpdatePricing_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'updatePricing',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useContentLicensing_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__
+ */
+export const useContentLicensing_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"buyContent"`
+ */
+export const useContentLicensing_BuyContent_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'buyContent',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"checkAccess"`
+ */
+export const useContentLicensing_CheckAccess_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'checkAccess',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"deactivateContent"`
+ */
+export const useContentLicensing_DeactivateContent_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contentLicensingAbi,
+    functionName: 'deactivateContent',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useContentLicensing_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"licenseContent"`
+ */
+export const useContentLicensing_LicenseContent_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'licenseContent',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"payRoyalty"`
+ */
+export const useContentLicensing_PayRoyalty_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'payRoyalty',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"registerContent"`
+ */
+export const useContentLicensing_RegisterContent_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: contentLicensingAbi,
+    functionName: 'registerContent',
+  }
+);
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useContentLicensing_RenounceOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contentLicensingAbi,
+    functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"rentContent"`
+ */
+export const useContentLicensing_RentContent_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'rentContent',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useContentLicensing_SetPlatformFee_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'setPlatformFee',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useContentLicensing_TransferOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contentLicensingAbi,
+    functionName: 'transferOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"updatePricing"`
+ */
+export const useContentLicensing_UpdatePricing_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'updatePricing',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useContentLicensing_UpgradeToAndCall_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contentLicensingAbi,
+    functionName: 'upgradeToAndCall',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__
+ */
+export const useContentLicensing_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"ContentBought"`
+ */
+export const useContentLicensing_ContentBought_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'ContentBought',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"ContentDeactivated"`
+ */
+export const useContentLicensing_ContentDeactivated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contentLicensingAbi,
+    eventName: 'ContentDeactivated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"ContentLicensed"`
+ */
+export const useContentLicensing_ContentLicensed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'ContentLicensed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"ContentRegistered"`
+ */
+export const useContentLicensing_ContentRegistered_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contentLicensingAbi,
+    eventName: 'ContentRegistered',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"ContentRented"`
+ */
+export const useContentLicensing_ContentRented_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'ContentRented',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useContentLicensing_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useContentLicensing_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contentLicensingAbi,
+    eventName: 'OwnershipTransferred',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"PricingUpdated"`
+ */
+export const useContentLicensing_PricingUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'PricingUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"RoyaltyPaid"`
+ */
+export const useContentLicensing_RoyaltyPaid_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'RoyaltyPaid',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"Upgraded"`
+ */
+export const useContentLicensing_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'Upgraded',
 });
 
 /**
@@ -10537,6 +17878,1103 @@ export const useCreditManager_PackageCreated_watch = /*#__PURE__*/ createUseWatc
 export const useCreditManager_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: creditManagerAbi,
   eventName: 'Upgraded',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__
+ */
+export const useEntityEditionNft_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useEntityEditionNft_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useEntityEditionNft_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'balanceOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"balanceOfBatch"`
+ */
+export const useEntityEditionNft_BalanceOfBatch_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'balanceOfBatch',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"editions"`
+ */
+export const useEntityEditionNft_Editions_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'editions',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"getByUniverse"`
+ */
+export const useEntityEditionNft_GetByUniverse_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'getByUniverse',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"isApprovedForAll"`
+ */
+export const useEntityEditionNft_IsApprovedForAll_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'isApprovedForAll',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"nextEditionId"`
+ */
+export const useEntityEditionNft_NextEditionId_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'nextEditionId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useEntityEditionNft_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"platform"`
+ */
+export const useEntityEditionNft_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useEntityEditionNft_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"rightsRegistry"`
+ */
+export const useEntityEditionNft_RightsRegistry_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'rightsRegistry',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"royaltyBps"`
+ */
+export const useEntityEditionNft_RoyaltyBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'royaltyBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"royaltyInfo"`
+ */
+export const useEntityEditionNft_RoyaltyInfo_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'royaltyInfo',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"supportsInterface"`
+ */
+export const useEntityEditionNft_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'supportsInterface',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"universeId"`
+ */
+export const useEntityEditionNft_UniverseId_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'universeId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"uri"`
+ */
+export const useEntityEditionNft_Uri_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityEditionNftAbi,
+  functionName: 'uri',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__
+ */
+export const useEntityEditionNft_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"createEdition"`
+ */
+export const useEntityEditionNft_CreateEdition_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'createEdition',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"deactivate"`
+ */
+export const useEntityEditionNft_Deactivate_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'deactivate',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useEntityEditionNft_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"mint"`
+ */
+export const useEntityEditionNft_Mint_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"safeBatchTransferFrom"`
+ */
+export const useEntityEditionNft_SafeBatchTransferFrom_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: entityEditionNftAbi,
+    functionName: 'safeBatchTransferFrom',
+  }
+);
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useEntityEditionNft_SafeTransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'safeTransferFrom',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useEntityEditionNft_SetApprovalForAll_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'setApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useEntityEditionNft_SetPlatformFee_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityEditionNftAbi,
+  functionName: 'setPlatformFee',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__
+ */
+export const useEntityEditionNft_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityEditionNftAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"createEdition"`
+ */
+export const useEntityEditionNft_CreateEdition_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityEditionNftAbi,
+  functionName: 'createEdition',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"deactivate"`
+ */
+export const useEntityEditionNft_Deactivate_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityEditionNftAbi,
+  functionName: 'deactivate',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useEntityEditionNft_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityEditionNftAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"mint"`
+ */
+export const useEntityEditionNft_Mint_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityEditionNftAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"safeBatchTransferFrom"`
+ */
+export const useEntityEditionNft_SafeBatchTransferFrom_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: entityEditionNftAbi,
+    functionName: 'safeBatchTransferFrom',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useEntityEditionNft_SafeTransferFrom_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: entityEditionNftAbi,
+    functionName: 'safeTransferFrom',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useEntityEditionNft_SetApprovalForAll_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: entityEditionNftAbi,
+    functionName: 'setApprovalForAll',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useEntityEditionNft_SetPlatformFee_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityEditionNftAbi,
+  functionName: 'setPlatformFee',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__
+ */
+export const useEntityEditionNft_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"ApprovalForAll"`
+ */
+export const useEntityEditionNft_ApprovalForAll_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'ApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"EditionCreated"`
+ */
+export const useEntityEditionNft_EditionCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'EditionCreated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"EditionDeactivated"`
+ */
+export const useEntityEditionNft_EditionDeactivated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: entityEditionNftAbi,
+    eventName: 'EditionDeactivated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"EditionMinted"`
+ */
+export const useEntityEditionNft_EditionMinted_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'EditionMinted',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useEntityEditionNft_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"TransferBatch"`
+ */
+export const useEntityEditionNft_TransferBatch_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'TransferBatch',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"TransferSingle"`
+ */
+export const useEntityEditionNft_TransferSingle_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'TransferSingle',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityEditionNftAbi}__ and `eventName` set to `"URI"`
+ */
+export const useEntityEditionNft_Uri_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityEditionNftAbi,
+  eventName: 'URI',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__
+ */
+export const useEntityNft_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useEntityNft_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useEntityNft_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'balanceOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"entities"`
+ */
+export const useEntityNft_Entities_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'entities',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"entityByName"`
+ */
+export const useEntityNft_EntityByName_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'entityByName',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"getApproved"`
+ */
+export const useEntityNft_GetApproved_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'getApproved',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"getByUniverse"`
+ */
+export const useEntityNft_GetByUniverse_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'getByUniverse',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"isApprovedForAll"`
+ */
+export const useEntityNft_IsApprovedForAll_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'isApprovedForAll',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"name"`
+ */
+export const useEntityNft_Name_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'name',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"nextTokenId"`
+ */
+export const useEntityNft_NextTokenId_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'nextTokenId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"ownerOf"`
+ */
+export const useEntityNft_OwnerOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'ownerOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useEntityNft_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"platform"`
+ */
+export const useEntityNft_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useEntityNft_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"rightsRegistry"`
+ */
+export const useEntityNft_RightsRegistry_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'rightsRegistry',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"royaltyBps"`
+ */
+export const useEntityNft_RoyaltyBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'royaltyBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"royaltyInfo"`
+ */
+export const useEntityNft_RoyaltyInfo_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'royaltyInfo',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"supportsInterface"`
+ */
+export const useEntityNft_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'supportsInterface',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useEntityNft_Symbol_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'symbol',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"tokenByIndex"`
+ */
+export const useEntityNft_TokenByIndex_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'tokenByIndex',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"tokenOfOwnerByIndex"`
+ */
+export const useEntityNft_TokenOfOwnerByIndex_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'tokenOfOwnerByIndex',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"tokenURI"`
+ */
+export const useEntityNft_TokenUri_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'tokenURI',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useEntityNft_TotalSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'totalSupply',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"universeId"`
+ */
+export const useEntityNft_UniverseId_read = /*#__PURE__*/ createUseReadContract({
+  abi: entityNftAbi,
+  functionName: 'universeId',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__
+ */
+export const useEntityNft_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"approve"`
+ */
+export const useEntityNft_Approve_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'approve',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useEntityNft_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"mint"`
+ */
+export const useEntityNft_Mint_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useEntityNft_SafeTransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'safeTransferFrom',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useEntityNft_SetApprovalForAll_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'setApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useEntityNft_SetPlatformFee_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'setPlatformFee',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useEntityNft_TransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: entityNftAbi,
+  functionName: 'transferFrom',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__
+ */
+export const useEntityNft_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"approve"`
+ */
+export const useEntityNft_Approve_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'approve',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useEntityNft_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"mint"`
+ */
+export const useEntityNft_Mint_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useEntityNft_SafeTransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'safeTransferFrom',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useEntityNft_SetApprovalForAll_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'setApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useEntityNft_SetPlatformFee_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'setPlatformFee',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link entityNftAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useEntityNft_TransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: entityNftAbi,
+  functionName: 'transferFrom',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__
+ */
+export const useEntityNft_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useEntityNft_Approval_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'Approval',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"ApprovalForAll"`
+ */
+export const useEntityNft_ApprovalForAll_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'ApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"BatchMetadataUpdate"`
+ */
+export const useEntityNft_BatchMetadataUpdate_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'BatchMetadataUpdate',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"EntityMinted"`
+ */
+export const useEntityNft_EntityMinted_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'EntityMinted',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useEntityNft_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"MetadataUpdate"`
+ */
+export const useEntityNft_MetadataUpdate_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'MetadataUpdate',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link entityNftAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useEntityNft_Transfer_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: entityNftAbi,
+  eventName: 'Transfer',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__
+ */
+export const useEpisodeEditionCollection_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useEpisodeEditionCollection_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useEpisodeEditionCollection_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'balanceOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"balanceOfBatch"`
+ */
+export const useEpisodeEditionCollection_BalanceOfBatch_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'balanceOfBatch',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"editions"`
+ */
+export const useEpisodeEditionCollection_Editions_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'editions',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"isApprovedForAll"`
+ */
+export const useEpisodeEditionCollection_IsApprovedForAll_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'isApprovedForAll',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"nextEditionId"`
+ */
+export const useEpisodeEditionCollection_NextEditionId_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'nextEditionId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useEpisodeEditionCollection_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"platform"`
+ */
+export const useEpisodeEditionCollection_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useEpisodeEditionCollection_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"rightsRegistry"`
+ */
+export const useEpisodeEditionCollection_RightsRegistry_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'rightsRegistry',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"royaltyBps"`
+ */
+export const useEpisodeEditionCollection_RoyaltyBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'royaltyBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"royaltyInfo"`
+ */
+export const useEpisodeEditionCollection_RoyaltyInfo_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'royaltyInfo',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"supportsInterface"`
+ */
+export const useEpisodeEditionCollection_SupportsInterface_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'supportsInterface',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"universeId"`
+ */
+export const useEpisodeEditionCollection_UniverseId_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'universeId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"uri"`
+ */
+export const useEpisodeEditionCollection_Uri_read = /*#__PURE__*/ createUseReadContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'uri',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__
+ */
+export const useEpisodeEditionCollection_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: episodeEditionCollectionAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"createEdition"`
+ */
+export const useEpisodeEditionCollection_CreateEdition_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: episodeEditionCollectionAbi,
+    functionName: 'createEdition',
+  }
+);
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"deactivateEdition"`
+ */
+export const useEpisodeEditionCollection_DeactivateEdition_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'deactivateEdition',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useEpisodeEditionCollection_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"mint"`
+ */
+export const useEpisodeEditionCollection_Mint_write = /*#__PURE__*/ createUseWriteContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"safeBatchTransferFrom"`
+ */
+export const useEpisodeEditionCollection_SafeBatchTransferFrom_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'safeBatchTransferFrom',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useEpisodeEditionCollection_SafeTransferFrom_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'safeTransferFrom',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useEpisodeEditionCollection_SetApprovalForAll_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'setApprovalForAll',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useEpisodeEditionCollection_SetPlatformFee_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'setPlatformFee',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__
+ */
+export const useEpisodeEditionCollection_undefined_simulate =
+  /*#__PURE__*/ createUseSimulateContract({ abi: episodeEditionCollectionAbi });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"createEdition"`
+ */
+export const useEpisodeEditionCollection_CreateEdition_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'createEdition',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"deactivateEdition"`
+ */
+export const useEpisodeEditionCollection_DeactivateEdition_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'deactivateEdition',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useEpisodeEditionCollection_Initialize_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'initialize',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"mint"`
+ */
+export const useEpisodeEditionCollection_Mint_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: episodeEditionCollectionAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"safeBatchTransferFrom"`
+ */
+export const useEpisodeEditionCollection_SafeBatchTransferFrom_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'safeBatchTransferFrom',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useEpisodeEditionCollection_SafeTransferFrom_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'safeTransferFrom',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useEpisodeEditionCollection_SetApprovalForAll_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'setApprovalForAll',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"setPlatformFee"`
+ */
+export const useEpisodeEditionCollection_SetPlatformFee_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: episodeEditionCollectionAbi,
+    functionName: 'setPlatformFee',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__
+ */
+export const useEpisodeEditionCollection_undefined_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"ApprovalForAll"`
+ */
+export const useEpisodeEditionCollection_ApprovalForAll_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'ApprovalForAll',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"EditionCreated"`
+ */
+export const useEpisodeEditionCollection_EditionCreated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'EditionCreated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"EditionDeactivated"`
+ */
+export const useEpisodeEditionCollection_EditionDeactivated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'EditionDeactivated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"EditionMinted"`
+ */
+export const useEpisodeEditionCollection_EditionMinted_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'EditionMinted',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useEpisodeEditionCollection_Initialized_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'Initialized',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"TransferBatch"`
+ */
+export const useEpisodeEditionCollection_TransferBatch_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'TransferBatch',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"TransferSingle"`
+ */
+export const useEpisodeEditionCollection_TransferSingle_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+    eventName: 'TransferSingle',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"URI"`
+ */
+export const useEpisodeEditionCollection_Uri_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: episodeEditionCollectionAbi,
+  eventName: 'URI',
 });
 
 /**
@@ -11777,12 +20215,39 @@ export const useLaunchpadStaking_undefined_watch = /*#__PURE__*/ createUseWatchC
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"EarlyUnstakePenaltyChanged"`
+ */
+export const useLaunchpadStaking_EarlyUnstakePenaltyChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchpadStakingAbi,
+    eventName: 'EarlyUnstakePenaltyChanged',
+  });
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"Initialized"`
  */
 export const useLaunchpadStaking_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: launchpadStakingAbi,
   eventName: 'Initialized',
 });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"LiquidityPoolChanged"`
+ */
+export const useLaunchpadStaking_LiquidityPoolChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchpadStakingAbi,
+    eventName: 'LiquidityPoolChanged',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"MinLockPeriodChanged"`
+ */
+export const useLaunchpadStaking_MinLockPeriodChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchpadStakingAbi,
+    eventName: 'MinLockPeriodChanged',
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"OwnershipTransferred"`
@@ -11807,6 +20272,23 @@ export const useLaunchpadStaking_Staked_watch = /*#__PURE__*/ createUseWatchCont
 export const useLaunchpadStaking_TierChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: launchpadStakingAbi,
   eventName: 'TierChanged',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"TierConfigChanged"`
+ */
+export const useLaunchpadStaking_TierConfigChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchpadStakingAbi,
+    eventName: 'TierConfigChanged',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"TreasuryChanged"`
+ */
+export const useLaunchpadStaking_TreasuryChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: launchpadStakingAbi,
+  eventName: 'TreasuryChanged',
 });
 
 /**
@@ -11858,6 +20340,509 @@ export const useLaunchpadStaking_Unstaked_watch = /*#__PURE__*/ createUseWatchCo
  */
 export const useLaunchpadStaking_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: launchpadStakingAbi,
+  eventName: 'Upgraded',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__
+ */
+export const useLicensingRegistry_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useLicensingRegistry_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
+ */
+export const useLicensingRegistry_UpgradeInterfaceVersion_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: licensingRegistryAbi,
+    functionName: 'UPGRADE_INTERFACE_VERSION',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"getUniverseCounts"`
+ */
+export const useLicensingRegistry_GetUniverseCounts_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'getUniverseCounts',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"getUniverseLicenses"`
+ */
+export const useLicensingRegistry_GetUniverseLicenses_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'getUniverseLicenses',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"getUniverseLicensesPaginated"`
+ */
+export const useLicensingRegistry_GetUniverseLicensesPaginated_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: licensingRegistryAbi,
+    functionName: 'getUniverseLicensesPaginated',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"getUniverseMerch"`
+ */
+export const useLicensingRegistry_GetUniverseMerch_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'getUniverseMerch',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"getUniverseMerchPaginated"`
+ */
+export const useLicensingRegistry_GetUniverseMerchPaginated_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: licensingRegistryAbi,
+    functionName: 'getUniverseMerchPaginated',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"licenses"`
+ */
+export const useLicensingRegistry_Licenses_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'licenses',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"merchItems"`
+ */
+export const useLicensingRegistry_MerchItems_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'merchItems',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"nextLicenseId"`
+ */
+export const useLicensingRegistry_NextLicenseId_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'nextLicenseId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"nextMerchId"`
+ */
+export const useLicensingRegistry_NextMerchId_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'nextMerchId',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useLicensingRegistry_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"paused"`
+ */
+export const useLicensingRegistry_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'paused',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useLicensingRegistry_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"platform"`
+ */
+export const useLicensingRegistry_Platform_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'platform',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"platformFeeBps"`
+ */
+export const useLicensingRegistry_PlatformFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'platformFeeBps',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"proxiableUUID"`
+ */
+export const useLicensingRegistry_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'proxiableUUID',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"universeCreators"`
+ */
+export const useLicensingRegistry_UniverseCreators_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'universeCreators',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"universeLicenses"`
+ */
+export const useLicensingRegistry_UniverseLicenses_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'universeLicenses',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"universeMerch"`
+ */
+export const useLicensingRegistry_UniverseMerch_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'universeMerch',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__
+ */
+export const useLicensingRegistry_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"activateLicense"`
+ */
+export const useLicensingRegistry_ActivateLicense_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'activateLicense',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"createLicense"`
+ */
+export const useLicensingRegistry_CreateLicense_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'createLicense',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"createMerch"`
+ */
+export const useLicensingRegistry_CreateMerch_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'createMerch',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useLicensingRegistry_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLicensingRegistry_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"payRoyalty"`
+ */
+export const useLicensingRegistry_PayRoyalty_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'payRoyalty',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"purchaseMerch"`
+ */
+export const useLicensingRegistry_PurchaseMerch_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'purchaseMerch',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"registerUniverse"`
+ */
+export const useLicensingRegistry_RegisterUniverse_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'registerUniverse',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useLicensingRegistry_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"revokeLicense"`
+ */
+export const useLicensingRegistry_RevokeLicense_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'revokeLicense',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useLicensingRegistry_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLicensingRegistry_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useLicensingRegistry_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__
+ */
+export const useLicensingRegistry_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"activateLicense"`
+ */
+export const useLicensingRegistry_ActivateLicense_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: licensingRegistryAbi,
+    functionName: 'activateLicense',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"createLicense"`
+ */
+export const useLicensingRegistry_CreateLicense_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'createLicense',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"createMerch"`
+ */
+export const useLicensingRegistry_CreateMerch_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'createMerch',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useLicensingRegistry_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLicensingRegistry_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"payRoyalty"`
+ */
+export const useLicensingRegistry_PayRoyalty_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'payRoyalty',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"purchaseMerch"`
+ */
+export const useLicensingRegistry_PurchaseMerch_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'purchaseMerch',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"registerUniverse"`
+ */
+export const useLicensingRegistry_RegisterUniverse_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: licensingRegistryAbi,
+    functionName: 'registerUniverse',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useLicensingRegistry_RenounceOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: licensingRegistryAbi,
+    functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"revokeLicense"`
+ */
+export const useLicensingRegistry_RevokeLicense_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'revokeLicense',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useLicensingRegistry_TransferOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: licensingRegistryAbi,
+    functionName: 'transferOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLicensingRegistry_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: licensingRegistryAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useLicensingRegistry_UpgradeToAndCall_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: licensingRegistryAbi,
+    functionName: 'upgradeToAndCall',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__
+ */
+export const useLicensingRegistry_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useLicensingRegistry_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"LicenseActivated"`
+ */
+export const useLicensingRegistry_LicenseActivated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: licensingRegistryAbi,
+    eventName: 'LicenseActivated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"LicenseCreated"`
+ */
+export const useLicensingRegistry_LicenseCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'LicenseCreated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"LicenseRevoked"`
+ */
+export const useLicensingRegistry_LicenseRevoked_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'LicenseRevoked',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"MerchCreated"`
+ */
+export const useLicensingRegistry_MerchCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'MerchCreated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"MerchSold"`
+ */
+export const useLicensingRegistry_MerchSold_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'MerchSold',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useLicensingRegistry_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: licensingRegistryAbi,
+    eventName: 'OwnershipTransferred',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useLicensingRegistry_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"RoyaltyPaid"`
+ */
+export const useLicensingRegistry_RoyaltyPaid_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'RoyaltyPaid',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"UniverseRegistered"`
+ */
+export const useLicensingRegistry_UniverseRegistered_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: licensingRegistryAbi,
+    eventName: 'UniverseRegistered',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useLicensingRegistry_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
+  eventName: 'Unpaused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link licensingRegistryAbi}__ and `eventName` set to `"Upgraded"`
+ */
+export const useLicensingRegistry_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: licensingRegistryAbi,
   eventName: 'Upgraded',
 });
 
@@ -12336,6 +21321,226 @@ export const useLoarBurner_Unpaused_watch = /*#__PURE__*/ createUseWatchContract
 export const useLoarBurner_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: loarBurnerAbi,
   eventName: 'Upgraded',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__
+ */
+export const useLoarFaucet_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"canClaim"`
+ */
+export const useLoarFaucet_CanClaim_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'canClaim',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"claimAmount"`
+ */
+export const useLoarFaucet_ClaimAmount_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'claimAmount',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"cooldown"`
+ */
+export const useLoarFaucet_Cooldown_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'cooldown',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"faucetBalance"`
+ */
+export const useLoarFaucet_FaucetBalance_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'faucetBalance',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"lastClaimed"`
+ */
+export const useLoarFaucet_LastClaimed_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'lastClaimed',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"loarToken"`
+ */
+export const useLoarFaucet_LoarToken_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'loarToken',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"owner"`
+ */
+export const useLoarFaucet_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarFaucetAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__
+ */
+export const useLoarFaucet_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"claim"`
+ */
+export const useLoarFaucet_Claim_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+  functionName: 'claim',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"drain"`
+ */
+export const useLoarFaucet_Drain_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+  functionName: 'drain',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useLoarFaucet_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"setClaimAmount"`
+ */
+export const useLoarFaucet_SetClaimAmount_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+  functionName: 'setClaimAmount',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"setCooldown"`
+ */
+export const useLoarFaucet_SetCooldown_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+  functionName: 'setCooldown',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useLoarFaucet_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarFaucetAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__
+ */
+export const useLoarFaucet_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"claim"`
+ */
+export const useLoarFaucet_Claim_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+  functionName: 'claim',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"drain"`
+ */
+export const useLoarFaucet_Drain_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+  functionName: 'drain',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useLoarFaucet_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"setClaimAmount"`
+ */
+export const useLoarFaucet_SetClaimAmount_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+  functionName: 'setClaimAmount',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"setCooldown"`
+ */
+export const useLoarFaucet_SetCooldown_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+  functionName: 'setCooldown',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarFaucetAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useLoarFaucet_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarFaucetAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFaucetAbi}__
+ */
+export const useLoarFaucet_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFaucetAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFaucetAbi}__ and `eventName` set to `"ClaimAmountUpdated"`
+ */
+export const useLoarFaucet_ClaimAmountUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFaucetAbi,
+  eventName: 'ClaimAmountUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFaucetAbi}__ and `eventName` set to `"Claimed"`
+ */
+export const useLoarFaucet_Claimed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFaucetAbi,
+  eventName: 'Claimed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFaucetAbi}__ and `eventName` set to `"CooldownUpdated"`
+ */
+export const useLoarFaucet_CooldownUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFaucetAbi,
+  eventName: 'CooldownUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFaucetAbi}__ and `eventName` set to `"Drained"`
+ */
+export const useLoarFaucet_Drained_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFaucetAbi,
+  eventName: 'Drained',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarFaucetAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useLoarFaucet_OwnershipTransferred_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarFaucetAbi,
+  eventName: 'OwnershipTransferred',
 });
 
 /**
@@ -14719,6 +23924,247 @@ export const useRemixFees_Upgraded_watch = /*#__PURE__*/ createUseWatchContractE
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__
+ */
+export const useRightsRegistry_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
+ */
+export const useRightsRegistry_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'UPGRADE_INTERFACE_VERSION',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"isMonetizable"`
+ */
+export const useRightsRegistry_IsMonetizable_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'isMonetizable',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"operators"`
+ */
+export const useRightsRegistry_Operators_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'operators',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useRightsRegistry_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"proxiableUUID"`
+ */
+export const useRightsRegistry_ProxiableUuid_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'proxiableUUID',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"rights"`
+ */
+export const useRightsRegistry_Rights_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'rights',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__
+ */
+export const useRightsRegistry_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"freeze"`
+ */
+export const useRightsRegistry_Freeze_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'freeze',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useRightsRegistry_Initialize_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useRightsRegistry_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setOperator"`
+ */
+export const useRightsRegistry_SetOperator_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'setOperator',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setRights"`
+ */
+export const useRightsRegistry_SetRights_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'setRights',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useRightsRegistry_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useRightsRegistry_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__
+ */
+export const useRightsRegistry_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"freeze"`
+ */
+export const useRightsRegistry_Freeze_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'freeze',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useRightsRegistry_Initialize_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'initialize',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useRightsRegistry_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: rightsRegistryAbi,
+    functionName: 'renounceOwnership',
+  }
+);
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setOperator"`
+ */
+export const useRightsRegistry_SetOperator_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'setOperator',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setRights"`
+ */
+export const useRightsRegistry_SetRights_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'setRights',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useRightsRegistry_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: rightsRegistryAbi,
+    functionName: 'transferOwnership',
+  }
+);
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"upgradeToAndCall"`
+ */
+export const useRightsRegistry_UpgradeToAndCall_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'upgradeToAndCall',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__
+ */
+export const useRightsRegistry_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"ContentFrozen"`
+ */
+export const useRightsRegistry_ContentFrozen_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'ContentFrozen',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"Initialized"`
+ */
+export const useRightsRegistry_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"OperatorUpdated"`
+ */
+export const useRightsRegistry_OperatorUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'OperatorUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useRightsRegistry_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: rightsRegistryAbi,
+    eventName: 'OwnershipTransferred',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"RightsSet"`
+ */
+export const useRightsRegistry_RightsSet_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'RightsSet',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"Upgraded"`
+ */
+export const useRightsRegistry_Upgraded_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'Upgraded',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link slopMarketAbi}__
  */
 export const useSlopMarket_undefined_read = /*#__PURE__*/ createUseReadContract({
@@ -14987,6 +24433,251 @@ export const useSlopMarket_Sale_watch = /*#__PURE__*/ createUseWatchContractEven
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__
+ */
+export const useSplitRouter_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
+ */
+export const useSplitRouter_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'MAX_FEE_BPS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"MAX_RECIPIENTS"`
+ */
+export const useSplitRouter_MaxRecipients_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'MAX_RECIPIENTS',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"getSplits"`
+ */
+export const useSplitRouter_GetSplits_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'getSplits',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"owner"`
+ */
+export const useSplitRouter_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useSplitRouter_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'paymentRouter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"registrars"`
+ */
+export const useSplitRouter_Registrars_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'registrars',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"splitOwner"`
+ */
+export const useSplitRouter_SplitOwner_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'splitOwner',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__
+ */
+export const useSplitRouter_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"registerSplitOwner"`
+ */
+export const useSplitRouter_RegisterSplitOwner_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'registerSplitOwner',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useSplitRouter_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"routeWithSplits"`
+ */
+export const useSplitRouter_RouteWithSplits_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'routeWithSplits',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setPaymentRouter"`
+ */
+export const useSplitRouter_SetPaymentRouter_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'setPaymentRouter',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setRegistrar"`
+ */
+export const useSplitRouter_SetRegistrar_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'setRegistrar',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setSplits"`
+ */
+export const useSplitRouter_SetSplits_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'setSplits',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useSplitRouter_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"transferSplitOwnership"`
+ */
+export const useSplitRouter_TransferSplitOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: splitRouterAbi,
+  functionName: 'transferSplitOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__
+ */
+export const useSplitRouter_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"registerSplitOwner"`
+ */
+export const useSplitRouter_RegisterSplitOwner_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'registerSplitOwner',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useSplitRouter_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"routeWithSplits"`
+ */
+export const useSplitRouter_RouteWithSplits_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'routeWithSplits',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setPaymentRouter"`
+ */
+export const useSplitRouter_SetPaymentRouter_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'setPaymentRouter',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setRegistrar"`
+ */
+export const useSplitRouter_SetRegistrar_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'setRegistrar',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setSplits"`
+ */
+export const useSplitRouter_SetSplits_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'setSplits',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useSplitRouter_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: splitRouterAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"transferSplitOwnership"`
+ */
+export const useSplitRouter_TransferSplitOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: splitRouterAbi,
+    functionName: 'transferSplitOwnership',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__
+ */
+export const useSplitRouter_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: splitRouterAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useSplitRouter_OwnershipTransferred_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: splitRouterAbi,
+  eventName: 'OwnershipTransferred',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"RegistrarUpdated"`
+ */
+export const useSplitRouter_RegistrarUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: splitRouterAbi,
+  eventName: 'RegistrarUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"SplitPayment"`
+ */
+export const useSplitRouter_SplitPayment_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: splitRouterAbi,
+  eventName: 'SplitPayment',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"SplitsConfigured"`
+ */
+export const useSplitRouter_SplitsConfigured_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: splitRouterAbi,
+  eventName: 'SplitsConfigured',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link storyBountiesAbi}__
  */
 export const useStoryBounties_undefined_read = /*#__PURE__*/ createUseReadContract({
@@ -15042,6 +24733,15 @@ export const useStoryBounties_GetUniverseBounties_read = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"getUniverseBountiesPaginated"`
+ */
+export const useStoryBounties_GetUniverseBountiesPaginated_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: storyBountiesAbi,
+    functionName: 'getUniverseBountiesPaginated',
+  });
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"loarToken"`
  */
 export const useStoryBounties_LoarToken_read = /*#__PURE__*/ createUseReadContract({
@@ -15071,6 +24771,14 @@ export const useStoryBounties_NextBountyId_read = /*#__PURE__*/ createUseReadCon
 export const useStoryBounties_Owner_read = /*#__PURE__*/ createUseReadContract({
   abi: storyBountiesAbi,
   functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"paymentRouter"`
+ */
+export const useStoryBounties_PaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: storyBountiesAbi,
+  functionName: 'paymentRouter',
 });
 
 /**
@@ -15201,6 +24909,14 @@ export const useStoryBounties_SetMinBountyAmount_write = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"setPaymentRouter"`
+ */
+export const useStoryBounties_SetPaymentRouter_write = /*#__PURE__*/ createUseWriteContract({
+  abi: storyBountiesAbi,
+  functionName: 'setPaymentRouter',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"setPlatform"`
  */
 export const useStoryBounties_SetPlatform_write = /*#__PURE__*/ createUseWriteContract({
@@ -15316,6 +25032,14 @@ export const useStoryBounties_SetMinBountyAmount_simulate = /*#__PURE__*/ create
 );
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"setPaymentRouter"`
+ */
+export const useStoryBounties_SetPaymentRouter_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: storyBountiesAbi,
+  functionName: 'setPaymentRouter',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"setPlatform"`
  */
 export const useStoryBounties_SetPlatform_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -15395,11 +25119,28 @@ export const useStoryBounties_BountyExpired_watch = /*#__PURE__*/ createUseWatch
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"CancellationFeeChanged"`
+ */
+export const useStoryBounties_CancellationFeeChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: storyBountiesAbi,
+    eventName: 'CancellationFeeChanged',
+  });
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"Initialized"`
  */
 export const useStoryBounties_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: storyBountiesAbi,
   eventName: 'Initialized',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"MinBountyChanged"`
+ */
+export const useStoryBounties_MinBountyChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: storyBountiesAbi,
+  eventName: 'MinBountyChanged',
 });
 
 /**
@@ -15410,6 +25151,22 @@ export const useStoryBounties_OwnershipTransferred_watch =
     abi: storyBountiesAbi,
     eventName: 'OwnershipTransferred',
   });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"PlatformFeeChanged"`
+ */
+export const useStoryBounties_PlatformFeeChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: storyBountiesAbi,
+  eventName: 'PlatformFeeChanged',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"TreasuryChanged"`
+ */
+export const useStoryBounties_TreasuryChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: storyBountiesAbi,
+  eventName: 'TreasuryChanged',
+});
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"Upgraded"`

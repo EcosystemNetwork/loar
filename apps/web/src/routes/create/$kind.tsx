@@ -9,7 +9,7 @@
  */
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';

@@ -12,6 +12,7 @@ import {
   adminProcedure,
   requirePermission,
 } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -152,6 +153,59 @@ async function autoAttachVideo(opts: {
     });
   } catch (err) {
     console.error('Failed to auto-attach video:', err);
+  }
+}
+
+// ── Legacy FAL compat helpers ────────────────────────────────────────
+
+const LEGACY_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as const;
+
+/** Deduct credits from user balance. Throws if insufficient. */
+async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
+  if (!db) return;
+  const userRef = db.collection('userCredits').doc(uid);
+  const userDoc = await userRef.get();
+  const balance = userDoc.data()?.balance || 0;
+
+  if (balance < cost) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+    });
+  }
+
+  await userRef.update({
+    balance: balance - cost,
+    totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
+    updatedAt: new Date(),
+  });
+
+  await db.collection('creditTransactions').add({
+    uid,
+    type: 'spend',
+    generationType,
+    credits: -cost,
+    source: 'generation_legacy',
+    createdAt: new Date(),
+  });
+}
+
+const videoGenerationsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('videoGenerations');
+};
+
+/** Fire-and-forget save for legacy routes — never blocks the response */
+function saveLegacyVideoRecord(record: Record<string, any>) {
+  try {
+    videoGenerationsCol()
+      .doc(record.id)
+      .set(record)
+      .catch((err: any) =>
+        console.error('Failed to save legacy video generation record:', err.message)
+      );
+  } catch {
+    // db not configured — skip silently
   }
 }
 
@@ -837,6 +891,278 @@ export const generationRouter = router({
         modelStats: modelStats.sort((a, b) => b.count - a.count),
       };
     }),
+
+  // ── Legacy FAL-compatible endpoints ─────────────────────────────────
+  // These mirror fal.* procedures so the frontend can call generation.*
+  // with the same signatures.
+
+  generateVideo: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        model: z
+          .enum([
+            // Text-to-Video
+            'fal-ai/hunyuan-video',
+            'fal-ai/ltx-video',
+            'fal-ai/cogvideox-5b',
+            'fal-ai/runway-gen3',
+            'fal-ai/veo3.1/fast',
+            'fal-ai/veo3.1',
+            'fal-ai/veo3.1/lite',
+            'fal-ai/sora-2/text-to-video',
+            'fal-ai/sora-2/text-to-video/pro',
+            'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+            'fal-ai/wan-25-preview/text-to-video',
+            'fal-ai/wan/v2.7/text-to-video',
+            'fal-ai/pixverse/v6/text-to-video',
+            // Image-to-Video
+            'fal-ai/veo3.1/fast/image-to-video',
+            'fal-ai/veo3.1/image-to-video',
+            'fal-ai/veo3.1/lite/image-to-video',
+            'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+            'fal-ai/kling-video/v3/pro/image-to-video',
+            'fal-ai/wan-25-preview/image-to-video',
+            'fal-ai/wan/v2.7/image-to-video',
+            'fal-ai/sora-2/image-to-video',
+            'fal-ai/sora-2/image-to-video/pro',
+            'fal-ai/pixverse/v6/image-to-video',
+            // Seedance 2.0
+            'bytedance/seedance-2.0/text-to-video',
+            'bytedance/seedance-2.0/image-to-video',
+            'bytedance/seedance-2.0/fast/text-to-video',
+            'bytedance/seedance-2.0/fast/image-to-video',
+            'bytedance/seedance-2.0/reference-to-video',
+            'bytedance/seedance-2.0/fast/reference-to-video',
+          ])
+          .optional(),
+        imageUrl: z.string().url().optional(),
+        duration: z.number().min(1).max(20).optional(),
+        fps: z.number().min(8).max(30).optional(),
+        width: z.number().min(256).max(1920).optional(),
+        height: z.number().min(256).max(1080).optional(),
+        guidanceScale: z.number().min(1).max(20).optional(),
+        numInferenceSteps: z.number().min(10).max(50).optional(),
+        aspectRatio: z.enum(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', 'auto']).optional(),
+        motionStrength: z.number().min(1).max(255).optional(),
+        negativePrompt: z.string().optional(),
+        cfgScale: z.number().min(0.1).max(2.0).optional(),
+        resolution: z.enum(['480p', '720p', '1080p', 'auto']).optional(),
+        enablePromptExpansion: z.boolean().optional(),
+        generateAudio: z.boolean().optional(),
+        endImageUrl: z.string().url().optional(),
+        seed: z.number().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video');
+      const startTime = Date.now();
+      const result = await falService.generateVideo(input);
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Video generation failed');
+      }
+      saveLegacyVideoRecord({
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: input.model || 'fal-ai/ltx-video',
+        mode: input.imageUrl ? 'image_to_video' : 'text_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration ?? null,
+        aspectRatio: input.aspectRatio ?? null,
+        resolution: input.resolution ?? null,
+        source: 'generation.generateVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
+    }),
+
+  veo3ImageToVideo: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z
+          .union([z.literal(5), z.literal(10)])
+          .optional()
+          .default(5),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
+        motionStrength: z.number().min(1).max(255).optional().default(127),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_veo3');
+      const startTime = Date.now();
+      const result = await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: 'fal-ai/veo3.1/fast/image-to-video',
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        motionStrength: input.motionStrength,
+      });
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Veo3 video generation failed');
+      }
+      saveLegacyVideoRecord({
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/veo3.1/fast/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        source: 'generation.veo3ImageToVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
+    }),
+
+  klingVideo: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z
+          .union([z.literal(5), z.literal(10)])
+          .optional()
+          .default(5),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
+        negativePrompt: z.string().optional(),
+        cfgScale: z.number().min(0.1).max(2.0).optional().default(0.5),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_kling');
+      const startTime = Date.now();
+      const result = await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        negativePrompt: input.negativePrompt,
+        cfgScale: input.cfgScale,
+      });
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Kling video generation failed');
+      }
+      saveLegacyVideoRecord({
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        source: 'generation.klingVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
+    }),
+
+  wan25ImageToVideo: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z
+          .union([z.literal(5), z.literal(10)])
+          .optional()
+          .default(5),
+        resolution: z.enum(['720p', '1080p', 'auto']).optional().default('1080p'),
+        negativePrompt: z.string().optional(),
+        enablePromptExpansion: z.boolean().optional().default(true),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_wan25');
+      const startTime = Date.now();
+      const result = await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: 'fal-ai/wan-25-preview/image-to-video',
+        duration: input.duration,
+        resolution: input.resolution,
+        negativePrompt: input.negativePrompt,
+        enablePromptExpansion: input.enablePromptExpansion,
+      });
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Wan25 video generation failed');
+      }
+      saveLegacyVideoRecord({
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/wan-25-preview/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        resolution: input.resolution,
+        source: 'generation.wan25ImageToVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
+    }),
+
+  soraImageToVideo: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1, 'Prompt is required for Sora video generation'),
+        imageUrl: z.string().url('Valid image URL is required for Sora image-to-video'),
+        duration: z
+          .union([z.literal(4), z.literal(8), z.literal(12)])
+          .optional()
+          .default(4),
+        aspectRatio: z.enum(['16:9', '9:16', '1:1', 'auto']).optional().default('auto'),
+        resolution: z.enum(['720p', '1080p', 'auto']).optional().default('auto'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_sora');
+      const startTime = Date.now();
+      const result = await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: 'fal-ai/sora-2/image-to-video',
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        resolution: input.resolution,
+      });
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Sora video generation failed');
+      }
+      saveLegacyVideoRecord({
+        id: result.id || randomUUID(),
+        userId: ctx.user?.uid || 'anonymous',
+        prompt: input.prompt,
+        model: 'fal-ai/sora-2/image-to-video',
+        mode: 'image_to_video',
+        status: 'completed',
+        videoUrl: result.videoUrl,
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        resolution: input.resolution,
+        source: 'generation.soraImageToVideo',
+        latencyMs: Date.now() - startTime,
+        createdAt: new Date(),
+      });
+      return result;
+    }),
+
+  getStatus: publicProcedure.input(z.object({ id: z.string().min(1) })).query(async ({ input }) => {
+    return await falService.getGenerationStatus(input.id);
+  }),
 });
 
 // ── Fallback Helper ───────────────────────────────────────────────────

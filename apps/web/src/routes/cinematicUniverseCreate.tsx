@@ -175,7 +175,7 @@ function CinematicUniverseCreate() {
     mutationFn: async () => {
       const prompt = `Epic cinematic universe cover art for "${universeName}". ${description}. Professional movie poster style, high quality, dramatic lighting`;
 
-      const result = await trpcClient.fal.generateImage.mutate({
+      const result = await trpcClient.image.generateImage.mutate({
         prompt,
         model: coverModel as any,
         imageSize: 'landscape_16_9',

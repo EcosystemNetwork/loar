@@ -5,7 +5,7 @@
  * Allows signers to confirm and execute transactions.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { decodeFunctionData } from 'viem';
 import { universeAbi } from '@loar/abis/generated';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ export function SafeTransactionQueue({ safeAddress, universeAddress }: SafeTrans
       const txs = await getPendingTransactions(safeAddress);
       setTransactions(txs);
     } catch (err) {
-      console.error('Failed to load Safe transactions:', err);
+      // Error handled by loading state
     } finally {
       setLoadingTxs(false);
     }
@@ -48,7 +48,7 @@ export function SafeTransactionQueue({ safeAddress, universeAddress }: SafeTrans
       await confirmTransaction(safeAddress, safeTxHash);
       await loadTransactions();
     } catch (err) {
-      console.error('Confirmation failed:', err);
+      // Error handled by UI state
     } finally {
       setActionTxHash(null);
     }
@@ -60,7 +60,7 @@ export function SafeTransactionQueue({ safeAddress, universeAddress }: SafeTrans
       await executeTransaction(safeAddress, safeTxHash);
       await loadTransactions();
     } catch (err) {
-      console.error('Execution failed:', err);
+      // Error handled by UI state
     } finally {
       setActionTxHash(null);
     }

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 
 export function FollowButton({ targetUid }: { targetUid: string }) {
   const { address } = useAccount();

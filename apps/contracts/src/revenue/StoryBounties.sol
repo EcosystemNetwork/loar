@@ -169,10 +169,10 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
         // Route winner payout through PaymentRouter if available, otherwise direct transfer
         if (address(paymentRouter) != address(0)) {
-            loarToken.safeApprove(address(paymentRouter), winnerReward);
+            loarToken.forceApprove(address(paymentRouter), winnerReward);
             paymentRouter.routeLoar(winner, 0, winnerReward); // 0 fee — already deducted
             if (platformFee > 0) {
-                loarToken.safeApprove(address(paymentRouter), platformFee);
+                loarToken.forceApprove(address(paymentRouter), platformFee);
                 paymentRouter.routeLoarToTreasury(platformFee);
             }
         } else {

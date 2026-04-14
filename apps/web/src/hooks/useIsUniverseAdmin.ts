@@ -7,7 +7,8 @@
  *
  * Returns admin status, whether admin is a Safe, and Safe metadata.
  */
-import { useAccount, usePublicClient, useReadContract, useChainId } from 'wagmi';
+import { usePublicClient, useReadContract, useChainId } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useQuery } from '@tanstack/react-query';
 import { universeAbi } from '@loar/abis/generated';
 

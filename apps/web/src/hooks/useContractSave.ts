@@ -97,8 +97,6 @@ export function useContractSave({
 
     try {
       // Step 1: Upload to decentralized storage via unified StorageManager
-      console.log('Step 1: Uploading video to decentralized storage. URL:', generatedVideoUrl);
-
       let storageUrl: string | null = null;
       let contentHashHex: string | null = null;
 
@@ -109,12 +107,6 @@ export function useContractSave({
           filename: `${uuid}.mp4`,
         });
 
-        console.log('Storage upload successful. Content hash:', manifest.contentHash);
-        console.log(
-          'Providers:',
-          manifest.uploads.map((u: { provider: string }) => u.provider).join(', ')
-        );
-
         contentHashHex = manifest.contentHash;
         storageUrl = manifest.uploads[0]?.url || generatedVideoUrl;
         setStorageKey(manifest.contentHash);
@@ -122,7 +114,7 @@ export function useContractSave({
 
         setGeneratedVideoUrl(storageUrl);
       } catch (storageError) {
-        console.error('Storage upload failed, proceeding with original URL:', storageError);
+        // Storage failed — fall back to original URL
         storageUrl = generatedVideoUrl;
       }
 
@@ -134,7 +126,6 @@ export function useContractSave({
       if (additionType === 'branch' && sourceNodeId) {
         const numericPart = sourceNodeId.match(/^\d+/);
         previousNodeId = numericPart ? parseInt(numericPart[0]) : 0;
-        console.log('Creating branch from event:', sourceNodeId, '-> numeric:', previousNodeId);
       } else {
         const numericIds = graphData.nodeIds.map((id) => {
           const idStr = String(id);
@@ -142,7 +133,6 @@ export function useContractSave({
           return numericPart ? parseInt(numericPart[0]) : 0;
         });
         previousNodeId = Math.max(...(numericIds || [0]), 0);
-        console.log('Creating linear continuation after event:', previousNodeId);
       }
 
       // Step 3: Compute content hashes for on-chain storage
@@ -152,14 +142,6 @@ export function useContractSave({
       const plotHash: `0x${string}` = keccak256(toBytes(videoDescription));
 
       const videoUrlForEvent = storageUrl || generatedVideoUrl;
-
-      console.log('Step 3: Saving to contract:', {
-        contentHash,
-        plotHash,
-        link: videoUrlForEvent,
-        plot: videoDescription,
-        previous: previousNodeId,
-      });
 
       // Determine which contract address to use
       const contractAddressToUse = isBlockchainUniverse
@@ -174,7 +156,6 @@ export function useContractSave({
         args: [contentHash, plotHash, BigInt(previousNodeId), videoUrlForEvent, videoDescription],
       });
 
-      console.log('Transaction submitted:', txHash);
       setContractSaved(true);
 
       toast.success('Event Saved to Blockchain & Decentralized Storage!', {
@@ -210,15 +191,14 @@ export function useContractSave({
           characterIds: characterIdsForWiki,
           previousEvents: previousEvents.length > 0 ? previousEvents : undefined,
         })
-        .then((wikiResult: unknown) => {
-          console.log('Wiki generated successfully!', wikiResult);
+        .then((_wikiResult: unknown) => {
           toast.success('Wiki Generated!', {
             description: 'AI-powered wiki entry created for your event.',
             duration: 4000,
           });
         })
-        .catch((wikiError: unknown) => {
-          console.error('Wiki generation failed:', wikiError);
+        .catch((_wikiError: unknown) => {
+          // Error handled by UI state
         });
 
       // Refresh the blockchain data
@@ -232,7 +212,6 @@ export function useContractSave({
         await queryClient.invalidateQueries();
       }, 5000);
     } catch (error) {
-      console.error('Error saving to contract:', error);
       toast.error('Contract Save Failed', {
         description:
           'Failed to save event to blockchain: ' +
@@ -272,7 +251,6 @@ export function useContractSave({
   ]);
 
   const handleRefreshTimeline = useCallback(async () => {
-    console.log('Manually refreshing timeline...');
     if (isBlockchainUniverse) {
       await refetchLeaves();
       await refetchFullGraph();

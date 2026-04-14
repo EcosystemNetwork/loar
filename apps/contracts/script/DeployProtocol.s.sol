@@ -72,7 +72,7 @@ contract DeployProtocolScript is Script {
         uint256 currentChain = getChainId();
         require(
             currentChain == 11155111 || currentChain == 84532 || currentChain == 8453,
-            "Unsupported chain — must be Sepolia (11155111), Base Sepolia (84532), or Base (8453)"
+            "Unsupported chain - must be Sepolia (11155111), Base Sepolia (84532), or Base (8453)"
         );
 
         // Validate required addresses

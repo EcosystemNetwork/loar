@@ -13,7 +13,7 @@
 import { useMemo } from 'react';
 import { ConnectButton } from 'thirdweb/react';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { thirdwebClient } from '@/lib/thirdweb';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 import { sepolia, baseSepolia, base } from 'thirdweb/chains';

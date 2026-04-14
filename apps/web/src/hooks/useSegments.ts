@@ -71,7 +71,7 @@ export function useSegments({ universeId, eventId }: UseSegmentsOptions) {
 
       setIsLoading(false);
     } catch (error) {
-      console.error('Failed to load segments:', error);
+      // Error handled by UI state
       setSegments([]);
       setIsLoading(false);
     }
@@ -100,7 +100,6 @@ export function useSegments({ universeId, eventId }: UseSegmentsOptions) {
 
         setSegments(sortSegments(updatedSegments));
       } catch (error) {
-        console.error('Failed to save segments:', error);
         throw error;
       }
     },

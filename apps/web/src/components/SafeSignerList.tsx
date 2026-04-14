@@ -4,7 +4,7 @@
  * Read-only component shown in governance / universe settings
  * when the admin is a Safe multi-sig.
  */
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { Badge } from '@/components/ui/badge';
 import { Shield, User, CheckCircle2 } from 'lucide-react';
 

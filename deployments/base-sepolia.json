@@ -1,14 +1,26 @@
 {
   "chainId": 84532,
   "environment": "base-sepolia",
-  "startBlock": 40078345,
-  "updatedAt": "2026-04-11T00:00:00.000Z",
+  "startBlock": 40182488,
+  "updatedAt": "2026-04-13T00:00:00.000Z",
   "contracts": {
-    "UniverseManager": "0x46ce7cd72763B784977349686AEa72B84d3F86B6",
-    "UniverseTokenDeployer": "0xEC9455F29A5a7A2a5F496bB7D4B428A1df3850dF",
-    "LoarToken": "0x008B6266C10d124B0E8713769C310De802D76a35",
-    "LoarHookStaticFee": "0xAC0C66fc1A9daE256ba91797D5B3E4fe4938a8Cc",
-    "LoarFeeLocker": "0x0a66152096f37F83D41c56534022e746B159b052",
-    "LoarLpLockerMultiple": "0x6FB4b73B1e980217010d20B7DA065b06EA7802B6"
+    "LoarToken": "0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5",
+    "LoarFaucet": "0x5Cc879CE26E38e4c9dAeecc0318f0EbdC22aa806",
+    "UniverseManager": "0xecfce8431CD0E1830D4252F1970345c2BA3a2E6e",
+    "UniverseTokenDeployer": "0xBbF0A2311bee8347479eAee07c64cB237E8AE429",
+    "LoarFeeLocker": "0xf076bc9dFFe89c7B345b0E9Ad120BCF7696d3e91",
+    "PaymentRouter": "0x5d5E30F23487D5D9AF73C3D97b054BEe7c317429",
+    "RightsRegistry": "0x30E7b8aC9BA8BA8bCd970714a367d380CED9FbE3",
+    "SplitRouter": "0x8370F54A01Fc035f89293272C597bCE3B1289FC4",
+    "RevenueModuleFactory": "0xeE8aC1e1Ae9Ff2e039537559e704E361B39Fb6D8",
+    "CanonMarketplace": "0x9FC304306Af5eE0f55B92C58cddE9020CCde7df5",
+    "CreditManager": "0x60d6Cd20B6aE2d8050Ec96436D3dF7A95B5a0e99",
+    "AdPlacement": "0x0a4678b657b558F9fd0461d6B5613f29428EaF6C",
+    "SubscriptionManager": "0x75F68A9D650B1e9a52506e424Ea2b095Cbb3A52D",
+    "LicensingRegistry": "0xCc773ed0d6c8f05B90A7C214a7341c8A190627b9",
+    "CollabManager": "0xFE69b81aBC8F903801AC7f91CaD052d8575AC039",
+    "AnalyticsRegistry": "0x7a580b50b8F8F83D163a03f70c808b3B90537350",
+    "LaunchpadStaking": "0x17250A23fA2E2deB1e695589FF272559d8bEb5bc",
+    "StoryBounties": "0x66BDfFebBa8e61D0A809eEbadD74f923A61aDB7d"
   }
 }

@@ -26,6 +26,7 @@ const { verifyAuth } = await import('./lib/auth');
 const { securityHeaders } = await import('./middleware/security-headers');
 const { rateLimiter, aiRateLimiter } = await import('./middleware/rate-limit');
 const { errorHandler } = await import('./middleware/error-handler');
+const { z } = await import('zod');
 
 const app = new Hono();
 
@@ -201,23 +202,29 @@ app.post('/api/upload', async (c) => {
 // Strict rate limit: 5 requests per minute per IP to prevent mass-flagging abuse
 app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 5 }));
 app.post('/api/takedown', async (c) => {
+  const takedownSchema = z.object({
+    contentId: z.string().min(1),
+    claimantName: z.string().min(1).max(200),
+    claimantEmail: z.string().email(),
+    copyrightWork: z.string().min(1).max(500),
+    explanation: z.string().min(20).max(5000),
+    swornStatement: z.literal(true),
+  });
+
   try {
     const body = await c.req.json();
-    const { contentId, claimantName, claimantEmail, copyrightWork, explanation, goodFaith } = body;
-
-    if (!contentId || !claimantName || !claimantEmail || !copyrightWork || !explanation) {
+    const parsed = takedownSchema.safeParse(body);
+    if (!parsed.success) {
       return c.json(
         {
           code: 'BAD_REQUEST',
-          message:
-            'Missing required fields: contentId, claimantName, claimantEmail, copyrightWork, explanation',
+          message: 'Validation failed',
+          errors: parsed.error.flatten().fieldErrors,
         },
         400
       );
     }
-    if (!goodFaith) {
-      return c.json({ code: 'BAD_REQUEST', message: 'Good faith declaration required' }, 400);
-    }
+    const { contentId, claimantName, claimantEmail, copyrightWork, explanation } = parsed.data;
 
     const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
     if (!fbAvail || !fireDb) {

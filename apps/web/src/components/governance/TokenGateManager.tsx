@@ -3,7 +3,7 @@
  * Universe creators can set different ownership thresholds for each access type.
  */
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';

@@ -8,7 +8,7 @@
  *   - Deploy Safe button
  */
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { isAddress } from 'viem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

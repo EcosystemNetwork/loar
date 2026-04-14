@@ -54,7 +54,7 @@ export function GenerativeMedia() {
         | 'landscape_4_3'
         | 'landscape_16_9';
       numImages: number;
-    }) => trpcClient.fal.generateImage.mutate(input),
+    }) => trpcClient.image.generateImage.mutate(input),
   });
 
   const generateVideoMutation = useMutation({
@@ -64,7 +64,7 @@ export function GenerativeMedia() {
       duration: 5 | 10;
       aspectRatio: '16:9' | '9:16' | '1:1';
       motionStrength: number;
-    }) => trpcClient.fal.veo3ImageToVideo.mutate(input),
+    }) => trpcClient.generation.veo3ImageToVideo.mutate(input),
   });
 
   const { isAuthenticated } = useWalletAuth();
@@ -128,7 +128,7 @@ export function GenerativeMedia() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download video:', error);
+      // Download failed silently
     }
   };
 

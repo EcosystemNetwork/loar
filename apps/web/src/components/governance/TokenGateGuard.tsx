@@ -4,7 +4,8 @@
  * ownership threshold for the specified gate target.
  */
 import { useTokenGate, type GateTarget } from '../../hooks/useTokenGate';
-import { useAccount, useReadContract } from 'wagmi';
+import { useReadContract } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
 import { useVocab } from '../../hooks/use-vocab';

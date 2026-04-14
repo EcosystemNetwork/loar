@@ -184,7 +184,7 @@ export function DirectUpload({
           duration: 4000,
         });
       } catch (err) {
-        console.error('Direct upload failed:', err);
+        // Error surfaced via toast
         toast.error('Upload failed', {
           description: err instanceof Error ? err.message : 'Unknown error',
         });

@@ -6,13 +6,8 @@
  * Also records the purchase in Firebase for marketplace tracking.
  */
 import { useState, useMemo } from 'react';
-import {
-  useAccount,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useBalance,
-  useChainId,
-} from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useBalance, useChainId } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther } from 'viem';
 import { useRecordMint } from '@/hooks/useRevenue';
 import { toast } from 'sonner';
@@ -129,7 +124,7 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
       toast.success('NFT purchased!');
       onSuccess?.();
     } catch (err: any) {
-      console.error('Buy failed:', err);
+      // Error surfaced via toast
       toast.error(err?.shortMessage || err?.message || 'Purchase failed');
       setStep('preview');
     }

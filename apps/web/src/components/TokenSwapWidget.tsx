@@ -9,7 +9,8 @@
 import { useState, useMemo } from 'react';
 import { useTokenPool, getSwapUrl } from '@/hooks/useTokenSwap';
 import { usePoolData, priceFromSqrtX96, priceFromTick, formatTokenAmount } from '@/hooks/useTokens';
-import { useChainId, useAccount, useBalance } from 'wagmi';
+import { useChainId, useBalance } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { ArrowUpDown, ExternalLink, Loader2, TrendingUp, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

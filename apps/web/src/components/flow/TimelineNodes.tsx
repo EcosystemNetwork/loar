@@ -40,9 +40,6 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   const [isHovered, setIsHovered] = useState(false);
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
-  // Debug: Log the node data
-  console.log('TimelineEventNode data:', data);
-
   // Storage URLs are direct HTTP URLs, no conversion needed
   useEffect(() => {
     // Simply use the video URL directly — Firebase Storage provides HTTP URLs
@@ -248,7 +245,6 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
           className="absolute -bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 w-8 h-8 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full"
           onClick={(e) => {
             e.stopPropagation();
-            console.log('🔴 Branch button clicked for event:', data.eventId);
             data.onAddScene?.('branch', data.eventId);
           }}
           title="Create branch event"

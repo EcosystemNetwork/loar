@@ -14,6 +14,7 @@ via_ir=true
 mainnet = "${RPC_1}"
 sepolia = "${RPC_11155111}"
 base-sepolia = "${RPC_84532}"
+base = "${RPC_8453}"
 
 [fmt]
 line_length = 100
@@ -21,6 +22,7 @@ line_length = 100
 [etherscan]
 sepolia = { key = "${VERIFICATION_KEY_1}" }
 base-sepolia = { key = "${VERIFICATION_KEY_84532}", url = "https://api-sepolia.basescan.org/api" }
+base = { key = "${VERIFICATION_KEY_8453}", url = "https://api.basescan.org/api" }
 
 [dependencies]
 forge-std = "1.10.0"

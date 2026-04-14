@@ -39,7 +39,8 @@ import {
   Bookmark,
   Share2,
 } from 'lucide-react';
-import { useChainId, useAccount } from 'wagmi';
+import { useChainId } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerAddressUrl } from '@/configs/chains';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 

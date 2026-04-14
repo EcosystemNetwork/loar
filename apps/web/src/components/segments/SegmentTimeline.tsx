@@ -159,7 +159,7 @@ function SegmentCard({
           setThumbnail(thumbUrl);
         }
       } catch (error) {
-        console.error('Failed to generate thumbnail:', error);
+        // Thumbnail generation failed, fallback UI shown
       }
     };
 

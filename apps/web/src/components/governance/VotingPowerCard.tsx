@@ -1,4 +1,5 @@
-import { useAccount, useReadContract } from 'wagmi';
+import { useReadContract } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { formatEther } from 'viem';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';

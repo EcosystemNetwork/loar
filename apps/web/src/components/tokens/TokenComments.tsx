@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

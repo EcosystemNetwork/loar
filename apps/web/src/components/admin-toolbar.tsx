@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWalletAuth, getSiweAddress } from '@/lib/wallet-auth';
 import { useRouterState } from '@tanstack/react-router';
-import { useAccount, useChainId, useBalance } from 'wagmi';
+import { useChainId, useBalance } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import {

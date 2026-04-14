@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { Loader2 } from 'lucide-react';
 import type { Node, Edge } from 'reactflow';
 import { MarkerType } from 'reactflow';
@@ -115,7 +115,7 @@ export function TimelineFlowWithData({
       setInitialNodes(nodes);
       setInitialEdges(edges);
     } catch (error) {
-      console.error('Error processing timeline data:', error);
+      // Error handled by loading state
     } finally {
       setIsLoading(false);
     }

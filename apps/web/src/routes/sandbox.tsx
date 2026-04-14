@@ -73,7 +73,7 @@ function SandboxPage() {
   // Image generation
   const generateImageMutation = useMutation({
     mutationFn: () =>
-      trpcClient.fal.generateImage.mutate({
+      trpcClient.image.generateImage.mutate({
         prompt,
         imageSize,
         numImages: 1,
@@ -93,7 +93,7 @@ function SandboxPage() {
       if (!generatedImageUrl) throw new Error('Generate an image first');
 
       if (videoModel === 'fal-veo3') {
-        const r = await trpcClient.fal.generateVideo.mutate({
+        const r = await trpcClient.generation.generateVideo.mutate({
           prompt,
           imageUrl: generatedImageUrl,
           model: 'fal-ai/veo3.1/fast/image-to-video',
@@ -102,7 +102,7 @@ function SandboxPage() {
         });
         return r.videoUrl;
       } else if (videoModel === 'fal-wan25') {
-        const r = await trpcClient.fal.wan25ImageToVideo.mutate({
+        const r = await trpcClient.generation.wan25ImageToVideo.mutate({
           prompt,
           imageUrl: generatedImageUrl,
           duration: 5,
@@ -111,7 +111,7 @@ function SandboxPage() {
         });
         return r.videoUrl;
       } else {
-        const r = await trpcClient.fal.klingVideo.mutate({
+        const r = await trpcClient.generation.klingVideo.mutate({
           prompt,
           imageUrl: generatedImageUrl,
           duration: 5,

@@ -69,45 +69,25 @@ export function useCharacterGeneration({
             .filter((char: any) => char.image_url && char.image_url.trim())
             .map((char: any) => char.image_url);
 
-          console.log('🎭 === CHARACTER SCENE EDITING WITH NANO BANANA ===');
-          console.log(
-            'Selected characters:',
-            selectedChars.map((c: any) => c.character_name)
-          );
-          console.log('Number of characters:', selectedChars.length);
-          console.log('Image URLs:', processedImageUrls);
-          console.log('Scene prompt:', editPrompt);
-          console.log('Image format:', imageFormat);
-          console.log('🚀 Calling Nano Banana Edit...');
-
           // Validate we have at least one valid image URL
           if (processedImageUrls.length === 0) {
             throw new Error('No valid character images found for editing');
           }
 
           try {
-            // Use Nano Banana Edit for character frame generation
-            console.log('🎯 Using fal-ai/nano-banana/edit for character frame generation');
-
-            const result = await trpcClient.fal.imageToImage.mutate({
+            const result = await trpcClient.image.imageToImage.mutate({
               prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
               imageUrls: processedImageUrls,
               imageSize: imageFormat,
               numImages: 1,
             });
 
-            console.log('✅ Nano Banana Edit result:', result);
-
             if (result.status !== 'completed' || !result.imageUrl) {
               throw new Error(result.error || 'Nano Banana frame generation failed');
             }
 
-            console.log('🎉 NANO BANANA CHARACTER FRAME GENERATION SUCCESSFUL!');
             return { success: true, imageUrl: result.imageUrl };
           } catch (imageToImageError) {
-            console.error('❌ NANO BANANA EDIT FAILED:', imageToImageError);
-            console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
-
             const errorMessage =
               imageToImageError instanceof Error
                 ? imageToImageError.message
@@ -121,10 +101,8 @@ export function useCharacterGeneration({
       }
 
       // For scenes without characters, generate directly with Nano Banana
-      console.log('🎨 Generating scene without characters using Nano Banana');
-
       try {
-        const result = await trpcClient.fal.generateImage.mutate({
+        const result = await trpcClient.image.generateImage.mutate({
           prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
           model: 'fal-ai/nano-banana',
           imageSize: imageFormat,
@@ -135,19 +113,13 @@ export function useCharacterGeneration({
           throw new Error(result.error || 'Failed to generate scene image');
         }
 
-        console.log('🎉 NANO BANANA SCENE GENERATION SUCCESSFUL!');
         return { success: true, imageUrl: result.imageUrl };
       } catch (error) {
-        console.error('❌ NANO BANANA GENERATION FAILED:', error);
         throw error;
       }
     },
     onSuccess: (data) => {
       if (data.imageUrl) {
-        console.log('=== GENERATED IMAGE URL ===');
-        console.log('Image URL:', data.imageUrl);
-        console.log('===========================');
-
         setGeneratedImageUrl(data.imageUrl);
         setShowVideoStep(true);
 
@@ -160,14 +132,6 @@ export function useCharacterGeneration({
       }
     },
     onError: (error) => {
-      console.error('Error generating image:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        selectedCharacters,
-        charactersData: charactersData?.characters?.length,
-      });
-
       let errorTitle = 'Image Generation Failed';
       let errorMessage = 'Failed to generate image. ';
       if (selectedCharacters.length > 0) {
@@ -202,7 +166,7 @@ export function useCharacterGeneration({
       // Use the video description as the image prompt
       await generateImageMutation.mutateAsync(videoDescription);
     } catch (error) {
-      console.error('Error:', error);
+      // Error handled by UI state
     } finally {
       setIsGeneratingImage(false);
     }
@@ -252,17 +216,10 @@ export function useCharacterGeneration({
         description: 'Creating frame with nano-banana...',
       });
 
-      console.log('🎨 Generating character frame:', {
-        selectedImageCharacters,
-        characterNames,
-        characterImageUrls,
-        prompt: videoDescription,
-      });
-
       // Call nano-banana edit directly with the character images
       const editPrompt = `${characterNames} ${videoDescription}, cinematic scene, high quality, detailed environment`;
 
-      const result = await trpcClient.fal.imageToImage.mutate({
+      const result = await trpcClient.image.imageToImage.mutate({
         prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
         imageUrls: characterImageUrls,
         imageSize: imageFormat,
@@ -273,7 +230,6 @@ export function useCharacterGeneration({
         throw new Error(result.error || 'Character frame generation failed');
       }
 
-      console.log('✅ Character frame generated:', result.imageUrl);
       setGeneratedImageUrl(result.imageUrl);
 
       setStatusMessage({
@@ -282,7 +238,6 @@ export function useCharacterGeneration({
         description: 'Your character frame is ready. Now you can generate a video from it.',
       });
     } catch (error) {
-      console.error('Character frame generation failed:', error);
       setStatusMessage({
         type: 'error',
         title: 'Frame Generation Failed',

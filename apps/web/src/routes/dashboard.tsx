@@ -65,14 +65,14 @@ function RouteComponent() {
   // Fetch user's universes (by creator address)
   const { data: myUniverses, isLoading: isLoadingMine } = useQuery({
     queryKey: ['my-universes', address],
-    queryFn: () => trpcClient.cinematicUniverses.getByCreator.query({ creator: address! }),
+    queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
     enabled: !!address,
   });
 
   // Fetch all universes for discovery
   const { data: allUniverses, isLoading: isLoadingAll } = useQuery({
     queryKey: ['all-universes'],
-    queryFn: () => trpcClient.cinematicUniverses.getAll.query(),
+    queryFn: () => trpcClient.universes.getAll.query(),
   });
 
   const isLoading = isLoadingMine || isLoadingAll;

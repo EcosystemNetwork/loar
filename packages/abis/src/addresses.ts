@@ -3,21 +3,21 @@
 
 export const UniverseManager = {
   '11155111': '0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce',
-  '84532': '0x46ce7cd72763B784977349686AEa72B84d3F86B6',
+  '84532': '0xecfce8431CD0E1830D4252F1970345c2BA3a2E6e',
 } as const;
 
 export type UniverseManagerChainId = keyof typeof UniverseManager;
 
 export const UniverseTokenDeployer = {
   '11155111': '0x3341674801438162e2EFFFcF3Fa68664763641c8', // V2 with vesting
-  '84532': '0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5', // V2 with vesting
+  '84532': '0xBbF0A2311bee8347479eAee07c64cB237E8AE429',
 } as const;
 
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
 
 export const LoarFeeLocker = {
   '11155111': '0x1E10b62bd2817d0C2414909027E1E63653fcCd8e',
-  '84532': '0x0a66152096f37F83D41c56534022e746B159b052',
+  '84532': '0xf076bc9dFFe89c7B345b0E9Ad120BCF7696d3e91',
 } as const;
 
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;

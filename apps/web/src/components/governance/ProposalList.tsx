@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
 import { toast } from 'sonner';

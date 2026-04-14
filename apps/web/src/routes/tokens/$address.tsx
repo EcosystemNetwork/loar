@@ -48,7 +48,8 @@ import {
   Bookmark,
   User,
 } from 'lucide-react';
-import { useChainId, useAccount, useBalance } from 'wagmi';
+import { useChainId, useBalance } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerAddressUrl } from '@/configs/chains';
 import { openExternal } from '@/utils/open-external';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

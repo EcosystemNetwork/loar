@@ -1,4 +1,5 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { formatEther } from 'viem';
 import { useMutation } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';

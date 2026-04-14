@@ -203,7 +203,7 @@ export function EventCreationSidebar({
         setUsePreviousFrame(true);
       }
     } catch (error) {
-      console.error('Error extracting frame:', error);
+      // Error handled by UI state
     } finally {
       setIsExtractingFrame(false);
     }
@@ -217,11 +217,6 @@ export function EventCreationSidebar({
       setCurrentStep('choose-frame');
     }
   }, [showVideoDialog]);
-
-  // Debug: Log previous event video URL
-  useEffect(() => {
-    console.log('EventCreationSidebar - previousEventVideoUrl:', previousEventVideoUrl);
-  }, [previousEventVideoUrl]);
 
   // Auto-scroll to status message when it appears
   useEffect(() => {
@@ -686,7 +681,7 @@ export function EventCreationSidebar({
                                 style: characterStyle,
                               });
                             } catch (error) {
-                              console.error('Character generation error:', error);
+                              // Error handled by mutation state
                             }
                           }
                         }}
@@ -1219,9 +1214,8 @@ export function EventCreationSidebar({
                   src={generatedVideoUrl}
                   controls
                   className="w-full rounded-lg border"
-                  onError={(e) => {
-                    console.error('Video playback error:', e);
-                    console.error('Failed URL:', generatedVideoUrl);
+                  onError={() => {
+                    // Video playback error handled by fallback UI
                   }}
                 >
                   Your browser does not support the video tag.

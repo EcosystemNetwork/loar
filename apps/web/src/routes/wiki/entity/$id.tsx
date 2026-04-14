@@ -7,7 +7,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';

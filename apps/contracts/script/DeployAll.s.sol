@@ -78,7 +78,7 @@ contract DeployAllScript is Script {
         LoarToken loarToken = new LoarToken(treasury, d);
         console.log("[1] LoarToken:", address(loarToken));
 
-        LoarFaucet faucet = new LoarFaucet(address(loarToken), d);
+        LoarFaucet faucet = new LoarFaucet(address(loarToken));
         console.log("[1] LoarFaucet:", address(faucet));
 
         // Seed faucet with tokens for testnet
@@ -245,9 +245,14 @@ contract DeployAllScript is Script {
         staking.setTierConfig(LaunchpadStaking.Tier(4), 500_000e18,  800, 1000, 300, true);  // DIAMOND
         console.log("[5] Staking tiers configured");
 
-        // StoryBounties
-        StoryBounties bounties = new StoryBounties(
-            address(loarToken), treasury, d, BOUNTY_MIN, BOUNTY_FEE, BOUNTY_CANCEL_FEE
+        // StoryBounties (UUPS proxy)
+        StoryBounties bounties = StoryBounties(
+            address(
+                new ERC1967Proxy(
+                    address(new StoryBounties()),
+                    abi.encodeCall(StoryBounties.initialize, (address(loarToken), treasury, d))
+                )
+            )
         );
         console.log("[5] StoryBounties:", address(bounties));
 

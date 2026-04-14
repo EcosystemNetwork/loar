@@ -4,7 +4,8 @@
  * Shows available tiers, benefits, and handles on-chain + off-chain subscription.
  */
 import { useState } from 'react';
-import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther } from 'viem';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

@@ -11,3 +11,4 @@ build.log
 .gitnexus
 .vercel
 .firebase
+apps/contracts/broadcast/

@@ -32,7 +32,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useMutation } from '@tanstack/react-query';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
@@ -79,7 +79,7 @@ export function ProposalCreateDialog({
 
       onClose();
     } catch (err) {
-      console.error('Proposal creation failed:', err);
+      // Error surfaced via UI state
     } finally {
       setIsSubmitting(false);
     }

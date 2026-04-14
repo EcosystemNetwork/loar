@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 
