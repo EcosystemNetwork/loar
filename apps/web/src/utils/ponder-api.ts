@@ -16,6 +16,23 @@ const OFFLINE_COOLDOWN_MS = 60_000; // back off 60s after a connection failure
 const _disabled = !PONDER_URL;
 
 /**
+ * Deep proxy that returns safe defaults for any property access chain.
+ * Prevents "Cannot read properties of undefined (reading 'items')" when
+ * the indexer is offline and callers do e.g. `d.nodes.items`.
+ */
+const EMPTY_RESULT: any = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (prop === 'items') return [];
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === 'then' || prop === Symbol.iterator) return undefined;
+      return EMPTY_RESULT;
+    },
+  }
+);
+
+/**
  * Executes a GraphQL query against the Ponder indexer.
  * Includes a circuit breaker — if the indexer is unreachable, further
  * requests are short-circuited silently to avoid console spam.
@@ -27,11 +44,11 @@ export async function ponderGql<T = any>(
 ): Promise<T> {
   // No indexer configured — return empty silently
   if (_disabled) {
-    return {} as T;
+    return EMPTY_RESULT as T;
   }
 
   if (Date.now() < _offlineUntil) {
-    return {} as T;
+    return EMPTY_RESULT as T;
   }
 
   let res: Response;
@@ -43,7 +60,7 @@ export async function ponderGql<T = any>(
     });
   } catch {
     _offlineUntil = Date.now() + OFFLINE_COOLDOWN_MS;
-    return {} as T;
+    return EMPTY_RESULT as T;
   }
 
   // Indexer is reachable — reset circuit breaker
