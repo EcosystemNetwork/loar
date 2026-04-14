@@ -145,7 +145,9 @@ function CinematicUniverseCreate() {
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [coverModel, setCoverModel] = useState<string>('fal-ai/nano-banana');
+  const [coverModel, setCoverModel] = useState<string>(
+    import.meta.env.VITE_DEFAULT_IMAGE_MODEL || 'fal-ai/nano-banana'
+  );
   const [coverInputMode, setCoverInputMode] = useState<'upload' | 'url' | 'generate'>('upload');
   const coverFileRef = useRef<HTMLInputElement>(null);
 

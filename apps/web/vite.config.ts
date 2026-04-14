@@ -53,17 +53,29 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-router': ['@tanstack/react-router', '@tanstack/react-query'],
-          'vendor-web3': ['wagmi', 'viem', 'thirdweb'],
-          'vendor-ui': [
-            'lucide-react',
-            'radix-ui',
-            'class-variance-authority',
-            'clsx',
-            'tailwind-merge',
-          ],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('wagmi') ||
+              id.includes('viem') ||
+              id.includes('thirdweb') ||
+              id.includes('@safe-global')
+            ) {
+              return 'vendor-web3';
+            }
+            if (id.includes('@tanstack/react-router') || id.includes('@tanstack/react-query')) {
+              return 'vendor-router';
+            }
+            if (
+              id.includes('lucide-react') ||
+              id.includes('@radix-ui') ||
+              id.includes('class-variance-authority') ||
+              id.includes('clsx') ||
+              id.includes('tailwind-merge')
+            ) {
+              return 'vendor-ui';
+            }
+          }
         },
       },
     },

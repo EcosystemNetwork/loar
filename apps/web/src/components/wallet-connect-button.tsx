@@ -16,9 +16,10 @@ import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { thirdwebClient } from '@/lib/thirdweb';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
-import { sepolia, baseSepolia, base } from 'thirdweb/chains';
+import { SUPPORTED_CHAIN_IDS } from '@/configs/chains';
+import { defineChain } from 'thirdweb';
 
-const supportedChains = [sepolia, baseSepolia, base];
+const supportedChains = SUPPORTED_CHAIN_IDS.map((id) => defineChain(id));
 
 interface WalletConnectButtonProps {
   size?: 'sm' | 'lg';
