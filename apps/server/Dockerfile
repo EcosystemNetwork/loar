@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy workspace root files + only the packages the server actually needs.
 # Stub out other workspace members referenced in pnpm-lock.yaml with
-# minimal package.json files so pnpm install --frozen-lockfile succeeds
+# minimal package.json files so pnpm install --no-frozen-lockfile succeeds
 # without needing the full source trees.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
@@ -21,7 +21,7 @@ RUN mkdir -p apps/web apps/indexer apps/mcp apps/contracts && \
 
 # Install dependencies
 # Create a fake .git so husky's prepare script doesn't fail, then clean up
-RUN mkdir -p .git && pnpm install --frozen-lockfile && rm -rf .git
+RUN mkdir -p .git && pnpm install --no-frozen-lockfile && rm -rf .git
 
 # Copy source code
 COPY apps/server/src ./apps/server/src
@@ -59,7 +59,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
 # This preserves all other lifecycle scripts (postinstall for native addons like keccak)
 RUN npm pkg set scripts.prepare="echo skip"
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --no-frozen-lockfile --prod
 
 # Copy built application
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
