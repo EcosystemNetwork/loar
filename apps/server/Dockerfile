@@ -22,8 +22,8 @@ COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 
 # Bundle app code only — all node_modules stay external (firebase-admin needs fs paths)
-# esbuild added explicitly since it's only a transitive dep via tsx
-RUN pnpm add -w -D esbuild && pnpm exec esbuild apps/server/src/index.ts \
+# esbuild is in root devDependencies, installed by pnpm install above
+RUN pnpm exec esbuild apps/server/src/index.ts \
   --bundle \
   --platform=node \
   --format=esm \
