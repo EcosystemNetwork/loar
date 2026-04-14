@@ -51,34 +51,11 @@ export default defineConfig({
     dedupe: ['wagmi', 'viem', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (
-              id.includes('wagmi') ||
-              id.includes('viem') ||
-              id.includes('thirdweb') ||
-              id.includes('@safe-global')
-            ) {
-              return 'vendor-web3';
-            }
-            if (id.includes('@tanstack/react-router') || id.includes('@tanstack/react-query')) {
-              return 'vendor-router';
-            }
-            if (
-              id.includes('lucide-react') ||
-              id.includes('@radix-ui') ||
-              id.includes('class-variance-authority') ||
-              id.includes('clsx') ||
-              id.includes('tailwind-merge')
-            ) {
-              return 'vendor-ui';
-            }
-          }
-        },
-      },
-    },
+    // Let Vite/Rollup handle code splitting automatically.
+    // Manual chunks broke module initialization order — @radix-ui calls
+    // React.forwardRef() at load time, but React was in a different chunk
+    // that hadn't initialized yet, causing "Cannot read properties of
+    // undefined (reading 'forwardRef')" white screen crash.
   },
   server: {
     port: 3001,
