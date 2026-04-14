@@ -4,7 +4,10 @@
  * Shows a grid of entity type cards. Universe creation (on-chain deploy)
  * is one option among many, not the only entry point.
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, useSearch } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
+import { z } from 'zod';
 import {
   Users,
   MapPin,
@@ -109,35 +112,70 @@ const ENTITY_TYPES: EntityTypeCard[] = [
 ];
 
 function CreateHub() {
+  const { universe: universeAddress } = useSearch({ from: '/create/' });
+
+  const { data: universeResult } = useQuery({
+    queryKey: ['universe', universeAddress],
+    queryFn: () => trpcClient.universes.get.query({ id: universeAddress! }),
+    enabled: !!universeAddress,
+  });
+  const universeInfo = universeResult?.data as
+    | { id: string; name?: string; image_url?: string }
+    | undefined;
+
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">
+      {universeInfo && (
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
+          {universeInfo.image_url && (
+            <img
+              src={universeInfo.image_url}
+              alt=""
+              className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Building in
+            </p>
+            <p className="text-lg font-bold truncate">{universeInfo.name}</p>
+          </div>
+        </div>
+      )}
+
       <div className="mb-10">
         <h1 className="text-4xl font-bold tracking-tight mb-3">Create</h1>
         <p className="text-muted-foreground text-lg max-w-2xl">
-          Anything in your universe is a first-class object. Build people, places, factions, and
-          lore — or deploy a new universe on-chain.
+          {universeInfo
+            ? `Add people, places, factions, lore, and more to ${universeInfo.name}.`
+            : 'Anything in your universe is a first-class object. Build people, places, factions, and lore — or deploy a new universe on-chain.'}
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {ENTITY_TYPES.map(({ kind, label, description, icon: Icon, color }) => {
-          const href = kind === 'universe' ? '/cinematicUniverseCreate' : `/create/${kind}`;
-          return (
-            <Link
-              key={kind}
-              to={href as any}
-              className={`group relative flex flex-col gap-3 p-6 rounded-xl border bg-gradient-to-br ${color} hover:scale-[1.02] transition-all duration-200 hover:shadow-lg`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-background/50">
-                  <Icon className="h-5 w-5" />
+        {ENTITY_TYPES.filter(({ kind }) => (universeAddress ? kind !== 'universe' : true)).map(
+          ({ kind, label, description, icon: Icon, color }) => {
+            const href = kind === 'universe' ? '/cinematicUniverseCreate' : `/create/${kind}`;
+            const search =
+              kind !== 'universe' && universeAddress ? { universe: universeAddress } : undefined;
+            return (
+              <Link
+                key={kind}
+                to={href as any}
+                search={search as any}
+                className={`group relative flex flex-col gap-3 p-6 rounded-xl border bg-gradient-to-br ${color} hover:scale-[1.02] transition-all duration-200 hover:shadow-lg`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-background/50">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-lg font-semibold">{label}</h2>
                 </div>
-                <h2 className="text-lg font-semibold">{label}</h2>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-            </Link>
-          );
-        })}
+                <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+              </Link>
+            );
+          }
+        )}
 
         {/* Upload Media — separate card */}
         <Link
@@ -159,6 +197,11 @@ function CreateHub() {
   );
 }
 
+const createHubSearchSchema = z.object({
+  universe: z.string().optional(),
+});
+
 export const Route = createFileRoute('/create/')({
   component: CreateHub,
+  validateSearch: createHubSearchSchema,
 });

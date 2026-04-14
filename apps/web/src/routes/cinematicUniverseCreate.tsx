@@ -7,7 +7,7 @@
  * Includes AI-powered cover image generation via fal.ai.
  */
 
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   useBalance,
@@ -193,7 +193,13 @@ function CinematicUniverseCreate() {
     },
     onError: (error: any) => {
       const msg = error?.message || 'Unknown error';
-      alert(`Failed to generate cover: ${msg}`);
+      if (msg.includes('Insufficient credits') || msg.includes('PRECONDITION_FAILED')) {
+        alert(
+          'Not enough credits to generate a cover image. Purchase credits in the Credits page.'
+        );
+      } else {
+        alert(`Failed to generate cover: ${msg}`);
+      }
     },
   });
 
@@ -610,10 +616,25 @@ function CinematicUniverseCreate() {
               )}
             </div>
 
-            <Button size="lg" onClick={() => (window.location.href = '/')}>
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              View All Universes
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {universeAddress && (
+                <RouterLink to="/create" search={{ universe: universeAddress.toLowerCase() }}>
+                  <Button size="lg" className="w-full">
+                    <Rocket className="h-5 w-5 mr-2" />
+                    Start Building
+                  </Button>
+                </RouterLink>
+              )}
+              <RouterLink to="/universe/$id" params={{ id: universeAddress?.toLowerCase() ?? '' }}>
+                <Button size="lg" variant="outline" className="w-full">
+                  Enter Universe
+                </Button>
+              </RouterLink>
+              <Button size="lg" variant="ghost" onClick={() => (window.location.href = '/')}>
+                <ArrowLeft className="h-5 w-5 mr-2" />
+                All Universes
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

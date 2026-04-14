@@ -12,6 +12,8 @@ import AdminToolbar from '@/components/admin-toolbar';
 import Header from '@/components/header';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { toast } from 'sonner';
 import type { trpc } from '@/utils/trpc';
 import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -24,6 +26,7 @@ import {
 } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { useTrackWalletLogin } from '@/hooks/useTrackWalletLogin';
+import { useRef, useEffect } from 'react';
 import '../index.css';
 
 export interface RouterAppContext {
@@ -95,6 +98,20 @@ function RootNotFound() {
   );
 }
 
+function AuthErrorWatcher() {
+  const { error } = useWalletAuth();
+  const prevError = useRef<string | null>(null);
+  useEffect(() => {
+    if (error && error !== prevError.current) {
+      prevError.current = error;
+      toast.error('Sign-in failed', { description: error, duration: 8000 });
+    } else if (!error) {
+      prevError.current = null;
+    }
+  }, [error]);
+  return null;
+}
+
 function RootComponent() {
   useTrackWalletLogin();
 
@@ -117,6 +134,7 @@ function RootComponent() {
           ) : (
             <>
               <Header />
+              <AuthErrorWatcher />
               {/* Testnet warning banner — only visible in testnet mode */}
               {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
                 <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">

@@ -7,9 +7,11 @@
  * event, lore, species, vehicle, technology, organization). Unknown kinds
  * redirect back to the create hub.
  */
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
+import { z } from 'zod';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
@@ -457,8 +459,19 @@ const KIND_LABELS: Record<EntityKind, string> = {
 
 function EntityCreateForm() {
   const { kind } = Route.useParams() as { kind: string };
+  const { universe: universeAddress } = useSearch({ from: '/create/$kind' });
   const navigate = useNavigate();
   const { address } = useAccount();
+
+  // Fetch universe info when scoped to a universe
+  const { data: universeResult } = useQuery({
+    queryKey: ['universe', universeAddress],
+    queryFn: () => trpcClient.universes.get.query({ id: universeAddress! }),
+    enabled: !!universeAddress,
+  });
+  const universeInfo = universeResult?.data as
+    | { id: string; name?: string; image_url?: string }
+    | undefined;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -550,6 +563,7 @@ function EntityCreateForm() {
         monetized,
         rightsDeclaration: monetized ? rightsDeclaration : null,
         unstoppableDomain: unstoppableDomain.trim() || null,
+        universeAddress: universeAddress || null,
       });
 
       toast.success(`${label} created!`);
@@ -590,17 +604,36 @@ function EntityCreateForm() {
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-2xl">
-      <Link to="/create">
+      <Link to="/create" search={universeAddress ? { universe: universeAddress } : {}}>
         <Button variant="outline" className="mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Create
         </Button>
       </Link>
 
+      {universeInfo && (
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
+          {universeInfo.image_url && (
+            <img
+              src={universeInfo.image_url}
+              alt=""
+              className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Creating in
+            </p>
+            <p className="text-sm font-bold truncate">{universeInfo.name}</p>
+          </div>
+        </div>
+      )}
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">New {label}</h1>
         <p className="text-muted-foreground mt-1">
-          Add a new {label.toLowerCase()} to your worldbuilding canon.
+          Add a new {label.toLowerCase()} to{' '}
+          {universeInfo ? universeInfo.name : 'your worldbuilding canon'}.
         </p>
       </div>
 
@@ -900,6 +933,11 @@ function EntityCreateForm() {
   );
 }
 
+const createSearchSchema = z.object({
+  universe: z.string().optional(),
+});
+
 export const Route = createFileRoute('/create/$kind')({
   component: EntityCreateForm,
+  validateSearch: createSearchSchema,
 });
