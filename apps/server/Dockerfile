@@ -3,15 +3,21 @@ FROM node:20.18.1-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
-# Copy workspace root files
+# Copy workspace root files + only the packages the server actually needs.
+# Stub out other workspace members referenced in pnpm-lock.yaml with
+# minimal package.json files so pnpm install --frozen-lockfile succeeds
+# without needing the full source trees.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
-COPY apps/web/package.json ./apps/web/
-COPY apps/indexer/package.json ./apps/indexer/
-COPY apps/mcp/package.json ./apps/mcp/
-COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
+
+# Stub workspace members that exist in the lockfile but aren't needed at runtime
+RUN mkdir -p apps/web apps/indexer apps/mcp apps/contracts && \
+    echo '{"name":"web","version":"0.0.0","private":true}' > apps/web/package.json && \
+    echo '{"name":"indexer","version":"0.0.0","private":true}' > apps/indexer/package.json && \
+    echo '{"name":"mcp","version":"0.0.0","private":true}' > apps/mcp/package.json && \
+    echo '{"name":"contracts","version":"0.0.0","private":true}' > apps/contracts/package.json
 
 # Install dependencies
 # Create a fake .git so husky's prepare script doesn't fail, then clean up
@@ -39,12 +45,15 @@ WORKDIR /app
 # Copy workspace root files for pnpm install
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/
-COPY apps/web/package.json ./apps/web/
-COPY apps/indexer/package.json ./apps/indexer/
-COPY apps/mcp/package.json ./apps/mcp/
-COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
+
+# Stub workspace members (same as builder — only needed for lockfile resolution)
+RUN mkdir -p apps/web apps/indexer apps/mcp apps/contracts && \
+    echo '{"name":"web","version":"0.0.0","private":true}' > apps/web/package.json && \
+    echo '{"name":"indexer","version":"0.0.0","private":true}' > apps/indexer/package.json && \
+    echo '{"name":"mcp","version":"0.0.0","private":true}' > apps/mcp/package.json && \
+    echo '{"name":"contracts","version":"0.0.0","private":true}' > apps/contracts/package.json
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
