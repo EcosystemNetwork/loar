@@ -33,8 +33,4 @@ const transports = Object.fromEntries(chains.map((c) => [c.id, http()])) as Reco
 export const config = createConfig({
   chains: chains as unknown as readonly [(typeof chains)[0], ...typeof chains],
   transports: transports as any,
-  // Disable built-in ENS resolution — the app runs on Base/Sepolia, not
-  // mainnet. Without this wagmi attempts mainnet ENS lookups on every
-  // connected wallet, producing "Failed to resolve ENS" console errors.
-  ens: { enabled: false },
 });

@@ -57,21 +57,19 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
         connectModal={{ size: 'compact' }}
         // Suppress ENS/social avatar resolution — the app runs on Base/Sepolia,
         // not mainnet, so these lookups always fail with console errors.
-        // Setting explicit name/avatar + disabling social profiles prevents
-        // thirdweb from attempting mainnet ENS resolution.
+        // Providing a non-undefined avatar URL prevents thirdweb from
+        // attempting mainnet ENS lookups entirely.
         detailsButton={{
           connectedAccountName: displayName,
-          connectedAccountAvatarUrl: udAvatar ?? undefined,
+          connectedAccountAvatarUrl: udAvatar || '',
         }}
         detailsModal={{
           connectedAccountName: displayName,
-          connectedAccountAvatarUrl: udAvatar ?? undefined,
+          connectedAccountAvatarUrl: udAvatar || '',
         }}
         connectButton={{
           label: 'Connect Wallet',
         }}
-        // Disable social profiles to prevent ENS/avatar resolution attempts
-        socialProfiles={false}
       />
     </div>
   );
