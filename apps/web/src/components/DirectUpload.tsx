@@ -135,6 +135,18 @@ export function DirectUpload({
       try {
         const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
+        // Pre-flight: verify session cookie is valid before uploading.
+        // Avoids cryptic HTTP/2 protocol errors when the server rejects
+        // auth mid-upload on Railway's edge proxy.
+        const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
+        if (!meRes.ok || !(await meRes.json()).authenticated) {
+          toast.error('Session expired', { description: 'Please sign in again.' });
+          setIsUploading(false);
+          setProgress(0);
+          setFileName(null);
+          return;
+        }
+
         const formData = new FormData();
         formData.append('file', file);
 
