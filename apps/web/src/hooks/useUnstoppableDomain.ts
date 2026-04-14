@@ -1,62 +1,45 @@
 /**
  * useUnstoppableDomain — Resolve Unstoppable Domains names and avatars
- * for wallet addresses. Replaces ENS resolution (which requires mainnet).
+ * for wallet addresses via the public UD API.
  *
- * The @unstoppabledomains/resolution SDK uses node-fetch internally which
- * crashes in browser builds. We lazy-import it to prevent module-level crashes.
+ * Uses the Unstoppable Domains public HTTP API instead of the SDK to avoid
+ * bundling node-fetch, js-sha256, and other Node.js dependencies that crash
+ * in browser ES module builds (require('crypto') / require('buffer')).
  */
 import { useQuery } from '@tanstack/react-query';
+
+const UD_API = 'https://api.unstoppabledomains.com';
 
 /** Cache resolved profiles in memory to avoid repeated lookups */
 const profileCache = new Map<string, { name: string | null; avatar: string | null }>();
 
-/** Lazy-loaded Resolution instance — avoids module-level node-fetch crash */
-let _resolution: any = null;
-async function getResolution() {
-  if (!_resolution) {
-    try {
-      const { default: Resolution } = await import('@unstoppabledomains/resolution');
-      _resolution = new Resolution();
-    } catch {
-      // Package unavailable or failed to load — disable UD resolution
-      _resolution = null;
-    }
-  }
-  return _resolution;
-}
-
 /**
- * Resolve an Unstoppable Domains reverse record for a wallet address.
- * Returns { name, avatar } or nulls if no domain is registered.
+ * Resolve an Unstoppable Domains reverse record for a wallet address
+ * using the public HTTP API (no SDK needed).
  */
 async function resolveUD(address: string): Promise<{ name: string | null; avatar: string | null }> {
-  const cached = profileCache.get(address.toLowerCase());
+  const key = address.toLowerCase();
+  const cached = profileCache.get(key);
   if (cached) return cached;
 
   try {
-    const resolution = await getResolution();
-    if (!resolution) {
-      return { name: null, avatar: null };
+    const res = await fetch(`${UD_API}/resolve/reverse/${key}`);
+    if (!res.ok) {
+      const result = { name: null, avatar: null };
+      profileCache.set(key, result);
+      return result;
     }
 
-    // Reverse resolution: address → domain name
-    const name = await resolution.reverse(address);
-
-    let avatar: string | null = null;
-    if (name) {
-      try {
-        avatar = await resolution.record(name, 'social.picture.value');
-      } catch {
-        // No avatar record
-      }
-    }
+    const data = await res.json();
+    const name = data?.meta?.domain ?? null;
+    const avatar = data?.records?.['social.picture.value'] ?? null;
 
     const result = { name, avatar };
-    profileCache.set(address.toLowerCase(), result);
+    profileCache.set(key, result);
     return result;
   } catch {
     const result = { name: null, avatar: null };
-    profileCache.set(address.toLowerCase(), result);
+    profileCache.set(key, result);
     return result;
   }
 }
