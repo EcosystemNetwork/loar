@@ -2,16 +2,28 @@
  * useUnstoppableDomain — Resolve Unstoppable Domains names and avatars
  * for wallet addresses. Replaces ENS resolution (which requires mainnet).
  *
- * Supports .crypto, .nft, .x, .wallet, .bitcoin, .dao, .888, .zil, etc.
+ * The @unstoppabledomains/resolution SDK uses node-fetch internally which
+ * crashes in browser builds. We lazy-import it to prevent module-level crashes.
  */
 import { useQuery } from '@tanstack/react-query';
-import Resolution from '@unstoppabledomains/resolution';
-
-// Singleton — no API key needed for basic resolution (uses public UNS contracts)
-const resolution = new Resolution();
 
 /** Cache resolved profiles in memory to avoid repeated lookups */
 const profileCache = new Map<string, { name: string | null; avatar: string | null }>();
+
+/** Lazy-loaded Resolution instance — avoids module-level node-fetch crash */
+let _resolution: any = null;
+async function getResolution() {
+  if (!_resolution) {
+    try {
+      const { default: Resolution } = await import('@unstoppabledomains/resolution');
+      _resolution = new Resolution();
+    } catch {
+      // Package unavailable or failed to load — disable UD resolution
+      _resolution = null;
+    }
+  }
+  return _resolution;
+}
 
 /**
  * Resolve an Unstoppable Domains reverse record for a wallet address.
@@ -22,16 +34,20 @@ async function resolveUD(address: string): Promise<{ name: string | null; avatar
   if (cached) return cached;
 
   try {
+    const resolution = await getResolution();
+    if (!resolution) {
+      return { name: null, avatar: null };
+    }
+
     // Reverse resolution: address → domain name
     const name = await resolution.reverse(address);
 
     let avatar: string | null = null;
     if (name) {
       try {
-        // Try to get avatar/profile picture from domain records
         avatar = await resolution.record(name, 'social.picture.value');
       } catch {
-        // No avatar record — that's fine
+        // No avatar record
       }
     }
 
@@ -39,7 +55,6 @@ async function resolveUD(address: string): Promise<{ name: string | null; avatar
     profileCache.set(address.toLowerCase(), result);
     return result;
   } catch {
-    // No UD domain for this address
     const result = { name: null, avatar: null };
     profileCache.set(address.toLowerCase(), result);
     return result;
@@ -48,16 +63,13 @@ async function resolveUD(address: string): Promise<{ name: string | null; avatar
 
 /**
  * React hook to resolve an Unstoppable Domains name for a wallet address.
- *
- * @param address - Ethereum address to resolve
- * @returns { name, avatar, isLoading } — name is the UD domain or null
  */
 export function useUnstoppableDomain(address: string | undefined) {
   const { data, isLoading } = useQuery({
     queryKey: ['ud-domain', address?.toLowerCase()],
     queryFn: () => resolveUD(address!),
     enabled: !!address,
-    staleTime: 5 * 60 * 1000, // cache 5 minutes
+    staleTime: 5 * 60 * 1000,
     retry: false,
     refetchOnWindowFocus: false,
   });
