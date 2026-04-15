@@ -26,9 +26,9 @@ interface WalletConnectButtonProps {
   className?: string;
 }
 
-// Empty string suppresses thirdweb's ENS/social avatar resolution.
-// The app runs on Base/Sepolia, not mainnet, so ENS lookups fail.
-const FALLBACK_AVATAR = '';
+// Minimal transparent SVG data URI — gives thirdweb a valid URL so it skips
+// ENS/social avatar resolution (which fails on non-mainnet chains).
+const FALLBACK_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
   const { address } = useAccount();
