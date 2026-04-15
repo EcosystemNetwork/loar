@@ -1138,7 +1138,8 @@ function CinematicUniverseCreate() {
                       <Sparkles className="h-5 w-5 mb-2 text-blue-400" />
                       <p className="text-sm font-bold">Create for Fun</p>
                       <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                        Free narrative playground. No token, no cost. You can always monetize later.
+                        Narrative playground. No token — just start building. Monetize anytime
+                        later.
                       </p>
                     </button>
 
