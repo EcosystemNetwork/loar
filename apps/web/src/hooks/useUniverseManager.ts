@@ -21,6 +21,15 @@ export function useUniverseManager() {
 
   const contractAddress = UniverseManager[String(chainId) as keyof typeof UniverseManager];
 
+  // Read the on-chain mint fee
+  const { data: mintFee } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: universeManagerAbi,
+    functionName: 'mintFee',
+    chainId,
+    query: { enabled: !!contractAddress },
+  });
+
   if (!contractAddress) {
     return {
       createUniverse: async () => {
@@ -72,6 +81,7 @@ export function useUniverseManager() {
         config.nodeVisibilityOptions,
         owner,
       ],
+      value: mintFee as bigint | undefined,
       chainId,
     });
   };
