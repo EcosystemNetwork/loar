@@ -257,8 +257,21 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit RoyaltyPaid(dealId, msg.value);
     }
 
+    /// @notice Check if a user has active access (view-only, does not auto-expire)
+    function hasAccess(bytes32 contentHash, address user) external view returns (bool) {
+        uint256[] storage dealIds = _contentDeals[contentHash];
+        for (uint256 i = dealIds.length; i > 0; i--) {
+            Deal storage deal = deals[dealIds[i - 1]];
+            if (deal.buyer != user) continue;
+            if (deal.status != DealStatus.ACTIVE) continue;
+            if (deal.dealType == DealType.BUY) return true;
+            if (deal.endTime == 0 || block.timestamp <= deal.endTime) return true;
+        }
+        return false;
+    }
+
     /// @notice Check if a user has active access to rented/licensed content
-    /// @dev Auto-expires deals past their endTime
+    /// @dev Auto-expires deals past their endTime (state-changing)
     function checkAccess(bytes32 contentHash, address user) external returns (bool hasAccess) {
         uint256[] storage dealIds = _contentDeals[contentHash];
         for (uint256 i = dealIds.length; i > 0; i--) {
@@ -350,6 +363,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     // ── Internal ────────────────────────────────────────────────────────
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[40] private __gap;
 
     /// @dev Route payment through SplitRouter if splits are configured,
     ///      otherwise fall back to PaymentRouter direct routing.

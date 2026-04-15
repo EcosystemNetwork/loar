@@ -213,4 +213,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         loarFeeDiscountBps = newDiscountBps;
         emit LoarFeeDiscountUpdated(newDiscountBps);
     }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[44] private __gap;
 }

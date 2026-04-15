@@ -752,17 +752,33 @@ function UniverseTimelineEditor() {
       startY: 100,
     });
 
+    // Load locally-saved event data (has resolved URLs and descriptions)
+    const localStorageKey = `universe_events_${id}`;
+    const storedEvents = localStorage.getItem(localStorageKey);
+    const localEvents: Record<string, any> = storedEvents ? JSON.parse(storedEvents) : {};
+
+    // Helper: detect bytes32 hashes (0x + 64 hex chars) which aren't useful for display
+    const isHash = (val: string) => /^0x[0-9a-fA-F]{64}$/.test(val);
+
     // Create nodes from blockchain data using calculated layout
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = normalizeNodeId(nodeIdStr);
-      const url = graphData.urls[index] || '';
+
+      // Try to resolve actual URL and description from localStorage first
+      const localEvent = localEvents[nodeId.toString()] || localEvents[String(nodeId)];
+
+      const rawUrl = graphData.urls[index] || '';
+      const url =
+        localEvent?.videoUrl || (typeof rawUrl === 'string' && !isHash(rawUrl) ? rawUrl : '');
 
       // Handle description which might be an object {timestamp, description} or a string
       const rawDesc = graphData.descriptions[index];
-      const description =
+      const rawDescStr =
         rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
           ? String((rawDesc as any).description)
           : String(rawDesc || '');
+      // Use localStorage description if the on-chain value is a hash
+      const description = localEvent?.description || (isHash(rawDescStr) ? '' : rawDescStr);
 
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
@@ -785,16 +801,19 @@ function UniverseTimelineEditor() {
 
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
 
+      const displayLabel =
+        localEvent?.title ||
+        (description && description.length > 0 && description !== `Timeline event ${nodeId}`
+          ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
+          : `Event ${nodeId}`);
+
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
         type: 'timelineEvent',
         position,
         data: {
-          label:
-            description && description.length > 0 && description !== `Timeline event ${nodeId}`
-              ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-              : `Event ${nodeId}`, // Always show actual blockchain node ID
-          description: description || `Timeline event ${nodeId}`,
+          label: displayLabel,
+          description: description || `Event ${nodeId}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
@@ -995,14 +1014,6 @@ function UniverseTimelineEditor() {
               >
                 <Background />
                 <Controls />
-
-                <Panel
-                  position="top-center"
-                  className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border"
-                >
-                  <h2 className="text-lg font-semibold">{timelineTitle}</h2>
-                  <p className="text-sm text-muted-foreground">{timelineDescription}</p>
-                </Panel>
 
                 <Panel position="top-right">
                   <div className="flex gap-2">

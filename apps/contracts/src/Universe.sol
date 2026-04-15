@@ -48,6 +48,9 @@ contract Universe is IUniverse {
     address public universeAdmin;
     uint public currentCanonId;  // tracked canon node (avoids unbounded loop)
 
+    /// @notice Maximum children per node (prevents unbounded array growth)
+    uint public constant MAX_CHILDREN_PER_NODE = 100;
+
     modifier onlyAdmin() {
       _checkAdmin();
       _;
@@ -134,6 +137,7 @@ contract Universe is IUniverse {
         }
 
         if (_previous != 0) {
+            require(nodes[_previous].next.length < MAX_CHILDREN_PER_NODE, "Max children reached");
             nodes[_previous].next.push(newId);
         }
 

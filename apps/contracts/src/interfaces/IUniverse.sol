@@ -34,4 +34,9 @@ interface IUniverse {
     function getToken() external view returns (address);
     function setVaultWhitelisted(address user, bool status) external;
     function getVaultWhitelisted(address user) external view returns (bool);
+
+    // Metadata accessors (used by UniverseManager for on-chain tokenURI)
+    function universeName() external view returns (string memory);
+    function universeDescription() external view returns (string memory);
+    function universeImageUrl() external view returns (string memory);
 }

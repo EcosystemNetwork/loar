@@ -67,6 +67,7 @@ import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
 import { Route as UniverseIdGalleryRouteImport } from './routes/universe/$id/gallery'
+import { Route as UniverseIdDeployTokenRouteImport } from './routes/universe/$id.deploy-token'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
@@ -360,6 +361,11 @@ const UniverseIdGalleryRoute = UniverseIdGalleryRouteImport.update({
   path: '/gallery',
   getParentRoute: () => UniverseIdRoute,
 } as any)
+const UniverseIdDeployTokenRoute = UniverseIdDeployTokenRouteImport.update({
+  id: '/deploy-token',
+  path: '/deploy-token',
+  getParentRoute: () => UniverseIdRoute,
+} as any)
 const TokensCreatorAddressRoute = TokensCreatorAddressRouteImport.update({
   id: '/tokens/creator/$address',
   path: '/tokens/creator/$address',
@@ -428,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -490,6 +497,7 @@ export interface FileRoutesByTo {
   '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -553,6 +561,7 @@ export interface FileRoutesById {
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -617,6 +626,7 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
+    | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
@@ -679,6 +689,7 @@ export interface FileRouteTypes {
     | '/wiki'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
+    | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
@@ -741,6 +752,7 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
+    | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
@@ -1216,6 +1228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdGalleryRouteImport
       parentRoute: typeof UniverseIdRoute
     }
+    '/universe/$id/deploy-token': {
+      id: '/universe/$id/deploy-token'
+      path: '/deploy-token'
+      fullPath: '/universe/$id/deploy-token'
+      preLoaderRoute: typeof UniverseIdDeployTokenRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
     '/tokens/creator/$address': {
       id: '/tokens/creator/$address'
       path: '/tokens/creator/$address'
@@ -1234,11 +1253,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface UniverseIdRouteChildren {
+  UniverseIdDeployTokenRoute: typeof UniverseIdDeployTokenRoute
   UniverseIdGalleryRoute: typeof UniverseIdGalleryRoute
   UniverseIdGenConfigRoute: typeof UniverseIdGenConfigRoute
 }
 
 const UniverseIdRouteChildren: UniverseIdRouteChildren = {
+  UniverseIdDeployTokenRoute: UniverseIdDeployTokenRoute,
   UniverseIdGalleryRoute: UniverseIdGalleryRoute,
   UniverseIdGenConfigRoute: UniverseIdGenConfigRoute,
 }

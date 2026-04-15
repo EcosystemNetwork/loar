@@ -4,6 +4,13 @@ import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
 import { isSupportedChain } from '@/configs/chains';
+import { encodeAbiParameters } from 'viem';
+
+// WETH addresses per chain (hooks require ERC20 paired token, not native ETH)
+const WETH: Record<number, `0x${string}`> = {
+  11155111: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9', // Sepolia
+  84532: '0x4200000000000000000000000000000000000006', // Base Sepolia
+};
 
 /**
  * Hook for interacting with the UniverseManager contract (launchpad)
@@ -190,11 +197,26 @@ export function useDefaultDeploymentConfig() {
   const chainId = useChainId();
   const chainKey = String(chainId) as keyof typeof LoarHookStaticFee;
 
+  // Encode pool fee config: loarFee=3000 (0.3%), pairedFee=3000 (0.3%)
+  const defaultPoolData = encodeAbiParameters(
+    [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'loarFee', type: 'uint24' },
+          { name: 'pairedFee', type: 'uint24' },
+        ],
+      },
+    ],
+    [{ loarFee: 3000, pairedFee: 3000 }]
+  );
+
   return {
     defaultHook: (LoarHookStaticFee[chainKey] ?? undefined) as `0x${string}` | undefined,
     defaultLocker: (LoarLpLockerMultiple[chainKey] ?? undefined) as `0x${string}` | undefined,
-    defaultPairedToken: '0x0000000000000000000000000000000000000000' as `0x${string}`, // ETH or WETH
-    defaultTickSpacing: 60,
-    defaultTickIfToken0IsLoar: -887220, // Example starting tick
+    defaultPairedToken: (WETH[chainId] ?? WETH[11155111]) as `0x${string}`, // WETH (hooks reject address(0))
+    defaultTickSpacing: 200,
+    defaultTickIfToken0IsLoar: -230400, // Standard starting tick
+    defaultPoolData,
   };
 }

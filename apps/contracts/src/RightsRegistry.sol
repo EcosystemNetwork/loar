@@ -75,4 +75,7 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
         operators[operator] = authorized;
         emit OperatorUpdated(operator, authorized);
     }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[47] private __gap;
 }

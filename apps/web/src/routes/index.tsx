@@ -161,11 +161,11 @@ function UniverseCard({ universe }: { universe: any }) {
       onClick={() => navigate({ to: `/universe/${universe.id}` })}
       className="group flex-shrink-0 w-[180px] md:w-[200px] cursor-pointer"
     >
-      {/* Tall poster image */}
+      {/* Tall poster image — prefer dedicated portrait crop */}
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
-        {universe.imageURL || universe.tokenData?.imageURL ? (
+        {universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL ? (
           <img
-            src={universe.imageURL || universe.tokenData?.imageURL}
+            src={universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL}
             alt=""
             className="w-full h-full object-cover"
           />
@@ -1095,9 +1095,9 @@ function SearchOverlay({
                       className="w-full p-3 rounded-xl hover:bg-white/5 transition-colors text-left flex items-center gap-3"
                     >
                       <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
-                        {(u.imageURL || u.tokenData?.imageURL) && (
+                        {(u.portraitImageURL || u.imageURL || u.tokenData?.imageURL) && (
                           <img
-                            src={u.imageURL || u.tokenData?.imageURL}
+                            src={u.portraitImageURL || u.imageURL || u.tokenData?.imageURL}
                             alt=""
                             className="w-full h-full object-cover"
                           />
@@ -1252,6 +1252,7 @@ function HomeComponent() {
       name: u.name || u.description?.slice(0, 40) || '',
       description: u.description || '',
       imageURL: u.image_url || u.imageURL || '',
+      portraitImageURL: u.portrait_image_url || '',
       creator: u.creator || '',
       tokenAddress: u.tokenAddress || null,
       governorAddress: u.governanceAddress || null,

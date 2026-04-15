@@ -109,8 +109,14 @@ export function GovernanceSidebar({
     timelineAddress as `0x${string}` | undefined
   );
 
-  // Check if governance is properly configured
-  const isGovernanceConfigured = governanceAddress && tokenAddress && timelineAddress;
+  // Check if governance is properly configured (zero address = not deployed yet)
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const isGovernanceConfigured =
+    governanceAddress &&
+    tokenAddress &&
+    timelineAddress &&
+    governanceAddress !== ZERO &&
+    tokenAddress !== ZERO;
 
   // Check token balance
   const { data: tokenBalance } = useReadContract({
@@ -119,7 +125,7 @@ export function GovernanceSidebar({
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!tokenAddress,
+      enabled: !!address && !!isGovernanceConfigured,
     },
   });
 
@@ -130,7 +136,7 @@ export function GovernanceSidebar({
     functionName: 'getVotes',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!tokenAddress,
+      enabled: !!address && !!isGovernanceConfigured,
     },
   });
 
@@ -141,7 +147,7 @@ export function GovernanceSidebar({
     functionName: 'delegates',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!tokenAddress,
+      enabled: !!address && !!isGovernanceConfigured,
     },
   });
 
@@ -151,7 +157,7 @@ export function GovernanceSidebar({
     address: governanceAddress,
     functionName: 'votingDelay',
     query: {
-      enabled: !!governanceAddress,
+      enabled: !!isGovernanceConfigured,
     },
   });
 
@@ -160,7 +166,7 @@ export function GovernanceSidebar({
     address: governanceAddress,
     functionName: 'votingPeriod',
     query: {
-      enabled: !!governanceAddress,
+      enabled: !!isGovernanceConfigured,
     },
   });
 
@@ -169,7 +175,7 @@ export function GovernanceSidebar({
     address: governanceAddress,
     functionName: 'proposalThreshold',
     query: {
-      enabled: !!governanceAddress,
+      enabled: !!isGovernanceConfigured,
     },
   });
 

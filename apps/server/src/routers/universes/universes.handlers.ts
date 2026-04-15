@@ -18,6 +18,7 @@ interface CreateUniverseInput {
   tokenAddress: string;
   governanceAddress: string;
   imageUrl: string;
+  portraitImageUrl?: string;
   description: string;
   onChainUniverseId?: string;
   mintTxHash?: string;
@@ -46,6 +47,7 @@ export async function createUniverse(input: CreateUniverseInput) {
       tokenAddress: input.tokenAddress,
       governanceAddress: input.governanceAddress,
       image_url: input.imageUrl,
+      portrait_image_url: input.portraitImageUrl ?? null,
       description: input.description,
       onChainUniverseId: input.onChainUniverseId ?? null,
       mintTxHash: input.mintTxHash ?? null,

@@ -142,6 +142,8 @@ function CinematicUniverseCreate() {
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [portraitPreview, setPortraitPreview] = useState<string | null>(null);
+  const [portraitImageUrl, setPortraitImageUrl] = useState('');
   const [coverModel, setCoverModel] = useState<string>(
     import.meta.env.VITE_DEFAULT_IMAGE_MODEL || 'fal-ai/nano-banana'
   );
@@ -149,8 +151,12 @@ function CinematicUniverseCreate() {
   const coverFileRef = useRef<HTMLInputElement>(null);
 
   // Cropper state — shown after file is picked, before upload
+  // cropPhase: 'landscape' = 16:9 crop first, 'portrait' = 3:4 crop second
   const [cropperSrc, setCropperSrc] = useState<string | null>(null);
   const [cropperFile, setCropperFile] = useState<File | null>(null);
+  const [cropPhase, setCropPhase] = useState<'landscape' | 'portrait'>('landscape');
+  // Keep original source so we can re-crop for portrait after landscape is done
+  const [originalSrc, setOriginalSrc] = useState<string | null>(null);
 
   // Hooks
   const { createUniverse, deployUniverseToken, hash, isPending, error } = useUniverseManager();
@@ -220,7 +226,7 @@ function CinematicUniverseCreate() {
     }
   };
 
-  // Step 1: user picks a file → validate and open cropper
+  // Step 1: user picks a file → validate and open landscape cropper first
   const handleCoverFilePick = useCallback((file: File) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
@@ -231,17 +237,16 @@ function CinematicUniverseCreate() {
       alert('Image must be under 10MB');
       return;
     }
+    const objectUrl = URL.createObjectURL(file);
     setCropperFile(file);
-    setCropperSrc(URL.createObjectURL(file));
+    setCropperSrc(objectUrl);
+    setOriginalSrc(objectUrl);
+    setCropPhase('landscape');
   }, []);
 
-  // Step 2: user confirms crop → upload the cropped blob
-  const handleCoverUpload = useCallback(async (blob: Blob) => {
-    // Close the cropper
-    setCropperSrc(null);
-    setCropperFile(null);
-
-    const file = new File([blob], 'cover.jpg', { type: 'image/jpeg' });
+  // Shared upload helper — uploads a blob and returns the URL
+  const uploadBlob = useCallback(async (blob: Blob, filename: string): Promise<string | null> => {
+    const file = new File([blob], filename, { type: 'image/jpeg' });
 
     setIsUploadingCover(true);
     setUploadProgress(0);
@@ -253,9 +258,7 @@ function CinematicUniverseCreate() {
       const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
       if (!meRes.ok || !(await meRes.json()).authenticated) {
         alert('Session expired. Please sign in again.');
-        setIsUploadingCover(false);
-        setUploadProgress(0);
-        return;
+        return null;
       }
 
       const formData = new FormData();
@@ -290,34 +293,89 @@ function CinematicUniverseCreate() {
         }
       );
 
-      const uploadedUrl = result.manifest.uploads[0]?.url;
-      if (uploadedUrl) {
-        setImageUrl(uploadedUrl);
-        setCoverPreview(URL.createObjectURL(blob));
-      }
+      return result.manifest.uploads[0]?.url || null;
     } catch (err) {
       alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return null;
     } finally {
       setIsUploadingCover(false);
       setUploadProgress(0);
     }
   }, []);
 
+  // Step 2: user confirms landscape crop → upload, then open portrait cropper
+  const handleLandscapeCrop = useCallback(
+    async (blob: Blob) => {
+      setCropperSrc(null);
+
+      const uploadedUrl = await uploadBlob(blob, 'cover.jpg');
+      if (uploadedUrl) {
+        setImageUrl(uploadedUrl);
+        setCoverPreview(URL.createObjectURL(blob));
+      }
+
+      // Now open the portrait cropper on the same original image
+      if (originalSrc) {
+        setCropPhase('portrait');
+        setCropperSrc(originalSrc);
+      }
+    },
+    [uploadBlob, originalSrc]
+  );
+
+  // Step 3: user confirms portrait crop → upload portrait version
+  const handlePortraitCrop = useCallback(
+    async (blob: Blob) => {
+      setCropperSrc(null);
+      setCropperFile(null);
+
+      const uploadedUrl = await uploadBlob(blob, 'cover-portrait.jpg');
+      if (uploadedUrl) {
+        setPortraitImageUrl(uploadedUrl);
+        setPortraitPreview(URL.createObjectURL(blob));
+      }
+    },
+    [uploadBlob]
+  );
+
+  // Dispatch to the right handler based on crop phase
+  const handleCoverCrop = useCallback(
+    (blob: Blob) => {
+      if (cropPhase === 'landscape') {
+        handleLandscapeCrop(blob);
+      } else {
+        handlePortraitCrop(blob);
+      }
+    },
+    [cropPhase, handleLandscapeCrop, handlePortraitCrop]
+  );
+
   const handleCropCancel = useCallback(() => {
-    setCropperSrc((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
+    if (cropPhase === 'portrait') {
+      // Skip portrait crop — landscape was already uploaded, just close
+      setCropperSrc(null);
+      setCropperFile(null);
+      return;
+    }
+    setCropperSrc(null);
     setCropperFile(null);
-  }, []);
+    if (originalSrc) {
+      URL.revokeObjectURL(originalSrc);
+      setOriginalSrc(null);
+    }
+  }, [cropPhase, originalSrc]);
 
   const handleClearCover = () => {
     setImageUrl('');
+    setPortraitImageUrl('');
     setCoverPreview(null);
-    setCropperSrc((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
+    setPortraitPreview(null);
+    setCropperSrc(null);
+    setCropPhase('landscape');
+    if (originalSrc) {
+      URL.revokeObjectURL(originalSrc);
+      setOriginalSrc(null);
+    }
     setCropperFile(null);
     if (coverFileRef.current) coverFileRef.current.value = '';
   };
@@ -387,6 +445,7 @@ function CinematicUniverseCreate() {
             tokenAddress: '0x0000000000000000000000000000000000000000',
             governanceAddress: '0x0000000000000000000000000000000000000000',
             imageUrl: imageUrl,
+            portraitImageUrl: portraitImageUrl || undefined,
             description: description,
             onChainUniverseId: parsedUniverseId?.toString(),
             mintTxHash: hash,
@@ -518,15 +577,15 @@ function CinematicUniverseCreate() {
             pairedToken: defaultConfig.defaultPairedToken,
             tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
             tickSpacing: defaultConfig.defaultTickSpacing,
-            poolData: '0x' as `0x${string}`,
+            poolData: defaultConfig.defaultPoolData as `0x${string}`,
           },
           lockerConfig: {
             locker: defaultConfig.defaultLocker,
             rewardAdmins: [address as `0x${string}`],
             rewardRecipients: [address as `0x${string}`],
-            rewardBps: [1000],
-            tickLower: [-887220],
-            tickUpper: [887220],
+            rewardBps: [10000],
+            tickLower: [defaultConfig.defaultTickIfToken0IsLoar],
+            tickUpper: [0],
             positionBps: [10000],
             lockerData: '0x' as `0x${string}`,
           },
@@ -740,34 +799,80 @@ function CinematicUniverseCreate() {
                 <div>
                   <Label className="text-sm font-semibold mb-2 block">Cover Image</Label>
 
-                  {/* Cover preview */}
+                  {/* Cover previews — landscape + portrait side by side */}
                   {coverPreview && !cropperSrc && (
-                    <div className="relative mb-2 rounded-lg overflow-hidden border">
-                      <img
-                        src={coverPreview}
-                        alt="Cover preview"
-                        className="w-full h-32 object-cover"
-                      />
+                    <div className="mb-2 space-y-2">
+                      <div className="flex gap-2">
+                        {/* Landscape preview */}
+                        <div className="relative flex-1 rounded-lg overflow-hidden border">
+                          <img
+                            src={coverPreview}
+                            alt="Landscape cover"
+                            className="w-full aspect-video object-cover"
+                          />
+                          <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                            16:9
+                          </span>
+                        </div>
+                        {/* Portrait preview */}
+                        <div className="relative w-20 rounded-lg overflow-hidden border">
+                          {portraitPreview ? (
+                            <img
+                              src={portraitPreview}
+                              alt="Portrait cover"
+                              className="w-full aspect-[3/4] object-cover"
+                            />
+                          ) : (
+                            <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center">
+                              <Crop className="h-3.5 w-3.5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                            3:4
+                          </span>
+                        </div>
+                      </div>
                       {deploymentStep === DeploymentStep.IDLE && (
-                        <div className="absolute top-1 right-1 flex gap-1">
+                        <div className="flex gap-1">
                           <button
                             type="button"
                             onClick={() => {
-                              // Re-open cropper with the current preview image
-                              setCropperSrc(coverPreview);
+                              if (originalSrc) {
+                                setCropPhase('landscape');
+                                setCropperSrc(originalSrc);
+                              } else {
+                                setCropperSrc(coverPreview);
+                                setCropPhase('landscape');
+                              }
                             }}
-                            className="p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
-                            title="Reposition"
+                            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                            title="Re-crop images"
                           >
-                            <Crop className="h-3.5 w-3.5" />
+                            <Crop className="h-3 w-3" />
+                            Re-crop
                           </button>
+                          {!portraitPreview && originalSrc && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCropPhase('portrait');
+                                setCropperSrc(originalSrc);
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                              title="Add portrait crop"
+                            >
+                              <Crop className="h-3 w-3" />
+                              Add portrait crop
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={handleClearCover}
-                            className="p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-muted hover:bg-muted/80 text-muted-foreground transition-colors ml-auto"
                             title="Remove"
                           >
-                            <X className="h-3.5 w-3.5" />
+                            <X className="h-3 w-3" />
+                            Remove
                           </button>
                         </div>
                       )}
@@ -817,13 +922,28 @@ function CinematicUniverseCreate() {
 
                       {/* Cropper — shown after file pick, before upload */}
                       {cropperSrc ? (
-                        <ImageCropper
-                          src={cropperSrc}
-                          aspectRatio={16 / 9}
-                          outputWidth={1280}
-                          onCrop={handleCoverUpload}
-                          onCancel={handleCropCancel}
-                        />
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {cropPhase === 'landscape'
+                                ? 'Step 1/2 — Landscape (16:9)'
+                                : 'Step 2/2 — Portrait (3:4)'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {cropPhase === 'landscape'
+                                ? 'For billboard & wide cards'
+                                : 'For poster cards'}
+                            </span>
+                          </div>
+                          <ImageCropper
+                            key={cropPhase}
+                            src={cropperSrc}
+                            aspectRatio={cropPhase === 'landscape' ? 16 / 9 : 3 / 4}
+                            outputWidth={cropPhase === 'landscape' ? 1280 : 600}
+                            onCrop={handleCoverCrop}
+                            onCancel={handleCropCancel}
+                          />
+                        </div>
                       ) : (
                         <div
                           onClick={() => !isUploadingCover && coverFileRef.current?.click()}

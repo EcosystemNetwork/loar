@@ -27,8 +27,11 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
     uint256 public universeId;
 
     uint256 public nextCharacterId;
+    uint256 public nextTokenId;
 
     mapping(uint256 => Character) public characters;
+    /// @notice Maps edition token IDs back to their character definition ID
+    mapping(uint256 => uint256) public tokenToCharacter;
     // universeId => characterName hash => characterId (prevent duplicates)
     mapping(uint256 => mapping(bytes32 => uint256)) public characterByName;
 
@@ -120,9 +123,13 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         characterMinted[characterId] = 1; // creator gets the first one
         characterActive[characterId] = true;
 
-        _safeMint(msg.sender, characterId);
-        _setTokenURI(characterId, metadataURI);
-        _setTokenRoyalty(characterId, msg.sender, 500); // 5% secondary royalty
+        // Use separate token ID counter to avoid collision with character IDs
+        uint256 tokenId = ++nextTokenId;
+        tokenToCharacter[tokenId] = characterId;
+
+        _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, metadataURI);
+        _setTokenRoyalty(tokenId, msg.sender, 500); // 5% secondary royalty
 
         emit CharacterCreated(characterId, universeId, name, msg.sender);
     }
@@ -137,7 +144,8 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         uint256 price = characterMintPrice[characterId];
         if (msg.value < price) revert InsufficientPayment();
 
-        tokenId = ++nextCharacterId; // reuse counter for token IDs
+        tokenId = ++nextTokenId;
+        tokenToCharacter[tokenId] = characterId;
         characterMinted[characterId]++;
 
         _safeMint(msg.sender, tokenId);

@@ -23,6 +23,7 @@ const createUniverseSchema = z.object({
   tokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid token address'),
   governanceAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid governance address'),
   imageUrl: z.string().url('Invalid image URL'),
+  portraitImageUrl: z.string().url('Invalid portrait image URL').optional(),
   description: z.string().min(1, 'Description is required').max(1000, 'Description too long'),
   signature: z.string().min(1, 'Signature is required'),
   message: z.string().min(1, 'Message is required'),
@@ -83,6 +84,7 @@ export const universesRouter = router({
       tokenAddress: input.tokenAddress,
       governanceAddress: input.governanceAddress,
       imageUrl: input.imageUrl,
+      portraitImageUrl: input.portraitImageUrl,
       description: input.description,
       onChainUniverseId: input.onChainUniverseId,
       mintTxHash: input.mintTxHash,
@@ -260,6 +262,7 @@ export const universesRouter = router({
         universeId: z.string(),
         name: z.string().min(1).max(200).optional(),
         imageUrl: z.string().url('Invalid image URL').optional(),
+        portraitImageUrl: z.string().url('Invalid portrait image URL').optional().nullable(),
         description: z.string().min(1).max(1000).optional(),
       })
     )
@@ -272,6 +275,7 @@ export const universesRouter = router({
       const updates: Record<string, unknown> = { updated_at: new Date() };
       if (input.name !== undefined) updates.name = input.name;
       if (input.imageUrl !== undefined) updates.image_url = input.imageUrl;
+      if (input.portraitImageUrl !== undefined) updates.portrait_image_url = input.portraitImageUrl;
       if (input.description !== undefined) updates.description = input.description;
 
       await db.collection('cinematicUniverses').doc(universeId).update(updates);

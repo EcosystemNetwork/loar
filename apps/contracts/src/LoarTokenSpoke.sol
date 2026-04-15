@@ -125,6 +125,7 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
 
     /// @notice Batch-set fee exemptions for DEX routers, pools, hooks, etc.
     function batchSetFeeExempt(address[] calldata accounts, bool exempt) external onlyOwner {
+        require(accounts.length <= 200, "Batch too large");
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
             feeExempt[accounts[i]] = exempt;

@@ -6,6 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgrade
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CreditManager
@@ -16,6 +17,8 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///         Credits are the internal unit for all generation actions.
 ///         1 credit = 1 unit of generation capacity (costs vary by action type).
 contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
+
     // ── Structs ──────────────────────────────────────────────────
 
     struct CreditPackage {
@@ -213,13 +216,12 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
         // Route $LOAR through PaymentRouter for consistent revenue accounting
         if (address(paymentRouter) != address(0)) {
-            loarToken.transferFrom(msg.sender, address(this), loarAmount);
-            loarToken.approve(address(paymentRouter), loarAmount);
+            loarToken.safeTransferFrom(msg.sender, address(this), loarAmount);
+            loarToken.forceApprove(address(paymentRouter), loarAmount);
             paymentRouter.routeLoarToTreasury(loarAmount);
         } else {
             // Fallback: direct treasury transfer (pre-PaymentRouter)
-            bool success = loarToken.transferFrom(msg.sender, treasury, loarAmount);
-            if (!success) revert TransferFailed();
+            loarToken.safeTransferFrom(msg.sender, treasury, loarAmount);
         }
 
         // $LOAR buyers get a bonus on top of the package bonus

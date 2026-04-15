@@ -82,6 +82,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     uint256 public minSubmissionFee;
     uint256 public votingDuration;        // seconds
 
+    /// @notice Minimum vote participation (basis points of total supply) for finalization
+    uint16 public quorumBps;
+
     event SubmissionCreated(uint256 indexed id, uint256 universeId, SubmissionType subType, address creator, bytes32 contentHash);
     event VoteCast(uint256 indexed submissionId, address voter, bool support, uint256 weight);
     event SubmissionAccepted(uint256 indexed submissionId, uint256 universeId);
@@ -102,6 +105,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error FeeTooHigh();
     error ContentNotMonetizable();
     error NothingToClaim();
+    error QuorumNotReached();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -133,6 +137,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         canonLicenseFeeBps = _canonLicenseFeeBps;
         minSubmissionFee = _minSubmissionFee;
         votingDuration = _votingDuration;
+        quorumBps = 1000; // default 10% quorum
     }
 
     function pause() external onlyOwner { _pause(); }
@@ -216,6 +221,14 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert InvalidStatus();
         if (block.timestamp < sub.votingDeadline) revert VotingNotEnded();
+
+        // Enforce minimum quorum: total votes must meet threshold of total supply
+        if (quorumBps > 0) {
+            uint256 totalVotes = sub.votesFor + sub.votesAgainst;
+            uint256 totalSupply = IVotes(sub.universeToken).getPastTotalSupply(sub.snapshotBlock);
+            uint256 quorumRequired = (totalSupply * quorumBps) / 10_000;
+            if (totalVotes < quorumRequired) revert QuorumNotReached();
+        }
 
         uint256 held = creatorHeldAmount[submissionId];
         creatorHeldAmount[submissionId] = 0;
@@ -302,5 +315,11 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @notice Get submission count for a universe
     function getSubmissionCount(uint256 universeId) external view returns (uint256) {
         return canonSubmissions[universeId].length;
+    }
+
+    /// @notice Update quorum requirement (owner only)
+    function setQuorumBps(uint16 _quorumBps) external onlyOwner {
+        require(_quorumBps <= 5000, "Max 50% quorum");
+        quorumBps = _quorumBps;
     }
 }

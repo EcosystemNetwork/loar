@@ -33,6 +33,8 @@ contract TokenVesting is Ownable {
         uint64 vestingDuration;
         /// @notice Whether this vesting has been revoked by admin.
         bool revoked;
+        /// @notice Amount vested at the time of revocation (caps further vesting).
+        uint128 vestedAtRevoke;
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -132,7 +134,8 @@ contract TokenVesting is Ownable {
             start: uint64(block.timestamp),
             cliffDuration: cliffDuration,
             vestingDuration: vestingDuration,
-            revoked: false
+            revoked: false,
+            vestedAtRevoke: 0
         });
 
         beneficiaryVestings[beneficiary].push(vestingId);
@@ -159,6 +162,7 @@ contract TokenVesting is Ownable {
         v.revoked = true;
 
         uint128 vested = _vestedAmount(v);
+        v.vestedAtRevoke = vested;
         uint128 unvested = v.totalAmount - vested;
 
         if (unvested > 0) {
@@ -237,7 +241,13 @@ contract TokenVesting is Ownable {
     // ──────────────────────────────────────────────────────────────────────
 
     /// @dev Calculate the total vested amount (regardless of claims) at the current timestamp.
+    ///      If revoked, caps at the amount vested at revocation time.
     function _vestedAmount(VestingSchedule storage v) internal view returns (uint128) {
+        // If revoked, vesting is frozen at the revocation snapshot
+        if (v.revoked) {
+            return v.vestedAtRevoke;
+        }
+
         uint256 elapsed = block.timestamp - v.start;
 
         // During the cliff period, nothing has vested

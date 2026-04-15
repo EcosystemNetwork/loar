@@ -6,6 +6,7 @@ import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {ILoarHook} from "./interfaces/ILoarHook.sol";
@@ -15,6 +16,8 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 import {UniverseData} from "./types/UniverseData.sol";
+import {Strings} from "@openzeppelin/utils/Strings.sol";
+import {Base64} from "@openzeppelin/utils/Base64.sol";
 
 interface IUniverseTokenDeployer {
     function deployTokenAndGovernance(
@@ -26,7 +29,14 @@ interface IUniverseTokenDeployer {
     );
 }
 
-contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
+/// @title UniverseManager
+/// @notice Factory that creates universes and represents each as a transferable ERC-721 NFT.
+///         The NFT shows up in wallets (OpenSea, Rainbow, etc.) and proves universe ownership.
+///         Before governance token deployment, transferring the NFT transfers admin control.
+///         After governance, the NFT represents creator identity; admin is the governor.
+contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
+    using Strings for uint256;
+    using Strings for address;
     uint public constant teamFee = 0;
     address public teamFeeRecipient;
     address public tokenDeployer;
@@ -58,7 +68,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     event MintFeeUpdated(uint256 oldFee, uint256 newFee);
     event MintFeeLpBpsUpdated(uint16 oldBps, uint16 newBps);
 
-    constructor(address _teamFeeRecipient, address _lpRecipient) Ownable(msg.sender) {
+    constructor(address _teamFeeRecipient, address _lpRecipient) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
         lpRecipient = _lpRecipient;
         mintFee = 0.05 ether;
@@ -94,8 +104,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     function claimEth(address recipient) external onlyOwner {
         require(recipient != address(0), "Zero address");
         uint256 balance = address(this).balance;
+        require(balance > totalCreditFundsHeld, "No ETH to claim");
         uint256 claimable = balance - totalCreditFundsHeld;
-        require(claimable > 0, "No ETH to claim");
         (bool sent,) = recipient.call{value: claimable}("");
         require(sent, "ETH claim failed");
     }
@@ -159,6 +169,9 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
 
         latestId++;
 
+        // Mint identity NFT to the universe creator — shows in wallet, transferable
+        _safeMint(initialOwner, currentId);
+
         emit UniverseCreated(address(universe), msg.sender);
         emit UniverseMintFee(currentId, msg.sender, lpAmount, creditAmount);
 
@@ -171,7 +184,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     ) public payable nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
         require(address(universe) != address(0), "Universe does not exist");
-        if (universe.getAdmin() != msg.sender) {
+        if (ownerOf(id) != msg.sender) {
           revert CallerIsNotOwner();
         }
         if (universe.getToken() != address(0)) {
@@ -294,5 +307,64 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     ) {
         UniverseData memory data = universeDatas[id];
         return (data.universe, data.token, data.universeGovernor, data.hook, data.locker);
+    }
+
+    /// @notice Total universes created (also the next token ID)
+    function totalSupply() external view returns (uint256) {
+        return latestId;
+    }
+
+    // ── ERC-721 Identity NFT ───────────────────────────────────────
+
+    /// @dev On transfer, sync the universe admin if governance hasn't been deployed yet.
+    ///      After governance token deployment, admin = governor (immovable), so the NFT
+    ///      represents creator identity only — doesn't change on-chain control.
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        address from = super._update(to, tokenId, auth);
+
+        // Sync admin on the Universe contract if no governance token deployed yet
+        UniverseData storage data = universeDatas[tokenId];
+        if (address(data.universe) != address(0) && address(data.universeGovernor) == address(0)) {
+            // Pre-governance: NFT holder = admin
+            data.universe.setAdmin(to);
+        }
+
+        return from;
+    }
+
+    /// @notice Fully on-chain tokenURI with universe metadata — shows name, image,
+    ///         description, and universe contract address in any wallet or marketplace.
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+
+        UniverseData storage data = universeDatas[tokenId];
+        IUniverse universe = data.universe;
+
+        string memory universeName = universe.universeName();
+        string memory universeDesc = universe.universeDescription();
+        string memory universeImage = universe.universeImageUrl();
+        address universeAddr = address(universe);
+        bool hasToken = address(data.token) != address(0);
+
+        // Build JSON metadata on-chain (no external server needed)
+        string memory json = string(abi.encodePacked(
+            '{"name":"', universeName,
+            '","description":"', universeDesc,
+            '","image":"', universeImage,
+            '","external_url":"https://loar.fun/universe/', universeAddr.toHexString(),
+            '","attributes":[',
+                '{"trait_type":"Universe Contract","value":"', universeAddr.toHexString(), '"}',
+                ',{"trait_type":"Universe ID","value":"', tokenId.toString(), '"}',
+                ',{"trait_type":"Has Token","value":"', hasToken ? 'true' : 'false', '"}',
+                hasToken ? string(abi.encodePacked(
+                    ',{"trait_type":"Token","value":"', address(data.token).toHexString(), '"}'
+                )) : '',
+            ']}'
+        ));
+
+        return string(abi.encodePacked(
+            "data:application/json;base64,",
+            Base64.encode(bytes(json))
+        ));
     }
 }
