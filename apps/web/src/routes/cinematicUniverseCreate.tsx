@@ -319,16 +319,20 @@ function CinematicUniverseCreate() {
   }, []);
 
   const handleCropCancel = useCallback(() => {
-    if (cropperSrc) URL.revokeObjectURL(cropperSrc);
-    setCropperSrc(null);
+    setCropperSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     setCropperFile(null);
-  }, [cropperSrc]);
+  }, []);
 
   const handleClearCover = () => {
     setImageUrl('');
     setCoverPreview(null);
-    if (cropperSrc) URL.revokeObjectURL(cropperSrc);
-    setCropperSrc(null);
+    setCropperSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     setCropperFile(null);
     if (coverFileRef.current) coverFileRef.current.value = '';
   };
