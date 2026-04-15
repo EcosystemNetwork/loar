@@ -26,10 +26,9 @@ interface WalletConnectButtonProps {
   className?: string;
 }
 
-// Transparent 1x1 PNG — used as avatar fallback so thirdweb skips ENS/social
-// resolution (which fails on non-mainnet chains and spams the console).
-const FALLBACK_AVATAR =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==';
+// Empty string suppresses thirdweb's ENS/social avatar resolution.
+// The app runs on Base/Sepolia, not mainnet, so ENS lookups fail.
+const FALLBACK_AVATAR = '';
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
   const { address } = useAccount();
