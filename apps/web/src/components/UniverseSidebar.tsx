@@ -80,6 +80,7 @@ export function UniverseSidebar({
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAccessSettings, setShowAccessSettings] = useState(false);
   const [showEditMetadata, setShowEditMetadata] = useState(false);
+  const [editName, setEditName] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
@@ -371,6 +372,7 @@ export function UniverseSidebar({
                 <>
                   <Button
                     onClick={() => {
+                      setEditName(finalUniverse?.name || '');
                       setEditImageUrl(finalUniverse?.imageUrl || '');
                       setEditDescription(finalUniverse?.description || '');
                       setShowEditMetadata(true);
@@ -525,6 +527,16 @@ export function UniverseSidebar({
             </div>
 
             <div className="space-y-2">
+              <Label className="text-sm font-medium">Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Universe name"
+                maxLength={200}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label className="text-sm font-medium">Image URL</Label>
               <Input
                 value={editImageUrl}
@@ -564,8 +576,13 @@ export function UniverseSidebar({
                   if (!universeId) return;
                   setIsSavingMetadata(true);
                   try {
-                    const updates: { universeId: string; imageUrl?: string; description?: string } =
-                      { universeId };
+                    const updates: {
+                      universeId: string;
+                      name?: string;
+                      imageUrl?: string;
+                      description?: string;
+                    } = { universeId };
+                    if (editName) updates.name = editName;
                     if (editImageUrl) updates.imageUrl = editImageUrl;
                     if (editDescription) updates.description = editDescription;
                     await trpcClient.universes.updateMetadata.mutate(updates);

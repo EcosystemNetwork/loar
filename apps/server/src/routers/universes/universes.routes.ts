@@ -19,6 +19,7 @@ import { generateNonce, consumeNonce } from '../../lib/siwe';
 const createUniverseSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address'),
   creator: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid creator address'),
+  name: z.string().min(1).max(200).optional(),
   tokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid token address'),
   governanceAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid governance address'),
   imageUrl: z.string().url('Invalid image URL'),
@@ -78,6 +79,7 @@ export const universesRouter = router({
     return await createUniverse({
       address: input.address,
       creator: input.creator,
+      name: input.name,
       tokenAddress: input.tokenAddress,
       governanceAddress: input.governanceAddress,
       imageUrl: input.imageUrl,
@@ -251,11 +253,12 @@ export const universesRouter = router({
       return { ok: true, accessModel: input.accessModel };
     }),
 
-  /** Update universe metadata (image, description). Admin only. */
+  /** Update universe metadata (name, image, description). Admin only. */
   updateMetadata: protectedProcedure
     .input(
       z.object({
         universeId: z.string(),
+        name: z.string().min(1).max(200).optional(),
         imageUrl: z.string().url('Invalid image URL').optional(),
         description: z.string().min(1).max(1000).optional(),
       })
@@ -267,6 +270,7 @@ export const universesRouter = router({
       }
 
       const updates: Record<string, unknown> = { updated_at: new Date() };
+      if (input.name !== undefined) updates.name = input.name;
       if (input.imageUrl !== undefined) updates.image_url = input.imageUrl;
       if (input.description !== undefined) updates.description = input.description;
 

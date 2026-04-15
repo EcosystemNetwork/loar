@@ -375,6 +375,7 @@ function CinematicUniverseCreate() {
           await trpcClient.universes.create.mutate({
             address: parsedUniverseAddress,
             creator,
+            name: universeName,
             tokenAddress: '0x0000000000000000000000000000000000000000',
             governanceAddress: '0x0000000000000000000000000000000000000000',
             imageUrl: imageUrl,

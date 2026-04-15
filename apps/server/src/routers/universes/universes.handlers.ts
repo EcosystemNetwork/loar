@@ -14,6 +14,7 @@ const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '500
 interface CreateUniverseInput {
   address: string;
   creator: string;
+  name?: string;
   tokenAddress: string;
   governanceAddress: string;
   imageUrl: string;
@@ -41,6 +42,7 @@ export async function createUniverse(input: CreateUniverseInput) {
     const data = {
       address: input.address,
       creator: input.creator,
+      name: input.name ?? null,
       tokenAddress: input.tokenAddress,
       governanceAddress: input.governanceAddress,
       image_url: input.imageUrl,
@@ -78,7 +80,7 @@ export async function createUniverse(input: CreateUniverseInput) {
 
 export async function getUniverse(id: string) {
   try {
-    const doc = await collection().doc(id).get();
+    const doc = await collection().doc(id.toLowerCase()).get();
 
     if (!doc.exists) {
       throw new Error('Universe not found');
