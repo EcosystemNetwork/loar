@@ -33,7 +33,9 @@ import {
   Upload,
   Link,
   X,
+  Crop,
 } from 'lucide-react';
+import { ImageCropper } from '@/components/ImageCropper';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
@@ -164,6 +166,10 @@ function CinematicUniverseCreate() {
   const [coverInputMode, setCoverInputMode] = useState<'upload' | 'url' | 'generate'>('upload');
   const coverFileRef = useRef<HTMLInputElement>(null);
 
+  // Cropper state — shown after file is picked, before upload
+  const [cropperSrc, setCropperSrc] = useState<string | null>(null);
+  const [cropperFile, setCropperFile] = useState<File | null>(null);
+
   // Hooks
   const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } =
     useUniverseManager();
@@ -229,7 +235,8 @@ function CinematicUniverseCreate() {
     }
   };
 
-  const handleCoverUpload = useCallback(async (file: File) => {
+  // Step 1: user picks a file → validate and open cropper
+  const handleCoverFilePick = useCallback((file: File) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       alert('Please upload an image file (JPEG, PNG, GIF, WebP, or AVIF)');
@@ -239,6 +246,17 @@ function CinematicUniverseCreate() {
       alert('Image must be under 10MB');
       return;
     }
+    setCropperFile(file);
+    setCropperSrc(URL.createObjectURL(file));
+  }, []);
+
+  // Step 2: user confirms crop → upload the cropped blob
+  const handleCoverUpload = useCallback(async (blob: Blob) => {
+    // Close the cropper
+    setCropperSrc(null);
+    setCropperFile(null);
+
+    const file = new File([blob], 'cover.jpg', { type: 'image/jpeg' });
 
     setIsUploadingCover(true);
     setUploadProgress(0);
@@ -290,7 +308,7 @@ function CinematicUniverseCreate() {
       const uploadedUrl = result.manifest.uploads[0]?.url;
       if (uploadedUrl) {
         setImageUrl(uploadedUrl);
-        setCoverPreview(URL.createObjectURL(file));
+        setCoverPreview(URL.createObjectURL(blob));
       }
     } catch (err) {
       alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -300,9 +318,18 @@ function CinematicUniverseCreate() {
     }
   }, []);
 
+  const handleCropCancel = useCallback(() => {
+    if (cropperSrc) URL.revokeObjectURL(cropperSrc);
+    setCropperSrc(null);
+    setCropperFile(null);
+  }, [cropperSrc]);
+
   const handleClearCover = () => {
     setImageUrl('');
     setCoverPreview(null);
+    if (cropperSrc) URL.revokeObjectURL(cropperSrc);
+    setCropperSrc(null);
+    setCropperFile(null);
     if (coverFileRef.current) coverFileRef.current.value = '';
   };
 
@@ -710,7 +737,7 @@ function CinematicUniverseCreate() {
                   <Label className="text-sm font-semibold mb-2 block">Cover Image</Label>
 
                   {/* Cover preview */}
-                  {coverPreview && (
+                  {coverPreview && !cropperSrc && (
                     <div className="relative mb-2 rounded-lg overflow-hidden border">
                       <img
                         src={coverPreview}
@@ -718,13 +745,27 @@ function CinematicUniverseCreate() {
                         className="w-full h-32 object-cover"
                       />
                       {deploymentStep === DeploymentStep.IDLE && (
-                        <button
-                          type="button"
-                          onClick={handleClearCover}
-                          className="absolute top-1 right-1 p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="absolute top-1 right-1 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Re-open cropper with the current preview image
+                              setCropperSrc(coverPreview);
+                            }}
+                            className="p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                            title="Reposition"
+                          >
+                            <Crop className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearCover}
+                            className="p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                            title="Remove"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -764,48 +805,60 @@ function CinematicUniverseCreate() {
                         accept="image/jpeg,image/png,image/gif,image/webp,image/avif"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) handleCoverUpload(file);
+                          if (file) handleCoverFilePick(file);
                           e.target.value = '';
                         }}
                         className="hidden"
                       />
-                      <div
-                        onClick={() => !isUploadingCover && coverFileRef.current?.click()}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const file = e.dataTransfer.files[0];
-                          if (file) handleCoverUpload(file);
-                        }}
-                        className={`cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-colors hover:border-primary/50 ${
-                          isUploadingCover ? 'pointer-events-none opacity-70' : ''
-                        }`}
-                      >
-                        {isUploadingCover ? (
-                          <div className="space-y-2">
-                            <Loader2 className="h-5 w-5 mx-auto animate-spin text-primary" />
-                            <div className="w-full bg-muted rounded-full h-1.5">
-                              <div
-                                className="bg-primary h-1.5 rounded-full transition-all"
-                                style={{ width: `${uploadProgress}%` }}
-                              />
+
+                      {/* Cropper — shown after file pick, before upload */}
+                      {cropperSrc ? (
+                        <ImageCropper
+                          src={cropperSrc}
+                          aspectRatio={16 / 9}
+                          outputWidth={1280}
+                          onCrop={handleCoverUpload}
+                          onCancel={handleCropCancel}
+                        />
+                      ) : (
+                        <div
+                          onClick={() => !isUploadingCover && coverFileRef.current?.click()}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const file = e.dataTransfer.files[0];
+                            if (file) handleCoverFilePick(file);
+                          }}
+                          className={`cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-colors hover:border-primary/50 ${
+                            isUploadingCover ? 'pointer-events-none opacity-70' : ''
+                          }`}
+                        >
+                          {isUploadingCover ? (
+                            <div className="space-y-2">
+                              <Loader2 className="h-5 w-5 mx-auto animate-spin text-primary" />
+                              <div className="w-full bg-muted rounded-full h-1.5">
+                                <div
+                                  className="bg-primary h-1.5 rounded-full transition-all"
+                                  style={{ width: `${uploadProgress}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Uploading... {uploadProgress}%
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Uploading... {uploadProgress}%
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            <Upload className="h-5 w-5 mx-auto text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">
-                              Drop an image or click to browse
-                            </p>
-                            <p className="text-[10px] text-muted-foreground/60">
-                              JPEG, PNG, GIF, WebP, AVIF — max 10MB
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <Upload className="h-5 w-5 mx-auto text-muted-foreground" />
+                              <p className="text-xs text-muted-foreground">
+                                Drop an image or click to browse
+                              </p>
+                              <p className="text-[10px] text-muted-foreground/60">
+                                JPEG, PNG, GIF, WebP, AVIF — max 10MB
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
