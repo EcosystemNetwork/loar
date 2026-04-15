@@ -88,6 +88,9 @@ function CinematicUniverseCreate() {
   const [metadata, setMetadata] = useState(''); // Additional token metadata
   const [context, setContext] = useState(''); // Universe context/lore
 
+  // Token launch mode: deploy token + LP now, or skip and do it later
+  const [launchTokenNow, setLaunchTokenNow] = useState(true);
+
   // Token allocation state (basis points, must sum to 10000)
   const [lpBps, setLpBps] = useState(8000); // 80% LP
   const [creatorBps, setCreatorBps] = useState(1000); // 10% Creator
@@ -417,14 +420,15 @@ function CinematicUniverseCreate() {
     if (parsedUniverseId !== null) {
       setUniverseId(parsedUniverseId);
     }
-    setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
-
-    // Auto-trigger token deployment (step 2) immediately after universe creation
-    if (parsedUniverseId !== null && address && tokenSymbol) {
+    // If user chose to launch token now AND provided a symbol, auto-trigger step 2
+    if (launchTokenNow && parsedUniverseId !== null && address && tokenSymbol) {
+      setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
       setTimeout(() => {
-        // Use the parsed values directly since state may not have updated yet
         handleDeployTokenWithId(parsedUniverseId!);
       }, 500);
+    } else {
+      // Skip token deployment — go straight to completed (universe-only)
+      setDeploymentStep(DeploymentStep.COMPLETED);
     }
 
     // Register universe in Firestore using parsed values directly (not stale state)
@@ -530,8 +534,13 @@ function CinematicUniverseCreate() {
       return;
     }
 
-    if (!universeName || !imageUrl || !description || !tokenSymbol) {
-      alert('Please fill in universe name, token symbol, image, and description');
+    if (!universeName || !imageUrl || !description) {
+      alert('Please fill in universe name, image, and description');
+      return;
+    }
+
+    if (launchTokenNow && !tokenSymbol) {
+      alert('Please enter a token symbol or switch to "Launch Token Later"');
       return;
     }
 
@@ -680,11 +689,15 @@ function CinematicUniverseCreate() {
         <Card className="w-full max-w-2xl">
           <CardContent className="text-center space-y-6 p-10">
             <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
-            <h2 className="text-3xl font-bold">Universe Launched! 🚀</h2>
+            <h2 className="text-3xl font-bold">
+              {tokenAddress ? 'Universe Launched!' : 'Universe Created!'} 🚀
+            </h2>
             <p className="text-muted-foreground text-lg">
               Your universe is now deployed on{' '}
-              {CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES] ?? 'testnet'} with governance token
-              and liquidity pool
+              {CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES] ?? 'testnet'}
+              {tokenAddress
+                ? ' with governance token and liquidity pool'
+                : '. You can launch a token anytime from your dashboard.'}
             </p>
 
             <div className="space-y-3">
@@ -736,6 +749,17 @@ function CinematicUniverseCreate() {
                   <Button size="lg" className="w-full">
                     <Rocket className="h-5 w-5 mr-2" />
                     Start Building
+                  </Button>
+                </RouterLink>
+              )}
+              {!tokenAddress && universeAddress && (
+                <RouterLink
+                  to="/universe/$id/deploy-token"
+                  params={{ id: universeAddress.toLowerCase() }}
+                >
+                  <Button size="lg" variant="outline" className="w-full">
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Launch Token Later
                   </Button>
                 </RouterLink>
               )}
@@ -1080,22 +1104,49 @@ function CinematicUniverseCreate() {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="tokenSymbolMain" className="text-sm font-semibold mb-2 block">
-                    Token Symbol
-                  </Label>
-                  <Input
-                    id="tokenSymbolMain"
-                    placeholder="e.g., MCU"
-                    value={tokenSymbol}
-                    onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-                    disabled={deploymentStep !== DeploymentStep.IDLE}
-                    maxLength={10}
-                    className="h-11"
-                  />
-                  <p className="text-[10px] text-muted-foreground/60 mt-1">
-                    Governance token ticker — deployed with your universe
-                  </p>
+                {/* Token Launch Toggle */}
+                <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">Launch Token & Pool</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {launchTokenNow
+                          ? 'Deploy governance token + liquidity pool at mint'
+                          : 'Create universe first, launch token later from dashboard'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLaunchTokenNow(!launchTokenNow)}
+                      disabled={deploymentStep !== DeploymentStep.IDLE}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        launchTokenNow ? 'bg-primary' : 'bg-zinc-600'
+                      } ${deploymentStep !== DeploymentStep.IDLE ? 'opacity-50' : ''}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          launchTokenNow ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {launchTokenNow && (
+                    <div>
+                      <Label htmlFor="tokenSymbolMain" className="text-sm font-semibold mb-2 block">
+                        Token Symbol
+                      </Label>
+                      <Input
+                        id="tokenSymbolMain"
+                        placeholder="e.g., MCU"
+                        value={tokenSymbol}
+                        onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
+                        disabled={deploymentStep !== DeploymentStep.IDLE}
+                        maxLength={10}
+                        className="h-11"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Multi-Sig Ownership (optional) */}
@@ -1112,7 +1163,7 @@ function CinematicUniverseCreate() {
                       !universeName ||
                       !imageUrl ||
                       !description ||
-                      !tokenSymbol ||
+                      (launchTokenNow && !tokenSymbol) ||
                       isPending ||
                       isConfirming
                     }
@@ -1122,20 +1173,20 @@ function CinematicUniverseCreate() {
                     {isPending || isConfirming ? (
                       <>
                         <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Creating Universe...
+                        {launchTokenNow ? 'Creating Universe & Token...' : 'Creating Universe...'}
                       </>
                     ) : (
                       <>
                         <Rocket className="h-5 w-5 mr-2" />
-                        Create Universe
+                        {launchTokenNow ? 'Launch Universe + Token' : 'Create Universe'}
                       </>
                     )}
                   </Button>
                 )}
               </div>
 
-              {/* Step 2: Token Deployment */}
-              {deploymentStep !== DeploymentStep.IDLE && (
+              {/* Step 2: Token Deployment (only shown when launching token with universe) */}
+              {launchTokenNow && deploymentStep !== DeploymentStep.IDLE && (
                 <div className="space-y-4 pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold">Step 2: Deploy Token & Pool</h3>

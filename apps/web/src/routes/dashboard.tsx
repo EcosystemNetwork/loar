@@ -6,7 +6,7 @@
  * Redirects to /login when unauthenticated.
  */
 
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link as RouterLink } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import {
   Plus,
   Wand2,
   Film,
+  Rocket,
   ShoppingBag,
   TrendingUp,
   Upload,
@@ -655,10 +656,17 @@ function UniverseGrid({
                   <Calendar className="h-4 w-4 text-white" />
                 </div>
               </div>
-              <div className="absolute bottom-2 left-2">
-                <div className="text-white text-xs bg-black/40 px-2 py-1 rounded">
-                  Active Timeline
-                </div>
+              <div className="absolute bottom-2 left-2 flex gap-1">
+                {universe.tokenAddress &&
+                universe.tokenAddress !== '0x0000000000000000000000000000000000000000' ? (
+                  <div className="text-white text-xs bg-green-600/80 px-2 py-1 rounded">
+                    Token Live
+                  </div>
+                ) : (
+                  <div className="text-white text-xs bg-amber-600/80 px-2 py-1 rounded">
+                    No Token
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-4">
@@ -674,17 +682,36 @@ function UniverseGrid({
                     ? `Created ${new Date(universe.createdAt).toLocaleDateString()}`
                     : ''}
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect(universe.id);
-                  }}
-                >
-                  <Play className="h-3 w-3" />
-                </Button>
+                <div className="flex gap-1">
+                  {(!universe.tokenAddress ||
+                    universe.tokenAddress === '0x0000000000000000000000000000000000000000') && (
+                    <RouterLink
+                      to="/universe/$id/deploy-token"
+                      params={{ id: (universe.address || universe.id).toLowerCase() }}
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs h-7 px-2"
+                      >
+                        <Rocket className="h-3 w-3 mr-1" />
+                        Launch Token
+                      </Button>
+                    </RouterLink>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect(universe.id);
+                    }}
+                  >
+                    <Play className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
