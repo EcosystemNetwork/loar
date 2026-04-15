@@ -7,8 +7,8 @@ yarn-error.log*
 .yarn
 .next
 .nuxt
-dist
-build
+apps/*/dist
+apps/*/build
 *.log
 .git
 .gitignore
@@ -24,7 +24,12 @@ firebase-service-account.json
 .gitnexus/
 docs/
 apps/mobile/
-apps/contracts/
+apps/contracts/src/
+apps/contracts/out/
+apps/contracts/cache/
+apps/contracts/lib/
+apps/contracts/test/
+apps/contracts/script/
 apps/contracts-sol/
 apps/contracts-sui/
 apps/bridge/
