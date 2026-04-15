@@ -96,7 +96,7 @@ contract DeployProtocolScript is Script {
 
         // 1. Deploy UniverseManager
         console.log("1/6 Deploying UniverseManager...");
-        universeManager = new UniverseManager(teamFeeRecipient, teamFeeRecipient);
+        universeManager = new UniverseManager(teamFeeRecipient, weth);
         console.log("   UniverseManager deployed at:", address(universeManager));
 
         // 2. Deploy UniverseTokenDeployer

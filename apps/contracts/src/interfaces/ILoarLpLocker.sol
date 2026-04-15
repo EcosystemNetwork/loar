@@ -46,13 +46,14 @@ interface ILoarLpLocker {
     // the pool is unlocked
     function collectRewardsWithoutUnlock(address token) external;
 
-    // take liqudity from the factory and place it into a pool
+    // take liquidity from the factory and place it into a pool (with optional paired-token seed)
     function placeLiquidity(
         IUniverseManager.LockerConfig memory lockerConfig,
         IUniverseManager.PoolConfig memory poolConfig,
         PoolKey memory poolKey,
         uint256 poolSupply,
-        address token
+        address token,
+        uint256 pairedAmount
     ) external returns (uint256 tokenId);
 
     // get the reward info for a token

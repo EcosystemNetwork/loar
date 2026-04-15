@@ -18,7 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Rocket, CheckCircle2, ArrowLeft } from 'lucide-react';
-import { parseEther } from 'viem';
 import { useWaitForTransactionReceipt } from 'wagmi';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { decodeEventLog } from 'viem';
@@ -140,8 +139,7 @@ function DeployTokenPage() {
             communityBps: 500,
           },
         },
-        BigInt(onChainId),
-        parseEther('0.01')
+        BigInt(onChainId)
       );
     } catch (err) {
       toast.error(`Deploy failed: ${err instanceof Error ? err.message : 'Unknown error'}`);

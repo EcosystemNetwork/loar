@@ -96,6 +96,11 @@ export function useUniverseManager() {
   /**
    * Step 2: Deploy token, governor, and liquidity pool for a universe
    */
+  /**
+   * Step 2: Deploy token, governor, and liquidity pool for a universe.
+   * No ETH value needed — the mint fee ETH from createUniverse is automatically
+   * wrapped to WETH and deposited into the token's liquidity pool.
+   */
   const deployUniverseToken = async (
     config: {
       tokenConfig: {
@@ -130,8 +135,7 @@ export function useUniverseManager() {
         communityBps: number;
       };
     },
-    universeId: bigint,
-    value: bigint
+    universeId: bigint
   ) => {
     if (!isConnected) throw new Error('Wallet not connected');
     if (!isSupportedChain(chainId))
@@ -157,7 +161,6 @@ export function useUniverseManager() {
         },
         universeId,
       ],
-      value,
       chainId,
     });
   };

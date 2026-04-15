@@ -100,8 +100,16 @@ export function GovernanceSidebar({
   const publicClient = usePublicClient();
 
   // Get governance addresses from universe data
-  const governanceAddress = finalUniverse?.governanceAddress as Address;
-  const tokenAddress = finalUniverse?.tokenAddress as Address;
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const rawGovernanceAddress = finalUniverse?.governanceAddress;
+  const rawTokenAddress = finalUniverse?.tokenAddress;
+  // Treat zero-address as undefined to prevent contract calls to address(0)
+  const governanceAddress = (
+    rawGovernanceAddress && rawGovernanceAddress !== ZERO ? rawGovernanceAddress : undefined
+  ) as Address | undefined;
+  const tokenAddress = (
+    rawTokenAddress && rawTokenAddress !== ZERO ? rawTokenAddress : undefined
+  ) as Address | undefined;
   const timelineAddress = finalUniverse?.address as Address;
 
   // Multi-sig admin detection
@@ -109,14 +117,8 @@ export function GovernanceSidebar({
     timelineAddress as `0x${string}` | undefined
   );
 
-  // Check if governance is properly configured (zero address = not deployed yet)
-  const ZERO = '0x0000000000000000000000000000000000000000';
-  const isGovernanceConfigured =
-    governanceAddress &&
-    tokenAddress &&
-    timelineAddress &&
-    governanceAddress !== ZERO &&
-    tokenAddress !== ZERO;
+  // Check if governance is properly configured (undefined = not deployed yet)
+  const isGovernanceConfigured = !!governanceAddress && !!tokenAddress && !!timelineAddress;
 
   // Check token balance
   const { data: tokenBalance } = useReadContract({

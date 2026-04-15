@@ -19,6 +19,12 @@ import {UniverseData} from "./types/UniverseData.sol";
 import {Strings} from "@openzeppelin/utils/Strings.sol";
 import {Base64} from "@openzeppelin/utils/Base64.sol";
 
+interface IWETH {
+    function deposit() external payable;
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transfer(address to, uint256 amount) external returns (bool);
+}
+
 interface IUniverseTokenDeployer {
     function deployTokenAndGovernance(
         IUniverseManager.DeploymentConfig memory deploymentConfig,
@@ -46,17 +52,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     /// @notice Fee required to mint a universe (default 0.05 ETH).
     uint256 public mintFee;
 
-    /// @notice Split basis points: how much of mint fee goes to LP (rest to credit fund). Default 5000 = 50%.
-    uint16 public mintFeeLpBps;
+    /// @notice WETH address used to seed liquidity pools with mint fee ETH.
+    address public weth;
 
-    /// @notice Address that receives the LP half of the mint fee to deepen $LOAR liquidity.
-    address public lpRecipient;
+    /// @notice Per-universe LP seed balance (wei) held until token deployment seeds the pool.
+    mapping(uint256 => uint256) public universeLpSeed;
 
-    /// @notice Per-universe credit fund balance (wei) waiting to be converted to credits by the platform.
-    mapping(uint256 => uint256) public universeCreditFund;
-
-    /// @notice Total ETH held across all universe credit funds (must not be drained by claimEth).
-    uint256 public totalCreditFundsHeld;
+    /// @notice Total ETH held across all universe LP seeds (must not be drained by claimEth).
+    uint256 public totalLpSeedsHeld;
 
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) public enabledHooks;
@@ -66,13 +69,13 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
     event SetTokenDeployer(address oldTokenDeployer, address newTokenDeployer);
     event MintFeeUpdated(uint256 oldFee, uint256 newFee);
-    event MintFeeLpBpsUpdated(uint16 oldBps, uint16 newBps);
+    event WethUpdated(address oldWeth, address newWeth);
 
-    constructor(address _teamFeeRecipient, address _lpRecipient) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
+    constructor(address _teamFeeRecipient, address _weth) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
-        lpRecipient = _lpRecipient;
+        require(_weth != address(0), "Zero WETH address");
+        weth = _weth;
         mintFee = 0.05 ether;
-        mintFeeLpBps = 5000; // 50% to LP, 50% to credit fund
     }
 
     function setMintFee(uint256 _mintFee) external onlyOwner {
@@ -80,10 +83,11 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         mintFee = _mintFee;
     }
 
-    function setMintFeeLpBps(uint16 _mintFeeLpBps) external onlyOwner {
-        require(_mintFeeLpBps <= 10_000, "Invalid bps");
-        emit MintFeeLpBpsUpdated(mintFeeLpBps, _mintFeeLpBps);
-        mintFeeLpBps = _mintFeeLpBps;
+    function setWeth(address _weth) external onlyOwner {
+        require(_weth != address(0), "Zero address");
+        address old = weth;
+        weth = _weth;
+        emit WethUpdated(old, _weth);
     }
 
     function setTokenDeployer(address _tokenDeployer) external onlyOwner {
@@ -92,29 +96,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         emit SetTokenDeployer(oldTokenDeployer, _tokenDeployer);
     }
 
-    /// @notice Update the address that receives the LP half of the mint fee.
-    function setLpRecipient(address _lpRecipient) external onlyOwner {
-        require(_lpRecipient != address(0), "Zero address");
-        address old = lpRecipient;
-        lpRecipient = _lpRecipient;
-        emit SetLpRecipient(old, _lpRecipient);
-    }
-
-    /// @notice Claim ETH held in the contract, excluding credit funds reserved for universes.
+    /// @notice Claim ETH held in the contract, excluding LP seeds reserved for universes.
     function claimEth(address recipient) external onlyOwner {
         require(recipient != address(0), "Zero address");
         uint256 balance = address(this).balance;
-        require(balance > totalCreditFundsHeld, "No ETH to claim");
-        uint256 claimable = balance - totalCreditFundsHeld;
+        require(balance > totalLpSeedsHeld, "No ETH to claim");
+        uint256 claimable = balance - totalLpSeedsHeld;
         (bool sent,) = recipient.call{value: claimable}("");
         require(sent, "ETH claim failed");
-    }
-
-    /// @notice Consume credit funds for a universe (called by owner after off-chain credit conversion).
-    function consumeCreditFund(uint256 universeId, uint256 amount) external onlyOwner {
-        require(universeCreditFund[universeId] >= amount, "Exceeds credit fund");
-        universeCreditFund[universeId] -= amount;
-        totalCreditFundsHeld -= amount;
     }
 
     receive() external payable {}
@@ -129,14 +118,6 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     ) public payable nonReentrant returns (uint256 _id, address) {
         require(!deprecated, "Manager is deprecated");
         if (msg.value < mintFee) revert InsufficientMintFee();
-        if (lpRecipient == address(0)) revert LpRecipientNotSet();
-
-        // ── Fee split: configurable LP/credit split via mintFeeLpBps ──
-        uint256 lpAmount     = (mintFee * mintFeeLpBps) / 10_000;
-        uint256 creditAmount = mintFee - lpAmount;
-
-        (bool lpSent,) = lpRecipient.call{value: lpAmount}("");
-        require(lpSent, "LP fee transfer failed");
 
         // Refund any overpayment
         if (msg.value > mintFee) {
@@ -164,8 +145,11 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
         uint256 currentId = latestId;
         universeDatas[currentId] = data;
-        universeCreditFund[currentId] = creditAmount;
-        totalCreditFundsHeld += creditAmount;
+
+        // 100% of mint fee is held as LP seed — wrapped to WETH and deposited
+        // into the universe token's liquidity pool when deployUniverseToken() is called.
+        universeLpSeed[currentId] = mintFee;
+        totalLpSeedsHeld += mintFee;
 
         latestId++;
 
@@ -173,7 +157,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         _safeMint(initialOwner, currentId);
 
         emit UniverseCreated(address(universe), msg.sender);
-        emit UniverseMintFee(currentId, msg.sender, lpAmount, creditAmount);
+        emit UniverseLpSeed(currentId, msg.sender, mintFee);
 
         return (currentId, address(universe));
     }
@@ -181,7 +165,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     function deployUniverseToken(
         DeploymentConfig memory deploymentConfig,
         uint id
-    ) public payable nonReentrant returns (address tokenAddress) {
+    ) public nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
         require(address(universe) != address(0), "Universe does not exist");
         if (ownerOf(id) != msg.sender) {
@@ -190,7 +174,6 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         if (universe.getToken() != address(0)) {
           revert TokenAlreadyDeployed();
         }
-      
 
         if (!enabledHooks[deploymentConfig.poolConfig.hook]) {
             revert HookNotEnabled();
@@ -211,6 +194,9 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
         tokenAddress = _tokenAddress;
 
+        // Paired token must be WETH for LP seeding
+        require(deploymentConfig.poolConfig.pairedToken == weth, "Paired token must be WETH");
+
         PoolKey memory poolkey = ILoarHook(deploymentConfig.poolConfig.hook).initializePool(
             tokenAddress,
             deploymentConfig.poolConfig.pairedToken,
@@ -220,15 +206,27 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
             deploymentConfig.poolConfig.poolData
         );
 
-        // Only LP portion (80%) is sent to this contract by UniverseTokenDeployer
+        // Only LP portion (80% default) is sent to this contract by UniverseTokenDeployer
         uint256 poolSupply = (TOKEN_SUPPLY * 8000) / 10000;
+
+        // Wrap the stored LP seed ETH → WETH to seed the pool's paired side
+        uint256 lpSeed = universeLpSeed[id];
+        universeLpSeed[id] = 0;
+        totalLpSeedsHeld -= lpSeed;
+
+        if (lpSeed > 0) {
+            IWETH(weth).deposit{value: lpSeed}();
+            IERC20(weth).approve(address(deploymentConfig.lockerConfig.locker), lpSeed);
+        }
+
         IERC20(tokenAddress).approve(address(deploymentConfig.lockerConfig.locker), poolSupply);
         ILoarLpLocker(deploymentConfig.lockerConfig.locker).placeLiquidity(
             deploymentConfig.lockerConfig,
             deploymentConfig.poolConfig,
             poolkey,
             poolSupply,
-            tokenAddress
+            tokenAddress,
+            lpSeed
         );
 
         universeDatas[id].token = IERC20(tokenAddress);

@@ -67,10 +67,12 @@ contract DeployAllScript is Script {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         address d = vm.addr(pk);
         address treasury = vm.envOr("TREASURY", d);
+        address wethAddr = vm.envAddress("WETH");
 
         console.log("=== LOAR Full Deploy ===");
         console.log("Deployer:", d);
         console.log("Treasury:", treasury);
+        console.log("WETH:", wethAddr);
 
         vm.startBroadcast(pk);
 
@@ -89,7 +91,7 @@ contract DeployAllScript is Script {
         }
 
         // ── Phase 2: Core Protocol ──────────────────────────────────
-        UniverseManager um = new UniverseManager(treasury, treasury);
+        UniverseManager um = new UniverseManager(treasury, wethAddr);
         console.log("[2] UniverseManager:", address(um));
 
         UniverseTokenDeployer utd = new UniverseTokenDeployer(address(um));

@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/select';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { SafeSetup } from '@/components/SafeSetup';
-import { parseEther, decodeEventLog } from 'viem';
+import { decodeEventLog } from 'viem';
 import { universeManagerAbi } from '@loar/abis/generated';
 import {
   isSupportedChain,
@@ -88,8 +88,8 @@ function CinematicUniverseCreate() {
   const [metadata, setMetadata] = useState(''); // Additional token metadata
   const [context, setContext] = useState(''); // Universe context/lore
 
-  // Token launch mode: deploy token + LP now, or skip and do it later
-  const [launchTokenNow, setLaunchTokenNow] = useState(true);
+  // Universe mode: 'fun' = free creative playground, 'monetize' = token + LP
+  const [universeMode, setUniverseMode] = useState<'fun' | 'monetize' | null>(null);
 
   // Token allocation state (basis points, must sum to 10000)
   const [lpBps, setLpBps] = useState(8000); // 80% LP
@@ -421,7 +421,7 @@ function CinematicUniverseCreate() {
       setUniverseId(parsedUniverseId);
     }
     // If user chose to launch token now AND provided a symbol, auto-trigger step 2
-    if (launchTokenNow && parsedUniverseId !== null && address && tokenSymbol) {
+    if (universeMode === 'monetize' && parsedUniverseId !== null && address && tokenSymbol) {
       setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
       setTimeout(() => {
         handleDeployTokenWithId(parsedUniverseId!);
@@ -539,8 +539,13 @@ function CinematicUniverseCreate() {
       return;
     }
 
-    if (launchTokenNow && !tokenSymbol) {
-      alert('Please enter a token symbol or switch to "Launch Token Later"');
+    if (!universeMode) {
+      alert('Please select a universe mode');
+      return;
+    }
+
+    if (universeMode === 'monetize' && !tokenSymbol) {
+      alert('Please enter a token symbol');
       return;
     }
 
@@ -605,8 +610,7 @@ function CinematicUniverseCreate() {
             communityBps,
           },
         },
-        id,
-        parseEther('0.01')
+        id
       );
     } catch (error) {
       alert(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -690,15 +694,18 @@ function CinematicUniverseCreate() {
           <CardContent className="text-center space-y-6 p-10">
             <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
             <h2 className="text-3xl font-bold">
-              {tokenAddress ? 'Universe Launched!' : 'Universe Created!'} 🚀
+              {tokenAddress ? 'Universe Launched!' : 'Universe Created!'}
             </h2>
             <p className="text-muted-foreground text-lg">
-              Your universe is now deployed on{' '}
-              {CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES] ?? 'testnet'}
               {tokenAddress
-                ? ' with governance token and liquidity pool'
-                : '. You can launch a token anytime from your dashboard.'}
+                ? `Your universe is live on ${CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES] ?? 'testnet'} with governance token and liquidity pool.`
+                : `Your universe is live on ${CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES] ?? 'testnet'}. Ready to start building your narrative world!`}
             </p>
+            {!tokenAddress && (
+              <div className="p-3 rounded-lg bg-muted/50 border text-sm text-muted-foreground">
+                Want to monetize later? You can launch a token anytime from your universe page.
+              </div>
+            )}
 
             <div className="space-y-3">
               {universeAddress && (
@@ -758,8 +765,8 @@ function CinematicUniverseCreate() {
                   params={{ id: universeAddress.toLowerCase() }}
                 >
                   <Button size="lg" variant="outline" className="w-full">
-                    <Sparkles className="h-5 w-5 mr-2" />
-                    Launch Token Later
+                    <Rocket className="h-5 w-5 mr-2" />
+                    Launch Token
                   </Button>
                 </RouterLink>
               )}
@@ -785,9 +792,9 @@ function CinematicUniverseCreate() {
       <div className="h-full max-w-6xl mx-auto px-4 py-6 md:p-8 flex flex-col">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-4xl font-bold mb-2">Launch Your Universe</h1>
+          <h1 className="text-2xl md:text-4xl font-bold mb-2">Create Your Universe</h1>
           <p className="text-muted-foreground text-sm md:text-lg">
-            Deploy a new cinematic universe with governance token and liquidity pool
+            Build a narrative world for fun, or launch with a token and liquidity pool
           </p>
         </div>
 
@@ -1104,34 +1111,54 @@ function CinematicUniverseCreate() {
                   />
                 </div>
 
-                {/* Token Launch Toggle */}
-                <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">Launch Token & Pool</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {launchTokenNow
-                          ? 'Deploy governance token + liquidity pool at mint'
-                          : 'Create universe first, launch token later from dashboard'}
-                      </p>
-                    </div>
+                {/* Universe Mode Selector */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold block">What kind of universe?</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Create for Fun */}
                     <button
                       type="button"
-                      onClick={() => setLaunchTokenNow(!launchTokenNow)}
+                      onClick={() => setUniverseMode('fun')}
                       disabled={deploymentStep !== DeploymentStep.IDLE}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        launchTokenNow ? 'bg-primary' : 'bg-zinc-600'
-                      } ${deploymentStep !== DeploymentStep.IDLE ? 'opacity-50' : ''}`}
+                      className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                        universeMode === 'fun'
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : 'border-muted hover:border-muted-foreground/30'
+                      } disabled:opacity-50`}
                     >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          launchTokenNow ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
+                      {universeMode === 'fun' && (
+                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                      )}
+                      <Sparkles className="h-5 w-5 mb-2 text-blue-400" />
+                      <p className="text-sm font-bold">Create for Fun</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                        Free narrative playground. No token, no cost. You can always monetize later.
+                      </p>
+                    </button>
+
+                    {/* Launch & Monetize */}
+                    <button
+                      type="button"
+                      onClick={() => setUniverseMode('monetize')}
+                      disabled={deploymentStep !== DeploymentStep.IDLE}
+                      className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                        universeMode === 'monetize'
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : 'border-muted hover:border-muted-foreground/30'
+                      } disabled:opacity-50`}
+                    >
+                      {universeMode === 'monetize' && (
+                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                      )}
+                      <Rocket className="h-5 w-5 mb-2 text-green-400" />
+                      <p className="text-sm font-bold">Launch & Monetize</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                        Deploy governance token + liquidity pool. Costs mint fee.
+                      </p>
                     </button>
                   </div>
 
-                  {launchTokenNow && (
+                  {universeMode === 'monetize' && (
                     <div>
                       <Label htmlFor="tokenSymbolMain" className="text-sm font-semibold mb-2 block">
                         Token Symbol
@@ -1163,7 +1190,8 @@ function CinematicUniverseCreate() {
                       !universeName ||
                       !imageUrl ||
                       !description ||
-                      (launchTokenNow && !tokenSymbol) ||
+                      !universeMode ||
+                      (universeMode === 'monetize' && !tokenSymbol) ||
                       isPending ||
                       isConfirming
                     }
@@ -1173,12 +1201,20 @@ function CinematicUniverseCreate() {
                     {isPending || isConfirming ? (
                       <>
                         <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        {launchTokenNow ? 'Creating Universe & Token...' : 'Creating Universe...'}
+                        {universeMode === 'monetize'
+                          ? 'Launching Universe & Token...'
+                          : 'Creating Universe...'}
                       </>
                     ) : (
                       <>
-                        <Rocket className="h-5 w-5 mr-2" />
-                        {launchTokenNow ? 'Launch Universe + Token' : 'Create Universe'}
+                        {universeMode === 'monetize' ? (
+                          <Rocket className="h-5 w-5 mr-2" />
+                        ) : (
+                          <Sparkles className="h-5 w-5 mr-2" />
+                        )}
+                        {universeMode === 'monetize'
+                          ? 'Launch Universe + Token'
+                          : 'Create Universe'}
                       </>
                     )}
                   </Button>
@@ -1186,7 +1222,7 @@ function CinematicUniverseCreate() {
               </div>
 
               {/* Step 2: Token Deployment (only shown when launching token with universe) */}
-              {launchTokenNow && deploymentStep !== DeploymentStep.IDLE && (
+              {universeMode === 'monetize' && deploymentStep !== DeploymentStep.IDLE && (
                 <div className="space-y-4 pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold">Step 2: Deploy Token & Pool</h3>
@@ -1463,11 +1499,24 @@ function CinematicUniverseCreate() {
                   <h3 className="text-2xl font-bold text-white drop-shadow-2xl mb-2">
                     {universeName || 'Your Universe Name'}
                   </h3>
-                  {tokenSymbol && (
-                    <Badge className="bg-white/20 backdrop-blur-sm text-white border-0">
-                      ${tokenSymbol}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {tokenSymbol && universeMode === 'monetize' && (
+                      <Badge className="bg-white/20 backdrop-blur-sm text-white border-0">
+                        ${tokenSymbol}
+                      </Badge>
+                    )}
+                    {universeMode && (
+                      <Badge
+                        className={`backdrop-blur-sm border-0 text-[10px] ${
+                          universeMode === 'monetize'
+                            ? 'bg-green-500/20 text-green-200'
+                            : 'bg-blue-500/20 text-blue-200'
+                        }`}
+                      >
+                        {universeMode === 'monetize' ? 'Monetized' : 'For Fun'}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -71,7 +71,8 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         IUniverseManager.PoolConfig memory poolConfig,
         PoolKey memory poolKey,
         uint256 poolSupply,
-        address token
+        address token,
+        uint256 pairedAmount
     ) external onlyFactory nonReentrant returns (uint256 positionId) {
         // ensure that we don't already have a reward for this token
         if (_tokenRewards[token].positionId != 0) {
@@ -129,10 +130,16 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             }
         }
 
-        // pull in the token and mint liquidity
+        // pull in the token supply
         IERC20(token).safeTransferFrom(msg.sender, address(this), poolSupply);
 
-        positionId = _mintLiquidity(poolConfig, lockerConfig, poolKey, poolSupply, token);
+        // pull in paired token (WETH) for two-sided liquidity if provided
+        address pairedToken = poolConfig.pairedToken;
+        if (pairedAmount > 0) {
+            IERC20(pairedToken).safeTransferFrom(msg.sender, address(this), pairedAmount);
+        }
+
+        positionId = _mintLiquidity(poolConfig, lockerConfig, poolKey, poolSupply, token, pairedAmount);
 
         // store the reward info
         tokenRewardInfo.positionId = positionId;
@@ -158,7 +165,8 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         IUniverseManager.LockerConfig memory lockerConfig,
         PoolKey memory poolKey,
         uint256 poolSupply,
-        address token
+        address token,
+        uint256 pairedAmount
     ) internal returns (uint256 positionId) {
         // check that all position infos are the same length
         if (
@@ -221,8 +229,10 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
             // determine token amount for this position
             uint256 tokenAmount = poolSupply * lockerConfig.positionBps[i] / BASIS_POINTS;
-            uint256 amount0 = token0IsLoar ? tokenAmount : 0;
-            uint256 amount1 = token0IsLoar ? 0 : tokenAmount;
+            // Split paired amount (WETH) proportionally across positions
+            uint256 pairedForPosition = pairedAmount * lockerConfig.positionBps[i] / BASIS_POINTS;
+            uint256 amount0 = token0IsLoar ? tokenAmount : pairedForPosition;
+            uint256 amount1 = token0IsLoar ? pairedForPosition : tokenAmount;
 
             // determine tick bounds for this position
             int24 tickLower_ =
@@ -255,12 +265,21 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         actions = abi.encodePacked(actions, uint8(Actions.SETTLE_PAIR));
         params[lockerConfig.tickLower.length] = abi.encode(poolKey.currency0, poolKey.currency1);
 
-        // approvals
+        // approvals for universe token
         {
             IERC20(token).approve(address(permit2), poolSupply);
             permit2.approve(
                 // forge-lint: disable-next-line(unsafe-typecast)
                 token, address(positionManager), uint160(poolSupply), uint48(block.timestamp)
+            );
+        }
+
+        // approvals for paired token (WETH) if seeding two-sided liquidity
+        if (pairedAmount > 0) {
+            address pairedToken = poolConfig.pairedToken;
+            IERC20(pairedToken).approve(address(permit2), pairedAmount);
+            permit2.approve(
+                pairedToken, address(positionManager), uint160(pairedAmount), uint48(block.timestamp)
             );
         }
 
