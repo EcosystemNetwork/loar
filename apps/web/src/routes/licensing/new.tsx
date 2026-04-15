@@ -106,17 +106,6 @@ export function CreateLicensePage() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
-  if (isAuthenticating) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
   const [step, setStep] = useState<Step>('type');
   const [form, setForm] = useState<LicenseForm>({
     licenseType: '',
@@ -128,6 +117,18 @@ export function CreateLicensePage() {
     royaltyBps: '500',
     durationDays: '365',
   });
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const stepIdx = STEPS.indexOf(step);
 

@@ -56,6 +56,16 @@ export function ProposeCollabPage() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
+  const [form, setForm] = useState<CollabForm>({
+    universeA: '',
+    universeB: '',
+    revenueShareBps: '5000',
+    durationDays: '90',
+    title: '',
+    description: '',
+    metadataURI: '',
+  });
+
   if (isAuthenticating) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -67,15 +77,6 @@ export function ProposeCollabPage() {
   if (!isAuthenticated) {
     return null;
   }
-  const [form, setForm] = useState<CollabForm>({
-    universeA: '',
-    universeB: '',
-    revenueShareBps: '5000',
-    durationDays: '90',
-    title: '',
-    description: '',
-    metadataURI: '',
-  });
 
   const stepIdx = STEPS.indexOf(step);
 

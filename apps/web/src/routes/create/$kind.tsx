@@ -471,18 +471,6 @@ function EntityCreateForm() {
     }
   }, [isAuthenticated, isAuthenticating, navigate, kind]);
 
-  if (isAuthenticating) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   // Fetch universe info when scoped to a universe
   const { data: universeResult } = useQuery({
     queryKey: ['universe', universeAddress],
@@ -533,6 +521,18 @@ function EntityCreateForm() {
       setGenerating(false);
     }
   };
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (!VALID_KINDS.includes(kind as EntityKind)) {
     return (

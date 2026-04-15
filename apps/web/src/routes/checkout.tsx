@@ -61,6 +61,12 @@ function CheckoutPage() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
+  const { listingId, productType, title, price, currency } = search;
+
+  // If real listing ID, fetch it; otherwise use URL params (for subscription-style flows)
+  const isRealListing = listingId && !listingId.startsWith('sub:');
+  const { data: listing } = useListing(isRealListing ? listingId! : '');
+
   if (isAuthenticating) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -72,12 +78,6 @@ function CheckoutPage() {
   if (!isAuthenticated) {
     return null;
   }
-
-  const { listingId, productType, title, price, currency } = search;
-
-  // If real listing ID, fetch it; otherwise use URL params (for subscription-style flows)
-  const isRealListing = listingId && !listingId.startsWith('sub:');
-  const { data: listing } = useListing(isRealListing ? listingId! : '');
 
   const displayTitle = (listing as any)?.title ?? title ?? 'Product';
   const displayPrice = (listing as any)?.price ?? price ?? '0';

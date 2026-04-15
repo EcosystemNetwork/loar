@@ -101,22 +101,18 @@ export function useCharacterGeneration({
       }
 
       // For scenes without characters, generate directly with Nano Banana
-      try {
-        const result = await trpcClient.image.generateImage.mutate({
-          prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
-          model: 'fal-ai/nano-banana',
-          imageSize: imageFormat,
-          numImages: 1,
-        });
+      const result = await trpcClient.image.generateImage.mutate({
+        prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
+        model: 'fal-ai/nano-banana',
+        imageSize: imageFormat,
+        numImages: 1,
+      });
 
-        if (result.status !== 'completed' || !result.imageUrl) {
-          throw new Error(result.error || 'Failed to generate scene image');
-        }
-
-        return { success: true, imageUrl: result.imageUrl };
-      } catch (error) {
-        throw error;
+      if (result.status !== 'completed' || !result.imageUrl) {
+        throw new Error(result.error || 'Failed to generate scene image');
       }
+
+      return { success: true, imageUrl: result.imageUrl };
     },
     onSuccess: (data) => {
       if (data.imageUrl) {

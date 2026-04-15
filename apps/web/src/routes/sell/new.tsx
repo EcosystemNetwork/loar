@@ -127,17 +127,6 @@ function CreateListingPage() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
-  if (isAuthenticating || isAutoConnecting) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
   const [form, setForm] = useState<FormData>({
     productType: '',
     title: '',
@@ -151,6 +140,18 @@ function CreateListingPage() {
     thumbnailUrl: '',
     universeId: '',
   });
+
+  if (isAuthenticating || isAutoConnecting) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   function update(key: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

@@ -106,15 +106,7 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
   const PAD = { top: 12, right: 64, bottom: 28, left: 4 };
   const chartW = W - PAD.left - PAD.right;
 
-  if (candles.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm">
-        No trading data available
-      </div>
-    );
-  }
-
-  const prices = candles.flatMap((c) => [c.high, c.low]);
+  const prices = candles.length > 0 ? candles.flatMap((c) => [c.high, c.low]) : [0];
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const priceRange = maxPrice - minPrice || minPrice * 0.01 || 1;
@@ -122,7 +114,7 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
 
   const maxVol = Math.max(...candles.map((c) => c.volume), 0.001);
 
-  const candleW = chartW / candles.length;
+  const candleW = candles.length > 0 ? chartW / candles.length : 1;
   const bodyW = Math.max(candleW * 0.6, 2);
 
   const toX = (i: number) => PAD.left + (i + 0.5) * candleW;
@@ -161,6 +153,14 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
     },
     [candles.length, candleW]
   );
+
+  if (candles.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm">
+        No trading data available
+      </div>
+    );
+  }
 
   const hoverCandle = hoverIndex !== null ? candles[hoverIndex] : null;
   const lastCandle = candles[candles.length - 1];

@@ -80,24 +80,6 @@ function CinematicUniverseCreate() {
   const { switchChain } = useSwitchChain();
   const thirdwebAccount = useActiveAccount();
 
-  useEffect(() => {
-    if (!isAuthenticated && !isAuthenticating && !isAutoConnecting) {
-      navigate({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
-    }
-  }, [isAuthenticated, isAuthenticating, isAutoConnecting, navigate]);
-
-  if (isAuthenticating || isAutoConnecting) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   // Form state
   const [universeName, setUniverseName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
@@ -561,10 +543,17 @@ function CinematicUniverseCreate() {
     }
   };
 
+  // Redirect to login if not authenticated (after all hooks)
+  useEffect(() => {
+    if (!isAuthenticated && !isAuthenticating && !isAutoConnecting) {
+      navigate({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
+    }
+  }, [isAuthenticated, isAuthenticating, isAutoConnecting, navigate]);
+
   // Wait for thirdweb to finish reconnecting the previously-connected wallet
   // before showing the connect prompt (avoids a flash of "Connect Your Wallet"
   // when the user is actually already connected).
-  if (isAutoConnecting) {
+  if (isAutoConnecting || isAuthenticating) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

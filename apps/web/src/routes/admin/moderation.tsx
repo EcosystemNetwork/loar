@@ -45,18 +45,6 @@ function ModerationDashboard() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
-  if (isAuthenticating) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   const { data: flags, isLoading: loadingFlags } = useQuery({
     queryKey: ['mod-flags'],
     queryFn: () =>
@@ -94,6 +82,18 @@ function ModerationDashboard() {
       toast.success('Takedown resolved');
     },
   });
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const statusActions = [
     { status: 'active', label: 'Restore', icon: RotateCcw, color: 'text-green-500' },

@@ -70,18 +70,6 @@ function StakingPage() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
-  if (isAuthenticating) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   const { data: profile, isLoading } = useQuery({
     queryKey: ['staking-profile'],
     queryFn: () => trpcClient.staking.getProfile.query(),
@@ -102,6 +90,18 @@ function StakingPage() {
     mutationFn: (data: { stakedAmount: number }) => trpcClient.staking.syncStake.mutate(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staking-profile'] }),
   });
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const p = profile as any;
   const currentTier = p?.tier || 'NONE';

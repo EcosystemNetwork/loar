@@ -82,26 +82,22 @@ export function useSegments({ universeId, eventId }: UseSegmentsOptions) {
    */
   const saveSegments = useCallback(
     (updatedSegments: VideoSegment[]) => {
-      try {
-        const stored = localStorage.getItem(storageKey);
-        const eventsData = stored ? JSON.parse(stored) : {};
-        const eventData = eventsData[eventId] || {};
+      const stored = localStorage.getItem(storageKey);
+      const eventsData = stored ? JSON.parse(stored) : {};
+      const eventData = eventsData[eventId] || {};
 
-        // Update event with new segments
-        const updatedEvent: MultiSegmentEvent = {
-          ...eventData,
-          eventId,
-          segments: sortSegments(updatedSegments),
-          updatedAt: Date.now(),
-        };
+      // Update event with new segments
+      const updatedEvent: MultiSegmentEvent = {
+        ...eventData,
+        eventId,
+        segments: sortSegments(updatedSegments),
+        updatedAt: Date.now(),
+      };
 
-        eventsData[eventId] = updatedEvent;
-        localStorage.setItem(storageKey, JSON.stringify(eventsData));
+      eventsData[eventId] = updatedEvent;
+      localStorage.setItem(storageKey, JSON.stringify(eventsData));
 
-        setSegments(sortSegments(updatedSegments));
-      } catch (error) {
-        throw error;
-      }
+      setSegments(sortSegments(updatedSegments));
     },
     [storageKey, eventId]
   );

@@ -89,6 +89,15 @@ export function CreateAdSlotPage() {
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
+  const [form, setForm] = useState<SlotForm>({
+    placementType: '',
+    universeId: '',
+    description: '',
+    constraints: '',
+    minBidEth: '0.01',
+    episodes: '5',
+  });
+
   if (isAuthenticating) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -100,14 +109,6 @@ export function CreateAdSlotPage() {
   if (!isAuthenticated) {
     return null;
   }
-  const [form, setForm] = useState<SlotForm>({
-    placementType: '',
-    universeId: '',
-    description: '',
-    constraints: '',
-    minBidEth: '0.01',
-    episodes: '5',
-  });
 
   const stepIdx = STEPS.indexOf(step);
 

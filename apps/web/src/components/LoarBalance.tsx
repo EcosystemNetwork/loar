@@ -19,8 +19,6 @@ export function LoarBalance() {
     enabled: isAuthenticated,
   });
 
-  if (!isAuthenticated) return null;
-
   const credits = balance?.balance ?? 0;
   const isLow = credits < 10;
 
@@ -40,6 +38,8 @@ export function LoarBalance() {
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
   }, [showStore, handleKeyDown]);
+
+  if (!isAuthenticated) return null;
 
   return (
     <>
