@@ -91,6 +91,45 @@ function CinematicUniverseCreate() {
   // Universe mode: 'fun' = free creative playground, 'monetize' = token + LP
   const [universeMode, setUniverseMode] = useState<'fun' | 'monetize' | null>(null);
 
+  // Starting price — slider controls the tick, which sets initial token price
+  // tick range: -300000 (very cheap, ~0.01 ETH MC) to -200000 (expensive, ~200 ETH MC)
+  // Rounded to tickSpacing of 200
+  const TICK_MIN = -300000;
+  const TICK_MAX = -200000;
+  const TICK_DEFAULT = -230200; // ~10 ETH market cap
+  const TOKEN_SUPPLY = 100_000_000_000; // 100B
+  const [startingTick, setStartingTick] = useState(TICK_DEFAULT);
+
+  // Derived price calculations (update in real-time as slider moves)
+  const pricePerToken = Math.pow(1.0001, startingTick);
+  const marketCapEth = pricePerToken * TOKEN_SUPPLY;
+  const tokensPerEth = 1 / pricePerToken;
+
+  // Quick preset buttons
+  const PRICE_PRESETS = [
+    { label: '0.1 ETH', tick: -276400 },
+    { label: '1 ETH', tick: -253200 },
+    { label: '10 ETH', tick: -230200 },
+    { label: '50 ETH', tick: -214200 },
+    { label: '100 ETH', tick: -207200 },
+  ] as const;
+
+  // Format helpers
+  const formatMarketCap = (mc: number) => {
+    if (mc < 0.01) return `${(mc * 1000).toFixed(2)} mETH`;
+    if (mc < 1) return `${mc.toFixed(3)} ETH`;
+    if (mc < 1000) return `${mc.toFixed(2)} ETH`;
+    return `${(mc / 1000).toFixed(1)}k ETH`;
+  };
+
+  const formatTokenAmount = (amount: number) => {
+    if (amount >= 1e12) return `${(amount / 1e12).toFixed(1)}T`;
+    if (amount >= 1e9) return `${(amount / 1e9).toFixed(1)}B`;
+    if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)}M`;
+    if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)}K`;
+    return amount.toFixed(0);
+  };
+
   // Token allocation state (basis points, must sum to 10000)
   const [lpBps, setLpBps] = useState(8000); // 80% LP
   const [creatorBps, setCreatorBps] = useState(1000); // 10% Creator
@@ -595,7 +634,7 @@ function CinematicUniverseCreate() {
           poolConfig: {
             hook: defaultConfig.defaultHook!,
             pairedToken: defaultConfig.defaultPairedToken,
-            tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
+            tickIfToken0IsLoar: startingTick,
             tickSpacing: defaultConfig.defaultTickSpacing,
             poolData: defaultConfig.defaultPoolData as `0x${string}`,
           },
@@ -604,7 +643,7 @@ function CinematicUniverseCreate() {
             rewardAdmins: [address as `0x${string}`],
             rewardRecipients: [address as `0x${string}`],
             rewardBps: [10000],
-            tickLower: [defaultConfig.defaultTickIfToken0IsLoar],
+            tickLower: [startingTick],
             tickUpper: [0],
             positionBps: [10000],
             lockerData: '0x' as `0x${string}`,
@@ -1166,19 +1205,93 @@ function CinematicUniverseCreate() {
                   </div>
 
                   {universeMode === 'monetize' && (
-                    <div>
-                      <Label htmlFor="tokenSymbolMain" className="text-sm font-semibold mb-2 block">
-                        Token Symbol
-                      </Label>
-                      <Input
-                        id="tokenSymbolMain"
-                        placeholder="e.g., MCU"
-                        value={tokenSymbol}
-                        onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-                        disabled={deploymentStep !== DeploymentStep.IDLE}
-                        maxLength={10}
-                        className="h-11"
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <Label
+                          htmlFor="tokenSymbolMain"
+                          className="text-sm font-semibold mb-2 block"
+                        >
+                          Token Symbol
+                        </Label>
+                        <Input
+                          id="tokenSymbolMain"
+                          placeholder="e.g., MCU"
+                          value={tokenSymbol}
+                          onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
+                          disabled={deploymentStep !== DeploymentStep.IDLE}
+                          maxLength={10}
+                          className="h-11"
+                        />
+                      </div>
+
+                      {/* Starting Price — live updating */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-semibold block">Starting Price</Label>
+
+                        {/* Live price stats */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                              Market Cap
+                            </p>
+                            <p className="text-sm font-bold text-primary tabular-nums">
+                              {formatMarketCap(marketCapEth)}
+                            </p>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                              Price / Token
+                            </p>
+                            <p className="text-sm font-bold tabular-nums">
+                              {pricePerToken.toExponential(1)}
+                            </p>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                              0.01 ETH Buys
+                            </p>
+                            <p className="text-sm font-bold tabular-nums">
+                              {formatTokenAmount(0.01 * tokensPerEth)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Slider */}
+                        <Slider
+                          value={[startingTick]}
+                          onValueChange={([v]) => {
+                            // Round to tickSpacing of 200
+                            setStartingTick(Math.round(v / 200) * 200);
+                          }}
+                          min={TICK_MIN}
+                          max={TICK_MAX}
+                          step={200}
+                          disabled={deploymentStep !== DeploymentStep.IDLE}
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                          <span>Cheaper</span>
+                          <span>More expensive</span>
+                        </div>
+
+                        {/* Quick presets */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {PRICE_PRESETS.map((preset) => (
+                            <button
+                              key={preset.tick}
+                              type="button"
+                              onClick={() => setStartingTick(preset.tick)}
+                              disabled={deploymentStep !== DeploymentStep.IDLE}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                                startingTick === preset.tick
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                              } disabled:opacity-50`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1529,6 +1642,30 @@ function CinematicUniverseCreate() {
 
               {/* Preview Content */}
               <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+                {universeMode === 'monetize' && tokenSymbol && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2.5 rounded-lg bg-muted/50">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                        Market Cap
+                      </p>
+                      <p className="text-sm font-bold text-primary tabular-nums">
+                        {formatMarketCap(marketCapEth)}
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-muted/50">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                        LP Seed
+                      </p>
+                      <p className="text-sm font-bold">0.05 ETH</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-muted/50">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                        Supply
+                      </p>
+                      <p className="text-sm font-bold">100B</p>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs font-bold text-muted-foreground mb-2 uppercase">About</p>
                   <p className="text-sm text-foreground leading-relaxed">

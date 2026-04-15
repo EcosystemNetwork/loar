@@ -143,9 +143,11 @@ contract DeployUniverseScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Create Universe
+        // 1. Create Universe (sends mintFee — 100% stored as LP seed for token pool)
+        uint256 mintFee = universeManager.mintFee();
         console.log("1/2 Creating Universe...");
-        (uint256 universeId, address universeAddress) = universeManager.createUniverse(
+        console.log("   Mint fee:", mintFee);
+        (uint256 universeId, address universeAddress) = universeManager.createUniverse{value: mintFee}(
             universeName,
             universeImage,
             universeDescription,

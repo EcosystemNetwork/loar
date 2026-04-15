@@ -2,36 +2,36 @@
 // To update: pnpm sync:addresses
 
 export const UniverseManager = {
-  '11155111': '0x66F289658Ce5fD0Bb1022251eA4604F6b0C4d7Ce',
-  '84532': '0xecfce8431CD0E1830D4252F1970345c2BA3a2E6e',
+  '11155111': '0xB82dE188841a799e0dBB58D885D81BEE7A735f00',
+  '84532': '0x829666ADAc47D954297a9CD1232744E1669B9e83',
 } as const;
 
 export type UniverseManagerChainId = keyof typeof UniverseManager;
 
 export const UniverseTokenDeployer = {
-  '11155111': '0x3341674801438162e2EFFFcF3Fa68664763641c8', // V2 with vesting
-  '84532': '0xBbF0A2311bee8347479eAee07c64cB237E8AE429',
+  '11155111': '0x4496549567eb411518793448ce85E4e8CaBDE802',
+  '84532': '0xDD4a87EfF3a45A718a4F3471C28De364e0F43E30',
 } as const;
 
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
 
 export const LoarFeeLocker = {
-  '11155111': '0x1E10b62bd2817d0C2414909027E1E63653fcCd8e',
-  '84532': '0xf076bc9dFFe89c7B345b0E9Ad120BCF7696d3e91',
+  '11155111': '0x965f5C192E38b86Fa4a79A561E695C48B1DC3582',
+  '84532': '0x2faA65c60Bb463b1CEC4eC14AD04CC29C7D04981',
 } as const;
 
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
 
 export const LoarLpLockerMultiple = {
-  '11155111': '0xc00225D9463C15280748dC2E21D8D8625982Ad54',
-  '84532': '0x6FB4b73B1e980217010d20B7DA065b06EA7802B6',
+  '11155111': '0x7d30fd57e44aB0ca407D312976816E7052905E0A',
+  '84532': '0x6C67EaC980DAF0AC8aDBD6a41E61a7833E2D5FF6',
 } as const;
 
 export type LoarLpLockerMultipleChainId = keyof typeof LoarLpLockerMultiple;
 
 export const LoarHookStaticFee = {
-  '11155111': '0x9A53B31b8B4F76Bb617D6B9aAd62731f8033A8Cc',
-  '84532': '0xAC0C66fc1A9daE256ba91797D5B3E4fe4938a8Cc',
+  '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
+  '84532': '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC',
 } as const;
 
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
