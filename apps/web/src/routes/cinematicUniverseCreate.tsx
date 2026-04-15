@@ -361,6 +361,14 @@ function CinematicUniverseCreate() {
     }
     setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
 
+    // Auto-trigger token deployment (step 2) immediately after universe creation
+    if (parsedUniverseId !== null && address && tokenSymbol) {
+      setTimeout(() => {
+        // Use the parsed values directly since state may not have updated yet
+        handleDeployTokenWithId(parsedUniverseId!);
+      }, 500);
+    }
+
     // Register universe in Firestore using parsed values directly (not stale state)
     if (address && parsedUniverseAddress) {
       (async () => {
@@ -463,8 +471,8 @@ function CinematicUniverseCreate() {
       return;
     }
 
-    if (!universeName || !imageUrl || !description) {
-      alert('Please fill in universe name, image URL, and description');
+    if (!universeName || !imageUrl || !description || !tokenSymbol) {
+      alert('Please fill in universe name, token symbol, image, and description');
       return;
     }
 
@@ -488,22 +496,13 @@ function CinematicUniverseCreate() {
     }
   };
 
-  const handleDeployToken = async () => {
-    if (!universeId || !address) {
-      alert('Universe must be created first');
-      return;
-    }
-
-    if (!tokenSymbol) {
-      alert('Please enter a token symbol');
-      return;
-    }
+  const handleDeployTokenWithId = async (id: bigint) => {
+    if (!address) return;
+    if (!tokenSymbol) return;
 
     setDeploymentStep(DeploymentStep.DEPLOYING_TOKEN);
 
     try {
-      // NOTE: This requires complex configuration.
-      // For now, using placeholder values - you should customize these based on your needs
       await deployUniverseToken(
         {
           tokenConfig: {
@@ -538,13 +537,21 @@ function CinematicUniverseCreate() {
             communityBps,
           },
         },
-        universeId,
+        id,
         parseEther('0.01')
       );
     } catch (error) {
       alert(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
     }
+  };
+
+  const handleDeployToken = () => {
+    if (!universeId) {
+      alert('Universe must be created first');
+      return;
+    }
+    handleDeployTokenWithId(universeId);
   };
 
   // Redirect to login if not authenticated (after all hooks)
@@ -953,6 +960,24 @@ function CinematicUniverseCreate() {
                   />
                 </div>
 
+                <div>
+                  <Label htmlFor="tokenSymbolMain" className="text-sm font-semibold mb-2 block">
+                    Token Symbol
+                  </Label>
+                  <Input
+                    id="tokenSymbolMain"
+                    placeholder="e.g., MCU"
+                    value={tokenSymbol}
+                    onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
+                    disabled={deploymentStep !== DeploymentStep.IDLE}
+                    maxLength={10}
+                    className="h-11"
+                  />
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">
+                    Governance token ticker — deployed with your universe
+                  </p>
+                </div>
+
                 {/* Multi-Sig Ownership (optional) */}
                 <SafeSetup
                   disabled={deploymentStep !== DeploymentStep.IDLE}
@@ -964,7 +989,12 @@ function CinematicUniverseCreate() {
                   <Button
                     onClick={handleCreateUniverse}
                     disabled={
-                      !universeName || !imageUrl || !description || isPending || isConfirming
+                      !universeName ||
+                      !imageUrl ||
+                      !description ||
+                      !tokenSymbol ||
+                      isPending ||
+                      isConfirming
                     }
                     className="w-full h-12 text-base font-bold"
                     size="lg"
