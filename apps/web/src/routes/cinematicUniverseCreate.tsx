@@ -573,6 +573,12 @@ function CinematicUniverseCreate() {
     if (!address) return;
     if (!tokenSymbol) return;
 
+    if (!defaultConfig.defaultHook || !defaultConfig.defaultLocker) {
+      alert('Token deployment contracts not available on this network. Please try again later.');
+      setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
+      return;
+    }
+
     setDeploymentStep(DeploymentStep.DEPLOYING_TOKEN);
 
     try {
@@ -587,14 +593,14 @@ function CinematicUniverseCreate() {
             context: context || description,
           },
           poolConfig: {
-            hook: defaultConfig.defaultHook,
+            hook: defaultConfig.defaultHook!,
             pairedToken: defaultConfig.defaultPairedToken,
             tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
             tickSpacing: defaultConfig.defaultTickSpacing,
             poolData: defaultConfig.defaultPoolData as `0x${string}`,
           },
           lockerConfig: {
-            locker: defaultConfig.defaultLocker,
+            locker: defaultConfig.defaultLocker!,
             rewardAdmins: [address as `0x${string}`],
             rewardRecipients: [address as `0x${string}`],
             rewardBps: [10000],
@@ -1552,24 +1558,26 @@ function CinematicUniverseCreate() {
                           Universe Contract
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        {deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
-                        deploymentStep === DeploymentStep.TOKEN_DEPLOYED ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        ) : (
-                          <Loader2 className="h-4 w-4 opacity-40" />
-                        )}
-                        <span
-                          className={
-                            deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
-                            deploymentStep === DeploymentStep.TOKEN_DEPLOYED
-                              ? ''
-                              : 'opacity-40'
-                          }
-                        >
-                          Token & Liquidity Pool
-                        </span>
-                      </div>
+                      {universeMode === 'monetize' && (
+                        <div className="flex items-center gap-2 text-sm">
+                          {deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
+                          deploymentStep === DeploymentStep.TOKEN_DEPLOYED ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : (
+                            <Loader2 className="h-4 w-4 opacity-40" />
+                          )}
+                          <span
+                            className={
+                              deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
+                              deploymentStep === DeploymentStep.TOKEN_DEPLOYED
+                                ? ''
+                                : 'opacity-40'
+                            }
+                          >
+                            Token & Liquidity Pool
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
