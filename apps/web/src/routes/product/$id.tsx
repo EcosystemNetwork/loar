@@ -24,7 +24,7 @@ import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { trpc, trpcClient } from '@/utils/trpc';
-import { useWriteContract, useSendTransaction } from 'wagmi';
+import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { BuyNFTDialog } from '@/components/BuyNFTDialog';
 import { useVocab } from '@/hooks/use-vocab';

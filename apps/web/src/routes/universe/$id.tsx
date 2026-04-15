@@ -28,7 +28,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useChainId, useWriteContract } from 'wagmi';
+import { useChainId } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { FlowCreationPanel } from '@/components/FlowCreationPanel';
@@ -142,20 +143,39 @@ function UniverseTimelineEditor() {
   // For blockchain universes (addresses starting with 0x), fetch from indexer
   const isBlockchainUniverse = id?.startsWith('0x');
 
-  // Unified query that checks both localStorage and indexer
+  // Unified query that checks Firestore, localStorage, and indexer
   const { data: universe, isLoading: isLoadingUniverse } = useQuery({
     queryKey: ['universe-metadata', id],
     queryFn: async () => {
-      // First check localStorage
+      // 1. Try Firestore (off-chain, editable metadata)
+      if (isBlockchainUniverse) {
+        try {
+          const fsResult = await trpcClient.universes.get.query({ id: id! });
+          if (fsResult?.data) {
+            const d = fsResult.data as Record<string, any>;
+            return {
+              id: d.id,
+              name: d.name ?? d.address,
+              description: d.description,
+              imageUrl: d.image_url ?? d.imageUrl,
+              address: d.address,
+              tokenAddress: d.tokenAddress,
+              governanceAddress: d.governanceAddress,
+              isDefault: false,
+            };
+          }
+        } catch {
+          // Firestore miss — continue
+        }
+      }
+
+      // 2. Check localStorage (just-created universes before Firestore record exists)
       const stored = localStorage.getItem('createdUniverses');
       const universes = stored ? JSON.parse(stored) : [];
       const found = universes.find((u: any) => u.id === id);
+      if (found) return found;
 
-      if (found) {
-        return found;
-      }
-
-      // If not in localStorage and it's a blockchain universe, fetch from indexer
+      // 3. Fall back to indexer (on-chain immutable values)
       if (isBlockchainUniverse) {
         try {
           const ponderUrl = import.meta.env.VITE_PONDER_URL || 'http://localhost:42069';
@@ -174,7 +194,7 @@ function UniverseTimelineEditor() {
               isDefault: false,
             };
           }
-        } catch (error) {
+        } catch {
           // Indexer fetch failed; fall through to return null
         }
       }

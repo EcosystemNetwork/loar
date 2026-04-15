@@ -1,4 +1,5 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
+import { useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeGovernorAbi } from '@loar/abis/generated';
 import { encodeAbiParameters } from 'viem';
 import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';

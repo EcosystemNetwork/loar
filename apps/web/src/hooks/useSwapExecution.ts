@@ -5,7 +5,8 @@
  * Falls back to Uniswap deep link when router is not available.
  */
 import { useState, useCallback } from 'react';
-import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useActiveAccount } from 'thirdweb/react';
 import { parseEther, encodeFunctionData, type Address } from 'viem';
 import { getSwapUrl } from '@/hooks/useTokenSwap';

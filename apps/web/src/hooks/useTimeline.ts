@@ -6,7 +6,8 @@
  * All read hooks resolve the contract address from the current chain ID.
  */
 
-import { useReadContract, useWriteContract, useChainId } from 'wagmi';
+import { useReadContract, useChainId } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeAbi } from '@loar/abis/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';

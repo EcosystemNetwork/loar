@@ -15,7 +15,7 @@ import { useState, useEffect } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useWriteContract, useSendTransaction } from 'wagmi';
+import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { useVocab } from '@/hooks/use-vocab';
 

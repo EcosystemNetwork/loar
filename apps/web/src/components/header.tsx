@@ -28,7 +28,7 @@ const primaryLinks = [
   { to: '/create', label: 'Create' },
   { to: '/gallery', label: 'Gallery' },
   { to: '/tokens', label: 'Launchpad' },
-  { to: '/credits', label: 'Credits' },
+  { to: '/pricing', label: 'Pricing' },
   { to: '/dashboard', label: 'Dashboard' },
 ];
 

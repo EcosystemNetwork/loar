@@ -7,7 +7,7 @@
  */
 import { useCallback } from 'react';
 import { encodeFunctionData, type Abi } from 'viem';
-import { useWriteContract } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useIsUniverseAdmin } from './useIsUniverseAdmin';
 import { useSafe } from './useSafe';
 

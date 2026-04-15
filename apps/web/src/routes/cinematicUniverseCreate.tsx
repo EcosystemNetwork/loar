@@ -153,10 +153,13 @@ function CinematicUniverseCreate() {
   const [cropperFile, setCropperFile] = useState<File | null>(null);
 
   // Hooks
-  const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } =
-    useUniverseManager();
+  const { createUniverse, deployUniverseToken, hash, isPending, error } = useUniverseManager();
   const defaultConfig = useDefaultDeploymentConfig();
-  const { isSuccess: txSuccess, data: txReceipt } = useWaitForTransactionReceipt({ hash });
+  const {
+    isSuccess: txSuccess,
+    isLoading: isConfirming,
+    data: txReceipt,
+  } = useWaitForTransactionReceipt({ hash });
 
   // Track which tx hash each effect has already processed to prevent double-firing
   const processedUniverseHash = useRef<string | null>(null);
@@ -1000,8 +1003,8 @@ function CinematicUniverseCreate() {
                       value={tokenSymbol}
                       onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
                       disabled={
-                        deploymentStep !== DeploymentStep.UNIVERSE_CREATED &&
-                        deploymentStep !== DeploymentStep.DEPLOYING_TOKEN
+                        (deploymentStep as DeploymentStep) === DeploymentStep.TOKEN_DEPLOYED ||
+                        (deploymentStep as DeploymentStep) === DeploymentStep.COMPLETED
                       }
                       maxLength={10}
                       className="h-11"

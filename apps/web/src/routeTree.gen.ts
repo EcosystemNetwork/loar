@@ -15,6 +15,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as StakingRouteImport } from './routes/staking'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
@@ -97,6 +98,11 @@ const SandboxRoute = SandboxRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyWorksRoute = MyWorksRouteImport.update({
@@ -379,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
@@ -440,6 +447,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
@@ -502,6 +510,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
@@ -565,6 +574,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/market'
     | '/my-works'
+    | '/pricing'
     | '/privacy'
     | '/sandbox'
     | '/staking'
@@ -626,6 +636,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/market'
     | '/my-works'
+    | '/pricing'
     | '/privacy'
     | '/sandbox'
     | '/staking'
@@ -687,6 +698,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/market'
     | '/my-works'
+    | '/pricing'
     | '/privacy'
     | '/sandbox'
     | '/staking'
@@ -749,6 +761,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
   MyWorksRoute: typeof MyWorksRoute
+  PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   SandboxRoute: typeof SandboxRoute
   StakingRoute: typeof StakingRoute
@@ -837,6 +850,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-works': {
@@ -1241,6 +1261,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
   MyWorksRoute: MyWorksRoute,
+  PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   SandboxRoute: SandboxRoute,
   StakingRoute: StakingRoute,

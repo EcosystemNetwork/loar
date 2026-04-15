@@ -251,6 +251,29 @@ export const universesRouter = router({
       return { ok: true, accessModel: input.accessModel };
     }),
 
+  /** Update universe metadata (image, description). Admin only. */
+  updateMetadata: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        imageUrl: z.string().url('Invalid image URL').optional(),
+        description: z.string().min(1).max(1000).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can update metadata');
+      }
+
+      const updates: Record<string, unknown> = { updated_at: new Date() };
+      if (input.imageUrl !== undefined) updates.image_url = input.imageUrl;
+      if (input.description !== undefined) updates.description = input.description;
+
+      await db.collection('cinematicUniverses').doc(universeId).update(updates);
+      return { ok: true };
+    }),
+
   /** Get the access model for a universe (public). */
   getAccessModel: publicProcedure
     .input(z.object({ universeId: z.string() }))

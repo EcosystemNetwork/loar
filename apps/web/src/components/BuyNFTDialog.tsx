@@ -6,7 +6,8 @@
  * Also records the purchase in Firebase for marketplace tracking.
  */
 import { useState, useMemo } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useBalance, useChainId } from 'wagmi';
+import { useWaitForTransactionReceipt, useBalance, useChainId } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther } from 'viem';
 import { useRecordMint } from '@/hooks/useRevenue';

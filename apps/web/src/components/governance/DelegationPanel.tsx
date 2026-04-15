@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWaitForTransactionReceipt } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { isAddress } from 'viem';

@@ -8,7 +8,8 @@
  * If the NFT contract isn't deployed yet, falls back to IPFS-only listing.
  */
 import { useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWaitForTransactionReceipt } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, keccak256, toBytes } from 'viem';
 import { useMintContent, useRecordMint } from '@/hooks/useRevenue';

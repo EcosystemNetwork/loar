@@ -80,6 +80,7 @@ import { moderationRouter } from './moderation/moderation.routes';
 import { stripeRouter } from './credits/stripe.routes';
 import { pricingRouter } from './pricing/pricing.routes';
 import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
+import { platformSubscriptionsRouter } from './platformSubscriptions/platformSubscriptions.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -234,6 +235,9 @@ export const appRouter = router({
   universeGenConfig: universeGenConfigRouter,
   contentLicensing: contentLicensingRouter,
   gallery: galleryRouter,
+
+  // ── Platform Subscriptions ──────────────────────────────────────────
+  platformSubscriptions: platformSubscriptionsRouter,
 
   // ── Token Social (comments, watchlist, portfolio) ──────────────────
   tokenSocial: tokenSocialRouter,

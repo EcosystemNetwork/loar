@@ -1,11 +1,6 @@
-import {
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useReadContract,
-  useChainId,
-  useAccount,
-} from 'wagmi';
+import { useReadContract, useChainId, useAccount } from 'wagmi';
 import { useActiveAccount } from 'thirdweb/react';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
 import { isSupportedChain } from '@/configs/chains';
@@ -22,8 +17,7 @@ export function useUniverseManager() {
   const { isConnected: wagmiConnected } = useAccount();
   const thirdwebAccount = useActiveAccount();
   const isConnected = wagmiConnected || !!thirdwebAccount;
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
 
   const contractAddress = UniverseManager[String(chainId) as keyof typeof UniverseManager];
 
@@ -42,8 +36,6 @@ export function useUniverseManager() {
       }),
       hash: undefined,
       isPending: false,
-      isConfirming: false,
-      isSuccess: false,
       error: new Error(`UniverseManager not deployed on chain ${chainId}`),
     } as any;
   }
@@ -66,8 +58,9 @@ export function useUniverseManager() {
     if (!isConnected) throw new Error('Wallet not connected');
     if (!isSupportedChain(chainId))
       throw new Error(`Unsupported chain ${chainId}. Please switch to a supported network.`);
+
     const owner = config.safeAddress ?? config.initialOwner;
-    writeContract({
+    await writeContractAsync({
       address: contractAddress as `0x${string}`,
       abi: universeManagerAbi,
       functionName: 'createUniverse',
@@ -85,11 +78,6 @@ export function useUniverseManager() {
 
   /**
    * Step 2: Deploy token, governor, and liquidity pool for a universe
-   * NOTE: This is a complex transaction that requires several config structs
-   * @param config - Token deployment configuration
-   * @param universeId - The ID returned from createUniverse()
-   * @param value - ETH value to send (for liquidity)
-   * @returns Transaction hash
    */
   const deployUniverseToken = async (
     config: {
@@ -104,8 +92,8 @@ export function useUniverseManager() {
       poolConfig: {
         hook: `0x${string}`;
         pairedToken: `0x${string}`;
-        tickIfToken0IsLoar: number; // int24
-        tickSpacing: number; // int24
+        tickIfToken0IsLoar: number;
+        tickSpacing: number;
         poolData: `0x${string}`;
       };
       lockerConfig: {
@@ -131,6 +119,7 @@ export function useUniverseManager() {
     if (!isConnected) throw new Error('Wallet not connected');
     if (!isSupportedChain(chainId))
       throw new Error(`Unsupported chain ${chainId}. Please switch to a supported network.`);
+
     const allocationConfig = config.allocationConfig ?? {
       lpBps: 8000,
       creatorBps: 1000,
@@ -138,7 +127,7 @@ export function useUniverseManager() {
       communityBps: 500,
     };
 
-    writeContract({
+    await writeContractAsync({
       address: contractAddress as `0x${string}`,
       abi: universeManagerAbi,
       functionName: 'deployUniverseToken',
@@ -179,8 +168,6 @@ export function useUniverseManager() {
     useGetUniverseData,
     hash,
     isPending,
-    isConfirming,
-    isSuccess,
     error,
   };
 }

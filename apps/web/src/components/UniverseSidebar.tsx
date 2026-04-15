@@ -34,6 +34,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { useChainId } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { getExplorerAddressUrl } from '@/configs/chains';
@@ -42,7 +43,11 @@ import { TokenSwapWidget } from '@/components/TokenSwapWidget';
 import { SubscribeDialog } from '@/components/SubscribeDialog';
 import { UniverseAccessSettings } from '@/components/UniverseAccessSettings';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
-import { Crown, Settings } from 'lucide-react';
+import { Crown, Settings, Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { trpcClient } from '@/utils/trpc';
+import { toast } from 'sonner';
 
 interface UniverseSidebarProps {
   finalUniverse: any;
@@ -74,6 +79,11 @@ export function UniverseSidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAccessSettings, setShowAccessSettings] = useState(false);
+  const [showEditMetadata, setShowEditMetadata] = useState(false);
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false);
+  const queryClient = useQueryClient();
   const { isAdmin } = useIsUniverseAdmin(
     finalUniverse?.address?.startsWith('0x') ? (finalUniverse.address as `0x${string}`) : undefined
   );
@@ -356,17 +366,32 @@ export function UniverseSidebar({
                 </Button>
               )}
 
-              {/* Access Settings button — admin only */}
+              {/* Admin buttons — edit metadata + access settings */}
               {isBlockchainUniverse && isAdmin && (
-                <Button
-                  onClick={() => setShowAccessSettings(true)}
-                  variant="outline"
-                  className="w-full border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group h-9"
-                  size="sm"
-                >
-                  <Settings className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-500" />
-                  Access Settings
-                </Button>
+                <>
+                  <Button
+                    onClick={() => {
+                      setEditImageUrl(finalUniverse?.imageUrl || '');
+                      setEditDescription(finalUniverse?.description || '');
+                      setShowEditMetadata(true);
+                    }}
+                    variant="outline"
+                    className="w-full border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group h-9"
+                    size="sm"
+                  >
+                    <Pencil className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
+                    Edit Universe
+                  </Button>
+                  <Button
+                    onClick={() => setShowAccessSettings(true)}
+                    variant="outline"
+                    className="w-full border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group h-9"
+                    size="sm"
+                  >
+                    <Settings className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-500" />
+                    Access Settings
+                  </Button>
+                </>
               )}
 
               {/* Gallery button */}
@@ -483,6 +508,87 @@ export function UniverseSidebar({
           universeId={finalUniverse?.address || ''}
           onClose={() => setShowAccessSettings(false)}
         />
+      )}
+
+      {/* Edit Universe Metadata Dialog */}
+      {showEditMetadata && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl border w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Edit Universe</h2>
+              <button
+                onClick={() => setShowEditMetadata(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Image URL</Label>
+              <Input
+                value={editImageUrl}
+                onChange={(e) => setEditImageUrl(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Description</Label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Describe your universe..."
+                rows={4}
+                maxLength={1000}
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {editDescription.length}/1000
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowEditMetadata(false)}
+                disabled={isSavingMetadata}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={isSavingMetadata}
+                onClick={async () => {
+                  const universeId = finalUniverse?.address;
+                  if (!universeId) return;
+                  setIsSavingMetadata(true);
+                  try {
+                    const updates: { universeId: string; imageUrl?: string; description?: string } =
+                      { universeId };
+                    if (editImageUrl) updates.imageUrl = editImageUrl;
+                    if (editDescription) updates.description = editDescription;
+                    await trpcClient.universes.updateMetadata.mutate(updates);
+                    toast.success('Universe updated');
+                    queryClient.invalidateQueries({ queryKey: ['universe-metadata', universeId] });
+                    setShowEditMetadata(false);
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Failed to update');
+                  } finally {
+                    setIsSavingMetadata(false);
+                  }
+                }}
+              >
+                {isSavingMetadata ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Save
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              On-chain values remain unchanged. This updates the off-chain display metadata.
+            </p>
+          </div>
+        </div>
       )}
     </>
   );
