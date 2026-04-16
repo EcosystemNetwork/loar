@@ -56,6 +56,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { UniverseStakePanel } from '@/components/UniverseStakePanel';
+import { LPYieldManager } from '@/components/LPYieldManager';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 
 export const Route = createFileRoute('/tokens/$address')({
@@ -516,6 +517,15 @@ function TokenDetailPage() {
                 universeName={universe.name || token.name}
               />
             )}
+
+            {/* LP Yield & Fee Management */}
+            <LPYieldManager
+              tokenAddress={token.id as `0x${string}`}
+              universeName={universe?.name || token.name}
+              onChainUniverseId={
+                universe?.universeId != null ? Number(universe.universeId) : undefined
+              }
+            />
 
             {/* Token Maturity */}
             <Card>

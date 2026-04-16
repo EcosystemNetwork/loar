@@ -1,17 +1,20 @@
 /**
  * Create Timeline Node Form
  *
- * Simple form card for creating a new timeline node with a plot description.
- * Currently uses a mock blockchain interaction (to be replaced with real
- * smart contract calls).
+ * Form card for creating a new timeline node with a plot description.
+ * Calls createNode on the Universe smart contract via useCreateNode hook.
  *
  * @param previousNodeId - The parent node ID this new node follows
  * @param onSuccess - Callback invoked with the new node's ID after creation
  */
 
 import { useState } from 'react';
+import { keccak256, toBytes, decodeEventLog, type Log } from 'viem';
+import { usePublicClient } from 'wagmi';
+import { useCreateNode } from '@/hooks/useTimeline';
+import { universeAbi } from '@loar/abis/generated';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 
@@ -23,6 +26,8 @@ interface CreateTimelineNodeProps {
 export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimelineNodeProps) {
   const [plot, setPlot] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { writeAsync } = useCreateNode();
+  const publicClient = usePublicClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,22 +39,43 @@ export function CreateTimelineNode({ previousNodeId, onSuccess }: CreateTimeline
     setIsLoading(true);
 
     try {
-      // TODO: Replace with real smart contract interaction
-      // TODO: Replace with real smart contract interaction
-      const mockNodeId = Math.floor(Math.random() * 10000) + previousNodeId + 1;
+      // Compute hashes for on-chain storage
+      const contentHash = keccak256(toBytes(plot));
+      const plotHash = keccak256(toBytes(plot));
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call createNode on the Universe contract
+      const txHash = await writeAsync(contentHash, plotHash, previousNodeId, '', plot);
 
-      // Call success callback with the new node ID
-      onSuccess(mockNodeId);
+      // Wait for receipt and extract real node ID from NodeCreated event
+      let nodeId = previousNodeId + 1; // fallback
+      if (publicClient) {
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+          for (const log of receipt.logs) {
+            try {
+              const decoded = decodeEventLog({
+                abi: universeAbi,
+                data: log.data,
+                topics: log.topics,
+              });
+              if (decoded.eventName === 'NodeCreated') {
+                nodeId = Number((decoded.args as any).id);
+                break;
+              }
+            } catch {
+              // Not a NodeCreated event
+            }
+          }
+        } catch {
+          // Receipt fetch failed — use fallback
+        }
+      }
 
-      // Reset form
+      toast.success(`Timeline event #${nodeId} created on-chain`);
+      onSuccess(nodeId);
       setPlot('');
     } catch (error) {
-      // Error surfaced via alert
-      // Surface error to user
-      alert('Failed to create timeline event. Please try again.');
+      toast.error('Failed to create timeline event. Please try again.');
     } finally {
       setIsLoading(false);
     }

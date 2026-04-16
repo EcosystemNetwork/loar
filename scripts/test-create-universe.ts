@@ -143,7 +143,7 @@ async function getAuthToken(): Promise<string> {
 
 // ── tRPC Helpers ───────────────────────────────────────────────────────────────
 async function tRPCQuery<T>(procedure: string, input: unknown = null, token?: string): Promise<T> {
-  const inputParam = encodeURIComponent(JSON.stringify({ '0': { json: input } }));
+  const inputParam = encodeURIComponent(JSON.stringify({ '0': input }));
   const url = `${SERVER_URL}/trpc/${procedure}?batch=1&input=${inputParam}`;
   const res = await fetch(url, {
     headers: {
@@ -153,7 +153,7 @@ async function tRPCQuery<T>(procedure: string, input: unknown = null, token?: st
   });
   const json = (await res.json()) as any[];
   if (json[0]?.error) throw new Error(`tRPC ${procedure}: ${JSON.stringify(json[0].error)}`);
-  return json[0]?.result?.data?.json ?? json[0]?.result?.data;
+  return json[0]?.result?.data;
 }
 
 async function tRPCMutate<T>(procedure: string, input: unknown, token?: string): Promise<T> {
@@ -164,11 +164,11 @@ async function tRPCMutate<T>(procedure: string, input: unknown, token?: string):
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ '0': { json: input } }),
+    body: JSON.stringify({ '0': input }),
   });
   const json = (await res.json()) as any[];
   if (json[0]?.error) throw new Error(`tRPC ${procedure}: ${JSON.stringify(json[0].error)}`);
-  return json[0]?.result?.data?.json ?? json[0]?.result?.data;
+  return json[0]?.result?.data;
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────

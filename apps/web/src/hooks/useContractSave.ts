@@ -3,10 +3,17 @@
  *
  * Handles saving timeline events to blockchain smart contracts with decentralized storage.
  * Uploads to unified storage (Walrus/IPFS/Synapse/Firebase), stores content hashes on-chain.
+ *
+ * Fixes applied:
+ * - Save queue prevents concurrent saves from corrupting state
+ * - Tx receipt parsing extracts real node ID from NodeCreated event
+ * - Optimistic latestNodeId/previousNodeId tracking for rapid deploys
+ * - Local description store so wiki previousEvents gets real text, not bytes32
  */
 
-import { useCallback } from 'react';
-import { type Address, keccak256, toBytes } from 'viem';
+import { useCallback, useRef } from 'react';
+import { type Address, keccak256, toBytes, decodeEventLog, type Log } from 'viem';
+import { usePublicClient } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
@@ -43,6 +50,36 @@ export interface UseContractSaveProps {
 export interface UseContractSaveReturn {
   handleSaveToContract: () => Promise<void>;
   handleRefreshTimeline: () => Promise<void>;
+  /** Whether a save is currently in-flight (use to disable save button) */
+  isSaveLocked: boolean;
+}
+
+/**
+ * Parse the NodeCreated event from a transaction receipt to extract the real on-chain node ID.
+ */
+function parseNodeCreatedEvent(logs: Log[]): {
+  nodeId: bigint;
+  previous: bigint;
+} | null {
+  for (const log of logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: universeAbi,
+        data: log.data,
+        topics: log.topics,
+      });
+      if (decoded.eventName === 'NodeCreated') {
+        const args = decoded.args as any;
+        return {
+          nodeId: BigInt(args.id),
+          previous: BigInt(args.previous),
+        };
+      }
+    } catch {
+      // Not a NodeCreated event — skip
+    }
+  }
+  return null;
 }
 
 /**
@@ -53,11 +90,9 @@ export interface UseContractSaveReturn {
  * 2. Determine the previous node (linear continuation or branch)
  * 3. Compute keccak256 content/plot hashes
  * 4. Call `createNode` on the Universe contract
- * 5. Trigger background wiki generation via tRPC
- * 6. Refresh on-chain data after confirmation
- *
- * @param props - All required state, setters, and refetch functions (see UseContractSaveProps)
- * @returns `{ handleSaveToContract, handleRefreshTimeline }`
+ * 5. Wait for tx receipt and parse real node ID from NodeCreated event
+ * 6. Trigger background wiki generation with real descriptions
+ * 7. Refresh on-chain data after confirmation
  */
 export function useContractSave({
   generatedVideoUrl,
@@ -85,12 +120,37 @@ export function useContractSave({
   refetchLatestNodeId,
 }: UseContractSaveProps): UseContractSaveReturn {
   const queryClient = useQueryClient();
+  const publicClient = usePublicClient();
+
+  // ── Save queue lock ───────────────────────────────────────────────────────
+  // Prevents concurrent saves from corrupting frontend state
+  const isSavingRef = useRef(false);
+
+  // ── Optimistic tracking ───────────────────────────────────────────────────
+  // Tracks the real latest node ID across rapid deploys, independent of
+  // the (slow) on-chain refetch cycle.
+  const optimisticNodeIdRef = useRef<number | null>(null);
+
+  // ── Local description store ───────────────────────────────────────────────
+  // Maps nodeId → description text so wiki previousEvents gets real strings
+  // instead of bytes32 plotHash placeholders.
+  const descriptionMapRef = useRef<Map<number, { title: string; description: string }>>(new Map());
 
   const handleSaveToContract = useCallback(async () => {
     if (!generatedVideoUrl || !videoTitle || !videoDescription) {
       alert('Video, title, and description are required to save to contract');
       return;
     }
+
+    // ── Save queue: reject if already saving ──────────────────────────────
+    if (isSavingRef.current) {
+      toast.warning('Save In Progress', {
+        description: 'Please wait for the current save to complete before saving another node.',
+        duration: 4000,
+      });
+      return;
+    }
+    isSavingRef.current = true;
 
     setIsSavingToContract(true);
     setIsSavingToStorage(true);
@@ -121,18 +181,25 @@ export function useContractSave({
       setIsSavingToStorage(false);
 
       // Step 2: Determine the previous node based on addition type
+      // Uses optimistic tracking to stay correct across rapid deploys.
       let previousNodeId: number;
 
       if (additionType === 'branch' && sourceNodeId) {
         const numericPart = sourceNodeId.match(/^\d+/);
         previousNodeId = numericPart ? parseInt(numericPart[0]) : 0;
       } else {
-        const numericIds = graphData.nodeIds.map((id) => {
-          const idStr = String(id);
-          const numericPart = idStr.match(/^\d+/);
-          return numericPart ? parseInt(numericPart[0]) : 0;
-        });
-        previousNodeId = Math.max(...(numericIds || [0]), 0);
+        // Use the optimistic ID if available (set by a prior save in this session),
+        // otherwise fall back to the max of graphData.nodeIds.
+        if (optimisticNodeIdRef.current !== null && optimisticNodeIdRef.current > 0) {
+          previousNodeId = optimisticNodeIdRef.current;
+        } else {
+          const numericIds = graphData.nodeIds.map((id) => {
+            const idStr = String(id);
+            const numericPart = idStr.match(/^\d+/);
+            return numericPart ? parseInt(numericPart[0]) : 0;
+          });
+          previousNodeId = Math.max(...(numericIds || [0]), 0);
+        }
       }
 
       // Step 3: Compute content hashes for on-chain storage
@@ -156,21 +223,85 @@ export function useContractSave({
         args: [contentHash, plotHash, BigInt(previousNodeId), videoUrlForEvent, videoDescription],
       });
 
+      // Step 5: Wait for tx receipt and parse real node ID from NodeCreated event
+      let realNodeId: number | null = null;
+
+      if (publicClient) {
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+          const parsed = parseNodeCreatedEvent(receipt.logs as Log[]);
+          if (parsed) {
+            realNodeId = Number(parsed.nodeId);
+          }
+        } catch (receiptError) {
+          // Receipt fetch failed — fall back to optimistic estimate
+          console.warn('Could not fetch tx receipt, using optimistic node ID:', receiptError);
+        }
+      }
+
+      // Update optimistic tracking with the real ID (or best estimate)
+      const effectiveLatest = optimisticNodeIdRef.current ?? latestNodeId;
+      const newNodeId = realNodeId ?? effectiveLatest + 1;
+      optimisticNodeIdRef.current = newNodeId;
+
+      // Store the description locally for future wiki context
+      descriptionMapRef.current.set(newNodeId, {
+        title: videoTitle,
+        description: videoDescription,
+      });
+
       setContractSaved(true);
 
       toast.success('Event Saved to Blockchain & Decentralized Storage!', {
-        description: `Your timeline event has been permanently stored.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
+        description: `Node #${newNodeId} stored on-chain.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
         duration: 8000,
       });
 
-      // Step 5: Generate wiki entry in background (non-blocking)
-      const previousEvents = graphData.nodeIds
-        .slice(-3)
-        .map((nodeId, idx) => ({
-          title: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || `Event ${nodeId}`,
-          description: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || '',
-        }))
-        .filter((evt) => evt.description.length > 0);
+      // Step 6: Generate wiki entry in background (non-blocking)
+      // Build previousEvents from local description store + graphData fallback
+      const previousEvents: { title: string; description: string }[] = [];
+
+      // Collect up to 3 prior events using local descriptions (real text)
+      const priorNodeIds = Array.from(descriptionMapRef.current.keys())
+        .filter((id) => id < newNodeId)
+        .sort((a, b) => b - a) // Most recent first
+        .slice(0, 3);
+
+      for (const priorId of priorNodeIds) {
+        const entry = descriptionMapRef.current.get(priorId);
+        if (entry && entry.description.length > 0) {
+          previousEvents.push(entry);
+        }
+      }
+
+      // If we don't have enough from local store, try graphData descriptions
+      // (but skip bytes32 hash placeholders — they start with 0x and are 66 chars)
+      if (previousEvents.length < 3) {
+        const remaining = 3 - previousEvents.length;
+        const usedIds = new Set(priorNodeIds);
+        const graphDescriptions = graphData.nodeIds
+          .map((nodeId, idx) => ({
+            nodeId: Number(nodeId),
+            description: String(graphData.descriptions[idx] || ''),
+          }))
+          .filter(
+            (entry) =>
+              entry.nodeId < newNodeId &&
+              !usedIds.has(entry.nodeId) &&
+              entry.description.length > 0 &&
+              // Skip bytes32 hash placeholders (0x + 64 hex chars = 66 chars)
+              !(entry.description.startsWith('0x') && entry.description.length === 66)
+          )
+          .reverse()
+          .slice(0, remaining);
+
+        for (const entry of graphDescriptions) {
+          previousEvents.push({
+            title: `Event ${entry.nodeId}`,
+            description: entry.description,
+          });
+        }
+      }
 
       const characterIdsForWiki =
         selectedImageCharacters.length > 0
@@ -179,12 +310,10 @@ export function useContractSave({
             ? selectedCharacters
             : undefined;
 
-      const newEventId = latestNodeId + 1;
-
       trpcClient.wiki.generateFromVideo
         .mutate({
           universeId: universeId,
-          eventId: String(newEventId),
+          eventId: String(newNodeId),
           videoUrl: videoUrlForEvent,
           title: videoTitle,
           description: videoDescription,
@@ -193,7 +322,7 @@ export function useContractSave({
         })
         .then((_wikiResult: unknown) => {
           toast.success('Wiki Generated!', {
-            description: 'AI-powered wiki entry created for your event.',
+            description: `Wiki entry created for Node #${newNodeId}.`,
             duration: 4000,
           });
         })
@@ -201,7 +330,7 @@ export function useContractSave({
           // Error handled by UI state
         });
 
-      // Refresh the blockchain data
+      // Step 7: Refresh the blockchain data
       setTimeout(async () => {
         if (isBlockchainUniverse) {
           await refetchLeaves();
@@ -221,6 +350,8 @@ export function useContractSave({
     } finally {
       setIsSavingToContract(false);
       setIsSavingToStorage(false);
+      // ── Release save lock ───────────────────────────────────────────────
+      isSavingRef.current = false;
     }
   }, [
     generatedVideoUrl,
@@ -236,6 +367,7 @@ export function useContractSave({
     universeId,
     isBlockchainUniverse,
     chainId,
+    publicClient,
     setGeneratedVideoUrl,
     setStorageKey,
     setStorageSaved,
@@ -271,5 +403,7 @@ export function useContractSave({
   return {
     handleSaveToContract,
     handleRefreshTimeline,
+    /** Ref-backed lock — use for imperative checks. UI should use isSavingToContract state. */
+    isSaveLocked: isSavingRef.current,
   };
 }

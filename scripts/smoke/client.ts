@@ -19,7 +19,7 @@ export async function tRPCQuery<T>(
   input: unknown = null,
   token?: string
 ): Promise<T> {
-  const inputParam = encodeURIComponent(JSON.stringify({ '0': { json: input } }));
+  const inputParam = encodeURIComponent(JSON.stringify({ '0': input }));
   const url = `${cfg.serverUrl}/trpc/${procedure}?batch=1&input=${inputParam}`;
 
   const res = await fetchWithTimeout(
@@ -55,7 +55,7 @@ export async function tRPCMutate<T>(
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ '0': { json: input } }),
+      body: JSON.stringify({ '0': input }),
     },
     cfg.timeout
   );
@@ -77,8 +77,7 @@ function unwrapBatch<T>(json: unknown, procedure: string): T {
   }
   const result = first.result as Record<string, unknown> | undefined;
   const data = result?.data as Record<string, unknown> | undefined;
-  // tRPC v10 wraps in { json: ... } for superjson transformer
-  return (data?.json ?? data) as T;
+  return data as T;
 }
 
 // ── Raw REST helpers ──────────────────────────────────────────────────────────

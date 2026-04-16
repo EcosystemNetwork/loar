@@ -7,7 +7,7 @@ import { isSupportedChain } from '@/configs/chains';
 import { encodeAbiParameters } from 'viem';
 
 // WETH addresses per chain (hooks require ERC20 paired token, not native ETH)
-const WETH: Record<number, `0x${string}`> = {
+const WETH: Partial<Record<number, `0x${string}`>> = {
   11155111: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9', // Sepolia
   84532: '0x4200000000000000000000000000000000000006', // Base Sepolia
   8453: '0x4200000000000000000000000000000000000006', // Base Mainnet
@@ -30,7 +30,7 @@ export function useUniverseManager() {
   const contractAddress = UniverseManager[String(chainId) as keyof typeof UniverseManager];
 
   // Read the on-chain mint fee
-  const { data: mintFee } = useReadContract({
+  const { data: mintFee, isLoading: mintFeeLoading } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: universeManagerAbi,
     functionName: 'mintFee',
@@ -89,7 +89,7 @@ export function useUniverseManager() {
         config.nodeVisibilityOptions,
         owner,
       ],
-      value: mintFee as bigint | undefined,
+      value: mintFee ?? undefined,
       chainId,
     });
   };
@@ -244,7 +244,7 @@ export function useUniverseManager() {
           allocationConfig,
         },
       ],
-      value: mintFee as bigint | undefined,
+      value: mintFee ?? undefined,
       chainId,
     });
   };
@@ -271,6 +271,8 @@ export function useUniverseManager() {
     createUniverseWithToken,
     deployUniverseToken,
     useGetUniverseData,
+    mintFee: mintFee as bigint | undefined,
+    mintFeeLoading,
     hash,
     isPending,
     error,
@@ -302,7 +304,7 @@ export function useDefaultDeploymentConfig() {
   return {
     defaultHook: (LoarHookStaticFee[chainKey] ?? undefined) as `0x${string}` | undefined,
     defaultLocker: (LoarLpLockerMultiple[chainKey] ?? undefined) as `0x${string}` | undefined,
-    defaultPairedToken: (WETH[chainId] ?? WETH[11155111]) as `0x${string}`, // WETH (hooks reject address(0))
+    defaultPairedToken: WETH[chainId] as `0x${string}` | undefined, // undefined if chain not supported — caller must check
     defaultTickSpacing: 200,
     defaultTickIfToken0IsLoar: -230400, // Standard starting tick
     defaultPoolData,

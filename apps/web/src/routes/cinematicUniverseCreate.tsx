@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import {
@@ -48,7 +49,7 @@ import {
 } from '@/components/ui/select';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { SafeSetup } from '@/components/SafeSetup';
-import { decodeEventLog } from 'viem';
+import { decodeEventLog, formatEther } from 'viem';
 import { universeManagerAbi } from '@loar/abis/generated';
 import {
   isSupportedChain,
@@ -201,11 +202,20 @@ function CinematicUniverseCreate() {
   const [originalSrc, setOriginalSrc] = useState<string | null>(null);
 
   // Hooks
-  const { createUniverse, createUniverseWithToken, deployUniverseToken, hash, isPending, error } =
-    useUniverseManager();
+  const {
+    createUniverse,
+    createUniverseWithToken,
+    deployUniverseToken,
+    mintFee,
+    mintFeeLoading,
+    hash,
+    isPending,
+    error,
+  } = useUniverseManager();
   const defaultConfig = useDefaultDeploymentConfig();
   const {
     isSuccess: txSuccess,
+    isError: txReverted,
     isLoading: isConfirming,
     data: txReceipt,
   } = useWaitForTransactionReceipt({ hash });
@@ -245,26 +255,30 @@ function CinematicUniverseCreate() {
       return result;
     },
     onSuccess: (data) => {
-      if (data?.imageUrl) {
-        setCoverPreview(data.imageUrl);
-        setImageUrl(data.imageUrl);
+      // API returns imageUrls (array), pick the first one
+      const url = data?.imageUrls?.[0];
+      if (url) {
+        setCoverPreview(url);
+        setImageUrl(url);
+      } else {
+        toast.error('Image was generated but no URL was returned. Please try again.');
       }
     },
     onError: (error: any) => {
       const msg = error?.message || 'Unknown error';
       if (msg.includes('Insufficient credits') || msg.includes('PRECONDITION_FAILED')) {
-        alert(
+        toast.error(
           'Not enough credits to generate a cover image. Purchase credits in the Credits page.'
         );
       } else {
-        alert(`Failed to generate cover: ${msg}`);
+        toast.error(`Failed to generate cover: ${msg}`);
       }
     },
   });
 
   const handleGenerateCover = async () => {
     if (!universeName) {
-      alert('Please enter a universe name first');
+      toast.warning('Please enter a universe name first');
       return;
     }
     setIsGeneratingCover(true);
@@ -279,11 +293,11 @@ function CinematicUniverseCreate() {
   const handleCoverFilePick = useCallback((file: File) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Please upload an image file (JPEG, PNG, GIF, WebP, or AVIF)');
+      toast.error('Please upload an image file (JPEG, PNG, GIF, WebP, or AVIF)');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image must be under 10MB');
+      toast.error('Image must be under 10MB');
       return;
     }
     const objectUrl = URL.createObjectURL(file);
@@ -306,7 +320,7 @@ function CinematicUniverseCreate() {
       // Pre-flight: verify session cookie is valid before uploading
       const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
       if (!meRes.ok || !(await meRes.json()).authenticated) {
-        alert('Session expired. Please sign in again.');
+        toast.error('Session expired. Please sign in again.');
         return null;
       }
 
@@ -336,6 +350,10 @@ function CinematicUniverseCreate() {
             }
           });
           xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.addEventListener('timeout', () =>
+            reject(new Error('Upload timed out — please try again'))
+          );
+          xhr.timeout = 30000; // 30s timeout
           xhr.open('POST', `${serverUrl}/api/upload`);
           xhr.withCredentials = true;
           xhr.send(formData);
@@ -344,7 +362,7 @@ function CinematicUniverseCreate() {
 
       return result.manifest.uploads[0]?.url || null;
     } catch (err) {
-      alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       return null;
     } finally {
       setIsUploadingCover(false);
@@ -358,10 +376,14 @@ function CinematicUniverseCreate() {
       setCropperSrc(null);
 
       const uploadedUrl = await uploadBlob(blob, 'cover.jpg');
-      if (uploadedUrl) {
-        setImageUrl(uploadedUrl);
-        setCoverPreview(URL.createObjectURL(blob));
+      if (!uploadedUrl) {
+        // Upload failed — don't proceed to portrait phase
+        setCropperFile(null);
+        return;
       }
+
+      setImageUrl(uploadedUrl);
+      setCoverPreview(URL.createObjectURL(blob));
 
       // Now open the portrait cropper on the same original image
       if (originalSrc) {
@@ -429,6 +451,16 @@ function CinematicUniverseCreate() {
     if (coverFileRef.current) coverFileRef.current.value = '';
   };
 
+  // Handle on-chain tx revert — reset deployment state so user can retry
+  useEffect(() => {
+    if (!txReverted || !hash) return;
+    if (deploymentStep === DeploymentStep.CREATING_UNIVERSE) {
+      toast.error('Transaction reverted on-chain. Please check your wallet and try again.');
+      setDeploymentStep(DeploymentStep.IDLE);
+      processedUniverseHash.current = null;
+    }
+  }, [txReverted, hash, deploymentStep]);
+
   // Watch for universe creation transaction success (fun mode OR atomic monetize mode)
   useEffect(() => {
     if (!txSuccess || !txReceipt || !hash) return;
@@ -450,17 +482,25 @@ function CinematicUniverseCreate() {
           topics: log.topics,
         });
         if (decoded.eventName === 'UniverseCreated') {
-          const args = decoded.args as { universe: string; creator: string };
-          parsedUniverseAddress = args.universe as `0x${string}`;
+          const args = decoded.args as Record<string, unknown>;
+          if (typeof args.universe === 'string') {
+            parsedUniverseAddress = args.universe as `0x${string}`;
+          }
         }
         if (decoded.eventName === 'UniverseLpSeed') {
-          const args = decoded.args as { universeId: bigint };
-          parsedUniverseId = args.universeId;
+          const args = decoded.args as Record<string, unknown>;
+          if (typeof args.universeId === 'bigint') {
+            parsedUniverseId = args.universeId;
+          }
         }
         if (decoded.eventName === 'TokenCreated') {
-          const args = decoded.args as { tokenAddress: string; governor: string };
-          parsedTokenAddress = args.tokenAddress as `0x${string}`;
-          parsedGovernorAddress = args.governor as `0x${string}`;
+          const args = decoded.args as Record<string, unknown>;
+          if (typeof args.tokenAddress === 'string') {
+            parsedTokenAddress = args.tokenAddress as `0x${string}`;
+          }
+          if (typeof args.governor === 'string') {
+            parsedGovernorAddress = args.governor as `0x${string}`;
+          }
         }
       } catch {
         // Not a UniverseManager event, skip
@@ -502,7 +542,13 @@ function CinematicUniverseCreate() {
             nonce,
           });
         } catch (err) {
-          // Registration error is non-blocking; universe was already created on-chain
+          // Registration error is non-blocking — universe was created on-chain.
+          // But warn the user so they know the app DB may not reflect it yet.
+          console.error('Firestore registration failed:', err);
+          toast.warning(
+            "Universe created on-chain, but app registration failed. It may take a moment to appear. Contact support if it doesn't.",
+            { duration: 10000 }
+          );
         }
       })();
     }
@@ -514,7 +560,7 @@ function CinematicUniverseCreate() {
 
   const handleCreateUniverse = async () => {
     if (!address) {
-      alert('Please connect your wallet first');
+      toast.error('Please connect your wallet first');
       return;
     }
 
@@ -523,28 +569,51 @@ function CinematicUniverseCreate() {
       try {
         await signIn();
       } catch {
-        alert('Please sign the message in your wallet to continue');
+        toast.error('Please sign the message in your wallet to continue');
         return;
       }
     }
 
     if (!isSupportedChain(chainId)) {
-      alert('Wrong Network! Please switch to a supported network.');
+      toast.error('Wrong network — please switch to a supported network.');
       return;
     }
 
     if (!universeName || !imageUrl || !description) {
-      alert('Please fill in universe name, image, and description');
+      toast.error('Please fill in universe name, image, and description');
       return;
     }
 
     if (!universeMode) {
-      alert('Please select a universe mode');
+      toast.error('Please select a universe mode');
       return;
     }
 
     if (universeMode === 'monetize' && !tokenSymbol) {
-      alert('Please enter a token symbol');
+      toast.error('Please enter a token symbol');
+      return;
+    }
+
+    // Guard: mint fee must be loaded from contract before submitting
+    if (mintFee === undefined) {
+      toast.error('Mint fee not loaded yet. Please wait a moment and try again.');
+      return;
+    }
+
+    // Guard: check wallet balance covers mintFee + gas buffer
+    if (balance?.value !== undefined && mintFee !== undefined) {
+      const gasBuffer = BigInt(5e15); // ~0.005 ETH buffer for gas
+      if (balance.value < mintFee + gasBuffer) {
+        toast.error(
+          `Insufficient balance. You need at least ${formatEther(mintFee + gasBuffer)} ETH (mint fee + gas).`
+        );
+        return;
+      }
+    }
+
+    // Guard: allocation must be valid in monetize mode
+    if (universeMode === 'monetize' && !allocationValid) {
+      toast.error('Token allocation is invalid. Please fix before continuing.');
       return;
     }
 
@@ -553,8 +622,12 @@ function CinematicUniverseCreate() {
     try {
       if (universeMode === 'monetize') {
         // Atomic: create universe + deploy token in a single transaction
-        if (!defaultConfig.defaultHook || !defaultConfig.defaultLocker) {
-          alert(
+        if (
+          !defaultConfig.defaultHook ||
+          !defaultConfig.defaultLocker ||
+          !defaultConfig.defaultPairedToken
+        ) {
+          toast.error(
             'Token deployment contracts not available on this network. Please try again later.'
           );
           setDeploymentStep(DeploymentStep.IDLE);
@@ -617,11 +690,12 @@ function CinematicUniverseCreate() {
           safeAddress: safeAddress ?? undefined,
         });
       }
-    } catch (error) {
-      alert(
-        `Universe creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    } catch (err) {
+      toast.error(
+        `Universe creation failed: ${err instanceof Error ? err.message : 'Unknown error'}`
       );
       setDeploymentStep(DeploymentStep.IDLE);
+      processedUniverseHash.current = null;
     }
   };
 
@@ -897,7 +971,7 @@ function CinematicUniverseCreate() {
                     placeholder="e.g., Marvel Cinematic Universe"
                     value={universeName}
                     onChange={(e) => setUniverseName(e.target.value)}
-                    disabled={deploymentStep !== DeploymentStep.IDLE}
+                    disabled={deploymentStep !== DeploymentStep.IDLE || isGeneratingCover}
                     className="h-11"
                   />
                 </div>
@@ -1180,10 +1254,13 @@ function CinematicUniverseCreate() {
                     placeholder="Describe your universe and its narrative..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    disabled={deploymentStep !== DeploymentStep.IDLE}
+                    disabled={deploymentStep !== DeploymentStep.IDLE || isGeneratingCover}
                     className="min-h-[100px] resize-none"
                     maxLength={500}
                   />
+                  <p className="text-[10px] text-muted-foreground mt-1 text-right tabular-nums">
+                    {description.length}/500
+                  </p>
                 </div>
 
                 {/* Token config (shown when monetize mode selected) */}
@@ -1198,10 +1275,13 @@ function CinematicUniverseCreate() {
                         placeholder="e.g., MCU"
                         value={tokenSymbol}
                         onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-                        disabled={deploymentStep !== DeploymentStep.IDLE}
+                        disabled={deploymentStep !== DeploymentStep.IDLE || isGeneratingCover}
                         maxLength={10}
                         className="h-11"
                       />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Auto-uppercase. 2-10 characters.
+                      </p>
                     </div>
 
                     {/* Starting Price — live updating */}
@@ -1283,40 +1363,59 @@ function CinematicUniverseCreate() {
                 />
 
                 {deploymentStep === DeploymentStep.IDLE && (
-                  <Button
-                    onClick={handleCreateUniverse}
-                    disabled={
-                      !universeName ||
-                      !imageUrl ||
-                      !description ||
-                      !universeMode ||
-                      (universeMode === 'monetize' && !tokenSymbol) ||
-                      isPending ||
-                      isConfirming
-                    }
-                    className="w-full h-12 text-base font-bold"
-                    size="lg"
-                  >
-                    {isPending || isConfirming ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        {universeMode === 'monetize'
-                          ? 'Launching Universe & Token...'
-                          : 'Creating Universe...'}
-                      </>
-                    ) : (
-                      <>
-                        {universeMode === 'monetize' ? (
-                          <Rocket className="h-5 w-5 mr-2" />
-                        ) : (
-                          <Sparkles className="h-5 w-5 mr-2" />
-                        )}
-                        {universeMode === 'monetize'
-                          ? 'Launch Universe + Token'
-                          : 'Create Universe'}
-                      </>
+                  <>
+                    {/* Mint fee info */}
+                    {universeMode && (
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border text-sm">
+                        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-muted-foreground">
+                          {universeMode === 'monetize'
+                            ? `Mint fee: ${mintFee !== undefined ? `${formatEther(mintFee)} ETH` : 'loading...'} (seeds LP pool)`
+                            : `Mint fee: ${mintFee !== undefined ? `${formatEther(mintFee)} ETH` : 'loading...'}`}
+                          {' + gas'}
+                        </span>
+                      </div>
                     )}
-                  </Button>
+
+                    <Button
+                      onClick={handleCreateUniverse}
+                      disabled={
+                        !universeName ||
+                        !imageUrl ||
+                        !description ||
+                        !universeMode ||
+                        (universeMode === 'monetize' && !tokenSymbol) ||
+                        (universeMode === 'monetize' && !allocationValid) ||
+                        mintFee === undefined ||
+                        mintFeeLoading ||
+                        isPending ||
+                        isConfirming ||
+                        isGeneratingCover
+                      }
+                      className="w-full h-12 text-base font-bold"
+                      size="lg"
+                    >
+                      {isPending || isConfirming ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          {universeMode === 'monetize'
+                            ? 'Launching Universe & Token...'
+                            : 'Creating Universe...'}
+                        </>
+                      ) : (
+                        <>
+                          {universeMode === 'monetize' ? (
+                            <Rocket className="h-5 w-5 mr-2" />
+                          ) : (
+                            <Sparkles className="h-5 w-5 mr-2" />
+                          )}
+                          {universeMode === 'monetize'
+                            ? 'Launch Universe + Token'
+                            : 'Create Universe'}
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
               </div>
 
@@ -1360,13 +1459,25 @@ function CinematicUniverseCreate() {
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
+                      const fallback =
+                        e.currentTarget.parentElement?.querySelector('.img-fallback');
+                      if (fallback) (fallback as HTMLElement).style.display = 'flex';
                     }}
                   />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+                ) : null}
+                <div
+                  className="img-fallback absolute inset-0 items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"
+                  style={{ display: imageUrl ? 'none' : 'flex' }}
+                >
+                  {imageUrl ? (
+                    <div className="text-center">
+                      <AlertCircle className="h-8 w-8 text-white/60 mx-auto mb-2" />
+                      <p className="text-white/60 text-xs">Image failed to load</p>
+                    </div>
+                  ) : (
                     <ImageIcon className="h-16 w-16 text-white/40" />
-                  </div>
-                )}
+                  )}
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <h3 className="text-2xl font-bold text-white drop-shadow-2xl mb-2">
@@ -1409,7 +1520,9 @@ function CinematicUniverseCreate() {
                       <p className="text-[10px] text-muted-foreground uppercase font-semibold">
                         LP Seed
                       </p>
-                      <p className="text-sm font-bold">0.05 ETH</p>
+                      <p className="text-sm font-bold">
+                        {mintFee !== undefined ? `${formatEther(mintFee)} ETH` : '...'}
+                      </p>
                     </div>
                     <div className="p-2.5 rounded-lg bg-muted/50">
                       <p className="text-[10px] text-muted-foreground uppercase font-semibold">

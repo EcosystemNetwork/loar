@@ -423,7 +423,7 @@ function UniverseTimelineEditor() {
   }, [generatedImageUrl]);
 
   // Contract save - using extracted hook
-  const { handleSaveToContract, handleRefreshTimeline } = useContractSave({
+  const { handleSaveToContract, handleRefreshTimeline, isSaveLocked } = useContractSave({
     generatedVideoUrl,
     videoTitle,
     videoDescription,
@@ -455,9 +455,13 @@ function UniverseTimelineEditor() {
   }, []);
 
   // Handle showing video generation dialog
+  // Preserves character selections, video model, duration, ratio, and image format
+  // across sequential deploys so users don't re-pick everything for each node.
+  // Only per-node content (title, description, generated media) is reset.
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
     setAdditionType(type);
     setSourceNodeId(nodeId || null);
+    // Per-node content — always reset
     setVideoTitle('');
     setVideoDescription('');
     setGeneratedImageUrl(null);
@@ -466,16 +470,18 @@ function UniverseTimelineEditor() {
     setUploadedUrl(null);
     setContractSaved(false);
     setIsSavingToContract(false);
-    setSelectedVideoModel('seedance'); // Reset to default
-    setSelectedVideoDuration(8); // Reset video duration to default
-    setNegativePrompt(''); // Reset negative prompt
-    setVideoPrompt(''); // Reset video prompt
-    setVideoRatio('16:9'); // Reset video ratio
-    setImageFormat('landscape_16_9'); // Reset image format
+    setNegativePrompt(''); // Reset negative prompt (scene-specific)
+    setVideoPrompt(''); // Reset video prompt (scene-specific)
     setSoundtrackUrl(''); // Reset soundtrack URL
     setSoundtrackName(''); // Reset soundtrack name
-    setSelectedCharacters([]); // Reset selected characters
     setStatusMessage(null); // Clear any status messages
+    // Carried forward between sequential deploys:
+    // - selectedVideoModel (kept)
+    // - selectedVideoDuration (kept)
+    // - videoRatio (kept)
+    // - imageFormat (kept)
+    // - selectedCharacters (kept)
+    // - selectedImageCharacters (kept)
     setShowVideoDialog(true);
   }, []);
 

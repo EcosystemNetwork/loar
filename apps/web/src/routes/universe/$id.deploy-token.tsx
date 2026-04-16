@@ -125,7 +125,8 @@ function DeployTokenPage() {
           topics: log.topics,
         });
         if (decoded.eventName === 'TokenCreated') {
-          const args = decoded.args as { tokenAddress: string; governor: string };
+          const args = decoded.args as Record<string, unknown>;
+          if (typeof args.tokenAddress !== 'string' || typeof args.governor !== 'string') continue;
           setTokenAddress(args.tokenAddress);
 
           // Update Firestore
@@ -137,7 +138,13 @@ function DeployTokenPage() {
                 governanceAddress: args.governor,
                 tokenDeployTxHash: hash,
               })
-              .catch(() => {});
+              .catch((err) => {
+                console.error('Firestore finalize failed:', err);
+                toast.warning(
+                  'Token deployed on-chain, but app registration failed. It may take a moment to appear.',
+                  { duration: 10000 }
+                );
+              });
           }
         }
       } catch {
@@ -149,6 +156,38 @@ function DeployTokenPage() {
 
   const handleDeploy = async () => {
     if (!address || !tokenSymbol || onChainId === undefined) return;
+
+    if (!universe) {
+      toast.error('Universe not found. Please check the URL.');
+      return;
+    }
+
+    if (
+      universe.tokenAddress &&
+      universe.tokenAddress !== '0x0000000000000000000000000000000000000000'
+    ) {
+      toast.error('This universe already has a token deployed.');
+      return;
+    }
+
+    if (universe.creator?.toLowerCase() !== address.toLowerCase()) {
+      toast.error('Only the universe creator can deploy a token.');
+      return;
+    }
+
+    if (
+      !defaultConfig.defaultHook ||
+      !defaultConfig.defaultLocker ||
+      !defaultConfig.defaultPairedToken
+    ) {
+      toast.error('Token deployment contracts not available on this network.');
+      return;
+    }
+
+    if (!isSupportedChain(chainId)) {
+      toast.error('Please switch to a supported network.');
+      return;
+    }
 
     setDeploying(true);
     try {

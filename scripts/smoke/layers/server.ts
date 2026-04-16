@@ -56,7 +56,7 @@ export async function runServerLayer(cfg: SmokeConfig): Promise<CheckResult[]> {
   // 4. tRPC healthCheck procedure
   results.push(
     await check('tRPC healthCheck → OK', async () => {
-      const inputParam = encodeURIComponent(JSON.stringify({ '0': { json: null } }));
+      const inputParam = encodeURIComponent(JSON.stringify({ '0': null }));
       const url = `${cfg.serverUrl}/trpc/healthCheck?batch=1&input=${inputParam}`;
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), cfg.timeout);
@@ -67,8 +67,8 @@ export async function runServerLayer(cfg: SmokeConfig): Promise<CheckResult[]> {
       } finally {
         clearTimeout(id);
       }
-      const arr = json as Array<{ result?: { data?: { json?: string } } }>;
-      const val = arr?.[0]?.result?.data?.json;
+      const arr = json as Array<{ result?: { data?: unknown } }>;
+      const val = arr?.[0]?.result?.data;
       if (val !== 'OK') throw new Error(`expected "OK", got: ${JSON.stringify(val)}`);
       return val;
     })

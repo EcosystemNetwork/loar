@@ -8,12 +8,13 @@
  * If the NFT contract isn't deployed yet, falls back to IPFS-only listing.
  */
 import { useState } from 'react';
-import { useWaitForTransactionReceipt } from 'wagmi';
+import { useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, keccak256, toBytes } from 'viem';
 import { useMintContent, useRecordMint } from '@/hooks/useRevenue';
 import { useVocab } from '@/hooks/use-vocab';
+import { getEvmAddresses } from '@/configs/addresses';
 import { toast } from 'sonner';
 import { Loader2, Sparkles, X, CheckCircle2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ export function MintContentDialog({
   const v = useVocab();
   const mint = useMintContent();
   const recordMint = useRecordMint();
+  const chainId = useChainId();
   const { writeContractAsync, data: txHash } = useWriteContract();
   const { isSuccess: txConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
   const [price, setPrice] = useState('0.01');
@@ -106,24 +108,73 @@ export function MintContentDialog({
         : `loar://${contentId}`;
       setIpfsUri(metadataUri);
 
-      // Step 2: On-chain mint (if contract deployed)
-      // TODO: Replace with actual deployed address when available
-      // For now, the listing is created in Firebase for the marketplace
-      setStep('done');
-      toast.success('Content listed as NFT!', {
-        description: `Pinned to IPFS. Listed for ${price} ETH.`,
-      });
+      // Step 2: On-chain mint via EpisodeEditionCollection (if deployed)
+      const addrs = getEvmAddresses(chainId);
+      const editionBeacon = addrs?.episodeEditionBeacon;
 
-      // Record the mint in Firestore for tracking
-      try {
-        await recordMint.mutateAsync({
-          episodeId: contentId,
-          tokenId: 0, // Will be set after on-chain mint
-          txHash: txHash ?? 'offchain',
-          price: price,
+      if (editionBeacon && writeContractAsync) {
+        try {
+          setStep('minting');
+          const mintTxHash = await writeContractAsync({
+            abi: EPISODE_EDITION_ABI,
+            address: editionBeacon,
+            functionName: 'mint',
+            args: [BigInt(1), BigInt(1)], // editionId 1, amount 1
+            value: parseEther(price),
+          });
+
+          // Record on-chain mint
+          try {
+            await recordMint.mutateAsync({
+              episodeId: contentId,
+              tokenId: 1,
+              txHash: mintTxHash,
+              price: price,
+            });
+          } catch {
+            // Non-critical
+          }
+
+          setStep('done');
+          toast.success('NFT minted on-chain!', {
+            description: `Pinned to IPFS and minted for ${price} ETH.`,
+          });
+        } catch (mintErr: any) {
+          // On-chain mint failed — fall back to IPFS-only listing
+          console.warn('On-chain mint failed, falling back to IPFS listing:', mintErr.message);
+          setStep('done');
+          toast.success('Content listed as NFT!', {
+            description: `Pinned to IPFS. Listed for ${price} ETH. On-chain mint will be available once contracts are fully deployed.`,
+          });
+
+          try {
+            await recordMint.mutateAsync({
+              episodeId: contentId,
+              tokenId: 0,
+              txHash: 'offchain',
+              price: price,
+            });
+          } catch {
+            // Non-critical
+          }
+        }
+      } else {
+        // No contract deployed on this chain — IPFS-only listing
+        setStep('done');
+        toast.success('Content listed as NFT!', {
+          description: `Pinned to IPFS. Listed for ${price} ETH.`,
         });
-      } catch {
-        // Non-critical, listing already created
+
+        try {
+          await recordMint.mutateAsync({
+            episodeId: contentId,
+            tokenId: 0,
+            txHash: 'offchain',
+            price: price,
+          });
+        } catch {
+          // Non-critical
+        }
       }
 
       onSuccess?.();
