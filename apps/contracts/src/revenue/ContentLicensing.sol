@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {ISplitRouter} from "../interfaces/ISplitRouter.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -12,7 +13,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 /// @notice Manages individual content piece licensing: buy (permanent), rent (time-bound),
 ///         or license (usage rights with royalties). Revenue is routed through SplitRouter
 ///         so universe creators and content generators both earn.
-contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum DealType { BUY, RENT, LICENSE }
     enum DealStatus { ACTIVE, EXPIRED, REVOKED }
 
@@ -103,6 +104,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platform == address(0) || _splitRouter == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
@@ -112,6 +114,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     // ── Registration ────────────────────────────────────────────────────
 
@@ -125,7 +130,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         uint256 rentPricePerDay,
         uint256 licenseFee,
         uint16 licenseRoyaltyBps
-    ) external {
+    ) external whenNotPaused {
         if (contentHash == bytes32(0)) revert ZeroHash();
         if (registrations[contentHash].creator != address(0)) revert AlreadyRegistered();
         if (licenseRoyaltyBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -155,7 +160,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Deal Execution ──────────────────────────────────────────────────
 
     /// @notice Buy content permanently. Payment routed through SplitRouter.
-    function buyContent(bytes32 contentHash) external payable nonReentrant returns (uint256 dealId) {
+    function buyContent(bytes32 contentHash) external payable nonReentrant whenNotPaused returns (uint256 dealId) {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
         if (reg.buyPrice == 0) revert NotForSale();
@@ -188,7 +193,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Rent content for a duration. Payment through SplitRouter.
-    function rentContent(bytes32 contentHash, uint256 durationDays) external payable nonReentrant returns (uint256 dealId) {
+    function rentContent(bytes32 contentHash, uint256 durationDays) external payable nonReentrant whenNotPaused returns (uint256 dealId) {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
         if (reg.rentPricePerDay == 0) revert NotForRent();
@@ -222,7 +227,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice License content for usage rights with potential ongoing royalties.
-    function licenseContent(bytes32 contentHash, uint256 durationDays) external payable nonReentrant returns (uint256 dealId) {
+    function licenseContent(bytes32 contentHash, uint256 durationDays) external payable nonReentrant whenNotPaused returns (uint256 dealId) {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
         if (reg.licenseFee == 0) revert NotLicensable();
@@ -257,7 +262,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice Pay ongoing royalty for a LICENSE deal.
     /// @dev Enforces endTime — auto-expires the deal if past deadline.
-    function payRoyalty(uint256 dealId) external payable nonReentrant {
+    function payRoyalty(uint256 dealId) external payable nonReentrant whenNotPaused {
         Deal storage deal = deals[dealId];
         if (deal.dealType != DealType.LICENSE) revert DealNotActive();
         if (deal.status != DealStatus.ACTIVE) revert DealNotActive();
@@ -334,7 +339,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         uint256 rentPricePerDay,
         uint256 licenseFee,
         uint16 licenseRoyaltyBps
-    ) external {
+    ) external whenNotPaused {
         ContentRegistration storage reg = registrations[contentHash];
         if (reg.creator != msg.sender) revert NotCreator();
         if (licenseRoyaltyBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -348,7 +353,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Deactivate content from marketplace
-    function deactivateContent(bytes32 contentHash) external {
+    function deactivateContent(bytes32 contentHash) external whenNotPaused {
         ContentRegistration storage reg = registrations[contentHash];
         if (reg.creator != msg.sender && msg.sender != platform) revert NotCreator();
         reg.active = false;
@@ -398,7 +403,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Internal ────────────────────────────────────────────────────────
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[40] private __gap;
+    uint256[39] private __gap;
 
     /// @dev Refund any overpayment to the buyer
     function _refundExcess(uint256 paid, uint256 price) internal {

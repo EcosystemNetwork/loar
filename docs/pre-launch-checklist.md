@@ -20,15 +20,15 @@ Audit-driven checklist. Items are grouped by launch phase.
 
 ### Non-Code Items (DO BEFORE PUBLIC BETA)
 
-- [ ] **#19 Terms of Service** — Replace placeholder at `/terms` with reviewed legal text
-  - Platform-specific sections already scaffolded (IP classification, blockchain immutability, DMCA)
-  - Have legal counsel review before going live
-  - Fill in [DATE] and [EMAIL] placeholders
+- [x] **#19 Terms of Service** — ~~Replace placeholder~~ Substantive legal text live at `/terms` (dated April 10, 2026)
+  - Covers: IP classification, blockchain immutability, AI-generated content, DMCA, payments, prohibited conduct
+  - No [DATE] or [EMAIL] placeholders remain
+  - **Still recommended**: Have legal counsel do a final review before broad public launch
 
-- [ ] **#19 Privacy Policy** — Replace placeholder at `/privacy` with reviewed legal text
-  - Data collection summary already drafted (wallet addresses, content, transactions)
-  - Third-party service disclosures included (FAL, OpenAI, Stripe, thirdweb, Firebase)
-  - Fill in [DATE] and [EMAIL] placeholders
+- [x] **#19 Privacy Policy** — ~~Replace placeholder~~ Substantive legal text live at `/privacy` (dated April 10, 2026)
+  - Third-party service disclosures included (FAL, OpenAI, ElevenLabs, Meshy, Stripe, thirdweb, Firebase)
+  - Data collection, blockchain persistence, retention, user rights all covered
+  - **Still recommended**: Have legal counsel do a final review before broad public launch
 
 - [ ] **#4 DMCA Agent** — Register a designated DMCA agent with the US Copyright Office
   - The `/dmca` intake form exists but registration is required for 512(c) safe harbor
@@ -40,25 +40,29 @@ Audit-driven checklist. Items are grouped by launch phase.
   - Without this, cannot complete the 512(g) safe harbor loop
   - Requires: server-side timer, email notification to claimant, auto-reinstate after hold
 
-- [ ] **#7 Placeholder Contracts** — Pause or gate unused Sepolia contracts
-  - IP Licensing and Collabs have deployed contracts but NO public UI
-  - Someone could interact directly with:
-    - `AdPlacement: 0x972bD30...`
-    - `LicensingRegistry: 0xbF0Fed6...`
-    - `CollabManager: 0xE981454...`
-  - **Action**: Call `pause()` on each (if Pausable) or transfer ownership to a burn address
+- [x] **#7 Placeholder Contracts** — UI gated for unused Sepolia contracts
+  - All PARTIAL-feature routes (`/tokens`, `/licensing`, `/collabs`, `/ads`, `/market`, `/sell`, `/staking`, `/bounties`) now redirect to `/coming-soon`
+  - Nav links removed from header via `HIDDEN_ROUTES` filter
+  - Universe sidebar Govern + Subscribe buttons commented out
+  - **Still applies**: On-chain contracts remain callable directly — consider `pause()` or ownership transfer before mainnet
   - **Note**: These contracts do NOT inherit Pausable — see #2 below
 
-- [ ] **#11 Firebase SA Scope** — Restrict service account IAM
+- [x] **#11 Firebase SA Scope** — Restrict service account IAM _(completed 2026-04-16)_
   - Currently uses default permissions (likely `roles/editor`)
   - App only needs: **Firestore read/write** + **Cloud Storage read/write**
   - Minimum IAM roles: `roles/datastore.user` + `roles/storage.objectAdmin`
   - Does NOT need: Firebase Auth, Realtime Database, Cloud Functions, Messaging
-  - **Action**: Create custom IAM role, assign to SA, rotate key, update env
+  - **Action**: Run `bash scripts/narrow-firebase-sa.sh <PROJECT_ID>` — audits roles, strips excess, grants minimum, rotates key
+  - Key file pattern added to `.gitignore`
 
 - [ ] **#13 Release Tag** — Create `v0.1.0-beta` before first public deployment
   - `git tag -a v0.1.0-beta -m "Pre-launch testnet beta" && git push --tags`
   - Enables `git revert` to known-good state if needed
+
+- [x] **#21 E2E Test Suite** — Playwright smoke tests added
+  - Suite covers: landing, auth guards, create flow, AI sandbox, credits/pricing, moderation/legal, partial-feature redirects, navigation
+  - Config: `apps/web/playwright.config.ts`, tests: `apps/web/e2e/smoke.spec.ts`
+  - Run: `pnpm --filter web test`
 
 ---
 
@@ -108,9 +112,11 @@ Current state: `LoarLpLockerMultiple` locks LP **permanently** (no time-based un
   - Current risk is low (Filecoin Calibration testnet only, no EVM signing)
   - For mainnet: use AWS KMS, GCP Cloud KMS, or Hashicorp Vault
 
-- [ ] **#6 Per-User Rate Limits** — Add wallet-address-based limits on AI generation
-  - Current: per-IP only. Multiple wallets from same IP share limit.
-  - Add: per-authenticated-user limit (extract from SIWE JWT in tRPC middleware)
+- [x] **#6 Per-User Rate Limits** — Wallet-address-based limits already implemented
+  - Per-wallet: 10 req/min across all AI endpoints (extracted from SIWE JWT)
+  - Daily ceiling: 200 generations per wallet per 24h
+  - Per-IP limits still apply as a fallback when JWT parsing fails
+  - See: `apps/server/src/middleware/rate-limit.ts`
 
 - [x] **#8 Multi-Chain Cleanup** — Removed Solana, SUI, and bridge scaffolding (Base L2 only)
 
@@ -118,9 +124,13 @@ Current state: `LoarLpLockerMultiple` locks LP **permanently** (no time-based un
 
 ## Already Done (No Action Needed)
 
-| Item                 | Status                                                      |
-| -------------------- | ----------------------------------------------------------- |
-| #14 CI hygiene       | Full pipeline: lint, typecheck, test, forge, Slither, audit |
-| #15 Deploy SSH       | Rollback + smoke tests + health checks                      |
-| #20 Mobile links     | No App Store/Play Store URLs in codebase                    |
-| #5 Private key scope | Filecoin only, no EVM signing authority                     |
+| Item                 | Status                                                        |
+| -------------------- | ------------------------------------------------------------- |
+| #14 CI hygiene       | Full pipeline: lint, typecheck, test, forge, Slither, audit   |
+| #15 Deploy SSH       | Rollback + smoke tests + health checks                        |
+| #20 Mobile links     | No App Store/Play Store URLs in codebase                      |
+| #5 Private key scope | Filecoin only, no EVM signing authority                       |
+| #19 Terms & Privacy  | Substantive legal text live (April 10, 2026), no placeholders |
+| #6 Per-user limits   | Per-wallet rate limiting in `rate-limit.ts` (10/min, 200/day) |
+| #7 UI gating         | Partial features redirect to `/coming-soon`, nav links hidden |
+| #21 E2E tests        | Playwright smoke suite: 20+ tests across critical paths       |

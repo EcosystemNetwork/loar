@@ -372,8 +372,8 @@ export function UniverseSidebar({
                 </Button>
               </Link>
 
-              {/* Govern button - only show for blockchain universes with governance configured */}
-              {isBlockchainUniverse &&
+              {/* Govern button — hidden until governance voting is fully wired (PARTIAL feature) */}
+              {/* {isBlockchainUniverse &&
                 onOpenGovernance &&
                 finalUniverse?.governanceAddress &&
                 finalUniverse?.tokenAddress && (
@@ -385,10 +385,10 @@ export function UniverseSidebar({
                     <Vote className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                     Govern
                   </Button>
-                )}
+                )} */}
 
-              {/* Subscribe button */}
-              {isBlockchainUniverse && (
+              {/* Subscribe button — hidden until subscriptions are fully wired (PARTIAL feature) */}
+              {/* {isBlockchainUniverse && (
                 <Button
                   onClick={() => setShowSubscribe(true)}
                   className="w-full bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 hover:from-amber-700 hover:via-amber-800 hover:to-amber-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
@@ -397,7 +397,7 @@ export function UniverseSidebar({
                   <Crown className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                   Subscribe
                 </Button>
-              )}
+              )} */}
 
               {/* Admin buttons — edit metadata + access settings */}
               {isBlockchainUniverse && isAdmin && (

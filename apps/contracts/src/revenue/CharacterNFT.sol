@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
@@ -7,13 +7,14 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CharacterNFT
 /// @notice Characters as ownable NFTs. Owners earn when their character appears in episodes.
 ///         Supports appearance tracking and royalty accumulation.
-contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable {
+contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
     struct Character {
         uint256 universeId;
         string name;
@@ -80,6 +81,7 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         uint16 _appearanceFeeBps
     ) external initializer {
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_appearanceFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;
@@ -87,6 +89,9 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         paymentRouter = IPaymentRouter(_paymentRouter);
         appearanceFeeBps = _appearanceFeeBps;
     }
+
+    function pause() external { require(msg.sender == platform, "Only platform"); _pause(); }
+    function unpause() external { require(msg.sender == platform, "Only platform"); _unpause(); }
 
     /// @notice Create a new character listing (free or paid). Creator becomes first owner.
     /// @param _universeId Universe this character belongs to
@@ -102,7 +107,7 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         string calldata metadataURI,
         uint256 mintPrice,
         uint256 maxSupply
-    ) external returns (uint256 characterId) {
+    ) external whenNotPaused returns (uint256 characterId) {
         if (_universeId != universeId) revert WrongUniverse();
         if (!rightsRegistry.isMonetizable(visualHash)) revert ContentNotMonetizable();
         bytes32 nameHash = keccak256(abi.encodePacked(name));
@@ -140,7 +145,7 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
     /// @notice Mint (purchase) a character NFT edition. Payment routed through PaymentRouter.
     /// @param characterId The character to mint an edition of
     /// @param tokenURI_ Metadata URI for this specific edition token
-    function mintCharacter(uint256 characterId, string calldata tokenURI_) external payable nonReentrant returns (uint256 tokenId) {
+    function mintCharacter(uint256 characterId, string calldata tokenURI_) external payable nonReentrant whenNotPaused returns (uint256 tokenId) {
         if (!characterActive[characterId]) revert CharacterNotActive();
         uint256 maxSup = characterMaxSupply[characterId];
         if (maxSup > 0 && characterMinted[characterId] >= maxSup) revert CharacterExists();
@@ -174,7 +179,7 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
 
     /// @notice Record a character appearance in an episode and accrue reward for owner
     /// @dev Called by the platform when an episode featuring this character is minted
-    function recordAppearance(uint256 characterId, uint256 episodeId) external payable {
+    function recordAppearance(uint256 characterId, uint256 episodeId) external payable whenNotPaused {
         require(msg.sender == platform, "Only platform");
         Character storage c = characters[characterId];
         c.appearanceCount++;

@@ -130,7 +130,7 @@ export function useUniverseManager() {
         lockerData: `0x${string}`;
       };
       allocationConfig?: {
-        lpBps: number;
+        curveBps: number;
         creatorBps: number;
         treasuryBps: number;
         communityBps: number;
@@ -143,7 +143,7 @@ export function useUniverseManager() {
       throw new Error(`Unsupported chain ${chainId}. Please switch to a supported network.`);
 
     const allocationConfig = config.allocationConfig ?? {
-      lpBps: 8000,
+      curveBps: 8000,
       creatorBps: 1000,
       treasuryBps: 500,
       communityBps: 500,
@@ -207,7 +207,7 @@ export function useUniverseManager() {
         lockerData: `0x${string}`;
       };
       allocationConfig?: {
-        lpBps: number;
+        curveBps: number;
         creatorBps: number;
         treasuryBps: number;
         communityBps: number;
@@ -220,7 +220,7 @@ export function useUniverseManager() {
 
     const owner = universeConfig.safeAddress ?? universeConfig.initialOwner;
     const allocationConfig = deploymentConfig.allocationConfig ?? {
-      lpBps: 8000,
+      curveBps: 8000,
       creatorBps: 1000,
       treasuryBps: 500,
       communityBps: 500,

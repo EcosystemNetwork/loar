@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
@@ -27,7 +28,7 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///         - All staked $LOAR is locked (reduces circulating supply)
 ///         - Early unstake penalty: 5% to LP (not burned)
 ///         - Minimum lock period: 7 days
-contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     enum Tier {
@@ -126,6 +127,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_loarToken == address(0) || _treasury == address(0)) revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
@@ -143,10 +145,13 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     // ── Stake ───────────────────────────────────────────────────
 
     /// @notice Stake $LOAR to earn tier benefits (requires prior approval)
-    function stake(uint256 amount) external nonReentrant {
+    function stake(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
 
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -174,7 +179,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Unstake ─────────────────────────────────────────────────
 
     /// @notice Unstake $LOAR. Early unstake (before minLockPeriod) incurs a penalty that is burned.
-    function unstake(uint256 amount) external nonReentrant {
+    function unstake(uint256 amount) external nonReentrant whenNotPaused {
         StakeInfo storage s = stakes[msg.sender];
         if (s.amount == 0) revert NothingStaked();
         if (amount > s.amount) revert InsufficientStake();
@@ -221,7 +226,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Universe Staking ──────────────────────────────────────
 
     /// @notice Stake $LOAR into a specific universe to earn revenue share
-    function stakeInUniverse(uint256 universeId, uint256 amount) external nonReentrant {
+    function stakeInUniverse(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
 
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -249,7 +254,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Unstake $LOAR from a universe. Early unstake penalty goes to LP.
-    function unstakeFromUniverse(uint256 universeId, uint256 amount) external nonReentrant {
+    function unstakeFromUniverse(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
         UniverseStake storage us = universeStakes[msg.sender][universeId];
         if (us.amount == 0) revert NothingStaked();
         if (amount > us.amount) revert InsufficientStake();
@@ -291,7 +296,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice Distribute $LOAR rewards to a universe's staking pool.
     ///         Called by platform when universe earns trading fees, subscriptions, etc.
-    function distributeUniverseReward(uint256 universeId, uint256 amount) external nonReentrant {
+    function distributeUniverseReward(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
         require(msg.sender == owner() || msg.sender == treasury, "Unauthorized");
         UniversePool storage pool = universePools[universeId];
         if (pool.totalStaked == 0) {
@@ -308,7 +313,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Claim pending universe staking rewards
-    function claimUniverseReward(uint256 universeId) external nonReentrant {
+    function claimUniverseReward(uint256 universeId) external nonReentrant whenNotPaused {
         UniversePool storage pool = universePools[universeId];
         UniverseStake storage us = universeStakes[msg.sender][universeId];
         if (us.amount == 0) revert NothingStaked();
@@ -427,4 +432,7 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         liquidityPool = newPool;
         emit LiquidityPoolChanged(old, newPool);
     }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[49] private __gap;
 }

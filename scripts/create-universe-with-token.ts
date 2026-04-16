@@ -251,7 +251,7 @@ async function deployOnChain(imageUrl: string): Promise<DeployResult> {
       positionBps: [10000],
       lockerData: '0x' as `0x${string}`,
     },
-    allocationConfig: { lpBps: 8000, creatorBps: 1000, treasuryBps: 500, communityBps: 500 },
+    allocationConfig: { curveBps: 8000, creatorBps: 1000, treasuryBps: 500, communityBps: 500 },
   };
 
   // Try atomic first, fall back to two-step if it reverts

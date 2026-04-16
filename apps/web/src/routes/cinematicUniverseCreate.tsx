@@ -99,7 +99,7 @@ function CinematicUniverseCreate() {
   const TICK_MIN = -300000;
   const TICK_MAX = -200000;
   const TICK_DEFAULT = -230200; // ~10 ETH market cap
-  const TOKEN_SUPPLY = 100_000_000_000; // 100B
+  const TOKEN_SUPPLY = 1_000_000_000; // 1B
   const [startingTick, setStartingTick] = useState(TICK_DEFAULT);
 
   // Derived price calculations (update in real-time as slider moves)
@@ -133,16 +133,16 @@ function CinematicUniverseCreate() {
   };
 
   // Token allocation state (basis points, must sum to 10000)
-  const [lpBps, setLpBps] = useState(8000); // 80% LP
+  const [curveBps, setCurveBps] = useState(8000); // 80% Bonding Curve
   const [creatorBps, setCreatorBps] = useState(1000); // 10% Creator
   const [treasuryBps, setTreasuryBps] = useState(500); // 5% Treasury
   const [communityBps, setCommunityBps] = useState(500); // 5% Community
   const [showAdvancedTokenomics, setShowAdvancedTokenomics] = useState(false);
 
   // Allocation helpers
-  const allocationTotal = lpBps + creatorBps + treasuryBps + communityBps;
+  const allocationTotal = curveBps + creatorBps + treasuryBps + communityBps;
   const allocationValid =
-    allocationTotal === 10000 && lpBps >= 5000 && treasuryBps >= 200 && creatorBps <= 4000;
+    allocationTotal === 10000 && curveBps >= 5000 && treasuryBps >= 200 && creatorBps <= 4000;
 
   const handleAllocationChange = (
     field: 'lp' | 'creator' | 'treasury' | 'community',
@@ -150,7 +150,7 @@ function CinematicUniverseCreate() {
   ) => {
     // Build the proposed state with the new value applied
     const proposed = {
-      lp: field === 'lp' ? value : lpBps,
+      lp: field === 'lp' ? value : curveBps,
       creator: field === 'creator' ? value : creatorBps,
       treasury: field === 'treasury' ? value : treasuryBps,
       community: field === 'community' ? value : communityBps,
@@ -165,7 +165,7 @@ function CinematicUniverseCreate() {
       proposed[balanceField] = adjusted;
     }
 
-    setLpBps(proposed.lp);
+    setCurveBps(proposed.lp);
     setCreatorBps(proposed.creator);
     setTreasuryBps(proposed.treasury);
     setCommunityBps(proposed.community);
@@ -721,7 +721,7 @@ function CinematicUniverseCreate() {
               lockerData: '0x' as `0x${string}`,
             },
             allocationConfig: {
-              lpBps,
+              curveBps,
               creatorBps,
               treasuryBps,
               communityBps,

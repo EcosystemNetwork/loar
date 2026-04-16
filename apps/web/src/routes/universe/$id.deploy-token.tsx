@@ -228,7 +228,7 @@ function DeployTokenPage() {
             feeSplit
           ),
           allocationConfig: {
-            lpBps: 8000,
+            curveBps: 8000,
             creatorBps: 1000,
             treasuryBps: 500,
             communityBps: 500,

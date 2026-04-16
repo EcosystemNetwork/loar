@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -16,7 +17,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Credits are the internal unit for all generation actions.
 ///         1 credit = 1 unit of generation capacity (costs vary by action type).
-contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     // ── Structs ──────────────────────────────────────────────────
@@ -98,6 +99,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         // loarToken can be address(0) initially — set later via updateLoarToken()
         if (_platform == address(0) || _treasury == address(0))
             revert ZeroAddress();
@@ -121,6 +123,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     // ── Package Management ───────────────────────────────────────
 
@@ -155,7 +160,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     /// @notice Buy credits with ETH. 35% platform margin.
     ///         If a holderDiscount is configured for a token and buyer holds that token,
     ///         they receive bonus credits proportional to the discount.
-    function purchaseWithEth(uint256 packageId, address discountToken) external payable nonReentrant {
+    function purchaseWithEth(uint256 packageId, address discountToken) external payable nonReentrant whenNotPaused {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
         if (msg.value < pkg.priceWei) revert InsufficientPayment();
@@ -185,7 +190,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     /// @notice Buy credits with ETH (no holder discount).
-    function purchaseWithEth(uint256 packageId) external payable nonReentrant {
+    function purchaseWithEth(uint256 packageId) external payable nonReentrant whenNotPaused {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
         if (msg.value < pkg.priceWei) revert InsufficientPayment();
@@ -204,7 +209,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     /// @notice Buy credits with $LOAR tokens. 25% platform margin.
     ///         User must approve this contract to spend their $LOAR first.
-    function purchaseWithLoar(uint256 packageId) external nonReentrant {
+    function purchaseWithLoar(uint256 packageId) external nonReentrant whenNotPaused {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
 
@@ -243,7 +248,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         uint256 amount,
         string calldata generationType,
         uint256 universeId
-    ) external onlyPlatform {
+    ) external onlyPlatform whenNotPaused {
         if (userCredits[user].balance < amount) revert InsufficientCredits();
 
         userCredits[user].balance -= amount;
@@ -259,7 +264,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         address user,
         uint256 amount,
         string calldata reason
-    ) external onlyPlatform {
+    ) external onlyPlatform whenNotPaused {
         userCredits[user].balance += amount;
         userCredits[user].totalPurchased += amount;
 
@@ -305,4 +310,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         UserCredits storage uc = userCredits[user];
         return (uc.balance, uc.totalPurchased, uc.totalSpent, uc.totalBonusReceived);
     }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[49] private __gap;
 }

@@ -25,6 +25,7 @@ import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CreditsRouteImport } from './routes/credits'
+import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ActivityRouteImport } from './routes/activity'
@@ -149,6 +150,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const CreditsRoute = CreditsRouteImport.update({
   id: '/credits',
   path: '/credits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComingSoonRoute = ComingSoonRouteImport.update({
+  id: '/coming-soon',
+  path: '/coming-soon',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CinematicUniverseCreateRoute = CinematicUniverseCreateRouteImport.update({
@@ -382,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/coming-soon': typeof ComingSoonRoute
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
@@ -445,6 +452,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/coming-soon': typeof ComingSoonRoute
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
@@ -509,6 +517,7 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/coming-soon': typeof ComingSoonRoute
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRoute
   '/discover': typeof DiscoverRoute
@@ -574,6 +583,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/coming-soon'
     | '/credits'
     | '/dashboard'
     | '/discover'
@@ -637,6 +647,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/coming-soon'
     | '/credits'
     | '/dashboard'
     | '/discover'
@@ -700,6 +711,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/checkout'
     | '/cinematicUniverseCreate'
+    | '/coming-soon'
     | '/credits'
     | '/dashboard'
     | '/discover'
@@ -764,6 +776,7 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
+  ComingSoonRoute: typeof ComingSoonRoute
   CreditsRoute: typeof CreditsRoute
   DashboardRoute: typeof DashboardRoute
   DiscoverRoute: typeof DiscoverRoute
@@ -932,6 +945,13 @@ declare module '@tanstack/react-router' {
       path: '/credits'
       fullPath: '/credits'
       preLoaderRoute: typeof CreditsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coming-soon': {
+      id: '/coming-soon'
+      path: '/coming-soon'
+      fullPath: '/coming-soon'
+      preLoaderRoute: typeof ComingSoonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cinematicUniverseCreate': {
@@ -1273,6 +1293,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
+  ComingSoonRoute: ComingSoonRoute,
   CreditsRoute: CreditsRoute,
   DashboardRoute: DashboardRoute,
   DiscoverRoute: DiscoverRoute,

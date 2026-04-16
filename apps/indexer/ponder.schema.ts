@@ -53,6 +53,43 @@ export const token = onchainTable(
   })
 );
 
+// ============= Bonding Curve =============
+
+export const bondingCurve = onchainTable(
+  'bonding_curve',
+  (t) => ({
+    id: t.text().primaryKey(), // bonding curve contract address
+    tokenAddress: t.hex().notNull(),
+    universeId: t.integer().notNull(),
+    graduationEth: t.text().notNull(), // target ETH as string
+    curveSupply: t.text().notNull(), // total curve supply as string
+    graduated: t.boolean().notNull().default(false),
+    graduatedAt: t.integer(),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    tokenIdx: index('bonding_curve_token_idx').on(table.tokenAddress),
+  })
+);
+
+export const bondingCurveTrade = onchainTable(
+  'bonding_curve_trade',
+  (t) => ({
+    id: t.text().primaryKey(), // txHash:logIndex
+    bondingCurve: t.hex().notNull(),
+    trader: t.hex().notNull(),
+    isBuy: t.boolean().notNull(),
+    ethAmount: t.text().notNull(),
+    tokenAmount: t.text().notNull(),
+    price: t.text().notNull(),
+    timestamp: t.integer().notNull(),
+  }),
+  (table) => ({
+    curveIdx: index('bct_curve_idx').on(table.bondingCurve),
+    traderIdx: index('bct_trader_idx').on(table.trader),
+  })
+);
+
 export const hookEvent = onchainTable('hook_event', (t) => ({
   id: t.text().primaryKey(),
   timestamp: t.integer().notNull(),

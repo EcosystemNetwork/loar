@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Universe} from "./Universe.sol";
@@ -13,6 +13,7 @@ import {ILoarHook} from "./interfaces/ILoarHook.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
 import {ILoarLpLocker} from "./interfaces/ILoarLpLocker.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 import {UniverseData} from "./types/UniverseData.sol";
@@ -37,7 +38,8 @@ interface IUniverseTokenDeployer {
         uint256 universeId
     ) external returns (
         address tokenAddress,
-        address governor
+        address governor,
+        address bondingCurve
     );
 }
 
@@ -52,7 +54,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     uint public constant teamFee = 0;
     address public teamFeeRecipient;
     address public tokenDeployer;
-    uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
+    uint256 public constant TOKEN_SUPPLY = 1_000_000_000e18; // 1B with 18 decimals
     uint256 public constant BPS = 10_000;
 
     /// @notice Fee required to mint a universe (default 0.05 ETH).
@@ -73,6 +75,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) public enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
+    /// @notice Stored deployment config per universe for graduation (pool + locker config).
+    mapping(uint256 => DeploymentConfig) public graduationConfigs;
     uint latestId;
     bool public deprecated;
 
@@ -203,7 +207,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
             token: IERC20(address(0)),
             universeGovernor: IGovernor(address(0)),
             hook: IHooks(address(0)),
-            locker: ILoarLpLocker(address(0))
+            locker: ILoarLpLocker(address(0)),
+            bondingCurve: address(0)
         });
 
         uint256 currentId = latestId;
@@ -255,7 +260,10 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
             revert LockerNotEnabled();
         }
 
-        (address _tokenAddress, address governor) =
+        // Paired token must be WETH for LP seeding at graduation
+        require(deploymentConfig.poolConfig.pairedToken == weth, "Paired token must be WETH");
+
+        (address _tokenAddress, address governor, address bondingCurve) =
             IUniverseTokenDeployer(tokenDeployer).deployTokenAndGovernance(
                 deploymentConfig,
                 id
@@ -263,51 +271,38 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
         require(_tokenAddress != address(0), "Token deployment returned zero address");
         require(governor != address(0), "Governor deployment returned zero address");
+        require(bondingCurve != address(0), "BondingCurve deployment returned zero address");
 
         tokenAddress = _tokenAddress;
 
-        // Paired token must be WETH for LP seeding
-        require(deploymentConfig.poolConfig.pairedToken == weth, "Paired token must be WETH");
+        // Store deployment config for graduation (pool + locker config needed later)
+        graduationConfigs[id] = deploymentConfig;
 
-        PoolKey memory poolkey = ILoarHook(deploymentConfig.poolConfig.hook).initializePool(
-            tokenAddress,
-            deploymentConfig.poolConfig.pairedToken,
-            deploymentConfig.poolConfig.tickIfToken0IsLoar,
-            deploymentConfig.poolConfig.tickSpacing,
-            deploymentConfig.lockerConfig.locker,
-            deploymentConfig.poolConfig.poolData
-        );
-
-        // Only LP portion (80% default) is sent to this contract by UniverseTokenDeployer
-        uint256 poolSupply = (TOKEN_SUPPLY * 8000) / 10000;
-
-        // Wrap the stored LP seed ETH → WETH to seed the pool's paired side
+        // Forward LP seed ETH to bonding curve as initial reserve
         uint256 lpSeed = universeLpSeed[id];
         universeLpSeed[id] = 0;
         totalLpSeedsHeld -= lpSeed;
 
         if (lpSeed > 0) {
-            IWETH(weth).deposit{value: lpSeed}();
-            IERC20(weth).approve(address(deploymentConfig.lockerConfig.locker), lpSeed);
+            (bool sent,) = bondingCurve.call{value: lpSeed}("");
+            require(sent, "LP seed transfer to bonding curve failed");
         }
 
-        IERC20(tokenAddress).approve(address(deploymentConfig.lockerConfig.locker), poolSupply);
-        ILoarLpLocker(deploymentConfig.lockerConfig.locker).placeLiquidity(
-            deploymentConfig.lockerConfig,
-            deploymentConfig.poolConfig,
-            poolkey,
-            poolSupply,
-            tokenAddress,
-            lpSeed
-        );
-
+        // Store universe data — pool init happens at graduation
         universeDatas[id].token = IERC20(tokenAddress);
         universeDatas[id].universeGovernor = IGovernor(governor);
-        universeDatas[id].hook = poolkey.hooks;
-        universeDatas[id].locker = ILoarLpLocker(deploymentConfig.lockerConfig.locker);
+        universeDatas[id].bondingCurve = bondingCurve;
 
         universe.setAdmin(governor);
         universe.setToken(tokenAddress);
+
+        emit BondingCurveCreated(
+            id,
+            tokenAddress,
+            bondingCurve,
+            4 ether,
+            (TOKEN_SUPPLY * 8000) / 10000
+        );
 
         emit TokenCreated(
             msg.sender,
@@ -320,11 +315,68 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
             deploymentConfig.tokenConfig.context,
             deploymentConfig.poolConfig.tickIfToken0IsLoar,
             deploymentConfig.poolConfig.hook,
-            poolkey.toId(),
+            PoolId.wrap(bytes32(0)),
             deploymentConfig.poolConfig.pairedToken,
             deploymentConfig.lockerConfig.locker,
             governor
         );
+    }
+
+    /// @notice Called by a universe's BondingCurve contract when it graduates.
+    ///         Initializes Uniswap v4 pool and permanently locks LP with raised ETH + unsold tokens.
+    function graduateFromBondingCurve(
+        uint256 universeId,
+        uint256 ethAmount,
+        uint256 tokenAmount,
+        address _token
+    ) external payable nonReentrant {
+        UniverseData storage data = universeDatas[universeId];
+        require(msg.sender == data.bondingCurve, "Only bonding curve can graduate");
+        require(address(data.token) == _token, "Token mismatch");
+
+        // Pull unsold tokens from bonding curve (already approved)
+        if (tokenAmount > 0) {
+            IERC20(_token).transferFrom(msg.sender, address(this), tokenAmount);
+        }
+
+        DeploymentConfig memory config = graduationConfigs[universeId];
+        require(config.poolConfig.hook != address(0), "No graduation config");
+
+        // Wrap ETH → WETH
+        if (msg.value > 0) {
+            IWETH(weth).deposit{value: msg.value}();
+            IERC20(weth).approve(address(config.lockerConfig.locker), msg.value);
+        }
+
+        // Initialize Uniswap v4 pool
+        PoolKey memory poolkey = ILoarHook(config.poolConfig.hook).initializePool(
+            _token,
+            config.poolConfig.pairedToken,
+            config.poolConfig.tickIfToken0IsLoar,
+            config.poolConfig.tickSpacing,
+            config.lockerConfig.locker,
+            config.poolConfig.poolData
+        );
+
+        // Lock LP permanently
+        if (tokenAmount > 0) {
+            IERC20(_token).approve(address(config.lockerConfig.locker), tokenAmount);
+        }
+        ILoarLpLocker(config.lockerConfig.locker).placeLiquidity(
+            config.lockerConfig,
+            config.poolConfig,
+            poolkey,
+            tokenAmount,
+            _token,
+            msg.value
+        );
+
+        // Update universe data — graduated
+        data.hook = poolkey.hooks;
+        data.locker = ILoarLpLocker(config.lockerConfig.locker);
+        data.bondingCurve = address(0);
+
+        emit TokenGraduated(universeId, _token, ethAmount, tokenAmount);
     }
 
     // ── Identity NFT minting ────────────────────────────────────────
@@ -431,10 +483,11 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         IERC20 token,
         IGovernor universeGovernor,
         IHooks hook,
-        ILoarLpLocker locker
+        ILoarLpLocker locker,
+        address bondingCurve
     ) {
         UniverseData memory data = universeDatas[id];
-        return (data.universe, data.token, data.universeGovernor, data.hook, data.locker);
+        return (data.universe, data.token, data.universeGovernor, data.hook, data.locker, data.bondingCurve);
     }
 
     /// @notice Total universes created (also the next token ID)

@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
@@ -21,7 +22,7 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///
 ///         Universe creators can set custom remix fees for their universe.
 ///         Platform sets a minimum and default.
-contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     struct RemixConfig {
@@ -90,6 +91,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_loarToken == address(0) || _treasury == address(0)) revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
@@ -109,6 +111,9 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     // ── Charge remix fee ────────────────────────────────────────
 
     /// @notice Charge a remix fee when someone branches content.
@@ -120,7 +125,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         address remixer,
         address originalCreator,
         uint256 universeId
-    ) external nonReentrant {
+    ) external nonReentrant whenNotPaused {
         if (msg.sender != platform && msg.sender != owner()) revert NotAuthorized();
         if (remixer == address(0) || originalCreator == address(0)) revert ZeroAddress();
 
@@ -163,7 +168,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     // ── Universe config ─────────────────────────────────────────
 
     /// @notice Universe creator sets a custom remix fee for their universe
-    function setUniverseRemixFee(uint256 universeId, uint256 fee) external {
+    function setUniverseRemixFee(uint256 universeId, uint256 fee) external whenNotPaused {
         if (msg.sender != universeCreators[universeId] && msg.sender != platform && msg.sender != owner()) {
             revert NotCreatorOrPlatform();
         }
@@ -175,7 +180,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     }
 
     /// @notice Register universe creator (platform only)
-    function registerUniverse(uint256 universeId, address creator) external {
+    function registerUniverse(uint256 universeId, address creator) external whenNotPaused {
         require(msg.sender == platform || msg.sender == owner(), "Unauthorized");
         universeCreators[universeId] = creator;
     }
@@ -225,4 +230,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     function setPlatform(address newPlatform) external onlyOwner {
         platform = newPlatform;
     }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[49] private __gap;
 }

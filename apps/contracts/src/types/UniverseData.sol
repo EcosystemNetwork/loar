@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 import {IUniverse} from "../interfaces/IUniverse.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
@@ -14,5 +14,5 @@ struct UniverseData {
   IGovernor universeGovernor;
   IHooks hook;
   ILoarLpLocker locker;
-
+  address bondingCurve;
 }

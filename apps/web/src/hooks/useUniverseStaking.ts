@@ -300,6 +300,6 @@ export function useStakingConfig() {
 
   return {
     minLockDays: minLock ? Number(minLock as bigint) / 86400 : 7,
-    penaltyPercent: penaltyBps ? Number(penaltyBps as bigint) / 100 : 5,
+    penaltyPercent: penaltyBps ? Number(penaltyBps as unknown as bigint) / 100 : 5,
   };
 }

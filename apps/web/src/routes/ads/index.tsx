@@ -5,7 +5,7 @@
  *   Browse  — all open slots across the platform, filterable by placement type
  *   Campaigns — advertiser's active sponsorships with impression stats
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
   Megaphone,
@@ -31,6 +31,9 @@ import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
 
 export const Route = createFileRoute('/ads/')({
+  beforeLoad: () => {
+    throw redirect({ to: '/coming-soon' });
+  },
   component: AdsHubPage,
 });
 

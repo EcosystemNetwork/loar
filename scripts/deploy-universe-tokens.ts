@@ -95,7 +95,7 @@ async function main() {
               lockerData: '0x' as `0x${string}`,
             },
             allocationConfig: {
-              lpBps: 8000,
+              curveBps: 8000,
               creatorBps: 1000,
               treasuryBps: 500,
               communityBps: 500,

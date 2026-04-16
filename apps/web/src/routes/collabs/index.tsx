@@ -6,7 +6,7 @@
  *   Proposals  — incoming/outgoing proposals needing action
  *   History    — completed and cancelled collabs
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
   Handshake,
@@ -36,6 +36,9 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/collabs/')({
+  beforeLoad: () => {
+    throw redirect({ to: '/coming-soon' });
+  },
   component: CollabsHubPage,
 });
 

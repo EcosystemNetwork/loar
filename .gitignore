@@ -10,6 +10,7 @@ coverage/
 .claude
 CLAUDE.md
 firebase-service-account.json
+firebase-sa-key-*.json
 build.log
 .gitnexus
 .vercel

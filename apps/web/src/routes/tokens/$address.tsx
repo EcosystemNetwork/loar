@@ -152,7 +152,7 @@ function TokenDetailPage() {
   // Holder stats
   const holderStats = useMemo(() => {
     if (!holders.length) return { total: 0, topHolderPct: 0 };
-    const totalSupply = 100_000_000_000n * 10n ** 18n;
+    const totalSupply = 1_000_000_000n * 10n ** 18n;
     const topBalance = BigInt(holders[0]?.balance ?? '0');
     return {
       total: holders.length,
@@ -160,7 +160,7 @@ function TokenDetailPage() {
     };
   }, [holders]);
 
-  const marketCap = currentPrice != null ? currentPrice * 100_000_000_000 : null;
+  const marketCap = currentPrice != null ? currentPrice * 1_000_000_000 : null;
   const totalSwaps = swaps?.length ?? 0;
 
   // Maturity milestones
@@ -670,7 +670,7 @@ function TokenDetailPage() {
                 ) : (
                   <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
                     {holders.slice(0, 20).map((holder, i) => {
-                      const totalSupply = 100_000_000_000n * 10n ** 18n;
+                      const totalSupply = 1_000_000_000n * 10n ** 18n;
                       const pct = Number((BigInt(holder.balance) * 10000n) / totalSupply) / 100;
                       const isHighConcentration = pct > 30;
                       return (

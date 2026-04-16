@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";

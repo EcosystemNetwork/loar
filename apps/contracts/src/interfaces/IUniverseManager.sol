@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
@@ -40,7 +40,7 @@ interface IUniverseManager {
     }
 
     struct AllocationConfig {
-        uint16 lpBps;         // % → LP locker (min 5000 = 50%)
+        uint16 curveBps;      // % → bonding curve (min 5000 = 50%)
         uint16 creatorBps;    // % → universe creator
         uint16 treasuryBps;   // % → protocol treasury (min 200 = 2%)
         uint16 communityBps;  // % → community rewards
@@ -77,7 +77,19 @@ interface IUniverseManager {
         uint256 amount
     );
     event TokenDeployed();
-    //event TokenGraduation();
+    event BondingCurveCreated(
+        uint256 indexed universeId,
+        address indexed token,
+        address indexed bondingCurve,
+        uint256 graduationEth,
+        uint256 curveSupply
+    );
+    event TokenGraduated(
+        uint256 indexed universeId,
+        address indexed token,
+        uint256 ethRaised,
+        uint256 lpTokens
+    );
     event SetTeamFeeRecipient(
         address oldTeamFeeRecipient,
         address newTeamFeeRecipient
@@ -153,6 +165,13 @@ interface IUniverseManager {
         address tokenAddress
     );
 
+    function graduateFromBondingCurve(
+        uint256 universeId,
+        uint256 ethAmount,
+        uint256 tokenAmount,
+        address token
+    ) external payable;
+
     function enabledHooks(address hook) external view returns (bool);
 
     function enabledLockers(address locker, address hook) external view returns (bool);
@@ -162,6 +181,7 @@ interface IUniverseManager {
         IERC20 token,
         IGovernor universeGovernor,
         IHooks hook,
-        ILoarLpLocker locker
+        ILoarLpLocker locker,
+        address bondingCurve
     );
 }

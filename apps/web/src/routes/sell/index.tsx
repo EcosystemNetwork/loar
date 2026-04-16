@@ -1,7 +1,7 @@
 /**
  * Seller Studio — My listings management
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import {
   Plus,
   BarChart3,
@@ -24,6 +24,9 @@ import { toast } from 'sonner';
 import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/sell/')({
+  beforeLoad: () => {
+    throw redirect({ to: '/coming-soon' });
+  },
   component: SellPage,
 });
 

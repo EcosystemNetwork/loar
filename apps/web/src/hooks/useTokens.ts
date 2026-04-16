@@ -319,7 +319,7 @@ export interface EnrichedToken extends Token {
   marketCap: number | null;
 }
 
-const TOTAL_SUPPLY = 100_000_000_000; // 100B tokens per universe
+const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens per universe
 
 /**
  * Fetches tokens with enriched analytics: price, 24h change, volume,

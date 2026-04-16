@@ -1,15 +1,16 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 
 /// @title AnalyticsRegistry
 /// @notice On-chain analytics for story engagement data. Records what stories
 ///         people like, trending characters, and engaging arcs. This data is
 ///         valuable for training story AIs and for studios.
-contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
     struct UniverseMetrics {
         uint256 totalViews;
         uint256 totalMints;
@@ -72,13 +73,17 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         require(_platform != address(0), "Zero address");
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+        __Pausable_init();
         platform = _platform;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     /// @notice Record a view on an episode
-    function recordView(uint256 universeId, uint256 episodeId) external onlyPlatform {
+    function recordView(uint256 universeId, uint256 episodeId) external onlyPlatform whenNotPaused {
         episodeMetrics[universeId][episodeId].views++;
         universeMetrics[universeId].totalViews++;
         universeMetrics[universeId].lastUpdated = block.timestamp;
@@ -87,7 +92,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Record an episode mint
-    function recordMint(uint256 universeId, uint256 episodeId) external onlyPlatform {
+    function recordMint(uint256 universeId, uint256 episodeId) external onlyPlatform whenNotPaused {
         episodeMetrics[universeId][episodeId].mints++;
         universeMetrics[universeId].totalMints++;
         universeMetrics[universeId].lastUpdated = block.timestamp;
@@ -96,7 +101,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Record engagement (like/share)
-    function recordEngagement(uint256 universeId, uint256 episodeId, bool isLike) external onlyPlatform {
+    function recordEngagement(uint256 universeId, uint256 episodeId, bool isLike) external onlyPlatform whenNotPaused {
         if (isLike) {
             episodeMetrics[universeId][episodeId].likes++;
         } else {
@@ -112,7 +117,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         uint256 characterId,
         uint256 newAppearances,
         uint256 newVotes
-    ) external onlyPlatform {
+    ) external onlyPlatform whenNotPaused {
         CharacterMetrics storage cm = characterMetrics[universeId][characterId];
         cm.appearances += newAppearances;
         cm.votes += newVotes;
@@ -122,7 +127,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Update universe revenue metrics
-    function recordRevenue(uint256 universeId, uint256 amount) external onlyPlatform {
+    function recordRevenue(uint256 universeId, uint256 amount) external onlyPlatform whenNotPaused {
         universeMetrics[universeId].totalRevenue += amount;
         universeMetrics[universeId].lastUpdated = block.timestamp;
 
@@ -135,7 +140,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Update subscriber count
-    function recordSubscriber(uint256 universeId, bool added) external onlyPlatform {
+    function recordSubscriber(uint256 universeId, bool added) external onlyPlatform whenNotPaused {
         if (added) {
             universeMetrics[universeId].totalSubscribers++;
         } else if (universeMetrics[universeId].totalSubscribers > 0) {
@@ -146,7 +151,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Record vote activity
-    function recordVote(uint256 universeId) external onlyPlatform {
+    function recordVote(uint256 universeId) external onlyPlatform whenNotPaused {
         universeMetrics[universeId].totalVotes++;
 
         emit VoteRecorded(universeId, universeMetrics[universeId].totalVotes);
@@ -155,7 +160,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     uint256 public constant MAX_TRENDING = 100;
 
     /// @notice Set trending universes (computed off-chain, stored on-chain, capped at 100)
-    function setTrending(uint256[] calldata universeIds) external onlyPlatform {
+    function setTrending(uint256[] calldata universeIds) external onlyPlatform whenNotPaused {
         require(universeIds.length <= MAX_TRENDING, "Too many trending");
         trendingUniverseIds = universeIds;
 
@@ -163,7 +168,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Request data export (emits event for off-chain processing)
-    function requestDataExport(uint256 universeId) external {
+    function requestDataExport(uint256 universeId) external whenNotPaused {
         emit DataExportRequested(msg.sender, universeId, block.timestamp);
     }
 
@@ -171,4 +176,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function getTrending() external view returns (uint256[] memory) {
         return trendingUniverseIds;
     }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[49] private __gap;
 }

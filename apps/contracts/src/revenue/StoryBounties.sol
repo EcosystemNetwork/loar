@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -22,7 +23,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///         - "Need a villain origin story for my universe" — 500 $LOAR
 ///         - "Create a 30-second trailer for Episode 3" — 2000 $LOAR
 ///         - "Design a faction logo" — 200 $LOAR
-contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     enum BountyStatus {
@@ -100,6 +101,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_loarToken == address(0) || _treasury == address(0)) revert ZeroAddress();
 
         loarToken = IERC20(_loarToken);
@@ -113,6 +115,9 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     // ── Create bounty ───────────────────────────────────────────
 
     /// @notice Post a new bounty — $LOAR is locked in this contract until claimed/cancelled
@@ -123,7 +128,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         string calldata descriptionHash,
         string calldata contentType,
         uint256 deadline
-    ) external nonReentrant returns (uint256 bountyId) {
+    ) external nonReentrant whenNotPaused returns (uint256 bountyId) {
         if (reward < minBountyAmount) revert AmountTooLow();
         if (deadline <= block.timestamp || deadline > block.timestamp + MAX_DEADLINE) revert InvalidDeadline();
 
@@ -155,7 +160,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // ── Award bounty ────────────────────────────────────────────
 
     /// @notice Poster awards the bounty to a winner
-    function awardBounty(uint256 bountyId, address winner, bytes32 submissionHash) external nonReentrant {
+    function awardBounty(uint256 bountyId, address winner, bytes32 submissionHash) external nonReentrant whenNotPaused {
         if (winner == address(0)) revert ZeroAddress();
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
@@ -192,7 +197,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // ── Cancel bounty ───────────────────────────────────────────
 
     /// @notice Poster cancels an open bounty before deadline — small fee applies
-    function cancelBounty(uint256 bountyId) external nonReentrant {
+    function cancelBounty(uint256 bountyId) external nonReentrant whenNotPaused {
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
         if (msg.sender != b.poster) revert NotPoster();
@@ -213,7 +218,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // ── Expire bounty ───────────────────────────────────────────
 
     /// @notice Anyone can mark a bounty as expired after deadline — full refund to poster
-    function expireBounty(uint256 bountyId) external nonReentrant {
+    function expireBounty(uint256 bountyId) external nonReentrant whenNotPaused {
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
         if (block.timestamp < b.deadline) revert DeadlineNotPassed();
@@ -283,4 +288,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     event CancellationFeeChanged(uint16 oldBps, uint16 newBps);
     event MinBountyChanged(uint256 oldMin, uint256 newMin);
     event TreasuryChanged(address indexed oldTreasury, address indexed newTreasury);
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[49] private __gap;
 }

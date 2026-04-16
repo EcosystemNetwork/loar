@@ -12,6 +12,8 @@ import { ponder } from 'ponder:registry';
 import {
   universe,
   token,
+  bondingCurve,
+  bondingCurveTrade,
   hookEvent,
   node,
   nodeCanonization,
@@ -117,6 +119,7 @@ ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
           `0x${string}`,
           `0x${string}`,
           `0x${string}`,
+          `0x${string}`,
         ];
         if (getAddress(tokenAddr) === tokenAddress) {
           resolvedUniverseAddress = getAddress(universeAddr).toLowerCase() as `0x${string}`;
@@ -185,6 +188,66 @@ ponder.on('UniverseManager:SetHook', async ({ event, context }) => {
     timestamp: Number(event.block.timestamp),
     hook_address: getAddress(event.args.hook),
     enabled: event.args.enabled,
+  });
+});
+
+// ============= Bonding Curve Events =============
+
+ponder.on('UniverseManager:BondingCurveCreated', async ({ event, context }) => {
+  await context.db.insert(bondingCurve).values({
+    id: getAddress(event.args.bondingCurve),
+    tokenAddress: getAddress(event.args.token),
+    universeId: Number(event.args.universeId),
+    graduationEth: event.args.graduationEth.toString(),
+    curveSupply: event.args.curveSupply.toString(),
+    graduated: false,
+    graduatedAt: null,
+    createdAt: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('UniverseManager:TokenGraduated', async ({ event, context }) => {
+  // Find the bonding curve by token address and mark as graduated
+  try {
+    const curves = await context.db.sql`
+      SELECT id FROM bonding_curve
+      WHERE LOWER("tokenAddress") = ${getAddress(event.args.token).toLowerCase()}
+      LIMIT 1
+    `;
+    if (curves.rows.length > 0) {
+      await context.db.update(bondingCurve, { id: curves.rows[0].id as string }).set({
+        graduated: true,
+        graduatedAt: Number(event.block.timestamp),
+      });
+    }
+  } catch (err) {
+    console.error('Failed to update bonding curve graduation:', err);
+  }
+});
+
+ponder.on('BondingCurve:TokensPurchased', async ({ event, context }) => {
+  await context.db.insert(bondingCurveTrade).values({
+    id: `${event.transaction.hash}:${event.log.logIndex}`,
+    bondingCurve: getAddress(event.log.address),
+    trader: getAddress(event.args.buyer),
+    isBuy: true,
+    ethAmount: event.args.ethAmount.toString(),
+    tokenAmount: event.args.tokenAmount.toString(),
+    price: event.args.newPrice.toString(),
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('BondingCurve:TokensSold', async ({ event, context }) => {
+  await context.db.insert(bondingCurveTrade).values({
+    id: `${event.transaction.hash}:${event.log.logIndex}`,
+    bondingCurve: getAddress(event.log.address),
+    trader: getAddress(event.args.seller),
+    isBuy: false,
+    ethAmount: event.args.ethReturned.toString(),
+    tokenAmount: event.args.tokenAmount.toString(),
+    price: event.args.newPrice.toString(),
+    timestamp: Number(event.block.timestamp),
   });
 });
 
