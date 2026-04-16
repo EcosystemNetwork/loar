@@ -650,6 +650,26 @@ function TokenDetailPage() {
                     <AlertTriangle className="h-2.5 w-2.5" /> No Vesting
                   </Badge>
                 </div>
+
+                {/* LP Lock Permanence Disclosure */}
+                <div className="mt-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                  <div className="flex items-start gap-2">
+                    <Zap className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                        Permanent Liquidity Lock
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        This token's liquidity pool is{' '}
+                        <span className="font-semibold">permanently locked on-chain</span> and
+                        cannot be withdrawn by anyone — including the token creator and the LOAR
+                        platform. This is enforced by the LoarLpLocker smart contract and is{' '}
+                        <span className="font-semibold">irreversible</span>. There is no admin key,
+                        timelock, or governance mechanism that can unlock it.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 

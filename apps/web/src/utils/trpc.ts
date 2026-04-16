@@ -55,7 +55,15 @@ export const queryClient = new QueryClient({
     },
   }),
   queryCache: new QueryCache({
-    onError: (error: any) => {
+    onError: (error: any, query: any) => {
+      // Skip errors from queries that opt out via meta.silent
+      if (query?.meta?.silent) return;
+
+      // Don't toast on contract reverts (expected for some reads like getCanonChain)
+      if (error.message?.includes('reverted') || error.name === 'ContractFunctionExecutionError') {
+        return;
+      }
+
       // Don't toast on network errors (server/indexer not running)
       if (error.message === 'Failed to fetch' || error.message.includes('ERR_CONNECTION_REFUSED')) {
         return;

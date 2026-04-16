@@ -24,20 +24,10 @@ import { Menu, X, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
 /**
- * Features marked PARTIAL in the README — contracts/APIs exist but UI is
- * incomplete.  Hidden from navigation until fully wired end-to-end.
- * Re-enable by removing the path from this set.
+ * Routes hidden from navigation (empty = all routes visible).
+ * Add paths here to temporarily hide incomplete features.
  */
-const HIDDEN_ROUTES = new Set([
-  '/tokens', // Launchpad / token trading UI
-  '/licensing', // IP licensing marketplace
-  '/collabs', // Collaborations
-  '/ads', // Ad marketplace
-  '/market', // Marketplace (NFT flows incomplete)
-  '/sell', // Sell (depends on marketplace)
-  '/staking', // Staking (partial)
-  '/bounties', // Bounties (partial)
-]);
+const HIDDEN_ROUTES = new Set<string>([]);
 
 const primaryLinks = [
   { to: '/discover', label: 'Discover' },

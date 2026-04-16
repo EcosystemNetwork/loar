@@ -34,6 +34,8 @@ const createUniverseSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .optional(),
+  /** Chain ID the universe was deployed on (e.g. 11155111 for Sepolia, 84532 for Base Sepolia). */
+  chainId: z.number().int().positive().optional(),
   /** Optional Unstoppable Domains name for this universe (e.g. "myuniverse.crypto"). */
   unstoppableDomain: z.string().max(100).nullish(),
 });
@@ -188,6 +190,16 @@ export const universesRouter = router({
           .string()
           .regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid tx hash')
           .optional(),
+        chainId: z.number().int().positive().optional(),
+        poolId: z.string().optional(),
+        hookAddress: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{40}$/)
+          .optional(),
+        lockerAddress: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{40}$/)
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -199,15 +211,18 @@ export const universesRouter = router({
       const doc = await db.collection('cinematicUniverses').doc(universeId).get();
       if (!doc.exists) throw new Error('Universe not found');
 
-      await db
-        .collection('cinematicUniverses')
-        .doc(universeId)
-        .update({
-          tokenAddress: input.tokenAddress.toLowerCase(),
-          governanceAddress: input.governanceAddress.toLowerCase(),
-          tokenDeployTxHash: input.tokenDeployTxHash ?? null,
-          updated_at: new Date(),
-        });
+      const updates: Record<string, any> = {
+        tokenAddress: input.tokenAddress.toLowerCase(),
+        governanceAddress: input.governanceAddress.toLowerCase(),
+        tokenDeployTxHash: input.tokenDeployTxHash ?? null,
+        updated_at: new Date(),
+      };
+      if (input.chainId) updates.chainId = input.chainId;
+      if (input.poolId) updates.poolId = input.poolId;
+      if (input.hookAddress) updates.hookAddress = input.hookAddress.toLowerCase();
+      if (input.lockerAddress) updates.lockerAddress = input.lockerAddress.toLowerCase();
+
+      await db.collection('cinematicUniverses').doc(universeId).update(updates);
 
       return { ok: true };
     }),

@@ -27,6 +27,7 @@ import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
 import {LaunchpadStaking} from "../src/revenue/LaunchpadStaking.sol";
 import {StoryBounties} from "../src/revenue/StoryBounties.sol";
 import {IdentityNFT} from "../src/IdentityNFT.sol";
+import {Escrow} from "../src/revenue/Escrow.sol";
 
 // NFT beacons
 import {EpisodeEditionCollection} from "../src/revenue/EpisodeEditionCollection.sol";
@@ -264,6 +265,17 @@ contract DeployAllScript is Script {
         );
         console.log("[5] StoryBounties:", address(bounties));
 
+        // ── Phase 6: Marketplace Escrow ─────────────────────────────────
+        Escrow escrow = Escrow(
+            address(
+                new ERC1967Proxy(
+                    address(new Escrow()),
+                    abi.encodeCall(Escrow.initialize, (treasury, address(paymentRouter), PLATFORM_FEE_BPS, 7 days))
+                )
+            )
+        );
+        console.log("[6] Escrow:", address(escrow));
+
         vm.stopBroadcast();
 
         // ── Output: All env vars ────────────────────────────────────
@@ -294,9 +306,10 @@ contract DeployAllScript is Script {
         _logEnv("COLLAB_MANAGER_ADDRESS", address(collabManager));
         _logEnv("ANALYTICS_REGISTRY_ADDRESS", address(analytics));
         console.log("");
-        console.log("# --- Staking & Bounties ---");
+        console.log("# --- Staking, Bounties & Escrow ---");
         _logEnv("LAUNCHPAD_STAKING_ADDRESS", address(staking));
         _logEnv("STORY_BOUNTIES_ADDRESS", address(bounties));
+        _logEnv("ESCROW_ADDRESS", address(escrow));
         console.log("");
         console.log("# --- Vite (frontend) ---");
         _logEnv("VITE_LOAR_TOKEN_ADDRESS", address(loarToken));

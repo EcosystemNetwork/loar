@@ -1,7 +1,10 @@
 /**
  * Gallery Grid — Responsive grid layout for content cards.
+ * Click any card to open it in a full-screen lightbox.
  */
+import { useState } from 'react';
 import { ContentCard } from './ContentCard';
+import { MediaLightbox } from './MediaLightbox';
 import { Loader2 } from 'lucide-react';
 
 interface GalleryGridProps {
@@ -21,6 +24,8 @@ export function GalleryGrid({
   onLicense,
   emptyMessage = 'No content found',
 }: GalleryGridProps) {
+  const [lightboxItem, setLightboxItem] = useState<any>(null);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -38,16 +43,20 @@ export function GalleryGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {items.map((item) => (
-        <ContentCard
-          key={item.id}
-          content={item}
-          onBuy={onBuy ? () => onBuy(item) : undefined}
-          onRent={onRent ? () => onRent(item) : undefined}
-          onLicense={onLicense ? () => onLicense(item) : undefined}
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {items.map((item) => (
+          <ContentCard
+            key={item.id}
+            content={item}
+            onClick={() => setLightboxItem(item)}
+            onBuy={onBuy ? () => onBuy(item) : undefined}
+            onRent={onRent ? () => onRent(item) : undefined}
+            onLicense={onLicense ? () => onLicense(item) : undefined}
+          />
+        ))}
+      </div>
+      <MediaLightbox content={lightboxItem} onClose={() => setLightboxItem(null)} />
+    </>
   );
 }

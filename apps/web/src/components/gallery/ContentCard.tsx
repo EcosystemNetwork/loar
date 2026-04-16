@@ -33,6 +33,7 @@ interface ContentCardProps {
   onBuy?: () => void;
   onRent?: () => void;
   onLicense?: () => void;
+  onClick?: () => void;
 }
 
 function formatPrice(wei: string | undefined): string {
@@ -44,7 +45,7 @@ function formatPrice(wei: string | undefined): string {
   }
 }
 
-export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardProps) {
+export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: ContentCardProps) {
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
   const thumbnail =
     content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
@@ -55,7 +56,10 @@ export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardPr
       content.licensing.licenseFee !== '0');
 
   return (
-    <Card className="group overflow-hidden hover:shadow-lg transition-all duration-300 border-muted/50">
+    <Card
+      className="group overflow-hidden hover:shadow-lg transition-all duration-300 border-muted/50 cursor-pointer"
+      onClick={onClick}
+    >
       {/* Thumbnail / Video */}
       <div className="relative aspect-video overflow-hidden bg-muted">
         {isVideo && content.mediaUrl ? (
@@ -116,6 +120,7 @@ export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardPr
           <Link
             to={`/profile/${content.creatorUid || content.creatorAddress}` as any}
             className="text-xs text-muted-foreground hover:text-foreground truncate block"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             by {content.creatorAddress.slice(0, 6)}...{content.creatorAddress.slice(-4)}
           </Link>
@@ -125,19 +130,43 @@ export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardPr
         {hasLicensing && (
           <div className="flex flex-wrap gap-1">
             {content.licensing!.buyPrice && content.licensing!.buyPrice !== '0' && (
-              <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={onBuy}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBuy?.();
+                }}
+              >
                 <ShoppingCart className="h-3 w-3 mr-1" />
                 {formatPrice(content.licensing!.buyPrice)}
               </Button>
             )}
             {content.licensing!.rentPricePerDay && content.licensing!.rentPricePerDay !== '0' && (
-              <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={onRent}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRent?.();
+                }}
+              >
                 <Clock className="h-3 w-3 mr-1" />
                 {formatPrice(content.licensing!.rentPricePerDay)}/day
               </Button>
             )}
             {content.licensing!.licenseFee && content.licensing!.licenseFee !== '0' && (
-              <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={onLicense}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLicense?.();
+                }}
+              >
                 <FileCheck className="h-3 w-3 mr-1" />
                 License
               </Button>

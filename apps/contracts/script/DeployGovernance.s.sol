@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import {Script, console} from "forge-std/Script.sol";
 import {TimelockController} from "@openzeppelin/governance/TimelockController.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.sol";
 
 /**
@@ -18,6 +19,15 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  * Environment variables:
  *   PRIVATE_KEY             — Deployer / current owner key
  *   SAFE_ADDRESS            — Gnosis Safe multisig address
+ *
+ *   Core Ownable contracts (non-upgradeable):
+ *     UNIVERSE_MANAGER
+ *     LOAR_TOKEN_ADDRESS
+ *     IDENTITY_NFT_ADDRESS
+ *     FEE_LOCKER_ADDRESS
+ *     SPLIT_ROUTER_ADDRESS
+ *     REVENUE_MODULE_FACTORY
+ *     SLOP_MARKET_ADDRESS
  *
  *   UUPS proxy addresses (all OwnableUpgradeable):
  *     PAYMENT_ROUTER_ADDRESS
@@ -76,6 +86,17 @@ contract DeployGovernanceScript is Script {
         address timelockAddr = address(timelock);
         console.log("[1] TimelockController:", timelockAddr);
 
+        // ── Transfer core Ownable contracts to timelock ─────────────
+        console.log("\n--- Transferring core contract ownership ---");
+
+        _transferOwnableIfSet("UNIVERSE_MANAGER", timelockAddr);
+        _transferOwnableIfSet("LOAR_TOKEN_ADDRESS", timelockAddr);
+        _transferOwnableIfSet("IDENTITY_NFT_ADDRESS", timelockAddr);
+        _transferOwnableIfSet("FEE_LOCKER_ADDRESS", timelockAddr);
+        _transferOwnableIfSet("SPLIT_ROUTER_ADDRESS", timelockAddr);
+        _transferOwnableIfSet("REVENUE_MODULE_FACTORY", timelockAddr);
+        _transferOwnableIfSet("SLOP_MARKET_ADDRESS", timelockAddr);
+
         // ── Transfer UUPS proxy ownership to timelock ───────────────
         console.log("\n--- Transferring UUPS proxy ownership ---");
 
@@ -90,6 +111,7 @@ contract DeployGovernanceScript is Script {
         _transferIfSet("ANALYTICS_REGISTRY_ADDRESS", timelockAddr);
         _transferIfSet("LAUNCHPAD_STAKING_ADDRESS", timelockAddr);
         _transferIfSet("STORY_BOUNTIES_ADDRESS", timelockAddr);
+        _transferIfSet("ESCROW_ADDRESS", timelockAddr);
 
         // ── Transfer NFT beacon ownership to timelock ───────────────
         console.log("\n--- Transferring beacon ownership ---");
@@ -137,6 +159,18 @@ contract DeployGovernanceScript is Script {
             return;
         }
         UpgradeableBeacon(addr).transferOwnership(newOwner);
+        console.log(string.concat("  OK   ", envKey, " -> timelock"));
+    }
+
+    /// @dev Transfer ownership of a non-upgradeable Ownable contract to the timelock.
+    ///      Skips silently if the env var is not set.
+    function _transferOwnableIfSet(string memory envKey, address newOwner) internal {
+        address addr = vm.envOr(envKey, address(0));
+        if (addr == address(0)) {
+            console.log(string.concat("  SKIP ", envKey, " (not set)"));
+            return;
+        }
+        Ownable(addr).transferOwnership(newOwner);
         console.log(string.concat("  OK   ", envKey, " -> timelock"));
     }
 }

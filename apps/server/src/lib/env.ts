@@ -34,6 +34,13 @@ const envSchema = z.object({
     .regex(/^[0-9a-fA-F]{64}$/, 'PRIVATE_KEY must be 64 hex characters without 0x prefix')
     .optional(),
 
+  // ── KMS signing (production — private key stays in HSM) ──────────────
+  KMS_KEY_ID: z.string().optional(),
+  KMS_REGION: z.string().default('us-east-1'),
+
+  // ── Base mainnet RPC ─────────────────────────────────────────────────
+  RPC_URL_BASE: z.string().url('RPC_URL_BASE must be a valid URL').optional(),
+
   // ── On-chain payment verification ─────────────────────────────────────────
   // Falls back to PONDER_RPC_URL_2 in credits.routes.ts if unset, but setting
   // this separately is recommended so server and indexer use independent RPCs.
@@ -164,6 +171,18 @@ export function validateEnv(): Env {
     if (!env.ADMIN_ADDRESSES && !env.ADMIN_WALLET) {
       prodErrors.push(
         'At least one of ADMIN_ADDRESSES or ADMIN_WALLET must be set in production for admin authorization'
+      );
+    }
+
+    if (!env.KMS_KEY_ID && env.PRIVATE_KEY) {
+      console.warn(
+        '⚠️  PRIVATE_KEY is set in production without KMS_KEY_ID — consider migrating to AWS KMS for HSM-backed signing'
+      );
+    }
+
+    if (!env.KMS_KEY_ID && !env.PRIVATE_KEY) {
+      prodErrors.push(
+        'Either KMS_KEY_ID (recommended) or PRIVATE_KEY must be set for on-chain signing'
       );
     }
 

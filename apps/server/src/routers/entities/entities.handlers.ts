@@ -105,7 +105,7 @@ export async function createEntity(
     nodeIds: input.nodeIds ?? [],
     imageUrl: input.imageUrl ?? null,
     metadata: input.metadata ?? {},
-    creator,
+    creator: creator.toLowerCase(),
     monetized,
     rightsDeclaration: monetized ? input.rightsDeclaration! : null,
     unstoppableDomain: input.unstoppableDomain ?? null,

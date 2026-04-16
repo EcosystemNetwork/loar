@@ -3,17 +3,29 @@
  *
  * Exposes REST endpoints and a GraphQL API for querying indexed blockchain data.
  * Includes custom Hono routes for universe, node, proposal, and token queries
- * alongside Ponder's built-in SQL client and GraphQL middleware.
+ * alongside Ponder's built-in GraphQL middleware.
+ *
+ * NOTE: The raw SQL client endpoint has been removed for security.
+ * Use the GraphQL endpoint for all queries.
  */
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import { Hono } from 'hono';
-import { client, graphql } from 'ponder';
+import { graphql } from 'ponder';
 import { getAddress } from 'viem';
 import { eq } from 'ponder';
 import { universe, node, proposal, token, vote } from 'ponder:schema';
 
 const app = new Hono();
+
+// ── Query limits to prevent DoS ──────────────────────────────────────
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
+
+function getLimit(c: any): number {
+  const raw = parseInt(c.req.query('limit') || String(DEFAULT_LIMIT), 10);
+  return Math.min(Math.max(1, raw), MAX_LIMIT);
+}
 
 app.get('/indexer-status', async (c) => {
   let dbStatus = 'ok';
@@ -34,37 +46,50 @@ app.get('/indexer-status', async (c) => {
   });
 });
 
-app.use('/sql/*', client({ db, schema }));
+// NOTE: Raw SQL endpoint removed — use GraphQL instead.
+// Previously: app.use('/sql/*', client({ db, schema }));
 
-// Custom REST endpoints
+// Custom REST endpoints — all queries are bounded with LIMIT
 app.get('/creator/:address/universes', async (c) => {
   const address = getAddress(c.req.param('address'));
+  const limit = getLimit(c);
 
-  const universes = await db.select().from(universe).where(eq(universe.creator, address));
+  const universes = await db
+    .select()
+    .from(universe)
+    .where(eq(universe.creator, address))
+    .limit(limit);
 
   return c.json({ universes });
 });
 
 app.get('/creator/:address/nodes', async (c) => {
   const address = getAddress(c.req.param('address'));
+  const limit = getLimit(c);
 
-  const nodes = await db.select().from(node).where(eq(node.creator, address));
+  const nodes = await db.select().from(node).where(eq(node.creator, address)).limit(limit);
 
   return c.json({ nodes });
 });
 
 app.get('/creator/:address/proposals', async (c) => {
   const address = getAddress(c.req.param('address'));
+  const limit = getLimit(c);
 
-  const proposals = await db.select().from(proposal).where(eq(proposal.proposer, address));
+  const proposals = await db
+    .select()
+    .from(proposal)
+    .where(eq(proposal.proposer, address))
+    .limit(limit);
 
   return c.json({ proposals });
 });
 
 app.get('/creator/:address/votes', async (c) => {
   const address = getAddress(c.req.param('address'));
+  const limit = getLimit(c);
 
-  const votes = await db.select().from(vote).where(eq(vote.voter, address));
+  const votes = await db.select().from(vote).where(eq(vote.voter, address)).limit(limit);
 
   return c.json({ votes });
 });
@@ -73,10 +98,10 @@ app.get('/creator/:address/summary', async (c) => {
   const address = getAddress(c.req.param('address'));
 
   const [universes, nodes, proposals, votes] = await Promise.all([
-    db.select().from(universe).where(eq(universe.creator, address)),
-    db.select().from(node).where(eq(node.creator, address)),
-    db.select().from(proposal).where(eq(proposal.proposer, address)),
-    db.select().from(vote).where(eq(vote.voter, address)),
+    db.select().from(universe).where(eq(universe.creator, address)).limit(100),
+    db.select().from(node).where(eq(node.creator, address)).limit(100),
+    db.select().from(proposal).where(eq(proposal.proposer, address)).limit(100),
+    db.select().from(vote).where(eq(vote.voter, address)).limit(100),
   ]);
 
   return c.json({
@@ -97,33 +122,34 @@ app.get('/creator/:address/summary', async (c) => {
 app.get('/universe/:address', async (c) => {
   const address = c.req.param('address').toLowerCase();
 
-  const [allUniverses, allNodes, allTokens] = await Promise.all([
-    db.select().from(universe),
-    db.select().from(node),
-    db.select().from(token),
-  ]);
-
-  const universeData = allUniverses.filter((u) => u.id.toLowerCase() === address);
-  const nodes = allNodes
-    .filter((n) => n.universeAddress.toLowerCase() === address)
-    .sort((a, b) => a.createdAt - b.createdAt);
-  const tokenData = allTokens.filter((t) => t.universeAddress.toLowerCase() === address);
+  // Query only the specific universe — NOT the entire database
+  const universeData = await db.select().from(universe).where(eq(universe.id, address)).limit(1);
 
   if (universeData.length === 0) {
     return c.json({ error: 'Universe not found' }, 404);
   }
 
+  const [nodes, tokenData] = await Promise.all([
+    db.select().from(node).where(eq(node.universeAddress, address)).limit(500),
+    db.select().from(token).where(eq(token.universeAddress, address)).limit(10),
+  ]);
+
   return c.json({
     universe: universeData[0],
     token: tokenData[0] || null,
-    nodes,
+    nodes: nodes.sort((a, b) => a.createdAt - b.createdAt),
   });
 });
 
 app.get('/universe/:address/proposals', async (c) => {
   const address = getAddress(c.req.param('address'));
+  const limit = getLimit(c);
 
-  const proposals = await db.select().from(proposal).where(eq(proposal.universeAddress, address));
+  const proposals = await db
+    .select()
+    .from(proposal)
+    .where(eq(proposal.universeAddress, address))
+    .limit(limit);
 
   return c.json({ proposals });
 });

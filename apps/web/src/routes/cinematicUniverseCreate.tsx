@@ -7,7 +7,7 @@
  * Includes AI-powered cover image generation via fal.ai.
  */
 
-import { createFileRoute, Link as RouterLink, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link as RouterLink, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
 import { useIsAutoConnecting, useActiveAccount } from 'thirdweb/react';
@@ -59,6 +59,11 @@ import {
 } from '@/configs/chains';
 
 export const Route = createFileRoute('/cinematicUniverseCreate')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
+    }
+  },
   component: CinematicUniverseCreate,
 });
 
@@ -562,6 +567,7 @@ function CinematicUniverseCreate() {
               description: description,
               onChainUniverseId: parsedUniverseId?.toString(),
               mintTxHash: hash,
+              chainId,
               signature,
               message,
               nonce,
@@ -753,12 +759,7 @@ function CinematicUniverseCreate() {
   // by the standalone /universe/$id/deploy-token page. This create page uses the
   // atomic createUniverseWithToken() for monetize mode.
 
-  // Redirect to login if not authenticated (after all hooks)
-  useEffect(() => {
-    if (!isAuthenticated && !isAuthenticating && !isAutoConnecting) {
-      navigate({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
-    }
-  }, [isAuthenticated, isAuthenticating, isAutoConnecting, navigate]);
+  // Auth is now checked in beforeLoad — no useEffect redirect needed
 
   // Wait for thirdweb to finish reconnecting the previously-connected wallet
   // before showing the connect prompt (avoids a flash of "Connect Your Wallet"

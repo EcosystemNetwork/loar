@@ -139,6 +139,9 @@ function DeployTokenPage() {
                 tokenAddress: args.tokenAddress,
                 governanceAddress: args.governor,
                 tokenDeployTxHash: hash,
+                chainId,
+                hookAddress: defaultConfig.defaultHook,
+                lockerAddress: defaultConfig.defaultLocker,
               })
               .catch((err) => {
                 console.error('Firestore finalize failed:', err);
