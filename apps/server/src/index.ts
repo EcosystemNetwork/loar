@@ -42,7 +42,7 @@ app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 app.use(logger());
 
 // Support comma-separated CORS origins (e.g. "https://loar.fun,https://staging.loar.fun")
-const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:3001')
+const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -348,7 +348,7 @@ import('./services/pricing/heartbeat')
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);
-console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:3001 (default)'}`);
+console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:5173 (default)'}`);
 console.log(`Environment: ${env.NODE_ENV}`);
 
 const server = serve({ fetch: app.fetch, port }, (info) => {
