@@ -15,8 +15,10 @@ export class FirebaseAdapter implements StorageProvider {
   }
 
   async upload(buffer: Buffer, filename: string, _mimeType?: string): Promise<UploadResult> {
+    // Sanitize filename to prevent path traversal
+    const safeFilename = filename.replace(/[\/\\\.\.]+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '_');
     const contentHash = computeSha256(buffer);
-    const key = await firebaseStorageService.upload(buffer, filename);
+    const key = await firebaseStorageService.upload(buffer, safeFilename);
 
     return {
       provider: this.name,

@@ -4,7 +4,7 @@
  * Creators post bounties for specific content needs (videos, art, stories, etc.)
  * and community members submit work to earn $LOAR rewards.
  */
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,9 +37,6 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export const Route = createFileRoute('/bounties/')({
-  beforeLoad: () => {
-    throw redirect({ to: '/coming-soon' });
-  },
   component: BountiesPage,
   validateSearch: (search: Record<string, unknown>): { universeId?: string } => ({
     ...(search.universeId ? { universeId: search.universeId as string } : {}),

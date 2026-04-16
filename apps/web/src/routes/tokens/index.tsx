@@ -5,7 +5,7 @@
  * sparkline, holder count), trending sort, live activity feed, and
  * token maturity progress indicators.
  */
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState, useMemo, memo } from 'react';
 import {
   useTokenListData,
@@ -45,9 +45,6 @@ import { getExplorerAddressUrl } from '@/configs/chains';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 export const Route = createFileRoute('/tokens/')({
-  beforeLoad: () => {
-    throw redirect({ to: '/coming-soon' });
-  },
   component: TokenLaunchpad,
 });
 

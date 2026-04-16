@@ -27,6 +27,7 @@ import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
 import {LaunchpadStaking} from "../src/revenue/LaunchpadStaking.sol";
 import {StoryBounties} from "../src/revenue/StoryBounties.sol";
 import {IdentityNFT} from "../src/IdentityNFT.sol";
+import {Escrow} from "../src/revenue/Escrow.sol";
 
 // NFT beacons
 import {EpisodeEditionCollection} from "../src/revenue/EpisodeEditionCollection.sol";

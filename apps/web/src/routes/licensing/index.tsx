@@ -5,7 +5,7 @@
  *   Licenses   — all licenses the user has created
  *   Merch      — user's created merchandise items + orders
  */
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
   Scale,
@@ -39,9 +39,6 @@ import { licensingRegistryAbi } from '@loar/abis/generated';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/licensing/')({
-  beforeLoad: () => {
-    throw redirect({ to: '/coming-soon' });
-  },
   component: LicensingHubPage,
 });
 

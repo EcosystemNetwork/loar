@@ -4,7 +4,7 @@
  * Browse all listings across the LOAR ecosystem:
  * trending, categories, search, universe storefronts.
  */
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
   Search,
@@ -40,9 +40,6 @@ import { useTrending, usePlatformStats } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 
 export const Route = createFileRoute('/market')({
-  beforeLoad: () => {
-    throw redirect({ to: '/coming-soon' });
-  },
   component: MarketPage,
 });
 
