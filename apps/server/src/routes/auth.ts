@@ -32,7 +32,7 @@ function setSessionCookie(c: any, token: string) {
   setCookie(c, COOKIE_NAME, token, {
     httpOnly: true,
     secure: true,
-    sameSite: IS_PRODUCTION ? 'Lax' : 'Lax',
+    sameSite: IS_PRODUCTION ? 'Strict' : 'Lax',
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   });
@@ -43,7 +43,7 @@ function clearSessionCookie(c: any) {
   deleteCookie(c, COOKIE_NAME, {
     httpOnly: true,
     secure: true,
-    sameSite: IS_PRODUCTION ? 'Lax' : 'Lax',
+    sameSite: IS_PRODUCTION ? 'Strict' : 'Lax',
     path: '/',
   });
 }

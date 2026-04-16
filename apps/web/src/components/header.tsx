@@ -45,6 +45,7 @@ const moreLinks = [
   { to: '/collabs', label: 'Collabs' },
   { to: '/ads', label: 'Ads' },
   { to: '/sandbox', label: 'Sandbox' },
+  { to: '/credits', label: 'Faucet' },
   { to: '/docs', label: 'Docs' },
 ];
 

@@ -117,6 +117,7 @@ function DeployTokenPage() {
     setDeploying(false);
 
     // Parse token address from event
+    let foundToken = false;
     for (const log of txReceipt.logs) {
       try {
         const decoded = decodeEventLog({
@@ -128,6 +129,7 @@ function DeployTokenPage() {
           const args = decoded.args as Record<string, unknown>;
           if (typeof args.tokenAddress !== 'string' || typeof args.governor !== 'string') continue;
           setTokenAddress(args.tokenAddress);
+          foundToken = true;
 
           // Update Firestore
           if (universe?.id) {
@@ -151,7 +153,15 @@ function DeployTokenPage() {
         // Not our event
       }
     }
-    toast.success('Token deployed successfully!');
+    if (foundToken) {
+      toast.success('Token deployed successfully!');
+    } else {
+      console.error('Transaction succeeded but no TokenCreated event found in receipt', txReceipt);
+      toast.error(
+        'Transaction confirmed but no TokenCreated event found. Token deployment may have failed — check the block explorer.',
+        { duration: 15000 }
+      );
+    }
   }
 
   const handleDeploy = async () => {

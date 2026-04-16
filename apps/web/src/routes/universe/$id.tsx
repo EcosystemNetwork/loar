@@ -797,6 +797,20 @@ function UniverseTimelineEditor() {
     generatedImageUrl,
   ]);
 
+  // Debug: log blockchain data state
+  useEffect(() => {
+    console.log('[Universe Debug]', {
+      id,
+      isBlockchainUniverse,
+      timelineContractAddress,
+      isLoadingAny,
+      nodeCount: graphData.nodeIds.length,
+      latestNodeId,
+      urlsSample: graphData.urls.slice(0, 2),
+      descSample: graphData.descriptions.slice(0, 2).map((d: any) => String(d).slice(0, 40)),
+    });
+  }, [id, isBlockchainUniverse, timelineContractAddress, isLoadingAny, graphData, latestNodeId]);
+
   // Convert blockchain data to timeline nodes
   useEffect(() => {
     if (!graphData.nodeIds.length) return;
@@ -1058,6 +1072,15 @@ function UniverseTimelineEditor() {
         onOpenGovernance={handleOpenGovernance}
         onOpenGenerations={() => setShowGenerationsPanel(true)}
       />
+
+      {/* Debug banner — remove after confirming nodes work */}
+      {import.meta.env.DEV && (
+        <div className="bg-yellow-900/80 text-yellow-200 text-xs px-3 py-1 font-mono">
+          [DEBUG] nodes={nodes.length} | graphNodes={graphData.nodeIds.length} | latestId=
+          {latestNodeId} | contract={timelineContractAddress?.slice(0, 10)} | loading=
+          {String(isLoadingAny)} | blockchain={String(isBlockchainUniverse)}
+        </div>
+      )}
 
       {/* Main Content Area */}
       <TokenGateGuard universeId={id} target="view">

@@ -240,35 +240,32 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
 
 function GalleryTab({ universeAddress }: { universeAddress?: string }) {
   const [search, setSearch] = useState('');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'video' | 'image'>('all');
 
-  // Query content collection — all public content, or universe-scoped
+  // Fetch ALL public content via gallery.browse (supports universe scoping + media type filter)
   const { data, isLoading } = useQuery({
-    queryKey: ['wiki', 'gallery', universeAddress],
-    queryFn: async () => {
-      // Use getAll content or universe-scoped — we'll call the content routes
-      // For now, fetch from entities that have media attachments, plus promoted content
-      try {
-        const result = await trpcClient.sandbox.myDrafts.query();
-        // Show only promoted drafts
-        return (result ?? []).filter((d: any) => d.status === 'promoted');
-      } catch {
-        return [];
-      }
-    },
+    queryKey: ['wiki', 'gallery', universeAddress, mediaFilter],
+    queryFn: () =>
+      trpcClient.gallery.browse.query({
+        universeId: universeAddress,
+        mediaType: mediaFilter,
+        sortBy: 'newest',
+        limit: 50,
+      }),
   });
 
-  const items = data ?? [];
+  const items = data?.items ?? [];
   const filtered = search.trim()
     ? items.filter(
         (item: any) =>
           item.title?.toLowerCase().includes(search.toLowerCase()) ||
-          item.prompt?.toLowerCase().includes(search.toLowerCase())
+          item.description?.toLowerCase().includes(search.toLowerCase())
       )
     : items;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -278,6 +275,22 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
             className="pl-9"
           />
         </div>
+        <Select value={mediaFilter} onValueChange={(v) => setMediaFilter(v as any)}>
+          <SelectTrigger className="h-9 text-xs w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">
+              All Media
+            </SelectItem>
+            <SelectItem value="video" className="text-xs">
+              Videos
+            </SelectItem>
+            <SelectItem value="image" className="text-xs">
+              Images
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Link to="/sandbox">
           <Button size="sm" variant="outline">
             <Plus className="h-4 w-4 mr-1" />
@@ -302,42 +315,62 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((item: any) => (
-          <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="aspect-video bg-muted relative">
-              {item.videoUrl ? (
-                <video
-                  src={item.videoUrl}
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                  onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
-                  onMouseLeave={(e) => {
-                    const v = e.currentTarget as HTMLVideoElement;
-                    v.pause();
-                    v.currentTime = 0;
-                  }}
-                />
-              ) : item.imageUrl ? (
-                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-                </div>
-              )}
-              {item.videoUrl && (
-                <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
-                  <Video className="h-2.5 w-2.5 mr-1" />
-                  Video
-                </Badge>
-              )}
-            </div>
-            <CardContent className="p-3">
-              <p className="text-sm font-medium truncate">{item.title}</p>
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{item.prompt}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {filtered.map((item: any) => {
+          const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
+          return (
+            <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="aspect-video bg-muted relative">
+                {isVideo && item.mediaUrl ? (
+                  <video
+                    src={item.mediaUrl}
+                    poster={item.thumbnailUrl || undefined}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                    onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+                    onMouseLeave={(e) => {
+                      const v = e.currentTarget as HTMLVideoElement;
+                      v.pause();
+                      v.currentTime = 0;
+                    }}
+                  />
+                ) : item.mediaUrl || item.thumbnailUrl ? (
+                  <img
+                    src={item.mediaUrl || item.thumbnailUrl}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                  </div>
+                )}
+                {isVideo && (
+                  <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
+                    <Video className="h-2.5 w-2.5 mr-1" />
+                    Video
+                  </Badge>
+                )}
+                {item.classification && (
+                  <Badge
+                    variant="outline"
+                    className="absolute top-2 right-2 bg-black/60 text-white border-0 text-[10px]"
+                  >
+                    {item.classification}
+                  </Badge>
+                )}
+              </div>
+              <CardContent className="p-3">
+                <p className="text-sm font-medium truncate">{item.title}</p>
+                {item.description && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {item.description}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

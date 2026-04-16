@@ -7,6 +7,30 @@ import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 
+// ── Rate limiting for public analytics writes ─────────────────────────
+const analyticsRateLimit = new Map<string, { count: number; resetAt: number }>();
+const ANALYTICS_LIMIT = 30; // max writes per key per minute
+const ANALYTICS_WINDOW = 60_000;
+
+function checkAnalyticsRate(key: string): void {
+  const now = Date.now();
+  const entry = analyticsRateLimit.get(key);
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= ANALYTICS_LIMIT) {
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Rate limit exceeded' });
+    }
+    entry.count++;
+  } else {
+    analyticsRateLimit.set(key, { count: 1, resetAt: now + ANALYTICS_WINDOW });
+  }
+  // Periodic cleanup
+  if (analyticsRateLimit.size > 5000) {
+    for (const [k, v] of analyticsRateLimit) {
+      if (now > v.resetAt) analyticsRateLimit.delete(k);
+    }
+  }
+}
+
 const analyticsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('analytics');
@@ -37,6 +61,7 @@ export const analyticsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      checkAnalyticsRate(`view:${input.universeId}:${input.viewerAddress || 'anon'}`);
       await viewsCol().add({
         ...input,
         viewedAt: new Date(),
@@ -78,6 +103,7 @@ export const analyticsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      checkAnalyticsRate(`engage:${input.universeId}:${input.userAddress || 'anon'}`);
       await engagementCol().add({
         ...input,
         createdAt: new Date(),

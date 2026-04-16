@@ -107,6 +107,71 @@ export const universesRouter = router({
     return await getAllUniverses();
   }),
 
+  /** Discover universes with search, sorting, and pagination. */
+  discover: publicProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        sortBy: z.enum(['newest', 'oldest', 'name']).default('newest'),
+        accessModel: z.enum(['open', 'subscription', 'token_gate', 'both']).optional(),
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const col = db.collection('cinematicUniverses');
+
+      // Firestore query — order by created_at (only reliable server-side sort)
+      let query = col.orderBy('created_at', input.sortBy === 'oldest' ? 'asc' : 'desc');
+
+      // Access model filter (Firestore can handle this with the orderBy)
+      if (input.accessModel) {
+        query = col
+          .where('accessModel', '==', input.accessModel)
+          .orderBy('created_at', input.sortBy === 'oldest' ? 'asc' : 'desc');
+      }
+
+      // Cursor-based pagination
+      if (input.cursor) {
+        const cursorDoc = await col.doc(input.cursor).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
+        }
+      }
+
+      // Fetch extra for client-side filtering
+      const fetchLimit = input.search ? 200 : input.limit + 1;
+      const snapshot = await query.limit(fetchLimit).get();
+
+      let items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+
+      // Client-side search (Firestore doesn't support full-text)
+      if (input.search) {
+        const term = input.search.toLowerCase();
+        items = items.filter(
+          (u: any) =>
+            u.name?.toLowerCase().includes(term) ||
+            u.description?.toLowerCase().includes(term) ||
+            u.id?.toLowerCase().includes(term)
+        );
+      }
+
+      // Client-side sort by name if requested
+      if (input.sortBy === 'name') {
+        items.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      }
+
+      // Paginate
+      const hasMore = items.length > input.limit;
+      const pageItems = items.slice(0, input.limit);
+
+      return {
+        items: pageItems,
+        nextCursor: hasMore ? pageItems[pageItems.length - 1]?.id : undefined,
+        total: pageItems.length,
+      };
+    }),
+
   /** Get universes by creator address. */
   getByCreator: publicProcedure.input(getByCreatorSchema).query(async ({ input }) => {
     return await getUniversesByCreator(input.creator);

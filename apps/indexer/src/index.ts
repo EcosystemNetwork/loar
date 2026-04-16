@@ -81,32 +81,77 @@ ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
   const deployer = getAddress(event.args.msgSender);
   const governorAddress = getAddress(event.args.governor);
 
-  // Resolve the universe this token belongs to by reading the contract.
-  // deployUniverseToken sets universe.token and universe.admin to the governor,
-  // so we can find the universe that just had its governor set to this address.
-  // Alternatively, look up by deployer (creator) — the most recent universe
-  // with tokenAddress=null created by this deployer is the match.
+  // Resolve which universe this token belongs to.
+  // Strategy 1: Read on-chain — iterate recent universe IDs to find the one
+  // whose token was just set to this address.
+  // Strategy 2: SQL fallback — match by deployer (creator) with no token yet.
   let resolvedUniverseAddress: `0x${string}` = '0x0000000000000000000000000000000000000000';
 
   try {
-    // Query universes created by this deployer that don't have a token yet
-    const universes = await context.db.sql`
-      SELECT id FROM universe
-      WHERE creator = ${deployer} AND "tokenAddress" IS NULL
-      ORDER BY "createdAt" DESC
-      LIMIT 1
-    `;
-    if (universes.rows.length > 0) {
-      resolvedUniverseAddress = universes.rows[0].id as `0x${string}`;
+    // Read total supply to know how many universes exist
+    const totalSupply = await context.client.readContract({
+      abi: context.contracts.UniverseManager.abi,
+      address: context.contracts.UniverseManager.address as `0x${string}`,
+      functionName: 'totalSupply',
+    });
 
-      // Also update the universe record with token + governor addresses
+    // Check the most recent universes first (most likely match)
+    const count = Number(totalSupply);
+    for (let i = count - 1; i >= Math.max(0, count - 10); i--) {
+      try {
+        const data = await context.client.readContract({
+          abi: context.contracts.UniverseManager.abi,
+          address: context.contracts.UniverseManager.address as `0x${string}`,
+          functionName: 'getUniverseData',
+          args: [BigInt(i)],
+        });
+        const [universeAddr, tokenAddr] = data as [
+          `0x${string}`,
+          `0x${string}`,
+          `0x${string}`,
+          `0x${string}`,
+          `0x${string}`,
+        ];
+        if (getAddress(tokenAddr) === tokenAddress) {
+          resolvedUniverseAddress = getAddress(universeAddr).toLowerCase() as `0x${string}`;
+          break;
+        }
+      } catch {
+        // Universe ID doesn't exist or call failed, skip
+      }
+    }
+  } catch (err) {
+    console.error('On-chain universe resolution failed, trying SQL fallback:', err);
+  }
+
+  // Fallback: SQL query by deployer
+  if (resolvedUniverseAddress === '0x0000000000000000000000000000000000000000') {
+    try {
+      const deployerLower = deployer.toLowerCase();
+      const universes = await context.db.sql`
+        SELECT id FROM universe
+        WHERE LOWER(creator) = ${deployerLower} AND "tokenAddress" IS NULL
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      `;
+      if (universes.rows.length > 0) {
+        resolvedUniverseAddress = universes.rows[0].id as `0x${string}`;
+      }
+    } catch (err) {
+      console.error('SQL fallback for universe resolution also failed:', err);
+    }
+  }
+
+  // Update the universe record with token + governor addresses
+  if (resolvedUniverseAddress !== '0x0000000000000000000000000000000000000000') {
+    try {
       await context.db.update(universe, { id: resolvedUniverseAddress }).set({
         tokenAddress: tokenAddress,
         governorAddress: governorAddress,
       });
+    } catch (err) {
+      console.error('Failed to update universe with token address:', err);
     }
-  } catch (err) {
-    console.error('Failed to resolve universe for token:', err);
   }
 
   await context.db.insert(token).values({

@@ -62,7 +62,14 @@ export const galleryRouter = router({
         query = query.where('creatorUid', '==', input.creatorUid);
       }
       if (input.mediaType !== 'all') {
-        query = query.where('mediaType', '==', input.mediaType);
+        // Match both raw types (video/image) and AI-generated variants (ai-video/ai-image)
+        const typeVariants =
+          input.mediaType === 'video'
+            ? ['video', 'ai-video']
+            : input.mediaType === 'image'
+              ? ['image', 'ai-image']
+              : [input.mediaType];
+        query = query.where('mediaType', 'in', typeVariants);
       }
 
       // Sorting

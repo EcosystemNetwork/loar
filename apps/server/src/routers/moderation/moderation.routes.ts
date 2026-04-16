@@ -93,6 +93,16 @@ export const moderationRouter = router({
       if (!col) throw new Error('Not available');
       if (!input.goodFaith) throw new Error('Good faith declaration required');
 
+      // Dedup: prevent same email from filing multiple takedowns for same content
+      const existing = await col
+        .where('contentId', '==', input.contentId)
+        .where('claimantEmail', '==', input.claimantEmail)
+        .limit(1)
+        .get();
+      if (!existing.empty) {
+        throw new Error('A takedown request for this content from this email already exists');
+      }
+
       const now = new Date();
       const request = {
         contentId: input.contentId,
