@@ -23,6 +23,22 @@ import {
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
+/**
+ * Features marked PARTIAL in the README — contracts/APIs exist but UI is
+ * incomplete.  Hidden from navigation until fully wired end-to-end.
+ * Re-enable by removing the path from this set.
+ */
+const HIDDEN_ROUTES = new Set([
+  '/tokens', // Launchpad / token trading UI
+  '/licensing', // IP licensing marketplace
+  '/collabs', // Collaborations
+  '/ads', // Ad marketplace
+  '/market', // Marketplace (NFT flows incomplete)
+  '/sell', // Sell (depends on marketplace)
+  '/staking', // Staking (partial)
+  '/bounties', // Bounties (partial)
+]);
+
 const primaryLinks = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
@@ -30,7 +46,7 @@ const primaryLinks = [
   { to: '/tokens', label: 'Launchpad' },
   { to: '/pricing', label: 'Pricing' },
   { to: '/dashboard', label: 'Dashboard' },
-];
+].filter((l) => !HIDDEN_ROUTES.has(l.to));
 
 const moreLinks = [
   { to: '/wiki', label: 'Wiki' },
@@ -47,7 +63,7 @@ const moreLinks = [
   { to: '/sandbox', label: 'Sandbox' },
   { to: '/credits', label: 'Faucet' },
   { to: '/docs', label: 'Docs' },
-];
+].filter((l) => !HIDDEN_ROUTES.has(l.to));
 
 const allLinks = [...primaryLinks, ...moreLinks];
 
