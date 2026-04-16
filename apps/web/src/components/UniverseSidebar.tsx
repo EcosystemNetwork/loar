@@ -343,6 +343,23 @@ export function UniverseSidebar({
                 Create Event
               </Button>
 
+              {/* Play Timeline — immersive branching player */}
+              {graphData.nodeIds.length > 0 && (
+                <Link
+                  to="/play/$universeId"
+                  params={{ universeId: finalUniverse?.address || finalUniverse?.id }}
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-950/50 dark:hover:to-teal-950/50 border-emerald-200 dark:border-emerald-800 transition-all duration-300 group h-10"
+                  >
+                    <Film className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-emerald-600 dark:text-emerald-400" />
+                    Play Timeline ({graphData.nodeIds.length} nodes)
+                  </Button>
+                </Link>
+              )}
+
               {/* Build World — open full create hub scoped to this universe */}
               <Link to="/create" search={{ universe: finalUniverse?.address || finalUniverse?.id }}>
                 <Button

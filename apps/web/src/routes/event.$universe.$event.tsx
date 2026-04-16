@@ -29,13 +29,24 @@ import {
   ChevronLeft,
   ChevronRight,
   Tag,
+  Play,
+  Plus,
+  ListVideo,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { useGetFullGraph } from '@/hooks/useTimeline';
 import { useCreateEpisodeListing } from '@/hooks/useRevenue';
 import { keccak256, toBytes } from 'viem';
+import { SegmentPlayer } from '@/components/segments/SegmentPlayer';
+import { VideoTimeline } from '@/components/segments/VideoTimeline';
+import {
+  AddSegmentDialog,
+  type SegmentGenerationConfig,
+} from '@/components/segments/AddSegmentDialog';
+import type { VideoSegment, MultiSegmentEvent } from '@/types/segments';
+import { migrateLegacyEvent, generateSegmentId, sortSegments } from '@/types/segments';
 
 function EventPage() {
   const { universe: universeId, event: eventId } = useParams({ from: '/event/$universe/$event' });
@@ -163,6 +174,219 @@ function EventPage() {
   const wiki = wikiData?.wikiData;
   const isLoading = isLoadingGraph || isLoadingWiki;
 
+  // Segment composition state
+  const [showAddSegment, setShowAddSegment] = useState(false);
+  const [isGeneratingSegment, setIsGeneratingSegment] = useState(false);
+  const [showSegmentView, setShowSegmentView] = useState(false);
+  const [isPlayingSegments, setIsPlayingSegments] = useState(false);
+  const [segmentCurrentTime, setSegmentCurrentTime] = useState(0);
+  const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
+
+  // Load segments from localStorage (persisted per event)
+  const segmentStorageKey = `event_segments_${universeId}_${eventId}`;
+  const [segments, setSegments] = useState<VideoSegment[]>(() => {
+    try {
+      const stored = localStorage.getItem(segmentStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return sortSegments(parsed);
+      }
+    } catch {
+      /* ignore */
+    }
+    return [];
+  });
+
+  // Persist segments to localStorage
+  const persistSegments = useCallback(
+    (newSegments: VideoSegment[]) => {
+      const sorted = sortSegments(newSegments);
+      setSegments(sorted);
+      localStorage.setItem(segmentStorageKey, JSON.stringify(sorted));
+    },
+    [segmentStorageKey]
+  );
+
+  // Auto-create initial segment from event video if none exist
+  const eventSegments: VideoSegment[] =
+    segments.length > 0
+      ? segments
+      : eventVideoUrl
+        ? [
+            {
+              id: `${eventId}-seg-1`,
+              videoUrl: eventVideoUrl,
+              description: eventDescription || `Event ${eventId}`,
+              prompt: eventDescription || '',
+              duration: 8,
+              order: 0,
+              model: 'fal-veo3' as const,
+              generatedAt: Date.now(),
+              aspectRatio: '16:9' as const,
+              generationMode: 'text-to-video' as const,
+            },
+          ]
+        : [];
+
+  // Handle adding a new segment via generation (text-to-video only from segment dialog)
+  const handleGenerateSegment = useCallback(
+    async (config: SegmentGenerationConfig) => {
+      setIsGeneratingSegment(true);
+      try {
+        // All segment dialog generations use text-to-video via the unified generateVideo route
+        // Image-to-video requires the main FlowCreationPanel flow (character selection → image gen → video)
+        const result = await trpcClient.generation.generateVideo.mutate({
+          prompt: config.prompt,
+          model:
+            config.model === 'fal-veo3'
+              ? ('fal-ai/veo3.1/fast' as any)
+              : config.model === 'fal-kling'
+                ? ('fal-ai/kling-video/v2.1/standard/text-to-video' as any)
+                : config.model === 'fal-wan25'
+                  ? ('fal-ai/wan/v2.1/text-to-video' as any)
+                  : config.model === 'fal-sora'
+                    ? ('fal-ai/sora-2/text-to-video' as any)
+                    : config.model === 'seedance-fast'
+                      ? ('bytedance/seedance-2.0/fast' as any)
+                      : config.model === 'seedance'
+                        ? ('bytedance/seedance-2.0' as any)
+                        : undefined,
+          duration: config.duration,
+          aspectRatio: config.aspectRatio,
+          negativePrompt: config.negativePrompt || undefined,
+        });
+
+        const videoUrl = result.videoUrl;
+        if (!videoUrl) throw new Error('No video URL returned from generation');
+
+        const newSegment: VideoSegment = {
+          id: generateSegmentId(eventId, eventSegments.length),
+          videoUrl,
+          description: config.prompt,
+          prompt: config.prompt,
+          duration: config.duration,
+          order: eventSegments.length,
+          model: config.model,
+          generatedAt: Date.now(),
+          aspectRatio: config.aspectRatio,
+          generationMode: config.mode,
+          negativePrompt: config.negativePrompt,
+        };
+
+        persistSegments([...eventSegments, newSegment]);
+        setShowAddSegment(false);
+      } catch (error) {
+        alert(
+          'Failed to generate segment: ' +
+            (error instanceof Error ? error.message : 'Unknown error')
+        );
+      } finally {
+        setIsGeneratingSegment(false);
+      }
+    },
+    [eventId, eventSegments, persistSegments]
+  );
+
+  // Handle segment reorder
+  const handleSegmentsReorder = useCallback(
+    (segmentIds: string[]) => {
+      const reordered = segmentIds
+        .map((id, idx) => {
+          const seg = eventSegments.find((s) => s.id === id);
+          return seg ? { ...seg, order: idx } : null;
+        })
+        .filter(Boolean) as VideoSegment[];
+      persistSegments(reordered);
+    },
+    [eventSegments, persistSegments]
+  );
+
+  // Handle segment delete
+  const handleSegmentDelete = useCallback(
+    (segmentId: string) => {
+      const filtered = eventSegments
+        .filter((s) => s.id !== segmentId)
+        .map((s, idx) => ({ ...s, order: idx }));
+      persistSegments(filtered);
+    },
+    [eventSegments, persistSegments]
+  );
+
+  // Build connected node chain for "Play Timeline" (walks previous→current→next)
+  const timelineChain: VideoSegment[] = [];
+  if (graphData) {
+    // Collect chain: previous → current → next events
+    const chainNodeIds: number[] = [];
+
+    // Walk backwards from current to find root
+    let walkId = parseInt(eventId);
+    const visited = new Set<number>();
+    while (walkId && !visited.has(walkId)) {
+      visited.add(walkId);
+      chainNodeIds.unshift(walkId);
+      const idx = graphData[0]?.findIndex((id: any) => {
+        const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
+        return numericId === walkId;
+      });
+      if (idx === -1 || idx === undefined) break;
+      const prevId = graphData[3]?.[idx];
+      if (!prevId || String(prevId) === '0') break;
+      walkId = typeof prevId === 'bigint' ? Number(prevId) : parseInt(String(prevId));
+    }
+
+    // Walk forward from current following first child
+    walkId = parseInt(eventId);
+    visited.clear();
+    visited.add(walkId);
+    while (true) {
+      // Find first child of walkId
+      let foundChild: number | null = null;
+      graphData[3]?.forEach((parentId: any, idx: number) => {
+        if (foundChild) return;
+        const parentNumeric =
+          typeof parentId === 'bigint' ? Number(parentId) : parseInt(String(parentId));
+        if (parentNumeric === walkId) {
+          const childId = graphData[0][idx];
+          foundChild = typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
+        }
+      });
+      if (!foundChild || visited.has(foundChild)) break;
+      visited.add(foundChild);
+      chainNodeIds.push(foundChild);
+      walkId = foundChild;
+    }
+
+    // Convert chain node IDs to segments
+    for (const nodeId of chainNodeIds) {
+      const idx = graphData[0]?.findIndex((id: any) => {
+        const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
+        return numericId === nodeId;
+      });
+      if (idx === -1 || idx === undefined) continue;
+      const url = String(graphData[1]?.[idx] || '');
+      if (!url || url.startsWith('0x')) continue;
+
+      const rawDesc = graphData[2]?.[idx];
+      const desc =
+        typeof rawDesc === 'object' && rawDesc !== null && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : String(rawDesc || `Event ${nodeId}`);
+
+      timelineChain.push({
+        id: `chain-${nodeId}`,
+        videoUrl: url,
+        description: desc,
+        prompt: desc,
+        duration: 8,
+        order: timelineChain.length,
+        model: 'fal-veo3',
+        generatedAt: Date.now(),
+        aspectRatio: '16:9',
+        generationMode: 'text-to-video',
+      });
+    }
+  }
+
   // List as NFT dialog
   const [listingOpen, setListingOpen] = useState(false);
   const [mintPrice, setMintPrice] = useState('0.05');
@@ -252,8 +476,40 @@ function EventPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-4 max-w-6xl">
-        {/* Video Player */}
-        {eventVideoUrl && (
+        {/* Video Player / Segment Composition */}
+        {showSegmentView && eventSegments.length > 1 ? (
+          /* Multi-Segment Player */
+          <div className="mb-4 space-y-3">
+            <SegmentPlayer
+              segments={eventSegments}
+              autoPlay
+              onSegmentChange={setCurrentSegmentIndex}
+              onPlaybackComplete={() => setIsPlayingSegments(false)}
+              className="shadow-lg"
+            />
+            <VideoTimeline
+              segments={eventSegments}
+              onSegmentsReorder={handleSegmentsReorder}
+              onSegmentDelete={handleSegmentDelete}
+              onAddSegment={() => setShowAddSegment(true)}
+              onPlaySegments={() => setIsPlayingSegments(!isPlayingSegments)}
+              isPlaying={isPlayingSegments}
+              currentTime={segmentCurrentTime}
+              currentSegmentIndex={currentSegmentIndex}
+            />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSegmentView(false)}
+                className="text-muted-foreground"
+              >
+                Switch to Single View
+              </Button>
+            </div>
+          </div>
+        ) : eventVideoUrl ? (
+          /* Single Video Player */
           <Card className="mb-4 shadow-lg">
             <CardContent className="p-0">
               <div className="aspect-video bg-black rounded-lg overflow-hidden">
@@ -269,6 +525,46 @@ function EventPage() {
               </div>
             </CardContent>
           </Card>
+        ) : null}
+
+        {/* Segment Actions Bar */}
+        {eventVideoUrl && (
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            {eventSegments.length > 1 && !showSegmentView && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSegmentView(true)}
+                className="gap-1.5"
+              >
+                <ListVideo className="h-3.5 w-3.5" />
+                View Segments ({eventSegments.length})
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddSegment(true)}
+              className="gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Segment
+            </Button>
+            {timelineChain.length > 1 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setSegments([]); // Temporarily clear to use chain
+                  setShowSegmentView(true);
+                }}
+                className="gap-1.5 ml-auto"
+              >
+                <Play className="h-3.5 w-3.5" />
+                Play Full Timeline ({timelineChain.length} nodes)
+              </Button>
+            )}
+          </div>
         )}
 
         {/* User Description */}
@@ -280,6 +576,15 @@ function EventPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Add Segment Dialog */}
+        <AddSegmentDialog
+          isOpen={showAddSegment}
+          onClose={() => setShowAddSegment(false)}
+          onGenerate={handleGenerateSegment}
+          isGenerating={isGeneratingSegment}
+          eventDescription={eventDescription}
+        />
 
         {/* Navigation Buttons */}
         <div className="mb-4">

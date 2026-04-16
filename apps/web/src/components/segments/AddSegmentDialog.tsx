@@ -92,6 +92,9 @@ export function AddSegmentDialog({
         return [5, 10];
       case 'fal-sora':
         return [4, 8, 12];
+      case 'seedance':
+      case 'seedance-fast':
+        return [5, 8, 10];
       case 'fal-veo3':
       default:
         return [4, 5, 8, 10];
@@ -244,6 +247,18 @@ export function AddSegmentDialog({
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-orange-500" />
                           Sora 2
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="seedance">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                          Seedance
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="seedance-fast">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-teal-500" />
+                          Seedance Fast
                         </div>
                       </SelectItem>
                     </SelectContent>

@@ -5,7 +5,13 @@
  * Each event can contain multiple video segments that play sequentially.
  */
 
-export type VideoModel = 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
+export type VideoModel =
+  | 'fal-veo3'
+  | 'fal-kling'
+  | 'fal-wan25'
+  | 'fal-sora'
+  | 'seedance'
+  | 'seedance-fast';
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 export type GenerationMode = 'text-to-video' | 'image-to-video';
 

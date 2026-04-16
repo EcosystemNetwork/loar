@@ -120,63 +120,68 @@ The server uses [Hono](https://hono.dev/) as the HTTP framework with middleware:
 ### tRPC Router Tree
 
 ```
-appRouter (45+ routers, 150+ procedures)
+appRouter (43 routers, 150+ procedures)
 ├── healthCheck              (query, public)
 ├── privateData              (query, protected)
-├── universes                (sub-router) — CRUD, team, treasury
-├── content                  (sub-router) — user content, wiki/lore generation
-├── generation               (sub-router) — AI video with smart routing + billing
-├── image                    (sub-router) — image generation with history
-├── voice                    (sub-router) — TTS, sound effects, voice cloning
-├── threed                   (sub-router) — 3D generation (Meshy)
-├── studio                   (sub-router) — entity asset pack orchestrator
-├── fal                      (sub-router) — FAL AI integration
-├── video                    (sub-router) — video generation with provider selection
-├── wiki                     (sub-router) — characters, wikia, storylines
-├── marketplace              (sub-router) — canon submissions, voting
-├── nft                      (sub-router) — NFT minting and metadata
-├── listings                 (sub-router) — content listings
-├── credits                  (sub-router) — credit packages and balances
-├── subscriptions            (sub-router) — universe subscription tiers
-├── analytics                (sub-router) — views, engagement, trending
+├── admin                    (sub-router) — platform configuration
 ├── ads                      (sub-router) — ad slots and sponsorships
-├── licensing                (sub-router) — IP licensing and royalties
-├── storage                  (sub-router) — Firebase Storage, Filecoin Synapse
-├── profiles                 (sub-router) — user profiles and discovery
-├── entities                 (sub-router) — characters, locations, items (10+ kinds)
-├── quests                   (sub-router) — quest system, daily check-ins, affiliates
-├── sandbox                  (sub-router) — draft creations
-├── collabs                  (sub-router) — cross-universe collaborations
-├── universeTeam             (sub-router) — universe team management
-├── universeTreasury         (sub-router) — treasury operations
-├── governance               (sub-router) — governance queries
-├── revenue                  (sub-router) — revenue tracking and splits
-├── tokenGates               (sub-router) — token-gated content
-├── social                   (sub-router) — social features
-├── feed                     (sub-router) — content feed
-├── lora                     (sub-router) — LoRA model training
-├── talentAgents             (sub-router) — AI talent agent management
+├── aiAgents                 (sub-router) — AI agent management
+├── aiPipelines              (sub-router) — AI agent pipeline execution
+├── analytics                (sub-router) — views, engagement, trending
 ├── apiKeys                  (sub-router) — API key management
-├── portfolio                (sub-router) — user portfolio
+├── bounties                 (sub-router) — story bounties
+├── collabs                  (sub-router) — cross-universe collaborations
+├── content                  (sub-router) — user content, wiki/lore generation
+├── contentLicensing         (sub-router) — content licensing deals
+├── credits                  (sub-router) — credit packages and balances
+├── entities                 (sub-router) — characters, locations, items (10+ kinds)
+├── feed                     (sub-router) — content feed
+├── gallery                  (sub-router) — universe galleries
+├── generation               (sub-router) — AI video with smart routing + billing
+├── governance               (sub-router) — governance queries
+├── licensing                (sub-router) — IP licensing and royalties
+├── listings                 (sub-router) — content listings
+├── marketplace              (sub-router) — canon submissions, voting
 ├── media                    (sub-router) — media management
 ├── moderation               (sub-router) — content moderation
-├── admin                    (sub-router) — platform configuration
-├── minio                    (sub-router) — Firebase Storage (legacy name)
-├── synapse                  (sub-router) — Filecoin/Synapse storage
-└── aiPipelines              (sub-router) — AI agent pipeline execution
+├── nft                      (sub-router) — NFT minting and metadata
+├── platformSubscriptions    (sub-router) — platform-level subscriptions
+├── player                   (sub-router) — narrative player/gameplay
+├── portfolio                (sub-router) — user portfolio
+├── pricing                  (sub-router) — pricing tiers
+├── privateSection           (sub-router) — private/gated content
+├── profiles                 (sub-router) — user profiles and discovery
+├── quests                   (sub-router) — quest system, daily check-ins, affiliates
+├── revenue                  (sub-router) — revenue tracking and splits
+├── sandbox                  (sub-router) — draft creations
+├── social                   (sub-router) — social features
+├── splits                   (sub-router) — revenue split configuration
+├── staking                  (sub-router) — token staking
+├── storage                  (sub-router) — decentralized storage
+├── studio                   (sub-router) — entity asset pack orchestrator
+├── subscriptions            (sub-router) — universe subscription tiers
+├── talentAgents             (sub-router) — talent agent management
+├── tokenGates               (sub-router) — token-gated content
+├── tokenSocial              (sub-router) — token social features
+├── universeGenConfig        (sub-router) — per-universe AI generation config
+├── universes                (sub-router) — CRUD, team, treasury
+├── universeTeam             (sub-router) — universe team management
+└── universeTreasury         (sub-router) — treasury operations
 ```
 
 ### Services
 
-| Service | File                  | External API          | Purpose                             |
-| ------- | --------------------- | --------------------- | ----------------------------------- |
-| Fal AI  | `services/fal.ts`     | fal.ai                | Image and video generation          |
-| Gemini  | `services/gemini.ts`  | Google Gemini 2.5 Pro | Wiki generation from video analysis |
-| MinIO\* | `services/minio.ts`   | Firebase Storage      | File upload/download                |
-| Synapse | `services/synapse.ts` | Filecoin/Synapse      | Decentralized video storage         |
-| Wikia   | `services/wikia.ts`   | OpenAI                | Storyline generation                |
+| Service    | File                  | External API          | Purpose                             |
+| ---------- | --------------------- | --------------------- | ----------------------------------- |
+| Fal AI     | `services/fal.ts`     | fal.ai                | Image and video generation          |
+| Gemini     | `services/gemini.ts`  | Google Gemini 2.5 Pro | Wiki generation from video analysis |
+| MinIO\*    | `services/minio.ts`   | Firebase Storage      | File upload/download                |
+| Synapse    | `services/synapse.ts` | Filecoin/Synapse      | Decentralized video storage         |
+| Wikia      | `services/wikia.ts`   | OpenAI                | Storyline generation                |
+| Pinata     | `services/storage/`   | Pinata                | IPFS pinning (primary hot storage)  |
+| Lighthouse | `services/storage/`   | Lighthouse            | Filecoin permanent storage          |
 
-_Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved)._
+_Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved). Storage providers are managed by `StorageManager` with priority-based fallback._
 
 ## Web Architecture
 

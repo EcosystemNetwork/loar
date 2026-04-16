@@ -351,6 +351,10 @@ function SegmentBlock({
         return 'from-green-500 to-green-600';
       case 'fal-sora':
         return 'from-orange-500 to-orange-600';
+      case 'seedance':
+        return 'from-emerald-500 to-emerald-600';
+      case 'seedance-fast':
+        return 'from-teal-500 to-teal-600';
       default:
         return 'from-gray-500 to-gray-600';
     }
@@ -366,6 +370,10 @@ function SegmentBlock({
         return 'border-green-400';
       case 'fal-sora':
         return 'border-orange-400';
+      case 'seedance':
+        return 'border-emerald-400';
+      case 'seedance-fast':
+        return 'border-teal-400';
       default:
         return 'border-gray-400';
     }

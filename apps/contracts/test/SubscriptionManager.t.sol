@@ -119,7 +119,7 @@ contract SubscriptionManagerTest is Test {
         assertTrue(autoRenew);
 
         // Verify payment was routed
-        uint256 expectedCreatorCut = totalPrice - (totalPrice * FEE_BPS / 10000);
+        uint256 expectedCreatorCut = totalPrice - (totalPrice * uint256(FEE_BPS) / 10000);
         assertEq(router._claimable(creator), expectedCreatorCut);
     }
 

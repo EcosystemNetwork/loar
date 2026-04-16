@@ -884,6 +884,22 @@ function UniverseTimelineEditor() {
           ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
           : `Event ${nodeId}`);
 
+      // Count children (branches) for this node
+      const childNodes = graphData.children[index];
+      const childCount = Array.isArray(childNodes) ? childNodes.length : 0;
+
+      // Count segments from localStorage
+      let segmentCount = 0;
+      try {
+        const segKey = `event_segments_${finalUniverse?.id || id}_${nodeId}`;
+        const segData = localStorage.getItem(segKey);
+        if (segData) {
+          segmentCount = JSON.parse(segData).length;
+        }
+      } catch {
+        /* ignore */
+      }
+
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
         type: 'timelineEvent',
@@ -894,13 +910,15 @@ function UniverseTimelineEditor() {
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: nodeId.toString(), // Use actual blockchain node ID for navigation
-          blockchainNodeId: nodeId, // Store actual blockchain node ID for navigation
-          displayName: nodeId.toString(), // Display actual blockchain node ID (not branch labels)
+          eventId: nodeId.toString(),
+          blockchainNodeId: nodeId,
+          displayName: nodeId.toString(),
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
-          isInCanonChain: isInCanonChain, // Pass canon chain information
+          isInCanonChain: isInCanonChain,
+          segmentCount: segmentCount > 1 ? segmentCount : undefined,
+          childCount: childCount > 1 ? childCount : undefined,
           onAddScene: handleAddEvent,
         },
       });

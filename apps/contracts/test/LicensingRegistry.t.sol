@@ -143,7 +143,8 @@ contract LicensingRegistryTest is Test {
         assertEq(endTime, block.timestamp + DURATION);
 
         // Payment routed
-        uint256 expectedCreatorCut = UPFRONT_FEE - (UPFRONT_FEE * FEE_BPS / 10000);
+        uint256 fee = (UPFRONT_FEE * uint256(FEE_BPS)) / 10000;
+        uint256 expectedCreatorCut = UPFRONT_FEE - fee;
         assertEq(router._claimable(creator), expectedCreatorCut);
     }
 
@@ -276,7 +277,8 @@ contract LicensingRegistryTest is Test {
         assertEq(sold, 1);
 
         // Payment routed to creator
-        uint256 expectedCreatorCut = 0.05 ether - (0.05 ether * FEE_BPS / 10000);
+        uint256 merchFee = (0.05 ether * uint256(FEE_BPS)) / 10000;
+        uint256 expectedCreatorCut = 0.05 ether - merchFee;
         assertEq(router._claimable(creator), expectedCreatorCut);
     }
 }

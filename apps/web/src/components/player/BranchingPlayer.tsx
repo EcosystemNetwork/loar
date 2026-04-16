@@ -27,11 +27,11 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
   const [showStats, setShowStats] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Get the full graph from the blockchain
+  // Get the full graph from the blockchain — universeId IS the contract address
   const { graphData: fullGraph } = useUniverseBlockchain({
     universeId,
-    contractAddress: undefined,
-    isBlockchainUniverse: true,
+    contractAddress: universeId.startsWith('0x') ? universeId : undefined,
+    isBlockchainUniverse: universeId.startsWith('0x'),
   });
 
   // Session management
@@ -40,7 +40,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
 
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // Build node map from graph data
+  // Build node map from graph data — uses resolved URLs and descriptions
   const [nodeMap, setNodeMap] = useState<Map<number, NodeData>>(new Map());
 
   useEffect(() => {
@@ -51,18 +51,40 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
     if (data?.nodeIds) {
       for (let i = 0; i < data.nodeIds.length; i++) {
         const id = Number(data.nodeIds[i]);
+
+        // Resolve media URL: prefer resolved URLs from indexer, fall back to contentHash
+        const resolvedUrl = data.urls?.[i] || '';
+        const contentHash = data.contentHashes?.[i] || '';
+        const isHash = (val: string) => /^0x[0-9a-fA-F]{64}$/.test(val);
+        const mediaUrl = resolvedUrl && !isHash(resolvedUrl) ? resolvedUrl : '';
+
+        // Also check localStorage for locally-saved events
+        let localUrl = '';
+        try {
+          const localKey = `universe_events_${universeId}`;
+          const stored = localStorage.getItem(localKey);
+          if (stored) {
+            const events = JSON.parse(stored);
+            const localEvent = events[id.toString()] || events[String(id)];
+            if (localEvent?.videoUrl) localUrl = localEvent.videoUrl;
+          }
+        } catch {
+          /* ignore */
+        }
+
         map.set(id, {
           id,
-          contentHash: data.contentHashes?.[i] || '',
+          contentHash,
           plotHash: data.plotHashes?.[i] || '',
-          previousId: Number(data.previousIds?.[i] || 0),
-          nextIds: (data.nextIds?.[i] || []).map(Number),
-          canon: data.canonFlags?.[i] || false,
+          previousId: Number(data.previousNodes?.[i] || data.previousIds?.[i] || 0),
+          nextIds: (data.children?.[i] || data.nextIds?.[i] || []).map(Number),
+          canon: data.flags?.[i] || data.canonFlags?.[i] || false,
+          mediaUrl: localUrl || mediaUrl,
         });
       }
     }
     setNodeMap(map);
-  }, [fullGraph]);
+  }, [fullGraph, universeId]);
 
   // Start session on mount
   useEffect(() => {

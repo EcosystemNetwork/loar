@@ -184,6 +184,10 @@ function SegmentCard({
         return 'bg-green-500';
       case 'fal-sora':
         return 'bg-orange-500';
+      case 'seedance':
+        return 'bg-emerald-500';
+      case 'seedance-fast':
+        return 'bg-teal-500';
       default:
         return 'bg-gray-500';
     }

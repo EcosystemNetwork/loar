@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import {EntityNFT} from "../src/revenue/EntityNFT.sol";
 import {IRightsRegistry} from "../src/interfaces/IRightsRegistry.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
@@ -27,15 +28,18 @@ contract EntityNFTTest is Test {
         router = new MockPaymentRouter(treasury);
         registry = new MockRightsRegistry();
 
-        nft = new EntityNFT();
-        nft.initialize(
-            UNIVERSE_ID,
-            platform,
-            address(router),
-            address(registry),
-            500,  // 5% platform fee
-            250   // 2.5% royalty
-        );
+        EntityNFT impl = new EntityNFT();
+        nft = EntityNFT(address(new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(EntityNFT.initialize, (
+                UNIVERSE_ID,
+                platform,
+                address(router),
+                address(registry),
+                500,
+                250
+            ))
+        )));
     }
 
     // ---- Initialization ----

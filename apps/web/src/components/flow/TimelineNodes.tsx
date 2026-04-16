@@ -30,8 +30,11 @@ export interface TimelineNodeData {
   nodeType?: 'scene' | 'branch' | 'add';
   isCanon?: boolean; // Whether this node is canonical
   isInCanonChain?: boolean; // Whether this node is part of the canonical chain
+  segmentCount?: number; // Number of video segments composing this event
+  childCount?: number; // Number of child/branching nodes
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
   onEditScene?: (eventId: string) => void;
+  wiki?: { title?: string; summary?: string; plot?: string };
 }
 
 export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
@@ -172,17 +175,25 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   {data.displayName || `Event ${data.eventId || '?'}`}
                 </div>
 
-                {/* Canon badge - displayed if node is in canonical chain */}
-                {data.isInCanonChain && (
-                  <div className="absolute top-2 right-2">
+                {/* Status badges - top right */}
+                <div className="absolute top-2 right-2 flex gap-1">
+                  {data.segmentCount && data.segmentCount > 1 && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-500/90 hover:bg-blue-600 text-white text-xs px-1.5 py-0.5"
+                    >
+                      {data.segmentCount} clips
+                    </Badge>
+                  )}
+                  {data.isInCanonChain && (
                     <Badge
                       variant="default"
                       className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs px-2 py-1"
                     >
                       Canon
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
@@ -205,10 +216,15 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 {data.displayName || `Event ${data.eventId || '?'}`}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {data.isRoot && (
-                <Badge variant="secondary" className="text-sm">
+                <Badge variant="secondary" className="text-xs">
                   Start
+                </Badge>
+              )}
+              {data.childCount && data.childCount > 1 && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  {data.childCount} branches
                 </Badge>
               )}
               <Button

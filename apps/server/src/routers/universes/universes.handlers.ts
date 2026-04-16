@@ -8,8 +8,8 @@
 import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
 
-// ── Mint fee credit conversion ────────────────────────────────────────────
-const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '5000', 10);
+// ── Mint fee credit conversion (~$10 worth of generation credits) ─────────
+const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '333', 10);
 
 interface CreateUniverseInput {
   address: string;

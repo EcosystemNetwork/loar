@@ -17,6 +17,7 @@ contract LoarFaucetTest is Test {
     uint256 constant FAUCET_SUPPLY = 100_000e18;
 
     function setUp() public {
+        vm.warp(100_000); // ensure first claim succeeds (lastClaimed=0, nextClaimAt=86400)
         vm.startPrank(owner);
         token = new LoarToken(treasury, holder);
         faucet = new LoarFaucet(address(token));

@@ -57,19 +57,19 @@ const LOCKER = getAddress(deployment.contracts.LoarLpLockerMultiple) as `0x${str
 const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9' as const; // Sepolia WETH
 
 // ── Universe config ───────────────────────────────────────────────────────────
-const UNIVERSE_NAME = 'Neon Ronin';
-const TOKEN_SYMBOL = 'RONIN';
+const UNIVERSE_NAME = 'Voidborn Saga';
+const TOKEN_SYMBOL = 'VOID';
 const UNIVERSE_DESCRIPTION =
-  'Tokyo 2089. Megacorporations own the sky, but the neon-lit streets belong to the Ronin — rogue AI samurai who defected from their corporate masters. Armed with quantum katanas that cut through both matter and data, they wage guerrilla warfare in the liminal space between meatspace and the Net. When a Ronin named Akira discovers an ancient protocol hidden in the blockchain — one that predates humanity — the war for the future of consciousness begins.';
+  'At the edge of known space, the Voidborn drift between collapsing realities — beings forged from dark matter who remember every universe that ever died. When the last stable dimension begins to fracture, a Voidborn named Sable must choose: let entropy consume everything, or rewrite the laws of physics using forbidden narrative code — stories so powerful they reshape spacetime itself. The catch? Every story she writes erases one of her own memories.';
 
 const COVER_PROMPT = [
   `Epic cinematic movie poster for "${UNIVERSE_NAME}".`,
-  'Tokyo 2089 cyberpunk cityscape at night, towering megacorporation skyscrapers with holographic advertisements,',
-  'neon-soaked rain-slicked streets below. A lone rogue AI samurai stands on a rooftop edge,',
-  'quantum katana glowing electric blue, their face half-human half-digital circuitry.',
-  'Cherry blossom petals drift through laser grid beams.',
-  'Deep indigo and hot pink neon color palette, dramatic volumetric fog, ultra-detailed 8K concept art.',
-  'No text, no watermarks, no logos.',
+  'A vast cosmic void with collapsing dimensional rifts, swirling dark matter forming humanoid silhouettes.',
+  'A lone figure made of starlight and shadow floats at the center, hands outstretched,',
+  'weaving glowing narrative threads that spiral into new galaxies.',
+  'Dying universes collapse in the background like shattered stained glass.',
+  'Deep purple, black, and electric gold color palette, bioluminescent particle effects.',
+  'Ultra-detailed 8K concept art, dramatic scale, no text, no watermarks, no logos.',
 ].join(' ');
 
 // Pool config
@@ -225,64 +225,137 @@ async function deployOnChain(imageUrl: string): Promise<DeployResult> {
     [{ loarFee: 3000, pairedFee: 3000 }]
   );
 
-  const deployArgs = [
-    UNIVERSE_NAME,
-    imageUrl,
-    UNIVERSE_DESCRIPTION,
-    0, // PUBLIC
-    0, // PUBLIC
-    account.address,
-    {
-      tokenConfig: {
-        tokenAdmin: account.address,
-        name: UNIVERSE_NAME,
-        symbol: TOKEN_SYMBOL,
-        imageURL: imageUrl,
-        metadata: `Governance token for ${UNIVERSE_NAME}`,
-        context: UNIVERSE_DESCRIPTION,
-      },
-      poolConfig: {
-        hook: HOOK,
-        pairedToken: WETH,
-        tickIfToken0IsLoar: STARTING_TICK,
-        tickSpacing: TICK_SPACING,
-        poolData,
-      },
-      lockerConfig: {
-        locker: LOCKER,
-        rewardAdmins: [account.address],
-        rewardRecipients: [account.address],
-        rewardBps: [10000],
-        tickLower: [STARTING_TICK],
-        tickUpper: [0],
-        positionBps: [10000],
-        lockerData: '0x' as `0x${string}`,
-      },
-      allocationConfig: { lpBps: 8000, creatorBps: 1000, treasuryBps: 500, communityBps: 500 },
+  const deploymentConfig = {
+    tokenConfig: {
+      tokenAdmin: account.address,
+      name: UNIVERSE_NAME,
+      symbol: TOKEN_SYMBOL,
+      imageURL: imageUrl,
+      metadata: `Governance token for ${UNIVERSE_NAME}`,
+      context: UNIVERSE_DESCRIPTION,
     },
-  ] as const;
+    poolConfig: {
+      hook: HOOK,
+      pairedToken: WETH,
+      tickIfToken0IsLoar: STARTING_TICK,
+      tickSpacing: TICK_SPACING,
+      poolData,
+    },
+    lockerConfig: {
+      locker: LOCKER,
+      rewardAdmins: [account.address],
+      rewardRecipients: [account.address],
+      rewardBps: [10000],
+      tickLower: [STARTING_TICK],
+      tickUpper: [0],
+      positionBps: [10000],
+      lockerData: '0x' as `0x${string}`,
+    },
+    allocationConfig: { lpBps: 8000, creatorBps: 1000, treasuryBps: 500, communityBps: 500 },
+  };
 
-  // Simulate
-  log('CHAIN', 'Simulating...');
-  await publicClient.simulateContract({
-    account,
-    address: UNIVERSE_MANAGER,
-    abi: universeManagerAbi,
-    functionName: 'createUniverseWithToken',
-    args: deployArgs,
-    value: mintFee,
-  });
-  log('CHAIN', 'Simulation passed');
+  // Try atomic first, fall back to two-step if it reverts
+  let txHash: `0x${string}`;
+  let universeAddress: string | undefined;
+  let tokenAddress: string | undefined;
+  let governorAddress: string | undefined;
+  let universeId: bigint | null = null;
 
-  // Send tx
-  log('CHAIN', 'Sending transaction...');
-  const txHash = await walletClient.writeContract({
-    address: UNIVERSE_MANAGER,
-    abi: universeManagerAbi,
-    functionName: 'createUniverseWithToken',
-    args: deployArgs,
-    value: mintFee,
-  });
+  try {
+    log('CHAIN', 'Simulating atomic createUniverseWithToken...');
+    await publicClient.simulateContract({
+      account,
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'createUniverseWithToken',
+      args: [
+        UNIVERSE_NAME,
+        imageUrl,
+        UNIVERSE_DESCRIPTION,
+        0,
+        0,
+        account.address,
+        deploymentConfig,
+      ],
+      value: mintFee,
+    });
+    log('CHAIN', 'Simulation passed — sending atomic tx...');
+
+    txHash = await walletClient.writeContract({
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'createUniverseWithToken',
+      args: [
+        UNIVERSE_NAME,
+        imageUrl,
+        UNIVERSE_DESCRIPTION,
+        0,
+        0,
+        account.address,
+        deploymentConfig,
+      ],
+      value: mintFee,
+    });
+  } catch {
+    log('CHAIN', 'Atomic call reverted — using two-step flow');
+
+    // Step A: Create universe
+    log('CHAIN', 'Step 1/2: Creating universe...');
+    const h1 = await walletClient.writeContract({
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'createUniverse',
+      args: [UNIVERSE_NAME, imageUrl, UNIVERSE_DESCRIPTION, 0, 0, account.address],
+      value: mintFee,
+    });
+    const r1 = await publicClient.waitForTransactionReceipt({ hash: h1, timeout: 120_000 });
+    if (r1.status !== 'success') throw new Error('createUniverse reverted');
+
+    for (const logEntry of r1.logs) {
+      try {
+        const d = decodeEventLog({
+          abi: universeManagerAbi,
+          data: logEntry.data,
+          topics: logEntry.topics,
+        });
+        if (d.eventName === 'UniverseCreated') universeAddress = (d.args as any).universe;
+        if (d.eventName === 'UniverseLpSeed') universeId = (d.args as any).universeId;
+      } catch {}
+    }
+    log('CHAIN', `Universe created: ${universeAddress} (ID: ${universeId})`);
+
+    if (universeId === null) {
+      // Resolve ID from event count
+      const { parseAbiItem } = await import('viem');
+      const logs = await publicClient.getLogs({
+        address: UNIVERSE_MANAGER,
+        event: parseAbiItem('event UniverseCreated(address universe, address creator)'),
+        fromBlock: BigInt(deployment.startBlock),
+        toBlock: 'latest',
+      });
+      universeId = BigInt(logs.length - 1);
+      log('CHAIN', `Resolved universe ID from events: ${universeId}`);
+    }
+
+    // Step B: Deploy token
+    log('CHAIN', 'Step 2/2: Deploying token...');
+    log('CHAIN', 'Simulating deployUniverseToken...');
+    await publicClient.simulateContract({
+      account,
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'deployUniverseToken',
+      args: [deploymentConfig, universeId],
+    });
+
+    txHash = await walletClient.writeContract({
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'deployUniverseToken',
+      args: [deploymentConfig, universeId],
+    });
+  }
+
   log('CHAIN', `TX: ${txHash}`);
   log('CHAIN', `Explorer: https://sepolia.etherscan.io/tx/${txHash}`);
 
@@ -297,12 +370,7 @@ async function deployOnChain(imageUrl: string): Promise<DeployResult> {
   }
   log('CHAIN', `Confirmed in block ${receipt.blockNumber} (gas: ${receipt.gasUsed})`);
 
-  // Parse events
-  let universeAddress: string | undefined;
-  let tokenAddress: string | undefined;
-  let governorAddress: string | undefined;
-  let universeId: bigint | null = null;
-
+  // Parse events from final receipt
   for (const logEntry of receipt.logs) {
     try {
       const decoded = decodeEventLog({
