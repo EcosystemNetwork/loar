@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpc, trpcClient } from '../../utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,9 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
       setBody('');
       setKind(null);
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create draft');
+    },
   });
 
   const publishMutation = useMutation({
@@ -53,12 +57,18 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['privateSection', 'listItems']] });
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to publish draft');
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => trpcClient.privateSection.deleteItem.mutate({ itemId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['privateSection', 'listItems']] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete draft');
     },
   });
 

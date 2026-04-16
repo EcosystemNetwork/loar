@@ -77,6 +77,7 @@ function useUniverseCanonChain(contractAddress?: string) {
     functionName: 'getCanonChain',
     query: {
       enabled: !!contractAddress,
+      retry: false, // CanonNotSet() revert is expected when no canon has been set
     },
   });
 }

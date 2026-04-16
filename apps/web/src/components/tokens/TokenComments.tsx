@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
@@ -73,6 +74,9 @@ export function TokenComments({ tokenAddress }: { tokenAddress: string }) {
       setReplyTo(null);
       setReplyText('');
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to post comment');
+    },
   });
 
   // Delete comment
@@ -82,6 +86,9 @@ export function TokenComments({ tokenAddress }: { tokenAddress: string }) {
       queryClient.invalidateQueries({ queryKey: ['token-comments', tokenAddress] });
       queryClient.invalidateQueries({ queryKey: ['token-comment-count', tokenAddress] });
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete comment');
+    },
   });
 
   // Like comment
@@ -89,6 +96,9 @@ export function TokenComments({ tokenAddress }: { tokenAddress: string }) {
     mutationFn: (commentId: string) => trpcClient.tokenSocial.likeComment.mutate({ commentId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['token-comments', tokenAddress] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to like comment');
     },
   });
 

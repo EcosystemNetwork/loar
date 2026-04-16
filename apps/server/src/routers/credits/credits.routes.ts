@@ -41,14 +41,18 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
   const cached = txCache.get(key);
   if (cached && Date.now() - cached.ts < TX_CACHE_TTL) return cached.data as Promise<T>;
   const promise = fetcher();
-  promise.then((data) => {
-    if (txCache.size >= TX_CACHE_MAX) {
-      // Evict oldest entry
-      const oldest = txCache.keys().next().value;
-      if (oldest) txCache.delete(oldest);
-    }
-    txCache.set(key, { data, ts: Date.now() });
-  });
+  promise
+    .then((data) => {
+      if (txCache.size >= TX_CACHE_MAX) {
+        // Evict oldest entry
+        const oldest = txCache.keys().next().value;
+        if (oldest) txCache.delete(oldest);
+      }
+      txCache.set(key, { data, ts: Date.now() });
+    })
+    .catch((err) => {
+      console.error(`[txCache] Fetch failed for ${key}:`, err?.message || err);
+    });
   return promise;
 }
 

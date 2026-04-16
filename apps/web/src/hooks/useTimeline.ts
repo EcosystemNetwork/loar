@@ -87,6 +87,9 @@ export function useGetCanonChain() {
     abi: universeAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
     functionName: 'getCanonChain',
+    query: {
+      retry: false, // CanonNotSet() revert is expected when no canon has been set
+    },
   });
 }
 

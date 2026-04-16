@@ -53,6 +53,9 @@ export function LicensingDialog({
       toast.success('License created');
       setShowCreate(false);
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create license');
+    },
   });
 
   const activateMutation = useMutation({
@@ -61,6 +64,9 @@ export function LicensingDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['licenses', universeId] });
       toast.success('License activated');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to activate license');
     },
   });
 

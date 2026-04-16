@@ -468,7 +468,7 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
     provider: 'bytedance',
     displayName: 'Seedream 5.0',
     shortDescription: 'Premium image gen — keyframes, storyboards, concept art',
-    bytedanceModelId: 'seedream-5.0',
+    bytedanceModelId: 'seedream-5-0-260128',
     tasks: ['text_to_image', 'image_to_image'],
     qualityTier: 'premium',
     speedTier: 'fast',

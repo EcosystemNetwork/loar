@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpc, trpcClient } from '../../utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,12 +42,18 @@ export function PlotNotes({ universeId, accessLevel }: PlotNotesProps) {
       queryClient.invalidateQueries({ queryKey: [['privateSection', 'listItems']] });
       setNewNote('');
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create note');
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => trpcClient.privateSection.deleteItem.mutate({ itemId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['privateSection', 'listItems']] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete note');
     },
   });
 

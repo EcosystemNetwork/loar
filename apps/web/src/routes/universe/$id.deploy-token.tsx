@@ -7,7 +7,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useChainId } from 'wagmi';
+import { useChainId, useSwitchChain } from 'wagmi';
 import { useActiveAccount } from 'thirdweb/react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
@@ -22,6 +22,14 @@ import { useWaitForTransactionReceipt } from 'wagmi';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { decodeEventLog } from 'viem';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES, isSupportedChain } from '@/configs/chains';
 
 export const Route = createFileRoute('/universe/$id/deploy-token')({
   component: DeployTokenPage,
@@ -33,6 +41,7 @@ function DeployTokenPage() {
   const { address } = useWalletAccount();
   const { isAuthenticated } = useWalletAuth();
   const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   const thirdwebAccount = useActiveAccount();
 
   const { deployUniverseToken, hash, isPending, error } = useUniverseManager();
@@ -206,6 +215,31 @@ function DeployTokenPage() {
                     </div>
                   </div>
                 ) : null}
+
+                {SUPPORTED_CHAIN_IDS.length > 1 && (
+                  <div>
+                    <Label className="text-sm font-semibold mb-2 block">Deploy on</Label>
+                    <Select
+                      value={String(chainId)}
+                      onValueChange={(v) => {
+                        const id = Number(v);
+                        if (id !== chainId) switchChain({ chainId: id });
+                      }}
+                      disabled={deploying || isPending || isConfirming}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select network" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CHAIN_IDS.map((id) => (
+                          <SelectItem key={id} value={String(id)}>
+                            {CHAIN_NAMES[id] ?? `Chain ${id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-sm font-semibold mb-2 block">Token Name</Label>

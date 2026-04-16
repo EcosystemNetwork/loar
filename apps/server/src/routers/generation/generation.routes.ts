@@ -178,7 +178,10 @@ async function autoAttachVideo(opts: {
   let targetName = '';
   try {
     const entityDoc = await db.collection('entities').doc(opts.entityId).get();
-    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+    if (!entityDoc.exists) return;
+    // Verify the caller owns this entity before attaching
+    if (entityDoc.data()?.creator !== opts.creator) return;
+    targetName = entityDoc.data()?.name ?? '';
   } catch {
     // Best-effort
   }
@@ -1007,7 +1010,9 @@ export const generationRouter = router({
       const result = isByteDance
         ? await bytedanceService.generateVideo({
             prompt: input.prompt,
-            model: input.model?.includes('fast') ? 'seedance-2.0-fast' : 'seedance-2.0',
+            model: input.model?.includes('fast')
+              ? 'dreamina-seedance-2-0-fast-260128'
+              : 'dreamina-seedance-2-0-260128',
             mode: input.model?.includes('reference')
               ? 'reference_to_video'
               : input.imageUrl

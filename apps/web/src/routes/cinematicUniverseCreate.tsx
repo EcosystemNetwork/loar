@@ -213,7 +213,7 @@ function CinematicUniverseCreate() {
   const processedUniverseHash = useRef<string | null>(null);
   const processedTokenHash = useRef<string | null>(null);
 
-  // Auto-switch to supported chain if on wrong network
+  // Auto-switch to first supported chain only when on a completely unsupported network
   useEffect(() => {
     if (isConnected && !isSupportedChain(chainId)) {
       switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
@@ -222,6 +222,13 @@ function CinematicUniverseCreate() {
 
   const handleSwitchNetwork = () => {
     switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
+  };
+
+  const handleChainSelect = (selectedChainId: string) => {
+    const id = Number(selectedChainId);
+    if (id !== chainId) {
+      switchChain({ chainId: id });
+    }
   };
 
   // Cover image generation mutation
@@ -857,6 +864,29 @@ function CinematicUniverseCreate() {
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
                     )}
                 </div>
+
+                {/* Chain Selector — only when multiple chains are available */}
+                {SUPPORTED_CHAIN_IDS.length > 1 && (
+                  <div>
+                    <Label className="text-sm font-semibold mb-2 block">Deploy on</Label>
+                    <Select
+                      value={String(chainId)}
+                      onValueChange={handleChainSelect}
+                      disabled={deploymentStep !== DeploymentStep.IDLE}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select network" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CHAIN_IDS.map((id) => (
+                          <SelectItem key={id} value={String(id)}>
+                            {CHAIN_NAMES[id] ?? `Chain ${id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Universe Mode Selector — shown first */}
                 <div className="space-y-3">

@@ -160,7 +160,10 @@ async function autoAttachAudio(opts: {
   let targetName = '';
   try {
     const entityDoc = await db.collection('entities').doc(opts.entityId).get();
-    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+    if (!entityDoc.exists) return;
+    // Verify the caller owns this entity before attaching
+    if (entityDoc.data()?.creator !== opts.creator) return;
+    targetName = entityDoc.data()?.name ?? '';
   } catch {
     // Best-effort
   }

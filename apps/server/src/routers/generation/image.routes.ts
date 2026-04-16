@@ -121,7 +121,7 @@ async function attemptFallback(
         candidate.provider === 'bytedance'
           ? await bytedanceService.generateImage({
               prompt: input.prompt,
-              model: candidate.bytedanceModelId || 'seedream-5.0',
+              model: candidate.bytedanceModelId || 'seedream-5-0-260128',
               negativePrompt: input.negativePrompt,
               numImages: input.numImages,
               seed: input.seed,
@@ -162,7 +162,10 @@ async function autoAttachImages(opts: {
   let targetName = '';
   try {
     const entityDoc = await db.collection('entities').doc(opts.entityId).get();
-    if (entityDoc.exists) targetName = entityDoc.data()?.name ?? '';
+    if (!entityDoc.exists) return;
+    // Verify the caller owns this entity before attaching
+    if (entityDoc.data()?.creator !== opts.creator) return;
+    targetName = entityDoc.data()?.name ?? '';
   } catch {
     // Best-effort
   }
@@ -319,7 +322,7 @@ export const imageRouter = router({
           model.provider === 'bytedance'
             ? await bytedanceService.generateImage({
                 prompt: input.prompt,
-                model: model.bytedanceModelId || 'seedream-5.0',
+                model: model.bytedanceModelId || 'seedream-5-0-260128',
                 negativePrompt: input.negativePrompt,
                 numImages: input.numImages,
                 seed: input.seed,
@@ -706,7 +709,19 @@ export const imageRouter = router({
         await userRef.update({ balance: balance - cost, updatedAt: new Date() });
       }
       const startTime = Date.now();
-      const result = await falService.generateImage(input);
+      let result;
+      try {
+        result = await falService.generateImage(input);
+      } catch (genError) {
+        // Refund credits on generation failure
+        if (db) {
+          const userRef = db.collection('userCredits').doc(ctx.user.uid);
+          await userRef
+            .update({ balance: FieldValue.increment(cost), updatedAt: new Date() })
+            .catch(() => {});
+        }
+        throw genError;
+      }
       if (result.status === 'completed' && result.imageUrl) {
         try {
           await imageGenerationsCol()
@@ -867,7 +882,10 @@ export const imageRouter = router({
         cyberpunk: 'cyberpunk style, neon, futuristic',
       };
       const stylePrompt = input.style ? stylePrompts[input.style] : stylePrompts.cute;
-      const fullPrompt = `Character portrait of ${input.name}, ${input.description}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
+      // Sanitize user inputs to prevent prompt injection
+      const safeName = input.name.replace(/[\n\r]/g, ' ').slice(0, 100);
+      const safeDesc = input.description.replace(/[\n\r]/g, ' ').slice(0, 300);
+      const fullPrompt = `Character portrait of ${safeName}, ${safeDesc}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
 
       const imageResult = await falService.generateImage({
         prompt: fullPrompt,

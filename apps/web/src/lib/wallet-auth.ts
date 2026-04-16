@@ -139,18 +139,22 @@ export function isSessionValidated(): boolean {
 
 // Proactive session refresh — refresh 1 hour before expiry.
 // JWT has 24h TTL, so refresh at the 23h mark.
-setInterval(
-  async () => {
-    const expiry = localStorage.getItem(EXPIRY_KEY);
-    if (!expiry) return;
+// Module-level interval is safe here — wallet-auth is a singleton module loaded once.
+// The interval must persist for the lifetime of the app (not tied to any component).
+if (typeof window !== 'undefined') {
+  setInterval(
+    async () => {
+      const expiry = localStorage.getItem(EXPIRY_KEY);
+      if (!expiry) return;
 
-    const expiresIn = Number(expiry) - Date.now();
-    if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
-      await refreshSession();
-    }
-  },
-  5 * 60 * 1000
-);
+      const expiresIn = Number(expiry) - Date.now();
+      if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
+        await refreshSession();
+      }
+    },
+    5 * 60 * 1000
+  );
+}
 
 // Refresh token when user returns to a backgrounded tab.
 if (typeof document !== 'undefined') {

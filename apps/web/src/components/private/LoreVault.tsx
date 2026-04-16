@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpc, trpcClient } from '../../utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,12 +65,18 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
       setBody('');
       setAccessTier('team');
     },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create lore entry');
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => trpcClient.privateSection.deleteItem.mutate({ itemId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [['privateSection', 'listItems']] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete lore entry');
     },
   });
 

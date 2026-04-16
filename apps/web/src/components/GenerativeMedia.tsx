@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -55,6 +56,9 @@ export function GenerativeMedia() {
         | 'landscape_16_9';
       numImages: number;
     }) => trpcClient.image.generateImage.mutate(input),
+    onError: (error: any) => {
+      toast.error(error.message || 'Image generation failed');
+    },
   });
 
   const generateVideoMutation = useMutation({
@@ -65,6 +69,9 @@ export function GenerativeMedia() {
       aspectRatio: '16:9' | '9:16' | '1:1';
       motionStrength: number;
     }) => trpcClient.generation.veo3ImageToVideo.mutate(input),
+    onError: (error: any) => {
+      toast.error(error.message || 'Video generation failed');
+    },
   });
 
   const { isAuthenticated } = useWalletAuth();

@@ -198,6 +198,9 @@ export class ByteDanceService {
           id?: string;
           task_id?: string;
           status: string;
+          content?: {
+            video_url?: string;
+          };
           output?: {
             video_url?: string;
             video?: { url?: string };
@@ -211,7 +214,10 @@ export class ByteDanceService {
         if (taskStatus === 'completed' || taskStatus === 'succeeded' || taskStatus === 'success') {
           // Extract video URL from various possible response shapes
           const videoUrl =
-            status.output?.video_url || status.output?.video?.url || status.result?.video_url;
+            status.content?.video_url ||
+            status.output?.video_url ||
+            status.output?.video?.url ||
+            status.result?.video_url;
 
           if (!videoUrl) {
             console.error('[ByteDance] Task completed but no video URL:', JSON.stringify(status));
@@ -271,7 +277,7 @@ export class ByteDanceService {
 
   async generateImage(options: ByteDanceImageOptions): Promise<ByteDanceImageResult> {
     try {
-      const model = options.model || 'seedream-5.0';
+      const model = options.model || 'seedream-5-0-260128';
 
       const body: Record<string, any> = {
         model,
