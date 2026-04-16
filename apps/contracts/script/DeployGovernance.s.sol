@@ -111,6 +111,7 @@ contract DeployGovernanceScript is Script {
         _transferIfSet("ANALYTICS_REGISTRY_ADDRESS", timelockAddr);
         _transferIfSet("LAUNCHPAD_STAKING_ADDRESS", timelockAddr);
         _transferIfSet("STORY_BOUNTIES_ADDRESS", timelockAddr);
+        _transferIfSet("ESCROW_ADDRESS", timelockAddr);
 
         // ── Transfer NFT beacon ownership to timelock ───────────────
         console.log("\n--- Transferring beacon ownership ---");
