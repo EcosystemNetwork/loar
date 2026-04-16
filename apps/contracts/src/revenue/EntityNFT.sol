@@ -73,6 +73,7 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
         uint16 _royaltyBps
     ) external initializer {
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;
