@@ -116,8 +116,14 @@ export async function getAllUniverses() {
 
 export async function getUniversesByCreator(creator: string) {
   try {
-    const snapshot = await collection().where('creator', '==', creator).orderBy('created_at').get();
-    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const snapshot = await collection().where('creator', '==', creator).get();
+    const data = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => {
+        const aTime = a.created_at?.toMillis?.() ?? a.created_at ?? 0;
+        const bTime = b.created_at?.toMillis?.() ?? b.created_at ?? 0;
+        return aTime - bTime;
+      });
 
     return {
       success: true,

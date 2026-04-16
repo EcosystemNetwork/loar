@@ -192,7 +192,7 @@ function UniverseCard({ universe }: { universe: any }) {
                 {universe.nodeCount} EP
               </span>
             )}
-            {universe.tokenData && (
+            {universe.tokenData && universe.tokenData.symbol && (
               <span className="text-[10px] font-semibold bg-primary/90 text-white px-1.5 py-0.5 rounded">
                 ${universe.tokenData.symbol}
               </span>
@@ -1294,7 +1294,22 @@ function HomeComponent() {
     // Enrich base with Ponder data where available
     const enriched = base.map((u: any) => {
       const ponder = ponderMap.get(u.id.toLowerCase());
-      const tokenData = tokenMap.get(u.id.toLowerCase());
+      let tokenData = tokenMap.get(u.id.toLowerCase());
+      // Fallback: if Ponder doesn't have the token but Firestore has a non-zero tokenAddress,
+      // create a minimal tokenData so the universe shows in Token-Powered section
+      if (
+        !tokenData &&
+        u.tokenAddress &&
+        u.tokenAddress !== '0x0000000000000000000000000000000000000000'
+      ) {
+        tokenData = {
+          id: u.tokenAddress,
+          universeAddress: u.id,
+          name: u.name,
+          symbol: '',
+          imageURL: u.imageURL,
+        } as Token;
+      }
       const poolId = tokenData?.poolId;
       const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
       const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;

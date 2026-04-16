@@ -858,6 +858,55 @@ function CinematicUniverseCreate() {
                     )}
                 </div>
 
+                {/* Universe Mode Selector — shown first */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold block">What kind of universe?</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Create for Fun */}
+                    <button
+                      type="button"
+                      onClick={() => setUniverseMode('fun')}
+                      disabled={deploymentStep !== DeploymentStep.IDLE}
+                      className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                        universeMode === 'fun'
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : 'border-muted hover:border-muted-foreground/30'
+                      } disabled:opacity-50`}
+                    >
+                      {universeMode === 'fun' && (
+                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                      )}
+                      <Sparkles className="h-5 w-5 mb-2 text-blue-400" />
+                      <p className="text-sm font-bold">Create for Fun</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                        Narrative playground. No token — just start building. Monetize anytime
+                        later.
+                      </p>
+                    </button>
+
+                    {/* Launch & Monetize */}
+                    <button
+                      type="button"
+                      onClick={() => setUniverseMode('monetize')}
+                      disabled={deploymentStep !== DeploymentStep.IDLE}
+                      className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                        universeMode === 'monetize'
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : 'border-muted hover:border-muted-foreground/30'
+                      } disabled:opacity-50`}
+                    >
+                      {universeMode === 'monetize' && (
+                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                      )}
+                      <Rocket className="h-5 w-5 mb-2 text-green-400" />
+                      <p className="text-sm font-bold">Launch & Monetize</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                        Deploy governance token + liquidity pool. Costs mint fee.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <Label htmlFor="universeName" className="text-sm font-semibold mb-2 block">
                     Universe Name
@@ -1156,145 +1205,94 @@ function CinematicUniverseCreate() {
                   />
                 </div>
 
-                {/* Universe Mode Selector */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold block">What kind of universe?</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Create for Fun */}
-                    <button
-                      type="button"
-                      onClick={() => setUniverseMode('fun')}
-                      disabled={deploymentStep !== DeploymentStep.IDLE}
-                      className={`relative p-4 rounded-lg border-2 text-left transition-all ${
-                        universeMode === 'fun'
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                          : 'border-muted hover:border-muted-foreground/30'
-                      } disabled:opacity-50`}
-                    >
-                      {universeMode === 'fun' && (
-                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
-                      )}
-                      <Sparkles className="h-5 w-5 mb-2 text-blue-400" />
-                      <p className="text-sm font-bold">Create for Fun</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                        Narrative playground. No token — just start building. Monetize anytime
-                        later.
-                      </p>
-                    </button>
+                {/* Token config (shown when monetize mode selected) */}
+                {universeMode === 'monetize' && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="tokenSymbolMain" className="text-sm font-semibold mb-2 block">
+                        Token Symbol
+                      </Label>
+                      <Input
+                        id="tokenSymbolMain"
+                        placeholder="e.g., MCU"
+                        value={tokenSymbol}
+                        onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
+                        disabled={deploymentStep !== DeploymentStep.IDLE}
+                        maxLength={10}
+                        className="h-11"
+                      />
+                    </div>
 
-                    {/* Launch & Monetize */}
-                    <button
-                      type="button"
-                      onClick={() => setUniverseMode('monetize')}
-                      disabled={deploymentStep !== DeploymentStep.IDLE}
-                      className={`relative p-4 rounded-lg border-2 text-left transition-all ${
-                        universeMode === 'monetize'
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                          : 'border-muted hover:border-muted-foreground/30'
-                      } disabled:opacity-50`}
-                    >
-                      {universeMode === 'monetize' && (
-                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
-                      )}
-                      <Rocket className="h-5 w-5 mb-2 text-green-400" />
-                      <p className="text-sm font-bold">Launch & Monetize</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                        Deploy governance token + liquidity pool. Costs mint fee.
-                      </p>
-                    </button>
-                  </div>
+                    {/* Starting Price — live updating */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold block">Starting Price</Label>
 
-                  {universeMode === 'monetize' && (
-                    <div className="space-y-4">
-                      <div>
-                        <Label
-                          htmlFor="tokenSymbolMain"
-                          className="text-sm font-semibold mb-2 block"
-                        >
-                          Token Symbol
-                        </Label>
-                        <Input
-                          id="tokenSymbolMain"
-                          placeholder="e.g., MCU"
-                          value={tokenSymbol}
-                          onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-                          disabled={deploymentStep !== DeploymentStep.IDLE}
-                          maxLength={10}
-                          className="h-11"
-                        />
+                      {/* Live price stats */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                            Market Cap
+                          </p>
+                          <p className="text-sm font-bold text-primary tabular-nums">
+                            {formatMarketCap(marketCapEth)}
+                          </p>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                            Price / Token
+                          </p>
+                          <p className="text-sm font-bold tabular-nums">
+                            {pricePerToken.toExponential(1)}
+                          </p>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                            0.01 ETH Buys
+                          </p>
+                          <p className="text-sm font-bold tabular-nums">
+                            {formatTokenAmount(0.01 * tokensPerEth)}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Starting Price — live updating */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-semibold block">Starting Price</Label>
+                      {/* Slider */}
+                      <Slider
+                        value={[startingTick]}
+                        onValueChange={([v]) => {
+                          // Round to tickSpacing of 200
+                          setStartingTick(Math.round(v / 200) * 200);
+                        }}
+                        min={TICK_MIN}
+                        max={TICK_MAX}
+                        step={200}
+                        disabled={deploymentStep !== DeploymentStep.IDLE}
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>Cheaper</span>
+                        <span>More expensive</span>
+                      </div>
 
-                        {/* Live price stats */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                              Market Cap
-                            </p>
-                            <p className="text-sm font-bold text-primary tabular-nums">
-                              {formatMarketCap(marketCapEth)}
-                            </p>
-                          </div>
-                          <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                              Price / Token
-                            </p>
-                            <p className="text-sm font-bold tabular-nums">
-                              {pricePerToken.toExponential(1)}
-                            </p>
-                          </div>
-                          <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                              0.01 ETH Buys
-                            </p>
-                            <p className="text-sm font-bold tabular-nums">
-                              {formatTokenAmount(0.01 * tokensPerEth)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Slider */}
-                        <Slider
-                          value={[startingTick]}
-                          onValueChange={([v]) => {
-                            // Round to tickSpacing of 200
-                            setStartingTick(Math.round(v / 200) * 200);
-                          }}
-                          min={TICK_MIN}
-                          max={TICK_MAX}
-                          step={200}
-                          disabled={deploymentStep !== DeploymentStep.IDLE}
-                        />
-                        <div className="flex justify-between text-[10px] text-muted-foreground">
-                          <span>Cheaper</span>
-                          <span>More expensive</span>
-                        </div>
-
-                        {/* Quick presets */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {PRICE_PRESETS.map((preset) => (
-                            <button
-                              key={preset.tick}
-                              type="button"
-                              onClick={() => setStartingTick(preset.tick)}
-                              disabled={deploymentStep !== DeploymentStep.IDLE}
-                              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                                startingTick === preset.tick
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                              } disabled:opacity-50`}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
+                      {/* Quick presets */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {PRICE_PRESETS.map((preset) => (
+                          <button
+                            key={preset.tick}
+                            type="button"
+                            onClick={() => setStartingTick(preset.tick)}
+                            disabled={deploymentStep !== DeploymentStep.IDLE}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                              startingTick === preset.tick
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            } disabled:opacity-50`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Multi-Sig Ownership (optional) */}
                 <SafeSetup

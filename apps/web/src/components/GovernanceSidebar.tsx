@@ -31,7 +31,7 @@ import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { universeGovernorAbi, governanceErc20Abi, universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
-import { encodeFunctionData, keccak256, encodeAbiParameters } from 'viem';
+import { encodeFunctionData, keccak256, encodeAbiParameters, getAddress } from 'viem';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import {
@@ -104,13 +104,18 @@ export function GovernanceSidebar({
   const rawGovernanceAddress = finalUniverse?.governanceAddress;
   const rawTokenAddress = finalUniverse?.tokenAddress;
   // Treat zero-address as undefined to prevent contract calls to address(0)
+  // Use getAddress() to normalize checksums — addresses from Firestore/indexer may have invalid EIP-55 casing
   const governanceAddress = (
-    rawGovernanceAddress && rawGovernanceAddress !== ZERO ? rawGovernanceAddress : undefined
+    rawGovernanceAddress && rawGovernanceAddress !== ZERO
+      ? getAddress(rawGovernanceAddress)
+      : undefined
   ) as Address | undefined;
   const tokenAddress = (
-    rawTokenAddress && rawTokenAddress !== ZERO ? rawTokenAddress : undefined
+    rawTokenAddress && rawTokenAddress !== ZERO ? getAddress(rawTokenAddress) : undefined
   ) as Address | undefined;
-  const timelineAddress = finalUniverse?.address as Address;
+  const timelineAddress = finalUniverse?.address
+    ? (getAddress(finalUniverse.address) as Address)
+    : (undefined as unknown as Address);
 
   // Multi-sig admin detection
   const { isSafe, safeAddress, owners, threshold } = useIsUniverseAdmin(
