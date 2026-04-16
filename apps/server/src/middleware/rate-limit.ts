@@ -56,35 +56,19 @@ class MemoryStore implements RateLimitStore {
 // ── Redis store (multi-instance production) ─────────────────────────────
 
 class RedisStore implements RateLimitStore {
-  private client: any;
-  private ready = false;
   /** In-memory fallback used when Redis is unavailable (fail-closed, not fail-open) */
   private memoryFallback = new MemoryStore();
 
-  constructor(redisUrl: string) {
-    this.init(redisUrl);
-  }
-
-  private async init(redisUrl: string) {
-    try {
-      // Dynamic import — ioredis is an optional dependency
-      const Redis = (await import('ioredis')).default;
-      this.client = new Redis(redisUrl, {
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
-        enableOfflineQueue: false,
-      });
-      await this.client.connect();
-      this.ready = true;
-      console.log('[RateLimit] Redis store connected');
-    } catch (err) {
-      console.warn('[RateLimit] Redis unavailable, falling back to in-memory store:', err);
-      this.ready = false;
-    }
+  constructor() {
+    // Client is managed by the shared redis.ts module
   }
 
   async consume(key: string, windowMs: number, max: number) {
-    if (!this.ready || !this.client) {
+    // Lazy-import shared client to avoid circular deps at module load time
+    const { getRedisClient } = await import('../lib/redis');
+    const client = getRedisClient();
+
+    if (!client) {
       // Fail-closed: use in-memory rate limiting instead of allowing all requests
       return this.memoryFallback.consume(key, windowMs, max);
     }
@@ -94,14 +78,14 @@ class RedisStore implements RateLimitStore {
       const windowSec = Math.ceil(windowMs / 1000);
 
       // Atomic increment + TTL via MULTI
-      const results = await this.client.multi().incr(redisKey).ttl(redisKey).exec();
+      const results = await client.multi().incr(redisKey).ttl(redisKey).exec();
 
       const count = results[0][1] as number;
       const ttl = results[1][1] as number;
 
       // Set expiry on first request in window
       if (ttl === -1) {
-        await this.client.expire(redisKey, windowSec);
+        await client.expire(redisKey, windowSec);
       }
 
       if (count > max) {
@@ -125,7 +109,7 @@ function getStore(): RateLimitStore {
 
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
-    store = new RedisStore(redisUrl);
+    store = new RedisStore();
   } else {
     store = new MemoryStore();
   }

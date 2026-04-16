@@ -20,7 +20,16 @@ import {
 import { useChainId, useBalance } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { formatEther, type Address } from 'viem';
-import { ArrowUpDown, ExternalLink, Loader2, TrendingUp, Zap, Flame } from 'lucide-react';
+import {
+  ArrowUpDown,
+  ExternalLink,
+  Loader2,
+  TrendingUp,
+  Zap,
+  Flame,
+  Lock,
+  Info,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +55,7 @@ export function TokenSwapWidget({
   const { data: pool, isLoading, isError } = useTokenPool(universeAddress);
   const { data: poolData } = usePoolData(pool?.poolId);
   const [buyAmount, setBuyAmount] = useState('');
+  const [showLpInfo, setShowLpInfo] = useState(false);
 
   // Bonding curve state
   const curveAddr = bondingCurveAddress as Address | undefined;
@@ -222,9 +232,35 @@ export function TokenSwapWidget({
           </Button>
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 text-[10px] text-amber-600 dark:text-amber-400">
-          <Zap className="h-2.5 w-2.5" />
-          {isInBondingPhase ? 'Anti-whale: max 2% per tx' : 'LP locked forever'}
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => !isInBondingPhase && setShowLpInfo(!showLpInfo)}
+            className="inline-flex items-center justify-center gap-1.5 text-[10px] text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+          >
+            {isInBondingPhase ? (
+              <>
+                <Zap className="h-2.5 w-2.5" />
+                Anti-whale: max 2% per tx
+              </>
+            ) : (
+              <>
+                <Lock className="h-2.5 w-2.5" />
+                LP locked forever
+                <Info className="h-2.5 w-2.5 opacity-60" />
+              </>
+            )}
+          </button>
+          {showLpInfo && !isInBondingPhase && (
+            <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-[10px] text-left text-amber-700 dark:text-amber-300 space-y-1">
+              <p className="font-medium">What does "LP locked forever" mean?</p>
+              <p>
+                Liquidity pool tokens are permanently locked at the protocol level. The creator
+                cannot withdraw liquidity or "rug pull" the pool. Only swap fee rewards can be
+                claimed by the reward admin.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -358,11 +394,39 @@ export function TokenSwapWidget({
         {!isInBondingPhase && <ExternalLink className="h-3 w-3 ml-2 opacity-50" />}
       </Button>
 
-      <p className="text-[10px] text-center text-muted-foreground">
-        {isInBondingPhase
-          ? 'Bonding curve — price rises with each buy — max 2% per tx — no rugs'
-          : 'Swaps on Uniswap v4 — LP locked forever — No rugs'}
-      </p>
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={() => !isInBondingPhase && setShowLpInfo(!showLpInfo)}
+          className="inline-flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {isInBondingPhase ? (
+            'Bonding curve — price rises with each buy — max 2% per tx — no rugs'
+          ) : (
+            <>
+              <Lock className="h-2.5 w-2.5" />
+              Swaps on Uniswap v4 — LP locked forever — No rugs
+              <Info className="h-2.5 w-2.5 opacity-60" />
+            </>
+          )}
+        </button>
+        {showLpInfo && !isInBondingPhase && (
+          <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-left text-amber-700 dark:text-amber-300 space-y-1.5">
+            <p className="font-semibold flex items-center gap-1.5">
+              <Lock className="h-3 w-3" />
+              Permanent LP Lock
+            </p>
+            <p>
+              Liquidity pool tokens are permanently locked at the protocol level. The creator cannot
+              withdraw liquidity or perform a "rug pull."
+            </p>
+            <p>
+              Only accumulated swap fee rewards can be claimed by the designated reward admin. The
+              underlying liquidity is irreversibly locked.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

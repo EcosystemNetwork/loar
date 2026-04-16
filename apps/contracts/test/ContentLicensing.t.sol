@@ -652,7 +652,7 @@ contract ContentLicensingTest is Test {
         licensing.buyContent{value: 1 ether}(contentHash);
 
         // Platform fee: 1 ether * 500 / 10000 = 0.05 ether
-        uint256 platformFee = (1 ether * PLATFORM_FEE_BPS) / 10000;
+        uint256 platformFee = (1 ether * uint256(PLATFORM_FEE_BPS)) / 10000;
         uint256 distributable = 1 ether - platformFee;
 
         // Creator: 70% of distributable
@@ -683,7 +683,7 @@ contract ContentLicensingTest is Test {
         vm.prank(buyer);
         licensing.buyContent{value: 1 ether}(contentHash);
 
-        uint256 expectedPlatformFee = (1 ether * PLATFORM_FEE_BPS) / 10000;
+        uint256 expectedPlatformFee = (1 ether * uint256(PLATFORM_FEE_BPS)) / 10000;
         uint256 expectedCreatorShare = 1 ether - expectedPlatformFee;
 
         // Payment went through paymentRouter.route, not splitRouter

@@ -8,6 +8,8 @@ import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
+import {Context} from "@openzeppelin/utils/Context.sol";
+import {ContextUpgradeable} from "@openzeppelin-upgradeable/utils/ContextUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -247,5 +249,19 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
 
     function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
         super._increaseBalance(account, value);
+    }
+
+    // ---- Context diamond override (non-upgradeable + upgradeable) ----
+
+    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
+        return msg.sender;
+    }
+
+    function _msgData() internal pure override(Context, ContextUpgradeable) returns (bytes calldata) {
+        return msg.data;
+    }
+
+    function _contextSuffixLength() internal pure override(Context, ContextUpgradeable) returns (uint256) {
+        return 0;
     }
 }

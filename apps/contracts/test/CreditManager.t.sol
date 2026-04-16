@@ -1019,7 +1019,7 @@ contract CreditManagerTest is Test {
     // ── 12. View Functions ──
     // ═══════════════════════════════════════════════════════════════
 
-    function test_getBalance_defaultsToZero() public view {
+    function test_getBalance_defaultsToZero() public {
         assertEq(credits.getBalance(makeAddr("nobody")), 0);
     }
 
@@ -1032,7 +1032,7 @@ contract CreditManagerTest is Test {
         assertEq(credits.getGenerationCost("unknown_type"), 0);
     }
 
-    function test_getUserStats_defaultsToZero() public view {
+    function test_getUserStats_defaultsToZero() public {
         (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) =
             credits.getUserStats(makeAddr("nobody"));
         assertEq(balance, 0);

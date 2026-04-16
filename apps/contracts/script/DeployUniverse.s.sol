@@ -214,7 +214,7 @@ contract DeployUniverseScript is Script {
         });
 
         IUniverseManager.AllocationConfig memory allocationConfig = IUniverseManager.AllocationConfig({
-            lpBps: 0,
+            curveBps: 0,
             creatorBps: 0,
             treasuryBps: 0,
             communityBps: 0

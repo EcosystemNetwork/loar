@@ -5,6 +5,9 @@ import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
+import {Context} from "@openzeppelin/utils/Context.sol";
+import {ContextUpgradeable} from "@openzeppelin-upgradeable/utils/ContextUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -15,7 +18,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Checks RightsRegistry before creating an edition — FUN and FROZEN content
 ///         cannot be monetized. Routes all payments through PaymentRouter.
-contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, ReentrancyGuardUpgradeable {
+contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
     struct Edition {
         uint256 nodeId;
         bytes32 contentHash;
@@ -83,6 +86,7 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
         uint16 _royaltyBps
     ) external initializer {
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         universeId = _universeId;
         platform = _platform;
@@ -92,6 +96,9 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
         royaltyBps = _royaltyBps;
     }
 
+    function pause() external onlyPlatform { _pause(); }
+    function unpause() external onlyPlatform { _unpause(); }
+
     /// @notice Register a new episode edition for minting
     /// @dev contentHash must not be classified as FUN or FROZEN in RightsRegistry
     function createEdition(
@@ -100,7 +107,7 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
         uint256 mintPrice,
         uint256 maxSupply,
         string calldata metadataURI
-    ) external returns (uint256 editionId) {
+    ) external whenNotPaused returns (uint256 editionId) {
         if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
 
         editionId = nextEditionId++;
@@ -120,7 +127,7 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
     }
 
     /// @notice Mint `amount` copies of an edition
-    function mint(uint256 editionId, uint256 amount) external payable nonReentrant {
+    function mint(uint256 editionId, uint256 amount) external payable nonReentrant whenNotPaused {
         Edition storage ed = editions[editionId];
         if (!ed.active) revert EditionNotActive();
         if (ed.maxSupply > 0 && ed.minted + amount > ed.maxSupply) revert MaxSupplyReached();
@@ -171,5 +178,19 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    // ---- Context diamond override (non-upgradeable + upgradeable) ----
+
+    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
+        return msg.sender;
+    }
+
+    function _msgData() internal pure override(Context, ContextUpgradeable) returns (bytes calldata) {
+        return msg.data;
+    }
+
+    function _contextSuffixLength() internal pure override(Context, ContextUpgradeable) returns (uint256) {
+        return 0;
     }
 }

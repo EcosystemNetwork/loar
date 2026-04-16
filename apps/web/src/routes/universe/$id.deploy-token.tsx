@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Rocket, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Loader2, Rocket, CheckCircle2, ArrowLeft, Lock, AlertTriangle } from 'lucide-react';
 import { useWaitForTransactionReceipt } from 'wagmi';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { decodeEventLog } from 'viem';
@@ -398,6 +398,31 @@ function DeployTokenPage() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* LP Lock Permanence Warning */}
+                <div className="border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                        Liquidity is permanently locked
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Once deployed, 80% of the token supply is paired with ETH in a Uniswap v4
+                        pool whose LP tokens are locked forever at the protocol level.{' '}
+                        <strong>This cannot be reversed.</strong>
+                      </p>
+                      <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1 list-disc ml-4">
+                        <li>Liquidity cannot be withdrawn by anyone, ever</li>
+                        <li>No rug pulls are possible — this is enforced on-chain</li>
+                        <li>
+                          Only accumulated swap fee rewards can be claimed by the reward admin
+                        </li>
+                        <li>This action is irreversible once the transaction confirms</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">

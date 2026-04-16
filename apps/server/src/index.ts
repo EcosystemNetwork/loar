@@ -292,12 +292,18 @@ app.get('/', (c) => {
 app.get('/health', async (c) => {
   const { firebaseAvailable } = await import('./lib/firebase');
   const { getPricingStatus } = await import('./services/pricing/heartbeat');
+  const { isRedisHealthy } = await import('./lib/redis');
+
+  const redisHealthy = await isRedisHealthy();
 
   const checks = {
     firebase: firebaseAvailable ? 'ok' : 'degraded',
+    redis: process.env.REDIS_URL ? (redisHealthy ? 'ok' : 'degraded') : 'not_configured',
   };
 
-  const status = Object.values(checks).every((v) => v === 'ok') ? 'healthy' : 'degraded';
+  const status = Object.values(checks).every((v) => v === 'ok' || v === 'not_configured')
+    ? 'healthy'
+    : 'degraded';
 
   return c.json({
     status,
@@ -310,6 +316,21 @@ app.get('/health', async (c) => {
     pricing: getPricingStatus(),
   });
 });
+
+// ── Graceful shutdown ──────────────────────────────────────────────────
+async function gracefulShutdown(signal: string) {
+  console.log(`\n[server] Received ${signal} — shutting down gracefully...`);
+  try {
+    const { shutdownRedis } = await import('./lib/redis');
+    await shutdownRedis();
+  } catch (err) {
+    console.warn('[server] Error during Redis shutdown:', err);
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);

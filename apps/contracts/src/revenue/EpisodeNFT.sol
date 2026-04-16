@@ -7,13 +7,16 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
+import {Context} from "@openzeppelin/utils/Context.sol";
+import {ContextUpgradeable} from "@openzeppelin-upgradeable/utils/ContextUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title EpisodeNFT
 /// @notice Mints AI-generated episodes as NFTs with ERC2981 royalties.
 ///         Each episode is tied to a universe node and earns royalties on resale.
-contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable {
+contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
     struct Episode {
         uint256 universeId;
         uint256 nodeId;
@@ -67,6 +70,7 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
         uint16 _defaultRoyaltyBps
     ) external initializer {
         __ReentrancyGuard_init();
+        __Pausable_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         rightsRegistry = IRightsRegistry(_rightsRegistry);
@@ -74,6 +78,9 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
         platformFeeBps = _platformFeeBps;
         defaultRoyaltyBps = _defaultRoyaltyBps;
     }
+
+    function pause() external { require(msg.sender == platform, "Not platform"); _pause(); }
+    function unpause() external { require(msg.sender == platform, "Not platform"); _unpause(); }
 
     /// @notice Create a new episode listing from a universe node
     function createEpisode(
@@ -83,7 +90,7 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
         uint256 mintPrice,
         uint256 maxSupply,
         string calldata /* metadataURI */
-    ) external returns (uint256 episodeId) {
+    ) external whenNotPaused returns (uint256 episodeId) {
         if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         episodeId = nextEpisodeId++;
 
@@ -102,7 +109,7 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
     }
 
     /// @notice Mint an episode NFT
-    function mint(uint256 episodeId, string calldata tokenURI_) external payable nonReentrant returns (uint256 tokenId) {
+    function mint(uint256 episodeId, string calldata tokenURI_) external payable nonReentrant whenNotPaused returns (uint256 tokenId) {
         Episode storage ep = episodes[episodeId];
         if (!ep.active) revert EpisodeNotActive();
         if (ep.maxSupply > 0 && ep.minted >= ep.maxSupply) revert MaxSupplyReached();
@@ -159,5 +166,19 @@ contract EpisodeNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC298
 
     function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
         super._increaseBalance(account, value);
+    }
+
+    // ---- Context diamond override (non-upgradeable + upgradeable) ----
+
+    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
+        return msg.sender;
+    }
+
+    function _msgData() internal pure override(Context, ContextUpgradeable) returns (bytes calldata) {
+        return msg.data;
+    }
+
+    function _contextSuffixLength() internal pure override(Context, ContextUpgradeable) returns (uint256) {
+        return 0;
     }
 }
