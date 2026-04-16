@@ -51,6 +51,7 @@ export function initFirebase() {
     try {
       const app = initializeApp({ credential: cert(serviceAccount) });
       db = getFirestore(app);
+      db.settings({ ignoreUndefinedProperties: true });
       firebaseAvailable = true;
       console.log('Firebase Admin SDK initialized successfully');
     } catch (err) {

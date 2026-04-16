@@ -506,8 +506,8 @@ export const creditsRouter = router({
       const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
 
       // Atomic: dedup + balance update + tx record
-      // Dedup key uses raw txHash only — tx hashes are globally unique across chains
-      const txDocId = `loar-${input.txHash}`;
+      // Include chainId in dedup key for defense-in-depth
+      const txDocId = `loar-${input.txHash}-${input.chainId || 0}`;
       await db.runTransaction(async (tx) => {
         const dedupRef = creditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);

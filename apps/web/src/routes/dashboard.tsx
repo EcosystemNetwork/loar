@@ -675,9 +675,9 @@ function UniverseGrid({
         >
           <CardContent className="p-0">
             <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-600 relative">
-              {universe.imageUrl && (
+              {(universe.image_url || universe.imageUrl) && (
                 <img
-                  src={universe.imageUrl}
+                  src={universe.image_url || universe.imageUrl}
                   alt={universe.name}
                   className="absolute inset-0 w-full h-full object-cover"
                 />

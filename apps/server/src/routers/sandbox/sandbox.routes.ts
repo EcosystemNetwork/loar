@@ -27,7 +27,8 @@ const profilesCol = () => {
 };
 
 export const sandboxRouter = router({
-  // Save a draft item (image + optional video) to Firestore
+  // Save a draft item (image + optional video) to Firestore.
+  // Auto-creates a gallery content record so all generated media is immediately visible.
   saveDraft: protectedProcedure
     .input(
       z.object({
@@ -41,6 +42,9 @@ export const sandboxRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
+      const hasMedia = !!(input.videoUrl || input.imageUrl);
+      const mediaType = input.videoUrl ? 'ai-video' : input.imageUrl ? 'ai-image' : 'image';
+
       const doc = await sandboxCol().add({
         creatorAddress: ctx.user.address,
         title: input.title,
@@ -49,11 +53,74 @@ export const sandboxRouter = router({
         videoUrl: input.videoUrl || null,
         model: input.model || null,
         tags: input.tags,
-        status: 'draft',
+        status: hasMedia ? 'promoted' : 'draft',
         createdAt: now,
         updatedAt: now,
       });
-      return { id: doc.id };
+
+      // Auto-publish to gallery when media is present (skip if already published by generation route)
+      let contentId: string | null = null;
+      if (hasMedia) {
+        const mediaUrl = input.videoUrl || input.imageUrl || '';
+
+        // Check if a content record already exists for this media URL (auto-created by generation route)
+        const existing = await contentCol()
+          .where('mediaUrl', '==', mediaUrl)
+          .where('creatorUid', '==', ctx.user.uid)
+          .limit(1)
+          .get();
+
+        if (!existing.empty) {
+          // Already in gallery — update title/tags and link to this draft
+          const existingDoc = existing.docs[0];
+          contentId = existingDoc.id;
+          await existingDoc.ref.update({
+            title: input.title,
+            tags: input.tags || [],
+            description: input.prompt || '',
+            updatedAt: now,
+          });
+        } else {
+          // Not yet in gallery — create content record
+          const contentData = {
+            title: input.title,
+            description: input.prompt || '',
+            mediaUrl,
+            thumbnailUrl: input.imageUrl || null,
+            mediaType,
+            classification: 'original' as const,
+            tags: input.tags || [],
+            ipDeclaration: {
+              isOriginal: true,
+              usesCopyrightedMaterial: false,
+              license: 'all-rights-reserved',
+            },
+            visibility: 'public',
+            creatorUid: ctx.user.uid,
+            createdAt: now,
+            updatedAt: now,
+            views: 0,
+            likes: 0,
+            reviewStatus: 'not_required',
+            promotedFromDraft: doc.id,
+            generationModel: input.model || null,
+          };
+          const contentRef = await contentCol().add(contentData);
+          contentId = contentRef.id;
+
+          // Update profile content count
+          const profileRef = profilesCol().doc(ctx.user.uid);
+          const profileDoc = await profileRef.get();
+          if (profileDoc.exists) {
+            await profileRef.update({ contentCount: FieldValue.increment(1) });
+          }
+        }
+
+        // Link draft to content
+        await doc.update({ promotedTo: contentId, status: 'promoted', updatedAt: now });
+      }
+
+      return { id: doc.id, contentId };
     }),
 
   // Update an existing draft
@@ -149,60 +216,75 @@ export const sandboxRouter = router({
       const draft = snap.data()!;
       if (draft.creatorAddress !== ctx.user.address)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
-      if (draft.status === 'promoted')
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Draft already promoted' });
-
-      // Create content item in the gallery
       const now = new Date();
+      const mediaUrl = draft.videoUrl || draft.imageUrl || '';
       const mediaType = draft.videoUrl ? 'ai-video' : draft.imageUrl ? 'ai-image' : 'image';
-      const contentData: Record<string, any> = {
-        title: draft.title,
-        description: draft.prompt || '',
-        mediaUrl: draft.videoUrl || draft.imageUrl || '',
-        thumbnailUrl: draft.imageUrl || null,
-        mediaType,
-        classification: input.classification,
-        tags: draft.tags || [],
-        ipDeclaration: {
-          isOriginal: true,
-          usesCopyrightedMaterial: false,
-          license: 'all-rights-reserved',
-        },
-        visibility: input.visibility,
-        creatorUid: ctx.user.uid,
-        createdAt: now,
-        updatedAt: now,
-        views: 0,
-        likes: 0,
-        reviewStatus: 'not_required',
-        // Track lineage
-        promotedFromDraft: input.draftId,
-        generationModel: draft.model || null,
-      };
 
-      // Only set universeId if provided (general gallery = no universe)
-      if (input.universeId) {
-        contentData.universeId = input.universeId;
+      // Check if content record already exists (auto-created by saveDraft or generation route)
+      let contentId: string;
+      const existing = await contentCol()
+        .where('mediaUrl', '==', mediaUrl)
+        .where('creatorUid', '==', ctx.user.uid)
+        .limit(1)
+        .get();
+
+      if (!existing.empty) {
+        // Update existing content record with universe/classification/visibility
+        const existingDoc = existing.docs[0];
+        contentId = existingDoc.id;
+        const updates: Record<string, any> = {
+          classification: input.classification,
+          visibility: input.visibility,
+          updatedAt: now,
+        };
+        if (input.universeId) updates.universeId = input.universeId;
+        await existingDoc.ref.update(updates);
+      } else {
+        // Create new content record
+        const contentData: Record<string, any> = {
+          title: draft.title,
+          description: draft.prompt || '',
+          mediaUrl,
+          thumbnailUrl: draft.imageUrl || null,
+          mediaType,
+          classification: input.classification,
+          tags: draft.tags || [],
+          ipDeclaration: {
+            isOriginal: true,
+            usesCopyrightedMaterial: false,
+            license: 'all-rights-reserved',
+          },
+          visibility: input.visibility,
+          creatorUid: ctx.user.uid,
+          createdAt: now,
+          updatedAt: now,
+          views: 0,
+          likes: 0,
+          reviewStatus: 'not_required',
+          promotedFromDraft: input.draftId,
+          generationModel: draft.model || null,
+        };
+        if (input.universeId) contentData.universeId = input.universeId;
+        const contentRef = await contentCol().add(contentData);
+        contentId = contentRef.id;
+
+        // Update profile content count
+        const profileRef = profilesCol().doc(ctx.user.uid);
+        const profileDoc = await profileRef.get();
+        if (profileDoc.exists) {
+          await profileRef.update({ contentCount: FieldValue.increment(1) });
+        }
       }
-
-      const contentRef = await contentCol().add(contentData);
 
       // Mark draft as promoted
       await ref.update({
         status: 'promoted',
-        promotedTo: contentRef.id,
+        promotedTo: contentId,
         ...(input.universeId ? { promotedUniverseId: input.universeId } : {}),
         updatedAt: now,
       });
 
-      // Update profile content count
-      const profileRef = profilesCol().doc(ctx.user.uid);
-      const profileDoc = await profileRef.get();
-      if (profileDoc.exists) {
-        await profileRef.update({ contentCount: FieldValue.increment(1) });
-      }
-
-      return { contentId: contentRef.id, universeId: input.universeId ?? null };
+      return { contentId, universeId: input.universeId ?? null };
     }),
 
   // Get a single draft

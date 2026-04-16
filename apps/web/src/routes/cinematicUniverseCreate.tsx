@@ -69,6 +69,7 @@ enum DeploymentStep {
   UNIVERSE_CREATED = 'universe_created',
   DEPLOYING_TOKEN = 'deploying_token',
   TOKEN_DEPLOYED = 'token_deployed',
+  REGISTERING = 'registering',
   COMPLETED = 'completed',
 }
 
@@ -532,45 +533,74 @@ function CinematicUniverseCreate() {
     if (parsedTokenAddress) setTokenAddress(parsedTokenAddress);
     if (parsedGovernorAddress) setGovernorAddress(parsedGovernorAddress);
 
-    // Go straight to completed — atomic mode handles both in one tx
-    setDeploymentStep(DeploymentStep.COMPLETED);
-
-    // Register universe in Firestore
+    // Register universe in Firestore before showing completed
     if (address && parsedUniverseAddress) {
-      (async () => {
-        try {
-          const creator = safeAddress ?? address;
-          const { nonce } = await trpcClient.universes.getNonce.query();
-          const message = `Register universe ${parsedUniverseAddress} created by ${creator} with nonce ${nonce} at ${Date.now()}`;
-          if (!thirdwebAccount) throw new Error('Wallet not connected');
-          const signature = await thirdwebAccount.signMessage({ message });
+      setDeploymentStep(DeploymentStep.REGISTERING);
 
-          await trpcClient.universes.create.mutate({
-            address: parsedUniverseAddress,
-            creator,
-            name: universeName,
-            tokenAddress: parsedTokenAddress ?? '0x0000000000000000000000000000000000000000',
-            governanceAddress:
-              parsedGovernorAddress ?? '0x0000000000000000000000000000000000000000',
-            imageUrl: imageUrl,
-            portraitImageUrl: portraitImageUrl || undefined,
-            description: description,
-            onChainUniverseId: parsedUniverseId?.toString(),
-            mintTxHash: hash,
-            signature,
-            message,
-            nonce,
-          });
-        } catch (err) {
-          // Registration error is non-blocking — universe was created on-chain.
-          // But warn the user so they know the app DB may not reflect it yet.
-          console.error('Firestore registration failed:', err);
-          toast.warning(
-            "Universe created on-chain, but app registration failed. It may take a moment to appear. Contact support if it doesn't.",
-            { duration: 10000 }
-          );
+      (async () => {
+        const MAX_RETRIES = 3;
+        let lastError: unknown;
+
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            const creator = safeAddress ?? address;
+            // Each attempt needs a fresh nonce + signature (nonce is consumed on the server)
+            const { nonce } = await trpcClient.universes.getNonce.query();
+            const message = `Register universe ${parsedUniverseAddress} created by ${creator} with nonce ${nonce} at ${Date.now()}`;
+            if (!thirdwebAccount) throw new Error('Wallet not connected');
+            const signature = await thirdwebAccount.signMessage({ message });
+
+            await trpcClient.universes.create.mutate({
+              address: parsedUniverseAddress,
+              creator,
+              name: universeName,
+              tokenAddress: parsedTokenAddress ?? '0x0000000000000000000000000000000000000000',
+              governanceAddress:
+                parsedGovernorAddress ?? '0x0000000000000000000000000000000000000000',
+              imageUrl: imageUrl,
+              portraitImageUrl: portraitImageUrl || undefined,
+              description: description,
+              onChainUniverseId: parsedUniverseId?.toString(),
+              mintTxHash: hash,
+              signature,
+              message,
+              nonce,
+            });
+
+            // Registration succeeded
+            setDeploymentStep(DeploymentStep.COMPLETED);
+            return;
+          } catch (err) {
+            lastError = err;
+            console.error(
+              `Firestore registration attempt ${attempt + 1}/${MAX_RETRIES} failed:`,
+              err
+            );
+
+            // If the universe already exists, treat as success (idempotent)
+            if (err instanceof Error && err.message.includes('already exists')) {
+              setDeploymentStep(DeploymentStep.COMPLETED);
+              return;
+            }
+
+            // Wait before retrying (exponential backoff: 1s, 2s, 4s)
+            if (attempt < MAX_RETRIES - 1) {
+              await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+            }
+          }
         }
+
+        // All retries exhausted — still show completed since on-chain succeeded,
+        // but warn the user about the DB gap
+        console.error('Firestore registration failed after all retries:', lastError);
+        toast.warning(
+          "Universe created on-chain, but app registration failed after multiple attempts. It may take a moment to appear. Contact support if it doesn't.",
+          { duration: 10000 }
+        );
+        setDeploymentStep(DeploymentStep.COMPLETED);
       })();
+    } else {
+      setDeploymentStep(DeploymentStep.COMPLETED);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txSuccess, txReceipt, hash]);
@@ -1458,6 +1488,23 @@ function CinematicUniverseCreate() {
                     </div>
                   </div>
                 )}
+
+              {/* Registering universe in app database */}
+              {deploymentStep === DeploymentStep.REGISTERING && (
+                <div className="pt-4 border-t">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                      <div>
+                        <p className="text-sm font-semibold">Registering universe...</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          On-chain transaction confirmed. Saving to the app database.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {error && (
                 <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">

@@ -206,6 +206,45 @@ async function autoAttachVideo(opts: {
   }
 }
 
+// ── Auto-publish video to gallery ────────────────────────────────────
+
+const contentCol = () => db.collection('content');
+
+async function autoPublishVideoToGallery(opts: {
+  creatorUid: string;
+  videoUrl: string;
+  prompt: string;
+  model: string;
+  universeId?: string;
+  generationId: string;
+}) {
+  const now = new Date();
+  await contentCol().add({
+    title: opts.prompt.slice(0, 100) || 'Generated Video',
+    description: opts.prompt,
+    mediaUrl: opts.videoUrl,
+    thumbnailUrl: null,
+    mediaType: 'ai-video',
+    classification: 'original',
+    tags: [],
+    ipDeclaration: {
+      isOriginal: true,
+      usesCopyrightedMaterial: false,
+      license: 'all-rights-reserved',
+    },
+    visibility: 'public',
+    creatorUid: opts.creatorUid,
+    ...(opts.universeId ? { universeId: opts.universeId } : {}),
+    createdAt: now,
+    updatedAt: now,
+    views: 0,
+    likes: 0,
+    reviewStatus: 'not_required',
+    generationId: opts.generationId,
+    generationModel: opts.model,
+  });
+}
+
 // ── Persist video to permanent storage (fire-and-forget) ────────────
 
 async function persistVideoToStorage(opts: {
@@ -705,6 +744,18 @@ export const generationRouter = router({
                 userId: ctx.user.uid,
               }).catch(() => {});
 
+              // Auto-publish fallback video to gallery
+              autoPublishVideoToGallery({
+                creatorUid: ctx.user.uid,
+                videoUrl: fallbackResult.videoUrl,
+                prompt: originalPrompt,
+                model: fallbackResult.fallbackModelId,
+                universeId: input.universeId,
+                generationId,
+              }).catch((err: Error) =>
+                console.error('[video] gallery publish failed:', err.message)
+              );
+
               return {
                 generationId,
                 status: 'completed' as const,
@@ -769,6 +820,16 @@ export const generationRouter = router({
           videoUrl: result.videoUrl!,
           userId: ctx.user.uid,
         }).catch(() => {}); // swallow — non-blocking
+
+        // Auto-publish video to gallery
+        autoPublishVideoToGallery({
+          creatorUid: ctx.user.uid,
+          videoUrl: result.videoUrl!,
+          prompt: originalPrompt,
+          model: finalModelId,
+          universeId: input.universeId,
+          generationId,
+        }).catch((err) => console.error('[video] gallery publish failed:', err.message));
 
         return {
           generationId,

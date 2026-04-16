@@ -195,6 +195,47 @@ async function autoAttachImages(opts: {
   }
 }
 
+// ── Auto-publish to gallery ──────────────────────────────────────────
+
+const contentCol = () => db.collection('content');
+
+async function autoPublishToGallery(opts: {
+  creatorUid: string;
+  imageUrls: string[];
+  prompt: string;
+  model: string;
+  universeId?: string;
+  generationId: string;
+}) {
+  const now = new Date();
+  for (const url of opts.imageUrls) {
+    await contentCol().add({
+      title: opts.prompt.slice(0, 100) || 'Generated Image',
+      description: opts.prompt,
+      mediaUrl: url,
+      thumbnailUrl: url,
+      mediaType: 'ai-image',
+      classification: 'original',
+      tags: [],
+      ipDeclaration: {
+        isOriginal: true,
+        usesCopyrightedMaterial: false,
+        license: 'all-rights-reserved',
+      },
+      visibility: 'public',
+      creatorUid: opts.creatorUid,
+      ...(opts.universeId ? { universeId: opts.universeId } : {}),
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+      likes: 0,
+      reviewStatus: 'not_required',
+      generationId: opts.generationId,
+      generationModel: opts.model,
+    });
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────
 
 export const imageRouter = router({
@@ -363,6 +404,16 @@ export const imageRouter = router({
                 prompt: input.prompt,
               }).catch((err) => console.error('[image] side-effect failed:', err.message));
 
+              // Auto-publish fallback images to gallery
+              autoPublishToGallery({
+                creatorUid: ctx.user.uid,
+                imageUrls: fallback.imageUrls,
+                prompt: input.prompt,
+                model: fallback.fallbackModelId,
+                universeId: input.universeId,
+                generationId: genId,
+              }).catch((err) => console.error('[image] gallery publish failed:', err.message));
+
               return {
                 generationId: genId,
                 status: 'completed' as const,
@@ -442,6 +493,16 @@ export const imageRouter = router({
           imageUrls,
           prompt: input.prompt,
         }).catch((err) => console.error('[image] side-effect failed:', err.message));
+
+        // Auto-publish each generated image to gallery
+        autoPublishToGallery({
+          creatorUid: ctx.user.uid,
+          imageUrls,
+          prompt: input.prompt,
+          model: finalModelId,
+          universeId: input.universeId,
+          generationId: genId,
+        }).catch((err) => console.error('[image] gallery publish failed:', err.message));
 
         return {
           generationId: genId,
