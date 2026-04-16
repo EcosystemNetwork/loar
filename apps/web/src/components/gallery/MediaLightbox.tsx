@@ -25,7 +25,10 @@ interface MediaLightboxProps {
 
 export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
   const isVideo = content?.mediaType === 'video' || content?.mediaType === 'ai-video';
-  const mediaSrc = content?.mediaUrl || content?.imageUrl || content?.thumbnailUrl;
+  // For lightbox, always use the full-quality source — never fall back to thumbnail
+  const videoSrc = content?.mediaUrl;
+  const imageSrc = content?.mediaUrl || content?.imageUrl;
+  const mediaSrc = isVideo ? videoSrc : imageSrc;
 
   // Close on Escape
   const handleKeyDown = useCallback(
@@ -70,13 +73,14 @@ export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
         <div className="rounded-lg overflow-hidden shadow-2xl bg-black">
           {isVideo ? (
             <video
+              key={mediaSrc}
               src={mediaSrc}
               className="max-w-[85vw] max-h-[75vh] object-contain"
               controls
               autoPlay
               loop
               playsInline
-              poster={content.thumbnailUrl || content.imageUrl || undefined}
+              preload="auto"
             />
           ) : (
             <img
