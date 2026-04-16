@@ -50,6 +50,7 @@ export interface ByteDanceImageResult {
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   imageUrl?: string;
   images?: Array<{ url: string; width?: number; height?: number }>;
+  seed?: number;
   error?: string;
 }
 

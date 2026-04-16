@@ -3,7 +3,7 @@
  *
  * Admin-only page. Shows pending flags, takedown requests, and audit log.
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,11 @@ import {
 } from 'lucide-react';
 
 export const Route = createFileRoute('/admin/moderation')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/admin/moderation' } });
+    }
+  },
   component: ModerationDashboard,
 });
 
@@ -37,13 +42,6 @@ function ModerationDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('flags');
-
-  // Redirect unauthenticated users to login
-  useEffect(() => {
-    if (!isAuthenticated && !isAuthenticating) {
-      navigate({ to: '/login', search: { redirect: '/admin/moderation' } });
-    }
-  }, [isAuthenticated, isAuthenticating, navigate]);
 
   // Admin address check
   const adminAddresses = (import.meta.env.VITE_ADMIN_ADDRESSES ?? '')

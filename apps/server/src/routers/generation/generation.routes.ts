@@ -17,6 +17,8 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { falService } from '../../services/fal';
+import { bytedanceService } from '../../services/bytedance';
+import type { ByteDanceVideoOptions } from '../../services/bytedance';
 import {
   routeModel,
   validateManualSelection,
@@ -106,6 +108,50 @@ function buildFalInput(
     enablePromptExpansion: input.enablePromptExpansion,
     generateAudio: input.audio && model.supportsAudio ? true : undefined,
   };
+}
+
+/** Build input for ByteDance ModelArk direct API */
+function buildByteDanceInput(
+  model: ReturnType<typeof getModelById>,
+  input: z.infer<typeof generateInputSchema>
+): ByteDanceVideoOptions {
+  if (!model) throw new Error('Model not found');
+
+  // Determine mode based on model ID suffix and input
+  let mode: ByteDanceVideoOptions['mode'] = 'text_to_video';
+  if (model.id.includes('-ref')) {
+    mode = 'reference_to_video';
+  } else if (model.id.includes('-i2v') || input.imageUrl) {
+    mode = 'image_to_video';
+  }
+
+  return {
+    prompt: input.prompt,
+    model: model.bytedanceModelId || 'seedance-2.0',
+    mode,
+    imageUrl: input.imageUrl,
+    duration: input.durationSec,
+    aspectRatio: input.aspectRatio,
+    resolution: input.resolution === '1080p' ? '720p' : input.resolution || '720p',
+    audio: input.audio && model.supportsAudio ? true : undefined,
+    negativePrompt: input.negativePrompt,
+    seed: undefined, // can be added if user passes seed
+  };
+}
+
+/** Dispatch video generation to the correct provider */
+async function dispatchGeneration(
+  model: NonNullable<ReturnType<typeof getModelById>>,
+  input: z.infer<typeof generateInputSchema>
+): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
+  if (model.provider === 'bytedance') {
+    const bdInput = buildByteDanceInput(model, input);
+    return bytedanceService.generateVideo(bdInput);
+  }
+
+  // Default: FAL
+  const falInput = buildFalInput(model, input);
+  return falService.generateVideo(falInput);
 }
 
 async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void> {
@@ -554,8 +600,7 @@ export const generationRouter = router({
         record.status = 'running';
         await generationsCol().doc(generationId).update({ status: 'running' });
 
-        const falInput = buildFalInput(model, input);
-        const result = await falService.generateVideo(falInput);
+        const result = await dispatchGeneration(model, input);
 
         const latencyMs = Date.now() - startTime;
 
@@ -957,7 +1002,27 @@ export const generationRouter = router({
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video');
       const startTime = Date.now();
-      const result = await falService.generateVideo(input);
+      // Dispatch Seedance models to ByteDance direct API, everything else to FAL
+      const isByteDance = input.model?.startsWith('bytedance/');
+      const result = isByteDance
+        ? await bytedanceService.generateVideo({
+            prompt: input.prompt,
+            model: input.model?.includes('fast') ? 'seedance-2.0-fast' : 'seedance-2.0',
+            mode: input.model?.includes('reference')
+              ? 'reference_to_video'
+              : input.imageUrl
+                ? 'image_to_video'
+                : 'text_to_video',
+            imageUrl: input.imageUrl,
+            endImageUrl: input.endImageUrl,
+            duration: input.duration,
+            aspectRatio: input.aspectRatio,
+            resolution: input.resolution,
+            audio: input.generateAudio,
+            negativePrompt: input.negativePrompt,
+            seed: input.seed,
+          })
+        : await falService.generateVideo(input);
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Video generation failed');
       }
@@ -1191,8 +1256,7 @@ async function attemptFallback(
     try {
       console.log(`Attempting fallback: ${failedModelId} -> ${candidate.id}`);
 
-      const falInput = buildFalInput(candidate, input);
-      const result = await falService.generateVideo(falInput);
+      const result = await dispatchGeneration(candidate, input);
 
       if (result.status === 'completed' && result.videoUrl) {
         markProviderHealthy(candidate.provider);

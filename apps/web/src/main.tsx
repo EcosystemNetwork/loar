@@ -28,12 +28,13 @@ import { queryClient, trpc } from './utils/trpc';
 
 import { WalletWrapper } from './lib/wallet-provider';
 import { Web3ModeProvider } from './lib/web3-mode';
+import { hasSession } from './lib/wallet-auth';
 
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
   defaultPendingComponent: () => <Loader />,
-  context: { trpc, queryClient },
+  context: { trpc, queryClient, hasSession },
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
     return (
       <WalletWrapper queryClient={queryClient}>

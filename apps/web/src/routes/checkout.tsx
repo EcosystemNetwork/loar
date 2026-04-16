@@ -4,7 +4,7 @@
  * Accepts search params: listingId, productType, title, price, currency
  * Falls back to fetching listing if listingId is a real listing ID.
  */
-import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
+import { createFileRoute, redirect, useNavigate, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, CheckCircle, Loader2, ShieldCheck, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,6 +43,11 @@ export const Route = createFileRoute('/checkout')({
     price: z.string().optional(),
     currency: z.string().optional(),
   }),
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/checkout' } });
+    }
+  },
   component: CheckoutPage,
 });
 
@@ -54,12 +59,6 @@ function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
-
-  useEffect(() => {
-    if (!isAuthenticated && !isAuthenticating) {
-      navigate({ to: '/login', search: { redirect: '/checkout' } });
-    }
-  }, [isAuthenticated, isAuthenticating, navigate]);
 
   const { listingId, productType, title, price, currency } = search;
 

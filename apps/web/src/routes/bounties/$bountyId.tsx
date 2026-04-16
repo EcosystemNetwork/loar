@@ -62,13 +62,21 @@ function BountyDetailPage() {
   const [showCancel, setShowCancel] = useState(false);
   const [awardingId, setAwardingId] = useState<string | null>(null);
 
-  const { data: bountyRaw, isLoading } = useQuery({
+  const {
+    data: bountyRaw,
+    isLoading,
+    isError: bountyError,
+  } = useQuery({
     queryKey: ['bounty', bountyId],
     queryFn: () => trpcClient.bounties.get.query({ bountyId }),
   });
   const bounty = bountyRaw as any;
 
-  const { data: submissions, isLoading: subsLoading } = useQuery({
+  const {
+    data: submissions,
+    isLoading: subsLoading,
+    isError: subsError,
+  } = useQuery({
     queryKey: ['bounty-submissions', bountyId],
     queryFn: () => trpcClient.bounties.submissions.query({ bountyId }),
   });
@@ -118,6 +126,12 @@ function BountyDetailPage() {
     },
     onError: (err: any) => toast.error(err.message || 'Cancel failed'),
   });
+
+  if (bountyError || subsError) {
+    return (
+      <div className="p-8 text-center text-red-400">Failed to load bounty. Please try again.</div>
+    );
+  }
 
   if (isLoading) {
     return (

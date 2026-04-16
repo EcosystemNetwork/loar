@@ -211,13 +211,14 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     // ---- Merch ----
 
-    /// @notice Create a merchandise item
+    /// @notice Create a merchandise item (universe creator or platform only)
     function createMerch(
         uint256 universeId,
         string calldata name,
         string calldata metadataURI,
         uint256 price
     ) external whenNotPaused returns (uint256 merchId) {
+        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotUniverseCreator();
         merchId = nextMerchId++;
         merchItems[merchId] = MerchItem({
             id: merchId,

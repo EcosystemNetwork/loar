@@ -16,6 +16,7 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { createPublicClient, http } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import { getStorageManager } from '../../services/storage';
@@ -80,91 +81,101 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // 1. Load the content from gallery
-      const contentRef = contentCol().doc(input.contentId);
-      const contentDoc = await contentRef.get();
-      if (!contentDoc.exists) throwApiError('NOT_FOUND', 'Content not found in gallery');
-      const content = contentDoc.data()!;
+      try {
+        // 1. Load the content from gallery
+        const contentRef = contentCol().doc(input.contentId);
+        const contentDoc = await contentRef.get();
+        if (!contentDoc.exists) throwApiError('NOT_FOUND', 'Content not found in gallery');
+        const content = contentDoc.data()!;
 
-      if (content.creatorUid !== ctx.user.uid) {
-        throwApiError('FORBIDDEN', 'Only the creator can mint their content');
-      }
+        if (content.creatorUid !== ctx.user.uid) {
+          throwApiError('FORBIDDEN', 'Only the creator can mint their content');
+        }
 
-      if (content.mintedAsNft) {
-        throwApiError('CONFLICT', 'Content has already been minted as an NFT');
-      }
+        if (content.mintedAsNft) {
+          throwApiError('CONFLICT', 'Content has already been minted as an NFT');
+        }
 
-      // 2. Pin to IPFS for permanent on-chain storage
-      const manager = getStorageManager();
-      let ipfsCid: string;
-      let ipfsUrl: string;
+        // 2. Pin to IPFS for permanent on-chain storage
+        const manager = getStorageManager();
+        let ipfsCid: string;
+        let ipfsUrl: string;
 
-      if (content.contentHash) {
-        // Content was uploaded via StorageManager — pin existing hash
-        const pinResult = await manager.pinToIPFS(content.contentHash);
-        ipfsCid = pinResult.cid;
-        ipfsUrl = pinResult.url;
-      } else if (content.mediaUrl) {
-        // Content has a media URL but no storage hash — upload to IPFS directly
-        const manifest = await manager.uploadFromUrl(content.mediaUrl);
-        const ipfsUpload = manifest.uploads.find((u) => u.provider === 'ipfs');
-        if (ipfsUpload) {
-          ipfsCid = ipfsUpload.contentId;
-          ipfsUrl = ipfsUpload.url;
-        } else {
-          // IPFS wasn't in primary chain, pin explicitly
-          const pinResult = await manager.pinToIPFS(manifest.contentHash);
+        if (content.contentHash) {
+          // Content was uploaded via StorageManager — pin existing hash
+          const pinResult = await manager.pinToIPFS(content.contentHash);
           ipfsCid = pinResult.cid;
           ipfsUrl = pinResult.url;
+        } else if (content.mediaUrl) {
+          // Content has a media URL but no storage hash — upload to IPFS directly
+          const manifest = await manager.uploadFromUrl(content.mediaUrl);
+          const ipfsUpload = manifest.uploads.find((u) => u.provider === 'ipfs');
+          if (ipfsUpload) {
+            ipfsCid = ipfsUpload.contentId;
+            ipfsUrl = ipfsUpload.url;
+          } else {
+            // IPFS wasn't in primary chain, pin explicitly
+            const pinResult = await manager.pinToIPFS(manifest.contentHash);
+            ipfsCid = pinResult.cid;
+            ipfsUrl = pinResult.url;
+          }
+        } else {
+          throwApiError('BAD_REQUEST', 'Content has no media to mint');
         }
-      } else {
-        throwApiError('BAD_REQUEST', 'Content has no media to mint');
+
+        // 3. Build NFT metadata URI (points to IPFS)
+        const metadataURI = ipfsUrl;
+
+        // 4. Create the NFT listing
+        const now = new Date();
+        const nftData = {
+          contentId: input.contentId,
+          universeId: input.universeId || content.universeId || null,
+          contentHash: content.contentHash || null,
+          ipfsCid,
+          ipfsUrl,
+          title: content.title,
+          description: content.description || '',
+          mediaUrl: ipfsUrl, // Permanent IPFS URL
+          thumbnailUrl: content.thumbnailUrl || null,
+          mediaType: content.mediaType || 'image',
+          metadataURI,
+          mintPrice: input.mintPrice,
+          maxSupply: input.maxSupply,
+          royaltyBps: input.royaltyBps,
+          creatorUid: ctx.user.uid,
+          creatorAddress: ctx.user.address || null,
+          minted: 0,
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const nftRef = await episodesCol().add(nftData);
+
+        // 5. Mark the gallery content as minted (media becomes immutable)
+        await contentRef.update({
+          mintedAsNft: true,
+          nftListingId: nftRef.id,
+          ipfsCid,
+          ipfsUrl,
+          mintedAt: now,
+          updatedAt: now,
+        });
+
+        return {
+          ...nftData,
+          nftListingId: nftRef.id,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('Error in mintContent:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Operation failed',
+          cause: error,
+        });
       }
-
-      // 3. Build NFT metadata URI (points to IPFS)
-      const metadataURI = ipfsUrl;
-
-      // 4. Create the NFT listing
-      const now = new Date();
-      const nftData = {
-        contentId: input.contentId,
-        universeId: input.universeId || content.universeId || null,
-        contentHash: content.contentHash || null,
-        ipfsCid,
-        ipfsUrl,
-        title: content.title,
-        description: content.description || '',
-        mediaUrl: ipfsUrl, // Permanent IPFS URL
-        thumbnailUrl: content.thumbnailUrl || null,
-        mediaType: content.mediaType || 'image',
-        metadataURI,
-        mintPrice: input.mintPrice,
-        maxSupply: input.maxSupply,
-        royaltyBps: input.royaltyBps,
-        creatorUid: ctx.user.uid,
-        creatorAddress: ctx.user.address || null,
-        minted: 0,
-        active: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const nftRef = await episodesCol().add(nftData);
-
-      // 5. Mark the gallery content as minted (media becomes immutable)
-      await contentRef.update({
-        mintedAsNft: true,
-        nftListingId: nftRef.id,
-        ipfsCid,
-        ipfsUrl,
-        mintedAt: now,
-        updatedAt: now,
-      });
-
-      return {
-        ...nftData,
-        nftListingId: nftRef.id,
-      };
     }),
 
   // ---- Episode NFTs ----
@@ -277,27 +288,37 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Check for duplicate character name in universe
-      const existing = await characterNFTsCol()
-        .where('universeId', '==', input.universeId)
-        .where('name', '==', input.name)
-        .get();
+      try {
+        // Check for duplicate character name in universe
+        const existing = await characterNFTsCol()
+          .where('universeId', '==', input.universeId)
+          .where('name', '==', input.name)
+          .get();
 
-      if (!existing.empty) throw new Error('Character already exists in this universe');
+        if (!existing.empty) throw new Error('Character already exists in this universe');
 
-      const characterData = {
-        ...input,
-        creatorUid: ctx.user.uid,
-        creatorAddress: ctx.user.address || null,
-        appearanceCount: 0,
-        accumulatedRoyalties: '0',
-        active: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+        const characterData = {
+          ...input,
+          creatorUid: ctx.user.uid,
+          creatorAddress: ctx.user.address || null,
+          appearanceCount: 0,
+          accumulatedRoyalties: '0',
+          active: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
 
-      const ref = await characterNFTsCol().add(characterData);
-      return { id: ref.id, ...characterData };
+        const ref = await characterNFTsCol().add(characterData);
+        return { id: ref.id, ...characterData };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('Error in createCharacterNFT:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Operation failed',
+          cause: error,
+        });
+      }
     }),
 
   recordAppearance: protectedProcedure

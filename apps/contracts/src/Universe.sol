@@ -310,6 +310,8 @@ contract Universe is IUniverse {
             }
             nextIds[i] = tmpNext;
         }
+
+        return (ids, contentHashes, plotHashes, previousIds, nextIds, canonFlags);
     }
 
     // ---- Canon ----

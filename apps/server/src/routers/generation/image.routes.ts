@@ -29,6 +29,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
+import { bytedanceService } from '../../services/bytedance';
 import { db } from '../../lib/firebase';
 import { geminiService } from '../../services/gemini';
 import { wrapError } from '../../lib/errors';
@@ -116,14 +117,23 @@ async function attemptFallback(
 
   for (const candidate of candidates.slice(0, 2)) {
     try {
-      const result = await falService.generateImage({
-        prompt: input.prompt,
-        model: candidate.falModelId as any,
-        negativePrompt: input.negativePrompt,
-        imageSize: input.imageSize,
-        numImages: input.numImages,
-        seed: input.seed,
-      });
+      const result =
+        candidate.provider === 'bytedance'
+          ? await bytedanceService.generateImage({
+              prompt: input.prompt,
+              model: candidate.bytedanceModelId || 'seedream-5.0',
+              negativePrompt: input.negativePrompt,
+              numImages: input.numImages,
+              seed: input.seed,
+            })
+          : await falService.generateImage({
+              prompt: input.prompt,
+              model: candidate.falModelId as any,
+              negativePrompt: input.negativePrompt,
+              imageSize: input.imageSize,
+              numImages: input.numImages,
+              seed: input.seed,
+            });
       if (result.status === 'completed' && result.images?.length) {
         markImageProviderHealthy(candidate.provider);
         return {
@@ -304,14 +314,24 @@ export const imageRouter = router({
       try {
         await imageGenerationsCol().doc(genId).update({ status: 'running' });
 
-        const result = await falService.generateImage({
-          prompt: input.prompt,
-          model: model.falModelId as any,
-          negativePrompt: input.negativePrompt,
-          imageSize: input.imageSize,
-          numImages: input.numImages,
-          seed: input.seed,
-        });
+        // Dispatch to correct provider
+        const result =
+          model.provider === 'bytedance'
+            ? await bytedanceService.generateImage({
+                prompt: input.prompt,
+                model: model.bytedanceModelId || 'seedream-5.0',
+                negativePrompt: input.negativePrompt,
+                numImages: input.numImages,
+                seed: input.seed,
+              })
+            : await falService.generateImage({
+                prompt: input.prompt,
+                model: model.falModelId as any,
+                negativePrompt: input.negativePrompt,
+                imageSize: input.imageSize,
+                numImages: input.numImages,
+                seed: input.seed,
+              });
 
         if (result.status !== 'completed' || !result.images?.length) {
           markImageProviderUnhealthy(model.provider);

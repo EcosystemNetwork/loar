@@ -365,13 +365,12 @@ export const creditsRouter = router({
   getPackages: publicProcedure.query(async () => {
     // Admin-configured overrides in Firestore take priority
     try {
-      const snapshot = await creditPackagesCol()
-        .where('active', '==', true)
-        .orderBy('credits', 'asc')
-        .get();
+      const snapshot = await creditPackagesCol().where('active', '==', true).get();
 
       if (snapshot.docs.length > 0) {
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as CreditPackage[];
+        return (
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as CreditPackage[]
+        ).sort((a, b) => (a.credits ?? 0) - (b.credits ?? 0));
       }
     } catch {
       // fall through to dynamic defaults

@@ -5,6 +5,7 @@
 import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
@@ -53,24 +54,34 @@ export const marketplaceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { onBehalfOfUid, ...submitInput } = input;
-      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'marketplace');
+      try {
+        const { onBehalfOfUid, ...submitInput } = input;
+        const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'marketplace');
 
-      const submission = {
-        ...submitInput,
-        creatorUid: actingUid,
-        creatorAddress: ctx.user.address || null,
-        status: 'VOTING' as const,
-        votesFor: 0,
-        votesAgainst: 0,
-        voterCount: 0,
-        votingDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+        const submission = {
+          ...submitInput,
+          creatorUid: actingUid,
+          creatorAddress: ctx.user.address || null,
+          status: 'VOTING' as const,
+          votesFor: 0,
+          votesAgainst: 0,
+          voterCount: 0,
+          votingDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
 
-      const ref = await submissionsCol().add(submission);
-      return { id: ref.id, ...submission };
+        const ref = await submissionsCol().add(submission);
+        return { id: ref.id, ...submission };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('Error in submit:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Operation failed',
+          cause: error,
+        });
+      }
     }),
 
   vote: protectedProcedure
@@ -86,44 +97,56 @@ export const marketplaceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Check if already voted
-      const existingVote = await canonVotesCol()
-        .where('submissionId', '==', input.submissionId)
-        .where('voterUid', '==', ctx.user.uid)
-        .get();
+      try {
+        // Check if already voted
+        const existingVote = await canonVotesCol()
+          .where('submissionId', '==', input.submissionId)
+          .where('voterUid', '==', ctx.user.uid)
+          .get();
 
-      if (!existingVote.empty) throw new Error('Already voted on this submission');
+        if (!existingVote.empty) throw new Error('Already voted on this submission');
 
-      const weightNum = parseFloat(input.weight);
-      if (isNaN(weightNum) || weightNum <= 0) throw new Error('Invalid vote weight');
+        const weightNum = parseFloat(input.weight);
+        if (isNaN(weightNum) || weightNum <= 0) throw new Error('Invalid vote weight');
 
-      // Record vote
-      const voteData = {
-        submissionId: input.submissionId,
-        voterUid: ctx.user.uid,
-        voterAddress: ctx.user.address || null,
-        support: input.support,
-        weight: input.weight,
-        txHash: input.txHash || null,
-        votedAt: new Date(),
-      };
+        // Record vote
+        const voteData = {
+          submissionId: input.submissionId,
+          voterUid: ctx.user.uid,
+          voterAddress: ctx.user.address || null,
+          support: input.support,
+          weight: input.weight,
+          txHash: input.txHash || null,
+          votedAt: new Date(),
+        };
 
-      await canonVotesCol().add(voteData);
+        await canonVotesCol().add(voteData);
 
-      // Update submission tallies
-      const subRef = submissionsCol().doc(input.submissionId);
-      const subDoc = await subRef.get();
-      if (!subDoc.exists) throw new Error('Submission not found');
+        // Update submission tallies
+        const subRef = submissionsCol().doc(input.submissionId);
+        const subDoc = await subRef.get();
+        if (!subDoc.exists) throw new Error('Submission not found');
 
-      const sub = subDoc.data()!;
-      await subRef.update({
-        votesFor: input.support ? (sub.votesFor || 0) + weightNum : sub.votesFor || 0,
-        votesAgainst: !input.support ? (sub.votesAgainst || 0) + weightNum : sub.votesAgainst || 0,
-        voterCount: (sub.voterCount || 0) + 1,
-        updatedAt: new Date(),
-      });
+        const sub = subDoc.data()!;
+        await subRef.update({
+          votesFor: input.support ? (sub.votesFor || 0) + weightNum : sub.votesFor || 0,
+          votesAgainst: !input.support
+            ? (sub.votesAgainst || 0) + weightNum
+            : sub.votesAgainst || 0,
+          voterCount: (sub.voterCount || 0) + 1,
+          updatedAt: new Date(),
+        });
 
-      return { ok: true, vote: voteData };
+        return { ok: true, vote: voteData };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('Error in vote:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Operation failed',
+          cause: error,
+        });
+      }
     }),
 
   finalize: protectedProcedure

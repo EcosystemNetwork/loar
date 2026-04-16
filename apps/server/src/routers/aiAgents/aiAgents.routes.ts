@@ -11,6 +11,7 @@ import { createAIAgentSchema, updateAIAgentSchema } from './aiAgents.types';
 import { allocateCreditsToAgent, getAgentCreditStats } from '../../services/aiAgentCredits';
 import { emitActivity } from '../../services/activity';
 import { FieldValue } from 'firebase-admin/firestore';
+import { isUniverseAdmin } from '../../lib/safe-admin';
 
 const aiAgentsCol = () => {
   if (!db)
@@ -27,13 +28,6 @@ const universeAgentAssignmentsCol = () => {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase not configured' });
   return db.collection('universeAgentAssignments');
 };
-
-/** Check if caller is the universe creator (admin) */
-async function isUniverseAdmin(universeId: string, callerUid: string): Promise<boolean> {
-  const doc = await universesCol().doc(universeId.toLowerCase()).get();
-  if (!doc.exists) return false;
-  return doc.data()?.creator?.toLowerCase() === callerUid.toLowerCase();
-}
 
 export const aiAgentsRouter = router({
   // ── CRUD ─────────────────────────────────────────────────────────────

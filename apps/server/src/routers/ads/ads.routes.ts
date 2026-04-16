@@ -173,10 +173,15 @@ export const adsRouter = router({
       const snapshot = await adSlotsCol()
         .where('universeId', '==', input.universeId)
         .where('active', '==', true)
-        .orderBy('createdAt', 'desc')
         .get();
 
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      return snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort(
+          (a, b) =>
+            (b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime()) -
+            (a.createdAt?.toMillis?.() ?? new Date(a.createdAt).getTime())
+        );
     }),
 
   getSponsorships: publicProcedure

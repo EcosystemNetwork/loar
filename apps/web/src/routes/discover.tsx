@@ -523,6 +523,7 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
           <button
             className="absolute bottom-14 right-3 p-2 rounded-full bg-black/50 text-white"
             onClick={() => setMuted((m) => !m)}
+            aria-label={muted ? 'Unmute' : 'Mute'}
           >
             {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
@@ -575,6 +576,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         onClick={() => go(-1)}
         disabled={index === 0}
         className="h-12 w-12 rounded-full border bg-background/80 backdrop-blur shadow-md flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-all shrink-0"
+        aria-label="Previous video"
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
@@ -647,6 +649,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         <button
           className="absolute bottom-20 right-3 p-2.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors backdrop-blur-sm"
           onClick={() => setMuted((m) => !m)}
+          aria-label={muted ? 'Unmute' : 'Mute'}
         >
           {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </button>
@@ -657,6 +660,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         onClick={() => go(1)}
         disabled={index === items.length - 1}
         className="h-12 w-12 rounded-full border bg-background/80 backdrop-blur shadow-md flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-all shrink-0"
+        aria-label="Next video"
       >
         <ChevronRight className="h-6 w-6" />
       </button>

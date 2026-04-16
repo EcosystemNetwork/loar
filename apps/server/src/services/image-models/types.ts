@@ -18,10 +18,11 @@ export type PriceTier = 'low' | 'medium' | 'high';
 
 export interface ImageModelConfig {
   id: string;
-  provider: 'fal' | 'comfyui';
+  provider: 'fal' | 'comfyui' | 'bytedance';
   displayName: string;
   shortDescription: string;
   falModelId?: string; // undefined for non-fal providers
+  bytedanceModelId?: string; // ModelArk model ID (used when provider='bytedance')
   tasks: ImageGenerationTask[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

@@ -254,21 +254,22 @@ export const wikiRouter = router({
   getUniverseWikis: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await eventWikisCol()
-        .where('universeId', '==', input.universeId)
-        .orderBy('generatedAt')
-        .get();
+      const snapshot = await eventWikisCol().where('universeId', '==', input.universeId).get();
 
-      return snapshot.docs.map((doc) => {
-        const data = doc.data()!;
-        return {
-          id: doc.id,
-          universeId: data.universeId as string,
-          eventId: data.eventId as string,
-          wikiData: data.wikiData as any,
-          generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
-        };
-      });
+      return snapshot.docs
+        .map((doc) => {
+          const data = doc.data()!;
+          return {
+            id: doc.id,
+            universeId: data.universeId as string,
+            eventId: data.eventId as string,
+            wikiData: data.wikiData as any,
+            generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
+          };
+        })
+        .sort(
+          (a, b) => new Date(a.generatedAt ?? 0).getTime() - new Date(b.generatedAt ?? 0).getTime()
+        );
     }),
 
   /** Improve a user's video prompt using Gemini. */

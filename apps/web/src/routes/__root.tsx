@@ -32,6 +32,7 @@ import '../index.css';
 export interface RouterAppContext {
   trpc: typeof trpc;
   queryClient: QueryClient;
+  hasSession: () => boolean;
 }
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({

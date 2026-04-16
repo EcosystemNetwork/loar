@@ -314,10 +314,11 @@ export const stakingRouter = router({
 
       await curationCol.add(record);
 
-      // Update lifetime total
+      // Atomically update lifetime total to prevent race conditions
+      const { FieldValue } = await import('firebase-admin/firestore');
       await stakingCol.doc(ctx.user.address!.toLowerCase()).set(
         {
-          totalCurationEarned: (profileDoc.data()?.totalCurationEarned || 0) + boostedReward,
+          totalCurationEarned: FieldValue.increment(boostedReward),
           updatedAt: new Date().toISOString(),
         },
         { merge: true }

@@ -240,32 +240,18 @@ export const contentRouter = router({
     .query(async ({ input }) => {
       let query = contentCol()
         .where('creatorUid', '==', input.creatorUid)
-        .where('visibility', '==', 'public')
-        .orderBy('createdAt', 'desc')
-        .limit(input.limit + 1);
+        .where('visibility', '==', 'public') as FirebaseFirestore.Query;
 
       if (input.classification) {
         query = contentCol()
           .where('creatorUid', '==', input.creatorUid)
           .where('visibility', '==', 'public')
-          .where('classification', '==', input.classification)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit + 1);
-      }
-
-      if (input.cursor) {
-        const cursorDoc = await contentCol().doc(input.cursor).get();
-        if (cursorDoc.exists) {
-          query = query.startAfter(cursorDoc);
-        }
+          .where('classification', '==', input.classification);
       }
 
       const snapshot = await query.get();
-      const docs = snapshot.docs;
-      const hasMore = docs.length > input.limit;
-
-      return {
-        items: docs.slice(0, input.limit).map((doc) => {
+      const allDocs = snapshot.docs
+        .map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -279,9 +265,24 @@ export const contentRouter = router({
             views: data.views || 0,
             likes: data.likes || 0,
             createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+            _createdAtMs: data.createdAt?.toMillis?.() ?? new Date(data.createdAt).getTime(),
           };
-        }),
-        nextCursor: hasMore ? docs[input.limit - 1]?.id : null,
+        })
+        .sort((a, b) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
+
+      // Find cursor position for in-memory pagination
+      let startIdx = 0;
+      if (input.cursor) {
+        const idx = allDocs.findIndex((d) => d.id === input.cursor);
+        if (idx >= 0) startIdx = idx + 1;
+      }
+
+      const page = allDocs.slice(startIdx, startIdx + input.limit + 1);
+      const hasMore = page.length > input.limit;
+
+      return {
+        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }) => rest),
+        nextCursor: hasMore ? page[input.limit - 1]?.id : null,
       };
     }),
 
@@ -295,32 +296,17 @@ export const contentRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      let query = contentCol()
-        .where('creatorUid', '==', ctx.user.uid)
-        .orderBy('createdAt', 'desc')
-        .limit(input.limit + 1);
+      let query = contentCol().where('creatorUid', '==', ctx.user.uid) as FirebaseFirestore.Query;
 
       if (input.classification) {
         query = contentCol()
           .where('creatorUid', '==', ctx.user.uid)
-          .where('classification', '==', input.classification)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit + 1);
-      }
-
-      if (input.cursor) {
-        const cursorDoc = await contentCol().doc(input.cursor).get();
-        if (cursorDoc.exists) {
-          query = query.startAfter(cursorDoc);
-        }
+          .where('classification', '==', input.classification);
       }
 
       const snapshot = await query.get();
-      const docs = snapshot.docs;
-      const hasMore = docs.length > input.limit;
-
-      return {
-        items: docs.slice(0, input.limit).map((doc) => {
+      const allDocs = snapshot.docs
+        .map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -336,9 +322,24 @@ export const contentRouter = router({
             views: data.views || 0,
             likes: data.likes || 0,
             createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+            _createdAtMs: data.createdAt?.toMillis?.() ?? new Date(data.createdAt).getTime(),
           };
-        }),
-        nextCursor: hasMore ? docs[input.limit - 1]?.id : null,
+        })
+        .sort((a, b) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
+
+      // Find cursor position for in-memory pagination
+      let startIdx = 0;
+      if (input.cursor) {
+        const idx = allDocs.findIndex((d) => d.id === input.cursor);
+        if (idx >= 0) startIdx = idx + 1;
+      }
+
+      const page = allDocs.slice(startIdx, startIdx + input.limit + 1);
+      const hasMore = page.length > input.limit;
+
+      return {
+        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }) => rest),
+        nextCursor: hasMore ? page[input.limit - 1]?.id : null,
       };
     }),
 
@@ -355,59 +356,47 @@ export const contentRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = contentCol()
-        .where('visibility', '==', 'public')
-        .orderBy('createdAt', 'desc')
-        .limit(input.limit + 1);
+      let query = contentCol().where('visibility', '==', 'public') as FirebaseFirestore.Query;
 
       if (input.classification) {
         query = contentCol()
           .where('visibility', '==', 'public')
-          .where('classification', '==', input.classification)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit + 1);
-      }
-
-      if (input.cursor) {
-        const cursorDoc = await contentCol().doc(input.cursor).get();
-        if (cursorDoc.exists) {
-          query = query.startAfter(cursorDoc);
-        }
+          .where('classification', '==', input.classification);
       }
 
       const snapshot = await query.get();
-      const docs = snapshot.docs;
-      const hasMore = docs.length > input.limit;
-
-      let items = docs.slice(0, input.limit).map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          title: data.title,
-          description: data.description,
-          mediaUrl: data.mediaUrl,
-          thumbnailUrl: data.thumbnailUrl || null,
-          mediaType: data.mediaType,
-          format: (data.format as 'short' | 'long') || null,
-          classification: data.classification,
-          tags: data.tags || [],
-          creatorUid: data.creatorUid,
-          views: data.views || 0,
-          likes: data.likes || 0,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
-        };
-      });
+      let allItems = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title,
+            description: data.description,
+            mediaUrl: data.mediaUrl,
+            thumbnailUrl: data.thumbnailUrl || null,
+            mediaType: data.mediaType,
+            format: (data.format as 'short' | 'long') || null,
+            classification: data.classification,
+            tags: data.tags || [],
+            creatorUid: data.creatorUid,
+            views: data.views || 0,
+            likes: data.likes || 0,
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+            _createdAtMs: data.createdAt?.toMillis?.() ?? new Date(data.createdAt).getTime(),
+          };
+        })
+        .sort((a, b) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
 
       // Client-side filters for fields Firestore can't compound-query easily
       if (input.mediaType) {
-        items = items.filter((i) => i.mediaType === input.mediaType);
+        allItems = allItems.filter((i) => i.mediaType === input.mediaType);
       }
       if (input.format) {
-        items = items.filter((i) => i.format === input.format);
+        allItems = allItems.filter((i) => i.format === input.format);
       }
       if (input.search) {
         const s = input.search.toLowerCase();
-        items = items.filter(
+        allItems = allItems.filter(
           (i) =>
             i.title.toLowerCase().includes(s) ||
             i.description.toLowerCase().includes(s) ||
@@ -415,9 +404,19 @@ export const contentRouter = router({
         );
       }
 
+      // Find cursor position for in-memory pagination
+      let startIdx = 0;
+      if (input.cursor) {
+        const idx = allItems.findIndex((d) => d.id === input.cursor);
+        if (idx >= 0) startIdx = idx + 1;
+      }
+
+      const page = allItems.slice(startIdx, startIdx + input.limit + 1);
+      const hasMore = page.length > input.limit;
+
       return {
-        items,
-        nextCursor: hasMore ? docs[input.limit - 1]?.id : null,
+        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }) => rest),
+        nextCursor: hasMore ? page[input.limit - 1]?.id : null,
       };
     }),
 });
