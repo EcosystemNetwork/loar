@@ -444,7 +444,7 @@ function CinematicUniverseCreate() {
           const args = decoded.args as { universe: string; creator: string };
           parsedUniverseAddress = args.universe as `0x${string}`;
         }
-        if (decoded.eventName === 'UniverseMintFee') {
+        if (decoded.eventName === 'UniverseLpSeed') {
           const args = decoded.args as { universeId: bigint };
           parsedUniverseId = args.universeId;
         }

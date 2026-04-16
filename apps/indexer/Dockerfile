@@ -1,6 +1,7 @@
 FROM node:20.18.1-alpine
 
 RUN apk add --no-cache curl
+ENV COREPACK_INTEGRITY_KEYS=0
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
@@ -33,6 +34,7 @@ COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
 RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
+RUN chown -R appuser:appgroup /app/apps/indexer
 USER appuser
 
 WORKDIR /app/apps/indexer

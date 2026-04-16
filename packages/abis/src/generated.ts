@@ -736,6 +736,13 @@ export const canonMarketplaceAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'quorumBps',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'renounceOwnership',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -746,6 +753,13 @@ export const canonMarketplaceAbi = [
     name: 'rightsRegistry',
     outputs: [{ name: '', internalType: 'contract IRightsRegistry', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_quorumBps', internalType: 'uint16', type: 'uint16' }],
+    name: 'setQuorumBps',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -1112,6 +1126,7 @@ export const canonMarketplaceAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'OwnableUnauthorizedAccount',
   },
+  { type: 'error', inputs: [], name: 'QuorumNotReached' },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   { type: 'error', inputs: [], name: 'TransferFailed' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
@@ -1320,6 +1335,13 @@ export const characterNftAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'nextTokenId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
     name: 'ownerOf',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
@@ -1430,6 +1452,13 @@ export const characterNftAbi = [
       { name: 'index', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'tokenOfOwnerByIndex',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenToCharacter',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -2410,6 +2439,16 @@ export const contentLicensingAbi = [
   {
     type: 'function',
     inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'user', internalType: 'address', type: 'address' },
+    ],
+    name: 'hasAccess',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: '_platform', internalType: 'address', type: 'address' },
       { name: '_splitRouter', internalType: 'address', type: 'address' },
       { name: '_paymentRouter', internalType: 'address', type: 'address' },
@@ -3340,10 +3379,21 @@ export const creditManagerAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'target', internalType: 'address', type: 'address' }],
+    name: 'AddressEmptyCode',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'AddressInsufficientBalance',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
     name: 'ERC1967InvalidImplementation',
   },
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
+  { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InsufficientCredits' },
   { type: 'error', inputs: [], name: 'InsufficientLoarAllowance' },
@@ -3364,6 +3414,11 @@ export const creditManagerAbi = [
   },
   { type: 'error', inputs: [], name: 'PackageNotActive' },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
   { type: 'error', inputs: [], name: 'TransferFailed' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
@@ -9077,6 +9132,7 @@ export const loarLpLockerMultipleAbi = [
       },
       { name: 'poolSupply', internalType: 'uint256', type: 'uint256' },
       { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'pairedAmount', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'placeLiquidity',
     outputs: [{ name: 'positionId', internalType: 'uint256', type: 'uint256' }],
@@ -12919,6 +12975,13 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'MAX_CHILDREN_PER_NODE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'associatedToken',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -14134,7 +14197,7 @@ export const universeManagerAbi = [
     type: 'constructor',
     inputs: [
       { name: '_teamFeeRecipient', internalType: 'address', type: 'address' },
-      { name: '_lpRecipient', internalType: 'address', type: 'address' },
+      { name: '_weth', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -14155,6 +14218,23 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'recipient', internalType: 'address', type: 'address' }],
     name: 'claimEth',
     outputs: [],
@@ -14164,16 +14244,6 @@ export const universeManagerAbi = [
     type: 'function',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'claimTeamFee',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'amount', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'consumeCreditFund',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -14283,7 +14353,7 @@ export const universeManagerAbi = [
     ],
     name: 'deployUniverseToken',
     outputs: [{ name: 'tokenAddress', internalType: 'address', type: 'address' }],
-    stateMutability: 'payable',
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -14311,6 +14381,13 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getApproved',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'id', internalType: 'uint256', type: 'uint256' }],
     name: 'getUniverseData',
     outputs: [
@@ -14332,9 +14409,12 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'lpRecipient',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -14347,8 +14427,8 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'mintFeeLpBps',
-    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
     stateMutability: 'view',
   },
   {
@@ -14360,8 +14440,48 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ownerOf',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -14395,22 +14515,8 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: '_lpRecipient', internalType: 'address', type: 'address' }],
-    name: 'setLpRecipient',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     inputs: [{ name: '_mintFee', internalType: 'uint256', type: 'uint256' }],
     name: 'setMintFee',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '_mintFeeLpBps', internalType: 'uint16', type: 'uint16' }],
-    name: 'setMintFeeLpBps',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -14427,6 +14533,27 @@ export const universeManagerAbi = [
     name: 'setTokenDeployer',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_weth', internalType: 'address', type: 'address' }],
+    name: 'setWeth',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -14451,10 +14578,35 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenURI',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
-    name: 'totalCreditFundsHeld',
+    name: 'totalLpSeedsHeld',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -14466,9 +14618,61 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    name: 'universeCreditFund',
+    name: 'universeLpSeed',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'weth',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
   },
   {
     type: 'event',
@@ -14494,25 +14698,6 @@ export const universeManagerAbi = [
       },
     ],
     name: 'ClaimTeamFees',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'oldBps',
-        internalType: 'uint16',
-        type: 'uint16',
-        indexed: false,
-      },
-      {
-        name: 'newBps',
-        internalType: 'uint16',
-        type: 'uint16',
-        indexed: false,
-      },
-    ],
-    name: 'MintFeeLpBpsUpdated',
   },
   {
     type: 'event',
@@ -14598,25 +14783,6 @@ export const universeManagerAbi = [
       { name: 'enabled', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'SetLocker',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'oldLpRecipient',
-        internalType: 'address',
-        type: 'address',
-        indexed: false,
-      },
-      {
-        name: 'newLpRecipient',
-        internalType: 'address',
-        type: 'address',
-        indexed: false,
-      },
-    ],
-    name: 'SetLpRecipient',
   },
   {
     type: 'event',
@@ -14752,6 +14918,21 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Transfer',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
       {
         name: 'universe',
         internalType: 'address',
@@ -14784,19 +14965,32 @@ export const universeManagerAbi = [
         indexed: true,
       },
       {
-        name: 'lpAmount',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'creditAmount',
+        name: 'amount',
         internalType: 'uint256',
         type: 'uint256',
         indexed: false,
       },
     ],
-    name: 'UniverseMintFee',
+    name: 'UniverseLpSeed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldWeth',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newWeth',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'WethUpdated',
   },
   {
     type: 'error',
@@ -14811,13 +15005,59 @@ export const universeManagerAbi = [
   { type: 'error', inputs: [], name: 'CallerIsNotOwner' },
   { type: 'error', inputs: [], name: 'DeployerIsNotOwner' },
   { type: 'error', inputs: [], name: 'Deprecated' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'owner', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC721IncorrectOwner',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC721InsufficientApproval',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOperator',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ERC721NonexistentToken',
+  },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'HookNotEnabled' },
   { type: 'error', inputs: [], name: 'InsufficientMintFee' },
   { type: 'error', inputs: [], name: 'InvalidHook' },
   { type: 'error', inputs: [], name: 'InvalidLocker' },
   { type: 'error', inputs: [], name: 'LockerNotEnabled' },
-  { type: 'error', inputs: [], name: 'LpRecipientNotSet' },
   {
     type: 'error',
     inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
@@ -14833,6 +15073,14 @@ export const universeManagerAbi = [
     type: 'error',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'SafeERC20FailedOperation',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+      { name: 'length', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'StringsInsufficientHexLength',
   },
   { type: 'error', inputs: [], name: 'TeamFeeRecipientNotSet' },
   { type: 'error', inputs: [], name: 'TokenAlreadyDeployed' },
@@ -15710,6 +15958,14 @@ export const useCanonMarketplace_ProxiableUuid_read = /*#__PURE__*/ createUseRea
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"quorumBps"`
+ */
+export const useCanonMarketplace_QuorumBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'quorumBps',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"rightsRegistry"`
  */
 export const useCanonMarketplace_RightsRegistry_read = /*#__PURE__*/ createUseReadContract({
@@ -15794,6 +16050,14 @@ export const useCanonMarketplace_Pause_write = /*#__PURE__*/ createUseWriteContr
 export const useCanonMarketplace_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
   abi: canonMarketplaceAbi,
   functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"setQuorumBps"`
+ */
+export const useCanonMarketplace_SetQuorumBps_write = /*#__PURE__*/ createUseWriteContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'setQuorumBps',
 });
 
 /**
@@ -15891,6 +16155,14 @@ export const useCanonMarketplace_RenounceOwnership_simulate =
     abi: canonMarketplaceAbi,
     functionName: 'renounceOwnership',
   });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"setQuorumBps"`
+ */
+export const useCanonMarketplace_SetQuorumBps_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: canonMarketplaceAbi,
+  functionName: 'setQuorumBps',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"submit"`
@@ -16170,6 +16442,14 @@ export const useCharacterNft_NextCharacterId_read = /*#__PURE__*/ createUseReadC
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"nextTokenId"`
+ */
+export const useCharacterNft_NextTokenId_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'nextTokenId',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"ownerOf"`
  */
 export const useCharacterNft_OwnerOf_read = /*#__PURE__*/ createUseReadContract({
@@ -16239,6 +16519,14 @@ export const useCharacterNft_TokenByIndex_read = /*#__PURE__*/ createUseReadCont
 export const useCharacterNft_TokenOfOwnerByIndex_read = /*#__PURE__*/ createUseReadContract({
   abi: characterNftAbi,
   functionName: 'tokenOfOwnerByIndex',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"tokenToCharacter"`
+ */
+export const useCharacterNft_TokenToCharacter_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'tokenToCharacter',
 });
 
 /**
@@ -17032,6 +17320,14 @@ export const useContentLicensing_GetContentDealsPaginated_read =
 export const useContentLicensing_GetRegistration_read = /*#__PURE__*/ createUseReadContract({
   abi: contentLicensingAbi,
   functionName: 'getRegistration',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"hasAccess"`
+ */
+export const useContentLicensing_HasAccess_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'hasAccess',
 });
 
 /**
@@ -25604,6 +25900,14 @@ export const useUniverse_undefined_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"MAX_CHILDREN_PER_NODE"`
+ */
+export const useUniverse_MaxChildrenPerNode_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'MAX_CHILDREN_PER_NODE',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"associatedToken"`
  */
 export const useUniverse_AssociatedToken_read = /*#__PURE__*/ createUseReadContract({
@@ -26671,6 +26975,14 @@ export const useUniverseManager_TokenSupply_read = /*#__PURE__*/ createUseReadCo
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useUniverseManager_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'balanceOf',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deprecated"`
  */
 export const useUniverseManager_Deprecated_read = /*#__PURE__*/ createUseReadContract({
@@ -26695,6 +27007,14 @@ export const useUniverseManager_EnabledLockers_read = /*#__PURE__*/ createUseRea
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"getApproved"`
+ */
+export const useUniverseManager_GetApproved_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'getApproved',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"getUniverseData"`
  */
 export const useUniverseManager_GetUniverseData_read = /*#__PURE__*/ createUseReadContract({
@@ -26703,11 +27023,11 @@ export const useUniverseManager_GetUniverseData_read = /*#__PURE__*/ createUseRe
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"lpRecipient"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"isApprovedForAll"`
  */
-export const useUniverseManager_LpRecipient_read = /*#__PURE__*/ createUseReadContract({
+export const useUniverseManager_IsApprovedForAll_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
-  functionName: 'lpRecipient',
+  functionName: 'isApprovedForAll',
 });
 
 /**
@@ -26719,11 +27039,11 @@ export const useUniverseManager_MintFee_read = /*#__PURE__*/ createUseReadContra
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"mintFeeLpBps"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"name"`
  */
-export const useUniverseManager_MintFeeLpBps_read = /*#__PURE__*/ createUseReadContract({
+export const useUniverseManager_Name_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
-  functionName: 'mintFeeLpBps',
+  functionName: 'name',
 });
 
 /**
@@ -26732,6 +27052,30 @@ export const useUniverseManager_MintFeeLpBps_read = /*#__PURE__*/ createUseReadC
 export const useUniverseManager_Owner_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
   functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"ownerOf"`
+ */
+export const useUniverseManager_OwnerOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'ownerOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"supportsInterface"`
+ */
+export const useUniverseManager_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'supportsInterface',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useUniverseManager_Symbol_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'symbol',
 });
 
 /**
@@ -26759,19 +27103,43 @@ export const useUniverseManager_TokenDeployer_read = /*#__PURE__*/ createUseRead
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"totalCreditFundsHeld"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"tokenURI"`
  */
-export const useUniverseManager_TotalCreditFundsHeld_read = /*#__PURE__*/ createUseReadContract({
+export const useUniverseManager_TokenUri_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
-  functionName: 'totalCreditFundsHeld',
+  functionName: 'tokenURI',
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"universeCreditFund"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"totalLpSeedsHeld"`
  */
-export const useUniverseManager_UniverseCreditFund_read = /*#__PURE__*/ createUseReadContract({
+export const useUniverseManager_TotalLpSeedsHeld_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
-  functionName: 'universeCreditFund',
+  functionName: 'totalLpSeedsHeld',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useUniverseManager_TotalSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'totalSupply',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"universeLpSeed"`
+ */
+export const useUniverseManager_UniverseLpSeed_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'universeLpSeed',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"weth"`
+ */
+export const useUniverseManager_Weth_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'weth',
 });
 
 /**
@@ -26779,6 +27147,14 @@ export const useUniverseManager_UniverseCreditFund_read = /*#__PURE__*/ createUs
  */
 export const useUniverseManager_undefined_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeManagerAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"approve"`
+ */
+export const useUniverseManager_Approve_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'approve',
 });
 
 /**
@@ -26795,14 +27171,6 @@ export const useUniverseManager_ClaimEth_write = /*#__PURE__*/ createUseWriteCon
 export const useUniverseManager_ClaimTeamFee_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeManagerAbi,
   functionName: 'claimTeamFee',
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"consumeCreditFund"`
- */
-export const useUniverseManager_ConsumeCreditFund_write = /*#__PURE__*/ createUseWriteContract({
-  abi: universeManagerAbi,
-  functionName: 'consumeCreditFund',
 });
 
 /**
@@ -26830,6 +27198,22 @@ export const useUniverseManager_RenounceOwnership_write = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useUniverseManager_SafeTransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'safeTransferFrom',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useUniverseManager_SetApprovalForAll_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setApprovalForAll',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setDeprecated"`
  */
 export const useUniverseManager_SetDeprecated_write = /*#__PURE__*/ createUseWriteContract({
@@ -26854,27 +27238,11 @@ export const useUniverseManager_SetLocker_write = /*#__PURE__*/ createUseWriteCo
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setLpRecipient"`
- */
-export const useUniverseManager_SetLpRecipient_write = /*#__PURE__*/ createUseWriteContract({
-  abi: universeManagerAbi,
-  functionName: 'setLpRecipient',
-});
-
-/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFee"`
  */
 export const useUniverseManager_SetMintFee_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeManagerAbi,
   functionName: 'setMintFee',
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFeeLpBps"`
- */
-export const useUniverseManager_SetMintFeeLpBps_write = /*#__PURE__*/ createUseWriteContract({
-  abi: universeManagerAbi,
-  functionName: 'setMintFeeLpBps',
 });
 
 /**
@@ -26894,6 +27262,22 @@ export const useUniverseManager_SetTokenDeployer_write = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setWeth"`
+ */
+export const useUniverseManager_SetWeth_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setWeth',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useUniverseManager_TransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'transferFrom',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useUniverseManager_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
@@ -26906,6 +27290,14 @@ export const useUniverseManager_TransferOwnership_write = /*#__PURE__*/ createUs
  */
 export const useUniverseManager_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: universeManagerAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"approve"`
+ */
+export const useUniverseManager_Approve_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'approve',
 });
 
 /**
@@ -26923,15 +27315,6 @@ export const useUniverseManager_ClaimTeamFee_simulate = /*#__PURE__*/ createUseS
   abi: universeManagerAbi,
   functionName: 'claimTeamFee',
 });
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"consumeCreditFund"`
- */
-export const useUniverseManager_ConsumeCreditFund_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeManagerAbi,
-    functionName: 'consumeCreditFund',
-  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"createUniverse"`
@@ -26960,6 +27343,25 @@ export const useUniverseManager_RenounceOwnership_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useUniverseManager_SafeTransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: universeManagerAbi,
+    functionName: 'safeTransferFrom',
+  }
+);
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useUniverseManager_SetApprovalForAll_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'setApprovalForAll',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setDeprecated"`
  */
 export const useUniverseManager_SetDeprecated_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -26984,27 +27386,11 @@ export const useUniverseManager_SetLocker_simulate = /*#__PURE__*/ createUseSimu
 });
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setLpRecipient"`
- */
-export const useUniverseManager_SetLpRecipient_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: universeManagerAbi,
-  functionName: 'setLpRecipient',
-});
-
-/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFee"`
  */
 export const useUniverseManager_SetMintFee_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: universeManagerAbi,
   functionName: 'setMintFee',
-});
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setMintFeeLpBps"`
- */
-export const useUniverseManager_SetMintFeeLpBps_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: universeManagerAbi,
-  functionName: 'setMintFeeLpBps',
 });
 
 /**
@@ -27027,6 +27413,22 @@ export const useUniverseManager_SetTokenDeployer_simulate = /*#__PURE__*/ create
 );
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setWeth"`
+ */
+export const useUniverseManager_SetWeth_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setWeth',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useUniverseManager_TransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'transferFrom',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useUniverseManager_TransferOwnership_simulate =
@@ -27043,21 +27445,28 @@ export const useUniverseManager_undefined_watch = /*#__PURE__*/ createUseWatchCo
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useUniverseManager_Approval_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'Approval',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"ApprovalForAll"`
+ */
+export const useUniverseManager_ApprovalForAll_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'ApprovalForAll',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"ClaimTeamFees"`
  */
 export const useUniverseManager_ClaimTeamFees_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeManagerAbi,
   eventName: 'ClaimTeamFees',
 });
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"MintFeeLpBpsUpdated"`
- */
-export const useUniverseManager_MintFeeLpBpsUpdated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'MintFeeLpBpsUpdated',
-  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"MintFeeUpdated"`
@@ -27101,14 +27510,6 @@ export const useUniverseManager_SetLocker_watch = /*#__PURE__*/ createUseWatchCo
 });
 
 /**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetLpRecipient"`
- */
-export const useUniverseManager_SetLpRecipient_watch = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: universeManagerAbi,
-  eventName: 'SetLpRecipient',
-});
-
-/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetTeamFeeRecipient"`
  */
 export const useUniverseManager_SetTeamFeeRecipient_watch =
@@ -27142,6 +27543,14 @@ export const useUniverseManager_TokenDeployed_watch = /*#__PURE__*/ createUseWat
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useUniverseManager_Transfer_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'Transfer',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseCreated"`
  */
 export const useUniverseManager_UniverseCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -27150,11 +27559,19 @@ export const useUniverseManager_UniverseCreated_watch = /*#__PURE__*/ createUseW
 });
 
 /**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseMintFee"`
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseLpSeed"`
  */
-export const useUniverseManager_UniverseMintFee_watch = /*#__PURE__*/ createUseWatchContractEvent({
+export const useUniverseManager_UniverseLpSeed_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeManagerAbi,
-  eventName: 'UniverseMintFee',
+  eventName: 'UniverseLpSeed',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"WethUpdated"`
+ */
+export const useUniverseManager_WethUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'WethUpdated',
 });
 
 /**
