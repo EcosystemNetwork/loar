@@ -101,7 +101,7 @@ export async function getUniverse(id: string) {
 
 export async function getAllUniverses() {
   try {
-    const snapshot = await collection().orderBy('created_at').get();
+    const snapshot = await collection().orderBy('created_at').limit(500).get();
     const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     return {

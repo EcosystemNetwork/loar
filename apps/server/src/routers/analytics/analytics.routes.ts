@@ -268,7 +268,7 @@ export const analyticsRouter = router({
   // ---- Platform-wide Stats ----
 
   getPlatformStats: publicProcedure.query(async () => {
-    const snapshot = await analyticsCol().get();
+    const snapshot = await analyticsCol().limit(1000).get();
 
     let totalViews = 0;
     let totalMints = 0;
