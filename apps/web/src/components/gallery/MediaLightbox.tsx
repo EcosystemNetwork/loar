@@ -2,8 +2,8 @@
  * Media Lightbox — Full-screen modal for viewing gallery videos and images.
  * Click a gallery card to pop it out into this immersive viewer.
  */
-import { useEffect, useCallback } from 'react';
-import { X, Download, ExternalLink, Heart, Eye, Film } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Download, Heart, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -24,11 +24,17 @@ interface MediaLightboxProps {
 }
 
 export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
+  const [loaded, setLoaded] = useState(false);
   const isVideo = content?.mediaType === 'video' || content?.mediaType === 'ai-video';
-  // For lightbox, always use the full-quality source — never fall back to thumbnail
+  // Prefer the full-quality source; fall back to thumbnail so images always display
   const videoSrc = content?.mediaUrl;
-  const imageSrc = content?.mediaUrl || content?.imageUrl;
+  const imageSrc = content?.mediaUrl || content?.imageUrl || content?.thumbnailUrl;
   const mediaSrc = isVideo ? videoSrc : imageSrc;
+
+  // Reset loaded state when content changes
+  useEffect(() => {
+    setLoaded(false);
+  }, [mediaSrc]);
 
   // Close on Escape
   const handleKeyDown = useCallback(
@@ -52,8 +58,8 @@ export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+      {/* Backdrop — solid overlay, no backdrop-filter to avoid GPU compositing blur */}
+      <div className="absolute inset-0 bg-black/95" />
 
       {/* Content */}
       <div
@@ -83,11 +89,20 @@ export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
               preload="auto"
             />
           ) : (
-            <img
-              src={mediaSrc}
-              alt={content.title || 'Content'}
-              className="max-w-[85vw] max-h-[75vh] object-contain"
-            />
+            <>
+              {!loaded && (
+                <div className="flex items-center justify-center w-[50vw] aspect-square max-h-[75vh]">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+                </div>
+              )}
+              <img
+                src={mediaSrc}
+                alt={content.title || 'Content'}
+                className={`max-w-[85vw] max-h-[75vh] object-contain ${loaded ? '' : 'hidden'}`}
+                style={{ imageRendering: 'auto' }}
+                onLoad={() => setLoaded(true)}
+              />
+            </>
           )}
         </div>
 

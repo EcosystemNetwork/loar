@@ -214,6 +214,26 @@ contract Universe is IUniverse {
         emit MediaUpdated(id, msg.sender, _contentHash, _link);
     }
 
+    /// @notice Swap the content (media + plot) between two nodes, keeping DAG structure intact.
+    /// @param nodeA First node ID
+    /// @param nodeB Second node ID
+    function swapNodes(uint nodeA, uint nodeB) public onlyAdmin {
+        require(nodeA != nodeB, "Cannot swap a node with itself");
+        require(nodes[nodeA].id != 0, "Node A does not exist");
+        require(nodes[nodeB].id != 0, "Node B does not exist");
+
+        bytes32 tempContentHash = nodes[nodeA].contentHash;
+        bytes32 tempPlotHash = nodes[nodeA].plotHash;
+
+        nodes[nodeA].contentHash = nodes[nodeB].contentHash;
+        nodes[nodeA].plotHash = nodes[nodeB].plotHash;
+
+        nodes[nodeB].contentHash = tempContentHash;
+        nodes[nodeB].plotHash = tempPlotHash;
+
+        emit NodesSwapped(nodeA, nodeB, msg.sender);
+    }
+
     function setNodeVisibilityOption(
         NodeVisibilityOptions _option
     ) public onlyAdmin {
