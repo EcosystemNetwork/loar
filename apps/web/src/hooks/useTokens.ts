@@ -192,7 +192,7 @@ export function usePoolData(poolId: string | undefined) {
         pool: PoolData | null;
       }>(
         `query ($poolId: String!) {
-          pool(id: $poolId) {
+          pool(poolId: $poolId) {
             poolId
             currency0
             currency1
