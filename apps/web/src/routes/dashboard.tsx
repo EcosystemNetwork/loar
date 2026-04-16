@@ -243,6 +243,9 @@ function RouteComponent() {
                       key={u.id}
                       tokenAddress={u.tokenAddress as `0x${string}`}
                       universeName={u.name || 'Unnamed Universe'}
+                      onChainUniverseId={
+                        u.onChainUniverseId != null ? Number(u.onChainUniverseId) : undefined
+                      }
                     />
                   ))}
               </div>

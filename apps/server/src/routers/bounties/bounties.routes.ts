@@ -174,7 +174,7 @@ export const bountiesRouter = router({
       if (!bountyDoc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = bountyDoc.data()!;
-      if (bounty.poster !== ctx.user.address)
+      if (!ctx.user.uid || bounty.posterUid !== ctx.user.uid)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only poster can award' });
       if (bounty.status !== 'open')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty not open' });
@@ -210,7 +210,7 @@ export const bountiesRouter = router({
       const doc = await col.doc(input.bountyId).get();
       if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = doc.data()!;
-      if (bounty.poster !== ctx.user.address)
+      if (!ctx.user.uid || bounty.posterUid !== ctx.user.uid)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only poster can cancel' });
       if (bounty.status !== 'open')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty not open' });

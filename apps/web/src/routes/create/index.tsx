@@ -21,6 +21,12 @@ import {
   Cpu,
   Building2,
   Dna,
+  GitBranch,
+  Eye,
+  Box,
+  Hexagon,
+  Castle,
+  Crown,
 } from 'lucide-react';
 
 interface EntityTypeCard {
@@ -108,6 +114,49 @@ const ENTITY_TYPES: EntityTypeCard[] = [
     description: 'Inventions, magical systems, devices, artifacts of power.',
     icon: Cpu,
     color: 'from-sky-500/20 to-blue-500/20 border-sky-500/30',
+  },
+  // Structural / ontology kinds
+  {
+    kind: 'timeline',
+    label: 'Timeline',
+    description: 'Branching narrative threads, alternate histories, story arcs.',
+    icon: GitBranch,
+    color: 'from-fuchsia-500/20 to-pink-500/20 border-fuchsia-500/30',
+  },
+  {
+    kind: 'reality',
+    label: 'Reality',
+    description: 'Parallel worlds, alternate realities, multiversal branches.',
+    icon: Eye,
+    color: 'from-violet-500/20 to-fuchsia-500/20 border-violet-500/30',
+  },
+  {
+    kind: 'dimension',
+    label: 'Dimension',
+    description: 'Planes of existence, pocket dimensions, astral layers.',
+    icon: Box,
+    color: 'from-purple-500/20 to-violet-500/20 border-purple-500/30',
+  },
+  {
+    kind: 'plane',
+    label: 'Plane',
+    description: 'Elemental planes, spirit worlds, underworlds, heavens.',
+    icon: Hexagon,
+    color: 'from-cyan-500/20 to-teal-500/20 border-cyan-500/30',
+  },
+  {
+    kind: 'realm',
+    label: 'Realm',
+    description: 'Kingdoms, empires, sovereign territories within a dimension.',
+    icon: Castle,
+    color: 'from-amber-500/20 to-orange-500/20 border-amber-500/30',
+  },
+  {
+    kind: 'domain',
+    label: 'Domain',
+    description: 'Sub-regions, districts, estates, controlled zones within a realm.',
+    icon: Crown,
+    color: 'from-rose-500/20 to-red-500/20 border-rose-500/30',
   },
 ];
 

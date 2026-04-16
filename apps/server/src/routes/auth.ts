@@ -32,7 +32,7 @@ function setSessionCookie(c: any, token: string) {
   setCookie(c, COOKIE_NAME, token, {
     httpOnly: true,
     secure: true,
-    sameSite: IS_PRODUCTION ? 'None' : 'Lax',
+    sameSite: IS_PRODUCTION ? 'Lax' : 'Lax',
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   });
@@ -43,7 +43,7 @@ function clearSessionCookie(c: any) {
   deleteCookie(c, COOKIE_NAME, {
     httpOnly: true,
     secure: true,
-    sameSite: IS_PRODUCTION ? 'None' : 'Lax',
+    sameSite: IS_PRODUCTION ? 'Lax' : 'Lax',
     path: '/',
   });
 }
@@ -74,6 +74,20 @@ authRoutes.post('/verify', async (c) => {
   const origin = c.req.header('Origin') || c.req.header('Referer');
   if (!origin) {
     return c.json({ error: 'Missing Origin header' }, 403);
+  }
+
+  // Validate origin against allowed domains
+  const ALLOWED_ORIGINS = new Set(
+    (process.env.CORS_ORIGIN || 'https://loar.fun').split(',').map((o) => o.trim())
+  );
+  // Also allow localhost in dev
+  if (!IS_PRODUCTION) {
+    ALLOWED_ORIGINS.add('http://localhost:5173');
+    ALLOWED_ORIGINS.add('http://localhost:3000');
+  }
+  const originUrl = origin.replace(/\/$/, '');
+  if (!ALLOWED_ORIGINS.has(originUrl) && !(originUrl.includes('localhost') && !IS_PRODUCTION)) {
+    return c.json({ error: 'Origin not allowed' }, 403);
   }
 
   const contentType = c.req.header('Content-Type');

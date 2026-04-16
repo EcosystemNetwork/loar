@@ -30,10 +30,19 @@ export async function validateUploadUrl(url: string): Promise<URL> {
     throw new Error('URL hostname is not allowed');
   }
 
-  // Resolve DNS and check for private IPs
+  // Resolve DNS (both IPv4 and IPv6) and check for private IPs
   try {
-    const addresses = await dns.resolve4(parsed.hostname);
-    for (const addr of addresses) {
+    const [ipv4Addrs, ipv6Addrs] = await Promise.all([
+      dns.resolve4(parsed.hostname).catch(() => [] as string[]),
+      dns.resolve6(parsed.hostname).catch(() => [] as string[]),
+    ]);
+    const allAddresses = [...ipv4Addrs, ...ipv6Addrs];
+
+    if (allAddresses.length === 0) {
+      throw new Error('Could not resolve hostname');
+    }
+
+    for (const addr of allAddresses) {
       for (const range of PRIVATE_IP_RANGES) {
         if (range.test(addr)) {
           throw new Error('URL resolves to a private address');
@@ -41,7 +50,10 @@ export async function validateUploadUrl(url: string): Promise<URL> {
       }
     }
   } catch (err) {
-    if (err instanceof Error && err.message.includes('private')) {
+    if (
+      err instanceof Error &&
+      (err.message.includes('private') || err.message.includes('resolve'))
+    ) {
       throw err;
     }
     // DNS resolution failure for non-private reasons — let it pass

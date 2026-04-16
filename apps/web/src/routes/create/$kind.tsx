@@ -41,7 +41,13 @@ type EntityKind =
   | 'species'
   | 'vehicle'
   | 'technology'
-  | 'organization';
+  | 'organization'
+  | 'timeline'
+  | 'reality'
+  | 'dimension'
+  | 'plane'
+  | 'realm'
+  | 'domain';
 
 const VALID_KINDS: EntityKind[] = [
   'person',
@@ -54,6 +60,12 @@ const VALID_KINDS: EntityKind[] = [
   'vehicle',
   'technology',
   'organization',
+  'timeline',
+  'reality',
+  'dimension',
+  'plane',
+  'realm',
+  'domain',
 ];
 
 interface FieldDef {
@@ -443,6 +455,201 @@ const FIELDS_BY_KIND: Record<EntityKind, FieldDef[]> = {
       metadataKey: true,
     },
   ],
+  // ── Structural / ontology kinds ─────────────────────────────────
+  timeline: [
+    {
+      key: 'era',
+      label: 'Era / Age',
+      placeholder: 'e.g. The First Age, Year Zero, Post-Collapse',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'scope',
+      label: 'Scope',
+      placeholder: 'What does this timeline cover?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'branchingPoint',
+      label: 'Branching Point',
+      placeholder: 'What divergence created this timeline?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'keyEvents',
+      label: 'Key Events',
+      placeholder: 'Major milestones in this timeline...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+  ],
+  reality: [
+    {
+      key: 'designation',
+      label: 'Designation',
+      placeholder: 'e.g. Earth-616, Prime Reality, Mirror World',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'divergence',
+      label: 'Point of Divergence',
+      placeholder: 'What makes this reality different?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'physicalLaws',
+      label: 'Physical Laws',
+      placeholder: 'How do the rules differ from baseline?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'accessibility',
+      label: 'Accessibility',
+      placeholder: 'How can this reality be reached?',
+      type: 'input',
+      metadataKey: true,
+    },
+  ],
+  dimension: [
+    {
+      key: 'dimensionType',
+      label: 'Type',
+      placeholder: 'e.g. Pocket Dimension, Astral Layer, Fold Space',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'properties',
+      label: 'Properties',
+      placeholder: 'What are the defining characteristics?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'inhabitants',
+      label: 'Inhabitants',
+      placeholder: 'What lives here?',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'entryPoints',
+      label: 'Entry Points',
+      placeholder: 'How do you get in and out?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+  ],
+  plane: [
+    {
+      key: 'planeType',
+      label: 'Type',
+      placeholder: 'e.g. Elemental, Spirit, Shadow, Ethereal',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'environment',
+      label: 'Environment',
+      placeholder: 'What does it look and feel like?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'rulers',
+      label: 'Rulers / Powers',
+      placeholder: 'Who or what governs this plane?',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'effects',
+      label: 'Effects on Visitors',
+      placeholder: 'What happens to mortals who enter?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+  ],
+  realm: [
+    {
+      key: 'realmType',
+      label: 'Type',
+      placeholder: 'e.g. Kingdom, Empire, City-State, Wild Territory',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'ruler',
+      label: 'Ruler',
+      placeholder: 'Who rules this realm?',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'geography',
+      label: 'Geography',
+      placeholder: 'Terrain, climate, key landmarks...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'culture',
+      label: 'Culture',
+      placeholder: 'Customs, laws, way of life...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'resources',
+      label: 'Resources',
+      placeholder: 'What does this realm produce or control?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+  ],
+  domain: [
+    {
+      key: 'domainType',
+      label: 'Type',
+      placeholder: 'e.g. District, Estate, Province, Stronghold',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'controller',
+      label: 'Controller',
+      placeholder: 'Who controls this domain?',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'purpose',
+      label: 'Purpose',
+      placeholder: 'What is this domain used for?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'boundaries',
+      label: 'Boundaries',
+      placeholder: 'What defines its borders?',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'notableFeatures',
+      label: 'Notable Features',
+      placeholder: 'Landmarks, defenses, secrets...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+  ],
 };
 
 const KIND_LABELS: Record<EntityKind, string> = {
@@ -456,6 +663,12 @@ const KIND_LABELS: Record<EntityKind, string> = {
   vehicle: 'Vehicle',
   technology: 'Technology',
   organization: 'Organization',
+  timeline: 'Timeline',
+  reality: 'Reality',
+  dimension: 'Dimension',
+  plane: 'Plane',
+  realm: 'Realm',
+  domain: 'Domain',
 };
 
 function EntityCreateForm() {

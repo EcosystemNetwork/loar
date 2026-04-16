@@ -135,6 +135,12 @@ export const contentRouter = router({
       );
     }
 
+    // Content under moderation review cannot be modified
+    const blockedStatuses = ['flagged', 'under_review', 'hidden', 'removed'];
+    if (blockedStatuses.includes(existing.contentStatus)) {
+      throw new Error('This content cannot be modified while it is under moderation review.');
+    }
+
     // Minted NFT content — media URL is immutable, but metadata can be updated
     if (existing.mintedAsNft && (input.classification || input.ipDeclaration)) {
       // Allow title/description/tags changes but not reclassification

@@ -54,7 +54,7 @@ export const universesRouter = router({
   }),
 
   /** Create a new universe (wallet-based auth via signature + server nonce). */
-  create: publicProcedure.input(createUniverseSchema).mutation(async ({ input }) => {
+  create: protectedProcedure.input(createUniverseSchema).mutation(async ({ input, ctx }) => {
     const { verifyMessage } = await import('viem');
 
     const isValid = await verifyMessage({
@@ -69,6 +69,11 @@ export const universesRouter = router({
 
     if (!input.message.toLowerCase().includes(input.creator.toLowerCase())) {
       throw new Error('Message must contain creator address');
+    }
+
+    // Verify authenticated user matches the claimed creator
+    if (input.creator.toLowerCase() !== ctx.user.uid.toLowerCase()) {
+      throw new Error('Creator must match authenticated wallet');
     }
 
     // Verify the server-issued nonce is present in the message and hasn't been used

@@ -98,48 +98,57 @@ export const marketplaceRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        // Check if already voted
-        const existingVote = await canonVotesCol()
-          .where('submissionId', '==', input.submissionId)
-          .where('voterUid', '==', ctx.user.uid)
-          .get();
-
-        if (!existingVote.empty) throw new Error('Already voted on this submission');
-
         const weightNum = parseFloat(input.weight);
         if (isNaN(weightNum) || weightNum <= 0) throw new Error('Invalid vote weight');
 
-        // Record vote
-        const voteData = {
-          submissionId: input.submissionId,
-          voterUid: ctx.user.uid,
-          voterAddress: ctx.user.address || null,
-          support: input.support,
-          weight: input.weight,
-          txHash: input.txHash || null,
-          votedAt: new Date(),
-        };
+        // Use a deterministic doc ID to prevent duplicate votes atomically
+        const voteDocId = `${input.submissionId}_${ctx.user.uid}`;
+        const voteRef = canonVotesCol().doc(voteDocId);
 
-        await canonVotesCol().add(voteData);
+        // Run dedup check + vote recording inside a transaction to prevent race conditions
+        const voteData = await db.runTransaction(async (tx) => {
+          const existingVote = await tx.get(voteRef);
+          if (existingVote.exists) throw new Error('Already voted on this submission');
 
-        // Update submission tallies
-        const subRef = submissionsCol().doc(input.submissionId);
-        const subDoc = await subRef.get();
-        if (!subDoc.exists) throw new Error('Submission not found');
+          const subRef = submissionsCol().doc(input.submissionId);
+          const subDoc = await tx.get(subRef);
+          if (!subDoc.exists) throw new Error('Submission not found');
 
-        const sub = subDoc.data()!;
-        await subRef.update({
-          votesFor: input.support ? (sub.votesFor || 0) + weightNum : sub.votesFor || 0,
-          votesAgainst: !input.support
-            ? (sub.votesAgainst || 0) + weightNum
-            : sub.votesAgainst || 0,
-          voterCount: (sub.voterCount || 0) + 1,
-          updatedAt: new Date(),
+          const sub = subDoc.data()!;
+          if (sub.status !== 'VOTING') throw new Error('Submission is not in voting status');
+          if (sub.votingDeadline?.toDate && new Date() > sub.votingDeadline.toDate()) {
+            throw new Error('Voting has ended');
+          }
+
+          const vote = {
+            submissionId: input.submissionId,
+            voterUid: ctx.user.uid,
+            voterAddress: ctx.user.address || null,
+            support: input.support,
+            weight: input.weight,
+            txHash: input.txHash || null,
+            votedAt: new Date(),
+          };
+
+          tx.set(voteRef, vote);
+          tx.update(subRef, {
+            votesFor: input.support ? (sub.votesFor || 0) + weightNum : sub.votesFor || 0,
+            votesAgainst: !input.support
+              ? (sub.votesAgainst || 0) + weightNum
+              : sub.votesAgainst || 0,
+            voterCount: (sub.voterCount || 0) + 1,
+            updatedAt: new Date(),
+          });
+
+          return vote;
         });
 
         return { ok: true, vote: voteData };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
+        if (error instanceof Error && error.message.includes('Already voted')) {
+          throw new TRPCError({ code: 'CONFLICT', message: error.message });
+        }
         console.error('Error in vote:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -247,11 +256,17 @@ export const marketplaceRouter = router({
   }),
 
   getVotes: publicProcedure
-    .input(z.object({ submissionId: z.string() }))
+    .input(
+      z.object({
+        submissionId: z.string(),
+        limit: z.number().min(1).max(500).default(100),
+      })
+    )
     .query(async ({ input }) => {
       const snapshot = await canonVotesCol()
         .where('submissionId', '==', input.submissionId)
         .orderBy('votedAt', 'desc')
+        .limit(input.limit)
         .get();
 
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));

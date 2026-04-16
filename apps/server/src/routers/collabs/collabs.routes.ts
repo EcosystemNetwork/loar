@@ -62,7 +62,22 @@ export const collabsRouter = router({
       const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
-      if (doc.data()?.status !== 'PROPOSED') throw new Error('Not in proposed status');
+      const collabData = doc.data()!;
+      if (collabData.status !== 'PROPOSED') throw new Error('Not in proposed status');
+
+      // Prevent self-acceptance: acceptor cannot be the proposer
+      if (collabData.proposerUid === actingUid) {
+        throw new Error('Proposer cannot accept their own collaboration');
+      }
+
+      // Verify caller is admin of universeB (the receiving universe)
+      const { isUniverseAdmin } = await import('../../lib/safe-admin');
+      const universeBId = collabData.universeB;
+      if (!universeBId) throw new Error('Collab missing universeB');
+      const isAdmin = await isUniverseAdmin(universeBId.toLowerCase(), actingUid);
+      if (!isAdmin) {
+        throw new Error('Only the admin of the receiving universe can accept a collaboration');
+      }
 
       await ref.update({
         acceptorUid: actingUid,

@@ -151,16 +151,17 @@ export async function verifySiweSignature(
     throw new Error('Signature does not match claimed address');
   }
 
-  // Validate message expiration time (if present)
+  // Validate message expiration time (REQUIRED per EIP-4361)
   const expirationMatch = message.match(/Expiration Time: (.+)/);
-  if (expirationMatch) {
-    const expiresAt = new Date(expirationMatch[1]);
-    if (isNaN(expiresAt.getTime())) {
-      throw new Error('Invalid Expiration Time in SIWE message');
-    }
-    if (new Date() > expiresAt) {
-      throw new Error('SIWE message has expired. Please sign in again.');
-    }
+  if (!expirationMatch) {
+    throw new Error('SIWE message must include an Expiration Time');
+  }
+  const expiresAt = new Date(expirationMatch[1]);
+  if (isNaN(expiresAt.getTime())) {
+    throw new Error('Invalid Expiration Time in SIWE message');
+  }
+  if (new Date() > expiresAt) {
+    throw new Error('SIWE message has expired. Please sign in again.');
   }
 
   // Extract and validate nonce
@@ -177,19 +178,19 @@ export async function verifySiweSignature(
     await db.runTransaction(async (transaction) => {
       const nonceRef = col2.doc(nonce);
       const nonceDoc = await transaction.get(nonceRef);
-      if (!nonceDoc.exists) throw new Error('Unknown nonce');
+      if (!nonceDoc.exists) throw new Error('Invalid or expired nonce');
 
       const nonceData = nonceDoc.data()!;
-      if (nonceData.used) throw new Error('Nonce already used');
-      if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Nonce expired');
+      if (nonceData.used) throw new Error('Invalid or expired nonce');
+      if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
 
       transaction.update(nonceRef, { used: true });
     });
   } else {
     const nonceData = memoryNonces.get(nonce);
-    if (!nonceData) throw new Error('Unknown nonce');
-    if (nonceData.used) throw new Error('Nonce already used');
-    if (new Date() > nonceData.expiresAt) throw new Error('Nonce expired');
+    if (!nonceData) throw new Error('Invalid or expired nonce');
+    if (nonceData.used) throw new Error('Invalid or expired nonce');
+    if (new Date() > nonceData.expiresAt) throw new Error('Invalid or expired nonce');
 
     // Atomically consume the nonce — delete prevents any concurrent use.
     // In Node.js single-threaded model, delete between awaits is safe, but
@@ -274,11 +275,17 @@ export async function verifySessionToken(token: string): Promise<SiweSessionPayl
 
 /**
  * Refresh a session token. Returns a new JWT if the existing one is valid.
- * The old token remains valid until it expires (or is explicitly revoked).
+ * Revokes the old token to prevent token accumulation.
  */
 export async function refreshSessionToken(token: string): Promise<string | null> {
   const payload = await verifySessionToken(token);
   if (!payload?.sub) return null;
+
+  // Revoke the old token so it can't be reused
+  if (payload.jti) {
+    await revokeToken(payload.jti);
+  }
+
   return issueSessionToken(payload.sub);
 }
 

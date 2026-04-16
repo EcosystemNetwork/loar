@@ -16,6 +16,12 @@ import {
   useClaimFees,
   useUpdateRewardRecipient,
 } from '@/hooks/useLPYield';
+import {
+  useUniversePool,
+  useDistributeUniverseReward,
+  useApproveLoar,
+  useLoarBalance,
+} from '@/hooks/useUniverseStaking';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import {
@@ -27,15 +33,22 @@ import {
   Percent,
   Wallet,
   CheckCircle2,
+  TrendingUp,
+  Gift,
 } from 'lucide-react';
 import type { Address } from 'viem';
 
 interface LPYieldManagerProps {
   tokenAddress: Address;
   universeName: string;
+  onChainUniverseId?: number;
 }
 
-export function LPYieldManager({ tokenAddress, universeName }: LPYieldManagerProps) {
+export function LPYieldManager({
+  tokenAddress,
+  universeName,
+  onChainUniverseId,
+}: LPYieldManagerProps) {
   const { address } = useWalletAccount();
   const {
     rewardConfig,
@@ -53,6 +66,13 @@ export function LPYieldManager({ tokenAddress, universeName }: LPYieldManagerPro
 
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [newRecipient, setNewRecipient] = useState('');
+  const [distributeAmount, setDistributeAmount] = useState('');
+
+  // Universe staking pool data (for distribute rewards)
+  const { pool: universePool } = useUniversePool(onChainUniverseId);
+  const { distributeReward, isPending: distributing } = useDistributeUniverseReward();
+  const { approve: approveLoar, isPending: approvingLoar } = useApproveLoar();
+  const { balanceFormatted: loarBalance } = useLoarBalance();
 
   if (configLoading) {
     return (

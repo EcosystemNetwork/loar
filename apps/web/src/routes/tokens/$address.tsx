@@ -55,6 +55,7 @@ import { openExternal } from '@/utils/open-external';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
+import { UniverseStakePanel } from '@/components/UniverseStakePanel';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 
 export const Route = createFileRoute('/tokens/$address')({
@@ -507,6 +508,14 @@ function TokenDetailPage() {
                 />
               </CardContent>
             </Card>
+
+            {/* Universe Staking — earn yield */}
+            {universe?.onChainUniverseId !== undefined && (
+              <UniverseStakePanel
+                universeId={Number(universe.onChainUniverseId)}
+                universeName={universe.name || token.name}
+              />
+            )}
 
             {/* Token Maturity */}
             <Card>
