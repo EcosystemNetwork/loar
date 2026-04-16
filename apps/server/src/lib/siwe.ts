@@ -88,16 +88,16 @@ export async function consumeNonce(nonce: string): Promise<void> {
   const col = getNoncesCol();
   if (col) {
     const nonceDoc = await col.doc(nonce).get();
-    if (!nonceDoc.exists) throw new Error('Unknown nonce');
+    if (!nonceDoc.exists) throw new Error('Invalid or expired nonce');
     const nonceData = nonceDoc.data()!;
-    if (nonceData.used) throw new Error('Nonce already used');
-    if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Nonce expired');
+    if (nonceData.used) throw new Error('Invalid or expired nonce');
+    if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
     await col.doc(nonce).update({ used: true });
   } else {
     const nonceData = memoryNonces.get(nonce);
-    if (!nonceData) throw new Error('Unknown nonce');
-    if (nonceData.used) throw new Error('Nonce already used');
-    if (new Date() > nonceData.expiresAt) throw new Error('Nonce expired');
+    if (!nonceData) throw new Error('Invalid or expired nonce');
+    if (nonceData.used) throw new Error('Invalid or expired nonce');
+    if (new Date() > nonceData.expiresAt) throw new Error('Invalid or expired nonce');
     memoryNonces.delete(nonce);
   }
 }
