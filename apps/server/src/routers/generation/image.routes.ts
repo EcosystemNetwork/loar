@@ -775,7 +775,19 @@ export const imageRouter = router({
         await userRef.update({ balance: balance - cost, updatedAt: new Date() });
       }
       const startTime = Date.now();
-      const result = await falService.editImage(input);
+      let result;
+      try {
+        result = await falService.editImage(input);
+      } catch (genError) {
+        // Refund credits on generation failure
+        if (db) {
+          const userRef2 = db.collection('userCredits').doc(ctx.user.uid);
+          await userRef2
+            .update({ balance: FieldValue.increment(cost), updatedAt: new Date() })
+            .catch(() => {});
+        }
+        throw genError;
+      }
       if (result.status === 'completed' && result.imageUrl) {
         try {
           await imageGenerationsCol()
@@ -836,7 +848,19 @@ export const imageRouter = router({
         await userRef.update({ balance: balance - cost, updatedAt: new Date() });
       }
       const startTime = Date.now();
-      const result = await falService.imageToImage(input);
+      let result;
+      try {
+        result = await falService.imageToImage(input);
+      } catch (genError) {
+        // Refund credits on generation failure
+        if (db) {
+          const userRef2 = db.collection('userCredits').doc(ctx.user.uid);
+          await userRef2
+            .update({ balance: FieldValue.increment(cost), updatedAt: new Date() })
+            .catch(() => {});
+        }
+        throw genError;
+      }
       if (result.status === 'completed' && result.imageUrl) {
         try {
           await imageGenerationsCol()

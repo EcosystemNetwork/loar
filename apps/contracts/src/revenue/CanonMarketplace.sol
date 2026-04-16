@@ -109,6 +109,11 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
+    /// @notice Minimum snapshot age in blocks to prevent flash loan attacks.
+    /// On Base L2 (2s blocks), 15 blocks ≈ 30 seconds — enough to prevent
+    /// same-block flash loan manipulation while keeping UX responsive.
+    uint256 public constant MIN_SNAPSHOT_AGE = 15;
+
     error ZeroAddress();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -178,7 +183,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             votesAgainst: 0,
             votingDeadline: block.timestamp + votingDuration,
             createdAt: block.timestamp,
-            snapshotBlock: block.number - 1
+            snapshotBlock: block.number - MIN_SNAPSHOT_AGE
         });
 
         // Platform takes cut of submission fee via PaymentRouter

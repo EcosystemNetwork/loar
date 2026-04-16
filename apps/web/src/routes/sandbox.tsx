@@ -2,8 +2,8 @@
  * Sandbox Creator
  *
  * A friction-free creative workspace. Generate images and videos from prompts
- * without needing to set up a universe first. Save drafts, then optionally
- * publish to a universe when you're ready.
+ * without needing to set up a universe first. Save drafts, edit them, and
+ * promote to a universe when ready.
  */
 
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -35,6 +35,11 @@ import {
   ArrowRight,
   ImageIcon,
   Loader2,
+  Rocket,
+  Pencil,
+  Check,
+  X,
+  Globe,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/sandbox')({
@@ -140,7 +145,6 @@ function SandboxPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
       toast.success('Draft saved!');
-      // Reset canvas
       setPrompt('');
       setTitle('');
       setGeneratedImageUrl(null);
@@ -152,7 +156,10 @@ function SandboxPage() {
   // Delete draft
   const deleteDraftMutation = useMutation({
     mutationFn: (id: string) => trpcClient.sandbox.deleteDraft.mutate({ id }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+      toast.success('Draft deleted');
+    },
     onError: (err: any) => toast.error(err.message || 'Failed to delete draft'),
   });
 
@@ -393,21 +400,79 @@ function SandboxPage() {
   );
 }
 
+// ── Draft Card with Edit + Promote ──────────────────────────────────
+
+interface DraftData {
+  id: string;
+  title: string;
+  prompt: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  model: string | null;
+  tags: string[];
+  status: string;
+  createdAt: string | null;
+}
+
 interface DraftCardProps {
-  draft: {
-    id: string;
-    title: string;
-    prompt: string;
-    imageUrl: string | null;
-    videoUrl: string | null;
-    createdAt: string | null;
-  };
+  draft: DraftData;
   onDelete: () => void;
   onLoad: () => void;
 }
 
 function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
+  const queryClient = useQueryClient();
   const thumb = draft.videoUrl || draft.imageUrl;
+  const isPromoted = draft.status === 'promoted';
+
+  // Inline edit state
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(draft.title);
+
+  // Promote state — '__gallery__' = general gallery (no universe)
+  const [showPromote, setShowPromote] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState('__gallery__');
+  const [classification, setClassification] = useState<'fan' | 'original' | 'licensed'>('original');
+  const [visibility, setVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
+
+  // Fetch user's universes for promote selector
+  const { data: universesResult } = useQuery({
+    queryKey: ['all-universes'],
+    queryFn: () => trpcClient.universes.getAll.query(),
+    enabled: showPromote,
+  });
+  const universes = (universesResult as any)?.data ?? universesResult ?? [];
+
+  // Update draft mutation
+  const updateMutation = useMutation({
+    mutationFn: (input: { id: string; title?: string; tags?: string[] }) =>
+      trpcClient.sandbox.updateDraft.mutate(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+      setEditing(false);
+      toast.success('Draft updated');
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to update'),
+  });
+
+  // Promote mutation
+  const promoteMutation = useMutation({
+    mutationFn: () =>
+      trpcClient.sandbox.promoteToUniverse.mutate({
+        draftId: draft.id,
+        ...(selectedTarget !== '__gallery__' ? { universeId: selectedTarget } : {}),
+        classification,
+        visibility,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+      setShowPromote(false);
+      toast.success(
+        selectedTarget === '__gallery__' ? 'Published to your gallery!' : 'Promoted to universe!'
+      );
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to promote'),
+  });
 
   return (
     <Card className="overflow-hidden group relative">
@@ -435,31 +500,191 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
             <Wand2 className="h-6 w-6 text-muted-foreground/30" />
           </div>
         )}
+
+        {/* Status badge */}
+        {isPromoted && (
+          <div className="absolute top-2 left-2">
+            <Badge className="bg-green-500/90 text-white border-0 text-[10px]">Promoted</Badge>
+          </div>
+        )}
+
         {/* Hover actions */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-          <Button size="sm" variant="secondary" onClick={onLoad}>
-            Load
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        {!showPromote && (
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            {!isPromoted && (
+              <Button size="sm" variant="default" onClick={() => setShowPromote(true)}>
+                <Rocket className="h-3.5 w-3.5 mr-1" />
+                Promote
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={onLoad}>
+              Load
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
+
       <CardContent className="p-3">
-        <p className="text-sm font-medium truncate">{draft.title}</p>
+        {/* Inline title edit */}
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="h-7 text-sm px-2"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  updateMutation.mutate({ id: draft.id, title: editTitle });
+                }
+                if (e.key === 'Escape') {
+                  setEditing(false);
+                  setEditTitle(draft.title);
+                }
+              }}
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => updateMutation.mutate({ id: draft.id, title: editTitle })}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Check className="h-3 w-3" />
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => {
+                setEditing(false);
+                setEditTitle(draft.title);
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm font-medium truncate">{draft.title}</p>
+        )}
         <p className="text-xs text-muted-foreground truncate mt-0.5">{draft.prompt}</p>
-        {draft.videoUrl && (
-          <Badge variant="secondary" className="mt-1.5 text-xs">
-            <Video className="h-2.5 w-2.5 mr-1" />
-            Video
-          </Badge>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          {draft.videoUrl && (
+            <Badge variant="secondary" className="text-xs">
+              <Video className="h-2.5 w-2.5 mr-1" />
+              Video
+            </Badge>
+          )}
+          {draft.model && (
+            <Badge variant="outline" className="text-[10px]">
+              {draft.model.replace('fal-', '')}
+            </Badge>
+          )}
+        </div>
+
+        {/* Promote to Universe panel */}
+        {showPromote && !isPromoted && (
+          <div className="mt-3 pt-3 border-t space-y-2">
+            <p className="text-xs font-semibold flex items-center gap-1.5">
+              <Globe className="h-3 w-3" />
+              Promote to Universe
+            </p>
+
+            {/* Target selector — gallery or universe */}
+            <Select value={selectedTarget} onValueChange={setSelectedTarget}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select destination" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__gallery__" className="text-xs font-medium">
+                  My Gallery (no universe)
+                </SelectItem>
+                {Array.isArray(universes) &&
+                  universes.map((u: any) => (
+                    <SelectItem key={u.id} value={u.id} className="text-xs">
+                      {u.name || u.id.slice(0, 12)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            {/* Classification */}
+            <div className="flex gap-1">
+              {(['original', 'fan', 'licensed'] as const).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setClassification(c)}
+                  className={`flex-1 text-[10px] py-1 rounded-md border transition-colors ${
+                    classification === c
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                  }`}
+                >
+                  {c.charAt(0).toUpperCase() + c.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Visibility */}
+            <Select value={visibility} onValueChange={(v) => setVisibility(v as typeof visibility)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="public" className="text-xs">
+                  Public
+                </SelectItem>
+                <SelectItem value="unlisted" className="text-xs">
+                  Unlisted
+                </SelectItem>
+                <SelectItem value="private" className="text-xs">
+                  Private
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Actions */}
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                className="flex-1 h-8 text-xs"
+                disabled={promoteMutation.isPending}
+                onClick={() => promoteMutation.mutate()}
+              >
+                {promoteMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Rocket className="h-3 w-3 mr-1" />
+                )}
+                {selectedTarget === '__gallery__' ? 'Publish' : 'Promote'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => setShowPromote(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -222,6 +222,7 @@ export function useUniverseForToken(universeAddress: string | undefined) {
       const data = await ponderGql<{
         universe: {
           id: string;
+          universeId: number | null;
           name: string;
           description: string;
           imageURL: string;
@@ -232,6 +233,7 @@ export function useUniverseForToken(universeAddress: string | undefined) {
         `query ($id: String!) {
           universe(id: $id) {
             id
+            universeId
             name
             description
             imageURL

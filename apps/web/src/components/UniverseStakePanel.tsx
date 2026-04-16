@@ -20,6 +20,10 @@ import {
   useClaimUniverseReward,
   useStakingConfig,
 } from '@/hooks/useUniverseStaking';
+import { useChainId } from 'wagmi';
+
+// Chains where LaunchpadStaking is deployed
+const STAKING_CHAINS = new Set([84532]); // Base Sepolia
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
@@ -40,7 +44,11 @@ interface UniverseStakePanelProps {
 }
 
 export function UniverseStakePanel({ universeId, universeName }: UniverseStakePanelProps) {
+  const chainId = useChainId();
   const { address } = useWalletAccount();
+
+  // Don't render if staking isn't deployed on this chain
+  if (!STAKING_CHAINS.has(chainId)) return null;
   const { pool, refetch: refetchPool } = useUniversePool(universeId);
   const { stake, refetch: refetchStake } = useUniverseStake(universeId);
   const { pendingFormatted, pending, refetch: refetchPending } = usePendingReward(universeId);

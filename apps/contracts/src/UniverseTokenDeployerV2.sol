@@ -131,11 +131,20 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
 
     // ─── Admin ─────────────────────────────────────────────────────────
 
+    error InvalidVestingContract();
+
     function setVestingConfig(
         address _vestingContract,
         uint64 _cliff,
         uint64 _duration
     ) external onlyOwner {
+        // Allow setting to address(0) to disable vesting (V1 behavior)
+        if (_vestingContract != address(0)) {
+            // Validate the contract has code (not an EOA)
+            uint256 codeSize;
+            assembly { codeSize := extcodesize(_vestingContract) }
+            if (codeSize == 0) revert InvalidVestingContract();
+        }
         vestingContract = ITokenVesting(_vestingContract);
         vestingCliff = _cliff;
         vestingDuration = _duration;

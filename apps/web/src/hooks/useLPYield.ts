@@ -28,7 +28,7 @@ export function useLPRewardConfig(tokenAddress: Address | undefined) {
   } = useReadContract({
     address: lockerAddress,
     abi: loarLpLockerMultipleAbi,
-    functionName: 'getTokenRewardInfo',
+    functionName: 'tokenRewards',
     args: tokenAddress ? [tokenAddress] : undefined,
     query: { enabled: !!lockerAddress && !!tokenAddress },
     chainId,

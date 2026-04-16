@@ -127,12 +127,17 @@ export const sandboxRouter = router({
    * The draft becomes a content item in the universe (still mutable, stored in Firebase).
    * Users can later mint it as an NFT or submit it for canon.
    */
+  /**
+   * Promote a sandbox draft to gallery content.
+   * If universeId is provided, it goes into that universe's gallery.
+   * If omitted, it goes into the creator's general gallery (no universe).
+   */
   promoteToUniverse: protectedProcedure
     .input(
       z.object({
         draftId: z.string(),
-        universeId: z.string(),
-        classification: z.enum(['fan', 'original', 'licensed']).default('fan'),
+        universeId: z.string().optional(),
+        classification: z.enum(['fan', 'original', 'licensed']).default('original'),
         visibility: z.enum(['public', 'private', 'unlisted']).default('public'),
       })
     )
@@ -150,7 +155,7 @@ export const sandboxRouter = router({
       // Create content item in the gallery
       const now = new Date();
       const mediaType = draft.videoUrl ? 'ai-video' : draft.imageUrl ? 'ai-image' : 'image';
-      const contentData = {
+      const contentData: Record<string, any> = {
         title: draft.title,
         description: draft.prompt || '',
         mediaUrl: draft.videoUrl || draft.imageUrl || '',
@@ -163,7 +168,6 @@ export const sandboxRouter = router({
           usesCopyrightedMaterial: false,
           license: 'all-rights-reserved',
         },
-        universeId: input.universeId,
         visibility: input.visibility,
         creatorUid: ctx.user.uid,
         createdAt: now,
@@ -176,13 +180,18 @@ export const sandboxRouter = router({
         generationModel: draft.model || null,
       };
 
+      // Only set universeId if provided (general gallery = no universe)
+      if (input.universeId) {
+        contentData.universeId = input.universeId;
+      }
+
       const contentRef = await contentCol().add(contentData);
 
       // Mark draft as promoted
       await ref.update({
         status: 'promoted',
         promotedTo: contentRef.id,
-        promotedUniverseId: input.universeId,
+        ...(input.universeId ? { promotedUniverseId: input.universeId } : {}),
         updatedAt: now,
       });
 
@@ -193,7 +202,7 @@ export const sandboxRouter = router({
         await profileRef.update({ contentCount: FieldValue.increment(1) });
       }
 
-      return { contentId: contentRef.id, universeId: input.universeId };
+      return { contentId: contentRef.id, universeId: input.universeId ?? null };
     }),
 
   // Get a single draft

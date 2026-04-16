@@ -52,6 +52,12 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // contentHash => deal IDs
     mapping(bytes32 => uint256[]) internal _contentDeals;
 
+    /// @notice Maximum deals per content piece to prevent unbounded array growth DoS
+    uint256 public constant MAX_DEALS_PER_CONTENT = 1000;
+
+    // contentHash => buyer => latest active dealId (O(1) access check)
+    mapping(bytes32 => mapping(address => uint256)) internal _buyerLatestDeal;
+
     // contentHash => current owner (set on BUY)
     mapping(bytes32 => address) public contentOwner;
 
@@ -81,6 +87,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error ZeroHash();
     error SplitRouterFailed();
     error RefundFailed();
+    error MaxDealsReached();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -166,7 +173,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             startTime: block.timestamp,
             endTime: 0 // permanent
         });
+        if (_contentDeals[contentHash].length >= MAX_DEALS_PER_CONTENT) revert MaxDealsReached();
         _contentDeals[contentHash].push(dealId);
+        _buyerLatestDeal[contentHash][msg.sender] = dealId;
 
         // Transfer ownership
         contentOwner[contentHash] = msg.sender;
@@ -202,7 +211,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             startTime: block.timestamp,
             endTime: endTime
         });
+        if (_contentDeals[contentHash].length >= MAX_DEALS_PER_CONTENT) revert MaxDealsReached();
         _contentDeals[contentHash].push(dealId);
+        _buyerLatestDeal[contentHash][msg.sender] = dealId;
 
         _routePayment(reg.splitEntityHash, totalCost);
         _refundExcess(msg.value, totalCost);
@@ -232,7 +243,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             startTime: block.timestamp,
             endTime: endTime
         });
+        if (_contentDeals[contentHash].length >= MAX_DEALS_PER_CONTENT) revert MaxDealsReached();
         _contentDeals[contentHash].push(dealId);
+        _buyerLatestDeal[contentHash][msg.sender] = dealId;
 
         _routePayment(reg.splitEntityHash, reg.licenseFee);
         _refundExcess(msg.value, reg.licenseFee);
@@ -261,7 +274,23 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit RoyaltyPaid(dealId, msg.value);
     }
 
+    /// @notice O(1) access check using the buyer's latest deal mapping.
+    /// Preferred over hasAccess() for gas efficiency on content with many deals.
+    function hasAccessFast(bytes32 contentHash, address user) external view returns (bool) {
+        // Check if user is the content owner (permanent BUY)
+        if (contentOwner[contentHash] == user) return true;
+
+        uint256 dealId = _buyerLatestDeal[contentHash][user];
+        if (dealId == 0) return false;
+        Deal storage deal = deals[dealId];
+        if (deal.buyer != user) return false;
+        if (deal.status != DealStatus.ACTIVE) return false;
+        if (deal.dealType == DealType.BUY) return true;
+        return deal.endTime == 0 || block.timestamp <= deal.endTime;
+    }
+
     /// @notice Check if a user has active access (view-only, does not auto-expire)
+    /// @dev Iterates backward through deals — use hasAccessFast() for gas-efficient checks.
     function hasAccess(bytes32 contentHash, address user) external view returns (bool) {
         uint256[] storage dealIds = _contentDeals[contentHash];
         for (uint256 i = dealIds.length; i > 0; i--) {

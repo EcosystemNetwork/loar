@@ -510,9 +510,9 @@ function TokenDetailPage() {
             </Card>
 
             {/* Universe Staking — earn yield */}
-            {universe?.onChainUniverseId !== undefined && (
+            {universe?.universeId != null && (
               <UniverseStakePanel
-                universeId={Number(universe.onChainUniverseId)}
+                universeId={Number(universe.universeId)}
                 universeName={universe.name || token.name}
               />
             )}

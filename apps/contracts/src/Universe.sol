@@ -164,11 +164,14 @@ contract Universe is IUniverse {
         return (n.id, n.contentHash, n.plotHash, n.previous, n.next, n.canon, n.creator);
     }
 
+    /// @notice Maximum timeline traversal depth to prevent gas exhaustion DoS
+    uint public constant MAX_TIMELINE_DEPTH = 1000;
+
     function getTimeline(uint fromId) public view returns (uint[] memory) {
         uint count = 0;
         uint cursor = fromId;
 
-        while (cursor != 0) {
+        while (cursor != 0 && count < MAX_TIMELINE_DEPTH) {
             count++;
             cursor = nodes[cursor].previous;
         }
@@ -342,10 +345,12 @@ contract Universe is IUniverse {
     }
 
     function setToken(address token) external onlyManager{
+        require(token != address(0), "Zero token address");
         associatedToken = token;
         emit TokenUpdated(token);
     }
     function setAdmin(address newAdmin) public onlyManager {
+      require(newAdmin != address(0), "Zero admin address");
       universeAdmin = newAdmin;
       emit AdminUpdated(newAdmin);
     }
