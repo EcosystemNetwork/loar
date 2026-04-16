@@ -53,7 +53,7 @@ export async function securityHeaders(c: Context, next: Next) {
       `connect-src ${TRUSTED_CONNECT}`,
       `img-src ${TRUSTED_IMG}`,
       "font-src 'self'",
-      "media-src 'self' blob:",
+      "media-src 'self' blob: https://*.pinata.cloud https://gateway.pinata.cloud https://*.mypinata.cloud https://*.lighthouse.storage https://*.volces.com https://*.fal.ai",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
