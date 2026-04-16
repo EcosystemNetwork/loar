@@ -108,8 +108,10 @@ contract SplitRouter is ReentrancyGuard, Ownable {
             paymentRouter.routeToTreasury{value: platformCut}();
         }
 
-        // Distribute remainder to co-creators via PaymentRouter (0 fee — already taken)
-        // Last recipient gets the remainder to avoid dust ETH from rounding
+        // Distribute remainder to co-creators via PaymentRouter (0 fee — already taken).
+        // NOTE: Due to integer division, earlier recipients may lose fractional wei.
+        // The last recipient receives the remainder (distributable - distributed) to
+        // collect all rounding dust, ensuring no ETH is left in the contract.
         uint256 distributed = 0;
         for (uint256 i = 0; i < splits.length; i++) {
             uint256 share;

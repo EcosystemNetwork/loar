@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { trpc } from '../utils/trpc';
+import { trpc } from '@/utils/trpc';
 
 export const Route = createFileRoute('/activity')({
   component: ActivityPage,

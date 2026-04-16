@@ -1,4 +1,5 @@
-FROM node:20.18.1-alpine
+# ── Stage 1: Builder ──────────────────────────────────────────────────────
+FROM node:20.18.1-alpine AS builder
 
 RUN apk add --no-cache curl
 ENV COREPACK_INTEGRITY_KEYS=0
@@ -32,6 +33,25 @@ COPY apps/indexer/env.ts apps/indexer/tsconfig.json ./apps/indexer/
 COPY apps/indexer/abis ./apps/indexer/abis
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
+
+# Prune dev dependencies
+RUN pnpm prune --prod --no-optional
+
+# ── Stage 2: Production ──────────────────────────────────────────────────
+FROM node:20.18.1-alpine
+
+RUN apk add --no-cache curl
+ENV COREPACK_INTEGRITY_KEYS=0
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+
+# Copy pruned node_modules and source from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/apps/indexer ./apps/indexer
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/deployments ./deployments
 
 RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
 RUN chown -R appuser:appgroup /app/apps/indexer

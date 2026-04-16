@@ -69,7 +69,11 @@ function BountiesPage() {
   const [contentType, setContentType] = useState<string>('video');
   const [deadlineDays, setDeadlineDays] = useState('14');
 
-  const { data: bounties, isLoading } = useQuery({
+  const {
+    data: bounties,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['bounties', filterType, universeId],
     queryFn: () =>
       trpcClient.bounties.list.query({
@@ -296,7 +300,9 @@ function BountiesPage() {
         </div>
 
         {/* Bounty List */}
-        {isLoading ? (
+        {isError ? (
+          <div className="p-8 text-center text-red-400">Failed to load data. Please try again.</div>
+        ) : isLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>

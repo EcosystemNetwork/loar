@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { BranchingPlayer } from '../../components/player/BranchingPlayer';
-import { TokenGateGuard } from '../../components/governance/TokenGateGuard';
+import { BranchingPlayer } from '@/components/player/BranchingPlayer';
+import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 
 export const Route = createFileRoute('/play/$universeId')({
   component: PlayPage,

@@ -79,7 +79,11 @@ function PricingPage() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [subscribingTier, setSubscribingTier] = useState<string | null>(null);
 
-  const { data: tiers, isLoading } = useQuery({
+  const {
+    data: tiers,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['subscription-tiers'],
     queryFn: () => trpcClient.platformSubscriptions.getTiers.query(),
   });
@@ -208,7 +212,9 @@ function PricingPage() {
         </div>
 
         {/* Tier cards */}
-        {isLoading ? (
+        {isError ? (
+          <div className="p-8 text-center text-red-400">Failed to load data. Please try again.</div>
+        ) : isLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>

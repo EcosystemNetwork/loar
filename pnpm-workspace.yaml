@@ -3,5 +3,7 @@ packages:
   - 'apps/server'
   - 'apps/indexer'
   - 'apps/contracts'
+  - 'apps/contracts-sol'
   - 'apps/mcp'
+  - 'apps/mobile'
   - 'packages/*'

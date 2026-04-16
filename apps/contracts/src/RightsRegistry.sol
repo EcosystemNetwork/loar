@@ -11,7 +11,8 @@ import {IRightsRegistry} from "./interfaces/IRightsRegistry.sol";
 ///         fan/parody), ORIGINAL, LICENSED, PUBLIC_DOMAIN, or FROZEN (disputed/DMCA).
 ///
 ///         Revenue contracts check isMonetizable() before minting or listing content.
-///         UNSET content is allowed by default — the platform freezes or tags FUN reactively.
+///         UNSET content is blocked by default (default-deny) — content must be explicitly
+///         classified as ORIGINAL, LICENSED, or PUBLIC_DOMAIN before it can be monetized.
 contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice Content hash => rights classification
     mapping(bytes32 => RightsType) public rights;
@@ -65,10 +66,11 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     }
 
     /// @notice Returns true if the content hash is allowed to be monetized.
-    ///         UNSET is permitted (default-allow); FUN and FROZEN are blocked.
+    ///         Default-deny: only ORIGINAL, LICENSED, and PUBLIC_DOMAIN are monetizable.
+    ///         UNSET, FUN, and FROZEN are all blocked.
     function isMonetizable(bytes32 contentHash) external view returns (bool) {
         RightsType r = rights[contentHash];
-        return r != RightsType.FUN && r != RightsType.FROZEN;
+        return r == RightsType.ORIGINAL || r == RightsType.LICENSED || r == RightsType.PUBLIC_DOMAIN;
     }
 
     function setOperator(address operator, bool authorized) external onlyOwner {

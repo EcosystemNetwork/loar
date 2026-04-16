@@ -193,6 +193,50 @@ ponder.on('Universe:NodeCanonized', async ({ event, context }) => {
   });
 });
 
+ponder.on('Universe:MediaUpdated', async ({ event, context }) => {
+  const universeAddress = getAddress(event.log.address).toLowerCase() as `0x${string}`;
+  const nodeId = Number(event.args.nodeId);
+  const compositeId = `${universeAddress}:${nodeId}`;
+
+  // Update node content with new media hash and link
+  const existing = await context.db.find(nodeContent, { id: compositeId });
+  if (existing) {
+    await context.db.update(nodeContent, { id: compositeId }).set({
+      contentHash: event.args.contentHash,
+      videoLink: event.args.link,
+    });
+  }
+
+  // Update node record with new content hash
+  const existingNode = await context.db.find(node, { id: compositeId });
+  if (existingNode) {
+    await context.db.update(node, { id: compositeId }).set({
+      contentHash: event.args.contentHash,
+    });
+  }
+});
+
+ponder.on('Universe:TokenUpdated', async ({ event, context }) => {
+  const universeAddress = getAddress(event.log.address).toLowerCase() as `0x${string}`;
+  const tokenAddress = getAddress(event.args.token);
+
+  const existing = await context.db.find(universe, { id: universeAddress });
+  if (existing) {
+    await context.db.update(universe, { id: universeAddress }).set({
+      tokenAddress: tokenAddress,
+    });
+  }
+});
+
+ponder.on('Universe:AdminUpdated', async ({ event, context }) => {
+  const universeAddress = getAddress(event.log.address).toLowerCase() as `0x${string}`;
+  // Universe schema doesn't have an admin field currently, but we log the event
+  // for future use. If admin tracking is needed, add an 'admin' column to the universe table.
+  console.log(
+    `[indexer] Admin updated for ${universeAddress} to ${getAddress(event.args.newAdmin)}`
+  );
+});
+
 // ============= UniverseGovernor Events =============
 
 ponder.on('UniverseGovernor:ProposalCreated', async ({ event, context }) => {

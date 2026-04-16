@@ -136,29 +136,49 @@ export async function getEntitiesByUniverse(
   kind?: EntityKind
 ): Promise<Entity[]> {
   const col = entitiesCol();
-  let query: FirebaseFirestore.Query = col
-    .where('universeAddress', '==', universeAddress.toLowerCase())
-    .orderBy('createdAt');
+  let query: FirebaseFirestore.Query = col.where(
+    'universeAddress',
+    '==',
+    universeAddress.toLowerCase()
+  );
 
   if (kind) {
-    query = col
-      .where('universeAddress', '==', universeAddress.toLowerCase())
-      .where('kind', '==', kind)
-      .orderBy('createdAt');
+    query = query.where('kind', '==', kind);
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
+    .sort((a, b) => {
+      const aTime =
+        a.createdAt instanceof Date
+          ? a.createdAt.getTime()
+          : new Date(a.createdAt as any).getTime();
+      const bTime =
+        b.createdAt instanceof Date
+          ? b.createdAt.getTime()
+          : new Date(b.createdAt as any).getTime();
+      return aTime - bTime;
+    });
 }
 
 export async function getEntitiesByKind(kind: EntityKind, limit = 100): Promise<Entity[]> {
-  const snapshot = await entitiesCol()
-    .where('kind', '==', kind)
-    .orderBy('createdAt', 'desc')
-    .limit(limit)
-    .get();
+  const snapshot = await entitiesCol().where('kind', '==', kind).get();
 
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
+    .sort((a, b) => {
+      const aTime =
+        a.createdAt instanceof Date
+          ? a.createdAt.getTime()
+          : new Date(a.createdAt as any).getTime();
+      const bTime =
+        b.createdAt instanceof Date
+          ? b.createdAt.getTime()
+          : new Date(b.createdAt as any).getTime();
+      return bTime - aTime;
+    })
+    .slice(0, limit);
 }
 
 export async function getEntitiesByCreator(
@@ -166,21 +186,27 @@ export async function getEntitiesByCreator(
   kind?: EntityKind,
   limit = 100
 ): Promise<Entity[]> {
-  let query: FirebaseFirestore.Query = entitiesCol()
-    .where('creator', '==', creator)
-    .orderBy('createdAt', 'desc')
-    .limit(limit);
+  let query: FirebaseFirestore.Query = entitiesCol().where('creator', '==', creator);
 
   if (kind) {
-    query = entitiesCol()
-      .where('creator', '==', creator)
-      .where('kind', '==', kind)
-      .orderBy('createdAt', 'desc')
-      .limit(limit);
+    query = query.where('kind', '==', kind);
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
+    .sort((a, b) => {
+      const aTime =
+        a.createdAt instanceof Date
+          ? a.createdAt.getTime()
+          : new Date(a.createdAt as any).getTime();
+      const bTime =
+        b.createdAt instanceof Date
+          ? b.createdAt.getTime()
+          : new Date(b.createdAt as any).getTime();
+      return bTime - aTime;
+    })
+    .slice(0, limit);
 }
 
 export async function getChildEntities(parentId: string, limit?: number): Promise<Entity[]>;
@@ -199,13 +225,22 @@ export async function getChildEntities(first: string, second?: string | number):
     parentId = first;
     if (typeof second === 'number') limit = second;
   }
-  const snapshot = await entitiesCol()
-    .where('parentId', '==', parentId)
-    .orderBy('createdAt')
-    .limit(limit)
-    .get();
+  const snapshot = await entitiesCol().where('parentId', '==', parentId).get();
 
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
+    .sort((a, b) => {
+      const aTime =
+        a.createdAt instanceof Date
+          ? a.createdAt.getTime()
+          : new Date(a.createdAt as any).getTime();
+      const bTime =
+        b.createdAt instanceof Date
+          ? b.createdAt.getTime()
+          : new Date(b.createdAt as any).getTime();
+      return aTime - bTime;
+    })
+    .slice(0, limit);
 }
 
 export async function updateEntity(entityId: string, input: UpdateEntityInput): Promise<Entity>;

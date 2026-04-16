@@ -93,8 +93,9 @@ export async function getUniverse(id: string) {
       data: { id: doc.id, ...doc.data() },
     };
   } catch (error) {
+    if (error instanceof Error && !error.message.startsWith('Failed to')) throw error;
     console.error('Error fetching universe:', error);
-    throw new Error('Failed to fetch universe');
+    throw new Error('Failed to fetch universe', { cause: error });
   }
 }
 
@@ -109,8 +110,9 @@ export async function getAllUniverses() {
       total: data.length,
     };
   } catch (error) {
+    if (error instanceof Error && !error.message.startsWith('Failed to')) throw error;
     console.error('Error fetching all universes:', error);
-    throw new Error('Failed to fetch universes');
+    throw new Error('Failed to fetch universes', { cause: error });
   }
 }
 
@@ -131,8 +133,9 @@ export async function getUniversesByCreator(creator: string) {
       total: data.length,
     };
   } catch (error) {
+    if (error instanceof Error && !error.message.startsWith('Failed to')) throw error;
     console.error('Error fetching universes by creator:', error);
-    throw new Error('Failed to fetch universes by creator');
+    throw new Error('Failed to fetch universes by creator', { cause: error });
   }
 }
 

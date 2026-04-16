@@ -152,10 +152,19 @@ export const analyticsRouter = router({
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
 
-  getRecentActivity: publicProcedure
-    .input(z.object({ limit: z.number().min(1).max(100).default(20) }))
+  getRecentActivity: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        universeId: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
-      const snapshot = await viewsCol().orderBy('viewedAt', 'desc').limit(input.limit).get();
+      let query: FirebaseFirestore.Query = viewsCol();
+      if (input.universeId) {
+        query = query.where('universeId', '==', input.universeId);
+      }
+      const snapshot = await query.orderBy('viewedAt', 'desc').limit(input.limit).get();
 
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),

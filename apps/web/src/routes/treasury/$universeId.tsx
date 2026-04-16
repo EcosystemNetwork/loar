@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useQuery } from '@tanstack/react-query';
-import { trpc } from '../../utils/trpc';
+import { trpc } from '@/utils/trpc';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

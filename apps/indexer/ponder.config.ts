@@ -18,6 +18,11 @@ import {
   paymentRouterAbi,
   creditManagerAbi,
   subscriptionManagerAbi,
+  canonMarketplaceAbi,
+  adPlacementAbi,
+  licensingRegistryAbi,
+  collabManagerAbi,
+  // analyticsRegistryAbi — no events to index currently
 } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
@@ -64,6 +69,18 @@ const creditManagerAddress = deployment.contracts.CreditManager
   : undefined;
 const subscriptionManagerAddress = deployment.contracts.SubscriptionManager
   ? getAddress(deployment.contracts.SubscriptionManager)
+  : undefined;
+const canonMarketplaceAddress = deployment.contracts.CanonMarketplace
+  ? getAddress(deployment.contracts.CanonMarketplace)
+  : undefined;
+const adPlacementAddress = deployment.contracts.AdPlacement
+  ? getAddress(deployment.contracts.AdPlacement)
+  : undefined;
+const licensingRegistryAddress = deployment.contracts.LicensingRegistry
+  ? getAddress(deployment.contracts.LicensingRegistry)
+  : undefined;
+const collabManagerAddress = deployment.contracts.CollabManager
+  ? getAddress(deployment.contracts.CollabManager)
   : undefined;
 
 const universeCreatedEvent = parseAbiItem(
@@ -153,7 +170,37 @@ export default createConfig({
         startBlock: startBlock,
       },
     }),
-    // TODO: Add CanonMarketplace, AdPlacement, LicensingRegistry, CollabManager,
-    // AnalyticsRegistry once ABIs are generated (run: forge build && npx wagmi generate)
+    ...(canonMarketplaceAddress && {
+      CanonMarketplace: {
+        chain: chainName,
+        abi: canonMarketplaceAbi,
+        address: canonMarketplaceAddress,
+        startBlock: startBlock,
+      },
+    }),
+    ...(adPlacementAddress && {
+      AdPlacement: {
+        chain: chainName,
+        abi: adPlacementAbi,
+        address: adPlacementAddress,
+        startBlock: startBlock,
+      },
+    }),
+    ...(licensingRegistryAddress && {
+      LicensingRegistry: {
+        chain: chainName,
+        abi: licensingRegistryAbi,
+        address: licensingRegistryAddress,
+        startBlock: startBlock,
+      },
+    }),
+    ...(collabManagerAddress && {
+      CollabManager: {
+        chain: chainName,
+        abi: collabManagerAbi,
+        address: collabManagerAddress,
+        startBlock: startBlock,
+      },
+    }),
   },
 });

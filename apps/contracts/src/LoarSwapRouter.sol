@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.28;
+pragma solidity ^0.8.28;
 
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
@@ -12,6 +12,7 @@ import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 /// @title LoarSwapRouter
 /// @notice Production swap router for Uniswap v4 pools within the LOAR ecosystem.
@@ -267,8 +268,7 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
 
     /// @notice Rescue ETH accidentally sent to this contract.
     function rescueETH(address payable to, uint256 amount) external onlyOwner {
-        (bool success,) = to.call{value: amount}("");
-        require(success, "ETH rescue failed");
+        Address.sendValue(to, amount);
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -279,8 +279,7 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
     function _refundETH(address recipient) internal {
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            (bool success,) = recipient.call{value: balance}("");
-            require(success, "ETH refund failed");
+            Address.sendValue(payable(recipient), balance);
         }
     }
 

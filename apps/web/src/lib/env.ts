@@ -55,8 +55,8 @@ export function validateWebEnv(): WebEnv {
     console.error(`[env] ${msg}`);
   }
 
-  // Dev-only: warn about unset optional vars that affect features
-  if (import.meta.env.DEV && result.success) {
+  // Warn about unset optional vars that affect features
+  if (result.success) {
     const featureVars = [
       'VITE_PONDER_URL',
       'VITE_LOAR_TOKEN_ADDRESS',

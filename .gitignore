@@ -1,5 +1,8 @@
 node_modules
 .turbo
+.DS_Store
+coverage/
+.nyc_output
 
 .env
 .env.local

@@ -33,7 +33,7 @@ export const Route = createFileRoute('/admin/moderation')({
 });
 
 function ModerationDashboard() {
-  const { isAuthenticated, isAuthenticating } = useWalletAuth();
+  const { isAuthenticated, isAuthenticating, address } = useWalletAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('flags');
@@ -44,6 +44,13 @@ function ModerationDashboard() {
       navigate({ to: '/login', search: { redirect: '/admin/moderation' } });
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
+
+  // Admin address check
+  const adminAddresses = (import.meta.env.VITE_ADMIN_ADDRESSES ?? '')
+    .split(',')
+    .map((a: string) => a.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdmin = !!address && adminAddresses.includes(address.toLowerCase());
 
   const { data: flags, isLoading: loadingFlags } = useQuery({
     queryKey: ['mod-flags'],
@@ -93,6 +100,20 @@ function ModerationDashboard() {
 
   if (!isAuthenticated) {
     return null;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-2">
+          <Shield className="h-12 w-12 mx-auto text-red-400" />
+          <h2 className="text-xl font-bold">Unauthorized</h2>
+          <p className="text-muted-foreground text-sm">
+            Your wallet address does not have admin access.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const statusActions = [

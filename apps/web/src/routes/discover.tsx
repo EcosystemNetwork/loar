@@ -42,12 +42,20 @@ function DiscoverPage() {
   const [contentFilter, setContentFilter] = useState<'all' | 'fan' | 'monetized'>('all');
   const [mediaFilter, setMediaFilter] = useState<string | undefined>();
 
-  const { data: profilesData, isLoading: profilesLoading } = useQuery({
+  const {
+    data: profilesData,
+    isLoading: profilesLoading,
+    isError: profilesError,
+  } = useQuery({
     queryKey: ['discover-profiles', search],
     queryFn: () => trpcClient.profiles.discover.query({ search: search || undefined, limit: 30 }),
   });
 
-  const { data: contentData, isLoading: contentLoading } = useQuery({
+  const {
+    data: contentData,
+    isLoading: contentLoading,
+    isError: contentError,
+  } = useQuery({
     queryKey: ['discover-content', search, contentFilter, mediaFilter],
     queryFn: () =>
       trpcClient.content.feed.query({
@@ -139,7 +147,11 @@ function DiscoverPage() {
 
           {/* Creators Tab */}
           <TabsContent value="creators">
-            {profilesLoading ? (
+            {profilesError ? (
+              <div className="p-8 text-center text-red-400">
+                Failed to load data. Please try again.
+              </div>
+            ) : profilesLoading ? (
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>
@@ -164,7 +176,11 @@ function DiscoverPage() {
 
           {/* Content Tab */}
           <TabsContent value="content">
-            {contentLoading ? (
+            {contentError ? (
+              <div className="p-8 text-center text-red-400">
+                Failed to load data. Please try again.
+              </div>
+            ) : contentLoading ? (
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>

@@ -266,6 +266,52 @@ contract Universe is IUniverse {
         return (ids, contentHashes, plotHashes, previousIds, nextIds, canonFlags);
     }
 
+    /// @notice Paginated version of getFullGraph. Returns nodes from startId to startId+count-1.
+    /// @param startId First node ID to include (must be >= 1)
+    /// @param count   Maximum number of nodes to return
+    function getGraphPage(uint startId, uint count)
+        public
+        view
+        returns (
+            uint[] memory ids,
+            bytes32[] memory contentHashes,
+            bytes32[] memory plotHashes,
+            uint[] memory previousIds,
+            uint[][] memory nextIds,
+            bool[] memory canonFlags
+        )
+    {
+        uint endId = startId + count - 1;
+        if (endId > latestNodeId) endId = latestNodeId;
+        if (startId > endId || startId == 0) {
+            return (new uint[](0), new bytes32[](0), new bytes32[](0), new uint[](0), new uint[][](0), new bool[](0));
+        }
+        uint total = endId - startId + 1;
+
+        ids = new uint[](total);
+        contentHashes = new bytes32[](total);
+        plotHashes = new bytes32[](total);
+        previousIds = new uint[](total);
+        nextIds = new uint[][](total);
+        canonFlags = new bool[](total);
+
+        for (uint i = 0; i < total; i++) {
+            VideoNode storage n = nodes[startId + i];
+            ids[i] = n.id;
+            contentHashes[i] = n.contentHash;
+            plotHashes[i] = n.plotHash;
+            previousIds[i] = n.previous;
+            canonFlags[i] = n.canon;
+
+            uint len = n.next.length;
+            uint[] memory tmpNext = new uint[](len);
+            for (uint j = 0; j < len; j++) {
+                tmpNext[j] = n.next[j];
+            }
+            nextIds[i] = tmpNext;
+        }
+    }
+
     // ---- Canon ----
 
     function setCanon(uint id) public onlyAdmin {

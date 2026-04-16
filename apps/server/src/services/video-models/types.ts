@@ -11,10 +11,11 @@ export type PriceTier = 'low' | 'medium' | 'high';
 
 export interface VideoModelConfig {
   id: string;
-  provider: string;
+  provider: string; // 'fal' | 'bytedance'
   displayName: string;
   shortDescription: string;
-  falModelId: string;
+  falModelId: string; // FAL model ID (used when provider='fal')
+  bytedanceModelId?: string; // ModelArk model ID (used when provider='bytedance')
   mode: VideoGenerationMode[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

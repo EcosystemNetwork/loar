@@ -59,25 +59,27 @@ export async function getAttachmentsByTarget(
   const snap = await col()
     .where('targetType', '==', targetType)
     .where('targetId', '==', targetId)
-    .orderBy('createdAt', 'desc')
     .get();
-  return snap.docs.map(docToAttachment);
+  return snap.docs
+    .map(docToAttachment)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function getAttachmentsByCreator(creator: string): Promise<MediaAttachment[]> {
-  const snap = await col()
-    .where('creator', '==', creator.toLowerCase())
-    .orderBy('createdAt', 'desc')
-    .limit(200)
-    .get();
-  return snap.docs.map(docToAttachment);
+  const snap = await col().where('creator', '==', creator.toLowerCase()).get();
+  return snap.docs
+    .map(docToAttachment)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 200);
 }
 
 /** Get all variants of a specific attachment (same variantOf chain). */
 export async function getVariants(attachmentId: string): Promise<MediaAttachment[]> {
   // Get variants where variantOf points to this attachment
-  const snap = await col().where('variantOf', '==', attachmentId).orderBy('version', 'asc').get();
-  const variants = snap.docs.map(docToAttachment);
+  const snap = await col().where('variantOf', '==', attachmentId).get();
+  const variants = snap.docs
+    .map(docToAttachment)
+    .sort((a, b) => (a.version ?? 1) - (b.version ?? 1));
 
   // Also include the original attachment itself
   const originalDoc = await col().doc(attachmentId).get();
@@ -138,7 +140,8 @@ export async function getNextVersion(
     query = query.where('variantOf', '==', variantOf);
   }
 
-  const snap = await query.orderBy('version', 'desc').limit(1).get();
+  const snap = await query.get();
   if (snap.empty) return 1;
-  return (snap.docs[0].data().version ?? 0) + 1;
+  const maxVersion = Math.max(...snap.docs.map((d) => d.data().version ?? 0));
+  return maxVersion + 1;
 }

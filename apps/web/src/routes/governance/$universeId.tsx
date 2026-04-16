@@ -2,14 +2,14 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useQuery } from '@tanstack/react-query';
-import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
-import { trpc } from '../../utils/trpc';
-import { ProposalList } from '../../components/governance/ProposalList';
-import { ProposalCreateDialog } from '../../components/governance/ProposalCreateDialog';
-import { VotingPowerCard } from '../../components/governance/VotingPowerCard';
-import { DelegationPanel } from '../../components/governance/DelegationPanel';
-import { TokenGateManager } from '../../components/governance/TokenGateManager';
-import { TokenGateGuard } from '../../components/governance/TokenGateGuard';
+import { useUniverseGovernor } from '@/hooks/useUniverseGovernor';
+import { trpc } from '@/utils/trpc';
+import { ProposalList } from '@/components/governance/ProposalList';
+import { ProposalCreateDialog } from '@/components/governance/ProposalCreateDialog';
+import { VotingPowerCard } from '@/components/governance/VotingPowerCard';
+import { DelegationPanel } from '@/components/governance/DelegationPanel';
+import { TokenGateManager } from '@/components/governance/TokenGateManager';
+import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 
 export const Route = createFileRoute('/governance/$universeId')({
   component: GovernancePage,
