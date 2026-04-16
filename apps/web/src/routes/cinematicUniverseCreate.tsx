@@ -241,7 +241,7 @@ function CinematicUniverseCreate() {
     }
   };
 
-  // Cover image generation mutation
+  // Cover image generation mutation — generates via fal.ai then pins to Pinata
   const generateCoverMutation = useMutation({
     mutationFn: async () => {
       const prompt = `Epic cinematic universe cover art for "${universeName}". ${description}. Professional movie poster style, high quality, dramatic lighting`;
@@ -254,14 +254,34 @@ function CinematicUniverseCreate() {
 
       return result;
     },
-    onSuccess: (data) => {
-      // API returns imageUrls (array), pick the first one
-      const url = data?.imageUrls?.[0];
-      if (url) {
-        setCoverPreview(url);
-        setImageUrl(url);
-      } else {
+    onSuccess: async (data) => {
+      // API returns imageUrl (single) or images array
+      const tempUrl = data?.imageUrl ?? data?.images?.[0]?.url;
+      if (!tempUrl) {
         toast.error('Image was generated but no URL was returned. Please try again.');
+        return;
+      }
+
+      setCoverPreview(tempUrl);
+
+      // Pin the temp fal.ai URL to Pinata for permanent storage
+      try {
+        const imgRes = await fetch(tempUrl);
+        if (!imgRes.ok) throw new Error(`Failed to fetch generated image`);
+        const blob = await imgRes.blob();
+        const pinnedUrl = await uploadBlob(blob, 'ai-cover.jpg');
+        if (pinnedUrl) {
+          setImageUrl(pinnedUrl);
+          setCoverPreview(pinnedUrl);
+        } else {
+          // Upload failed — fall back to temp URL (will expire in ~24h)
+          setImageUrl(tempUrl);
+          toast.warning('Could not pin image to permanent storage. Using temporary URL.');
+        }
+      } catch {
+        // Pinata upload failed — use temp URL as fallback
+        setImageUrl(tempUrl);
+        toast.warning('Could not pin image to permanent storage. Using temporary URL.');
       }
     },
     onError: (error: any) => {

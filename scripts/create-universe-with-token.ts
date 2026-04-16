@@ -1,10 +1,16 @@
 /**
- * Create a universe WITH a governance token on Sepolia.
+ * Full end-to-end universe + token deployment.
  *
- * Uses the current deployed contracts from deployments/sepolia.json.
- * The token will appear on the launchpad once the Ponder indexer picks up the events.
+ * Flow:
+ *   1. Generate cover image via fal.ai
+ *   2. Pin image to IPFS via Pinata (permanent URL)
+ *   3. Create universe + deploy token on-chain (atomic tx)
+ *   4. Register universe in Firestore via tRPC (SIWE auth)
  *
  * Usage: pnpm tsx scripts/create-universe-with-token.ts
+ *
+ * Required env: PRIVATE_KEY, FAL_KEY, PINATA_JWT, PINATA_GATEWAY_URL
+ * Optional env: RPC_URL, VITE_SERVER_URL
  */
 import dotenv from 'dotenv';
 import path from 'path';
@@ -16,11 +22,14 @@ import {
   formatEther,
   decodeEventLog,
   encodeAbiParameters,
+  getAddress,
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 
-// Load ABI directly from Foundry output
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// ── ABI ───────────────────────────────────────────────────────────────────────
 const artifact = JSON.parse(
   readFileSync(
     path.resolve(process.cwd(), 'apps/contracts/out/UniverseManager.sol/UniverseManager.json'),
@@ -29,29 +38,42 @@ const artifact = JSON.parse(
 );
 const universeManagerAbi = artifact.abi;
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-
 // ── Config ────────────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';
 const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
 const RPC_URL = process.env.RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
+const FAL_KEY = process.env.FAL_KEY!;
+const PINATA_JWT = process.env.PINATA_JWT!;
+const PINATA_GATEWAY = process.env.PINATA_GATEWAY_URL ?? 'https://gateway.pinata.cloud';
+const SERVER_URL = process.env.VITE_SERVER_URL ?? 'http://localhost:3000';
 
-// Sepolia contract addresses from deployments/sepolia.json + packages/abis/addresses.ts
-const UNIVERSE_MANAGER = '0xB82dE188841a799e0dBB58D885D81BEE7A735f00' as const;
-const HOOK = '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC' as const; // LoarHookStaticFee
-const LOCKER = '0x7d30fd57e44aB0ca407D312976816E7052905E0A' as const; // LoarLpLockerMultiple
+// Contract addresses — loaded from deployment manifest
+const deployment = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), 'deployments/sepolia.json'), 'utf-8')
+);
+const UNIVERSE_MANAGER = getAddress(deployment.contracts.UniverseManager) as `0x${string}`;
+const HOOK = getAddress(deployment.contracts.LoarHookStaticFee) as `0x${string}`;
+const LOCKER = getAddress(deployment.contracts.LoarLpLockerMultiple) as `0x${string}`;
 const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9' as const; // Sepolia WETH
 
-// ── Universe details ──────────────────────────────────────────────────────────
+// ── Universe config ───────────────────────────────────────────────────────────
 const UNIVERSE_NAME = 'Neon Ronin';
+const TOKEN_SYMBOL = 'RONIN';
 const UNIVERSE_DESCRIPTION =
   'Tokyo 2089. Megacorporations own the sky, but the neon-lit streets belong to the Ronin — rogue AI samurai who defected from their corporate masters. Armed with quantum katanas that cut through both matter and data, they wage guerrilla warfare in the liminal space between meatspace and the Net. When a Ronin named Akira discovers an ancient protocol hidden in the blockchain — one that predates humanity — the war for the future of consciousness begins.';
-const UNIVERSE_IMAGE =
-  'https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmVGt4DfHvgvh1xmx8abxwELFhKwtaaMDeG1DjfY8BxTWn';
-const TOKEN_SYMBOL = 'RONIN';
+
+const COVER_PROMPT = [
+  `Epic cinematic movie poster for "${UNIVERSE_NAME}".`,
+  'Tokyo 2089 cyberpunk cityscape at night, towering megacorporation skyscrapers with holographic advertisements,',
+  'neon-soaked rain-slicked streets below. A lone rogue AI samurai stands on a rooftop edge,',
+  'quantum katana glowing electric blue, their face half-human half-digital circuitry.',
+  'Cherry blossom petals drift through laser grid beams.',
+  'Deep indigo and hot pink neon color palette, dramatic volumetric fog, ultra-detailed 8K concept art.',
+  'No text, no watermarks, no logos.',
+].join(' ');
 
 // Pool config
-const STARTING_TICK = -230400; // ~10 ETH market cap
+const STARTING_TICK = -230400;
 const TICK_SPACING = 200;
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -59,39 +81,137 @@ const account = privateKeyToAccount(PRIVATE_KEY);
 const publicClient = createPublicClient({ chain: sepolia, transport: http(RPC_URL) });
 const walletClient = createWalletClient({ account, chain: sepolia, transport: http(RPC_URL) });
 
-async function main() {
-  console.log('\n' + '═'.repeat(60));
-  console.log('  LOAR — Create Universe + Token (Sepolia)');
-  console.log('═'.repeat(60));
+function log(step: string, msg: string) {
+  console.log(`  [${step}] ${msg}`);
+}
 
-  console.log(`\n  Deployer : ${account.address}`);
+// ── Step 1: Generate cover image via fal.ai ───────────────────────────────────
 
-  // Check balance
-  const balance = await publicClient.getBalance({ address: account.address });
-  console.log(`  Balance  : ${formatEther(balance)} ETH`);
-  if (balance < 50000000000000000n) {
-    throw new Error('Need at least 0.05 ETH for mint fee + gas');
+async function generateCoverImage(): Promise<Buffer> {
+  log('IMAGE', 'Generating cover image via fal.ai (flux-pro)...');
+
+  // Submit to queue
+  const submitRes = await fetch('https://queue.fal.run/fal-ai/flux-pro/v1.1', {
+    method: 'POST',
+    headers: {
+      Authorization: `Key ${FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: COVER_PROMPT,
+      image_size: 'landscape_16_9',
+      num_images: 1,
+      enable_safety_checker: true,
+    }),
+  });
+
+  if (!submitRes.ok) {
+    throw new Error(`fal.ai submit failed: ${submitRes.status} ${await submitRes.text()}`);
   }
 
-  // Read mint fee from contract
+  const { request_id, response_url } = (await submitRes.json()) as {
+    request_id: string;
+    response_url: string;
+  };
+  log('IMAGE', `Queued: ${request_id}`);
+
+  // Poll for completion
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const statusRes = await fetch(`${response_url}/status`, {
+      headers: { Authorization: `Key ${FAL_KEY}` },
+    });
+    const status = (await statusRes.json()) as { status: string };
+    if (status.status === 'COMPLETED') break;
+    if (status.status === 'FAILED') throw new Error('fal.ai generation failed');
+  }
+
+  // Fetch result
+  const resultRes = await fetch(response_url, {
+    headers: { Authorization: `Key ${FAL_KEY}` },
+  });
+  const result = (await resultRes.json()) as {
+    images: Array<{ url: string; width: number; height: number }>;
+  };
+
+  if (!result.images?.length) throw new Error('No images in fal.ai response');
+
+  const imageUrl = result.images[0].url;
+  log('IMAGE', `Generated: ${imageUrl.slice(0, 60)}...`);
+
+  // Download the image bytes (fal URLs are temporary)
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) throw new Error(`Failed to download image: ${imgRes.status}`);
+  const buffer = Buffer.from(await imgRes.arrayBuffer());
+  log('IMAGE', `Downloaded: ${(buffer.length / 1024).toFixed(0)} KB`);
+
+  return buffer;
+}
+
+// ── Step 2: Pin image to IPFS via Pinata ──────────────────────────────────────
+
+async function pinToPinata(imageBuffer: Buffer, filename: string): Promise<string> {
+  log('PINATA', 'Uploading to Pinata IPFS...');
+
+  const form = new FormData();
+  form.append('file', new Blob([imageBuffer], { type: 'image/jpeg' }), filename);
+  form.append(
+    'pinataMetadata',
+    JSON.stringify({ name: `${UNIVERSE_NAME} cover`, keyvalues: { universe: UNIVERSE_NAME } })
+  );
+
+  const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${PINATA_JWT}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Pinata upload failed: ${res.status} ${text.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as { IpfsHash: string; PinSize: number };
+  const permanentUrl = `${PINATA_GATEWAY}/ipfs/${data.IpfsHash}`;
+  log('PINATA', `Pinned: ${data.IpfsHash} (${(data.PinSize / 1024).toFixed(0)} KB)`);
+  log('PINATA', `URL: ${permanentUrl}`);
+
+  // Verify the URL is accessible
+  const headRes = await fetch(permanentUrl, { method: 'HEAD' });
+  if (!headRes.ok) {
+    log('PINATA', `WARNING: HEAD check returned ${headRes.status} (may need gateway propagation)`);
+  }
+
+  return permanentUrl;
+}
+
+// ── Step 3: Deploy universe + token on-chain ──────────────────────────────────
+
+interface DeployResult {
+  txHash: `0x${string}`;
+  universeAddress: string;
+  tokenAddress: string;
+  governorAddress: string;
+  universeId: bigint | null;
+}
+
+async function deployOnChain(imageUrl: string): Promise<DeployResult> {
+  log('CHAIN', `Contract: ${UNIVERSE_MANAGER}`);
+
+  const balance = await publicClient.getBalance({ address: account.address });
+  log('CHAIN', `Balance: ${formatEther(balance)} ETH`);
+
   const mintFee = (await publicClient.readContract({
     address: UNIVERSE_MANAGER,
     abi: universeManagerAbi,
     functionName: 'mintFee',
   })) as bigint;
-  console.log(`  Mint fee : ${formatEther(mintFee)} ETH`);
+  log('CHAIN', `Mint fee: ${formatEther(mintFee)} ETH`);
 
-  // Check hook is enabled
-  const hookEnabled = await publicClient.readContract({
-    address: UNIVERSE_MANAGER,
-    abi: universeManagerAbi,
-    functionName: 'enabledHooks',
-    args: [HOOK],
-  });
-  console.log(`  Hook     : ${hookEnabled ? 'enabled' : 'DISABLED'}`);
-  if (!hookEnabled) throw new Error('Hook is not enabled on UniverseManager');
+  if (balance < mintFee + 5000000000000000n) {
+    throw new Error(`Need at least ${formatEther(mintFee + 5000000000000000n)} ETH`);
+  }
 
-  // Encode pool fee data
   const poolData = encodeAbiParameters(
     [
       {
@@ -105,119 +225,66 @@ async function main() {
     [{ loarFee: 3000, pairedFee: 3000 }]
   );
 
-  // ── Step 1: Simulate first ──────────────────────────────────────────────────
-  console.log(`\n  Simulating createUniverseWithToken...`);
+  const deployArgs = [
+    UNIVERSE_NAME,
+    imageUrl,
+    UNIVERSE_DESCRIPTION,
+    0, // PUBLIC
+    0, // PUBLIC
+    account.address,
+    {
+      tokenConfig: {
+        tokenAdmin: account.address,
+        name: UNIVERSE_NAME,
+        symbol: TOKEN_SYMBOL,
+        imageURL: imageUrl,
+        metadata: `Governance token for ${UNIVERSE_NAME}`,
+        context: UNIVERSE_DESCRIPTION,
+      },
+      poolConfig: {
+        hook: HOOK,
+        pairedToken: WETH,
+        tickIfToken0IsLoar: STARTING_TICK,
+        tickSpacing: TICK_SPACING,
+        poolData,
+      },
+      lockerConfig: {
+        locker: LOCKER,
+        rewardAdmins: [account.address],
+        rewardRecipients: [account.address],
+        rewardBps: [10000],
+        tickLower: [STARTING_TICK],
+        tickUpper: [0],
+        positionBps: [10000],
+        lockerData: '0x' as `0x${string}`,
+      },
+      allocationConfig: { lpBps: 8000, creatorBps: 1000, treasuryBps: 500, communityBps: 500 },
+    },
+  ] as const;
 
-  try {
-    await publicClient.simulateContract({
-      account,
-      address: UNIVERSE_MANAGER,
-      abi: universeManagerAbi,
-      functionName: 'createUniverseWithToken',
-      args: [
-        UNIVERSE_NAME,
-        UNIVERSE_IMAGE,
-        UNIVERSE_DESCRIPTION,
-        0, // NodeCreationOptions.PUBLIC
-        0, // NodeVisibilityOptions.PUBLIC
-        account.address,
-        {
-          tokenConfig: {
-            tokenAdmin: account.address,
-            name: UNIVERSE_NAME,
-            symbol: TOKEN_SYMBOL,
-            imageURL: UNIVERSE_IMAGE,
-            metadata: `Governance token for ${UNIVERSE_NAME}`,
-            context: UNIVERSE_DESCRIPTION,
-          },
-          poolConfig: {
-            hook: HOOK,
-            pairedToken: WETH,
-            tickIfToken0IsLoar: STARTING_TICK,
-            tickSpacing: TICK_SPACING,
-            poolData,
-          },
-          lockerConfig: {
-            locker: LOCKER,
-            rewardAdmins: [account.address],
-            rewardRecipients: [account.address],
-            rewardBps: [10000],
-            tickLower: [STARTING_TICK],
-            tickUpper: [0],
-            positionBps: [10000],
-            lockerData: '0x' as `0x${string}`,
-          },
-          allocationConfig: {
-            lpBps: 8000,
-            creatorBps: 1000,
-            treasuryBps: 500,
-            communityBps: 500,
-          },
-        },
-      ],
-      value: mintFee,
-    });
-    console.log('  Simulation passed!\n');
-  } catch (err: any) {
-    console.error('\n  Simulation FAILED:', err.message?.slice(0, 500));
-    if (err.cause) console.error('  Cause:', (err.cause as any)?.message?.slice(0, 500));
-    throw new Error('Simulation failed — aborting');
-  }
+  // Simulate
+  log('CHAIN', 'Simulating...');
+  await publicClient.simulateContract({
+    account,
+    address: UNIVERSE_MANAGER,
+    abi: universeManagerAbi,
+    functionName: 'createUniverseWithToken',
+    args: deployArgs,
+    value: mintFee,
+  });
+  log('CHAIN', 'Simulation passed');
 
-  // ── Step 2: Send transaction ────────────────────────────────────────────────
-  console.log('  Sending transaction...');
-
+  // Send tx
+  log('CHAIN', 'Sending transaction...');
   const txHash = await walletClient.writeContract({
     address: UNIVERSE_MANAGER,
     abi: universeManagerAbi,
     functionName: 'createUniverseWithToken',
-    args: [
-      UNIVERSE_NAME,
-      UNIVERSE_IMAGE,
-      UNIVERSE_DESCRIPTION,
-      0,
-      0,
-      account.address,
-      {
-        tokenConfig: {
-          tokenAdmin: account.address,
-          name: UNIVERSE_NAME,
-          symbol: TOKEN_SYMBOL,
-          imageURL: UNIVERSE_IMAGE,
-          metadata: `Governance token for ${UNIVERSE_NAME}`,
-          context: UNIVERSE_DESCRIPTION,
-        },
-        poolConfig: {
-          hook: HOOK,
-          pairedToken: WETH,
-          tickIfToken0IsLoar: STARTING_TICK,
-          tickSpacing: TICK_SPACING,
-          poolData,
-        },
-        lockerConfig: {
-          locker: LOCKER,
-          rewardAdmins: [account.address],
-          rewardRecipients: [account.address],
-          rewardBps: [10000],
-          tickLower: [STARTING_TICK],
-          tickUpper: [0],
-          positionBps: [10000],
-          lockerData: '0x' as `0x${string}`,
-        },
-        allocationConfig: {
-          lpBps: 8000,
-          creatorBps: 1000,
-          treasuryBps: 500,
-          communityBps: 500,
-        },
-      },
-    ],
+    args: deployArgs,
     value: mintFee,
   });
-
-  console.log(`  TX: ${txHash}`);
-  console.log(`  Explorer: https://sepolia.etherscan.io/tx/${txHash}`);
-  console.log('  Waiting for confirmation...');
+  log('CHAIN', `TX: ${txHash}`);
+  log('CHAIN', `Explorer: https://sepolia.etherscan.io/tx/${txHash}`);
 
   const receipt = await publicClient.waitForTransactionReceipt({
     hash: txHash,
@@ -228,13 +295,13 @@ async function main() {
   if (receipt.status !== 'success') {
     throw new Error(`Transaction reverted! Status: ${receipt.status}`);
   }
+  log('CHAIN', `Confirmed in block ${receipt.blockNumber} (gas: ${receipt.gasUsed})`);
 
-  console.log(`  Confirmed in block ${receipt.blockNumber} (gas: ${receipt.gasUsed})`);
-
-  // ── Step 3: Parse events ────────────────────────────────────────────────────
+  // Parse events
   let universeAddress: string | undefined;
   let tokenAddress: string | undefined;
   let governorAddress: string | undefined;
+  let universeId: bigint | null = null;
 
   for (const logEntry of receipt.logs) {
     try {
@@ -243,44 +310,178 @@ async function main() {
         data: logEntry.data,
         topics: logEntry.topics,
       });
-
       if (decoded.eventName === 'UniverseCreated') {
-        const args = decoded.args as any;
-        universeAddress = args.universe;
-        console.log(`  UniverseCreated: ${universeAddress}`);
+        universeAddress = (decoded.args as any).universe;
+        log('CHAIN', `UniverseCreated: ${universeAddress}`);
+      }
+      if (decoded.eventName === 'UniverseLpSeed') {
+        universeId = (decoded.args as any).universeId;
+        log('CHAIN', `Universe ID: ${universeId}`);
       }
       if (decoded.eventName === 'TokenCreated') {
-        const args = decoded.args as any;
-        tokenAddress = args.tokenAddress;
-        governorAddress = args.governor;
-        console.log(`  TokenCreated: ${tokenAddress} ($${TOKEN_SYMBOL})`);
-        console.log(`  Governor: ${governorAddress}`);
+        tokenAddress = (decoded.args as any).tokenAddress;
+        governorAddress = (decoded.args as any).governor;
+        log('CHAIN', `TokenCreated: ${tokenAddress} ($${TOKEN_SYMBOL})`);
+        log('CHAIN', `Governor: ${governorAddress}`);
       }
     } catch {
       // Not our event
     }
   }
 
-  if (!tokenAddress) {
-    console.error('\n  WARNING: No TokenCreated event found in receipt!');
-    console.error('  The universe was created but token deployment may have failed.');
-    process.exit(1);
+  if (!universeAddress || !tokenAddress || !governorAddress) {
+    throw new Error('Missing events in receipt — universe or token deployment failed');
   }
 
-  // ── Done ────────────────────────────────────────────────────────────────────
+  return { txHash, universeAddress, tokenAddress, governorAddress, universeId };
+}
+
+// ── Step 4: Register in Firestore via SIWE + tRPC ─────────────────────────────
+
+function buildSiweMessage(params: { address: string; nonce: string; chainId: number }): string {
+  const domain = new URL(SERVER_URL).hostname;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 2 * 60 * 1000);
+  return [
+    `${domain} wants you to sign in with your Ethereum account:`,
+    params.address,
+    '',
+    'Sign in to LOAR',
+    '',
+    `URI: ${SERVER_URL}`,
+    `Version: 1`,
+    `Chain ID: ${params.chainId}`,
+    `Nonce: ${params.nonce}`,
+    `Issued At: ${now.toISOString()}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
+  ].join('\n');
+}
+
+async function registerInFirestore(deploy: DeployResult, imageUrl: string): Promise<void> {
+  log('REGISTER', 'Authenticating via SIWE...');
+
+  // 1. Get nonce
+  const nonceRes = await fetch(`${SERVER_URL}/auth/nonce`);
+  if (!nonceRes.ok) throw new Error(`Nonce fetch failed: ${nonceRes.status}`);
+  const { nonce: authNonce } = (await nonceRes.json()) as { nonce: string };
+
+  // 2. Sign SIWE message
+  const siweMessage = buildSiweMessage({
+    address: getAddress(account.address),
+    nonce: authNonce,
+    chainId: sepolia.id,
+  });
+  const signature = await account.signMessage({ message: siweMessage });
+
+  // 3. Verify to get JWT
+  const verifyRes = await fetch(`${SERVER_URL}/auth/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: SERVER_URL },
+    body: JSON.stringify({ message: siweMessage, signature }),
+  });
+
+  if (!verifyRes.ok) throw new Error(`Auth verify failed: ${await verifyRes.text()}`);
+
+  // Extract JWT from cookie or response
+  const setCookie = verifyRes.headers.get('set-cookie') ?? '';
+  const jwtMatch = setCookie.match(/siwe-session=([^;]+)/);
+  const jwt = jwtMatch?.[1];
+  if (!jwt) throw new Error('No session token in verify response');
+  log('REGISTER', `Authenticated as ${account.address}`);
+
+  // 4. Get universe creation nonce
+  const createNonceRes = await fetch(
+    `${SERVER_URL}/trpc/universes.getNonce?batch=1&input=${encodeURIComponent(JSON.stringify({ '0': null }))}`,
+    { headers: { Authorization: `Bearer ${jwt}` } }
+  );
+  const createNonceData = (await createNonceRes.json()) as any[];
+  const createNonce = createNonceData[0]?.result?.data?.nonce;
+  if (!createNonce) throw new Error('Failed to get creation nonce');
+
+  // 5. Sign creation message
+  const ts = Math.floor(Date.now() / 1000);
+  const createMsg = `Create universe as ${account.address} at ${ts} nonce:${createNonce}`;
+  const createSig = await account.signMessage({ message: createMsg });
+
+  // 6. Register universe
+  log('REGISTER', 'Registering universe in Firestore...');
+  const createRes = await fetch(`${SERVER_URL}/trpc/universes.create?batch=1`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+    body: JSON.stringify({
+      '0': {
+        address: deploy.universeAddress,
+        creator: account.address,
+        name: UNIVERSE_NAME,
+        tokenAddress: deploy.tokenAddress,
+        governanceAddress: deploy.governorAddress,
+        imageUrl,
+        description: UNIVERSE_DESCRIPTION,
+        onChainUniverseId: deploy.universeId?.toString(),
+        mintTxHash: deploy.txHash,
+        signature: createSig,
+        message: createMsg,
+        nonce: createNonce,
+      },
+    }),
+  });
+
+  const createData = (await createRes.json()) as any[];
+  if (createData[0]?.error) {
+    throw new Error(`Firestore registration failed: ${JSON.stringify(createData[0].error)}`);
+  }
+
+  const result = createData[0]?.result?.data;
+  log('REGISTER', `Firestore ID: ${result?.data?.id ?? 'unknown'}`);
+  log('REGISTER', `Credits awarded: ${result?.mintCreditsAwarded ?? 0}`);
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function main() {
   console.log('\n' + '═'.repeat(60));
-  console.log('  SUCCESS');
+  console.log('  LOAR — Full Universe + Token Deployment');
+  console.log('═'.repeat(60));
+  console.log(`  Deployer: ${account.address}`);
+  console.log(`  Chain:    Sepolia (${sepolia.id})`);
+  console.log(`  Server:   ${SERVER_URL}\n`);
+
+  // Validate env
+  if (!FAL_KEY) throw new Error('FAL_KEY not set');
+  if (!PINATA_JWT) throw new Error('PINATA_JWT not set');
+
+  // Step 1: Generate cover image
+  const imageBuffer = await generateCoverImage();
+
+  // Step 2: Pin to IPFS
+  const imageUrl = await pinToPinata(imageBuffer, `${TOKEN_SYMBOL.toLowerCase()}-cover.jpg`);
+
+  // Step 3: Deploy on-chain
+  const deploy = await deployOnChain(imageUrl);
+
+  // Step 4: Register in Firestore
+  try {
+    await registerInFirestore(deploy, imageUrl);
+  } catch (err: any) {
+    // Non-blocking — on-chain deployment already succeeded
+    log('REGISTER', `WARNING: Firestore registration failed: ${err.message}`);
+    log('REGISTER', 'Universe is live on-chain but may not appear in the app until registered.');
+  }
+
+  // Done
+  console.log('\n' + '═'.repeat(60));
+  console.log('  COMPLETE');
   console.log('═'.repeat(60));
   console.log(`
   Universe : ${UNIVERSE_NAME}
-  Address  : ${universeAddress}
-  Token    : $${TOKEN_SYMBOL} @ ${tokenAddress}
-  Governor : ${governorAddress}
-  Chain    : Sepolia (11155111)
-  TX       : https://sepolia.etherscan.io/tx/${txHash}
+  Address  : ${deploy.universeAddress}
+  Token    : $${TOKEN_SYMBOL} @ ${deploy.tokenAddress}
+  Governor : ${deploy.governorAddress}
+  Image    : ${imageUrl}
+  TX       : https://sepolia.etherscan.io/tx/${deploy.txHash}
 
-  The Ponder indexer should pick this up automatically.
-  Check the launchpad: /tokens
+  Launchpad: /tokens
+  Universe:  /universe/${deploy.universeAddress}
 `);
 }
 
