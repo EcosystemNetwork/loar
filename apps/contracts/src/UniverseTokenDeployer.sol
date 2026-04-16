@@ -2,14 +2,12 @@
 pragma solidity ^0.8.30;
 
 import {LoarDeployer} from "./utils/LoarDeployer.sol";
-import {UniverseTimelockGovernor} from "./UniverseTimelockGovernor.sol";
-import {TimelockController} from "@openzeppelin/governance/TimelockController.sol";
+import {GovernorDeployer} from "./utils/GovernorDeployer.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
-import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 interface IUniverseManagerCallback {
@@ -134,42 +132,11 @@ contract UniverseTokenDeployer is ReentrancyGuard {
         // (community allocation managed off-chain via treasury)
         IERC20(tokenAddress).safeTransfer(address(universeManager), treasuryAmount + communityAmount);
 
-        governor = address(_deployGovernance(tokenAddress));
+        governor = GovernorDeployer.deployGovernance(tokenAddress, address(this));
 
         emit TokenDeployed(universeId, tokenAddress, deploymentConfig.poolConfig.hook, deploymentConfig.lockerConfig.locker);
         emit TokenAllocation(universeId, lpAmount, creatorAmount, treasuryAmount, communityAmount);
 
         return (tokenAddress, governor);
-    }
-
-    function _deployGovernance(
-        address tokenAddress
-    ) internal returns (IGovernor) {
-        // Deploy a per-universe TimelockController with 24h minimum delay.
-        // The governor is the sole proposer; anyone can execute after delay.
-        address[] memory proposers = new address[](0); // set after governor deploy
-        address[] memory executors = new address[](1);
-        executors[0] = address(0); // open execution
-
-        TimelockController timelock = new TimelockController(
-            24 hours,
-            proposers,
-            executors,
-            address(this) // temporary admin to grant proposer role
-        );
-
-        UniverseTimelockGovernor governor = new UniverseTimelockGovernor(
-            IVotes(tokenAddress),
-            timelock
-        );
-
-        // Grant the governor PROPOSER_ROLE on the timelock
-        timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
-        // Also grant CANCELLER_ROLE so governance can cancel queued proposals
-        timelock.grantRole(timelock.CANCELLER_ROLE(), address(governor));
-        // Renounce admin so only governance controls the timelock
-        timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), address(this));
-
-        return IGovernor(governor);
     }
 }

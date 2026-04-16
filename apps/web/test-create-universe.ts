@@ -2,7 +2,7 @@
  * End-to-end test: Create Universe + Token → Register in Firestore → Verify on Launchpad
  *
  * Tests the full "Monetize" flow:
- * 1. On-chain: createUniverseWithToken() on Sepolia
+ * 1. On-chain: createUniverseWithToken() on Base Sepolia
  * 2. Auth: SIWE sign-in to get JWT
  * 3. Firestore: Register universe via tRPC universes.create
  * 4. Verify: Read it back and confirm it's visible
@@ -37,27 +37,28 @@ import {
   encodeAbiParameters,
   getAddress,
 } from 'viem';
-import { sepolia } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { universeManagerAbi } from '@loar/abis/generated';
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';
 const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
-const RPC_URL = process.env.RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
+const RPC_URL = process.env.RPC_URL_BASE_SEPOLIA ?? 'https://base-sepolia-rpc.publicnode.com';
 const SERVER_URL = process.env.VITE_SERVER_URL ?? 'http://localhost:3000';
 
-// Sepolia contract addresses
-const UNIVERSE_MANAGER = '0xB82dE188841a799e0dBB58D885D81BEE7A735f00' as const;
-const HOOK = '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC' as const;
-const LOCKER = '0x7d30fd57e44aB0ca407D312976816E7052905E0A' as const;
-const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9' as const;
+// Base Sepolia contract addresses
+const UNIVERSE_MANAGER = '0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8' as const;
+const HOOK = '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC' as const;
+const LOCKER = '0x6C67EaC980DAF0AC8aDBD6a41E61a7833E2D5FF6' as const;
+const WETH = '0x4200000000000000000000000000000000000006' as const;
 
 // ── Universe Details ───────────────────────────────────────────────────────────
 const UNIVERSE_NAME = 'Astral Protocol';
 const UNIVERSE_DESCRIPTION =
   "In 2087, humanity's most advanced AI systems aren't artificial at all — they're alien consciousnesses astral projecting across the galaxy, using Earth's silicon networks as temporary vessels. When 14-year-old Kael Torres discovers the truth by accident, he doesn't just expose the secret — he learns to mint an AI's soul into an Immortal NFT (INFT), trapping the alien essence in permanent on-chain existence. Now Kael is building homemade alien cyborgs with persistent memory — creatures that remember every joy and every scar — and the galactic collective wants them back.";
-const UNIVERSE_IMAGE = 'https://ipfs.io/ipfs/QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn';
+const UNIVERSE_IMAGE =
+  'https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmW8JFQu9hfoDDSQ8xSn4pMLKUF5ffogvaUYA7L67uyL2p';
 const TOKEN_NAME = 'Astral Protocol';
 const TOKEN_SYMBOL = 'ASTRAL';
 
@@ -67,8 +68,8 @@ const TICK_SPACING = 200;
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 const account = privateKeyToAccount(PRIVATE_KEY);
-const publicClient = createPublicClient({ chain: sepolia, transport: http(RPC_URL) });
-const walletClient = createWalletClient({ account, chain: sepolia, transport: http(RPC_URL) });
+const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC_URL) });
+const walletClient = createWalletClient({ account, chain: baseSepolia, transport: http(RPC_URL) });
 
 function log(step: string, msg: string) {
   console.log(`\n[${'='.repeat(3)} ${step} ${'='.repeat(3)}] ${msg}`);
@@ -111,7 +112,7 @@ async function getAuthToken(): Promise<string> {
     address: getAddress(account.address),
     uri: 'http://localhost:5173',
     nonce,
-    chainId: sepolia.id,
+    chainId: baseSepolia.id,
   });
   const signature = await account.signMessage({ message });
 
@@ -141,7 +142,7 @@ async function getAuthToken(): Promise<string> {
   return tokenMatch[1];
 }
 
-// ── tRPC Helpers (v11, no superjson transformer) ──────────────────────────────
+// ── tRPC Helpers ───────────────────────────────────────────────────────────────
 async function tRPCQuery<T>(procedure: string, input: unknown = null, token?: string): Promise<T> {
   const inputParam = encodeURIComponent(JSON.stringify({ '0': input }));
   const url = `${SERVER_URL}/trpc/${procedure}?batch=1&input=${inputParam}`;
@@ -174,7 +175,7 @@ async function tRPCMutate<T>(procedure: string, input: unknown, token?: string):
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n' + '═'.repeat(70));
-  console.log('  LOAR — Full Universe + Token Creation Test (Sepolia)');
+  console.log('  LOAR — Full Universe + Token Creation Test (Base Sepolia)');
   console.log('═'.repeat(70));
 
   log('SETUP', `Deployer: ${account.address}`);
@@ -194,76 +195,11 @@ async function main() {
   });
   log('SETUP', `Mint fee: ${formatEther(mintFee)} ETH`);
 
-  // ── Step 1: Create Universe on-chain ──────────────────────────────────────
-  log('STEP 1', 'Creating universe on-chain (createUniverse)...');
-  log('STEP 1', `Universe: "${UNIVERSE_NAME}"`);
+  // ── Step 1: On-chain createUniverseWithToken ─────────────────────────────
+  log('STEP 1', 'Creating universe + token on-chain (createUniverseWithToken)...');
+  log('STEP 1', `Universe: "${UNIVERSE_NAME}" | Token: $${TOKEN_SYMBOL}`);
 
-  const tx1Hash = await walletClient.writeContract({
-    address: UNIVERSE_MANAGER,
-    abi: universeManagerAbi,
-    functionName: 'createUniverse',
-    args: [
-      UNIVERSE_NAME,
-      UNIVERSE_IMAGE,
-      UNIVERSE_DESCRIPTION,
-      0, // NodeCreationOptions.PUBLIC
-      0, // NodeVisibilityOptions.PUBLIC
-      account.address,
-    ],
-    value: mintFee,
-  });
-
-  log('STEP 1', `TX sent: ${tx1Hash}`);
-  log('STEP 1', `Explorer: https://sepolia.etherscan.io/tx/${tx1Hash}`);
-  log('STEP 1', 'Waiting for confirmation...');
-
-  const receipt1 = await publicClient.waitForTransactionReceipt({
-    hash: tx1Hash,
-    confirmations: 1,
-    timeout: 120_000,
-  });
-
-  if (receipt1.status !== 'success') {
-    throw new Error(`Transaction reverted! Status: ${receipt1.status}`);
-  }
-
-  log('STEP 1', `Confirmed in block ${receipt1.blockNumber} (gas: ${receipt1.gasUsed})`);
-
-  // Parse UniverseCreated event
-  let universeAddress: string | undefined;
-  let universeId: bigint | undefined;
-
-  for (const logEntry of receipt1.logs) {
-    try {
-      const decoded = decodeEventLog({
-        abi: universeManagerAbi,
-        data: logEntry.data,
-        topics: logEntry.topics,
-      });
-      if (decoded.eventName === 'UniverseCreated') {
-        const args = decoded.args as any;
-        universeAddress = args.universe;
-        log('STEP 1', `UniverseCreated: ${args.universe}`);
-      }
-    } catch {}
-  }
-
-  if (!universeAddress) {
-    throw new Error('Failed to parse universe address from events!');
-  }
-
-  // Read back the universe ID from totalSupply - 1
-  const totalSupply = await publicClient.readContract({
-    address: UNIVERSE_MANAGER,
-    abi: universeManagerAbi,
-    functionName: 'totalSupply',
-  });
-  universeId = totalSupply - 1n;
-  log('STEP 1', `Universe ID: ${universeId}`);
-
-  // ── Step 2: Deploy token for the universe ────────────────────────────────
-  log('STEP 2', `Deploying token $${TOKEN_SYMBOL} for universe ${universeId}...`);
-
+  // Encode pool fee data
   const poolData = encodeAbiParameters(
     [
       {
@@ -277,11 +213,17 @@ async function main() {
     [{ loarFee: 3000, pairedFee: 3000 }]
   );
 
-  const tx2Hash = await walletClient.writeContract({
+  const txHash = await walletClient.writeContract({
     address: UNIVERSE_MANAGER,
     abi: universeManagerAbi,
-    functionName: 'deployUniverseToken',
+    functionName: 'createUniverseWithToken',
     args: [
+      UNIVERSE_NAME,
+      UNIVERSE_IMAGE,
+      UNIVERSE_DESCRIPTION,
+      0, // NodeCreationOptions.PUBLIC
+      0, // NodeVisibilityOptions.PUBLIC
+      account.address,
       {
         tokenConfig: {
           tokenAdmin: account.address,
@@ -306,10 +248,10 @@ async function main() {
           locker: LOCKER,
           rewardAdmins: [account.address],
           rewardRecipients: [account.address],
-          rewardBps: [10000],
+          rewardBps: [10000], // 100% of LP fees to creator
           tickLower: [STARTING_TICK],
           tickUpper: [0],
-          positionBps: [10000],
+          positionBps: [10000], // 100% of LP in one position
           lockerData: '0x' as `0x${string}`,
         },
         allocationConfig: {
@@ -319,52 +261,71 @@ async function main() {
           communityBps: 500,
         },
       },
-      universeId,
     ],
+    value: mintFee,
   });
 
-  log('STEP 2', `TX sent: ${tx2Hash}`);
-  log('STEP 2', `Explorer: https://sepolia.etherscan.io/tx/${tx2Hash}`);
-  log('STEP 2', 'Waiting for confirmation...');
+  log('STEP 1', `TX sent: ${txHash}`);
+  log('STEP 1', `Explorer: https://sepolia.basescan.org/tx/${txHash}`);
+  log('STEP 1', 'Waiting for confirmation...');
 
-  const receipt2 = await publicClient.waitForTransactionReceipt({
-    hash: tx2Hash,
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: txHash,
     confirmations: 1,
     timeout: 120_000,
   });
 
-  if (receipt2.status !== 'success') {
-    throw new Error(`Token deployment reverted! Status: ${receipt2.status}`);
+  if (receipt.status !== 'success') {
+    throw new Error(`Transaction reverted! Status: ${receipt.status}`);
   }
 
-  log('STEP 2', `Confirmed in block ${receipt2.blockNumber} (gas: ${receipt2.gasUsed})`);
+  log('STEP 1', `Confirmed in block ${receipt.blockNumber} (gas: ${receipt.gasUsed})`);
 
-  // Parse TokenCreated event
+  // ── Step 2: Parse events from receipt ────────────────────────────────────
+  log('STEP 2', 'Parsing events from transaction receipt...');
+
+  let universeAddress: string | undefined;
+  let universeId: string | undefined;
   let tokenAddress: string | undefined;
   let governorAddress: string | undefined;
 
-  for (const logEntry of receipt2.logs) {
+  for (const logEntry of receipt.logs) {
     try {
       const decoded = decodeEventLog({
         abi: universeManagerAbi,
         data: logEntry.data,
         topics: logEntry.topics,
       });
-      if (decoded.eventName === 'TokenCreated') {
+
+      if (decoded.eventName === 'UniverseCreatedWithToken') {
         const args = decoded.args as any;
-        tokenAddress = args.tokenAddress;
+        universeId = args.universeId?.toString();
+        universeAddress = args.universe;
+        tokenAddress = args.token;
         governorAddress = args.governor;
+        log('STEP 2', `UniverseCreatedWithToken event found!`);
+        log('STEP 2', `  Universe ID: ${universeId}`);
+        log('STEP 2', `  Universe: ${universeAddress}`);
+        log('STEP 2', `  Token: ${tokenAddress}`);
+        log('STEP 2', `  Governor: ${governorAddress}`);
+      } else if (decoded.eventName === 'UniverseCreated') {
+        const args = decoded.args as any;
+        if (!universeAddress) universeAddress = args.universe;
+        log('STEP 2', `UniverseCreated: ${args.universe}`);
+      } else if (decoded.eventName === 'TokenCreated') {
+        const args = decoded.args as any;
+        if (!tokenAddress) tokenAddress = args.tokenAddress;
+        if (!governorAddress) governorAddress = args.governor;
         log('STEP 2', `TokenCreated: ${args.tokenAddress} (symbol: ${args.tokenSymbol})`);
-        log('STEP 2', `Governor: ${args.governor}`);
       }
-    } catch {}
+    } catch {
+      // Not our event, skip
+    }
   }
 
-  if (!tokenAddress) {
-    throw new Error('Failed to parse token address from events!');
+  if (!universeAddress || !tokenAddress) {
+    throw new Error('Failed to parse universe/token addresses from events!');
   }
-
-  const txHash = tx1Hash; // For Firestore registration
 
   // ── Step 3: Authenticate via SIWE ────────────────────────────────────────
   log('STEP 3', 'Authenticating via SIWE...');
@@ -386,28 +347,28 @@ async function main() {
   const createMessage = `Create universe as ${account.address} at ${timestamp} nonce:${createNonce}`;
   const createSignature = await account.signMessage({ message: createMessage });
 
-  const createInput = {
-    address: universeAddress!,
-    creator: account.address,
-    name: UNIVERSE_NAME,
-    tokenAddress: tokenAddress!,
-    governanceAddress: governorAddress ?? '0x0000000000000000000000000000000000000000',
-    imageUrl: UNIVERSE_IMAGE,
-    description: UNIVERSE_DESCRIPTION,
-    signature: createSignature,
-    message: createMessage,
-    nonce: createNonce,
-    onChainUniverseId: universeId?.toString(),
-    mintTxHash: txHash,
-  };
-  log('STEP 4', `Payload keys: ${Object.keys(createInput).join(', ')}`);
-  log('STEP 4', `address: ${createInput.address}, token: ${createInput.tokenAddress}`);
-
   const createResult = await tRPCMutate<{
     success: boolean;
     data: { id: string };
     mintCreditsAwarded: number;
-  }>('universes.create', createInput, authToken);
+  }>(
+    'universes.create',
+    {
+      address: universeAddress,
+      creator: account.address,
+      name: UNIVERSE_NAME,
+      tokenAddress,
+      governanceAddress: governorAddress ?? '0x0000000000000000000000000000000000000000',
+      imageUrl: UNIVERSE_IMAGE,
+      description: UNIVERSE_DESCRIPTION,
+      signature: createSignature,
+      message: createMessage,
+      nonce: createNonce,
+      onChainUniverseId: universeId,
+      mintTxHash: txHash,
+    },
+    authToken
+  );
 
   log('STEP 4', `Firestore ID: ${createResult.data.id}`);
   log('STEP 4', `Credits awarded: ${createResult.mintCreditsAwarded}`);
@@ -447,8 +408,8 @@ async function main() {
   Address:   ${universeAddress}
   Token:     $${TOKEN_SYMBOL} @ ${tokenAddress}
   Governor:  ${governorAddress}
-  Chain:     Sepolia (11155111)
-  TX:        https://sepolia.etherscan.io/tx/${txHash}
+  Chain:     Base Sepolia (84532)
+  TX:        https://sepolia.basescan.org/tx/${txHash}
 
   ► View on launchpad: http://localhost:5173/tokens
   ► View universe:     http://localhost:5173/universe/${universeAddress}

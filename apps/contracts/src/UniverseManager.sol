@@ -343,29 +343,35 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
         IdentityNFT inft = IdentityNFT(identityNft);
 
-        // Try to detect Gnosis Safe by calling getOwners()
-        try IGnosisSafe(owner).getOwners() returns (address[] memory owners) {
-            if (owners.length > 0) {
-                // Multi-sig detected — mint to each signer
-                uint8 total = owners.length > 255 ? 255 : uint8(owners.length);
-                for (uint8 i = 0; i < total; i++) {
-                    try inft.mint(
-                        owners[i],
-                        universeId,
-                        i + 1,        // 1-based index
-                        total,
-                        owner,        // safe address
-                        universeContract,
-                        universeName,
-                        universeImage
-                    ) {} catch {
-                        // Mint failed for this signer (maybe duplicate), continue
+        // Try to detect Gnosis Safe by calling getOwners().
+        // IMPORTANT: check extcodesize first — Solidity's try/catch does NOT
+        // catch ABI-decode failures when a call to a codeless address (EOA)
+        // succeeds with empty returndata. The decoder panics in the caller
+        // context which bypasses the catch block entirely.
+        if (owner.code.length > 0) {
+            try IGnosisSafe(owner).getOwners() returns (address[] memory owners) {
+                if (owners.length > 0) {
+                    // Multi-sig detected — mint to each signer
+                    uint8 total = owners.length > 255 ? 255 : uint8(owners.length);
+                    for (uint8 i = 0; i < total; i++) {
+                        try inft.mint(
+                            owners[i],
+                            universeId,
+                            i + 1,        // 1-based index
+                            total,
+                            owner,        // safe address
+                            universeContract,
+                            universeName,
+                            universeImage
+                        ) {} catch {
+                            // Mint failed for this signer (maybe duplicate), continue
+                        }
                     }
+                    return;
                 }
-                return;
+            } catch {
+                // Not a Safe / call reverted — treat as EOA
             }
-        } catch {
-            // Not a Safe / call reverted — treat as EOA
         }
 
         // EOA creator — mint a single "1/1" INFT

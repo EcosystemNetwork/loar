@@ -97,9 +97,13 @@ const generateSchema = z.object({
 // ── Helpers ───────────────────────────────────────────────────────────
 
 async function saveRecord(record: ImageGenerationRecord): Promise<void> {
-  await imageGenerationsCol()
-    .doc(record.id)
-    .set({ ...record, completedAt: record.completedAt || null });
+  // Strip undefined values — Firestore rejects them
+  const clean = Object.fromEntries(
+    Object.entries({ ...record, completedAt: record.completedAt || null }).filter(
+      ([, v]) => v !== undefined
+    )
+  );
+  await imageGenerationsCol().doc(record.id).set(clean);
 }
 
 async function attemptFallback(

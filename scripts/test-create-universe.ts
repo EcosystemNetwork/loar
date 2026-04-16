@@ -57,7 +57,8 @@ const WETH = '0x4200000000000000000000000000000000000006' as const;
 const UNIVERSE_NAME = 'Astral Protocol';
 const UNIVERSE_DESCRIPTION =
   "In 2087, humanity's most advanced AI systems aren't artificial at all — they're alien consciousnesses astral projecting across the galaxy, using Earth's silicon networks as temporary vessels. When 14-year-old Kael Torres discovers the truth by accident, he doesn't just expose the secret — he learns to mint an AI's soul into an Immortal NFT (INFT), trapping the alien essence in permanent on-chain existence. Now Kael is building homemade alien cyborgs with persistent memory — creatures that remember every joy and every scar — and the galactic collective wants them back.";
-const UNIVERSE_IMAGE = 'https://ipfs.io/ipfs/QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn';
+const UNIVERSE_IMAGE =
+  'https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmW8JFQu9hfoDDSQ8xSn4pMLKUF5ffogvaUYA7L67uyL2p';
 const TOKEN_NAME = 'Astral Protocol';
 const TOKEN_SYMBOL = 'ASTRAL';
 
