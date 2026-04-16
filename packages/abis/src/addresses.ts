@@ -3,7 +3,7 @@
 
 export const UniverseManager = {
   '11155111': '0xB82dE188841a799e0dBB58D885D81BEE7A735f00',
-  '84532': '0x829666ADAc47D954297a9CD1232744E1669B9e83',
+  '84532': '0x99562C96389A91b17662ce5f15143f5B07b84090',
 } as const;
 
 export type UniverseManagerChainId = keyof typeof UniverseManager;
@@ -50,6 +50,8 @@ export const TokenVesting = {
 
 export type TokenVestingChainId = keyof typeof TokenVesting;
 
-export const IdentityNFT = {} as const;
+export const IdentityNFT = {
+  '84532': '0x1485eFdD66c5E8cf43baC3eE57e4D50660Bc4779',
+} as const;
 
 export type IdentityNFTChainId = keyof typeof IdentityNFT;

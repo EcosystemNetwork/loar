@@ -3,24 +3,14 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
-import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
 import {PaymentRouter} from "../src/PaymentRouter.sol";
 import {CreditManager} from "../src/revenue/CreditManager.sol";
-
-contract MockERC20 is ERC20 {
-    constructor() ERC20("Mock LOAR", "MLOAR") {
-        _mint(msg.sender, 1_000_000e18);
-    }
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
+import {LoarToken} from "../src/LoarToken.sol";
 
 contract CreditManagerTest is Test {
     CreditManager public credits;
     PaymentRouter public router;
-    MockERC20 public loarToken;
+    LoarToken public loarToken;
 
     address deployer = makeAddr("deployer");
     address platform = makeAddr("platform");
@@ -38,8 +28,11 @@ contract CreditManagerTest is Test {
             abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
         )));
 
-        // Deploy mock LOAR token
-        loarToken = new MockERC20();
+        // Deploy real LoarToken — treasury gets 70%, deployer (initialHolder) gets 30%
+        loarToken = new LoarToken(treasury, deployer);
+
+        // Set loar token on PaymentRouter
+        router.setLoarToken(address(loarToken));
 
         // Deploy CreditManager
         CreditManager creditsImpl = new CreditManager();
@@ -50,15 +43,19 @@ contract CreditManagerTest is Test {
             ))
         )));
 
-        // Set loar token on PaymentRouter so routeLoarToTreasury works
-        router.setLoarToken(address(loarToken));
-
         vm.stopPrank();
 
-        // Setup: give user some ETH and LOAR
+        // Make CreditManager and PaymentRouter fee-exempt on LoarToken
+        // (required in production — otherwise transfer fee causes amount mismatch)
+        vm.startPrank(deployer);
+        loarToken.setFeeExempt(address(credits), true);
+        loarToken.setFeeExempt(address(router), true);
+        vm.stopPrank();
+
+        // Setup: give user some ETH and LOAR from deployer's 30% allocation
         vm.deal(user, 100 ether);
         vm.prank(deployer);
-        loarToken.mint(user, 10_000e18);
+        loarToken.transfer(user, 10_000e18);
     }
 
     // ── Initialize ──
@@ -179,6 +176,35 @@ contract CreditManagerTest is Test {
         vm.prank(user);
         vm.expectRevert(CreditManager.InsufficientLoarAllowance.selector);
         credits.purchaseWithLoar(0);
+    }
+
+    // ── Purchase with LOAR (non-exempt user → transfer fee applies on user→CreditManager) ──
+
+    function test_purchaseWithLoar_nonExemptUser() public {
+        // User is NOT fee-exempt, so the transfer from user → CreditManager
+        // skims a tiny fee to liquidityPool. But since CreditManager IS exempt,
+        // the CreditManager → PaymentRouter → treasury leg has no fee.
+        // This verifies the real LoarToken transfer fee integration.
+
+        // Set up a liquidity pool to receive fees
+        address lp = makeAddr("lp");
+        vm.prank(deployer);
+        loarToken.setLiquidityPool(lp);
+
+        vm.prank(platform);
+        credits.createPackage("Starter", 100, 0.01 ether, 50e18, 5);
+
+        uint256 userBalBefore = loarToken.balanceOf(user);
+
+        vm.startPrank(user);
+        loarToken.approve(address(credits), 50e18);
+        credits.purchaseWithLoar(0);
+        vm.stopPrank();
+
+        // User spent 50e18 (full amount debited)
+        assertEq(userBalBefore - loarToken.balanceOf(user), 50e18);
+        // Credits granted correctly
+        assertEq(credits.getBalance(user), 115);
     }
 
     // ── Spend credits ──

@@ -2,7 +2,7 @@
 
 ## Overview
 
-All contracts are in `apps/contracts/src/`, built with [Foundry](https://book.getfoundry.sh/) (Solidity ^0.8.30), and deployed to **Sepolia testnet** (chain 11155111).
+All contracts are in `apps/contracts/src/`, built with [Foundry](https://book.getfoundry.sh/) (Solidity ^0.8.30), and deployed to **Sepolia testnet** (chain 11155111) with multi-chain support for **Base Sepolia** (84532) and **Base Mainnet** (8453).
 
 Revenue contracts use an **upgradeable proxy architecture**:
 
@@ -65,10 +65,17 @@ All upgradeable contracts use OpenZeppelin Upgradeable v5.0.2.
 - **Data model:** Nodes linked by `previousNodeId`, content stored as `bytes32` hashes
 - **Key features:** Node creation, content attachment, canonization
 
-#### UniverseTokenDeployer
+#### UniverseTokenDeployer / UniverseTokenDeployerV2
 
 - **Purpose:** Deploys GovernanceERC20 tokens for each universe
 - **Called by:** UniverseManager during universe creation
+- **V2 additions:** Allocation config (LP/creator/treasury/community BPS splits), mint fee WETH seeding into LP pool
+
+#### IdentityNFT
+
+- **Purpose:** Creator identity proof minted per universe
+- **Features:** Tracks co-creators and multi-sig signers, one NFT per universe creator
+- **Minted by:** UniverseManager during `createUniverse()` or `createUniverseWithToken()`
 
 ### Governance
 
@@ -82,7 +89,13 @@ All upgradeable contracts use OpenZeppelin Upgradeable v5.0.2.
 
 - **Purpose:** On-chain governance using OpenZeppelin Governor
 - **Features:** Proposal creation, voting (for/against/abstain), execution, cancellation
-- **Quorum:** Configurable per universe
+- **Quorum:** 10% of supply (configurable per universe)
+
+#### UniverseTimelockGovernor
+
+- **Purpose:** Enhanced governance with TimelockController for safer execution
+- **Timelock:** 24-hour delay on proposal execution
+- **Parameters:** Voting delay 7200 blocks (~1 day on Base L2), voting period 50400 blocks (~7 days), proposal threshold 1M tokens
 
 ### Revenue Contracts (UUPS Pattern)
 
@@ -154,12 +167,31 @@ src/
 ├── lp-lockers/         # LoarLpLockerMultiple, LoarFeeLocker
 ├── types/              # Custom type definitions
 ├── utils/              # Utility contracts
+├── IdentityNFT.sol     # Creator identity NFTs
+├── LoarToken.sol       # Platform $LOAR token
+├── LoarFaucet.sol      # Testnet faucet
+├── LoarSwapRouter.sol  # DEX routing
+├── LoarFeeLocker.sol   # Fee escrow
 ├── PaymentRouter.sol   # Fee routing singleton
 ├── RightsRegistry.sol  # Rights management singleton
+├── SplitRouter.sol     # Revenue split routing
 ├── RevenueModuleFactory.sol  # Per-universe NFT deployer
+├── TokenVesting.sol    # Token vesting schedules
 ├── Universe.sol        # DAG narrative contract
 ├── UniverseManager.sol # Protocol factory
-└── UniverseTokenDeployer.sol # Token deployer
+├── UniverseGovernor.sol # Standard governor
+├── UniverseTimelockGovernor.sol # Governor with timelock
+├── UniverseTokenDeployer.sol # Token deployer
+├── UniverseTokenDeployerV2.sol # V2 with allocation config
+├── GovernanceERC20.sol # Governance token standard
+├── ContentLicensing.sol # BUY/RENT/LICENSE deals
+├── LaunchpadStaking.sol # $LOAR staking
+├── StoryBounties.sol   # Content bounties
+├── SlopMarket.sol      # Secondary market
+├── CollectiveTokenFactory.sol # Collective tokens
+├── StructuralDeed.sol  # Structural deed NFTs
+├── LoarBurner.sol      # Token burn mechanism
+└── RemixFees.sol       # Remix fee collection
 ```
 
 ## Development

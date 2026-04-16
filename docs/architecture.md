@@ -17,6 +17,7 @@ graph TD
     subgraph External Services
         FIREBASE[(Firebase<br/>Firestore Only)]
         FAL[Fal AI<br/>Video/Image Generation]
+        BYTEDANCE[ByteDance ModelArk<br/>Seedance 2.0 Video]
         GEMINI[Google Gemini<br/>Wiki Generation]
         OPENAI[OpenAI<br/>Storyline Generation]
         PINATA[Pinata<br/>Hot Storage]
@@ -25,6 +26,7 @@ graph TD
 
     subgraph Blockchain
         SEPOLIA[Sepolia Testnet<br/>Smart Contracts]
+        BASE[Base L2<br/>Target Mainnet]
     end
 
     WEB -->|tRPC over HTTP| SERVER
@@ -33,6 +35,7 @@ graph TD
 
     SERVER --> FIREBASE
     SERVER --> FAL
+    SERVER --> BYTEDANCE
     SERVER --> GEMINI
     SERVER --> OPENAI
     SERVER --> PINATA
@@ -117,37 +120,50 @@ The server uses [Hono](https://hono.dev/) as the HTTP framework with middleware:
 ### tRPC Router Tree
 
 ```
-appRouter
-├── healthCheck          (query, public)
-├── privateData          (query, protected)
-├── cinematicUniverses   (sub-router)
-│   ├── createcu         (mutation)
-│   ├── get              (query)
-│   ├── getAll           (query)
-│   └── getByCreator     (query)
-├── fal                  (sub-router)
-│   ├── generateImage    (mutation)
-│   ├── generateVideo    (mutation)
-│   └── generateCharacter (mutation)
-├── wiki                 (sub-router)
-│   ├── characters       (query)
-│   ├── character        (query)
-│   ├── generateEventWikia (mutation)
-│   ├── generateStoryline  (mutation)
-│   ├── generateFromVideo  (mutation)
-│   ├── getWiki          (query)
-│   ├── getUniverseWikis (query)
-│   └── improveVideoPrompt (mutation)
-├── video                (sub-router)
-│   └── generateWithProvider (mutation)
-├── minio                (sub-router)
-│   ├── uploadFromUrl    (mutation)
-│   ├── download         (query)
-│   └── getPublicUrl     (query)
-└── synapse              (sub-router)
-    ├── uploadFromUrl    (mutation)
-    ├── download         (query)
-    └── getHttpUrl       (query)
+appRouter (45+ routers, 150+ procedures)
+├── healthCheck              (query, public)
+├── privateData              (query, protected)
+├── universes                (sub-router) — CRUD, team, treasury
+├── content                  (sub-router) — user content, wiki/lore generation
+├── generation               (sub-router) — AI video with smart routing + billing
+├── image                    (sub-router) — image generation with history
+├── voice                    (sub-router) — TTS, sound effects, voice cloning
+├── threed                   (sub-router) — 3D generation (Meshy)
+├── studio                   (sub-router) — entity asset pack orchestrator
+├── fal                      (sub-router) — FAL AI integration
+├── video                    (sub-router) — video generation with provider selection
+├── wiki                     (sub-router) — characters, wikia, storylines
+├── marketplace              (sub-router) — canon submissions, voting
+├── nft                      (sub-router) — NFT minting and metadata
+├── listings                 (sub-router) — content listings
+├── credits                  (sub-router) — credit packages and balances
+├── subscriptions            (sub-router) — universe subscription tiers
+├── analytics                (sub-router) — views, engagement, trending
+├── ads                      (sub-router) — ad slots and sponsorships
+├── licensing                (sub-router) — IP licensing and royalties
+├── storage                  (sub-router) — Firebase Storage, Filecoin Synapse
+├── profiles                 (sub-router) — user profiles and discovery
+├── entities                 (sub-router) — characters, locations, items (10+ kinds)
+├── quests                   (sub-router) — quest system, daily check-ins, affiliates
+├── sandbox                  (sub-router) — draft creations
+├── collabs                  (sub-router) — cross-universe collaborations
+├── universeTeam             (sub-router) — universe team management
+├── universeTreasury         (sub-router) — treasury operations
+├── governance               (sub-router) — governance queries
+├── revenue                  (sub-router) — revenue tracking and splits
+├── tokenGates               (sub-router) — token-gated content
+├── social                   (sub-router) — social features
+├── feed                     (sub-router) — content feed
+├── lora                     (sub-router) — LoRA model training
+├── talentAgents             (sub-router) — AI talent agent management
+├── apiKeys                  (sub-router) — API key management
+├── portfolio                (sub-router) — user portfolio
+├── media                    (sub-router) — media management
+├── moderation               (sub-router) — content moderation
+├── admin                    (sub-router) — platform configuration
+├── minio                    (sub-router) — Firebase Storage (legacy name)
+├── synapse                  (sub-router) — Filecoin/Synapse storage
+└── aiPipelines              (sub-router) — AI agent pipeline execution
 ```
 
 ### Services
@@ -178,18 +194,41 @@ _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved
 
 ### Route Map
 
-| Route                     | Description                     |
-| ------------------------- | ------------------------------- |
-| `/`                       | Home / landing page             |
-| `/login`                  | Authentication (wallet connect) |
-| `/dashboard`              | User dashboard                  |
-| `/market`                 | Token marketplace               |
-| `/create`                 | Create hub (universe, entities) |
-| `/create/$kind`           | Per-kind creation form          |
-| `/universe/$id`           | Universe detail view            |
-| `/wiki`                   | Worldbuilding encyclopedia      |
-| `/wiki/entity/$id`        | Entity detail page              |
-| `/event.$universe.$event` | Event detail within universe    |
+| Route                        | Description                                          |
+| ---------------------------- | ---------------------------------------------------- |
+| `/`                          | Home / landing page                                  |
+| `/login`                     | Authentication (wallet connect)                      |
+| `/dashboard`                 | User dashboard (universes, AI gen, LP yield, quests) |
+| `/market`                    | Token marketplace                                    |
+| `/create`                    | Create hub (universe, entities)                      |
+| `/create/$kind`              | Per-kind creation form                               |
+| `/cinematicUniverseCreate`   | Full universe creation wizard                        |
+| `/universe/$id`              | Universe detail view                                 |
+| `/universe/$id/deploy-token` | Deploy token for existing universe                   |
+| `/universe/$id/gen-config`   | AI generation configuration                          |
+| `/universe/$id/gallery`      | Universe gallery                                     |
+| `/governance/$universeId`    | Governance voting (proposals, timelock)              |
+| `/treasury/$universeId`      | Treasury management                                  |
+| `/play/$universeId`          | Narrative gameplay                                   |
+| `/wiki`                      | Worldbuilding encyclopedia                           |
+| `/wiki/entity/$id`           | Entity detail page                                   |
+| `/wiki/character/$id`        | Character detail page                                |
+| `/tokens/`                   | Token dashboard                                      |
+| `/tokens/$address`           | Token details                                        |
+| `/tokens/portfolio`          | Token portfolio                                      |
+| `/staking`                   | $LOAR staking                                        |
+| `/credits`                   | Credit balance and purchase                          |
+| `/sell/`                     | Content selling hub                                  |
+| `/licensing/`                | IP licensing hub                                     |
+| `/collabs/`                  | Collaboration hub                                    |
+| `/ads/`                      | Ad management                                        |
+| `/canon/$universeId`         | Canon marketplace                                    |
+| `/bounties/`                 | Bounty hub                                           |
+| `/agents/`                   | AI agent marketplace                                 |
+| `/profile/$username`         | User profiles                                        |
+| `/admin/moderation`          | Content moderation queue                             |
+| `/dmca`                      | DMCA takedown form                                   |
+| `/event.$universe.$event`    | Event detail within universe                         |
 
 ### Environment Variable Loading
 

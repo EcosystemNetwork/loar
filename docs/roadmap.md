@@ -1,8 +1,8 @@
 # LOAR — Product Roadmap
 
-## Current State (March 2026)
+## Current State (April 2026)
 
-The platform has strong infrastructure — smart contracts deployed, backend fully implemented, AI generation working, timeline editor functional. The critical gap is **closing the monetization loop on the frontend** and **proving the product works for one external creator**.
+The platform has strong infrastructure — 30+ smart contracts deployed (Sepolia + Base), 45+ tRPC routers, 60+ web routes, 5 AI video providers (incl. ByteDance Seedance 2.0), LP yield management, TimelockController governance, Identity NFTs, multi-chain support, and on-chain credit purchases. The critical gap is **closing the remaining monetization UI loops** (NFT minting, subscriptions, collabs) and **proving the product works for one external creator**.
 
 ---
 
@@ -14,11 +14,13 @@ The platform has strong infrastructure — smart contracts deployed, backend ful
 
 ### Deliverables
 
+- [x] ~~**Fix Dashboard**~~ — Real universe data via `universes.getByCreator()`, LP yield panel, quests, daily check-in, monetization overview
+- [x] ~~**Wire Credit Purchases**~~ — On-chain ETH/$LOAR payment verification live (Sepolia + Base Sepolia)
+- [x] ~~**Basic Governance**~~ — TimelockController governance with configurable voting parameters, Ponder indexing proposals/votes
+- [x] ~~**Token Deployment**~~ — Standalone `/universe/$id/deploy-token` route with chain selection, custom symbols, allocation splits
+- [x] ~~**LP Yield Management**~~ — Fee collection, multi-recipient distribution, claim UI in dashboard
 - [ ] **Wire NFT Minting** — Add mint/buy buttons in Episode NFT and Character NFT marketplace tabs, connected to smart contracts via wagmi
-- [ ] **Wire Credit Purchases** — Credits tab purchase flow connected to `credits.purchase` tRPC mutation
-- [ ] **Wire Canon Voting** — Submission form + token-weighted voting UI in Canon marketplace tab
-- [ ] **Fix Dashboard** — Replace dummy data with real `cinematicUniverses.getByCreator()` data
-- [ ] **Basic Governance Voting** — Complete GovernanceSidebar with proposal creation and vote casting
+- [ ] **Wire Canon Voting** — Submission form + token-weighted voting UI in Canon marketplace tab (backend + contract ready, frontend finalize/license calls not wired)
 - [ ] **Wire Subscriptions** — Subscribe button connected to `subscriptions.subscribe()` mutation
 - [ ] **End-to-End Smoke Test** — One full creator journey: wallet > universe > content > list NFT > fan mints
 
@@ -58,10 +60,10 @@ A non-team wallet can: create a universe, generate AI content, list an episode N
 
 - [ ] **Smart Contract Audit** — Third-party audit of all deployed contracts
 - [ ] **Fiat On-Ramp** — Stripe or MoonPay integration for credit/subscription purchases
-- [ ] **Content Moderation** — Review queue, flagging, DMCA takedown process
+- [x] ~~**Content Moderation**~~ — Review queue, flagging, DMCA takedown process (implemented: `/admin/moderation`, `/dmca`, content status gates)
 - [ ] **KYC/AML** — For high-value transactions (licensing, large NFT sales)
 - [ ] **Social Layer** — Follows, comments, activity feed, notifications
-- [ ] **Mainnet Deployment** — Ethereum L2 (Base or Arbitrum) for lower gas costs
+- [ ] **Mainnet Deployment** — Base L2 (decided, multi-chain support already implemented)
 - [ ] **Creator SDK / API** — Third-party apps can read universe data, embed episodes
 - [ ] **Recommendation Engine** — Personalized universe suggestions
 
@@ -73,14 +75,13 @@ First fiat payment processed. 100+ DAU. Platform passes security audit. One lice
 
 ## What We're NOT Building (And Why)
 
-| Feature                        | Why Not                                                                          |
-| ------------------------------ | -------------------------------------------------------------------------------- |
-| **Mobile App**                 | Web-first validates faster. Mobile is a growth investment, not a validation tool |
-| **Multi-Chain**                | Complexity without validation signal. One chain is enough to prove the model     |
-| **AI Model Training**          | We use third-party models (FAL, Gemini, OpenAI). Training our own is a $10M+ bet |
-| **Physical Merch Fulfillment** | Requires logistics infrastructure. Partner with print-on-demand later            |
-| **Live Events / Premieres**    | Cool feature, zero validation signal at this stage                               |
-| **Cross-Platform Syndication** | YouTube/TikTok export is a growth play, not a core loop                          |
+| Feature                        | Why Not                                                                                                     |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| **Mobile App**                 | Web-first validates faster. Mobile is a growth investment, not a validation tool (Expo app exists for beta) |
+| **AI Model Training**          | We use third-party models (FAL, Gemini, OpenAI). Training our own is a $10M+ bet                            |
+| **Physical Merch Fulfillment** | Requires logistics infrastructure. Partner with print-on-demand later                                       |
+| **Live Events / Premieres**    | Cool feature, zero validation signal at this stage                                                          |
+| **Cross-Platform Syndication** | YouTube/TikTok export is a growth play, not a core loop                                                     |
 
 ---
 

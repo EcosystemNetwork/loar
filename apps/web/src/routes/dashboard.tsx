@@ -43,6 +43,7 @@ import { MonetizationOverview } from '@/components/MonetizationOverview';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { UploadForm } from '@/components/UploadForm';
 import { useMyNFTs } from '@/hooks/useRevenue';
+import { LPYieldManager } from '@/components/LPYieldManager';
 import { toast } from 'sonner';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
@@ -219,6 +220,34 @@ function RouteComponent() {
               <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
             )}
           </section>
+
+          {/* LP Yield Management — shown for universes with tokens */}
+          {myUniverseList.filter(
+            (u: any) =>
+              u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000'
+          ).length > 0 && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-6">
+                <TrendingUp className="h-5 w-5" />
+                <h2 className="text-xl font-semibold">LP Yield & Fee Management</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myUniverseList
+                  .filter(
+                    (u: any) =>
+                      u.tokenAddress &&
+                      u.tokenAddress !== '0x0000000000000000000000000000000000000000'
+                  )
+                  .map((u: any) => (
+                    <LPYieldManager
+                      key={u.id}
+                      tokenAddress={u.tokenAddress as `0x${string}`}
+                      universeName={u.name || 'Unnamed Universe'}
+                    />
+                  ))}
+              </div>
+            </section>
+          )}
 
           {/* Other Universes */}
           {otherUniverses.length > 0 && (
