@@ -7,7 +7,7 @@
  *   3. pricing   — Upfront fee + royalty %
  *   4. confirm   — Review + publish
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -39,6 +39,9 @@ import { licensingRegistryAbi } from '@loar/abis/generated';
 
 export const Route = createFileRoute('/licensing/new')({
   component: CreateLicensePage,
+  validateSearch: (search: Record<string, unknown>): { universeId?: string } => ({
+    ...(search.universeId ? { universeId: search.universeId as string } : {}),
+  }),
 });
 
 const LICENSE_TYPES = [
@@ -104,6 +107,7 @@ interface LicenseForm {
 
 export function CreateLicensePage() {
   const navigate = useNavigate();
+  const { universeId: prefillUniverseId } = useSearch({ from: '/licensing/new' });
   const { isConnected, isAuthenticated, isAuthenticating, address } = useWalletAuth();
   const createLicense = useCreateLicense();
   const { writeContractAsync, isPending: isTxPending } = useWriteContract();
@@ -136,6 +140,20 @@ export function CreateLicensePage() {
     royaltyBps: '500',
     durationDays: '365',
   });
+
+  // Pre-fill universe from search params (when navigating from a shop page)
+  useEffect(() => {
+    if (prefillUniverseId && myUniverses.length > 0 && !form.universeId) {
+      const match = myUniverses.find((u: any) => u.id === prefillUniverseId);
+      if (match) {
+        setForm((f) => ({
+          ...f,
+          universeId: match.id,
+          onChainUniverseId: match.onChainUniverseId?.toString() ?? '',
+        }));
+      }
+    }
+  }, [prefillUniverseId, myUniverses, form.universeId]);
 
   if (isAuthenticating) {
     return (

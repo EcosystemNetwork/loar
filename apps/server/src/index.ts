@@ -330,6 +330,14 @@ console.log(`Starting server on port ${port}`);
 console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:3001 (default)'}`);
 console.log(`Environment: ${env.NODE_ENV}`);
 
-serve({ fetch: app.fetch, port }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Server listening on http://localhost:${info.port}`);
 });
+
+// Video generation (Seedance, Veo, etc.) can take 2-5 minutes.
+// Default Node.js HTTP server timeout (2 min) kills connections mid-generation.
+if ('requestTimeout' in server) {
+  (server as any).requestTimeout = 600_000; // 10 minutes
+  (server as any).headersTimeout = 600_000;
+  (server as any).keepAliveTimeout = 620_000;
+}

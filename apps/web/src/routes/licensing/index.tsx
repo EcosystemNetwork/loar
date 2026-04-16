@@ -22,10 +22,21 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { useMyMerch, useMerchOrders, useMyLicenses, useRevokeLicense } from '@/hooks/useRevenue';
+import {
+  useMyMerch,
+  useMerchOrders,
+  useMyLicenses,
+  useRevokeLicense,
+  useActivateLicense,
+} from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useChainId } from 'wagmi';
+import { getEvmAddresses } from '@/configs/addresses';
+import { licensingRegistryAbi } from '@loar/abis/generated';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute('/licensing/')({
   component: LicensingHubPage,
@@ -159,6 +170,37 @@ function LicensesTab({
 }) {
   const isAutoConnecting = useIsAutoConnecting();
   const revokeLicense = useRevokeLicense();
+  const activateLicense = useActivateLicense();
+  const { writeContractAsync, isPending: isTxPending } = useWriteContract();
+  const chainId = useChainId();
+  const addresses = getEvmAddresses(chainId);
+
+  async function handleActivate(lic: any) {
+    try {
+      let txHash: string | undefined;
+
+      // Submit on-chain activation if the contract is deployed
+      if (addresses?.licensingRegistry) {
+        toast.info('Confirm the activation transaction in your wallet...');
+        txHash = await writeContractAsync({
+          address: addresses.licensingRegistry,
+          abi: licensingRegistryAbi,
+          functionName: 'activateLicense',
+          args: [BigInt(lic.onChainLicenseId ?? 0)],
+          value: lic.upfrontFee ? BigInt(lic.upfrontFee) : 0n,
+        });
+        toast.info('Transaction submitted, activating license...');
+      }
+
+      await activateLicense.mutateAsync({
+        licenseId: lic.id,
+        txHash: txHash ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
+      });
+      toast.success('License activated!');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to activate license');
+    }
+  }
 
   if (isAutoConnecting) {
     return (
@@ -256,6 +298,22 @@ function LicensesTab({
                   </div>
                 )}
               </div>
+
+              {lic.status === 'PROPOSED' && (
+                <Button
+                  size="sm"
+                  className="w-full mt-3 h-7 text-xs"
+                  onClick={() => handleActivate(lic)}
+                  disabled={activateLicense.isPending || isTxPending}
+                >
+                  {activateLicense.isPending || isTxPending ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                  )}
+                  {isTxPending ? 'Confirming...' : 'Activate License'}
+                </Button>
+              )}
 
               {lic.status === 'ACTIVE' && (
                 <Button

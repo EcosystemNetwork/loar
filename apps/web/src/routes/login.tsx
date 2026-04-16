@@ -26,10 +26,14 @@ function LoginPage() {
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: '/login' });
 
-  // Redirect once authenticated
+  // Redirect once authenticated — only allow internal paths (prevent open redirect)
   useEffect(() => {
     if (isAuthenticated) {
-      navigate({ to: redirect || '/dashboard' });
+      const target =
+        redirect && redirect.startsWith('/') && !redirect.startsWith('//')
+          ? redirect
+          : '/dashboard';
+      navigate({ to: target });
     }
   }, [isAuthenticated, navigate, redirect]);
 

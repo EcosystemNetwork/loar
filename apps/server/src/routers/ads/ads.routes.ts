@@ -240,16 +240,23 @@ export const adsRouter = router({
     }),
 
   mySponsorships: protectedProcedure.query(async ({ ctx }) => {
-    const snapshot = await sponsorshipsCol().where('sponsorUid', '==', ctx.user.uid).get();
+    const snapshot = await sponsorshipsCol()
+      .where('sponsorUid', '==', ctx.user.uid)
+      .limit(100)
+      .get();
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }),
 
   getBids: publicProcedure.input(z.object({ slotId: z.string() })).query(async ({ input }) => {
-    const snapshot = await adBidsCol()
-      .where('slotId', '==', input.slotId)
-      .orderBy('createdAt', 'desc')
-      .get();
+    const snapshot = await adBidsCol().where('slotId', '==', input.slotId).get();
 
-    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() }) as any)
+      .sort((a: any, b: any) => {
+        const at = a.createdAt?.toMillis?.() ?? new Date(a.createdAt).getTime();
+        const bt = b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime();
+        return bt - at;
+      })
+      .slice(0, 100);
   }),
 });

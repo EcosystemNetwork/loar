@@ -57,9 +57,32 @@ function getSessionToken(c: any): string | undefined {
   return c.req.header('Authorization')?.replace('Bearer ', '') || undefined;
 }
 
+// Per-IP rate limiting for nonce generation (prevent Firestore bloat)
+const nonceRateLimit = new Map<string, { count: number; resetAt: number }>();
+const NONCE_LIMIT = 10; // max nonces per IP per minute
+const NONCE_WINDOW = 60_000;
+
 /** Returns a fresh nonce for constructing a SIWE message on the client. */
 authRoutes.get('/nonce', async (c) => {
   try {
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const now = Date.now();
+    const entry = nonceRateLimit.get(ip);
+    if (entry && now < entry.resetAt) {
+      if (entry.count >= NONCE_LIMIT) {
+        return c.json({ error: 'Too many nonce requests. Try again later.' }, 429);
+      }
+      entry.count++;
+    } else {
+      nonceRateLimit.set(ip, { count: 1, resetAt: now + NONCE_WINDOW });
+    }
+    // Periodic cleanup to prevent memory leak
+    if (nonceRateLimit.size > 10000) {
+      for (const [key, val] of nonceRateLimit) {
+        if (now > val.resetAt) nonceRateLimit.delete(key);
+      }
+    }
+
     const nonce = await generateNonce();
     return c.json({ nonce });
   } catch (err) {

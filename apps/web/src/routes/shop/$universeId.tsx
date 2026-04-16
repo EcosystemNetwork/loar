@@ -41,9 +41,15 @@ import {
   useUniverseLicenses,
   useUniverseCollabs,
   useUniverseMerch,
+  usePurchaseMerch,
 } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { formatEther } from 'viem';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useChainId } from 'wagmi';
+import { getEvmAddresses } from '@/configs/addresses';
+import { licensingRegistryAbi } from '@loar/abis/generated';
+import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVocab } from '@/hooks/use-vocab';
@@ -277,7 +283,7 @@ function UniverseShopPage() {
             <TabsContent value="licensing">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">IP Licenses</h3>
-                <Link to="/licensing/new">
+                <Link to="/licensing/new" search={{ universeId }}>
                   <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
                     <Plus className="w-3 h-3" />
                     New License
@@ -298,7 +304,7 @@ function UniverseShopPage() {
                 <div className="text-center py-12 text-muted-foreground">
                   <Scale className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No active licenses</p>
-                  <Link to="/licensing/new">
+                  <Link to="/licensing/new" search={{ universeId }}>
                     <Button variant="outline" size="sm" className="mt-3">
                       Create a License
                     </Button>
@@ -546,6 +552,41 @@ function LicenseCard({ license }: { license: any }) {
 
 function MerchCard({ item }: { item: any }) {
   const priceEth = item.price ? parseFloat(formatEther(BigInt(item.price))).toFixed(4) : '0';
+  const purchaseMerch = usePurchaseMerch();
+  const { writeContractAsync, isPending: isTxPending } = useWriteContract();
+  const { isConnected } = useWalletAuth();
+  const chainId = useChainId();
+  const addresses = getEvmAddresses(chainId);
+
+  async function handleBuy() {
+    try {
+      let txHash: string | undefined;
+
+      // Submit on-chain purchase if the contract is deployed
+      if (addresses?.licensingRegistry && item.onChainMerchId != null) {
+        toast.info('Confirm the purchase in your wallet...');
+        txHash = await writeContractAsync({
+          address: addresses.licensingRegistry,
+          abi: licensingRegistryAbi,
+          functionName: 'purchaseMerch',
+          args: [BigInt(item.onChainMerchId)],
+          value: BigInt(item.price),
+        });
+        toast.info('Transaction submitted, recording purchase...');
+      }
+
+      await purchaseMerch.mutateAsync({
+        merchId: item.id,
+        quantity: 1,
+        txHash: txHash ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
+      });
+      toast.success('Purchase complete!');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to purchase');
+    }
+  }
+
+  const isBusy = purchaseMerch.isPending || isTxPending;
 
   return (
     <Card className="overflow-hidden">
@@ -562,6 +603,21 @@ function MerchCard({ item }: { item: any }) {
             {item.category}
           </Badge>
         </div>
+        {isConnected && (
+          <Button
+            size="sm"
+            className="w-full mt-2 h-7 text-xs"
+            onClick={handleBuy}
+            disabled={isBusy}
+          >
+            {isBusy ? (
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+            ) : (
+              <ShoppingBag className="w-3 h-3 mr-1" />
+            )}
+            {isTxPending ? 'Confirming...' : `Buy for ${priceEth} ETH`}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

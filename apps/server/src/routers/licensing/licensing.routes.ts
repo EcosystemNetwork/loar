@@ -179,7 +179,10 @@ export const licensingRouter = router({
   getLicenses: publicProcedure
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await licensesCol().where('universeId', '==', input.universeId).get();
+      const snapshot = await licensesCol()
+        .where('universeId', '==', input.universeId)
+        .limit(200)
+        .get();
       const now = new Date();
 
       const licenses = snapshot.docs.map((d) => {
@@ -330,10 +333,16 @@ export const licensingRouter = router({
     const snapshot = await merchCol()
       .where('universeId', '==', input.universeId)
       .where('active', '==', true)
-      .orderBy('createdAt', 'desc')
       .get();
 
-    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() }) as any)
+      .sort((a: any, b: any) => {
+        const at = a.createdAt?.toMillis?.() ?? new Date(a.createdAt).getTime();
+        const bt = b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime();
+        return bt - at;
+      })
+      .slice(0, 200);
   }),
 
   getOrders: protectedProcedure

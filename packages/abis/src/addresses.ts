@@ -3,7 +3,7 @@
 
 export const UniverseManager = {
   '11155111': '0xB82dE188841a799e0dBB58D885D81BEE7A735f00',
-  '84532': '0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8',
+  '84532': '0x829666ADAc47D954297a9CD1232744E1669B9e83',
 } as const;
 
 export type UniverseManagerChainId = keyof typeof UniverseManager;
@@ -24,14 +24,14 @@ export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
 
 export const LoarLpLockerMultiple = {
   '11155111': '0x7d30fd57e44aB0ca407D312976816E7052905E0A',
-  '84532': '0xF951065C7d4D28805188F60A3F8bD398B7776eC8',
+  '84532': '0x2Bb4750B79C48e5D39c29b5e88DE05DB94A6AB1f',
 } as const;
 
 export type LoarLpLockerMultipleChainId = keyof typeof LoarLpLockerMultiple;
 
 export const LoarHookStaticFee = {
   '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
-  '84532': '0xcac7d3aDe1F947D9F152B1282086e6598870a8CC',
+  '84532': '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC',
 } as const;
 
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
