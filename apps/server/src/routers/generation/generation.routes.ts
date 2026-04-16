@@ -279,6 +279,17 @@ async function persistVideoToStorage(opts: {
         await doc.ref.update({ url: permanentUrl, contentHash: manifest.contentHash });
       }
 
+      // Update gallery content documents that reference this generation
+      const contentDocs = await db
+        .collection('content')
+        .where('generationId', '==', opts.generationId)
+        .limit(5)
+        .get();
+
+      for (const doc of contentDocs.docs) {
+        await doc.ref.update({ mediaUrl: permanentUrl });
+      }
+
       console.log(`[persist] ${filename} saved permanently: ${permanentUrl}`);
     }
   } catch (err) {
@@ -554,18 +565,19 @@ export const generationRouter = router({
             }
           }
 
-          // Prompt modification
+          // Prompt modification — sanitize config values to prevent prompt injection
+          const sanitize = (s: string) => s.replace(/[\n\r]/g, ' ').slice(0, 500);
           if (genConfig.defaultPromptPrefix) {
-            input.prompt = `${genConfig.defaultPromptPrefix} ${input.prompt}`;
+            input.prompt = `${sanitize(genConfig.defaultPromptPrefix)} ${input.prompt}`;
           }
           if (genConfig.defaultPromptSuffix) {
-            input.prompt = `${input.prompt} ${genConfig.defaultPromptSuffix}`;
+            input.prompt = `${input.prompt} ${sanitize(genConfig.defaultPromptSuffix)}`;
           }
 
           // Inject negative prompts
           if (genConfig.negativePrompts?.length > 0) {
             const existingNeg = input.negativePrompt || '';
-            const configNeg = genConfig.negativePrompts.join(', ');
+            const configNeg = genConfig.negativePrompts.map((s: string) => sanitize(s)).join(', ');
             input.negativePrompt = existingNeg ? `${existingNeg}, ${configNeg}` : configNeg;
           }
         }
@@ -666,10 +678,8 @@ export const generationRouter = router({
       await saveGenerationRecord(record);
 
       // ── Deduct credits (transactional) ─────────────────────────────
+      const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
       if (creditsCharged > 0) {
-        const userCreditsCol = db.collection('userCredits');
-        const userCreditsRef = userCreditsCol.doc(ctx.user.uid);
-
         try {
           await db.runTransaction(async (tx) => {
             const userCreditsDoc = await tx.get(userCreditsRef);
@@ -849,25 +859,27 @@ export const generationRouter = router({
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
         // Refund credits atomically on failure
-        try {
-          await userCreditsRef.update({
-            balance: FieldValue.increment(creditsCharged),
-            totalSpent: FieldValue.increment(-creditsCharged),
-            updatedAt: new Date(),
-          });
-          console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
-        } catch (refundErr) {
-          console.error(
-            `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
-            refundErr
-          );
-          logFailedRefund({
-            userId: ctx.user.uid,
-            credits: creditsCharged,
-            source: 'generation.generate',
-            generationId,
-            error: refundErr instanceof Error ? refundErr.message : 'Unknown',
-          });
+        if (creditsCharged > 0) {
+          try {
+            await userCreditsRef.update({
+              balance: FieldValue.increment(creditsCharged),
+              totalSpent: FieldValue.increment(-creditsCharged),
+              updatedAt: new Date(),
+            });
+            console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
+          } catch (refundErr) {
+            console.error(
+              `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
+              refundErr
+            );
+            logFailedRefund({
+              userId: ctx.user.uid,
+              credits: creditsCharged,
+              source: 'generation.generate',
+              generationId,
+              error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+            });
+          }
         }
 
         await generationsCol().doc(generationId).update({

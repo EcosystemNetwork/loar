@@ -48,22 +48,44 @@ function GalleryPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {trending.slice(0, 4).map((item: any) => (
-                <div
-                  key={item.id}
-                  className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
-                >
-                  <img
-                    src={item.thumbnailUrl || item.imageUrl || '/placeholder.jpg'}
-                    alt={item.title || 'Trending'}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="absolute bottom-2 left-2 text-white text-xs font-medium">
-                    {item.title || 'Untitled'}
+              {trending.slice(0, 4).map((item: any) => {
+                const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
+                const thumbnail =
+                  item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
+                return (
+                  <div
+                    key={item.id}
+                    className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
+                  >
+                    {isVideo && item.mediaUrl ? (
+                      <video
+                        src={item.mediaUrl}
+                        className="w-full h-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        poster={item.thumbnailUrl || item.imageUrl || undefined}
+                        onMouseEnter={(e) => e.currentTarget.play()}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.pause();
+                          e.currentTarget.currentTime = 0;
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={thumbnail}
+                        alt={item.title || 'Trending'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-2 left-2 text-white text-xs font-medium">
+                      {item.title || 'Untitled'}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

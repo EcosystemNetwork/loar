@@ -6,7 +6,7 @@
  * Redirects to /login when unauthenticated.
  */
 
-import { createFileRoute, useNavigate, Link as RouterLink } from '@tanstack/react-router';
+import { createFileRoute, redirect, useNavigate, Link as RouterLink } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +50,11 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { useEffect, useState, useMemo } from 'react';
 
 export const Route = createFileRoute('/dashboard')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/dashboard' } });
+    }
+  },
   component: RouteComponent,
 });
 
@@ -57,12 +62,7 @@ function RouteComponent() {
   const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = Route.useNavigate();
 
-  // Redirect unauthenticated users to login
-  useEffect(() => {
-    if (!isAuthenticated && !isAuthenticating) {
-      navigate({ to: '/login', search: { redirect: '/dashboard' } });
-    }
-  }, [isAuthenticated, isAuthenticating, navigate]);
+  // Auth is now checked in beforeLoad — no useEffect redirect needed
 
   // Fetch user's universes (by creator address)
   const { data: myUniverses, isLoading: isLoadingMine } = useQuery({

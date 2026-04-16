@@ -24,6 +24,12 @@ import {
   proposalExecution,
   proposalCancellation,
   vote,
+  canonSubmission,
+  canonVote,
+  adSlot,
+  sponsorship,
+  license,
+  collab,
 } from 'ponder:schema';
 import { getAddress } from 'viem';
 
@@ -438,4 +444,128 @@ ponder.on('PoolManager:Swap', async ({ event, context }) => {
     timestamp: Number(event.block.timestamp),
     blockNumber: Number(event.block.number),
   });
+});
+
+// ============= Revenue Contract Events =============
+
+// ── CanonMarketplace ──────────────────────────────────────────────────
+
+ponder.on('CanonMarketplace:SubmissionCreated', async ({ event, context }) => {
+  await context.db.insert(canonSubmission).values({
+    id: event.args.id.toString(),
+    universeId: Number(event.args.universeId),
+    creator: getAddress(event.args.creator),
+    contentHash: event.args.contentHash,
+    subType: Number(event.args.subType),
+    status: 'pending',
+    voteFor: 0,
+    voteAgainst: 0,
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('CanonMarketplace:VoteCast', async ({ event, context }) => {
+  const submissionId = event.args.submissionId.toString();
+  await context.db.insert(canonVote).values({
+    id: `${submissionId}:${getAddress(event.args.voter)}`,
+    submissionId,
+    voter: getAddress(event.args.voter),
+    support: event.args.support,
+    weight: event.args.weight.toString(),
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('CanonMarketplace:SubmissionAccepted', async ({ event, context }) => {
+  await context.db
+    .update(canonSubmission, { id: event.args.submissionId.toString() })
+    .set({ status: 'accepted' });
+});
+
+ponder.on('CanonMarketplace:SubmissionRejected', async ({ event, context }) => {
+  await context.db
+    .update(canonSubmission, { id: event.args.submissionId.toString() })
+    .set({ status: 'rejected' });
+});
+
+// ── AdPlacement ───────────────────────────────────────────────────────
+
+ponder.on('AdPlacement:AdSlotCreated', async ({ event, context }) => {
+  await context.db.insert(adSlot).values({
+    id: event.args.slotId.toString(),
+    universeId: Number(event.args.universeId),
+    placementType: Number(event.args.placementType),
+    minBid: event.args.minBid.toString(),
+    active: true,
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('AdPlacement:SponsorshipActivated', async ({ event, context }) => {
+  await context.db.insert(sponsorship).values({
+    id: event.args.sponsorshipId.toString(),
+    slotId: event.args.slotId.toString(),
+    sponsor: getAddress(event.args.sponsor),
+    active: true,
+    impressions: 0,
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+// ── LicensingRegistry ─────────────────────────────────────────────────
+
+ponder.on('LicensingRegistry:LicenseCreated', async ({ event, context }) => {
+  await context.db.insert(license).values({
+    id: event.args.licenseId.toString(),
+    universeId: Number(event.args.universeId),
+    licenseType: Number(event.args.licenseType),
+    licensee: getAddress(event.args.licensee),
+    upfrontFee: event.args.upfrontFee.toString(),
+    status: 'pending',
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('LicensingRegistry:LicenseActivated', async ({ event, context }) => {
+  await context.db
+    .update(license, { id: event.args.licenseId.toString() })
+    .set({ status: 'active' });
+});
+
+ponder.on('LicensingRegistry:LicenseRevoked', async ({ event, context }) => {
+  await context.db
+    .update(license, { id: event.args.licenseId.toString() })
+    .set({ status: 'revoked' });
+});
+
+// ── CollabManager ─────────────────────────────────────────────────────
+
+ponder.on('CollabManager:CollabProposed', async ({ event, context }) => {
+  await context.db.insert(collab).values({
+    id: event.args.collabId.toString(),
+    universeA: Number(event.args.universeA),
+    universeB: Number(event.args.universeB),
+    proposer: getAddress(event.args.proposer),
+    status: 'proposed',
+    totalRevenue: '0',
+    timestamp: Number(event.block.timestamp),
+  });
+});
+
+ponder.on('CollabManager:CollabAccepted', async ({ event, context }) => {
+  await context.db
+    .update(collab, { id: event.args.collabId.toString() })
+    .set({ status: 'accepted' });
+});
+
+ponder.on('CollabManager:CollabCompleted', async ({ event, context }) => {
+  await context.db
+    .update(collab, { id: event.args.collabId.toString() })
+    .set({ status: 'completed', totalRevenue: event.args.totalRevenue.toString() });
+});
+
+ponder.on('CollabManager:CollabCancelled', async ({ event, context }) => {
+  await context.db
+    .update(collab, { id: event.args.collabId.toString() })
+    .set({ status: 'cancelled' });
 });

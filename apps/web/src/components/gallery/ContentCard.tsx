@@ -4,7 +4,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Clock, FileCheck, Eye, Heart } from 'lucide-react';
+import { ShoppingCart, Clock, FileCheck, Eye, Heart, Film } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { formatEther } from 'viem';
 
@@ -15,6 +15,7 @@ interface ContentCardProps {
     description?: string;
     thumbnailUrl?: string;
     imageUrl?: string;
+    mediaUrl?: string;
     mediaType?: string;
     creatorUid?: string;
     creatorAddress?: string;
@@ -44,7 +45,9 @@ function formatPrice(wei: string | undefined): string {
 }
 
 export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardProps) {
-  const thumbnail = content.thumbnailUrl || content.imageUrl || '/placeholder.jpg';
+  const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
+  const thumbnail =
+    content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
   const hasLicensing =
     content.licensing &&
     (content.licensing.buyPrice !== '0' ||
@@ -53,17 +56,41 @@ export function ContentCard({ content, onBuy, onRent, onLicense }: ContentCardPr
 
   return (
     <Card className="group overflow-hidden hover:shadow-lg transition-all duration-300 border-muted/50">
-      {/* Thumbnail */}
+      {/* Thumbnail / Video */}
       <div className="relative aspect-video overflow-hidden bg-muted">
-        <img
-          src={thumbnail}
-          alt={content.title || 'Content'}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+        {isVideo && content.mediaUrl ? (
+          <video
+            src={content.mediaUrl}
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster={content.thumbnailUrl || content.imageUrl || undefined}
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+          />
+        ) : (
+          <img
+            src={thumbnail}
+            alt={content.title || 'Content'}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        )}
         {content.mediaType && (
           <Badge variant="secondary" className="absolute top-2 left-2 text-xs capitalize">
             {content.mediaType}
           </Badge>
+        )}
+        {isVideo && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity">
+            <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+              <Film className="h-5 w-5 text-white" />
+            </div>
+          </div>
         )}
         {/* Stats overlay */}
         <div className="absolute bottom-2 right-2 flex items-center gap-2 text-xs text-white">
