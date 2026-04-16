@@ -11,7 +11,7 @@
  */
 
 import type { AppRouter } from '@loar/shared/trpc';
-import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
@@ -40,6 +40,20 @@ export const queryClient = new QueryClient({
       retryDelay: 2000,
     },
   },
+  mutationCache: new MutationCache({
+    onError: (error: any, _variables, _context, mutation) => {
+      // Skip if the mutation already has its own onError handler
+      if (mutation.options.onError) return;
+
+      if (
+        error.message === 'Failed to fetch' ||
+        error.message?.includes('ERR_CONNECTION_REFUSED')
+      ) {
+        return;
+      }
+      toast.error(error.message || 'Operation failed');
+    },
+  }),
   queryCache: new QueryCache({
     onError: (error: any) => {
       // Don't toast on network errors (server/indexer not running)

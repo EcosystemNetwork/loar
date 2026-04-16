@@ -157,7 +157,7 @@ export const licensingRouter = router({
       const snapshot = await licensesCol().where('universeId', '==', input.universeId).get();
 
       return snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
+        .map((d) => ({ id: d.id, ...d.data() }) as Record<string, any>)
         .sort(
           (a, b) =>
             (b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime()) -

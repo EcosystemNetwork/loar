@@ -84,8 +84,16 @@ interface FlowCreationPanelProps {
   setVideoPrompt: (prompt: string) => void;
   videoRatio: '16:9' | '9:16' | '1:1';
   setVideoRatio: (ratio: '16:9' | '9:16' | '1:1') => void;
-  selectedVideoModel: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
-  setSelectedVideoModel: (model: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora') => void;
+  selectedVideoModel:
+    | 'fal-veo3'
+    | 'fal-kling'
+    | 'fal-wan25'
+    | 'fal-sora'
+    | 'seedance'
+    | 'seedance-fast';
+  setSelectedVideoModel: (
+    model: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora' | 'seedance' | 'seedance-fast'
+  ) => void;
   selectedVideoDuration: number;
   setSelectedVideoDuration: (duration: number) => void;
   negativePrompt: string;
@@ -427,7 +435,9 @@ export function FlowCreationPanel({
   if (!showVideoDialog) return null;
 
   const modelNames: Record<string, string> = {
-    'fal-veo3': 'Veo 3.1 - Fast',
+    seedance: 'Seedance 2.0',
+    'seedance-fast': 'Seedance Fast',
+    'fal-veo3': 'Veo 3.1',
     'fal-kling': 'Kling 2.5',
     'fal-wan25': 'Wan 2.5',
     'fal-sora': 'Sora 2',
@@ -669,7 +679,16 @@ export function FlowCreationPanel({
             <div className="space-y-2">
               <Label>Model</Label>
               <div className="grid grid-cols-2 gap-2">
-                {(['fal-veo3', 'fal-kling', 'fal-wan25', 'fal-sora'] as const).map((model) => (
+                {(
+                  [
+                    'seedance',
+                    'seedance-fast',
+                    'fal-veo3',
+                    'fal-kling',
+                    'fal-wan25',
+                    'fal-sora',
+                  ] as const
+                ).map((model) => (
                   <button
                     key={model}
                     onClick={() => setSelectedVideoModel(model)}
@@ -709,6 +728,20 @@ export function FlowCreationPanel({
             <div className="space-y-2">
               <Label>Duration</Label>
               <div className="flex gap-2">
+                {(selectedVideoModel === 'seedance' || selectedVideoModel === 'seedance-fast') &&
+                  [4, 6, 8, 10, 12, 15].map((duration) => (
+                    <button
+                      key={duration}
+                      onClick={() => setSelectedVideoDuration(duration)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                        selectedVideoDuration === duration
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-input bg-background hover:bg-muted'
+                      }`}
+                    >
+                      {duration}s
+                    </button>
+                  ))}
                 {selectedVideoModel === 'fal-sora' &&
                   [4, 8, 12].map((duration) => (
                     <button

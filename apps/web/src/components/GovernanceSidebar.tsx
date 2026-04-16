@@ -433,7 +433,7 @@ export function GovernanceSidebar({
       // Create proposal
       const txHash = await writeContractAsync({
         abi: universeGovernorAbi,
-        address: governanceAddress,
+        address: governanceAddress!,
         functionName: 'propose',
         args: [
           [timelineAddress], // targets
@@ -493,7 +493,7 @@ export function GovernanceSidebar({
       try {
         const txHash = await writeContractAsync({
           abi: universeGovernorAbi,
-          address: governanceAddress,
+          address: governanceAddress!,
           functionName: 'castVote',
           args: [proposalId, support], // 0 = Against, 1 = For, 2 = Abstain
         });
@@ -534,7 +534,7 @@ export function GovernanceSidebar({
 
         const txHash = await writeContractAsync({
           abi: universeGovernorAbi,
-          address: governanceAddress,
+          address: governanceAddress!,
           functionName: 'execute',
           args: [
             proposal.targets as readonly `0x${string}`[],

@@ -9,7 +9,13 @@ import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 
-export type VideoModel = 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
+export type VideoModel =
+  | 'fal-veo3'
+  | 'fal-kling'
+  | 'fal-wan25'
+  | 'fal-sora'
+  | 'seedance'
+  | 'seedance-fast';
 export type VideoRatio = '16:9' | '9:16' | '1:1';
 
 export interface StatusMessage {
@@ -106,6 +112,22 @@ export function useVideoGeneration({
           resolution: 'auto',
         });
         return { videoUrl: result.videoUrl };
+      } else if (selectedVideoModel === 'seedance' || selectedVideoModel === 'seedance-fast') {
+        const seedModel =
+          selectedVideoModel === 'seedance-fast'
+            ? 'bytedance/seedance-2.0/fast/image-to-video'
+            : 'bytedance/seedance-2.0/image-to-video';
+        const result = await trpcClient.generation.generateVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          model: seedModel as any,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio === '1:1' ? '1:1' : videoRatio,
+          resolution: '720p',
+          generateAudio: true,
+          negativePrompt: negativePrompt || undefined,
+        });
+        return { videoUrl: result.videoUrl };
       }
 
       throw new Error('Invalid video model selected');
@@ -119,6 +141,8 @@ export function useVideoGeneration({
           'fal-kling': 'Kling 2.5',
           'fal-wan25': 'Wan 2.5',
           'fal-sora': 'Sora 2',
+          seedance: 'Seedance 2.0',
+          'seedance-fast': 'Seedance 2.0 Fast',
         };
         const modelName = modelNames[selectedVideoModel] || 'Video';
 
@@ -248,6 +272,8 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             'fal-sora': 'fal-ai/sora-2/text-to-video',
             'fal-kling': 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
             'fal-wan25': 'fal-ai/wan-25-preview/text-to-video',
+            seedance: 'bytedance/seedance-2.0/text-to-video',
+            'seedance-fast': 'bytedance/seedance-2.0/fast/text-to-video',
           };
 
           const modelNames: Record<string, string> = {
@@ -255,6 +281,8 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             'fal-kling': 'Kling 2.5',
             'fal-wan25': 'Wan 2.5',
             'fal-sora': 'Sora 2',
+            seedance: 'Seedance 2.0',
+            'seedance-fast': 'Seedance 2.0 Fast',
           };
 
           const textToVideoModel = modelMap[selectedVideoModel] || 'fal-ai/veo3.1/fast';

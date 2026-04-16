@@ -176,7 +176,7 @@ export const adsRouter = router({
         .get();
 
       return snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
+        .map((d) => ({ id: d.id, ...d.data() }) as Record<string, any>)
         .sort(
           (a, b) =>
             (b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime()) -

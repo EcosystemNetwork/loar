@@ -73,8 +73,8 @@ function UniverseTimelineEditor() {
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
   const [selectedVideoModel, setSelectedVideoModel] = useState<
-    'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'
-  >('fal-veo3');
+    'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora' | 'seedance' | 'seedance-fast'
+  >('seedance');
   const [selectedVideoDuration, setSelectedVideoDuration] = useState<number>(8);
   const [negativePrompt, setNegativePrompt] = useState('');
   const [videoPrompt, setVideoPrompt] = useState('');

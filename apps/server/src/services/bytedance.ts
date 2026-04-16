@@ -334,6 +334,7 @@ export class ByteDanceService {
     try {
       const status = await this.request<{
         status: string;
+        content?: { video_url?: string };
         output?: { video_url?: string; video?: { url?: string } };
         result?: { video_url?: string };
         error?: string | { message?: string };
@@ -341,7 +342,10 @@ export class ByteDanceService {
 
       const taskStatus = status.status?.toLowerCase();
       const videoUrl =
-        status.output?.video_url || status.output?.video?.url || status.result?.video_url;
+        status.content?.video_url ||
+        status.output?.video_url ||
+        status.output?.video?.url ||
+        status.result?.video_url;
 
       if (taskStatus === 'completed' || taskStatus === 'succeeded') {
         return { id: taskId, status: 'completed', videoUrl };
