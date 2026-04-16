@@ -607,19 +607,11 @@ export const creditsRouter = router({
 
         // Use isUniverseAdmin which correctly handles Safe multi-sig universes
         const { isUniverseAdmin } = await import('../../lib/safe-admin');
-        const [isAdmin, memberDoc] = await Promise.all([
-          isUniverseAdmin(universeId, callerUid),
-          db.collection('universeTeamMembers').doc(`${universeId}-${callerUid}`).get(),
-        ]);
+        const isAdmin = await isUniverseAdmin(universeId, callerUid);
 
-        const membership = memberDoc.exists ? memberDoc.data()! : null;
-        const isMember = !!membership && membership.status === 'active';
-
-        if (!isAdmin && !isMember) {
-          throw new Error('You are not an active team member of this universe');
-        }
-
-        // Atomic: allowance check + pool deduction + tx record
+        // Atomic: membership + allowance check + pool deduction + tx record
+        // Membership is verified INSIDE the transaction to prevent TOCTOU races
+        // (e.g. member removed between check and spend).
         const remainingBalance = await db.runTransaction(async (tx) => {
           const poolRef = db.collection('universeCredits').doc(universeId);
           const poolDoc = await tx.get(poolRef);
@@ -632,13 +624,20 @@ export const creditsRouter = router({
             );
           }
 
+          // Verify membership inside transaction — re-read to prevent TOCTOU
+          const memberDocId = `${universeId}-${callerUid}`;
+          const memberRef = db.collection('universeTeamMembers').doc(memberDocId);
+          const memberSnap = await tx.get(memberRef);
+          const memberData = memberSnap.exists ? memberSnap.data()! : null;
+          const isMember = !!memberData && memberData.status === 'active';
+
+          if (!isAdmin && !isMember) {
+            throw new Error('You are not an active team member of this universe');
+          }
+
           // Enforce monthly allowance and track spending for non-admins (inside transaction).
           // Always track spend even when monthlyAllowance is 0 (unlimited) for audit purposes.
-          if (!isAdmin && membership) {
-            const memberDocId = `${universeId}-${callerUid}`;
-            const memberRef = db.collection('universeTeamMembers').doc(memberDocId);
-            const memberSnap = await tx.get(memberRef);
-            const memberData = memberSnap.data()!;
+          if (!isAdmin && memberData) {
             const periodStart = memberData.allowancePeriodStart?.toDate?.() ?? new Date(0);
             const now = new Date();
             const sameMonth =

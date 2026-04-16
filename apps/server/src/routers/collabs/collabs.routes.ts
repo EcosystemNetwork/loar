@@ -34,6 +34,13 @@ export const collabsRouter = router({
       const { onBehalfOfUid, ...collabInput } = input;
       const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'collabs');
 
+      // Verify caller is admin of universeA (the proposing universe)
+      const { isUniverseAdmin } = await import('../../lib/safe-admin');
+      const isAdmin = await isUniverseAdmin(collabInput.universeA.toLowerCase(), actingUid);
+      if (!isAdmin) {
+        throw new Error('Only the admin of universeA can propose a collaboration');
+      }
+
       const collab = {
         ...collabInput,
         proposerUid: actingUid,
@@ -91,13 +98,17 @@ export const collabsRouter = router({
 
   activate: protectedProcedure
     .input(z.object({ collabId: z.string(), txHash: z.string().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
-      if (doc.data()?.status !== 'ACCEPTED') throw new Error('Not accepted');
-
       const data = doc.data()!;
+      if (data.status !== 'ACCEPTED') throw new Error('Not accepted');
+
+      // Only collab participants can activate
+      if (data.proposerUid !== ctx.user.uid && data.acceptorUid !== ctx.user.uid) {
+        throw new Error('Only collab participants can activate');
+      }
       const startTime = new Date();
       const endTime = new Date(startTime.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
 
@@ -118,7 +129,7 @@ export const collabsRouter = router({
         episodeTitle: z.string(),
         contentHash: z.string(),
         mediaUrl: z.string().optional(),
-        revenue: z.string(), // wei
+        revenue: z.string().regex(/^\d+$/, 'Revenue must be a non-negative integer string (wei)'),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -155,11 +166,17 @@ export const collabsRouter = router({
 
   complete: protectedProcedure
     .input(z.object({ collabId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = collabsCol().doc(input.collabId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Collab not found');
-      if (doc.data()?.status !== 'ACTIVE') throw new Error('Not active');
+      const data = doc.data()!;
+      if (data.status !== 'ACTIVE') throw new Error('Not active');
+
+      // Only collab participants can complete
+      if (data.proposerUid !== ctx.user.uid && data.acceptorUid !== ctx.user.uid) {
+        throw new Error('Only collab participants can complete');
+      }
 
       await ref.update({ status: 'COMPLETED', updatedAt: new Date() });
       return { ok: true };
@@ -219,7 +236,17 @@ export const collabsRouter = router({
       collabsCol().where('acceptorUid', '==', ctx.user.uid).get(),
     ]);
 
-    const all = [...asProposer.docs, ...asAcceptor.docs].map((d) => ({ id: d.id, ...d.data() }));
-    return all;
+    // Deduplicate (in case user is both proposer and acceptor) and sort newest-first
+    const seen = new Set<string>();
+    const all: any[] = [];
+    for (const d of [...asProposer.docs, ...asAcceptor.docs]) {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        all.push({ id: d.id, ...d.data() });
+      }
+    }
+    return all.sort(
+      (a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)
+    );
   }),
 });

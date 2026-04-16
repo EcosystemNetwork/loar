@@ -130,7 +130,8 @@ export async function verifySiweSignature(
         }
       } catch (e) {
         if (e instanceof Error && e.message.includes('does not match')) throw e;
-        // Malformed origin — skip cross-check (CORS will block anyway)
+        // Malformed origin — reject instead of silently passing
+        throw new Error('Malformed request origin');
       }
     }
   }

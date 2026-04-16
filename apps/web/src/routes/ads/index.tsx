@@ -349,10 +349,10 @@ function CampaignsTab({
 
 function SponsorshipCard({ s }: { s: any }) {
   const paidEth = s.totalPaid ? formatEther(BigInt(s.totalPaid)) : '0';
-  const progressPct =
-    s.episodesRemaining != null && s.episodesRemaining + s.impressions > 0
-      ? Math.round((s.impressions / (s.impressions + s.episodesRemaining)) * 100)
-      : 0;
+  const impressions = Number(s.impressions) || 0;
+  const remaining = Number(s.episodesRemaining) || 0;
+  const total = impressions + remaining;
+  const progressPct = total > 0 ? Math.round((impressions / total) * 100) : 0;
 
   return (
     <Card>
@@ -370,8 +370,8 @@ function SponsorshipCard({ s }: { s: any }) {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-3">
           <Stat label="Spent" value={`${parseFloat(paidEth).toFixed(4)} ETH`} />
-          <Stat label="Impressions" value={String(s.impressions ?? 0)} />
-          <Stat label="Episodes Left" value={String(s.episodesRemaining ?? 0)} />
+          <Stat label="Impressions" value={String(impressions)} />
+          <Stat label="Episodes Left" value={String(remaining)} />
         </div>
 
         {/* Progress bar */}

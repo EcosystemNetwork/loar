@@ -1,9 +1,10 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Coins, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
-import { usePoolBalance } from '@/hooks/useTreasury';
+import { Coins, TrendingUp, TrendingDown, Wallet, User } from 'lucide-react';
+import { usePoolBalance, useMyAllowance } from '@/hooks/useTreasury';
 
 export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
   const { data, isLoading } = usePoolBalance(universeId);
+  const { data: myAllowance } = useMyAllowance(universeId);
 
   if (isLoading) {
     return (
@@ -63,22 +64,49 @@ export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {metrics.map((m) => (
-        <Card
-          key={m.label}
-          className={`bg-gradient-to-br ${m.gradient} ${m.border} hover:shadow-lg transition-shadow`}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <m.icon className={`h-4 w-4 ${m.iconColor}`} />
-              <span className="text-xs font-medium text-zinc-400">{m.label}</span>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {metrics.map((m) => (
+          <Card
+            key={m.label}
+            className={`bg-gradient-to-br ${m.gradient} ${m.border} hover:shadow-lg transition-shadow`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <m.icon className={`h-4 w-4 ${m.iconColor}`} />
+                <span className="text-xs font-medium text-zinc-400">{m.label}</span>
+              </div>
+              <div className={`text-2xl font-bold ${m.valueColor}`}>{m.value}</div>
+              <div className="text-xs text-zinc-500 mt-1">credits</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Member's own monthly budget */}
+      {myAllowance && (
+        <Card className="bg-gradient-to-br from-violet-600/20 to-violet-800/10 border-violet-800">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-violet-400" />
+              <span className="text-sm font-medium text-zinc-300">Your Monthly Budget</span>
             </div>
-            <div className={`text-2xl font-bold ${m.valueColor}`}>{m.value}</div>
-            <div className="text-xs text-zinc-500 mt-1">credits</div>
+            <div className="text-right">
+              <span className="text-lg font-bold text-violet-300">
+                {myAllowance.remaining !== null
+                  ? `${myAllowance.remaining.toLocaleString()} remaining`
+                  : 'Unlimited'}
+              </span>
+              {myAllowance.monthlyAllowance > 0 && (
+                <div className="text-xs text-zinc-500">
+                  {myAllowance.creditsUsedThisMonth.toLocaleString()} /{' '}
+                  {myAllowance.monthlyAllowance.toLocaleString()} used this month
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
-      ))}
+      )}
     </div>
   );
 }

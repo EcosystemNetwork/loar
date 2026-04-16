@@ -211,6 +211,13 @@ export const universeTreasuryRouter = router({
       return getPoolData(input.universeId);
     }),
 
+  // ── Pool packages (live pricing from platformConfig) ──────────────
+
+  getPoolPackages: publicProcedure.query(async () => {
+    const packages = await buildPackagesFromConfig();
+    return packages.filter((p) => p.active);
+  }),
+
   // ── Fund pool from treasury (admin only) ──────────────────────────
   //
   // The admin submits proof of payment (txHash for on-chain, or a

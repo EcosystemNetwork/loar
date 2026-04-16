@@ -4,6 +4,7 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
+import { isUniverseAdmin } from '../../lib/safe-admin';
 import { z } from 'zod';
 
 const adSlotsCol = () => {
@@ -36,6 +37,16 @@ export const adsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify caller owns or administers the universe
+      const callerAddress = ctx.user.address || ctx.user.uid;
+      const isAdmin = await isUniverseAdmin(input.universeId, callerAddress);
+      if (!isAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can create ad slots',
+        });
+      }
+
       const slot = {
         ...input,
         creatorUid: ctx.user.uid,
@@ -63,73 +74,94 @@ export const adsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const slotRef = adSlotsCol().doc(input.slotId);
-      const slotDoc = await slotRef.get();
-      if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
-      const slot = slotDoc.data()!;
-      if (!slot.active) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Slot not active' });
+      if (!db) throw new Error('Firebase is not configured');
 
-      if (BigInt(input.amount) <= BigInt(slot.currentBid || '0')) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bid too low' });
-      }
-      if (BigInt(input.amount) < BigInt(slot.minBid)) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Below minimum bid' });
-      }
+      return db.runTransaction(async (tx) => {
+        const slotRef = adSlotsCol().doc(input.slotId);
+        const slotDoc = await tx.get(slotRef);
+        if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
+        const slot = slotDoc.data()!;
+        if (!slot.active)
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Slot is not active' });
 
-      // Record bid
-      await adBidsCol().add({
-        slotId: input.slotId,
-        bidderUid: ctx.user.uid,
-        bidderAddress: ctx.user.address || null,
-        amount: input.amount,
-        brandName: input.brandName,
-        creativeUrl: input.creativeUrl || null,
-        txHash: input.txHash,
-        createdAt: new Date(),
+        // Prevent creator from bidding on their own slot
+        if (slot.creatorUid === ctx.user.uid) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot bid on your own slot',
+          });
+        }
+
+        if (BigInt(input.amount) <= BigInt(slot.currentBid || '0')) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bid too low' });
+        }
+        if (BigInt(input.amount) < BigInt(slot.minBid)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Below minimum bid' });
+        }
+
+        // Record bid
+        const bidRef = adBidsCol().doc();
+        tx.set(bidRef, {
+          slotId: input.slotId,
+          bidderUid: ctx.user.uid,
+          bidderAddress: ctx.user.address || null,
+          amount: input.amount,
+          brandName: input.brandName,
+          creativeUrl: input.creativeUrl || null,
+          txHash: input.txHash,
+          createdAt: new Date(),
+        });
+
+        tx.update(slotRef, {
+          currentBid: input.amount,
+          currentBidder: ctx.user.uid,
+          updatedAt: new Date(),
+        });
+
+        return { ok: true };
       });
-
-      await slotRef.update({
-        currentBid: input.amount,
-        currentBidder: ctx.user.uid,
-        updatedAt: new Date(),
-      });
-
-      return { ok: true };
     }),
 
   acceptBid: protectedProcedure
     .input(z.object({ slotId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const slotRef = adSlotsCol().doc(input.slotId);
-      const slotDoc = await slotRef.get();
-      if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
-      const slot = slotDoc.data()!;
-      if (slot.creatorUid !== ctx.user.uid)
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
-      if (!slot.currentBidder) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No bids' });
+      if (!db) throw new Error('Firebase is not configured');
 
-      const sponsorship = {
-        slotId: input.slotId,
-        universeId: slot.universeId,
-        sponsorUid: slot.currentBidder,
-        totalPaid: slot.currentBid,
-        impressions: 0,
-        episodesRemaining: slot.episodes,
-        active: true,
-        startedAt: new Date(),
-        createdAt: new Date(),
-      };
+      return db.runTransaction(async (tx) => {
+        const slotRef = adSlotsCol().doc(input.slotId);
+        const slotDoc = await tx.get(slotRef);
+        if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
+        const slot = slotDoc.data()!;
+        if (slot.creatorUid !== ctx.user.uid)
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+        if (!slot.currentBidder) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No bids' });
 
-      const ref = await sponsorshipsCol().add(sponsorship);
+        const sponsorship = {
+          slotId: input.slotId,
+          universeId: slot.universeId,
+          sponsorUid: slot.currentBidder,
+          placementType: slot.placementType,
+          totalPaid: slot.currentBid,
+          impressions: 0,
+          episodesRemaining: slot.episodes,
+          active: true,
+          startedAt: new Date(),
+          createdAt: new Date(),
+        };
 
-      // Reset slot
-      await slotRef.update({
-        currentBid: '0',
-        currentBidder: null,
-        updatedAt: new Date(),
+        const sponsorRef = sponsorshipsCol().doc();
+        tx.set(sponsorRef, sponsorship);
+
+        // Deactivate the slot — it's been filled
+        tx.update(slotRef, {
+          active: false,
+          currentBid: '0',
+          currentBidder: null,
+          updatedAt: new Date(),
+        });
+
+        return { id: sponsorRef.id, ...sponsorship };
       });
-
-      return { id: ref.id, ...sponsorship };
     }),
 
   // ---- Impressions ----
@@ -137,35 +169,47 @@ export const adsRouter = router({
   recordImpression: protectedProcedure
     .input(z.object({ sponsorshipId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ref = sponsorshipsCol().doc(input.sponsorshipId);
-      const doc = await ref.get();
-      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
+      if (!db) throw new Error('Firebase is not configured');
 
-      // Only the sponsor or the universe slot creator can record impressions
-      const data = doc.data()!;
-      const slotDoc = await adSlotsCol().doc(data.slotId).get();
-      const slotCreator = slotDoc.data()?.creatorUid;
-      if (data.sponsorUid !== ctx.user.uid && slotCreator !== ctx.user.uid) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Not authorized to record impressions for this sponsorship',
+      return db.runTransaction(async (tx) => {
+        const ref = sponsorshipsCol().doc(input.sponsorshipId);
+        const doc = await tx.get(ref);
+        if (!doc.exists)
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
+
+        const data = doc.data()!;
+
+        // Only the sponsor or the universe slot creator can record impressions
+        const slotRef = adSlotsCol().doc(data.slotId);
+        const slotDoc = await tx.get(slotRef);
+        const slotCreator = slotDoc.data()?.creatorUid;
+        if (data.sponsorUid !== ctx.user.uid && slotCreator !== ctx.user.uid) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Not authorized to record impressions for this sponsorship',
+          });
+        }
+
+        const newImpressions = (data.impressions || 0) + 1;
+        const newRemaining = (data.episodesRemaining || 0) - 1;
+
+        tx.update(ref, {
+          impressions: newImpressions,
+          episodesRemaining: Math.max(0, newRemaining),
+          active: newRemaining > 0, // fixed: was > 1 (off-by-one)
         });
-      }
 
-      const sData = doc.data()!;
-      const newImpressions = (sData.impressions || 0) + 1;
-      const newRemaining = (sData.episodesRemaining || 0) - 1;
-
-      await ref.update({
-        impressions: newImpressions,
-        episodesRemaining: Math.max(0, newRemaining),
-        active: newRemaining > 1,
+        return { ok: true, impressions: newImpressions };
       });
-
-      return { ok: true, impressions: newImpressions };
     }),
 
   // ---- Queries ----
+
+  getSlot: publicProcedure.input(z.object({ slotId: z.string() })).query(async ({ input }) => {
+    const doc = await adSlotsCol().doc(input.slotId).get();
+    if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
+    return { id: doc.id, ...doc.data() } as Record<string, any>;
+  }),
 
   getSlotsByUniverse: publicProcedure
     .input(z.object({ universeId: z.string() }))

@@ -7,13 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Coins } from 'lucide-react';
 import { useFundPool } from '@/hooks/useTreasury';
 import { useChainId } from 'wagmi';
-
-const PACKAGES = [
-  { id: 'starter', name: 'Starter', credits: 500, price: '$4.00' },
-  { id: 'pro', name: 'Pro', credits: 2000, price: '$12.00' },
-  { id: 'studio', name: 'Studio', credits: 10000, price: '$48.00' },
-  { id: 'enterprise', name: 'Enterprise', credits: 50000, price: '$200.00' },
-];
+import { useQuery } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
 
 const PAYMENT_METHODS = [
   { value: 'card' as const, label: 'Card' },
@@ -28,20 +23,29 @@ interface FundPoolDialogProps {
 }
 
 export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialogProps) {
-  const [selectedPkg, setSelectedPkg] = useState(PACKAGES[1].id);
+  const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'eth' | 'crypto' | 'loar'>('card');
   const [paymentRef, setPaymentRef] = useState('');
   const [loarAmount, setLoarAmount] = useState('');
   const fundPool = useFundPool();
   const chainId = useChainId();
 
+  const { data: packages, isLoading: packagesLoading } = useQuery({
+    queryKey: ['pool-packages'],
+    queryFn: () => trpcClient.universeTreasury.getPoolPackages.query(),
+    enabled: open,
+  });
+
+  const pkgs = packages ?? [];
+  const activePkg = selectedPkg ?? pkgs[1]?.id ?? pkgs[0]?.id;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentRef.trim()) return;
+    if (!paymentRef.trim() || !activePkg) return;
 
     await fundPool.mutateAsync({
       universeId,
-      packageId: selectedPkg,
+      packageId: activePkg,
       paymentMethod,
       paymentRef: paymentRef.trim(),
       ...(paymentMethod === 'loar' ? { loarAmount } : {}),
@@ -66,26 +70,42 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
           {/* Package Selection */}
           <div className="space-y-2">
             <Label className="text-zinc-300">Credit Package</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {PACKAGES.map((pkg) => (
-                <button
-                  key={pkg.id}
-                  type="button"
-                  onClick={() => setSelectedPkg(pkg.id)}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    selectedPkg === pkg.id
-                      ? 'border-emerald-500 bg-emerald-950/30'
-                      : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="text-sm font-semibold">{pkg.name}</div>
-                  <div className="text-xs text-zinc-400">
-                    {pkg.credits.toLocaleString()} credits
-                  </div>
-                  <div className="text-xs text-emerald-400 mt-1">{pkg.price}</div>
-                </button>
-              ))}
-            </div>
+            {packagesLoading ? (
+              <div className="grid grid-cols-2 gap-2">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-20 bg-zinc-900 animate-pulse rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {pkgs.map((pkg) => {
+                  const isLoar = paymentMethod === 'loar';
+                  const price = isLoar ? pkg.loarPriceUsd : pkg.fiatPriceUsd;
+                  return (
+                    <button
+                      key={pkg.id}
+                      type="button"
+                      onClick={() => setSelectedPkg(pkg.id)}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        activePkg === pkg.id
+                          ? 'border-emerald-500 bg-emerald-950/30'
+                          : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="text-sm font-semibold">{pkg.name}</div>
+                      <div className="text-xs text-zinc-400">
+                        {pkg.credits.toLocaleString()} credits
+                      </div>
+                      <div className="text-xs text-emerald-400 mt-1">
+                        {isLoar
+                          ? `${pkg.loarTokenAmount.toLocaleString()} $LOAR`
+                          : `$${price.toFixed(2)}`}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Payment Method */}
@@ -139,7 +159,7 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
           {/* Submit */}
           <Button
             type="submit"
-            disabled={fundPool.isPending || !paymentRef.trim()}
+            disabled={fundPool.isPending || !paymentRef.trim() || packagesLoading}
             className="w-full bg-emerald-600 hover:bg-emerald-700"
           >
             {fundPool.isPending ? (
@@ -150,9 +170,11 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
             ) : (
               <>
                 Fund Pool
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {PACKAGES.find((p) => p.id === selectedPkg)?.credits.toLocaleString()} credits
-                </Badge>
+                {activePkg && pkgs.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {pkgs.find((p) => p.id === activePkg)?.credits.toLocaleString()} credits
+                  </Badge>
+                )}
               </>
             )}
           </Button>

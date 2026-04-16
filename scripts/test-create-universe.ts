@@ -47,10 +47,10 @@ const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${s
 const RPC_URL = process.env.RPC_URL_BASE_SEPOLIA ?? 'https://base-sepolia-rpc.publicnode.com';
 const SERVER_URL = process.env.VITE_SERVER_URL ?? 'http://localhost:3000';
 
-// Base Sepolia contract addresses
-const UNIVERSE_MANAGER = '0x99562C96389A91b17662ce5f15143f5B07b84090' as const;
-const HOOK = '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC' as const;
-const LOCKER = '0x6C67EaC980DAF0AC8aDBD6a41E61a7833E2D5FF6' as const;
+// Base Sepolia contract addresses (redeployed with extcodesize fix)
+const UNIVERSE_MANAGER = '0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8' as const;
+const HOOK = '0xcac7d3aDe1F947D9F152B1282086e6598870a8CC' as const;
+const LOCKER = '0xF951065C7d4D28805188F60A3F8bD398B7776eC8' as const;
 const WETH = '0x4200000000000000000000000000000000000006' as const;
 
 // ── Universe Details ───────────────────────────────────────────────────────────

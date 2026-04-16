@@ -10,6 +10,8 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { resolveActingUid } from '../../services/agentAuth';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { isUniverseAdmin } from '../../lib/safe-admin';
+import { verifyAndClaimTx } from '../../services/tx-verify';
 
 const licensesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -49,6 +51,12 @@ export const licensingRouter = router({
       const { onBehalfOfUid, ...licenseInput } = input;
       const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'licensing');
 
+      // Verify caller is the universe admin
+      const callerAddress = ctx.user.address || actingUid;
+      if (!(await isUniverseAdmin(input.universeId, callerAddress))) {
+        throw new Error('Only the universe admin can create licenses');
+      }
+
       const license = {
         ...licenseInput,
         licensorUid: actingUid,
@@ -72,12 +80,20 @@ export const licensingRouter = router({
         txHash: z.string(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = licensesCol().doc(input.licenseId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('License not found');
       const data = doc.data()!;
       if (data.status !== 'PROPOSED') throw new Error('Not in proposed status');
+
+      // Only the licensor (universe admin) can activate licenses
+      if (data.licensorUid !== ctx.user.uid) {
+        throw new Error('Only the licensor can activate this license');
+      }
+
+      // Verify the on-chain transaction is real and hasn't been reused
+      await verifyAndClaimTx(input.txHash, `license-activate:${input.licenseId}`, ctx.user.uid);
 
       const startTime = new Date();
       const endTime = new Date(startTime.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
@@ -99,7 +115,7 @@ export const licensingRouter = router({
           amountWei: data.upfrontFee,
           universeId: data.universeId,
           metadata: { licenseId: input.licenseId, type: 'upfront_fee' },
-        }).catch(() => {});
+        }).catch((err) => console.error('[licensing] revenue recording failed:', err));
       }
 
       return { ok: true, startTime, endTime };
@@ -114,12 +130,21 @@ export const licensingRouter = router({
         period: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = licensesCol().doc(input.licenseId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('License not found');
 
       const data = doc.data()!;
+
+      // Only the licensor or licensee can record royalties
+      if (data.licensorUid !== ctx.user.uid && data.licensee !== ctx.user.uid) {
+        throw new Error('Only the licensor or licensee can record royalties');
+      }
+
+      // Verify the on-chain transaction is real and hasn't been reused
+      await verifyAndClaimTx(input.txHash, `license-royalty:${input.licenseId}`, ctx.user.uid);
+
       await ref.update({
         totalRoyalties: (BigInt(data.totalRoyalties || '0') + BigInt(input.amount)).toString(),
         lastRoyaltyAt: new Date(),
@@ -134,7 +159,7 @@ export const licensingRouter = router({
         amountWei: input.amount,
         universeId: data.universeId,
         metadata: { licenseId: input.licenseId, type: 'royalty', period: input.period ?? '' },
-      }).catch(() => {});
+      }).catch((err) => console.error('[licensing] revenue recording failed:', err));
 
       return { ok: true };
     }),
@@ -155,14 +180,59 @@ export const licensingRouter = router({
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input }) => {
       const snapshot = await licensesCol().where('universeId', '==', input.universeId).get();
+      const now = new Date();
 
-      return snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as Record<string, any>)
-        .sort(
-          (a, b) =>
-            (b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime()) -
-            (a.createdAt?.toMillis?.() ?? new Date(a.createdAt).getTime())
-        );
+      const licenses = snapshot.docs.map((d) => {
+        const data = { id: d.id, ...d.data() } as Record<string, any>;
+
+        // Auto-expire ACTIVE licenses past their endTime
+        if (data.status === 'ACTIVE' && data.endTime) {
+          const endTime = data.endTime.toDate ? data.endTime.toDate() : new Date(data.endTime);
+          if (endTime < now) {
+            data.status = 'EXPIRED';
+            // Fire-and-forget update in Firestore
+            licensesCol()
+              .doc(d.id)
+              .update({ status: 'EXPIRED', updatedAt: now })
+              .catch((err) => console.error('[licensing] auto-expire failed:', err));
+          }
+        }
+        return data;
+      });
+
+      return licenses.sort(
+        (a, b) =>
+          (b.createdAt?.toMillis?.() ?? new Date(b.createdAt).getTime()) -
+          (a.createdAt?.toMillis?.() ?? new Date(a.createdAt).getTime())
+      );
+    }),
+
+  /** Get all licenses where the current user is the licensor */
+  myLicenses: protectedProcedure
+    .input(z.object({ limit: z.number().default(50) }))
+    .query(async ({ input, ctx }) => {
+      const snapshot = await licensesCol()
+        .where('licensorUid', '==', ctx.user.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit)
+        .get();
+
+      const now = new Date();
+      return snapshot.docs.map((d) => {
+        const data = { id: d.id, ...d.data() } as Record<string, any>;
+        // Auto-expire
+        if (data.status === 'ACTIVE' && data.endTime) {
+          const endTime = data.endTime.toDate ? data.endTime.toDate() : new Date(data.endTime);
+          if (endTime < now) {
+            data.status = 'EXPIRED';
+            licensesCol()
+              .doc(d.id)
+              .update({ status: 'EXPIRED', updatedAt: now })
+              .catch((err) => console.error('[licensing] auto-expire failed:', err));
+          }
+        }
+        return data;
+      });
     }),
 
   // ---- Merchandise ----
@@ -181,6 +251,12 @@ export const licensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify caller is the universe admin
+      const callerAddress = ctx.user.address || ctx.user.uid;
+      if (!(await isUniverseAdmin(input.universeId, callerAddress))) {
+        throw new Error('Only the universe admin can create merchandise');
+      }
+
       const merch = {
         ...input,
         creatorUid: ctx.user.uid,
@@ -204,6 +280,9 @@ export const licensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify the on-chain transaction is real and hasn't been reused
+      await verifyAndClaimTx(input.txHash, `merch-purchase:${input.merchId}`, ctx.user.uid);
+
       const merchRef = merchCol().doc(input.merchId);
       const merchDoc = await merchRef.get();
       if (!merchDoc.exists) throw new Error('Merch not found');
@@ -242,7 +321,7 @@ export const licensingRouter = router({
         amountWei: totalPrice,
         universeId: data.universeId,
         metadata: { merchId: input.merchId, orderId: orderRef.id },
-      }).catch(() => {});
+      }).catch((err) => console.error('[licensing] revenue recording failed:', err));
 
       return { id: orderRef.id, ...order };
     }),

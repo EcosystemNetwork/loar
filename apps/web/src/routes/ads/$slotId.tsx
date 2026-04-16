@@ -4,6 +4,9 @@
  * Two modes depending on who is viewing:
  *   Advertiser  — see placement specs, current bid, place a higher bid
  *   Creator     — see all bids ranked, accept the winning bid
+ *
+ * Slot data is fetched from the server via getSlot; search params are NOT
+ * relied upon so direct navigation / bookmarks / shared links work.
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -27,13 +30,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useAdBids, usePlaceBid, useAcceptBid } from '@/hooks/useRevenue';
+import { useAdSlot, useAdBids, usePlaceBid, useAcceptBid } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
-import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/ads/$slotId')({
   component: SlotDetailPage,
@@ -53,28 +55,21 @@ const PLACEMENT_LABELS: Record<string, string> = {
   AUDIO_MENTION: 'Audio Mention',
 };
 
-// The slot data comes from the parent route's search params (passed via Link state)
-// or re-fetched. We use search params to avoid an extra round-trip.
-interface SlotSearch {
-  universeId?: string;
-  placementType?: string;
-  minBid?: string;
-  currentBid?: string;
-  currentBidder?: string;
-  description?: string;
-  constraints?: string;
-  episodes?: number;
-  creatorUid?: string;
-  active?: boolean;
+function safeBigInt(value: string | undefined | null): bigint {
+  if (!value || value === '') return 0n;
+  try {
+    return BigInt(value);
+  } catch {
+    return 0n;
+  }
 }
 
 export function SlotDetailPage() {
   const { slotId } = Route.useParams();
-  const search = Route.useSearch() as SlotSearch;
   const navigate = useNavigate();
   const { address, isConnected } = useWalletAuth();
-  const v = useVocab();
 
+  const { data: slot, isLoading: slotLoading } = useAdSlot(slotId);
   const { data: bids, isLoading: bidsLoading } = useAdBids(slotId);
   const placeBid = usePlaceBid();
   const acceptBid = useAcceptBid();
@@ -84,15 +79,39 @@ export function SlotDetailPage() {
   const [creativeUrl, setCreativeUrl] = useState('');
   const [showBidForm, setShowBidForm] = useState(false);
 
-  const isCreator = !!address && address === search.creatorUid;
-  const currentBidWei = search.currentBid ?? '0';
-  const minBidWei = search.minBid ?? '0';
-  const currentBidEth = parseFloat(formatEther(BigInt(currentBidWei)));
-  const minBidEth = parseFloat(formatEther(BigInt(minBidWei)));
+  if (slotLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!slot) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center px-4">
+        <Gavel className="w-12 h-12 mb-3 text-muted-foreground opacity-30" />
+        <p className="font-semibold mb-1">Slot not found</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          This ad slot may have been removed or doesn't exist.
+        </p>
+        <Button variant="outline" onClick={() => navigate({ to: '/ads' })}>
+          Back to Ads
+        </Button>
+      </div>
+    );
+  }
+
+  // Compare lowercased addresses — ctx.user.uid is the lowercased wallet address
+  const isCreator = !!address && address.toLowerCase() === slot.creatorUid?.toLowerCase();
+  const currentBidWei = safeBigInt(slot.currentBid);
+  const minBidWei = safeBigInt(slot.minBid);
+  const currentBidEth = parseFloat(formatEther(currentBidWei));
+  const minBidEth = parseFloat(formatEther(minBidWei));
   const floorEth = Math.max(currentBidEth, minBidEth);
 
   const sortedBids = [...(bids ?? [])].sort((a: any, b: any) =>
-    Number(BigInt(b.amount) - BigInt(a.amount))
+    Number(safeBigInt(b.amount) - safeBigInt(a.amount))
   );
   const topBid = sortedBids[0] as any;
 
@@ -112,12 +131,12 @@ export function SlotDetailPage() {
     }
     try {
       const weiAmount = parseEther(bidEth as `${number}`).toString();
-      // In production the ETH transfer happens via the AdPlacement.sol contract.
-      // Here we record the off-chain bid + txHash would come from the wallet tx.
+      // TODO: In production, collect ETH via the AdPlacement.sol contract
+      // and pass the real txHash from the wallet transaction.
       await placeBid.mutateAsync({
         slotId,
         amount: weiAmount,
-        txHash: '0x' + Math.random().toString(16).slice(2).padEnd(64, '0'), // placeholder
+        txHash: '0x_placeholder_pending_contract_integration',
         brandName: brandName.trim(),
         creativeUrl: creativeUrl.trim() || undefined,
       });
@@ -159,7 +178,7 @@ export function SlotDetailPage() {
           <p className="font-semibold text-sm">Ad Slot</p>
           <p className="text-xs text-muted-foreground">#{slotId.slice(0, 12)}…</p>
         </div>
-        {search.active !== false ? (
+        {slot.active ? (
           <Badge variant="default" className="text-xs">
             Open
           </Badge>
@@ -176,30 +195,28 @@ export function SlotDetailPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                {PLACEMENT_ICONS[search.placementType ?? ''] ?? <Gavel className="w-5 h-5" />}
+                {PLACEMENT_ICONS[slot.placementType ?? ''] ?? <Gavel className="w-5 h-5" />}
               </div>
               <div>
                 <p className="font-semibold">
-                  {PLACEMENT_LABELS[search.placementType ?? ''] ??
-                    search.placementType ??
-                    'Ad Slot'}
+                  {PLACEMENT_LABELS[slot.placementType ?? ''] ?? slot.placementType ?? 'Ad Slot'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Universe #{search.universeId?.slice(0, 10) ?? '—'}
+                  Universe #{slot.universeId?.slice(0, 10) ?? '—'}
                 </p>
               </div>
             </div>
 
-            {search.description && (
+            {slot.description && (
               <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                {search.description}
+                {slot.description}
               </p>
             )}
 
-            {search.constraints && (
+            {slot.constraints && (
               <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Constraints: </span>
-                {search.constraints}
+                {slot.constraints}
               </div>
             )}
           </CardContent>
@@ -220,7 +237,7 @@ export function SlotDetailPage() {
           <StatCard
             icon={<Film className="w-4 h-4 text-blue-400" />}
             label="Episodes"
-            value={String(search.episodes ?? '—')}
+            value={String(slot.episodes ?? '—')}
           />
         </div>
 
@@ -271,7 +288,7 @@ export function SlotDetailPage() {
               <div>
                 <p className="text-sm font-medium">Ready to accept?</p>
                 <p className="text-xs text-muted-foreground">
-                  Top bid: {parseFloat(formatEther(BigInt(topBid.amount))).toFixed(4)} ETH by{' '}
+                  Top bid: {parseFloat(formatEther(safeBigInt(topBid.amount))).toFixed(4)} ETH by{' '}
                   {topBid.brandName}
                 </p>
               </div>
@@ -293,7 +310,7 @@ export function SlotDetailPage() {
         )}
 
         {/* Advertiser — place bid */}
-        {!isCreator && search.active !== false && (
+        {!isCreator && slot.active && (
           <section>
             <h2 className="font-semibold mb-3 flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4" />
@@ -307,7 +324,7 @@ export function SlotDetailPage() {
                 onClick={() => setShowBidForm(true)}
                 disabled={!isConnected}
               >
-                {isConnected ? 'Place a Bid' : v('connect-wallet-to-bid')}
+                {isConnected ? 'Place a Bid' : 'Connect wallet to bid'}
               </Button>
             ) : (
               <Card>
@@ -422,7 +439,7 @@ function BidRow({
   onAccept: () => void;
   accepting: boolean;
 }) {
-  const ethAmt = parseFloat(formatEther(BigInt(bid.amount))).toFixed(4);
+  const ethAmt = parseFloat(formatEther(safeBigInt(bid.amount))).toFixed(4);
 
   return (
     <div

@@ -30,6 +30,12 @@ import { useCreateLicense } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
+import { useQuery } from '@tanstack/react-query';
+import { trpcClient } from '@/utils/trpc';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useChainId } from 'wagmi';
+import { getEvmAddresses } from '@/configs/addresses';
+import { licensingRegistryAbi } from '@loar/abis/generated';
 
 export const Route = createFileRoute('/licensing/new')({
   component: CreateLicensePage,
@@ -87,7 +93,8 @@ const STEPS: Step[] = ['type', 'details', 'pricing', 'confirm'];
 interface LicenseForm {
   licenseType: LicenseType | '';
   universeId: string;
-  licensee: string;
+  onChainUniverseId: string; // uint256 for the on-chain contract
+  licensee: string; // wallet address (0x...)
   licenseeContact: string;
   terms: string;
   upfrontFeeEth: string;
@@ -97,8 +104,19 @@ interface LicenseForm {
 
 export function CreateLicensePage() {
   const navigate = useNavigate();
-  const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
+  const { isConnected, isAuthenticated, isAuthenticating, address } = useWalletAuth();
   const createLicense = useCreateLicense();
+  const { writeContractAsync, isPending: isTxPending } = useWriteContract();
+  const chainId = useChainId();
+  const addresses = getEvmAddresses(chainId);
+
+  // Fetch universes owned by the current user
+  const { data: myUniversesRaw, isLoading: universesLoading } = useQuery({
+    queryKey: ['my-universes', address],
+    queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
+    enabled: !!address,
+  });
+  const myUniverses: any[] = (myUniversesRaw as any)?.data ?? [];
 
   useEffect(() => {
     if (!isAuthenticated && !isAuthenticating) {
@@ -110,6 +128,7 @@ export function CreateLicensePage() {
   const [form, setForm] = useState<LicenseForm>({
     licenseType: '',
     universeId: '',
+    onChainUniverseId: '',
     licensee: '',
     licenseeContact: '',
     terms: '',
@@ -138,8 +157,10 @@ export function CreateLicensePage() {
 
   function canAdvance() {
     if (step === 'type') return !!form.licenseType;
-    if (step === 'details')
-      return !!form.universeId.trim() && !!form.licensee.trim() && !!form.terms.trim();
+    if (step === 'details') {
+      const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(form.licensee.trim());
+      return !!form.universeId.trim() && isValidAddress && !!form.terms.trim();
+    }
     if (step === 'pricing') {
       const fee = parseFloat(form.upfrontFeeEth);
       const royalty = parseInt(form.royaltyBps);
@@ -167,16 +188,55 @@ export function CreateLicensePage() {
       return;
     }
     try {
-      const upfrontFee = parseEther(form.upfrontFeeEth as `${number}`).toString();
+      const upfrontFeeWei = parseEther(form.upfrontFeeEth as `${number}`);
+      const royaltyBps = parseInt(form.royaltyBps);
+      const durationDays = parseInt(form.durationDays);
+      const durationSeconds = BigInt(durationDays) * 86400n;
+
+      // License type enum index for the contract
+      const LICENSE_TYPE_INDEX: Record<string, number> = {
+        STREAMING: 0,
+        MERCH: 1,
+        GAMING: 2,
+        COMIC: 3,
+        AUDIO: 4,
+        OTHER: 5,
+      };
+      const typeIndex = LICENSE_TYPE_INDEX[form.licenseType] ?? 5;
+
+      let txHash: string | undefined;
+
+      // Submit on-chain transaction if the contract is deployed and universe has an on-chain ID
+      if (addresses?.licensingRegistry && form.onChainUniverseId) {
+        toast.info('Confirm the transaction in your wallet...');
+        txHash = await writeContractAsync({
+          address: addresses.licensingRegistry,
+          abi: licensingRegistryAbi,
+          functionName: 'createLicense',
+          args: [
+            BigInt(form.onChainUniverseId), // universeId (uint256 from on-chain)
+            typeIndex, // licenseType enum
+            form.licensee as `0x${string}`, // licensee address
+            upfrontFeeWei, // upfrontFee
+            royaltyBps, // royaltyBps
+            durationSeconds, // duration in seconds
+            form.terms, // terms string (IPFS URI or inline)
+          ],
+        });
+        toast.info('Transaction submitted, recording license...');
+      }
+
+      // Record in Firestore via tRPC (with txHash for verification)
       await createLicense.mutateAsync({
         universeId: form.universeId,
         licenseType: form.licenseType as LicenseType,
         licensee: form.licensee,
         licenseeContact: form.licenseeContact || undefined,
-        upfrontFee,
-        royaltyBps: parseInt(form.royaltyBps),
-        durationDays: parseInt(form.durationDays),
+        upfrontFee: upfrontFeeWei.toString(),
+        royaltyBps,
+        durationDays,
         terms: form.terms,
+        txHash,
       });
       toast.success('License created! Awaiting activation.');
       navigate({ to: '/licensing' });
@@ -255,30 +315,71 @@ export function CreateLicensePage() {
             </p>
 
             <div className="space-y-2">
-              <Label htmlFor="universeId">Universe ID *</Label>
-              <Input
-                id="universeId"
-                placeholder="Your universe identifier"
-                value={form.universeId}
-                onChange={(e) => set('universeId', e.target.value)}
-              />
+              <Label htmlFor="universeId">Universe *</Label>
+              {universesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading your universes...
+                </div>
+              ) : myUniverses.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  You don't have any universes yet. Create one first.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {myUniverses.map((u: any) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                        form.universeId === u.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/30'
+                      }`}
+                      onClick={() => {
+                        set('universeId', u.id);
+                        set('onChainUniverseId', u.onChainUniverseId?.toString() ?? '');
+                      }}
+                    >
+                      {u.image_url && (
+                        <img
+                          src={u.image_url}
+                          alt=""
+                          className="w-8 h-8 rounded-lg object-cover shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{u.name || u.id}</p>
+                      </div>
+                      {form.universeId === u.id && (
+                        <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="licensee">Licensee *</Label>
+              <Label htmlFor="licensee">Licensee wallet address *</Label>
               <Input
                 id="licensee"
-                placeholder="Company or individual name"
+                placeholder="0x..."
                 value={form.licensee}
                 onChange={(e) => set('licensee', e.target.value)}
               />
+              {form.licensee && !/^0x[a-fA-F0-9]{40}$/.test(form.licensee) && (
+                <p className="text-xs text-destructive">
+                  Must be a valid Ethereum address (0x followed by 40 hex characters)
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="licenseeContact">Licensee contact (optional)</Label>
+              <Label htmlFor="licenseeContact">Licensee contact name or email (optional)</Label>
               <Input
                 id="licenseeContact"
-                placeholder="Email or wallet address"
+                placeholder="Company name, email, or other contact info"
                 value={form.licenseeContact}
                 onChange={(e) => set('licenseeContact', e.target.value)}
               />
@@ -403,14 +504,14 @@ export function CreateLicensePage() {
                 size="lg"
                 className="w-full"
                 onClick={handleCreate}
-                disabled={createLicense.isPending || !isConnected}
+                disabled={createLicense.isPending || isTxPending || !isConnected}
               >
-                {createLicense.isPending ? (
+                {createLicense.isPending || isTxPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <CheckCircle className="w-4 h-4 mr-2" />
                 )}
-                Create License
+                {isTxPending ? 'Confirming on-chain...' : 'Create License'}
               </Button>
               {!isConnected && (
                 <p className="text-xs text-center text-muted-foreground">

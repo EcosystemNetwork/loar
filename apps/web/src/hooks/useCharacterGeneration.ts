@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { type StatusMessage } from '@/hooks/useVideoGeneration';
+import { useCreditCheck } from '@/hooks/useCreditCheck';
 
 export type ImageFormat =
   | 'square_hd'
@@ -47,6 +48,7 @@ export function useCharacterGeneration({
   setStatusMessage,
 }: UseCharacterGenerationProps): UseCharacterGenerationReturn {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const { checkCredits, invalidateBalance } = useCreditCheck();
 
   // Image generation mutation using Nano Banana for editing
   const generateImageMutation = useMutation({
@@ -115,6 +117,7 @@ export function useCharacterGeneration({
       return { success: true, imageUrl: result.imageUrl };
     },
     onSuccess: (data) => {
+      invalidateBalance(); // Refresh credit display after spend
       if (data.imageUrl) {
         setGeneratedImageUrl(data.imageUrl);
         setShowVideoStep(true);
@@ -155,6 +158,7 @@ export function useCharacterGeneration({
   // Handle image generation for the event
   const handleGenerateEventImage = useCallback(async () => {
     if (!videoDescription.trim()) return;
+    if (!checkCredits('image')) return;
 
     setStatusMessage(null); // Clear any previous messages
     setIsGeneratingImage(true);
@@ -166,11 +170,12 @@ export function useCharacterGeneration({
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [videoDescription, generateImageMutation, setStatusMessage]);
+  }, [videoDescription, generateImageMutation, setStatusMessage, checkCredits]);
 
   // Handle character frame generation for image-to-video
   const handleGenerateCharacterFrame = useCallback(async () => {
     if (!videoDescription.trim() || selectedImageCharacters.length === 0) return;
+    if (!checkCredits('image')) return;
 
     setStatusMessage(null);
     setIsGeneratingImage(true);
@@ -252,6 +257,7 @@ export function useCharacterGeneration({
     imageFormat,
     setGeneratedImageUrl,
     setStatusMessage,
+    checkCredits,
   ]);
 
   return {

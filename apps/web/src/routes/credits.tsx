@@ -42,7 +42,7 @@ function CreditsPage() {
 
   const { data: balance, isLoading: balanceLoading } = useCreditBalance();
   const { data: txHistory, isLoading: historyLoading } = useCreditHistory(30);
-  const { data: costs } = useQuery({
+  const { data: costs, isLoading: costsLoading } = useQuery({
     queryKey: ['generation-costs'],
     queryFn: () => trpcClient.credits.getCosts.query(),
   });
@@ -136,12 +136,18 @@ function CreditsPage() {
             </Card>
 
             {/* Generation costs reference */}
-            {costs && (
-              <Card>
-                <CardHeader className="pb-2 pt-4 px-5">
-                  <CardTitle className="text-sm">Generation Costs</CardTitle>
-                </CardHeader>
-                <CardContent className="px-5 pb-4">
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-5">
+                <CardTitle className="text-sm">Generation Costs</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-4">
+                {costsLoading ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="h-9 bg-muted animate-pulse rounded-md" />
+                    ))}
+                  </div>
+                ) : costs ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {Object.entries(costs).map(([key, value]) => (
                       <div
@@ -157,9 +163,13 @@ function CreditsPage() {
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    Could not load costs
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Transaction history */}
             <Card>

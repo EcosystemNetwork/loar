@@ -8,6 +8,7 @@
 import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useCreditCheck } from '@/hooks/useCreditCheck';
 
 export type VideoModel =
   | 'fal-veo3'
@@ -59,6 +60,7 @@ export function useVideoGeneration({
   setStatusMessage,
 }: UseVideoGenerationProps): UseVideoGenerationReturn {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const { checkCredits, invalidateBalance } = useCreditCheck();
 
   // Video generation mutation with multiple models
   const generateVideoMutation = useMutation({
@@ -133,6 +135,7 @@ export function useVideoGeneration({
       throw new Error('Invalid video model selected');
     },
     onSuccess: (data) => {
+      invalidateBalance(); // Refresh credit display after spend
       if (data.videoUrl) {
         setGeneratedVideoUrl(data.videoUrl);
 
@@ -258,6 +261,9 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     async (generatedImageUrl: string | null, uploadedUrl: string | null) => {
       setStatusMessage(null); // Clear any previous messages
 
+      // Pre-flight credit check — fail fast before expensive generation
+      if (!checkCredits('video_standard')) return;
+
       setIsGeneratingVideo(true);
       try {
         const hasImage = uploadedUrl || generatedImageUrl;
@@ -345,6 +351,8 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       videoPrompt,
       setGeneratedVideoUrl,
       setStatusMessage,
+      checkCredits,
+      invalidateBalance,
     ]
   );
 

@@ -3,13 +3,15 @@
  *
  * Custom hooks for fetching and processing blockchain data for a universe timeline.
  * Updated for bytes32 content hash storage (PRD 5).
- * Content hashes are stored on-chain; full URLs/descriptions are resolved via indexer or storage API.
+ * Content hashes are stored on-chain; full URLs/descriptions resolved from Ponder indexer.
  */
 
 import { useMemo } from 'react';
 import { useReadContract } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 import { universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
+import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 
 export interface GraphData {
   nodeIds: readonly (string | number | bigint)[];
@@ -48,6 +50,15 @@ export interface UseUniverseBlockchainReturn {
   refetchLatestNodeId: () => Promise<any>;
 }
 
+/** Ponder nodeContent shape returned by the GraphQL query. */
+interface IndexerNodeContent {
+  id: string; // "{universeAddress}:{nodeId}"
+  contentHash: string;
+  plotHash: string;
+  videoLink: string;
+  plot: string;
+}
+
 function useUniverseLeaves(contractAddress?: string) {
   return useReadContract({
     abi: universeAbi,
@@ -64,6 +75,22 @@ function useUniverseFullGraph(contractAddress?: string) {
     abi: universeAbi,
     address: (contractAddress || '0x') as Address,
     functionName: 'getFullGraph',
+    query: {
+      enabled: !!contractAddress,
+      retry: 1, // getFullGraph can hit gas limits on large universes
+    },
+  });
+}
+
+/**
+ * Paginated graph fetch — use when getFullGraph exceeds gas limits.
+ */
+export function useUniverseGraphPage(contractAddress?: string, startId = 1, count = 500) {
+  return useReadContract({
+    abi: universeAbi,
+    address: (contractAddress || '0x') as Address,
+    functionName: 'getGraphPage',
+    args: [BigInt(startId), BigInt(count)],
     query: {
       enabled: !!contractAddress,
     },
@@ -83,8 +110,60 @@ function useUniverseCanonChain(contractAddress?: string) {
 }
 
 /**
+ * Fetch resolved content (video URLs + plot text) from the Ponder indexer
+ * for all nodes in a given universe. The indexer captures these from
+ * NodeCreated events — they're emitted but not stored on-chain.
+ */
+function useNodeContents(contractAddress?: string) {
+  return useQuery({
+    queryKey: ['nodeContents', contractAddress],
+    queryFn: async () => {
+      if (!contractAddress) return new Map<string, IndexerNodeContent>();
+
+      const addr = contractAddress.toLowerCase();
+      // Paginate to handle universes with >1000 nodes
+      const map = new Map<string, IndexerNodeContent>();
+      let after: string | null = null;
+      const PAGE_SIZE = 1000;
+
+      interface NodeContentPage {
+        nodeContents: {
+          items: IndexerNodeContent[];
+          pageInfo: { hasNextPage: boolean; endCursor: string };
+        };
+      }
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const page: NodeContentPage = await ponderGql<NodeContentPage>(
+          `query($universePrefix: String!, $limit: Int!, $after: String) {
+            nodeContents(where: { id_starts_with: $universePrefix }, limit: $limit, after: $after) {
+              items { id contentHash plotHash videoLink plot }
+              pageInfo { hasNextPage endCursor }
+            }
+          }`,
+          { universePrefix: `${addr}:`, limit: PAGE_SIZE, after }
+        );
+
+        for (const item of page?.nodeContents?.items || []) {
+          const nodeId = item.id.split(':')[1];
+          if (nodeId) map.set(nodeId, item);
+        }
+
+        if (!page?.nodeContents?.pageInfo?.hasNextPage) break;
+        after = page.nodeContents.pageInfo.endCursor;
+      }
+
+      return map;
+    },
+    enabled: !!contractAddress,
+    ...ponderQueryDefaults,
+  });
+}
+
+/**
  * Main hook for managing all blockchain data for a universe.
- * Now works with bytes32 content hashes instead of raw strings.
+ * Merges on-chain graph structure with Ponder-resolved content (URLs + descriptions).
  */
 export function useUniverseBlockchain({
   universeId,
@@ -118,23 +197,35 @@ export function useUniverseBlockchain({
 
   const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
 
+  // Fetch resolved content from Ponder indexer
+  const { data: contentMap } = useNodeContents(contractAddress);
+
   const graphData = useMemo(() => {
     if (contractAddress && fullGraphData) {
-      // getFullGraph now returns: (uint[] ids, bytes32[] contentHashes, bytes32[] plotHashes, uint[] previousIds, uint[][] nextIds, bool[] canonFlags)
       const [nodeIds, contentHashes, plotHashes, previousIds, nextIds, flags] = fullGraphData;
 
-      // Content hashes and plot hashes are bytes32 on-chain.
-      // The actual URLs and plot text are stored off-chain (indexer captures from events).
-      // For now, pass the hashes through; the UI will resolve via indexer data or storage.resolve().
       const hashStrings = (contentHashes || []) as readonly string[];
       const plotHashStrings = (plotHashes || []) as readonly string[];
+
+      // Resolve URLs and descriptions from indexer content map
+      const resolvedUrls: string[] = [];
+      const resolvedDescriptions: string[] = [];
+
+      for (let i = 0; i < (nodeIds || []).length; i++) {
+        const nid = String(nodeIds[i]);
+        const content = contentMap?.get(nid);
+
+        // Use indexer-resolved content if available, otherwise fall back to hash
+        resolvedUrls.push(content?.videoLink || String(hashStrings[i] || ''));
+        resolvedDescriptions.push(content?.plot || String(plotHashStrings[i] || ''));
+      }
 
       return {
         nodeIds: (nodeIds || []) as readonly (string | number | bigint)[],
         contentHashes: hashStrings,
         plotHashes: plotHashStrings,
-        urls: hashStrings, // Placeholder — resolved by the page component
-        descriptions: plotHashStrings, // Placeholder — resolved by the page component
+        urls: resolvedUrls,
+        descriptions: resolvedDescriptions,
         previousNodes: (previousIds || []) as readonly (string | number | bigint)[],
         children: (nextIds || []) as readonly (string | number | bigint)[][],
         flags: flags || [],
@@ -153,7 +244,14 @@ export function useUniverseBlockchain({
       flags: [],
       canonChain: [],
     };
-  }, [universeId, isBlockchainUniverse, fullGraphData, canonChainData, contractAddress]);
+  }, [
+    universeId,
+    isBlockchainUniverse,
+    fullGraphData,
+    canonChainData,
+    contractAddress,
+    contentMap,
+  ]);
 
   const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingCanonChain;
 

@@ -3,7 +3,7 @@
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useChainId, useReadContract } from 'wagmi';
+import { useChainId, useReadContract, usePublicClient } from 'wagmi';
 import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, parseUnits, formatUnits, type Address } from 'viem';
@@ -24,7 +24,7 @@ const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
 // Faucet contract address (testnet only)
 const LOAR_FAUCET_ADDRESS = (import.meta.env.VITE_LOAR_FAUCET_ADDRESS ?? '') as Address;
 
-// Minimal ERC20 ABI for approve + transfer
+// Minimal ERC20 ABI for approve + transfer + error decoding
 const ERC20_ABI = [
   {
     name: 'approve',
@@ -52,6 +52,35 @@ const ERC20_ABI = [
     stateMutability: 'view' as const,
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  // OpenZeppelin ERC20 custom errors for proper error decoding
+  {
+    name: 'ERC20InsufficientBalance',
+    type: 'error' as const,
+    inputs: [
+      { name: 'sender', type: 'address' },
+      { name: 'balance', type: 'uint256' },
+      { name: 'needed', type: 'uint256' },
+    ],
+  },
+  {
+    name: 'ERC20InvalidSender',
+    type: 'error' as const,
+    inputs: [{ name: 'sender', type: 'address' }],
+  },
+  {
+    name: 'ERC20InvalidReceiver',
+    type: 'error' as const,
+    inputs: [{ name: 'receiver', type: 'address' }],
+  },
+  {
+    name: 'ERC20InsufficientAllowance',
+    type: 'error' as const,
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'allowance', type: 'uint256' },
+      { name: 'needed', type: 'uint256' },
+    ],
   },
 ] as const;
 
@@ -278,6 +307,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   const chainId = useChainId();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
 
   const { data: ethPriceData } = useQuery({
     queryKey: ['ethPrice'],
@@ -292,7 +322,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   });
 
   const { data: balance } = useQuery({
-    queryKey: ['creditBalance'],
+    queryKey: ['credit-balance'],
     queryFn: () => trpcClient.credits.getBalance.query(),
   });
 
@@ -305,7 +335,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     }) => trpcClient.credits.purchaseWithFiat.mutate(params),
     onSuccess: (data) => {
       toast.success(`Added ${data.creditsAdded} credits!`);
-      queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-balance'] });
       setIsPaying(false);
       setSelectedPkg(null);
     },
@@ -324,7 +354,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     }) => trpcClient.credits.purchaseWithLoar.mutate(params),
     onSuccess: (data) => {
       toast.success(data.savings);
-      queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-balance'] });
       setIsPaying(false);
       setSelectedPkg(null);
     },
@@ -566,6 +596,26 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                 setIsPaying(true);
                 try {
                   const loarAmount = parseUnits(pkg.loarTokenAmount.toString(), 18);
+
+                  // Pre-check: verify user has enough $LOAR balance
+                  if (address && publicClient) {
+                    const balance = (await publicClient.readContract({
+                      address: LOAR_TOKEN_ADDRESS,
+                      abi: ERC20_ABI,
+                      functionName: 'balanceOf',
+                      args: [address],
+                    })) as bigint;
+                    if (balance < loarAmount) {
+                      const have = formatUnits(balance, 18);
+                      const need = pkg.loarTokenAmount.toLocaleString();
+                      toast.error(
+                        `Insufficient $LOAR balance. You have ${Number(have).toLocaleString()} but need ${need} $LOAR.`
+                      );
+                      setIsPaying(false);
+                      return;
+                    }
+                  }
+
                   toast.info('Confirm $LOAR transfer in your wallet...');
                   const txHash = await writeContractAsync({
                     address: LOAR_TOKEN_ADDRESS,
@@ -582,7 +632,12 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                   });
                 } catch (err) {
                   if (err instanceof Error && !err.message.includes('rejected')) {
-                    toast.error('$LOAR payment failed: ' + err.message);
+                    const msg = err.message;
+                    if (msg.includes('ERC20InsufficientBalance') || msg.includes('e450d38c')) {
+                      toast.error('Insufficient $LOAR balance. Please acquire more tokens first.');
+                    } else {
+                      toast.error('$LOAR payment failed: ' + msg);
+                    }
                   }
                   setIsPaying(false);
                 }
@@ -607,6 +662,21 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                 try {
                   const ethPrice = pkg.fiatPriceUsd / ethPriceUsd;
                   const ethAmount = parseEther(ethPrice.toFixed(18));
+
+                  // Pre-check: verify user has enough ETH
+                  if (address && publicClient) {
+                    const ethBalance = await publicClient.getBalance({ address });
+                    if (ethBalance < ethAmount) {
+                      const have = formatUnits(ethBalance, 18);
+                      const need = ethPrice.toFixed(6);
+                      toast.error(
+                        `Insufficient ETH balance. You have ${Number(have).toFixed(6)} ETH but need ~${need} ETH.`
+                      );
+                      setIsPaying(false);
+                      return;
+                    }
+                  }
+
                   toast.info('Confirm ETH transfer in your wallet...');
                   const txHash = await sendTransactionAsync({
                     to: TREASURY_ADDRESS,

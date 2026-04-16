@@ -11,6 +11,8 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { computeEntityHash } from '../../services/split-orchestrator';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { verifyAndClaimTx } from '../../services/tx-verify';
+import { isUniverseAdmin } from '../../lib/safe-admin';
 
 const registrationsCol = () => {
   if (!db)
@@ -45,6 +47,15 @@ export const contentLicensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify caller is the universe admin
+      const callerAddress = ctx.user.address || ctx.user.uid;
+      if (!(await isUniverseAdmin(input.universeId, callerAddress))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can register content for licensing',
+        });
+      }
+
       // Verify content is not fan-classified (non-commercial content cannot be licensed)
       const contentDoc = await db.collection('content').doc(input.contentId).get();
       if (contentDoc.exists && contentDoc.data()?.classification === 'fan') {
@@ -127,6 +138,13 @@ export const contentLicensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Verify the on-chain transaction is real and hasn't been reused
+      await verifyAndClaimTx(
+        input.txHash,
+        `content-deal:${input.registrationId}:${input.dealType}`,
+        ctx.user.uid
+      );
+
       const regDoc = await registrationsCol().doc(input.registrationId).get();
       if (!regDoc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
@@ -166,7 +184,7 @@ export const contentLicensingRouter = router({
         amountWei: input.pricePaid,
         universeId: regData.universeId,
         metadata: { dealType: input.dealType, registrationId: input.registrationId },
-      }).catch(() => {});
+      }).catch((err) => console.error('[contentLicensing] revenue recording failed:', err));
 
       return { id: ref.id, ...deal };
     }),

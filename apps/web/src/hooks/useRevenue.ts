@@ -200,14 +200,18 @@ export function useProposeCollab() {
   return useMutation({
     mutationFn: (input: Parameters<typeof trpcClient.collabs.propose.mutate>[0]) =>
       trpcClient.collabs.propose.mutate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['collabs'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collabs'] });
+      qc.invalidateQueries({ queryKey: ['my-collabs'] });
+    },
   });
 }
 
-export function useMyCollabs() {
+export function useMyCollabs(enabled = true) {
   return useQuery({
     queryKey: ['my-collabs'],
     queryFn: () => trpcClient.collabs.myCollabs.query(),
+    enabled,
   });
 }
 
@@ -285,6 +289,14 @@ export function useAdSlots(universeId: string) {
   });
 }
 
+export function useAdSlot(slotId: string) {
+  return useQuery({
+    queryKey: ['ad-slot', slotId],
+    queryFn: () => trpcClient.ads.getSlot.query({ slotId }),
+    enabled: !!slotId,
+  });
+}
+
 export function useAdBids(slotId: string) {
   return useQuery({
     queryKey: ['ad-bids', slotId],
@@ -336,9 +348,11 @@ export function useAcceptBid() {
 }
 
 export function useMySponsorships() {
+  const { isAuthenticated } = useWalletAuth();
   return useQuery({
     queryKey: ['my-sponsorships'],
     queryFn: () => trpcClient.ads.mySponsorships.query(),
+    enabled: isAuthenticated,
   });
 }
 
@@ -349,6 +363,15 @@ export function useUniverseLicenses(universeId: string) {
     queryKey: ['licenses', universeId],
     queryFn: () => trpcClient.licensing.getLicenses.query({ universeId }),
     enabled: !!universeId,
+  });
+}
+
+export function useMyLicenses(limit = 50) {
+  const { isAuthenticated } = useWalletAuth();
+  return useQuery({
+    queryKey: ['my-licenses', limit],
+    queryFn: () => trpcClient.licensing.myLicenses.query({ limit }),
+    enabled: isAuthenticated,
   });
 }
 

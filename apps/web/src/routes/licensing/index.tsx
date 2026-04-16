@@ -2,7 +2,7 @@
  * Licensing Hub — Browse and manage IP licenses + merchandise
  *
  * Tabs:
- *   Licenses   — all licenses the user has created or received
+ *   Licenses   — all licenses the user has created
  *   Merch      — user's created merchandise items + orders
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
@@ -18,17 +18,14 @@ import {
   XCircle,
   ArrowRight,
   Banknote,
-  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { useMyMerch, useMerchOrders } from '@/hooks/useRevenue';
+import { Card, CardContent } from '@/components/ui/card';
+import { useMyMerch, useMerchOrders, useMyLicenses, useRevokeLicense } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
-import { useQuery } from '@tanstack/react-query';
-import { trpcClient } from '@/utils/trpc';
 
 export const Route = createFileRoute('/licensing/')({
   component: LicensingHubPage,
@@ -69,21 +66,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 type Tab = 'licenses' | 'merch';
 
 function LicensingHubPage() {
-  const { isConnected, address: uid } = useWalletAuth();
+  const { isConnected } = useWalletAuth();
   const [tab, setTab] = useState<Tab>('licenses');
 
-  // Fetch all licenses where the user is the licensor
-  // We use a "my licenses" approach — the server groups by proposer/licensor
+  const { data: myLicenses, isLoading: licensesLoading } = useMyLicenses();
   const { data: myMerch, isLoading: merchLoading } = useMyMerch();
   const { data: merchOrders, isLoading: ordersLoading } = useMerchOrders();
-
-  // For licenses, we need a custom query since there's no "myLicenses" endpoint
-  // We'll show a prompt to navigate to universe-specific licensing
-  const { data: myCollabsForLicenses } = useQuery({
-    queryKey: ['my-licenses-all'],
-    queryFn: () => trpcClient.collabs.myCollabs.query(), // placeholder for discovering universes
-    enabled: isConnected,
-  });
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -126,20 +114,31 @@ function LicensingHubPage() {
               }`}
             >
               {t === 'licenses' ? 'Licenses' : 'Merchandise'}
-              {t === 'merch' && (myMerch?.length ?? 0) > 0 && (
+              {t === 'licenses' && (myLicenses as any[])?.length > 0 && (
                 <Badge variant="secondary" className="ml-1.5 text-xs px-1.5 py-0">
-                  {myMerch!.length}
+                  {(myLicenses as any[]).length}
+                </Badge>
+              )}
+              {t === 'merch' && (myMerch as any[])?.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 text-xs px-1.5 py-0">
+                  {(myMerch as any[]).length}
                 </Badge>
               )}
             </button>
           ))}
         </div>
 
-        {tab === 'licenses' && <LicensesTab isConnected={isConnected} />}
+        {tab === 'licenses' && (
+          <LicensesTab
+            licenses={(myLicenses as any[]) ?? []}
+            isLoading={licensesLoading}
+            isConnected={isConnected}
+          />
+        )}
         {tab === 'merch' && (
           <MerchTab
-            merch={myMerch ?? []}
-            orders={merchOrders ?? []}
+            merch={(myMerch as any[]) ?? []}
+            orders={(merchOrders as any[]) ?? []}
             isLoading={merchLoading || ordersLoading}
             isConnected={isConnected}
           />
@@ -149,8 +148,17 @@ function LicensingHubPage() {
   );
 }
 
-function LicensesTab({ isConnected }: { isConnected: boolean }) {
+function LicensesTab({
+  licenses,
+  isLoading,
+  isConnected,
+}: {
+  licenses: any[];
+  isLoading: boolean;
+  isConnected: boolean;
+}) {
   const isAutoConnecting = useIsAutoConnecting();
+  const revokeLicense = useRevokeLicense();
 
   if (isAutoConnecting) {
     return (
@@ -170,74 +178,21 @@ function LicensesTab({ isConnected }: { isConnected: boolean }) {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* How it works */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardHeader className="pb-2 pt-4 px-4">
-          <h3 className="text-sm font-semibold">How IP Licensing Works</h3>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          <div className="space-y-2.5">
-            {[
-              {
-                icon: <FileText className="w-4 h-4" />,
-                text: 'Create a license for your universe IP — streaming, gaming, merch, etc.',
-              },
-              {
-                icon: <Banknote className="w-4 h-4" />,
-                text: 'Set upfront fees and ongoing royalty percentages',
-              },
-              {
-                icon: <Shield className="w-4 h-4" />,
-                text: 'Terms are recorded and enforced via smart contract',
-              },
-              {
-                icon: <CheckCircle2 className="w-4 h-4" />,
-                text: 'Track royalty payments and manage license lifecycle',
-              },
-            ].map((step, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-sm">
-                <div className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                  {step.icon}
-                </div>
-                <span className="text-muted-foreground pt-0.5">{step.text}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
-      {/* License types showcase */}
-      <section>
-        <h2 className="font-semibold mb-3">License Types</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {Object.entries(LICENSE_TYPE_LABELS).map(([key, label]) => (
-            <Card key={key}>
-              <CardContent className="p-3">
-                <div className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border mb-2 bg-primary/10 text-primary border-primary/20">
-                  <FileText className="w-3 h-3" />
-                  {label}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {key === 'STREAMING' && 'Stream your universe on external platforms'}
-                  {key === 'MERCH' && 'Physical or digital merchandise rights'}
-                  {key === 'GAMING' && 'Adapt universe IP for games'}
-                  {key === 'COMIC' && 'Print or digital comic adaptations'}
-                  {key === 'AUDIO' && 'Podcast, audiobook, or music rights'}
-                  {key === 'OTHER' && 'Custom licensing arrangement'}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <div className="mt-6 p-4 rounded-xl border border-dashed text-center text-sm text-muted-foreground">
-        <Scale className="w-8 h-8 mx-auto mb-2 opacity-30" />
-        <p className="font-medium mb-1">Create licenses from universe shops</p>
-        <p className="text-xs mb-3">
-          Visit any universe's storefront to manage its licenses and merchandise.
+  if (licenses.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <Scale className="w-10 h-10 mx-auto mb-3 opacity-30" />
+        <p className="font-medium">No licenses yet</p>
+        <p className="text-sm mt-1 mb-4">
+          Create IP licenses for your universes — streaming, gaming, merch, and more.
         </p>
         <Link to="/licensing/new">
           <Button variant="outline" size="sm" className="gap-1">
@@ -246,6 +201,82 @@ function LicensesTab({ isConnected }: { isConnected: boolean }) {
           </Button>
         </Link>
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {licenses.map((lic: any) => {
+        const status = STATUS_CONFIG[lic.status] ?? STATUS_CONFIG.PROPOSED;
+        const typeLabel = LICENSE_TYPE_LABELS[lic.licenseType] ?? lic.licenseType;
+        const royaltyPct = lic.royaltyBps ? (lic.royaltyBps / 100).toFixed(1) : '0';
+
+        return (
+          <Card key={lic.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-sm">{typeLabel}</span>
+                </div>
+                <Badge className={`text-xs ${status.color}`}>
+                  <span className="mr-1">{status.icon}</span>
+                  {status.label}
+                </Badge>
+              </div>
+
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex justify-between">
+                  <span>Licensee</span>
+                  <span className="font-medium text-foreground">{lic.licensee}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Upfront Fee</span>
+                  <span className="font-medium text-foreground flex items-center gap-1">
+                    <Banknote className="w-3 h-3" />
+                    {lic.upfrontFee && BigInt(lic.upfrontFee) > 0n
+                      ? `${formatEther(BigInt(lic.upfrontFee))} ETH`
+                      : 'None'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Royalty</span>
+                  <span className="font-medium text-foreground">{royaltyPct}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Duration</span>
+                  <span className="font-medium text-foreground">{lic.durationDays} days</span>
+                </div>
+                {lic.totalRoyalties && BigInt(lic.totalRoyalties) > 0n && (
+                  <div className="flex justify-between">
+                    <span>Total Royalties</span>
+                    <span className="font-medium text-primary">
+                      {formatEther(BigInt(lic.totalRoyalties))} ETH
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {lic.status === 'ACTIVE' && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full mt-3 h-7 text-xs"
+                  onClick={() => revokeLicense.mutate({ licenseId: lic.id })}
+                  disabled={revokeLicense.isPending}
+                >
+                  {revokeLicense.isPending ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <XCircle className="w-3 h-3 mr-1" />
+                  )}
+                  Revoke License
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

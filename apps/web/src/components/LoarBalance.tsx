@@ -13,7 +13,7 @@ export function LoarBalance() {
   const { isAuthenticated } = useWalletAuth();
 
   const { data: balance } = useQuery({
-    queryKey: ['creditBalance'],
+    queryKey: ['credit-balance'],
     queryFn: () => trpcClient.credits.getBalance.query(),
     refetchInterval: 30000,
     enabled: isAuthenticated,

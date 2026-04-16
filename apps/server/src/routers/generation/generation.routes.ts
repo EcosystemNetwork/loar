@@ -282,6 +282,24 @@ async function deductCredits(uid: string, cost: number, generationType: string):
   });
 }
 
+/** Refund credits on generation failure. Best-effort — never throws. */
+async function refundCredits(uid: string, cost: number): Promise<void> {
+  if (!db) return;
+  try {
+    const { FieldValue } = await import('firebase-admin/firestore');
+    await db
+      .collection('userCredits')
+      .doc(uid)
+      .update({
+        balance: FieldValue.increment(cost),
+        totalSpent: FieldValue.increment(-cost),
+        updatedAt: new Date(),
+      });
+  } catch (err) {
+    console.error(`[refundCredits] Failed to refund ${cost} to ${uid}:`, err);
+  }
+}
+
 const videoGenerationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('videoGenerations');
@@ -1062,29 +1080,35 @@ export const generationRouter = router({
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video');
       const startTime = Date.now();
-      // Dispatch Seedance models to ByteDance direct API, everything else to FAL
-      const isByteDance = input.model?.startsWith('bytedance/');
-      const result = isByteDance
-        ? await bytedanceService.generateVideo({
-            prompt: input.prompt,
-            model: input.model?.includes('fast')
-              ? 'dreamina-seedance-2-0-fast-260128'
-              : 'dreamina-seedance-2-0-260128',
-            mode: input.model?.includes('reference')
-              ? 'reference_to_video'
-              : input.imageUrl
-                ? 'image_to_video'
-                : 'text_to_video',
-            imageUrl: input.imageUrl,
-            endImageUrl: input.endImageUrl,
-            duration: input.duration,
-            aspectRatio: input.aspectRatio,
-            resolution: input.resolution,
-            audio: input.generateAudio,
-            negativePrompt: input.negativePrompt,
-            seed: input.seed,
-          })
-        : await falService.generateVideo(input);
+      let result;
+      try {
+        // Dispatch Seedance models to ByteDance direct API, everything else to FAL
+        const isByteDance = input.model?.startsWith('bytedance/');
+        result = isByteDance
+          ? await bytedanceService.generateVideo({
+              prompt: input.prompt,
+              model: input.model?.includes('fast')
+                ? 'dreamina-seedance-2-0-fast-260128'
+                : 'dreamina-seedance-2-0-260128',
+              mode: input.model?.includes('reference')
+                ? 'reference_to_video'
+                : input.imageUrl
+                  ? 'image_to_video'
+                  : 'text_to_video',
+              imageUrl: input.imageUrl,
+              endImageUrl: input.endImageUrl,
+              duration: input.duration,
+              aspectRatio: input.aspectRatio,
+              resolution: input.resolution,
+              audio: input.generateAudio,
+              negativePrompt: input.negativePrompt,
+              seed: input.seed,
+            })
+          : await falService.generateVideo(input);
+      } catch (genError) {
+        await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+        throw genError;
+      }
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Video generation failed');
       }
@@ -1122,14 +1146,20 @@ export const generationRouter = router({
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_veo3');
       const startTime = Date.now();
-      const result = await falService.generateVideo({
-        prompt: input.prompt,
-        imageUrl: input.imageUrl,
-        model: 'fal-ai/veo3.1/fast/image-to-video',
-        duration: input.duration,
-        aspectRatio: input.aspectRatio,
-        motionStrength: input.motionStrength,
-      });
+      let result;
+      try {
+        result = await falService.generateVideo({
+          prompt: input.prompt,
+          imageUrl: input.imageUrl,
+          model: 'fal-ai/veo3.1/fast/image-to-video',
+          duration: input.duration,
+          aspectRatio: input.aspectRatio,
+          motionStrength: input.motionStrength,
+        });
+      } catch (genError) {
+        await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+        throw genError;
+      }
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Veo3 video generation failed');
       }
@@ -1167,15 +1197,21 @@ export const generationRouter = router({
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_kling');
       const startTime = Date.now();
-      const result = await falService.generateVideo({
-        prompt: input.prompt,
-        imageUrl: input.imageUrl,
-        model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
-        duration: input.duration,
-        aspectRatio: input.aspectRatio,
-        negativePrompt: input.negativePrompt,
-        cfgScale: input.cfgScale,
-      });
+      let result;
+      try {
+        result = await falService.generateVideo({
+          prompt: input.prompt,
+          imageUrl: input.imageUrl,
+          model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+          duration: input.duration,
+          aspectRatio: input.aspectRatio,
+          negativePrompt: input.negativePrompt,
+          cfgScale: input.cfgScale,
+        });
+      } catch (genError) {
+        await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+        throw genError;
+      }
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Kling video generation failed');
       }
@@ -1213,15 +1249,21 @@ export const generationRouter = router({
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_wan25');
       const startTime = Date.now();
-      const result = await falService.generateVideo({
-        prompt: input.prompt,
-        imageUrl: input.imageUrl,
-        model: 'fal-ai/wan-25-preview/image-to-video',
-        duration: input.duration,
-        resolution: input.resolution,
-        negativePrompt: input.negativePrompt,
-        enablePromptExpansion: input.enablePromptExpansion,
-      });
+      let result;
+      try {
+        result = await falService.generateVideo({
+          prompt: input.prompt,
+          imageUrl: input.imageUrl,
+          model: 'fal-ai/wan-25-preview/image-to-video',
+          duration: input.duration,
+          resolution: input.resolution,
+          negativePrompt: input.negativePrompt,
+          enablePromptExpansion: input.enablePromptExpansion,
+        });
+      } catch (genError) {
+        await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+        throw genError;
+      }
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Wan25 video generation failed');
       }
@@ -1258,14 +1300,20 @@ export const generationRouter = router({
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_sora');
       const startTime = Date.now();
-      const result = await falService.generateVideo({
-        prompt: input.prompt,
-        imageUrl: input.imageUrl,
-        model: 'fal-ai/sora-2/image-to-video',
-        duration: input.duration,
-        aspectRatio: input.aspectRatio,
-        resolution: input.resolution,
-      });
+      let result;
+      try {
+        result = await falService.generateVideo({
+          prompt: input.prompt,
+          imageUrl: input.imageUrl,
+          model: 'fal-ai/sora-2/image-to-video',
+          duration: input.duration,
+          aspectRatio: input.aspectRatio,
+          resolution: input.resolution,
+        });
+      } catch (genError) {
+        await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+        throw genError;
+      }
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Sora video generation failed');
       }

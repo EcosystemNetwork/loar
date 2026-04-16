@@ -81,6 +81,28 @@ export function useDepositRevenue() {
   });
 }
 
+// ---- My Allowance (member's own budget visibility) ----
+
+export function useMyAllowance(universeId: string) {
+  return useQuery({
+    queryKey: ['my-allowance', universeId],
+    queryFn: async () => {
+      const result = await trpcClient.universeTeam.isMember.query({ universeId });
+      if (!result.isMember || !result.membership) return null;
+      const m = result.membership as Record<string, any>;
+      return {
+        monthlyAllowance: (m.monthlyAllowance as number) || 0,
+        creditsUsedThisMonth: (m.creditsUsedThisMonth as number) || 0,
+        remaining:
+          m.monthlyAllowance > 0
+            ? Math.max(0, m.monthlyAllowance - (m.creditsUsedThisMonth || 0))
+            : null, // null = unlimited
+      };
+    },
+    enabled: !!universeId,
+  });
+}
+
 // ---- Team Members (for allocation dropdown) ----
 
 export function useTeamMembers(universeId: string) {

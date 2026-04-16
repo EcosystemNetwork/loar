@@ -132,7 +132,8 @@ export function ProposeCollabPage() {
     }
   }
 
-  const sharePct = (parseInt(form.revenueShareBps) / 100).toFixed(1);
+  const parsedBps = parseInt(form.revenueShareBps) || 0;
+  const sharePct = (parsedBps / 100).toFixed(1);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -258,13 +259,13 @@ export function ProposeCollabPage() {
               <div className="flex h-6 rounded-full overflow-hidden">
                 <div
                   className="bg-primary flex items-center justify-center text-xs font-medium text-primary-foreground"
-                  style={{ width: `${100 - parseInt(form.revenueShareBps) / 100}%` }}
+                  style={{ width: `${100 - parsedBps / 100}%` }}
                 >
-                  You {(100 - parseInt(form.revenueShareBps) / 100).toFixed(1)}%
+                  You {(100 - parsedBps / 100).toFixed(1)}%
                 </div>
                 <div
                   className="bg-blue-500 flex items-center justify-center text-xs font-medium text-white"
-                  style={{ width: `${parseInt(form.revenueShareBps) / 100}%` }}
+                  style={{ width: `${parsedBps / 100}%` }}
                 >
                   Partner {sharePct}%
                 </div>

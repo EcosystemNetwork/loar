@@ -8,6 +8,7 @@
 import { db } from '../lib/firebase';
 import { TRPCError } from '@trpc/server';
 import { FieldValue } from 'firebase-admin/firestore';
+import { logFailedRefund } from '../lib/refund-audit';
 
 const userCreditsCol = () => {
   if (!db)
@@ -128,6 +129,14 @@ export async function refundAgentCredits(agentId: string, amount: number): Promi
     });
   } catch (err) {
     console.error(`Failed to refund ${amount} credits to agent ${agentId}:`, err);
+    // Log to failedRefunds collection for operator recovery
+    await logFailedRefund({
+      userId: agentId,
+      credits: amount,
+      source: 'ai_agent_refund',
+      generationId: agentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

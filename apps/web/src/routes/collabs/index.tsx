@@ -72,10 +72,11 @@ type Tab = 'active' | 'proposals' | 'history';
 function CollabsHubPage() {
   const { isAuthenticated, address: uid } = useWalletAuth();
   const [tab, setTab] = useState<Tab>('active');
-  const { data: collabs, isLoading } = useMyCollabs();
+  const { data: collabs, isLoading } = useMyCollabs(isAuthenticated);
   const acceptCollab = useAcceptCollab();
   const activateCollab = useActivateCollab();
   const cancelCollab = useCancelCollab();
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   const active = (collabs ?? []).filter((c: any) => c.status === 'ACTIVE');
   const proposals = (collabs ?? []).filter(
@@ -86,29 +87,39 @@ function CollabsHubPage() {
   );
 
   async function handleAccept(collabId: string) {
+    setPendingId(collabId);
     try {
       await acceptCollab.mutateAsync({ collabId });
       toast.success('Collaboration accepted! Ready to activate.');
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to accept');
+    } finally {
+      setPendingId(null);
     }
   }
 
   async function handleActivate(collabId: string) {
+    setPendingId(collabId);
     try {
       await activateCollab.mutateAsync({ collabId });
       toast.success('Collaboration is now active!');
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to activate');
+    } finally {
+      setPendingId(null);
     }
   }
 
   async function handleCancel(collabId: string) {
+    if (!window.confirm('Are you sure you want to cancel this collaboration?')) return;
+    setPendingId(collabId);
     try {
       await cancelCollab.mutateAsync({ collabId });
       toast.success('Collaboration cancelled.');
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to cancel');
+    } finally {
+      setPendingId(null);
     }
   }
 
@@ -186,9 +197,7 @@ function CollabsHubPage() {
                 onAccept={handleAccept}
                 onActivate={handleActivate}
                 onCancel={handleCancel}
-                accepting={acceptCollab.isPending}
-                activating={activateCollab.isPending}
-                cancelling={cancelCollab.isPending}
+                pendingId={pendingId}
               />
             )}
             {tab === 'history' && <HistoryTab collabs={history} />}
@@ -269,18 +278,14 @@ function ProposalsTab({
   onAccept,
   onActivate,
   onCancel,
-  accepting,
-  activating,
-  cancelling,
+  pendingId,
 }: {
   collabs: any[];
   currentUid: string;
   onAccept: (id: string) => void;
   onActivate: (id: string) => void;
   onCancel: (id: string) => void;
-  accepting: boolean;
-  activating: boolean;
-  cancelling: boolean;
+  pendingId: string | null;
 }) {
   if (collabs.length === 0) {
     return (
@@ -340,10 +345,10 @@ function ProposalsTab({
                   <Button
                     size="sm"
                     onClick={() => onAccept(collab.id)}
-                    disabled={accepting}
+                    disabled={pendingId === collab.id}
                     className="gap-1"
                   >
-                    {accepting ? (
+                    {pendingId === collab.id ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <CheckCircle2 className="w-3 h-3" />
@@ -355,10 +360,10 @@ function ProposalsTab({
                   <Button
                     size="sm"
                     onClick={() => onActivate(collab.id)}
-                    disabled={activating}
+                    disabled={pendingId === collab.id}
                     className="gap-1"
                   >
-                    {activating ? (
+                    {pendingId === collab.id ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <Zap className="w-3 h-3" />
@@ -371,10 +376,10 @@ function ProposalsTab({
                     size="sm"
                     variant="outline"
                     onClick={() => onCancel(collab.id)}
-                    disabled={cancelling}
+                    disabled={pendingId === collab.id}
                     className="gap-1 text-red-400 border-red-500/30 hover:bg-red-500/10"
                   >
-                    {cancelling ? (
+                    {pendingId === collab.id ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <XCircle className="w-3 h-3" />

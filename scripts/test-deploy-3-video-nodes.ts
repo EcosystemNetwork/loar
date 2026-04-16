@@ -517,7 +517,10 @@ async function main() {
       const { storageUrl, contentHash } = await uploadToStorage(authToken, videoUrl, i);
       videos.push({ url: videoUrl, storageUrl, contentHash });
     } catch (err: any) {
-      log(`VIDEO ${i + 1}`, `Generation failed: ${err.message?.slice(0, 200)}`);
+      log(
+        `VIDEO ${i + 1}`,
+        `Generation failed: ${JSON.stringify(err.message ?? err).slice(0, 400)}`
+      );
       log(`VIDEO ${i + 1}`, 'Using placeholder video URL...');
       // Use a placeholder hash
       const placeholderHash = keccak256(toBytes(`memeverse-scene-${i + 1}-${Date.now()}`));
