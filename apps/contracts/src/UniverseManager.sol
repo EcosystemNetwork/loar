@@ -18,11 +18,17 @@ import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOption
 import {UniverseData} from "./types/UniverseData.sol";
 import {Strings} from "@openzeppelin/utils/Strings.sol";
 import {Base64} from "@openzeppelin/utils/Base64.sol";
+import {IdentityNFT} from "./IdentityNFT.sol";
 
 interface IWETH {
     function deposit() external payable;
     function approve(address spender, uint256 amount) external returns (bool);
     function transfer(address to, uint256 amount) external returns (bool);
+}
+
+interface IGnosisSafe {
+    function getOwners() external view returns (address[] memory);
+    function getThreshold() external view returns (uint256);
 }
 
 interface IUniverseTokenDeployer {
@@ -54,6 +60,9 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
     /// @notice WETH address used to seed liquidity pools with mint fee ETH.
     address public weth;
+
+    /// @notice Identity NFT contract for co-creator / multi-sig signer INFTs.
+    address public identityNft;
 
     /// @notice Per-universe LP seed balance (wei) held until token deployment seeds the pool.
     mapping(uint256 => uint256) public universeLpSeed;
@@ -96,6 +105,12 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         emit SetTokenDeployer(oldTokenDeployer, _tokenDeployer);
     }
 
+    function setIdentityNft(address _identityNft) external onlyOwner {
+        address old = identityNft;
+        identityNft = _identityNft;
+        emit SetIdentityNft(old, _identityNft);
+    }
+
     /// @notice Claim ETH held in the contract, excluding LP seeds reserved for universes.
     function claimEth(address recipient) external onlyOwner {
         require(recipient != address(0), "Zero address");
@@ -108,6 +123,9 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
     receive() external payable {}
 
+    // ── Public entry points (thin wrappers) ─────────────────────────
+
+    /// @notice Create a universe without a token (fun mode). Token can be deployed later.
     function createUniverse(
         string memory name,
         string memory imageURL,
@@ -116,14 +134,59 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
     ) public payable nonReentrant returns (uint256 _id, address) {
+        return _createUniverse(name, imageURL, description, nodeCreationOptions, nodeVisibilityOptions, initialOwner);
+    }
+
+    /// @notice Deploy a governance token for an existing universe (created without one).
+    function deployUniverseToken(
+        DeploymentConfig memory deploymentConfig,
+        uint id
+    ) public nonReentrant returns (address tokenAddress) {
+        return _deployUniverseToken(deploymentConfig, id);
+    }
+
+    /// @notice Atomic universe + token creation in a single transaction.
+    ///         Creates the universe AND deploys its governance token + LP pool.
+    ///         One wallet signature, one tx, no fragile intermediate state.
+    function createUniverseWithToken(
+        string memory name,
+        string memory imageURL,
+        string memory description,
+        NodeCreationOptions nodeCreationOptions,
+        NodeVisibilityOptions nodeVisibilityOptions,
+        address initialOwner,
+        DeploymentConfig memory deploymentConfig
+    ) external payable nonReentrant returns (
+        uint256 universeId,
+        address universeAddress,
+        address tokenAddress
+    ) {
+        (universeId, universeAddress) = _createUniverse(
+            name, imageURL, description,
+            nodeCreationOptions, nodeVisibilityOptions,
+            initialOwner
+        );
+
+        tokenAddress = _deployUniverseToken(deploymentConfig, universeId);
+
+        emit UniverseCreatedWithToken(universeId, universeAddress, tokenAddress, address(universeDatas[universeId].universeGovernor));
+    }
+
+    // ── Internal implementations ────────────────────────────────────
+
+    function _createUniverse(
+        string memory name,
+        string memory imageURL,
+        string memory description,
+        NodeCreationOptions nodeCreationOptions,
+        NodeVisibilityOptions nodeVisibilityOptions,
+        address initialOwner
+    ) internal returns (uint256 _id, address) {
         require(!deprecated, "Manager is deprecated");
         if (msg.value < mintFee) revert InsufficientMintFee();
 
-        // Refund any overpayment
-        if (msg.value > mintFee) {
-            (bool refunded,) = msg.sender.call{value: msg.value - mintFee}("");
-            require(refunded, "Refund failed");
-        }
+        // Cache overpayment for refund AFTER state updates (CEI pattern)
+        uint256 overpayment = msg.value > mintFee ? msg.value - mintFee : 0;
 
         UniverseConfig memory config = UniverseConfig({
             nodeCreationOption: nodeCreationOptions,
@@ -147,7 +210,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         universeDatas[currentId] = data;
 
         // 100% of mint fee is held as LP seed — wrapped to WETH and deposited
-        // into the universe token's liquidity pool when deployUniverseToken() is called.
+        // into the universe token's liquidity pool when token is deployed.
         universeLpSeed[currentId] = mintFee;
         totalLpSeedsHeld += mintFee;
 
@@ -156,16 +219,25 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         // Mint identity NFT to the universe creator — shows in wallet, transferable
         _safeMint(initialOwner, currentId);
 
+        // Mint Identity NFTs (INFT) to co-creators / multi-sig signers
+        _mintIdentityNfts(initialOwner, currentId, address(universe), name, imageURL);
+
         emit UniverseCreated(address(universe), msg.sender);
         emit UniverseLpSeed(currentId, msg.sender, mintFee);
+
+        // Refund overpayment AFTER all state updates (CEI pattern)
+        if (overpayment > 0) {
+            (bool refunded,) = msg.sender.call{value: overpayment}("");
+            require(refunded, "Refund failed");
+        }
 
         return (currentId, address(universe));
     }
 
-    function deployUniverseToken(
+    function _deployUniverseToken(
         DeploymentConfig memory deploymentConfig,
         uint id
-    ) public nonReentrant returns (address tokenAddress) {
+    ) internal returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
         require(address(universe) != address(0), "Universe does not exist");
         if (ownerOf(id) != msg.sender) {
@@ -255,6 +327,64 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         );
     }
 
+    // ── Identity NFT minting ────────────────────────────────────────
+
+    /// @dev Attempts to detect if `owner` is a Gnosis Safe. If so, mints an INFT
+    ///      to each signer. If EOA, mints a single "1/1" INFT to the creator.
+    ///      Uses try/catch so failures never block universe creation.
+    function _mintIdentityNfts(
+        address owner,
+        uint256 universeId,
+        address universeContract,
+        string memory universeName,
+        string memory universeImage
+    ) internal {
+        if (identityNft == address(0)) return; // INFT not configured yet
+
+        IdentityNFT inft = IdentityNFT(identityNft);
+
+        // Try to detect Gnosis Safe by calling getOwners()
+        try IGnosisSafe(owner).getOwners() returns (address[] memory owners) {
+            if (owners.length > 0) {
+                // Multi-sig detected — mint to each signer
+                uint8 total = owners.length > 255 ? 255 : uint8(owners.length);
+                for (uint8 i = 0; i < total; i++) {
+                    try inft.mint(
+                        owners[i],
+                        universeId,
+                        i + 1,        // 1-based index
+                        total,
+                        owner,        // safe address
+                        universeContract,
+                        universeName,
+                        universeImage
+                    ) {} catch {
+                        // Mint failed for this signer (maybe duplicate), continue
+                    }
+                }
+                return;
+            }
+        } catch {
+            // Not a Safe / call reverted — treat as EOA
+        }
+
+        // EOA creator — mint a single "1/1" INFT
+        try inft.mint(
+            owner,
+            universeId,
+            1,            // signer 1
+            1,            // of 1
+            address(0),   // no safe
+            universeContract,
+            universeName,
+            universeImage
+        ) {} catch {
+            // Non-blocking — INFT mint failure shouldn't break universe creation
+        }
+    }
+
+    // ── Admin functions ─────────────────────────────────────────────
+
     function setTeamFeeRecipient(address _teamFeeRecipient) public onlyOwner {
         address oldTeamFeeRecipient = teamFeeRecipient;
         teamFeeRecipient = _teamFeeRecipient;
@@ -275,24 +405,18 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     }
 
     function setHook(address hook, bool enabled) external onlyOwner {
-        // check that the hook supports the ILoarHook interface
         if (!ILoarHook(hook).supportsInterface(type(ILoarHook).interfaceId)) {
             revert InvalidHook();
         }
-
         enabledHooks[hook] = enabled;
-
         emit SetHook(hook, enabled);
     }
 
     function setLocker(address locker, address hook, bool enabled) external onlyOwner {
-        // check that the locker supports the ILoarLpLocker interface
         if (!ILoarLpLocker(locker).supportsInterface(type(ILoarLpLocker).interfaceId)) {
             revert InvalidLocker();
         }
-
         enabledLockers[locker][hook] = enabled;
-
         emit SetLocker(locker, hook, enabled);
     }
 
@@ -315,23 +439,18 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     // ── ERC-721 Identity NFT ───────────────────────────────────────
 
     /// @dev On transfer, sync the universe admin if governance hasn't been deployed yet.
-    ///      After governance token deployment, admin = governor (immovable), so the NFT
-    ///      represents creator identity only — doesn't change on-chain control.
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = super._update(to, tokenId, auth);
 
-        // Sync admin on the Universe contract if no governance token deployed yet
         UniverseData storage data = universeDatas[tokenId];
         if (address(data.universe) != address(0) && address(data.universeGovernor) == address(0)) {
-            // Pre-governance: NFT holder = admin
             data.universe.setAdmin(to);
         }
 
         return from;
     }
 
-    /// @notice Fully on-chain tokenURI with universe metadata — shows name, image,
-    ///         description, and universe contract address in any wallet or marketplace.
+    /// @notice Fully on-chain tokenURI with universe metadata.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
 
@@ -344,7 +463,6 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         address universeAddr = address(universe);
         bool hasToken = address(data.token) != address(0);
 
-        // Build JSON metadata on-chain (no external server needed)
         string memory json = string(abi.encodePacked(
             '{"name":"', universeName,
             '","description":"', universeDesc,

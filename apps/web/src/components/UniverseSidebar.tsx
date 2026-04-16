@@ -30,6 +30,7 @@ import {
   X,
   Target,
   Vault,
+  BookPlus,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
@@ -61,6 +62,7 @@ interface UniverseSidebarProps {
   handleAddEvent: (type: 'after' | 'branch', nodeId?: string) => void;
   handleRefreshTimeline: () => void;
   onOpenGovernance?: () => void;
+  onOpenGenerations?: () => void;
 }
 
 export function UniverseSidebar({
@@ -73,6 +75,7 @@ export function UniverseSidebar({
   handleAddEvent,
   handleRefreshTimeline,
   onOpenGovernance,
+  onOpenGenerations,
 }: UniverseSidebarProps) {
   const chainId = useChainId();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -340,6 +343,18 @@ export function UniverseSidebar({
                 Create Event
               </Button>
 
+              {/* Build World — open full create hub scoped to this universe */}
+              <Link to="/create" search={{ universe: finalUniverse?.address || finalUniverse?.id }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 hover:from-indigo-100 hover:to-violet-100 dark:hover:from-indigo-950/50 dark:hover:to-violet-950/50 border-indigo-200 dark:border-indigo-800 transition-all duration-300 group h-10"
+                >
+                  <BookPlus className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-indigo-600 dark:text-indigo-400" />
+                  Build World
+                </Button>
+              </Link>
+
               {/* Govern button - only show for blockchain universes with governance configured */}
               {isBlockchainUniverse &&
                 onOpenGovernance &&
@@ -394,6 +409,19 @@ export function UniverseSidebar({
                     Access Settings
                   </Button>
                 </>
+              )}
+
+              {/* Generations panel button */}
+              {onOpenGenerations && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenGenerations}
+                  className="w-full bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 hover:from-purple-100 hover:to-violet-100 dark:hover:from-purple-950/50 dark:hover:to-violet-950/50 border-purple-200 dark:border-purple-800 transition-all duration-300 group h-10"
+                >
+                  <Film className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-purple-600 dark:text-purple-400" />
+                  Generations
+                </Button>
               )}
 
               {/* Gallery button */}

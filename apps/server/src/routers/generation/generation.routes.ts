@@ -19,6 +19,7 @@ import { db } from '../../lib/firebase';
 import { falService } from '../../services/fal';
 import { bytedanceService } from '../../services/bytedance';
 import type { ByteDanceVideoOptions } from '../../services/bytedance';
+import { getStorageManager } from '../../services/storage';
 import {
   routeModel,
   validateManualSelection,
@@ -202,6 +203,48 @@ async function autoAttachVideo(opts: {
     });
   } catch (err) {
     console.error('Failed to auto-attach video:', err);
+  }
+}
+
+// ── Persist video to permanent storage (fire-and-forget) ────────────
+
+async function persistVideoToStorage(opts: {
+  generationId: string;
+  videoUrl: string;
+  userId: string;
+}) {
+  try {
+    const manager = getStorageManager();
+    const filename = `generation-${opts.generationId}.mp4`;
+    console.log(`[persist] Uploading ${filename} to permanent storage...`);
+
+    const manifest = await manager.uploadFromUrl(opts.videoUrl, filename, opts.userId);
+    const permanentUrl = manifest.uploads[0]?.url;
+
+    if (permanentUrl) {
+      // Update the generation record with the permanent URL
+      await generationsCol().doc(opts.generationId).update({
+        permanentVideoUrl: permanentUrl,
+        storageContentHash: manifest.contentHash,
+        storagePersisted: true,
+      });
+
+      // Also update any media attachment that references this generation
+      const attachments = await db
+        .collection('mediaAttachments')
+        .where('generationId', '==', opts.generationId)
+        .limit(5)
+        .get();
+
+      for (const doc of attachments.docs) {
+        await doc.ref.update({ url: permanentUrl, contentHash: manifest.contentHash });
+      }
+
+      console.log(`[persist] ${filename} saved permanently: ${permanentUrl}`);
+    }
+  } catch (err) {
+    // Non-fatal — the temporary URL still works for now
+    console.error(`[persist] Failed to persist video ${opts.generationId}:`, err);
   }
 }
 
@@ -635,6 +678,13 @@ export const generationRouter = router({
                 prompt: originalPrompt,
               });
 
+              // Fire-and-forget: persist to permanent storage
+              persistVideoToStorage({
+                generationId,
+                videoUrl: fallbackResult.videoUrl,
+                userId: ctx.user.uid,
+              }).catch(() => {});
+
               return {
                 generationId,
                 status: 'completed' as const,
@@ -689,9 +739,16 @@ export const generationRouter = router({
           creator: ctx.user.uid,
           entityId: input.entityId,
           generationId,
-          videoUrl: result.videoUrl,
+          videoUrl: result.videoUrl!,
           prompt: originalPrompt,
         });
+
+        // Fire-and-forget: persist to permanent storage (Pinata/IPFS)
+        persistVideoToStorage({
+          generationId,
+          videoUrl: result.videoUrl!,
+          userId: ctx.user.uid,
+        }).catch(() => {}); // swallow — non-blocking
 
         return {
           generationId,

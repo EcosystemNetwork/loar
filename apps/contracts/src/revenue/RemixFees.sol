@@ -73,6 +73,10 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     error NotAuthorized();
     error NotCreatorOrPlatform();
     error FeeBelowMinimum();
+    error FeeAboveMaximum();
+
+    /// @notice Maximum remix fee (prevents abusive pricing)
+    uint256 public maxRemixFee;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -95,6 +99,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
 
         defaultRemixFee = 25e18;    // 25 $LOAR default
         minRemixFee = 5e18;         // 5 $LOAR minimum
+        maxRemixFee = 10_000e18;    // 10,000 $LOAR maximum
 
         // Default split: 70% creator, 20% LP, 10% treasury
         creatorShareBps = 7000;
@@ -163,6 +168,7 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
             revert NotCreatorOrPlatform();
         }
         if (fee > 0 && fee < minRemixFee) revert FeeBelowMinimum();
+        if (fee > maxRemixFee) revert FeeAboveMaximum();
 
         universeConfigs[universeId] = RemixConfig({fee: fee, customFee: true});
         emit UniverseRemixFeeSet(universeId, fee);
@@ -194,6 +200,10 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
 
     function setMinRemixFee(uint256 newMin) external onlyOwner {
         minRemixFee = newMin;
+    }
+
+    function setMaxRemixFee(uint256 newMax) external onlyOwner {
+        maxRemixFee = newMax;
     }
 
     function setSplitRatios(uint16 _creator, uint16 _lp, uint16 _treasury) external onlyOwner {

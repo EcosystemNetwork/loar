@@ -57,6 +57,10 @@ contract EpisodeEditionTest is Test {
 
         vm.stopPrank();
         vm.deal(buyer, 100 ether);
+
+        // Classify content as ORIGINAL so it passes monetization checks
+        vm.prank(platform);
+        registry.setRights(contentHash, IRightsRegistry.RightsType.ORIGINAL);
     }
 
     // ── Initialize ──

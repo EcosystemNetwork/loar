@@ -66,6 +66,8 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
     mapping(uint256 => bool) public characterActive;
     /// @notice Claimable royalties per owner address (from appearance rewards)
     mapping(address => uint256) public claimableRoyalties;
+    /// @notice Maps characterId to the original token ID minted for that character
+    mapping(uint256 => uint256) public characterOriginalToken;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() ERC721("LOAR Characters", "CHARACTER") { _disableInitializers(); }
@@ -126,6 +128,7 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         // Use separate token ID counter to avoid collision with character IDs
         uint256 tokenId = ++nextTokenId;
         tokenToCharacter[tokenId] = characterId;
+        characterOriginalToken[characterId] = tokenId;
 
         _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, metadataURI);
@@ -177,9 +180,11 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         c.appearanceCount++;
         c.accumulatedRoyalties += msg.value;
 
-        // Accrue claimable royalties for the current owner
+        // Accrue claimable royalties for the current owner of the original character token.
+        // NOTE: characterId != tokenId — they diverge after edition mints,
+        // so ownerOf(characterId) would return the wrong address.
         if (msg.value > 0) {
-            address charOwner = ownerOf(characterId);
+            address charOwner = ownerOf(characterOriginalToken[characterId]);
             claimableRoyalties[charOwner] += msg.value;
             // Route reward through PaymentRouter (0 fee — platform already took its cut)
             paymentRouter.route{value: msg.value}(charOwner, 0);

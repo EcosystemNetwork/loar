@@ -36,6 +36,7 @@ import CanonMarketplace from './apps/contracts/out/CanonMarketplace.sol/CanonMar
 import ContentLicensing from './apps/contracts/out/ContentLicensing.sol/ContentLicensing.json';
 import LoarToken from './apps/contracts/out/LoarToken.sol/LoarToken.json';
 import LoarFaucet from './apps/contracts/out/LoarFaucet.sol/LoarFaucet.json';
+import IdentityNFT from './apps/contracts/out/IdentityNFT.sol/IdentityNFT.json';
 // Timelock governor (mainnet-ready replacement for UniverseGovernor)
 // import UniverseTimelockGovernor from './apps/contracts/out/UniverseTimelockGovernor.sol/UniverseTimelockGovernor.json';
 
@@ -97,6 +98,7 @@ export default defineConfig({
     { name: 'ContentLicensing', abi: ContentLicensing.abi as Abi },
     { name: 'LoarToken', abi: LoarToken.abi as Abi },
     { name: 'LoarFaucet', abi: LoarFaucet.abi as Abi },
+    { name: 'IdentityNFT', abi: IdentityNFT.abi as Abi },
   ],
   plugins: [
     react({

@@ -10,6 +10,7 @@ import { encodeAbiParameters } from 'viem';
 const WETH: Record<number, `0x${string}`> = {
   11155111: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9', // Sepolia
   84532: '0x4200000000000000000000000000000000000006', // Base Sepolia
+  8453: '0x4200000000000000000000000000000000000006', // Base Mainnet
 };
 
 /**
@@ -166,6 +167,89 @@ export function useUniverseManager() {
   };
 
   /**
+   * Atomic: create universe + deploy token in a single transaction.
+   * One wallet signature, one tx. No fragile intermediate state.
+   */
+  const createUniverseWithToken = async (
+    universeConfig: {
+      name: string;
+      imageURL: string;
+      description: string;
+      nodeCreationOptions: number;
+      nodeVisibilityOptions: number;
+      initialOwner: `0x${string}`;
+      safeAddress?: `0x${string}`;
+    },
+    deploymentConfig: {
+      tokenConfig: {
+        tokenAdmin: `0x${string}`;
+        name: string;
+        symbol: string;
+        imageURL: string;
+        metadata: string;
+        context: string;
+      };
+      poolConfig: {
+        hook: `0x${string}`;
+        pairedToken: `0x${string}`;
+        tickIfToken0IsLoar: number;
+        tickSpacing: number;
+        poolData: `0x${string}`;
+      };
+      lockerConfig: {
+        locker: `0x${string}`;
+        rewardAdmins: `0x${string}`[];
+        rewardRecipients: `0x${string}`[];
+        rewardBps: number[];
+        tickLower: number[];
+        tickUpper: number[];
+        positionBps: number[];
+        lockerData: `0x${string}`;
+      };
+      allocationConfig?: {
+        lpBps: number;
+        creatorBps: number;
+        treasuryBps: number;
+        communityBps: number;
+      };
+    }
+  ) => {
+    if (!isConnected) throw new Error('Wallet not connected');
+    if (!isSupportedChain(chainId))
+      throw new Error(`Unsupported chain ${chainId}. Please switch to a supported network.`);
+
+    const owner = universeConfig.safeAddress ?? universeConfig.initialOwner;
+    const allocationConfig = deploymentConfig.allocationConfig ?? {
+      lpBps: 8000,
+      creatorBps: 1000,
+      treasuryBps: 500,
+      communityBps: 500,
+    };
+
+    await writeContractAsync({
+      address: contractAddress as `0x${string}`,
+      abi: universeManagerAbi,
+      functionName: 'createUniverseWithToken',
+      args: [
+        universeConfig.name,
+        universeConfig.imageURL,
+        universeConfig.description,
+        universeConfig.nodeCreationOptions,
+        universeConfig.nodeVisibilityOptions,
+        owner,
+        {
+          tokenConfig: deploymentConfig.tokenConfig,
+          poolConfig: deploymentConfig.poolConfig,
+          lockerConfig: deploymentConfig.lockerConfig,
+          allocationConfig,
+        },
+      ],
+      value: mintFee as bigint | undefined,
+      chainId,
+    });
+  };
+
+  /**
    * Read function to get universe data by ID
    * Returns: [universeAddress, tokenAddress, governorAddress, hookAddress, lockerAddress]
    */
@@ -184,6 +268,7 @@ export function useUniverseManager() {
 
   return {
     createUniverse,
+    createUniverseWithToken,
     deployUniverseToken,
     useGetUniverseData,
     hash,

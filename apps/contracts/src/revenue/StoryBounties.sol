@@ -156,6 +156,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     /// @notice Poster awards the bounty to a winner
     function awardBounty(uint256 bountyId, address winner, bytes32 submissionHash) external nonReentrant {
+        if (winner == address(0)) revert ZeroAddress();
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
         if (msg.sender != b.poster && msg.sender != platform) revert NotPoster();

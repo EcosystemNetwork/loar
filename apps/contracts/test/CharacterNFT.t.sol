@@ -56,6 +56,15 @@ contract CharacterNFTTest is Test {
 
         vm.stopPrank();
         vm.deal(platform, 100 ether);
+
+        // Classify content hashes as ORIGINAL so they pass the monetization check
+        vm.startPrank(platform);
+        registry.setRights(visualHash, IRightsRegistry.RightsType.ORIGINAL);
+        registry.setRights(keccak256("a"), IRightsRegistry.RightsType.ORIGINAL);
+        registry.setRights(keccak256("b"), IRightsRegistry.RightsType.ORIGINAL);
+        registry.setRights(keccak256("c"), IRightsRegistry.RightsType.ORIGINAL);
+        registry.setRights(keccak256("different"), IRightsRegistry.RightsType.ORIGINAL);
+        vm.stopPrank();
     }
 
     // ── Initialize ──
@@ -80,7 +89,7 @@ contract CharacterNFTTest is Test {
 
     function test_createCharacter() public {
         vm.prank(creator);
-        uint256 id = nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        uint256 id = nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
 
         assertEq(id, 1);
         assertEq(nft.ownerOf(1), creator);
@@ -98,14 +107,14 @@ contract CharacterNFTTest is Test {
     function test_createCharacter_revert_wrongUniverse() public {
         vm.prank(creator);
         vm.expectRevert(CharacterNFT.WrongUniverse.selector);
-        nft.createCharacter(999, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(999, "Alice", visualHash, "ipfs://alice", 0, 0);
     }
 
     function test_createCharacter_revert_duplicate() public {
         vm.startPrank(creator);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
         vm.expectRevert(CharacterNFT.CharacterExists.selector);
-        nft.createCharacter(1, "Alice", keccak256("different"), "ipfs://alice2");
+        nft.createCharacter(1, "Alice", keccak256("different"), "ipfs://alice2", 0, 0);
         vm.stopPrank();
     }
 
@@ -115,7 +124,7 @@ contract CharacterNFTTest is Test {
 
         vm.prank(creator);
         vm.expectRevert(CharacterNFT.ContentNotMonetizable.selector);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
     }
 
     function test_createCharacter_revert_frozenContent() public {
@@ -124,14 +133,14 @@ contract CharacterNFTTest is Test {
 
         vm.prank(creator);
         vm.expectRevert(CharacterNFT.ContentNotMonetizable.selector);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
     }
 
     // ── Record Appearance ──
 
     function test_recordAppearance() public {
         vm.prank(creator);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
 
         vm.prank(platform);
         nft.recordAppearance{value: 0.1 ether}(1, 42);
@@ -146,7 +155,7 @@ contract CharacterNFTTest is Test {
 
     function test_recordAppearance_multiple() public {
         vm.prank(creator);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
 
         vm.startPrank(platform);
         nft.recordAppearance{value: 0.1 ether}(1, 1);
@@ -161,7 +170,7 @@ contract CharacterNFTTest is Test {
 
     function test_recordAppearance_revert_notPlatform() public {
         vm.prank(creator);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
 
         vm.deal(creator, 1 ether);
         vm.prank(creator);
@@ -173,7 +182,7 @@ contract CharacterNFTTest is Test {
 
     function test_recordAppearance_afterTransfer() public {
         vm.prank(creator);
-        uint256 id = nft.createCharacter(1, "Alice", visualHash, "ipfs://alice");
+        uint256 id = nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
 
         // Transfer NFT to user2
         vm.prank(creator);
@@ -192,9 +201,9 @@ contract CharacterNFTTest is Test {
 
     function test_getCharactersByUniverse() public {
         vm.startPrank(creator);
-        nft.createCharacter(1, "Alice", keccak256("a"), "ipfs://a");
-        nft.createCharacter(1, "Bob", keccak256("b"), "ipfs://b");
-        nft.createCharacter(1, "Charlie", keccak256("c"), "ipfs://c");
+        nft.createCharacter(1, "Alice", keccak256("a"), "ipfs://a", 0, 0);
+        nft.createCharacter(1, "Bob", keccak256("b"), "ipfs://b", 0, 0);
+        nft.createCharacter(1, "Charlie", keccak256("c"), "ipfs://c", 0, 0);
         vm.stopPrank();
 
         uint256[] memory ids = nft.getCharactersByUniverse(1, 1, 10);

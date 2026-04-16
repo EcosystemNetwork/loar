@@ -26,6 +26,7 @@ import {CollabManager} from "../src/revenue/CollabManager.sol";
 import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
 import {LaunchpadStaking} from "../src/revenue/LaunchpadStaking.sol";
 import {StoryBounties} from "../src/revenue/StoryBounties.sol";
+import {IdentityNFT} from "../src/IdentityNFT.sol";
 
 // NFT beacons
 import {EpisodeEditionCollection} from "../src/revenue/EpisodeEditionCollection.sol";
@@ -103,6 +104,11 @@ contract DeployAllScript is Script {
         // Wire up: set token deployer on UniverseManager
         um.setTokenDeployer(address(utd));
         console.log("[2] TokenDeployer set on UniverseManager");
+
+        // Identity NFT for co-creators / multi-sig signers
+        IdentityNFT identityNft = new IdentityNFT(address(um));
+        um.setIdentityNft(address(identityNft));
+        console.log("[2] IdentityNFT:", address(identityNft));
 
         // ── Phase 3: Revenue Infrastructure ─────────────────────────
         // PaymentRouter (UUPS proxy)
@@ -273,6 +279,7 @@ contract DeployAllScript is Script {
         _logEnv("UNIVERSE_MANAGER", address(um));
         _logEnv("UNIVERSE_TOKEN_DEPLOYER", address(utd));
         _logEnv("FEE_LOCKER_ADDRESS", address(feeLocker));
+        _logEnv("IDENTITY_NFT_ADDRESS", address(identityNft));
         console.log("");
         console.log("# --- Revenue ---");
         _logEnv("PAYMENT_ROUTER_ADDRESS", address(paymentRouter));
@@ -300,6 +307,7 @@ contract DeployAllScript is Script {
         _logEnv("VITE_SPLIT_ROUTER_ADDRESS", address(splitRouter));
         _logEnv("VITE_LAUNCHPAD_STAKING_ADDRESS", address(staking));
         _logEnv("VITE_STORY_BOUNTIES_ADDRESS", address(bounties));
+        _logEnv("VITE_IDENTITY_NFT_ADDRESS", address(identityNft));
         console.log("");
         console.log("# --- Platform treasury for split orchestrator ---");
         _logEnv("PLATFORM_TREASURY_ADDRESS", treasury);

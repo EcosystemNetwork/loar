@@ -50,6 +50,9 @@ contract CreditManagerTest is Test {
             ))
         )));
 
+        // Set loar token on PaymentRouter so routeLoarToTreasury works
+        router.setLoarToken(address(loarToken));
+
         vm.stopPrank();
 
         // Setup: give user some ETH and LOAR

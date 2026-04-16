@@ -117,8 +117,9 @@ contract SlopMarket is ReentrancyGuard, Ownable {
         bytes32 contentHash
     ) external returns (uint256 listingId) {
         if (amount == 0) revert InvalidAmount();
-        // Paid listings require monetizable content; free transfers always allowed
-        if (pricePerUnit > 0 && contentHash != bytes32(0)) {
+        // Paid listings require a valid, monetizable content hash
+        if (pricePerUnit > 0) {
+            if (contentHash == bytes32(0)) revert ContentNotMonetizable();
             if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         }
 

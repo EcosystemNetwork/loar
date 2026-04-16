@@ -93,7 +93,7 @@ contract RightsRegistryTest is Test {
     // ── isMonetizable ──
 
     function test_isMonetizable_unset() public view {
-        assertTrue(registry.isMonetizable(hash1)); // UNSET is allowed
+        assertFalse(registry.isMonetizable(hash1)); // UNSET is blocked (default-deny)
     }
 
     function test_isMonetizable_original() public {

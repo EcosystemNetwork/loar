@@ -103,6 +103,13 @@ interface IUniverseManager {
         address locker,
         address governor
     );
+    event UniverseCreatedWithToken(
+        uint256 indexed universeId,
+        address universe,
+        address token,
+        address governor
+    );
+    event SetIdentityNft(address oldIdentityNft, address newIdentityNft);
     event SetLocker(address locker, address hook, bool enabled);
     event SetDeprecated(bool deprecated);
     event SetHook(address hook, bool enabled);
@@ -131,6 +138,20 @@ interface IUniverseManager {
         DeploymentConfig memory deploymentConfig,
         uint id
     ) external returns (address tokenAddress);
+
+    function createUniverseWithToken(
+        string memory name,
+        string memory imageURL,
+        string memory description,
+        NodeCreationOptions nodeCreationOptions,
+        NodeVisibilityOptions nodeVisibilityOptions,
+        address initialOwner,
+        DeploymentConfig memory deploymentConfig
+    ) external payable returns (
+        uint256 universeId,
+        address universeAddress,
+        address tokenAddress
+    );
 
     function enabledHooks(address hook) external view returns (bool);
 

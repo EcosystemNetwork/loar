@@ -34,6 +34,7 @@ import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
+import { GenerationsPanel } from '@/components/GenerationsPanel';
 import { calculateTreeLayout, normalizeNodeId, getEventLabel } from '@/utils/treeLayout';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
@@ -111,6 +112,9 @@ function UniverseTimelineEditor() {
 
   // Image-to-video character selection (1-2 max)
   const [selectedImageCharacters, setSelectedImageCharacters] = useState<string[]>([]);
+
+  // Generations panel state
+  const [showGenerationsPanel, setShowGenerationsPanel] = useState(false);
 
   // File upload state
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -462,7 +466,7 @@ function UniverseTimelineEditor() {
     setUploadedUrl(null);
     setContractSaved(false);
     setIsSavingToContract(false);
-    setSelectedVideoModel('fal-veo3'); // Reset to default
+    setSelectedVideoModel('seedance'); // Reset to default
     setSelectedVideoDuration(8); // Reset video duration to default
     setNegativePrompt(''); // Reset negative prompt
     setVideoPrompt(''); // Reset video prompt
@@ -473,6 +477,59 @@ function UniverseTimelineEditor() {
     setSelectedCharacters([]); // Reset selected characters
     setStatusMessage(null); // Clear any status messages
     setShowVideoDialog(true);
+  }, []);
+
+  // Handle selecting a generation from the panel — pre-fills dialog with video ready to save
+  const handleSelectGeneration = useCallback(
+    (gen: {
+      videoUrl: string;
+      title: string;
+      description: string;
+      generationId: string;
+      model: string;
+    }) => {
+      setAdditionType('after');
+      setSourceNodeId(null);
+      setVideoTitle(gen.title);
+      setVideoDescription(gen.description);
+      setGeneratedVideoUrl(gen.videoUrl);
+      setGeneratedImageUrl(null);
+      setShowVideoStep(true);
+      setUploadedUrl(null);
+      setContractSaved(false);
+      setIsSavingToContract(false);
+      setStatusMessage({
+        type: 'info',
+        title: 'Video Loaded',
+        description: `Loaded "${gen.title.slice(0, 40)}..." from generations. Save to timeline to commit on-chain.`,
+      });
+      setShowGenerationsPanel(false);
+      setShowVideoDialog(true);
+    },
+    []
+  );
+
+  // Handle drop from generations panel onto the ReactFlow canvas
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const data = event.dataTransfer.getData('application/json');
+      if (!data) return;
+      try {
+        const gen = JSON.parse(data);
+        if (gen.videoUrl) {
+          handleSelectGeneration(gen);
+        }
+      } catch {
+        // Not a valid generation drop
+      }
+    },
+    [handleSelectGeneration]
+  );
+
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
   }, []);
 
   // Handle creating actual event after dialog submission - Keep universe branch logic
@@ -993,6 +1050,7 @@ function UniverseTimelineEditor() {
         handleAddEvent={handleAddEvent}
         handleRefreshTimeline={handleRefreshTimeline}
         onOpenGovernance={handleOpenGovernance}
+        onOpenGenerations={() => setShowGenerationsPanel(true)}
       />
 
       {/* Main Content Area */}
@@ -1006,6 +1064,8 @@ function UniverseTimelineEditor() {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
                 nodeTypes={nodeTypes}
                 fitView
                 className="bg-gradient-to-br from-background via-background/95 to-muted/20"
@@ -1178,6 +1238,14 @@ function UniverseTimelineEditor() {
             />
           );
         })()}
+
+        {/* Generations Panel */}
+        <GenerationsPanel
+          universeId={id}
+          isOpen={showGenerationsPanel}
+          onClose={() => setShowGenerationsPanel(false)}
+          onSelectGeneration={handleSelectGeneration}
+        />
 
         {/* Governance Sidebar */}
         <GovernanceSidebar

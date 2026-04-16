@@ -39,7 +39,11 @@ export const adPlacementAbi = [
     outputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256' },
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'placementType', internalType: 'enum AdPlacement.PlacementType', type: 'uint8' },
+      {
+        name: 'placementType',
+        internalType: 'enum AdPlacement.PlacementType',
+        type: 'uint8',
+      },
       { name: 'minBid', internalType: 'uint256', type: 'uint256' },
       { name: 'currentBid', internalType: 'uint256', type: 'uint256' },
       { name: 'currentBidder', internalType: 'address', type: 'address' },
@@ -60,7 +64,11 @@ export const adPlacementAbi = [
     type: 'function',
     inputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'placementType', internalType: 'enum AdPlacement.PlacementType', type: 'uint8' },
+      {
+        name: 'placementType',
+        internalType: 'enum AdPlacement.PlacementType',
+        type: 'uint8',
+      },
       { name: 'minBid', internalType: 'uint256', type: 'uint256' },
       { name: 'episodes', internalType: 'uint256', type: 'uint256' },
       { name: 'metadata', internalType: 'string', type: 'string' },
@@ -129,7 +137,13 @@ export const adPlacementAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -235,7 +249,13 @@ export const adPlacementAbi = [
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -257,15 +277,30 @@ export const adPlacementAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'slotId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       {
         name: 'placementType',
         internalType: 'enum AdPlacement.PlacementType',
         type: 'uint8',
         indexed: false,
       },
-      { name: 'minBid', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'minBid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'AdSlotCreated',
   },
@@ -273,9 +308,24 @@ export const adPlacementAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'slotId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'bidder', internalType: 'address', type: 'address', indexed: false },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'bidder',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'BidPlaced',
   },
@@ -283,38 +333,82 @@ export const adPlacementAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'sponsorshipId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'totalImpressions', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'sponsorshipId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'totalImpressions',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ImpressionRecorded',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'bidder', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'bidder',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RefundWithdrawn',
   },
@@ -322,9 +416,24 @@ export const adPlacementAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'sponsorshipId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'slotId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'sponsor', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'sponsorshipId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'sponsor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'SponsorshipActivated',
   },
@@ -332,21 +441,45 @@ export const adPlacementAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'UniverseRegistered',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -430,7 +563,13 @@ export const canonMarketplaceAbi = [
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'claimRefund', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claimRefund',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'address', type: 'address' }],
@@ -552,7 +691,13 @@ export const canonMarketplaceAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -629,7 +774,11 @@ export const canonMarketplaceAbi = [
         internalType: 'enum CanonMarketplace.SubmissionType',
         type: 'uint8',
       },
-      { name: 'status', internalType: 'enum CanonMarketplace.SubmissionStatus', type: 'uint8' },
+      {
+        name: 'status',
+        internalType: 'enum CanonMarketplace.SubmissionStatus',
+        type: 'uint8',
+      },
       { name: 'creator', internalType: 'address', type: 'address' },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'metadataURI', internalType: 'string', type: 'string' },
@@ -647,7 +796,11 @@ export const canonMarketplaceAbi = [
     inputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
       { name: 'universeToken', internalType: 'address', type: 'address' },
-      { name: 'subType', internalType: 'enum CanonMarketplace.SubmissionType', type: 'uint8' },
+      {
+        name: 'subType',
+        internalType: 'enum CanonMarketplace.SubmissionType',
+        type: 'uint8',
+      },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'metadataURI', internalType: 'string', type: 'string' },
     ],
@@ -662,7 +815,13 @@ export const canonMarketplaceAbi = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -704,9 +863,24 @@ export const canonMarketplaceAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'licenseId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'submissionId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'licensee', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'licensee',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
       { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
     name: 'CanonLicensed',
@@ -715,39 +889,88 @@ export const canonMarketplaceAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'submissionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
     ],
     name: 'CanonSubmissionAccepted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RefundClaimed',
   },
@@ -755,8 +978,18 @@ export const canonMarketplaceAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'submissionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'SubmissionAccepted',
   },
@@ -765,44 +998,95 @@ export const canonMarketplaceAbi = [
     anonymous: false,
     inputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       {
         name: 'subType',
         internalType: 'enum CanonMarketplace.SubmissionType',
         type: 'uint8',
         indexed: false,
       },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
     ],
     name: 'SubmissionCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'submissionId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'SubmissionRejected',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'submissionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'voter', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'submissionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'voter',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
       { name: 'support', internalType: 'bool', type: 'bool', indexed: false },
-      { name: 'weight', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'weight',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'VoteCast',
   },
@@ -934,6 +1218,13 @@ export const characterNftAbi = [
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'characterOriginalToken',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     name: 'characters',
     outputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
@@ -941,7 +1232,11 @@ export const characterNftAbi = [
       { name: 'visualHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'creator', internalType: 'address', type: 'address' },
       { name: 'appearanceCount', internalType: 'uint256', type: 'uint256' },
-      { name: 'accumulatedRoyalties', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'accumulatedRoyalties',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
     ],
     stateMutability: 'view',
   },
@@ -1210,9 +1505,24 @@ export const characterNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'approved', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Approval',
   },
@@ -1220,8 +1530,18 @@ export const characterNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
@@ -1230,8 +1550,18 @@ export const characterNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: '_fromTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: '_toTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: '_fromTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: '_toTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'BatchMetadataUpdate',
   },
@@ -1239,9 +1569,24 @@ export const characterNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'characterId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'episodeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'reward', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'characterId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'episodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'reward',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CharacterAppearance',
   },
@@ -1249,10 +1594,25 @@ export const characterNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'characterId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'characterId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'name', internalType: 'string', type: 'string', indexed: false },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'CharacterCreated',
   },
@@ -1260,32 +1620,81 @@ export const characterNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'characterId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'price', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'characterId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EpisodeMinted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: '_tokenId', internalType: 'uint256', type: 'uint256', indexed: false }],
+    inputs: [
+      {
+        name: '_tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
     name: 'MetadataUpdate',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'characterId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'owner', internalType: 'address', type: 'address', indexed: false },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'characterId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RoyaltyClaimed',
   },
@@ -1295,7 +1704,12 @@ export const characterNftAbi = [
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Transfer',
   },
@@ -1450,7 +1864,11 @@ export const collabManagerAbi = [
       { name: 'universeB', internalType: 'uint256', type: 'uint256' },
       { name: 'proposer', internalType: 'address', type: 'address' },
       { name: 'acceptor', internalType: 'address', type: 'address' },
-      { name: 'status', internalType: 'enum CollabManager.CollabStatus', type: 'uint8' },
+      {
+        name: 'status',
+        internalType: 'enum CollabManager.CollabStatus',
+        type: 'uint8',
+      },
       { name: 'revenueShareBps', internalType: 'uint256', type: 'uint256' },
       { name: 'totalRevenue', internalType: 'uint256', type: 'uint256' },
       { name: 'startTime', internalType: 'uint256', type: 'uint256' },
@@ -1521,7 +1939,13 @@ export const collabManagerAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -1609,7 +2033,13 @@ export const collabManagerAbi = [
     outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -1624,8 +2054,18 @@ export const collabManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'acceptor', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'acceptor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'CollabAccepted',
   },
@@ -1633,24 +2073,56 @@ export const collabManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'startTime', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'endTime', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'startTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'endTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CollabActivated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'CollabCancelled',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'totalRevenue', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'totalRevenue',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CollabCompleted',
   },
@@ -1658,9 +2130,24 @@ export const collabManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'episodeCount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'revenue', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'episodeCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'revenue',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CollabEpisodeCreated',
   },
@@ -1668,54 +2155,127 @@ export const collabManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeA', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'universeB', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'proposer', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeA',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'universeB',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'proposer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'CollabProposed',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'collabId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amountA', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'amountB', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'collabId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amountA',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amountB',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RevenueDistributed',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -1821,8 +2381,16 @@ export const contentLicensingAbi = [
       { name: 'id', internalType: 'uint256', type: 'uint256' },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'splitEntityHash', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'dealType', internalType: 'enum ContentLicensing.DealType', type: 'uint8' },
-      { name: 'status', internalType: 'enum ContentLicensing.DealStatus', type: 'uint8' },
+      {
+        name: 'dealType',
+        internalType: 'enum ContentLicensing.DealType',
+        type: 'uint8',
+      },
+      {
+        name: 'status',
+        internalType: 'enum ContentLicensing.DealStatus',
+        type: 'uint8',
+      },
       { name: 'buyer', internalType: 'address', type: 'address' },
       { name: 'pricePaid', internalType: 'uint256', type: 'uint256' },
       { name: 'startTime', internalType: 'uint256', type: 'uint256' },
@@ -2067,28 +2635,75 @@ export const contentLicensingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'dealId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'price', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ContentBought',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: true }],
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+    ],
     name: 'ContentDeactivated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'dealId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
       { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'endTime', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'endTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ContentLicensed',
   },
@@ -2096,10 +2711,30 @@ export const contentLicensingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'splitEntityHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'splitEntityHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
     ],
     name: 'ContentRegistered',
   },
@@ -2107,48 +2742,114 @@ export const contentLicensingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'dealId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'price', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'endTime', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'endTime',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ContentRented',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: true }],
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+    ],
     name: 'PricingUpdated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'dealId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RoyaltyPaid',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -2188,6 +2889,7 @@ export const contentLicensingAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'RefundFailed' },
   { type: 'error', inputs: [], name: 'SplitRouterFailed' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
@@ -2477,8 +3179,18 @@ export const creditManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'reason', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'reason',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
     ],
     name: 'CreditsGranted',
   },
@@ -2487,10 +3199,30 @@ export const creditManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'packageId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'credits', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'bonus', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'paid', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'packageId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'credits',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'bonus',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CreditsPurchasedWithEth',
   },
@@ -2499,10 +3231,30 @@ export const creditManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'packageId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'credits', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'bonus', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'loarPaid', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'packageId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'credits',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'bonus',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'loarPaid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CreditsPurchasedWithLoar',
   },
@@ -2511,9 +3263,24 @@ export const creditManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'generationType', internalType: 'string', type: 'string', indexed: false },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'generationType',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CreditsSpent',
   },
@@ -2521,23 +3288,50 @@ export const creditManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'genType', internalType: 'string', type: 'string', indexed: false },
-      { name: 'newCost', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'genType',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'newCost',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'GenerationCostUpdated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -2545,18 +3339,45 @@ export const creditManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'packageId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'packageId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       { name: 'name', internalType: 'string', type: 'string', indexed: false },
-      { name: 'credits', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'priceWei', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'priceLoar', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'credits',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'priceWei',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'priceLoar',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'PackageCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -2653,7 +3474,11 @@ export const entityEditionNftAbi = [
     type: 'function',
     inputs: [
       { name: '_universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'kind', internalType: 'enum EntityEditionNFT.EntityKind', type: 'uint8' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+      },
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
@@ -2677,7 +3502,11 @@ export const entityEditionNftAbi = [
     name: 'editions',
     outputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'kind', internalType: 'enum EntityEditionNFT.EntityKind', type: 'uint8' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+      },
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'creator', internalType: 'address', type: 'address' },
@@ -2692,7 +3521,11 @@ export const entityEditionNftAbi = [
     type: 'function',
     inputs: [
       { name: '_universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'kind', internalType: 'enum EntityEditionNFT.EntityKind', type: 'uint8' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityEditionNFT.EntityKind',
+        type: 'uint8',
+      },
       { name: 'startId', internalType: 'uint256', type: 'uint256' },
       { name: 'count', internalType: 'uint256', type: 'uint256' },
     ],
@@ -2857,8 +3690,18 @@ export const entityEditionNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'account', internalType: 'address', type: 'address', indexed: true },
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
@@ -2867,8 +3710,18 @@ export const entityEditionNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'editionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       {
         name: 'kind',
         internalType: 'enum EntityEditionNFT.EntityKind',
@@ -2876,44 +3729,108 @@ export const entityEditionNftAbi = [
         indexed: false,
       },
       { name: 'name', internalType: 'string', type: 'string', indexed: false },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
-      { name: 'mintPrice', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'maxSupply', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'mintPrice',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'maxSupply',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EditionCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'EditionDeactivated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'editionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'paid', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EditionMinted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
-      { name: 'values', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
+      {
+        name: 'ids',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'values',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
     ],
     name: 'TransferBatch',
   },
@@ -2921,11 +3838,21 @@ export const entityEditionNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
       { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'value', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'TransferSingle',
   },
@@ -3064,7 +3991,11 @@ export const entityNftAbi = [
     name: 'entities',
     outputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'kind', internalType: 'enum EntityNFT.EntityKind', type: 'uint8' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+      },
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'creator', internalType: 'address', type: 'address' },
@@ -3094,7 +4025,11 @@ export const entityNftAbi = [
     type: 'function',
     inputs: [
       { name: '_universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'kind', internalType: 'enum EntityNFT.EntityKind', type: 'uint8' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+      },
       { name: 'startId', internalType: 'uint256', type: 'uint256' },
       { name: 'count', internalType: 'uint256', type: 'uint256' },
     ],
@@ -3130,7 +4065,11 @@ export const entityNftAbi = [
     type: 'function',
     inputs: [
       { name: '_universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'kind', internalType: 'enum EntityNFT.EntityKind', type: 'uint8' },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+      },
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'mintPrice', internalType: 'uint256', type: 'uint256' },
@@ -3316,9 +4255,24 @@ export const entityNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'approved', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Approval',
   },
@@ -3326,8 +4280,18 @@ export const entityNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
@@ -3336,8 +4300,18 @@ export const entityNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: '_fromTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: '_toTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: '_fromTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: '_toTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'BatchMetadataUpdate',
   },
@@ -3345,25 +4319,64 @@ export const entityNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'kind', internalType: 'enum EntityNFT.EntityKind', type: 'uint8', indexed: false },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'kind',
+        internalType: 'enum EntityNFT.EntityKind',
+        type: 'uint8',
+        indexed: false,
+      },
       { name: 'name', internalType: 'string', type: 'string', indexed: false },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
     ],
     name: 'EntityMinted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: '_tokenId', internalType: 'uint256', type: 'uint256', indexed: false }],
+    inputs: [
+      {
+        name: '_tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
     name: 'MetadataUpdate',
   },
   {
@@ -3372,7 +4385,12 @@ export const entityNftAbi = [
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Transfer',
   },
@@ -3698,8 +4716,18 @@ export const episodeEditionCollectionAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'account', internalType: 'address', type: 'address', indexed: true },
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
@@ -3708,47 +4736,126 @@ export const episodeEditionCollectionAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'editionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'nodeId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
-      { name: 'mintPrice', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'maxSupply', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'nodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'mintPrice',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'maxSupply',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EditionCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'editionId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'EditionDeactivated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'editionId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'paid', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'editionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EditionMinted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
-      { name: 'values', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
+      {
+        name: 'ids',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'values',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
     ],
     name: 'TransferBatch',
   },
@@ -3756,11 +4863,21 @@ export const episodeEditionCollectionAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
       { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'value', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'TransferSingle',
   },
@@ -4159,9 +5276,24 @@ export const episodeNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'approved', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Approval',
   },
@@ -4169,8 +5301,18 @@ export const episodeNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
@@ -4179,8 +5321,18 @@ export const episodeNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: '_fromTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: '_toTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: '_fromTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: '_toTokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'BatchMetadataUpdate',
   },
@@ -4188,42 +5340,113 @@ export const episodeNftAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'episodeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'nodeId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
-      { name: 'mintPrice', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'maxSupply', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'episodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'nodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'mintPrice',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'maxSupply',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EpisodeCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'episodeId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'episodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'EpisodeDeactivated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'episodeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'price', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'episodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'EpisodeMinted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: '_tokenId', internalType: 'uint256', type: 'uint256', indexed: false }],
+    inputs: [
+      {
+        name: '_tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
     name: 'MetadataUpdate',
   },
   {
@@ -4232,7 +5455,12 @@ export const episodeNftAbi = [
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Transfer',
   },
@@ -4604,9 +5832,24 @@ export const governanceErc20Abi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'spender', internalType: 'address', type: 'address', indexed: true },
-      { name: 'value', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'spender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Approval',
   },
@@ -4614,9 +5857,24 @@ export const governanceErc20Abi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'delegator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'fromDelegate', internalType: 'address', type: 'address', indexed: true },
-      { name: 'toDelegate', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'delegator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'fromDelegate',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'toDelegate',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'DelegateChanged',
   },
@@ -4624,9 +5882,24 @@ export const governanceErc20Abi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'delegate', internalType: 'address', type: 'address', indexed: true },
-      { name: 'previousVotes', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newVotes', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'delegate',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'previousVotes',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newVotes',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'DelegateVotesChanged',
   },
@@ -4637,7 +5910,12 @@ export const governanceErc20Abi = [
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'value', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Transfer',
   },
@@ -4747,6 +6025,408 @@ export const governanceErc20Abi = [
     type: 'error',
     inputs: [{ name: 'expiry', internalType: 'uint256', type: 'uint256' }],
     name: 'VotesExpiredSignature',
+  },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// IdentityNFT
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const identityNftAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_minter', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getApproved',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'signerIndex', internalType: 'uint8', type: 'uint8' },
+      { name: 'totalSigners', internalType: 'uint8', type: 'uint8' },
+      { name: 'safe', internalType: 'address', type: 'address' },
+      { name: 'universeContract', internalType: 'address', type: 'address' },
+      { name: 'universeName', internalType: 'string', type: 'string' },
+      { name: 'universeImage', internalType: 'string', type: 'string' },
+    ],
+    name: 'mint',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'minter',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ownerOf',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_minter', internalType: 'address', type: 'address' }],
+    name: 'setMinter',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'signerInfo',
+    outputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'signerIndex', internalType: 'uint8', type: 'uint8' },
+      { name: 'totalSigners', internalType: 'uint8', type: 'uint8' },
+      { name: 'safeAddress', internalType: 'address', type: 'address' },
+      { name: 'universeContract', internalType: 'address', type: 'address' },
+      { name: 'universeName', internalType: 'string', type: 'string' },
+      { name: 'universeImage', internalType: 'string', type: 'string' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'signerTokenForUniverse',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenURI',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'signerIndex',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'totalSigners',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+    ],
+    name: 'Minted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldMinter',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newMinter',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'MinterUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Transfer',
+  },
+  { type: 'error', inputs: [], name: 'AlreadyMinted' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'owner', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC721IncorrectOwner',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC721InsufficientApproval',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOperator',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ERC721NonexistentToken',
+  },
+  { type: 'error', inputs: [], name: 'OnlyMinter' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+      { name: 'length', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'StringsInsufficientHexLength',
   },
 ] as const;
 
@@ -4909,7 +6589,11 @@ export const launchpadStakingAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'tier', internalType: 'enum LaunchpadStaking.Tier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum LaunchpadStaking.Tier',
+        type: 'uint8',
+      },
       { name: 'minStake', internalType: 'uint256', type: 'uint256' },
       { name: 'weight', internalType: 'uint16', type: 'uint16' },
       { name: 'feeDiscountBps', internalType: 'uint16', type: 'uint16' },
@@ -4952,7 +6636,11 @@ export const launchpadStakingAbi = [
       { name: 'amount', internalType: 'uint256', type: 'uint256' },
       { name: 'stakedAt', internalType: 'uint256', type: 'uint256' },
       { name: 'lastClaimAt', internalType: 'uint256', type: 'uint256' },
-      { name: 'tier', internalType: 'enum LaunchpadStaking.Tier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum LaunchpadStaking.Tier',
+        type: 'uint8',
+      },
     ],
     stateMutability: 'view',
   },
@@ -5074,23 +6762,50 @@ export const launchpadStakingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldPenaltyBps', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'newPenaltyBps', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'oldPenaltyBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newPenaltyBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'EarlyUnstakePenaltyChanged',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldPool', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newPool', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'LiquidityPoolChanged',
   },
@@ -5098,8 +6813,18 @@ export const launchpadStakingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldPeriod', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newPeriod', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldPeriod',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newPeriod',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'MinLockPeriodChanged',
   },
@@ -5107,8 +6832,18 @@ export const launchpadStakingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -5117,8 +6852,18 @@ export const launchpadStakingAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'tier', internalType: 'enum LaunchpadStaking.Tier', type: 'uint8', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'tier',
+        internalType: 'enum LaunchpadStaking.Tier',
+        type: 'uint8',
+        indexed: false,
+      },
     ],
     name: 'Staked',
   },
@@ -5146,12 +6891,42 @@ export const launchpadStakingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'tier', internalType: 'enum LaunchpadStaking.Tier', type: 'uint8', indexed: true },
-      { name: 'minStake', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'weight', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'feeDiscountBps', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'curationBoost', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'priorityQueue', internalType: 'bool', type: 'bool', indexed: false },
+      {
+        name: 'tier',
+        internalType: 'enum LaunchpadStaking.Tier',
+        type: 'uint8',
+        indexed: true,
+      },
+      {
+        name: 'minStake',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'weight',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'feeDiscountBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'curationBoost',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'priorityQueue',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
     ],
     name: 'TierConfigChanged',
   },
@@ -5159,8 +6934,18 @@ export const launchpadStakingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTreasury', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newTreasury', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'TreasuryChanged',
   },
@@ -5169,8 +6954,18 @@ export const launchpadStakingAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'UniverseRewardClaimed',
   },
@@ -5178,8 +6973,18 @@ export const launchpadStakingAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'UniverseRewardDistributed',
   },
@@ -5188,8 +6993,18 @@ export const launchpadStakingAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'UniverseStaked',
   },
@@ -5198,9 +7013,24 @@ export const launchpadStakingAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'penalty', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'penalty',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'UniverseUnstaked',
   },
@@ -5209,15 +7039,32 @@ export const launchpadStakingAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'penalty', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'penalty',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Unstaked',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -5305,7 +7152,11 @@ export const licensingRegistryAbi = [
     type: 'function',
     inputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'licenseType', internalType: 'enum LicensingRegistry.LicenseType', type: 'uint8' },
+      {
+        name: 'licenseType',
+        internalType: 'enum LicensingRegistry.LicenseType',
+        type: 'uint8',
+      },
       { name: 'licensee', internalType: 'address', type: 'address' },
       { name: 'upfrontFee', internalType: 'uint256', type: 'uint256' },
       { name: 'royaltyBps', internalType: 'uint16', type: 'uint16' },
@@ -5398,8 +7249,16 @@ export const licensingRegistryAbi = [
     outputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256' },
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'licenseType', internalType: 'enum LicensingRegistry.LicenseType', type: 'uint8' },
-      { name: 'status', internalType: 'enum LicensingRegistry.LicenseStatus', type: 'uint8' },
+      {
+        name: 'licenseType',
+        internalType: 'enum LicensingRegistry.LicenseType',
+        type: 'uint8',
+      },
+      {
+        name: 'status',
+        internalType: 'enum LicensingRegistry.LicenseStatus',
+        type: 'uint8',
+      },
       { name: 'licensor', internalType: 'address', type: 'address' },
       { name: 'licensee', internalType: 'address', type: 'address' },
       { name: 'upfrontFee', internalType: 'uint256', type: 'uint256' },
@@ -5448,7 +7307,13 @@ export const licensingRegistryAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -5556,7 +7421,13 @@ export const licensingRegistryAbi = [
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -5570,46 +7441,102 @@ export const licensingRegistryAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'LicenseActivated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'licenseId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       {
         name: 'licenseType',
         internalType: 'enum LicensingRegistry.LicenseType',
         type: 'uint8',
         indexed: false,
       },
-      { name: 'licensee', internalType: 'address', type: 'address', indexed: false },
-      { name: 'upfrontFee', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'licensee',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'upfrontFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'LicenseCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'LicenseRevoked',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'merchId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'merchId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'name', internalType: 'string', type: 'string', indexed: false },
-      { name: 'price', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'MerchCreated',
   },
@@ -5617,9 +7544,24 @@ export const licensingRegistryAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'merchId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'price', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'merchId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'price',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'MerchSold',
   },
@@ -5627,23 +7569,50 @@ export const licensingRegistryAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'licenseId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'licenseId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RoyaltyPaid',
   },
@@ -5651,21 +7620,45 @@ export const licensingRegistryAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'UniverseRegistered',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -5754,7 +7747,13 @@ export const loarBurnerAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'action', internalType: 'enum LoarBurner.BurnAction', type: 'uint8' }],
+    inputs: [
+      {
+        name: 'action',
+        internalType: 'enum LoarBurner.BurnAction',
+        type: 'uint8',
+      },
+    ],
     name: 'execute',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -5770,7 +7769,11 @@ export const loarBurnerAbi = [
     type: 'function',
     inputs: [
       { name: 'user', internalType: 'address', type: 'address' },
-      { name: 'action', internalType: 'enum LoarBurner.BurnAction', type: 'uint8' },
+      {
+        name: 'action',
+        internalType: 'enum LoarBurner.BurnAction',
+        type: 'uint8',
+      },
     ],
     name: 'executeFor',
     outputs: [],
@@ -5816,7 +7819,13 @@ export const loarBurnerAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -5848,7 +7857,11 @@ export const loarBurnerAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'action', internalType: 'enum LoarBurner.BurnAction', type: 'uint8' },
+      {
+        name: 'action',
+        internalType: 'enum LoarBurner.BurnAction',
+        type: 'uint8',
+      },
       { name: 'cost', internalType: 'uint256', type: 'uint256' },
       { name: 'active', internalType: 'bool', type: 'bool' },
     ],
@@ -5923,7 +7936,13 @@ export const loarBurnerAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -5938,8 +7957,18 @@ export const loarBurnerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'action', internalType: 'enum LoarBurner.BurnAction', type: 'uint8', indexed: false },
-      { name: 'cost', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'action',
+        internalType: 'enum LoarBurner.BurnAction',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'cost',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'active', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ActionConfigUpdated',
@@ -5949,10 +7978,30 @@ export const loarBurnerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'action', internalType: 'enum LoarBurner.BurnAction', type: 'uint8', indexed: true },
-      { name: 'cost', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toLp', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toTreasury', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'action',
+        internalType: 'enum LoarBurner.BurnAction',
+        type: 'uint8',
+        indexed: true,
+      },
+      {
+        name: 'cost',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'toLp',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'toTreasury',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ActionExecuted',
   },
@@ -5960,8 +8009,18 @@ export const loarBurnerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'actionName', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'cost', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'actionName',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'cost',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'active', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'CustomActionConfigUpdated',
@@ -5971,25 +8030,62 @@ export const loarBurnerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'actionName', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'cost', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toLp', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toTreasury', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'actionName',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'cost',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'toLp',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'toTreasury',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CustomActionExecuted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldPool', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newPool', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'LiquidityPoolUpdated',
   },
@@ -5997,8 +8093,18 @@ export const loarBurnerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldRatio', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'newRatio', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'oldRatio',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newRatio',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'LpRatioUpdated',
   },
@@ -6006,23 +8112,50 @@ export const loarBurnerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldPlatform', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newPlatform', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'PlatformUpdated',
   },
@@ -6030,21 +8163,45 @@ export const loarBurnerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTreasury', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newTreasury', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'TreasuryUpdated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   { type: 'error', inputs: [], name: 'ActionNotActive' },
@@ -6121,7 +8278,13 @@ export const loarFaucetAbi = [
     ],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'claim', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claim',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -6136,7 +8299,13 @@ export const loarFaucetAbi = [
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'drain', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'drain',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -6197,8 +8366,18 @@ export const loarFaucetAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newAmount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ClaimAmountUpdated',
   },
@@ -6207,7 +8386,12 @@ export const loarFaucetAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Claimed',
   },
@@ -6215,8 +8399,18 @@ export const loarFaucetAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldCooldown', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newCooldown', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldCooldown',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newCooldown',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'CooldownUpdated',
   },
@@ -6225,7 +8419,12 @@ export const loarFaucetAbi = [
     anonymous: false,
     inputs: [
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Drained',
   },
@@ -6233,8 +8432,18 @@ export const loarFaucetAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -6372,16 +8581,38 @@ export const loarFeeLockerAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'depositor', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'depositor',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'AddDepositor',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'feeOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amountClaimed', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'feeOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amountClaimed',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ClaimTokens',
   },
@@ -6389,10 +8620,30 @@ export const loarFeeLockerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'feeOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'recipient', internalType: 'address', type: 'address', indexed: false },
-      { name: 'amountClaimed', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'feeOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amountClaimed',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ClaimTokensPermissioned',
   },
@@ -6400,26 +8651,68 @@ export const loarFeeLockerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'depositor', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'depositor',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'RemoveDepositor',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'sender', internalType: 'address', type: 'address', indexed: true },
-      { name: 'feeOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'balance', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'feeOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'balance',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'StoreTokens',
   },
@@ -6635,7 +8928,11 @@ export const loarHookStaticFeeAbi = [
         components: [
           { name: 'zeroForOne', internalType: 'bool', type: 'bool' },
           { name: 'amountSpecified', internalType: 'int256', type: 'int256' },
-          { name: 'sqrtPriceLimitX96', internalType: 'uint160', type: 'uint160' },
+          {
+            name: 'sqrtPriceLimitX96',
+            internalType: 'uint160',
+            type: 'uint160',
+          },
         ],
       },
       { name: 'delta', internalType: 'BalanceDelta', type: 'int256' },
@@ -6783,7 +9080,11 @@ export const loarHookStaticFeeAbi = [
         components: [
           { name: 'zeroForOne', internalType: 'bool', type: 'bool' },
           { name: 'amountSpecified', internalType: 'int256', type: 'int256' },
-          { name: 'sqrtPriceLimitX96', internalType: 'uint160', type: 'uint160' },
+          {
+            name: 'sqrtPriceLimitX96',
+            internalType: 'uint160',
+            type: 'uint160',
+          },
         ],
       },
       { name: 'hookData', internalType: 'bytes', type: 'bytes' },
@@ -6825,8 +9126,16 @@ export const loarHookStaticFeeAbi = [
           { name: 'afterDonate', internalType: 'bool', type: 'bool' },
           { name: 'beforeSwapReturnDelta', internalType: 'bool', type: 'bool' },
           { name: 'afterSwapReturnDelta', internalType: 'bool', type: 'bool' },
-          { name: 'afterAddLiquidityReturnDelta', internalType: 'bool', type: 'bool' },
-          { name: 'afterRemoveLiquidityReturnDelta', internalType: 'bool', type: 'bool' },
+          {
+            name: 'afterAddLiquidityReturnDelta',
+            internalType: 'bool',
+            type: 'bool',
+          },
+          {
+            name: 'afterRemoveLiquidityReturnDelta',
+            internalType: 'bool',
+            type: 'bool',
+          },
         ],
       },
     ],
@@ -6933,8 +9242,18 @@ export const loarHookStaticFeeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ClaimProtocolFees',
   },
@@ -6942,8 +9261,18 @@ export const loarHookStaticFeeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -6951,12 +9280,37 @@ export const loarHookStaticFeeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'pairedToken', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'pairedToken',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'loar', internalType: 'address', type: 'address', indexed: true },
-      { name: 'poolId', internalType: 'PoolId', type: 'bytes32', indexed: false },
-      { name: 'tickIfToken0IsLoar', internalType: 'int24', type: 'int24', indexed: false },
-      { name: 'tickSpacing', internalType: 'int24', type: 'int24', indexed: false },
-      { name: 'locker', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'poolId',
+        internalType: 'PoolId',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'tickIfToken0IsLoar',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: false,
+      },
+      {
+        name: 'tickSpacing',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: false,
+      },
+      {
+        name: 'locker',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'PoolCreatedFactory',
   },
@@ -6964,11 +9318,31 @@ export const loarHookStaticFeeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'pairedToken', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'pairedToken',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'loar', internalType: 'address', type: 'address', indexed: true },
-      { name: 'poolId', internalType: 'PoolId', type: 'bytes32', indexed: false },
-      { name: 'tickIfToken0IsLoar', internalType: 'int24', type: 'int24', indexed: false },
-      { name: 'tickSpacing', internalType: 'int24', type: 'int24', indexed: false },
+      {
+        name: 'poolId',
+        internalType: 'PoolId',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'tickIfToken0IsLoar',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: false,
+      },
+      {
+        name: 'tickSpacing',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: false,
+      },
     ],
     name: 'PoolCreatedOpen',
   },
@@ -6976,9 +9350,24 @@ export const loarHookStaticFeeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'poolId', internalType: 'PoolId', type: 'bytes32', indexed: false },
-      { name: 'loarFee', internalType: 'uint24', type: 'uint24', indexed: false },
-      { name: 'pairedFee', internalType: 'uint24', type: 'uint24', indexed: false },
+      {
+        name: 'poolId',
+        internalType: 'PoolId',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'loarFee',
+        internalType: 'uint24',
+        type: 'uint24',
+        indexed: false,
+      },
+      {
+        name: 'pairedFee',
+        internalType: 'uint24',
+        type: 'uint24',
+        indexed: false,
+      },
     ],
     name: 'PoolInitialized',
   },
@@ -7110,8 +9499,16 @@ export const loarLpLockerMultipleAbi = [
         type: 'tuple',
         components: [
           { name: 'locker', internalType: 'address', type: 'address' },
-          { name: 'rewardAdmins', internalType: 'address[]', type: 'address[]' },
-          { name: 'rewardRecipients', internalType: 'address[]', type: 'address[]' },
+          {
+            name: 'rewardAdmins',
+            internalType: 'address[]',
+            type: 'address[]',
+          },
+          {
+            name: 'rewardRecipients',
+            internalType: 'address[]',
+            type: 'address[]',
+          },
           { name: 'rewardBps', internalType: 'uint16[]', type: 'uint16[]' },
           { name: 'tickLower', internalType: 'int24[]', type: 'int24[]' },
           { name: 'tickUpper', internalType: 'int24[]', type: 'int24[]' },
@@ -7192,14 +9589,26 @@ export const loarLpLockerMultipleAbi = [
               { name: 'currency1', internalType: 'Currency', type: 'address' },
               { name: 'fee', internalType: 'uint24', type: 'uint24' },
               { name: 'tickSpacing', internalType: 'int24', type: 'int24' },
-              { name: 'hooks', internalType: 'contract IHooks', type: 'address' },
+              {
+                name: 'hooks',
+                internalType: 'contract IHooks',
+                type: 'address',
+              },
             ],
           },
           { name: 'positionId', internalType: 'uint256', type: 'uint256' },
           { name: 'numPositions', internalType: 'uint256', type: 'uint256' },
           { name: 'rewardBps', internalType: 'uint16[]', type: 'uint16[]' },
-          { name: 'rewardAdmins', internalType: 'address[]', type: 'address[]' },
-          { name: 'rewardRecipients', internalType: 'address[]', type: 'address[]' },
+          {
+            name: 'rewardAdmins',
+            internalType: 'address[]',
+            type: 'address[]',
+          },
+          {
+            name: 'rewardRecipients',
+            internalType: 'address[]',
+            type: 'address[]',
+          },
         ],
       },
     ],
@@ -7255,11 +9664,36 @@ export const loarLpLockerMultipleAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount0', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'amount1', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'rewards0', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
-      { name: 'rewards1', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'rewards0',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'rewards1',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
     ],
     name: 'ClaimedRewards',
   },
@@ -7267,8 +9701,18 @@ export const loarLpLockerMultipleAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -7277,7 +9721,12 @@ export const loarLpLockerMultipleAbi = [
     anonymous: false,
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
-      { name: 'positionId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'positionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Received',
   },
@@ -7285,10 +9734,30 @@ export const loarLpLockerMultipleAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'oldAdmin', internalType: 'address', type: 'address', indexed: false },
-      { name: 'newAdmin', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'rewardIndex',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'oldAdmin',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newAdmin',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'RewardAdminUpdated',
   },
@@ -7296,10 +9765,30 @@ export const loarLpLockerMultipleAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'oldRecipient', internalType: 'address', type: 'address', indexed: false },
-      { name: 'newRecipient', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'rewardIndex',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'oldRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'RewardRecipientUpdated',
   },
@@ -7307,7 +9796,12 @@ export const loarLpLockerMultipleAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
       {
         name: 'poolKey',
         internalType: 'struct PoolKey',
@@ -7321,15 +9815,60 @@ export const loarLpLockerMultipleAbi = [
         ],
         indexed: false,
       },
-      { name: 'poolSupply', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'positionId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'numPositions', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'rewardBps', internalType: 'uint16[]', type: 'uint16[]', indexed: false },
-      { name: 'rewardAdmins', internalType: 'address[]', type: 'address[]', indexed: false },
-      { name: 'rewardRecipients', internalType: 'address[]', type: 'address[]', indexed: false },
-      { name: 'tickLower', internalType: 'int24[]', type: 'int24[]', indexed: false },
-      { name: 'tickUpper', internalType: 'int24[]', type: 'int24[]', indexed: false },
-      { name: 'positionBps', internalType: 'uint16[]', type: 'uint16[]', indexed: false },
+      {
+        name: 'poolSupply',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'positionId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'numPositions',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'rewardBps',
+        internalType: 'uint16[]',
+        type: 'uint16[]',
+        indexed: false,
+      },
+      {
+        name: 'rewardAdmins',
+        internalType: 'address[]',
+        type: 'address[]',
+        indexed: false,
+      },
+      {
+        name: 'rewardRecipients',
+        internalType: 'address[]',
+        type: 'address[]',
+        indexed: false,
+      },
+      {
+        name: 'tickLower',
+        internalType: 'int24[]',
+        type: 'int24[]',
+        indexed: false,
+      },
+      {
+        name: 'tickUpper',
+        internalType: 'int24[]',
+        type: 'int24[]',
+        indexed: false,
+      },
+      {
+        name: 'positionBps',
+        internalType: 'uint16[]',
+        type: 'uint16[]',
+        indexed: false,
+      },
     ],
     name: 'TokenRewardAdded',
   },
@@ -7677,9 +10216,24 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'spender', internalType: 'address', type: 'address', indexed: true },
-      { name: 'value', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'spender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Approval',
   },
@@ -7688,7 +10242,12 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'account', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'exempt', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'FeeExemptUpdated',
@@ -7707,8 +10266,18 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldPool', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newPool', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPool',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'LiquidityPoolUpdated',
   },
@@ -7716,8 +10285,18 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'minter', internalType: 'address', type: 'address', indexed: true },
-      { name: 'authorized', internalType: 'bool', type: 'bool', indexed: false },
+      {
+        name: 'minter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'authorized',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
     ],
     name: 'MinterUpdated',
   },
@@ -7725,8 +10304,18 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -7736,7 +10325,12 @@ export const loarTokenAbi = [
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'value', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Transfer',
   },
@@ -7744,8 +10338,18 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldFeeBps', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newFeeBps', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldFeeBps',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFeeBps',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'TransferFeeUpdated',
   },
@@ -7753,8 +10357,18 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTreasury', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newTreasury', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'TreasuryUpdated',
   },
@@ -7871,8 +10485,20 @@ export const paymentRouterAbi = [
     outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'claim', outputs: [], stateMutability: 'nonpayable' },
-  { type: 'function', inputs: [], name: 'claimLoar', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claim',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claimLoar',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'address', type: 'address' }],
@@ -7898,7 +10524,11 @@ export const paymentRouterAbi = [
     type: 'function',
     inputs: [
       { name: '_treasury', internalType: 'address', type: 'address' },
-      { name: '_defaultPlatformFeeBps', internalType: 'uint16', type: 'uint16' },
+      {
+        name: '_defaultPlatformFeeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+      },
       { name: '_loarToken', internalType: 'address', type: 'address' },
       { name: '_loarFeeDiscountBps', internalType: 'uint16', type: 'uint16' },
     ],
@@ -7927,7 +10557,13 @@ export const paymentRouterAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -8026,7 +10662,13 @@ export const paymentRouterAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -8041,78 +10683,183 @@ export const paymentRouterAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Claimed',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'newFeeBps', internalType: 'uint16', type: 'uint16', indexed: true }],
+    inputs: [
+      {
+        name: 'newFeeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: true,
+      },
+    ],
     name: 'DefaultFeeUpdated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'LoarClaimed',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'newDiscountBps', internalType: 'uint16', type: 'uint16', indexed: true }],
+    inputs: [
+      {
+        name: 'newDiscountBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: true,
+      },
+    ],
     name: 'LoarFeeDiscountUpdated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'creatorAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'platformAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'feeBps', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'creatorAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'feeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'LoarPaymentRouted',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'newToken', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'newToken',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'LoarTokenUpdated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'creatorAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'platformAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'feeBps', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'creatorAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'feeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'PaymentRouted',
   },
@@ -8120,21 +10867,45 @@ export const paymentRouterAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTreasury', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newTreasury', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'TreasuryUpdated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -8274,6 +11045,13 @@ export const remixFeesAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'maxRemixFee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'minRemixFee',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -8327,6 +11105,13 @@ export const remixFeesAbi = [
     type: 'function',
     inputs: [{ name: 'newPool', internalType: 'address', type: 'address' }],
     name: 'setLiquidityPool',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newMax', internalType: 'uint256', type: 'uint256' }],
+    name: 'setMaxRemixFee',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -8452,23 +11237,50 @@ export const remixFeesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldFee', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newFee', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'DefaultRemixFeeUpdated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -8476,13 +11288,43 @@ export const remixFeesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'remixer', internalType: 'address', type: 'address', indexed: true },
-      { name: 'originalCreator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'remixer',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'originalCreator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toCreator', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toLp', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'toTreasury', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'toCreator',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'toLp',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'toTreasury',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'RemixFeeCharged',
   },
@@ -8490,7 +11332,12 @@ export const remixFeesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
     name: 'UniverseRemixFeeSet',
@@ -8498,7 +11345,14 @@ export const remixFeesAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -8524,6 +11378,7 @@ export const remixFeesAbi = [
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
+  { type: 'error', inputs: [], name: 'FeeAboveMaximum' },
   { type: 'error', inputs: [], name: 'FeeBelowMinimum' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
   { type: 'error', inputs: [], name: 'NotAuthorized' },
@@ -8623,7 +11478,13 @@ export const rightsRegistryAbi = [
     type: 'function',
     inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     name: 'rights',
-    outputs: [{ name: '', internalType: 'enum IRightsRegistry.RightsType', type: 'uint8' }],
+    outputs: [
+      {
+        name: '',
+        internalType: 'enum IRightsRegistry.RightsType',
+        type: 'uint8',
+      },
+    ],
     stateMutability: 'view',
   },
   {
@@ -8640,7 +11501,11 @@ export const rightsRegistryAbi = [
     type: 'function',
     inputs: [
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'rightsType', internalType: 'enum IRightsRegistry.RightsType', type: 'uint8' },
+      {
+        name: 'rightsType',
+        internalType: 'enum IRightsRegistry.RightsType',
+        type: 'uint8',
+      },
     ],
     name: 'setRights',
     outputs: [],
@@ -8667,23 +11532,50 @@ export const rightsRegistryAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'reason', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'reason',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
     ],
     name: 'ContentFrozen',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'authorized', internalType: 'bool', type: 'bool', indexed: false },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'authorized',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
     ],
     name: 'OperatorUpdated',
   },
@@ -8691,8 +11583,18 @@ export const rightsRegistryAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -8700,7 +11602,12 @@ export const rightsRegistryAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
       {
         name: 'rightsType',
         internalType: 'enum IRightsRegistry.RightsType',
@@ -8713,7 +11620,14 @@ export const rightsRegistryAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -8813,7 +11727,11 @@ export const slopMarketAbi = [
           { name: 'seller', internalType: 'address', type: 'address' },
           { name: 'tokenContract', internalType: 'address', type: 'address' },
           { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-          { name: 'standard', internalType: 'enum SlopMarket.TokenStandard', type: 'uint8' },
+          {
+            name: 'standard',
+            internalType: 'enum SlopMarket.TokenStandard',
+            type: 'uint8',
+          },
           { name: 'amount', internalType: 'uint256', type: 'uint256' },
           { name: 'pricePerUnit', internalType: 'uint256', type: 'uint256' },
           { name: 'active', internalType: 'bool', type: 'bool' },
@@ -8850,7 +11768,11 @@ export const slopMarketAbi = [
       { name: 'seller', internalType: 'address', type: 'address' },
       { name: 'tokenContract', internalType: 'address', type: 'address' },
       { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-      { name: 'standard', internalType: 'enum SlopMarket.TokenStandard', type: 'uint8' },
+      {
+        name: 'standard',
+        internalType: 'enum SlopMarket.TokenStandard',
+        type: 'uint8',
+      },
       { name: 'amount', internalType: 'uint256', type: 'uint256' },
       { name: 'pricePerUnit', internalType: 'uint256', type: 'uint256' },
       { name: 'active', internalType: 'bool', type: 'bool' },
@@ -8930,25 +11852,62 @@ export const slopMarketAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'listingId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'listingId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'Delisted',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'listingId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'seller', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenContract', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'listingId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'seller',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenContract',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       {
         name: 'standard',
         internalType: 'enum SlopMarket.TokenStandard',
         type: 'uint8',
         indexed: false,
       },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'pricePerUnit', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'pricePerUnit',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Listed',
   },
@@ -8956,25 +11915,62 @@ export const slopMarketAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'newFeeBps', internalType: 'uint16', type: 'uint16', indexed: false }],
+    inputs: [
+      {
+        name: 'newFeeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
     name: 'PlatformFeeUpdated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'listingId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'buyer', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'totalPaid', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'listingId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'buyer',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'totalPaid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Sale',
   },
@@ -9156,8 +12152,18 @@ export const splitRouterAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -9165,8 +12171,18 @@ export const splitRouterAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'registrar', internalType: 'address', type: 'address', indexed: true },
-      { name: 'authorized', internalType: 'bool', type: 'bool', indexed: false },
+      {
+        name: 'registrar',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'authorized',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
     ],
     name: 'RegistrarUpdated',
   },
@@ -9174,10 +12190,30 @@ export const splitRouterAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'entityHash', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'totalAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'recipientCount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'platformFeeBps', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'entityHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'totalAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'recipientCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformFeeBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'SplitPayment',
   },
@@ -9185,9 +12221,24 @@ export const splitRouterAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'entityHash', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'recipientCount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'entityHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipientCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'SplitsConfigured',
   },
@@ -9255,7 +12306,11 @@ export const storyBountiesAbi = [
       { name: 'descriptionHash', internalType: 'string', type: 'string' },
       { name: 'contentType', internalType: 'string', type: 'string' },
       { name: 'deadline', internalType: 'uint256', type: 'uint256' },
-      { name: 'status', internalType: 'enum StoryBounties.BountyStatus', type: 'uint8' },
+      {
+        name: 'status',
+        internalType: 'enum StoryBounties.BountyStatus',
+        type: 'uint8',
+      },
       { name: 'claimedBy', internalType: 'address', type: 'address' },
       { name: 'submissionHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'createdAt', internalType: 'uint256', type: 'uint256' },
@@ -9315,7 +12370,11 @@ export const storyBountiesAbi = [
           { name: 'descriptionHash', internalType: 'string', type: 'string' },
           { name: 'contentType', internalType: 'string', type: 'string' },
           { name: 'deadline', internalType: 'uint256', type: 'uint256' },
-          { name: 'status', internalType: 'enum StoryBounties.BountyStatus', type: 'uint8' },
+          {
+            name: 'status',
+            internalType: 'enum StoryBounties.BountyStatus',
+            type: 'uint8',
+          },
           { name: 'claimedBy', internalType: 'address', type: 'address' },
           { name: 'submissionHash', internalType: 'bytes32', type: 'bytes32' },
           { name: 'createdAt', internalType: 'uint256', type: 'uint256' },
@@ -9513,8 +12572,18 @@ export const storyBountiesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'bountyId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'refund', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'bountyId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'refund',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
     name: 'BountyCancelled',
@@ -9523,10 +12592,30 @@ export const storyBountiesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'bountyId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'winner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'reward', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'platformFee', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'bountyId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'winner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'reward',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'BountyClaimed',
   },
@@ -9534,41 +12623,100 @@ export const storyBountiesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'bountyId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'poster', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'reward', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'contentType', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'bountyId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'poster',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'reward',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'contentType',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
     ],
     name: 'BountyCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'bountyId', internalType: 'uint256', type: 'uint256', indexed: true }],
+    inputs: [
+      {
+        name: 'bountyId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
     name: 'BountyExpired',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldBps', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'newBps', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'oldBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'CancellationFeeChanged',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldMin', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newMin', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldMin',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newMin',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'MinBountyChanged',
   },
@@ -9576,8 +12724,18 @@ export const storyBountiesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
@@ -9585,8 +12743,18 @@ export const storyBountiesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldBps', internalType: 'uint16', type: 'uint16', indexed: false },
-      { name: 'newBps', internalType: 'uint16', type: 'uint16', indexed: false },
+      {
+        name: 'oldBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'newBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
     ],
     name: 'PlatformFeeChanged',
   },
@@ -9594,15 +12762,32 @@ export const storyBountiesAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTreasury', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newTreasury', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'oldTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newTreasury',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'TreasuryChanged',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -9692,7 +12877,11 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'tier', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
       { name: 'pricePerMonth', internalType: 'uint256', type: 'uint256' },
       { name: 'earlyAccess', internalType: 'bool', type: 'bool' },
       { name: 'votingBoost', internalType: 'bool', type: 'bool' },
@@ -9708,7 +12897,11 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'tier', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
     ],
     name: 'deactivateTier',
     outputs: [],
@@ -9722,7 +12915,11 @@ export const subscriptionManagerAbi = [
     ],
     name: 'getSubscription',
     outputs: [
-      { name: 'tier', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
       { name: 'expiresAt', internalType: 'uint256', type: 'uint256' },
       { name: 'active', internalType: 'bool', type: 'bool' },
       { name: 'autoRenew', internalType: 'bool', type: 'bool' },
@@ -9734,7 +12931,11 @@ export const subscriptionManagerAbi = [
     inputs: [
       { name: 'user', internalType: 'address', type: 'address' },
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'minTier', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: 'minTier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
     ],
     name: 'hasAccess',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
@@ -9758,7 +12959,13 @@ export const subscriptionManagerAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
@@ -9815,7 +13022,11 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'tier', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
       { name: 'months', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'subscribe',
@@ -9826,7 +13037,11 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [
       { name: '', internalType: 'uint256', type: 'uint256' },
-      { name: '', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: '',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
     ],
     name: 'subscriberCount',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -9841,7 +13056,11 @@ export const subscriptionManagerAbi = [
     name: 'subscriptions',
     outputs: [
       { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'tier', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: 'tier',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
       { name: 'startedAt', internalType: 'uint256', type: 'uint256' },
       { name: 'expiresAt', internalType: 'uint256', type: 'uint256' },
       { name: 'autoRenew', internalType: 'bool', type: 'bool' },
@@ -9852,7 +13071,11 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [
       { name: '', internalType: 'uint256', type: 'uint256' },
-      { name: '', internalType: 'enum SubscriptionManager.SubscriptionTier', type: 'uint8' },
+      {
+        name: '',
+        internalType: 'enum SubscriptionManager.SubscriptionTier',
+        type: 'uint8',
+      },
     ],
     name: 'tierConfigs',
     outputs: [
@@ -9880,7 +13103,13 @@ export const subscriptionManagerAbi = [
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [
@@ -9894,22 +13123,46 @@ export const subscriptionManagerAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
+    inputs: [
+      {
+        name: 'version',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
     name: 'Initialized',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Paused',
   },
   {
@@ -9917,14 +13170,24 @@ export const subscriptionManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       {
         name: 'tier',
         internalType: 'enum SubscriptionManager.SubscriptionTier',
         type: 'uint8',
         indexed: false,
       },
-      { name: 'expiresAt', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'expiresAt',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Subscribed',
   },
@@ -9933,7 +13196,12 @@ export const subscriptionManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'SubscriptionCancelled',
   },
@@ -9942,8 +13210,18 @@ export const subscriptionManagerAbi = [
     anonymous: false,
     inputs: [
       { name: 'user', internalType: 'address', type: 'address', indexed: true },
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'newExpiry', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'newExpiry',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'SubscriptionRenewed',
   },
@@ -9951,14 +13229,24 @@ export const subscriptionManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       {
         name: 'tier',
         internalType: 'enum SubscriptionManager.SubscriptionTier',
         type: 'uint8',
         indexed: false,
       },
-      { name: 'pricePerMonth', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'pricePerMonth',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'TierConfigured',
   },
@@ -9966,7 +13254,12 @@ export const subscriptionManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       {
         name: 'tier',
         internalType: 'enum SubscriptionManager.SubscriptionTier',
@@ -9980,21 +13273,45 @@ export const subscriptionManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'UniverseRegistered',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
     name: 'Unpaused',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'implementation', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'implementation',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'Upgraded',
   },
   {
@@ -10060,7 +13377,11 @@ export const universeAbi = [
         internalType: 'struct IUniverseManager.UniverseConfig',
         type: 'tuple',
         components: [
-          { name: 'nodeCreationOption', internalType: 'enum NodeCreationOptions', type: 'uint8' },
+          {
+            name: 'nodeCreationOption',
+            internalType: 'enum NodeCreationOptions',
+            type: 'uint8',
+          },
           {
             name: 'nodeVisibilityOption',
             internalType: 'enum NodeVisibilityOptions',
@@ -10267,14 +13588,26 @@ export const universeAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: '_option', internalType: 'enum NodeCreationOptions', type: 'uint8' }],
+    inputs: [
+      {
+        name: '_option',
+        internalType: 'enum NodeCreationOptions',
+        type: 'uint8',
+      },
+    ],
     name: 'setNodeCreationOption',
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    inputs: [{ name: '_option', internalType: 'enum NodeVisibilityOptions', type: 'uint8' }],
+    inputs: [
+      {
+        name: '_option',
+        internalType: 'enum NodeVisibilityOptions',
+        type: 'uint8',
+      },
+    ],
     name: 'setNodeVisibilityOption',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -10351,16 +13684,38 @@ export const universeAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'newAdmin', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'newAdmin',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'AdminUpdated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'nodeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'updater', internalType: 'address', type: 'address', indexed: false },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'nodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'updater',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
       { name: 'link', internalType: 'string', type: 'string', indexed: false },
     ],
     name: 'MediaUpdated',
@@ -10370,7 +13725,12 @@ export const universeAbi = [
     anonymous: false,
     inputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'canonizer', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'canonizer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'NodeCanonized',
   },
@@ -10379,10 +13739,30 @@ export const universeAbi = [
     anonymous: false,
     inputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'previous', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'plotHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'previous',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'plotHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
       { name: 'link', internalType: 'string', type: 'string', indexed: false },
       { name: 'plot', internalType: 'string', type: 'string', indexed: false },
     ],
@@ -10392,7 +13772,12 @@ export const universeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'option', internalType: 'enum NodeCreationOptions', type: 'uint8', indexed: false },
+      {
+        name: 'option',
+        internalType: 'enum NodeCreationOptions',
+        type: 'uint8',
+        indexed: false,
+      },
     ],
     name: 'NodeCreationOptionUpdated',
   },
@@ -10400,14 +13785,26 @@ export const universeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'option', internalType: 'enum NodeVisibilityOptions', type: 'uint8', indexed: false },
+      {
+        name: 'option',
+        internalType: 'enum NodeVisibilityOptions',
+        type: 'uint8',
+        indexed: false,
+      },
     ],
     name: 'NodeVisibilityOptionUpdated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'token', internalType: 'address', type: 'address', indexed: true }],
+    inputs: [
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
     name: 'TokenUpdated',
   },
   {
@@ -10796,7 +14193,13 @@ export const universeGovernorAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'newProposalThreshold', internalType: 'uint256', type: 'uint256' }],
+    inputs: [
+      {
+        name: 'newProposalThreshold',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+    ],
     name: 'setProposalThreshold',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -10868,37 +14271,106 @@ export const universeGovernorAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'proposalId', internalType: 'uint256', type: 'uint256', indexed: false }],
+    inputs: [
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
     name: 'ProposalCanceled',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'proposalId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'proposer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'targets', internalType: 'address[]', type: 'address[]', indexed: false },
-      { name: 'values', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
-      { name: 'signatures', internalType: 'string[]', type: 'string[]', indexed: false },
-      { name: 'calldatas', internalType: 'bytes[]', type: 'bytes[]', indexed: false },
-      { name: 'voteStart', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'voteEnd', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'description', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'proposer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'targets',
+        internalType: 'address[]',
+        type: 'address[]',
+        indexed: false,
+      },
+      {
+        name: 'values',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'signatures',
+        internalType: 'string[]',
+        type: 'string[]',
+        indexed: false,
+      },
+      {
+        name: 'calldatas',
+        internalType: 'bytes[]',
+        type: 'bytes[]',
+        indexed: false,
+      },
+      {
+        name: 'voteStart',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'voteEnd',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'description',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
     ],
     name: 'ProposalCreated',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'proposalId', internalType: 'uint256', type: 'uint256', indexed: false }],
+    inputs: [
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
     name: 'ProposalExecuted',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'proposalId', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'etaSeconds', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'etaSeconds',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ProposalQueued',
   },
@@ -10906,8 +14378,18 @@ export const universeGovernorAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldProposalThreshold', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newProposalThreshold', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldProposalThreshold',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newProposalThreshold',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ProposalThresholdSet',
   },
@@ -10915,8 +14397,18 @@ export const universeGovernorAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldQuorumNumerator', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newQuorumNumerator', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldQuorumNumerator',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newQuorumNumerator',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'QuorumNumeratorUpdated',
   },
@@ -10924,11 +14416,31 @@ export const universeGovernorAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'voter', internalType: 'address', type: 'address', indexed: true },
-      { name: 'proposalId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'voter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'support', internalType: 'uint8', type: 'uint8', indexed: false },
-      { name: 'weight', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'reason', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'weight',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'reason',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
     ],
     name: 'VoteCast',
   },
@@ -10936,11 +14448,31 @@ export const universeGovernorAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'voter', internalType: 'address', type: 'address', indexed: true },
-      { name: 'proposalId', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'voter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
       { name: 'support', internalType: 'uint8', type: 'uint8', indexed: false },
-      { name: 'weight', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'reason', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'weight',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'reason',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
       { name: 'params', internalType: 'bytes', type: 'bytes', indexed: false },
     ],
     name: 'VoteCastWithParams',
@@ -10949,8 +14481,18 @@ export const universeGovernorAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldVotingDelay', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newVotingDelay', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldVotingDelay',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newVotingDelay',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'VotingDelaySet',
   },
@@ -10958,8 +14500,18 @@ export const universeGovernorAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldVotingPeriod', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newVotingPeriod', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldVotingPeriod',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newVotingPeriod',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'VotingPeriodSet',
   },
@@ -11043,7 +14595,11 @@ export const universeGovernorAbi = [
     type: 'error',
     inputs: [
       { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
-      { name: 'current', internalType: 'enum IGovernor.ProposalState', type: 'uint8' },
+      {
+        name: 'current',
+        internalType: 'enum IGovernor.ProposalState',
+        type: 'uint8',
+      },
       { name: 'expectedStates', internalType: 'bytes32', type: 'bytes32' },
     ],
     name: 'GovernorUnexpectedProposalState',
@@ -11139,14 +14695,122 @@ export const universeManagerAbi = [
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'imageURL', internalType: 'string', type: 'string' },
       { name: 'description', internalType: 'string', type: 'string' },
-      { name: 'nodeCreationOptions', internalType: 'enum NodeCreationOptions', type: 'uint8' },
-      { name: 'nodeVisibilityOptions', internalType: 'enum NodeVisibilityOptions', type: 'uint8' },
+      {
+        name: 'nodeCreationOptions',
+        internalType: 'enum NodeCreationOptions',
+        type: 'uint8',
+      },
+      {
+        name: 'nodeVisibilityOptions',
+        internalType: 'enum NodeVisibilityOptions',
+        type: 'uint8',
+      },
       { name: 'initialOwner', internalType: 'address', type: 'address' },
     ],
     name: 'createUniverse',
     outputs: [
       { name: '_id', internalType: 'uint256', type: 'uint256' },
       { name: '', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'imageURL', internalType: 'string', type: 'string' },
+      { name: 'description', internalType: 'string', type: 'string' },
+      {
+        name: 'nodeCreationOptions',
+        internalType: 'enum NodeCreationOptions',
+        type: 'uint8',
+      },
+      {
+        name: 'nodeVisibilityOptions',
+        internalType: 'enum NodeVisibilityOptions',
+        type: 'uint8',
+      },
+      { name: 'initialOwner', internalType: 'address', type: 'address' },
+      {
+        name: 'deploymentConfig',
+        internalType: 'struct IUniverseManager.DeploymentConfig',
+        type: 'tuple',
+        components: [
+          {
+            name: 'tokenConfig',
+            internalType: 'struct IUniverseManager.TokenConfig',
+            type: 'tuple',
+            components: [
+              { name: 'tokenAdmin', internalType: 'address', type: 'address' },
+              { name: 'name', internalType: 'string', type: 'string' },
+              { name: 'symbol', internalType: 'string', type: 'string' },
+              { name: 'imageURL', internalType: 'string', type: 'string' },
+              { name: 'metadata', internalType: 'string', type: 'string' },
+              { name: 'context', internalType: 'string', type: 'string' },
+            ],
+          },
+          {
+            name: 'poolConfig',
+            internalType: 'struct IUniverseManager.PoolConfig',
+            type: 'tuple',
+            components: [
+              { name: 'hook', internalType: 'address', type: 'address' },
+              { name: 'pairedToken', internalType: 'address', type: 'address' },
+              {
+                name: 'tickIfToken0IsLoar',
+                internalType: 'int24',
+                type: 'int24',
+              },
+              { name: 'tickSpacing', internalType: 'int24', type: 'int24' },
+              { name: 'poolData', internalType: 'bytes', type: 'bytes' },
+            ],
+          },
+          {
+            name: 'lockerConfig',
+            internalType: 'struct IUniverseManager.LockerConfig',
+            type: 'tuple',
+            components: [
+              { name: 'locker', internalType: 'address', type: 'address' },
+              {
+                name: 'rewardAdmins',
+                internalType: 'address[]',
+                type: 'address[]',
+              },
+              {
+                name: 'rewardRecipients',
+                internalType: 'address[]',
+                type: 'address[]',
+              },
+              { name: 'rewardBps', internalType: 'uint16[]', type: 'uint16[]' },
+              { name: 'tickLower', internalType: 'int24[]', type: 'int24[]' },
+              { name: 'tickUpper', internalType: 'int24[]', type: 'int24[]' },
+              {
+                name: 'positionBps',
+                internalType: 'uint16[]',
+                type: 'uint16[]',
+              },
+              { name: 'lockerData', internalType: 'bytes', type: 'bytes' },
+            ],
+          },
+          {
+            name: 'allocationConfig',
+            internalType: 'struct IUniverseManager.AllocationConfig',
+            type: 'tuple',
+            components: [
+              { name: 'lpBps', internalType: 'uint16', type: 'uint16' },
+              { name: 'creatorBps', internalType: 'uint16', type: 'uint16' },
+              { name: 'treasuryBps', internalType: 'uint16', type: 'uint16' },
+              { name: 'communityBps', internalType: 'uint16', type: 'uint16' },
+            ],
+          },
+        ],
+      },
+    ],
+    name: 'createUniverseWithToken',
+    outputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'universeAddress', internalType: 'address', type: 'address' },
+      { name: 'tokenAddress', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'payable',
   },
@@ -11178,7 +14842,11 @@ export const universeManagerAbi = [
             components: [
               { name: 'hook', internalType: 'address', type: 'address' },
               { name: 'pairedToken', internalType: 'address', type: 'address' },
-              { name: 'tickIfToken0IsLoar', internalType: 'int24', type: 'int24' },
+              {
+                name: 'tickIfToken0IsLoar',
+                internalType: 'int24',
+                type: 'int24',
+              },
               { name: 'tickSpacing', internalType: 'int24', type: 'int24' },
               { name: 'poolData', internalType: 'bytes', type: 'bytes' },
             ],
@@ -11189,12 +14857,24 @@ export const universeManagerAbi = [
             type: 'tuple',
             components: [
               { name: 'locker', internalType: 'address', type: 'address' },
-              { name: 'rewardAdmins', internalType: 'address[]', type: 'address[]' },
-              { name: 'rewardRecipients', internalType: 'address[]', type: 'address[]' },
+              {
+                name: 'rewardAdmins',
+                internalType: 'address[]',
+                type: 'address[]',
+              },
+              {
+                name: 'rewardRecipients',
+                internalType: 'address[]',
+                type: 'address[]',
+              },
               { name: 'rewardBps', internalType: 'uint16[]', type: 'uint16[]' },
               { name: 'tickLower', internalType: 'int24[]', type: 'int24[]' },
               { name: 'tickUpper', internalType: 'int24[]', type: 'int24[]' },
-              { name: 'positionBps', internalType: 'uint16[]', type: 'uint16[]' },
+              {
+                name: 'positionBps',
+                internalType: 'uint16[]',
+                type: 'uint16[]',
+              },
               { name: 'lockerData', internalType: 'bytes', type: 'bytes' },
             ],
           },
@@ -11255,10 +14935,25 @@ export const universeManagerAbi = [
     outputs: [
       { name: 'universe', internalType: 'contract IUniverse', type: 'address' },
       { name: 'token', internalType: 'contract IERC20', type: 'address' },
-      { name: 'universeGovernor', internalType: 'contract IGovernor', type: 'address' },
+      {
+        name: 'universeGovernor',
+        internalType: 'contract IGovernor',
+        type: 'address',
+      },
       { name: 'hook', internalType: 'contract IHooks', type: 'address' },
-      { name: 'locker', internalType: 'contract ILoarLpLocker', type: 'address' },
+      {
+        name: 'locker',
+        internalType: 'contract ILoarLpLocker',
+        type: 'address',
+      },
     ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'identityNft',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -11353,6 +15048,13 @@ export const universeManagerAbi = [
       { name: 'enabled', internalType: 'bool', type: 'bool' },
     ],
     name: 'setHook',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_identityNft', internalType: 'address', type: 'address' }],
+    name: 'setIdentityNft',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -11487,9 +15189,24 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'approved', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Approval',
   },
@@ -11497,8 +15214,18 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
@@ -11507,9 +15234,24 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'recipient', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'ClaimTeamFees',
   },
@@ -11517,8 +15259,18 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldFee', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'newFee', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'oldFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'MintFeeUpdated',
   },
@@ -11526,22 +15278,44 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
     ],
     name: 'OwnershipTransferred',
   },
   {
     type: 'event',
     anonymous: false,
-    inputs: [{ name: 'deprecated', internalType: 'bool', type: 'bool', indexed: false }],
+    inputs: [
+      {
+        name: 'deprecated',
+        internalType: 'bool',
+        type: 'bool',
+        indexed: false,
+      },
+    ],
     name: 'SetDeprecated',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'hook', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'hook',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
       { name: 'enabled', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'SetHook',
@@ -11550,8 +15324,37 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'locker', internalType: 'address', type: 'address', indexed: false },
-      { name: 'hook', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'oldIdentityNft',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newIdentityNft',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'SetIdentityNft',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'locker',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'hook',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
       { name: 'enabled', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'SetLocker',
@@ -11560,8 +15363,18 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTeamFeeRecipient', internalType: 'address', type: 'address', indexed: false },
-      { name: 'newTeamFeeRecipient', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'oldTeamFeeRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newTeamFeeRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'SetTeamFeeRecipient',
   },
@@ -11569,8 +15382,18 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldTokenDeployer', internalType: 'address', type: 'address', indexed: false },
-      { name: 'newTokenDeployer', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'oldTokenDeployer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newTokenDeployer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'SetTokenDeployer',
   },
@@ -11578,20 +15401,90 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'msgSender', internalType: 'address', type: 'address', indexed: false },
-      { name: 'tokenAddress', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenAdmin', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenImage', internalType: 'string', type: 'string', indexed: false },
-      { name: 'tokenName', internalType: 'string', type: 'string', indexed: false },
-      { name: 'tokenSymbol', internalType: 'string', type: 'string', indexed: false },
-      { name: 'tokenMetadata', internalType: 'string', type: 'string', indexed: false },
-      { name: 'tokenContext', internalType: 'string', type: 'string', indexed: false },
-      { name: 'startingTick', internalType: 'int24', type: 'int24', indexed: false },
-      { name: 'poolHook', internalType: 'address', type: 'address', indexed: false },
-      { name: 'poolId', internalType: 'PoolId', type: 'bytes32', indexed: false },
-      { name: 'pairedToken', internalType: 'address', type: 'address', indexed: false },
-      { name: 'locker', internalType: 'address', type: 'address', indexed: false },
-      { name: 'governor', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'msgSender',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'tokenAddress',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenAdmin',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenImage',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'tokenName',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'tokenSymbol',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'tokenMetadata',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'tokenContext',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+      {
+        name: 'startingTick',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: false,
+      },
+      {
+        name: 'poolHook',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'poolId',
+        internalType: 'PoolId',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'pairedToken',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'locker',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'governor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'TokenCreated',
   },
@@ -11602,7 +15495,12 @@ export const universeManagerAbi = [
     inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
     ],
     name: 'Transfer',
   },
@@ -11610,8 +15508,18 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universe', internalType: 'address', type: 'address', indexed: false },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'universe',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'UniverseCreated',
   },
@@ -11619,9 +15527,55 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'universe',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'governor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'UniverseCreatedWithToken',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'UniverseLpSeed',
   },
@@ -11629,8 +15583,18 @@ export const universeManagerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'oldWeth', internalType: 'address', type: 'address', indexed: false },
-      { name: 'newWeth', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'oldWeth',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newWeth',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'WethUpdated',
   },
@@ -11822,7 +15786,11 @@ export const universeTokenDeployerAbi = [
             components: [
               { name: 'hook', internalType: 'address', type: 'address' },
               { name: 'pairedToken', internalType: 'address', type: 'address' },
-              { name: 'tickIfToken0IsLoar', internalType: 'int24', type: 'int24' },
+              {
+                name: 'tickIfToken0IsLoar',
+                internalType: 'int24',
+                type: 'int24',
+              },
               { name: 'tickSpacing', internalType: 'int24', type: 'int24' },
               { name: 'poolData', internalType: 'bytes', type: 'bytes' },
             ],
@@ -11833,12 +15801,24 @@ export const universeTokenDeployerAbi = [
             type: 'tuple',
             components: [
               { name: 'locker', internalType: 'address', type: 'address' },
-              { name: 'rewardAdmins', internalType: 'address[]', type: 'address[]' },
-              { name: 'rewardRecipients', internalType: 'address[]', type: 'address[]' },
+              {
+                name: 'rewardAdmins',
+                internalType: 'address[]',
+                type: 'address[]',
+              },
+              {
+                name: 'rewardRecipients',
+                internalType: 'address[]',
+                type: 'address[]',
+              },
               { name: 'rewardBps', internalType: 'uint16[]', type: 'uint16[]' },
               { name: 'tickLower', internalType: 'int24[]', type: 'int24[]' },
               { name: 'tickUpper', internalType: 'int24[]', type: 'int24[]' },
-              { name: 'positionBps', internalType: 'uint16[]', type: 'uint16[]' },
+              {
+                name: 'positionBps',
+                internalType: 'uint16[]',
+                type: 'uint16[]',
+              },
               { name: 'lockerData', internalType: 'bytes', type: 'bytes' },
             ],
           },
@@ -11875,11 +15855,36 @@ export const universeTokenDeployerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'lpAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'creatorAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'treasuryAmount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'communityAmount', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'lpAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'creatorAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'treasuryAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'communityAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'TokenAllocation',
   },
@@ -11887,10 +15892,25 @@ export const universeTokenDeployerAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'tokenAddress', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'tokenAddress',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
       { name: 'hook', internalType: 'address', type: 'address', indexed: true },
-      { name: 'locker', internalType: 'address', type: 'address', indexed: false },
+      {
+        name: 'locker',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'TokenDeployed',
   },
@@ -12392,7 +16412,10 @@ export const useCanonMarketplace_MaxFeeBps_read = /*#__PURE__*/ createUseReadCon
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link canonMarketplaceAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
  */
 export const useCanonMarketplace_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract(
-  { abi: canonMarketplaceAbi, functionName: 'UPGRADE_INTERFACE_VERSION' }
+  {
+    abi: canonMarketplaceAbi,
+    functionName: 'UPGRADE_INTERFACE_VERSION',
+  }
 );
 
 /**
@@ -12969,6 +16992,14 @@ export const useCharacterNft_CharacterMinted_read = /*#__PURE__*/ createUseReadC
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characterOriginalToken"`
+ */
+export const useCharacterNft_CharacterOriginalToken_read = /*#__PURE__*/ createUseReadContract({
+  abi: characterNftAbi,
+  functionName: 'characterOriginalToken',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"characters"`
  */
 export const useCharacterNft_Characters_read = /*#__PURE__*/ createUseReadContract({
@@ -13258,7 +17289,10 @@ export const useCharacterNft_CreateCharacter_simulate = /*#__PURE__*/ createUseS
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"deactivateCharacter"`
  */
 export const useCharacterNft_DeactivateCharacter_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: characterNftAbi, functionName: 'deactivateCharacter' }
+  {
+    abi: characterNftAbi,
+    functionName: 'deactivateCharacter',
+  }
 );
 
 /**
@@ -13855,7 +17889,10 @@ export const useContentLicensing_MaxFeeBps_read = /*#__PURE__*/ createUseReadCon
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
  */
 export const useContentLicensing_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract(
-  { abi: contentLicensingAbi, functionName: 'UPGRADE_INTERFACE_VERSION' }
+  {
+    abi: contentLicensingAbi,
+    functionName: 'UPGRADE_INTERFACE_VERSION',
+  }
 );
 
 /**
@@ -14158,7 +18195,10 @@ export const useContentLicensing_PayRoyalty_simulate = /*#__PURE__*/ createUseSi
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"registerContent"`
  */
 export const useContentLicensing_RegisterContent_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: contentLicensingAbi, functionName: 'registerContent' }
+  {
+    abi: contentLicensingAbi,
+    functionName: 'registerContent',
+  }
 );
 
 /**
@@ -14928,7 +18968,10 @@ export const useEntityEditionNft_Mint_write = /*#__PURE__*/ createUseWriteContra
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link entityEditionNftAbi}__ and `functionName` set to `"safeBatchTransferFrom"`
  */
 export const useEntityEditionNft_SafeBatchTransferFrom_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: entityEditionNftAbi, functionName: 'safeBatchTransferFrom' }
+  {
+    abi: entityEditionNftAbi,
+    functionName: 'safeBatchTransferFrom',
+  }
 );
 
 /**
@@ -15621,7 +19664,10 @@ export const useEpisodeEditionCollection_undefined_write = /*#__PURE__*/ createU
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `functionName` set to `"createEdition"`
  */
 export const useEpisodeEditionCollection_CreateEdition_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: episodeEditionCollectionAbi, functionName: 'createEdition' }
+  {
+    abi: episodeEditionCollectionAbi,
+    functionName: 'createEdition',
+  }
 );
 
 /**
@@ -15766,7 +19812,9 @@ export const useEpisodeEditionCollection_SetPlatformFee_simulate =
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__
  */
 export const useEpisodeEditionCollection_undefined_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: episodeEditionCollectionAbi });
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: episodeEditionCollectionAbi,
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link episodeEditionCollectionAbi}__ and `eventName` set to `"ApprovalForAll"`
@@ -16610,6 +20658,314 @@ export const useGovernanceErc20_Transfer_watch = /*#__PURE__*/ createUseWatchCon
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__
+ */
+export const useIdentityNft_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useIdentityNft_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'balanceOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"getApproved"`
+ */
+export const useIdentityNft_GetApproved_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'getApproved',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"isApprovedForAll"`
+ */
+export const useIdentityNft_IsApprovedForAll_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'isApprovedForAll',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"minter"`
+ */
+export const useIdentityNft_Minter_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'minter',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"name"`
+ */
+export const useIdentityNft_Name_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'name',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"owner"`
+ */
+export const useIdentityNft_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"ownerOf"`
+ */
+export const useIdentityNft_OwnerOf_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'ownerOf',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"signerInfo"`
+ */
+export const useIdentityNft_SignerInfo_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'signerInfo',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"signerTokenForUniverse"`
+ */
+export const useIdentityNft_SignerTokenForUniverse_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'signerTokenForUniverse',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"supportsInterface"`
+ */
+export const useIdentityNft_SupportsInterface_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'supportsInterface',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useIdentityNft_Symbol_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'symbol',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"tokenURI"`
+ */
+export const useIdentityNft_TokenUri_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'tokenURI',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useIdentityNft_TotalSupply_read = /*#__PURE__*/ createUseReadContract({
+  abi: identityNftAbi,
+  functionName: 'totalSupply',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__
+ */
+export const useIdentityNft_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"approve"`
+ */
+export const useIdentityNft_Approve_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'approve',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"mint"`
+ */
+export const useIdentityNft_Mint_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useIdentityNft_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useIdentityNft_SafeTransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'safeTransferFrom',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useIdentityNft_SetApprovalForAll_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'setApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"setMinter"`
+ */
+export const useIdentityNft_SetMinter_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'setMinter',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useIdentityNft_TransferFrom_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'transferFrom',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useIdentityNft_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: identityNftAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__
+ */
+export const useIdentityNft_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"approve"`
+ */
+export const useIdentityNft_Approve_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'approve',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"mint"`
+ */
+export const useIdentityNft_Mint_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'mint',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useIdentityNft_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"safeTransferFrom"`
+ */
+export const useIdentityNft_SafeTransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'safeTransferFrom',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"setApprovalForAll"`
+ */
+export const useIdentityNft_SetApprovalForAll_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'setApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"setMinter"`
+ */
+export const useIdentityNft_SetMinter_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'setMinter',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useIdentityNft_TransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'transferFrom',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link identityNftAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useIdentityNft_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: identityNftAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__
+ */
+export const useIdentityNft_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useIdentityNft_Approval_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+  eventName: 'Approval',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__ and `eventName` set to `"ApprovalForAll"`
+ */
+export const useIdentityNft_ApprovalForAll_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+  eventName: 'ApprovalForAll',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__ and `eventName` set to `"Minted"`
+ */
+export const useIdentityNft_Minted_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+  eventName: 'Minted',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__ and `eventName` set to `"MinterUpdated"`
+ */
+export const useIdentityNft_MinterUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+  eventName: 'MinterUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useIdentityNft_OwnershipTransferred_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+  eventName: 'OwnershipTransferred',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link identityNftAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useIdentityNft_Transfer_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: identityNftAbi,
+  eventName: 'Transfer',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__
  */
 export const useLaunchpadStaking_undefined_read = /*#__PURE__*/ createUseReadContract({
@@ -16620,7 +20976,10 @@ export const useLaunchpadStaking_undefined_read = /*#__PURE__*/ createUseReadCon
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"UPGRADE_INTERFACE_VERSION"`
  */
 export const useLaunchpadStaking_UpgradeInterfaceVersion_read = /*#__PURE__*/ createUseReadContract(
-  { abi: launchpadStakingAbi, functionName: 'UPGRADE_INTERFACE_VERSION' }
+  {
+    abi: launchpadStakingAbi,
+    functionName: 'UPGRADE_INTERFACE_VERSION',
+  }
 );
 
 /**
@@ -17025,7 +21384,10 @@ export const useLaunchpadStaking_Stake_simulate = /*#__PURE__*/ createUseSimulat
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"stakeInUniverse"`
  */
 export const useLaunchpadStaking_StakeInUniverse_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: launchpadStakingAbi, functionName: 'stakeInUniverse' }
+  {
+    abi: launchpadStakingAbi,
+    functionName: 'stakeInUniverse',
+  }
 );
 
 /**
@@ -17177,7 +21539,10 @@ export const useLaunchpadStaking_UniverseStaked_watch = /*#__PURE__*/ createUseW
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"UniverseUnstaked"`
  */
 export const useLaunchpadStaking_UniverseUnstaked_watch = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: launchpadStakingAbi, eventName: 'UniverseUnstaked' }
+  {
+    abi: launchpadStakingAbi,
+    eventName: 'UniverseUnstaked',
+  }
 );
 
 /**
@@ -18756,7 +23121,10 @@ export const useLoarHookStaticFee_AfterInitialize_write = /*#__PURE__*/ createUs
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"afterRemoveLiquidity"`
  */
 export const useLoarHookStaticFee_AfterRemoveLiquidity_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: loarHookStaticFeeAbi, functionName: 'afterRemoveLiquidity' }
+  {
+    abi: loarHookStaticFeeAbi,
+    functionName: 'afterRemoveLiquidity',
+  }
 );
 
 /**
@@ -18929,7 +23297,10 @@ export const useLoarHookStaticFee_BeforeSwap_simulate = /*#__PURE__*/ createUseS
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"initializePool"`
  */
 export const useLoarHookStaticFee_InitializePool_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: loarHookStaticFeeAbi, functionName: 'initializePool' }
+  {
+    abi: loarHookStaticFeeAbi,
+    functionName: 'initializePool',
+  }
 );
 
 /**
@@ -18988,14 +23359,20 @@ export const useLoarHookStaticFee_PoolCreatedFactory_watch =
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"PoolCreatedOpen"`
  */
 export const useLoarHookStaticFee_PoolCreatedOpen_watch = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: loarHookStaticFeeAbi, eventName: 'PoolCreatedOpen' }
+  {
+    abi: loarHookStaticFeeAbi,
+    eventName: 'PoolCreatedOpen',
+  }
 );
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `eventName` set to `"PoolInitialized"`
  */
 export const useLoarHookStaticFee_PoolInitialized_watch = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: loarHookStaticFeeAbi, eventName: 'PoolInitialized' }
+  {
+    abi: loarHookStaticFeeAbi,
+    eventName: 'PoolInitialized',
+  }
 );
 
 /**
@@ -19138,21 +23515,30 @@ export const useLoarLpLockerMultiple_PlaceLiquidity_write = /*#__PURE__*/ create
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"renounceOwnership"`
  */
 export const useLoarLpLockerMultiple_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: loarLpLockerMultipleAbi, functionName: 'renounceOwnership' }
+  {
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'renounceOwnership',
+  }
 );
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useLoarLpLockerMultiple_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: loarLpLockerMultipleAbi, functionName: 'transferOwnership' }
+  {
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'transferOwnership',
+  }
 );
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardAdmin"`
  */
 export const useLoarLpLockerMultiple_UpdateRewardAdmin_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: loarLpLockerMultipleAbi, functionName: 'updateRewardAdmin' }
+  {
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'updateRewardAdmin',
+  }
 );
 
 /**
@@ -19272,7 +23658,10 @@ export const useLoarLpLockerMultiple_WithdrawErc20_simulate =
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawEth"`
  */
 export const useLoarLpLockerMultiple_WithdrawEth_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: loarLpLockerMultipleAbi, functionName: 'withdrawEth' }
+  {
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'withdrawEth',
+  }
 );
 
 /**
@@ -20157,7 +24546,10 @@ export const usePaymentRouter_SetDefaultFee_simulate = /*#__PURE__*/ createUseSi
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link paymentRouterAbi}__ and `functionName` set to `"setLoarFeeDiscount"`
  */
 export const usePaymentRouter_SetLoarFeeDiscount_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: paymentRouterAbi, functionName: 'setLoarFeeDiscount' }
+  {
+    abi: paymentRouterAbi,
+    functionName: 'setLoarFeeDiscount',
+  }
 );
 
 /**
@@ -20377,6 +24769,14 @@ export const useRemixFees_LpShareBps_read = /*#__PURE__*/ createUseReadContract(
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"maxRemixFee"`
+ */
+export const useRemixFees_MaxRemixFee_read = /*#__PURE__*/ createUseReadContract({
+  abi: remixFeesAbi,
+  functionName: 'maxRemixFee',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"minRemixFee"`
  */
 export const useRemixFees_MinRemixFee_read = /*#__PURE__*/ createUseReadContract({
@@ -20528,6 +24928,14 @@ export const useRemixFees_SetLiquidityPool_write = /*#__PURE__*/ createUseWriteC
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"setMaxRemixFee"`
+ */
+export const useRemixFees_SetMaxRemixFee_write = /*#__PURE__*/ createUseWriteContract({
+  abi: remixFeesAbi,
+  functionName: 'setMaxRemixFee',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"setMinRemixFee"`
  */
 export const useRemixFees_SetMinRemixFee_write = /*#__PURE__*/ createUseWriteContract({
@@ -20636,6 +25044,14 @@ export const useRemixFees_SetDefaultRemixFee_simulate = /*#__PURE__*/ createUseS
 export const useRemixFees_SetLiquidityPool_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: remixFeesAbi,
   functionName: 'setLiquidityPool',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"setMaxRemixFee"`
+ */
+export const useRemixFees_SetMaxRemixFee_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: remixFeesAbi,
+  functionName: 'setMaxRemixFee',
 });
 
 /**
@@ -20894,7 +25310,10 @@ export const useRightsRegistry_Initialize_simulate = /*#__PURE__*/ createUseSimu
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
  */
 export const useRightsRegistry_RenounceOwnership_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: rightsRegistryAbi, functionName: 'renounceOwnership' }
+  {
+    abi: rightsRegistryAbi,
+    functionName: 'renounceOwnership',
+  }
 );
 
 /**
@@ -20917,7 +25336,10 @@ export const useRightsRegistry_SetRights_simulate = /*#__PURE__*/ createUseSimul
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useRightsRegistry_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: rightsRegistryAbi, functionName: 'transferOwnership' }
+  {
+    abi: rightsRegistryAbi,
+    functionName: 'transferOwnership',
+  }
 );
 
 /**
@@ -21835,14 +26257,20 @@ export const useStoryBounties_RenounceOwnership_simulate = /*#__PURE__*/ createU
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"setCancellationFee"`
  */
 export const useStoryBounties_SetCancellationFee_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: storyBountiesAbi, functionName: 'setCancellationFee' }
+  {
+    abi: storyBountiesAbi,
+    functionName: 'setCancellationFee',
+  }
 );
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"setMinBountyAmount"`
  */
 export const useStoryBounties_SetMinBountyAmount_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: storyBountiesAbi, functionName: 'setMinBountyAmount' }
+  {
+    abi: storyBountiesAbi,
+    functionName: 'setMinBountyAmount',
+  }
 );
 
 /**
@@ -22121,7 +26549,10 @@ export const useSubscriptionManager_undefined_write = /*#__PURE__*/ createUseWri
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"cancelSubscription"`
  */
 export const useSubscriptionManager_CancelSubscription_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: subscriptionManagerAbi, functionName: 'cancelSubscription' }
+  {
+    abi: subscriptionManagerAbi,
+    functionName: 'cancelSubscription',
+  }
 );
 
 /**
@@ -22410,7 +26841,9 @@ export const useSubscriptionManager_Upgraded_watch = /*#__PURE__*/ createUseWatc
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__
  */
-export const useUniverse_undefined_read = /*#__PURE__*/ createUseReadContract({ abi: universeAbi });
+export const useUniverse_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"MAX_CHILDREN_PER_NODE"`
@@ -22726,7 +27159,10 @@ export const useUniverse_SetNodeCreationOption_simulate = /*#__PURE__*/ createUs
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setNodeVisibilityOption"`
  */
 export const useUniverse_SetNodeVisibilityOption_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: universeAbi, functionName: 'setNodeVisibilityOption' }
+  {
+    abi: universeAbi,
+    functionName: 'setNodeVisibilityOption',
+  }
 );
 
 /**
@@ -23207,7 +27643,10 @@ export const useUniverseGovernor_SetVotingPeriod_write = /*#__PURE__*/ createUse
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"updateQuorumNumerator"`
  */
 export const useUniverseGovernor_UpdateQuorumNumerator_write = /*#__PURE__*/ createUseWriteContract(
-  { abi: universeGovernorAbi, functionName: 'updateQuorumNumerator' }
+  {
+    abi: universeGovernorAbi,
+    functionName: 'updateQuorumNumerator',
+  }
 );
 
 /**
@@ -23348,7 +27787,10 @@ export const useUniverseGovernor_SetVotingDelay_simulate = /*#__PURE__*/ createU
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeGovernorAbi}__ and `functionName` set to `"setVotingPeriod"`
  */
 export const useUniverseGovernor_SetVotingPeriod_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: universeGovernorAbi, functionName: 'setVotingPeriod' }
+  {
+    abi: universeGovernorAbi,
+    functionName: 'setVotingPeriod',
+  }
 );
 
 /**
@@ -23380,7 +27822,10 @@ export const useUniverseGovernor_Eip712DomainChanged_watch =
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalCanceled"`
  */
 export const useUniverseGovernor_ProposalCanceled_watch = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: universeGovernorAbi, eventName: 'ProposalCanceled' }
+  {
+    abi: universeGovernorAbi,
+    eventName: 'ProposalCanceled',
+  }
 );
 
 /**
@@ -23395,7 +27840,10 @@ export const useUniverseGovernor_ProposalCreated_watch = /*#__PURE__*/ createUse
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeGovernorAbi}__ and `eventName` set to `"ProposalExecuted"`
  */
 export const useUniverseGovernor_ProposalExecuted_watch = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: universeGovernorAbi, eventName: 'ProposalExecuted' }
+  {
+    abi: universeGovernorAbi,
+    eventName: 'ProposalExecuted',
+  }
 );
 
 /**
@@ -23526,6 +27974,14 @@ export const useUniverseManager_GetApproved_read = /*#__PURE__*/ createUseReadCo
 export const useUniverseManager_GetUniverseData_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
   functionName: 'getUniverseData',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"identityNft"`
+ */
+export const useUniverseManager_IdentityNft_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'identityNft',
 });
 
 /**
@@ -23688,6 +28144,15 @@ export const useUniverseManager_CreateUniverse_write = /*#__PURE__*/ createUseWr
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"createUniverseWithToken"`
+ */
+export const useUniverseManager_CreateUniverseWithToken_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeManagerAbi,
+    functionName: 'createUniverseWithToken',
+  });
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deployUniverseToken"`
  */
 export const useUniverseManager_DeployUniverseToken_write = /*#__PURE__*/ createUseWriteContract({
@@ -23733,6 +28198,14 @@ export const useUniverseManager_SetDeprecated_write = /*#__PURE__*/ createUseWri
 export const useUniverseManager_SetHook_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeManagerAbi,
   functionName: 'setHook',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setIdentityNft"`
+ */
+export const useUniverseManager_SetIdentityNft_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setIdentityNft',
 });
 
 /**
@@ -23831,6 +28304,15 @@ export const useUniverseManager_CreateUniverse_simulate = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"createUniverseWithToken"`
+ */
+export const useUniverseManager_CreateUniverseWithToken_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'createUniverseWithToken',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deployUniverseToken"`
  */
 export const useUniverseManager_DeployUniverseToken_simulate =
@@ -23852,7 +28334,10 @@ export const useUniverseManager_RenounceOwnership_simulate =
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"safeTransferFrom"`
  */
 export const useUniverseManager_SafeTransferFrom_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: universeManagerAbi, functionName: 'safeTransferFrom' }
+  {
+    abi: universeManagerAbi,
+    functionName: 'safeTransferFrom',
+  }
 );
 
 /**
@@ -23878,6 +28363,14 @@ export const useUniverseManager_SetDeprecated_simulate = /*#__PURE__*/ createUse
 export const useUniverseManager_SetHook_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: universeManagerAbi,
   functionName: 'setHook',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setIdentityNft"`
+ */
+export const useUniverseManager_SetIdentityNft_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeManagerAbi,
+  functionName: 'setIdentityNft',
 });
 
 /**
@@ -23909,7 +28402,10 @@ export const useUniverseManager_SetTeamFeeRecipient_simulate =
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setTokenDeployer"`
  */
 export const useUniverseManager_SetTokenDeployer_simulate = /*#__PURE__*/ createUseSimulateContract(
-  { abi: universeManagerAbi, functionName: 'setTokenDeployer' }
+  {
+    abi: universeManagerAbi,
+    functionName: 'setTokenDeployer',
+  }
 );
 
 /**
@@ -24002,6 +28498,14 @@ export const useUniverseManager_SetHook_watch = /*#__PURE__*/ createUseWatchCont
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetIdentityNft"`
+ */
+export const useUniverseManager_SetIdentityNft_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SetIdentityNft',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SetLocker"`
  */
 export const useUniverseManager_SetLocker_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -24059,6 +28563,15 @@ export const useUniverseManager_UniverseCreated_watch = /*#__PURE__*/ createUseW
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseCreatedWithToken"`
+ */
+export const useUniverseManager_UniverseCreatedWithToken_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeManagerAbi,
+    eventName: 'UniverseCreatedWithToken',
+  });
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"UniverseLpSeed"`
  */
 export const useUniverseManager_UniverseLpSeed_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -24110,7 +28623,10 @@ export const useUniverseTokenDeployer_DefaultLpBps_read = /*#__PURE__*/ createUs
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"DEFAULT_TREASURY_BPS"`
  */
 export const useUniverseTokenDeployer_DefaultTreasuryBps_read = /*#__PURE__*/ createUseReadContract(
-  { abi: universeTokenDeployerAbi, functionName: 'DEFAULT_TREASURY_BPS' }
+  {
+    abi: universeTokenDeployerAbi,
+    functionName: 'DEFAULT_TREASURY_BPS',
+  }
 );
 
 /**

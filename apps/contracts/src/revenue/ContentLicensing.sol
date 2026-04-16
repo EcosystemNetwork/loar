@@ -80,6 +80,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error ZeroAddress();
     error ZeroHash();
     error SplitRouterFailed();
+    error RefundFailed();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -170,10 +171,11 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         // Transfer ownership
         contentOwner[contentHash] = msg.sender;
 
-        // Route payment through splits
-        _routePayment(reg.splitEntityHash, msg.value);
+        // Route exact price through splits; refund overpayment
+        _routePayment(reg.splitEntityHash, reg.buyPrice);
+        _refundExcess(msg.value, reg.buyPrice);
 
-        emit ContentBought(dealId, contentHash, msg.sender, msg.value);
+        emit ContentBought(dealId, contentHash, msg.sender, reg.buyPrice);
     }
 
     /// @notice Rent content for a duration. Payment through SplitRouter.
@@ -202,9 +204,10 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         });
         _contentDeals[contentHash].push(dealId);
 
-        _routePayment(reg.splitEntityHash, msg.value);
+        _routePayment(reg.splitEntityHash, totalCost);
+        _refundExcess(msg.value, totalCost);
 
-        emit ContentRented(dealId, contentHash, msg.sender, msg.value, endTime);
+        emit ContentRented(dealId, contentHash, msg.sender, totalCost, endTime);
     }
 
     /// @notice License content for usage rights with potential ongoing royalties.
@@ -231,9 +234,10 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         });
         _contentDeals[contentHash].push(dealId);
 
-        _routePayment(reg.splitEntityHash, msg.value);
+        _routePayment(reg.splitEntityHash, reg.licenseFee);
+        _refundExcess(msg.value, reg.licenseFee);
 
-        emit ContentLicensed(dealId, contentHash, msg.sender, msg.value, endTime);
+        emit ContentLicensed(dealId, contentHash, msg.sender, reg.licenseFee, endTime);
     }
 
     error DealExpired();
@@ -366,6 +370,14 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @dev Reserved storage gap for future upgrades
     uint256[40] private __gap;
+
+    /// @dev Refund any overpayment to the buyer
+    function _refundExcess(uint256 paid, uint256 price) internal {
+        if (paid > price) {
+            (bool ok,) = msg.sender.call{value: paid - price}("");
+            if (!ok) revert RefundFailed();
+        }
+    }
 
     /// @dev Route payment through SplitRouter if splits are configured,
     ///      otherwise fall back to PaymentRouter direct routing.

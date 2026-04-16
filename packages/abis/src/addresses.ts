@@ -49,3 +49,7 @@ export const TokenVesting = {
 } as const;
 
 export type TokenVestingChainId = keyof typeof TokenVesting;
+
+export const IdentityNFT = {} as const;
+
+export type IdentityNFTChainId = keyof typeof IdentityNFT;

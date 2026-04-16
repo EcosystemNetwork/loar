@@ -201,7 +201,8 @@ function CinematicUniverseCreate() {
   const [originalSrc, setOriginalSrc] = useState<string | null>(null);
 
   // Hooks
-  const { createUniverse, deployUniverseToken, hash, isPending, error } = useUniverseManager();
+  const { createUniverse, createUniverseWithToken, deployUniverseToken, hash, isPending, error } =
+    useUniverseManager();
   const defaultConfig = useDefaultDeploymentConfig();
   const {
     isSuccess: txSuccess,
@@ -211,7 +212,6 @@ function CinematicUniverseCreate() {
 
   // Track which tx hash each effect has already processed to prevent double-firing
   const processedUniverseHash = useRef<string | null>(null);
-  const processedTokenHash = useRef<string | null>(null);
 
   // Auto-switch to first supported chain only when on a completely unsupported network
   useEffect(() => {
@@ -429,16 +429,18 @@ function CinematicUniverseCreate() {
     if (coverFileRef.current) coverFileRef.current.value = '';
   };
 
-  // Watch for universe creation transaction success
+  // Watch for universe creation transaction success (fun mode OR atomic monetize mode)
   useEffect(() => {
     if (!txSuccess || !txReceipt || !hash) return;
     if (deploymentStep !== DeploymentStep.CREATING_UNIVERSE) return;
     if (processedUniverseHash.current === hash) return; // Already processed this tx
     processedUniverseHash.current = hash;
 
-    // Parse UniverseCreated event from receipt logs
+    // Parse events from receipt — in atomic mode, both UniverseCreated + TokenCreated are here
     let parsedUniverseAddress: `0x${string}` | null = null;
     let parsedUniverseId: bigint | null = null;
+    let parsedTokenAddress: `0x${string}` | null = null;
+    let parsedGovernorAddress: `0x${string}` | null = null;
 
     for (const log of txReceipt.logs) {
       try {
@@ -455,34 +457,29 @@ function CinematicUniverseCreate() {
           const args = decoded.args as { universeId: bigint };
           parsedUniverseId = args.universeId;
         }
+        if (decoded.eventName === 'TokenCreated') {
+          const args = decoded.args as { tokenAddress: string; governor: string };
+          parsedTokenAddress = args.tokenAddress as `0x${string}`;
+          parsedGovernorAddress = args.governor as `0x${string}`;
+        }
       } catch {
         // Not a UniverseManager event, skip
       }
     }
 
-    if (parsedUniverseAddress) {
-      setUniverseAddress(parsedUniverseAddress);
-    }
-    if (parsedUniverseId !== null) {
-      setUniverseId(parsedUniverseId);
-    }
-    // If user chose to launch token now AND provided a symbol, auto-trigger step 2
-    if (universeMode === 'monetize' && parsedUniverseId !== null && address && tokenSymbol) {
-      setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
-      setTimeout(() => {
-        handleDeployTokenWithId(parsedUniverseId!);
-      }, 500);
-    } else {
-      // Skip token deployment — go straight to completed (universe-only)
-      setDeploymentStep(DeploymentStep.COMPLETED);
-    }
+    if (parsedUniverseAddress) setUniverseAddress(parsedUniverseAddress);
+    if (parsedUniverseId !== null) setUniverseId(parsedUniverseId);
+    if (parsedTokenAddress) setTokenAddress(parsedTokenAddress);
+    if (parsedGovernorAddress) setGovernorAddress(parsedGovernorAddress);
 
-    // Register universe in Firestore using parsed values directly (not stale state)
+    // Go straight to completed — atomic mode handles both in one tx
+    setDeploymentStep(DeploymentStep.COMPLETED);
+
+    // Register universe in Firestore
     if (address && parsedUniverseAddress) {
       (async () => {
         try {
           const creator = safeAddress ?? address;
-          // Fetch server-issued nonce and sign a message to prove wallet ownership
           const { nonce } = await trpcClient.universes.getNonce.query();
           const message = `Register universe ${parsedUniverseAddress} created by ${creator} with nonce ${nonce} at ${Date.now()}`;
           if (!thirdwebAccount) throw new Error('Wallet not connected');
@@ -492,8 +489,9 @@ function CinematicUniverseCreate() {
             address: parsedUniverseAddress,
             creator,
             name: universeName,
-            tokenAddress: '0x0000000000000000000000000000000000000000',
-            governanceAddress: '0x0000000000000000000000000000000000000000',
+            tokenAddress: parsedTokenAddress ?? '0x0000000000000000000000000000000000000000',
+            governanceAddress:
+              parsedGovernorAddress ?? '0x0000000000000000000000000000000000000000',
             imageUrl: imageUrl,
             portraitImageUrl: portraitImageUrl || undefined,
             description: description,
@@ -511,53 +509,8 @@ function CinematicUniverseCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txSuccess, txReceipt, hash]);
 
-  // Watch for token deployment transaction success
-  useEffect(() => {
-    if (!txSuccess || !txReceipt || !hash) return;
-    if (deploymentStep !== DeploymentStep.DEPLOYING_TOKEN) return;
-    if (processedTokenHash.current === hash) return; // Already processed this tx
-    processedTokenHash.current = hash;
-
-    // Parse TokenCreated event for token + governor addresses
-    let parsedTokenAddress: `0x${string}` | undefined;
-    let parsedGovernorAddress: `0x${string}` | undefined;
-
-    for (const log of txReceipt.logs) {
-      try {
-        const decoded = decodeEventLog({
-          abi: universeManagerAbi,
-          data: log.data,
-          topics: log.topics,
-        });
-        if (decoded.eventName === 'TokenCreated') {
-          const args = decoded.args as { tokenAddress: string; governor: string };
-          parsedTokenAddress = args.tokenAddress as `0x${string}`;
-          parsedGovernorAddress = args.governor as `0x${string}`;
-        }
-      } catch {
-        // Not a UniverseManager event, skip
-      }
-    }
-
-    if (parsedTokenAddress) setTokenAddress(parsedTokenAddress);
-    if (parsedGovernorAddress) setGovernorAddress(parsedGovernorAddress);
-    setDeploymentStep(DeploymentStep.COMPLETED);
-
-    // Update Firestore with real token and governance addresses
-    if (universeAddress && parsedTokenAddress && parsedGovernorAddress) {
-      trpcClient.universes.finalizeTokenDeployment
-        .mutate({
-          universeId: universeAddress,
-          tokenAddress: parsedTokenAddress,
-          governanceAddress: parsedGovernorAddress,
-          tokenDeployTxHash: hash,
-        })
-        .catch(() => {
-          // Firestore finalization error is non-blocking; token was already deployed on-chain
-        });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txSuccess, txReceipt, hash]);
+  // Note: Token deployment event parsing is handled in the universe creation effect above
+  // since createUniverseWithToken() emits both events in a single receipt.
 
   const handleCreateUniverse = async () => {
     if (!address) {
@@ -598,15 +551,72 @@ function CinematicUniverseCreate() {
     setDeploymentStep(DeploymentStep.CREATING_UNIVERSE);
 
     try {
-      await createUniverse({
-        name: universeName,
-        imageURL: imageUrl,
-        description: description,
-        nodeCreationOptions: 0, // OPEN - anyone can create nodes
-        nodeVisibilityOptions: 0, // PUBLIC - all nodes visible
-        initialOwner: address as `0x${string}`,
-        safeAddress: safeAddress ?? undefined,
-      });
+      if (universeMode === 'monetize') {
+        // Atomic: create universe + deploy token in a single transaction
+        if (!defaultConfig.defaultHook || !defaultConfig.defaultLocker) {
+          alert(
+            'Token deployment contracts not available on this network. Please try again later.'
+          );
+          setDeploymentStep(DeploymentStep.IDLE);
+          return;
+        }
+
+        await createUniverseWithToken(
+          {
+            name: universeName,
+            imageURL: imageUrl,
+            description: description,
+            nodeCreationOptions: 0,
+            nodeVisibilityOptions: 0,
+            initialOwner: address as `0x${string}`,
+            safeAddress: safeAddress ?? undefined,
+          },
+          {
+            tokenConfig: {
+              tokenAdmin: address as `0x${string}`,
+              name: universeName,
+              symbol: tokenSymbol,
+              imageURL: imageUrl,
+              metadata: metadata || `Token for ${universeName}`,
+              context: context || description,
+            },
+            poolConfig: {
+              hook: defaultConfig.defaultHook,
+              pairedToken: defaultConfig.defaultPairedToken,
+              tickIfToken0IsLoar: startingTick,
+              tickSpacing: defaultConfig.defaultTickSpacing,
+              poolData: defaultConfig.defaultPoolData as `0x${string}`,
+            },
+            lockerConfig: {
+              locker: defaultConfig.defaultLocker,
+              rewardAdmins: [address as `0x${string}`],
+              rewardRecipients: [address as `0x${string}`],
+              rewardBps: [10000],
+              tickLower: [startingTick],
+              tickUpper: [0],
+              positionBps: [10000],
+              lockerData: '0x' as `0x${string}`,
+            },
+            allocationConfig: {
+              lpBps,
+              creatorBps,
+              treasuryBps,
+              communityBps,
+            },
+          }
+        );
+      } else {
+        // Fun mode: create universe only (token can be deployed later)
+        await createUniverse({
+          name: universeName,
+          imageURL: imageUrl,
+          description: description,
+          nodeCreationOptions: 0,
+          nodeVisibilityOptions: 0,
+          initialOwner: address as `0x${string}`,
+          safeAddress: safeAddress ?? undefined,
+        });
+      }
     } catch (error) {
       alert(
         `Universe creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -615,68 +625,9 @@ function CinematicUniverseCreate() {
     }
   };
 
-  const handleDeployTokenWithId = async (id: bigint) => {
-    if (!address) return;
-    if (!tokenSymbol) return;
-
-    if (!defaultConfig.defaultHook || !defaultConfig.defaultLocker) {
-      alert('Token deployment contracts not available on this network. Please try again later.');
-      setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
-      return;
-    }
-
-    setDeploymentStep(DeploymentStep.DEPLOYING_TOKEN);
-
-    try {
-      await deployUniverseToken(
-        {
-          tokenConfig: {
-            tokenAdmin: address as `0x${string}`,
-            name: universeName,
-            symbol: tokenSymbol,
-            imageURL: imageUrl,
-            metadata: metadata || `Token for ${universeName}`,
-            context: context || description,
-          },
-          poolConfig: {
-            hook: defaultConfig.defaultHook!,
-            pairedToken: defaultConfig.defaultPairedToken,
-            tickIfToken0IsLoar: startingTick,
-            tickSpacing: defaultConfig.defaultTickSpacing,
-            poolData: defaultConfig.defaultPoolData as `0x${string}`,
-          },
-          lockerConfig: {
-            locker: defaultConfig.defaultLocker!,
-            rewardAdmins: [address as `0x${string}`],
-            rewardRecipients: [address as `0x${string}`],
-            rewardBps: [10000],
-            tickLower: [startingTick],
-            tickUpper: [0],
-            positionBps: [10000],
-            lockerData: '0x' as `0x${string}`,
-          },
-          allocationConfig: {
-            lpBps,
-            creatorBps,
-            treasuryBps,
-            communityBps,
-          },
-        },
-        id
-      );
-    } catch (error) {
-      alert(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setDeploymentStep(DeploymentStep.UNIVERSE_CREATED);
-    }
-  };
-
-  const handleDeployToken = () => {
-    if (!universeId) {
-      alert('Universe must be created first');
-      return;
-    }
-    handleDeployTokenWithId(universeId);
-  };
+  // Note: Token deployment for existing universes (fun → monetize later) is handled
+  // by the standalone /universe/$id/deploy-token page. This create page uses the
+  // atomic createUniverseWithToken() for monetize mode.
 
   // Redirect to login if not authenticated (after all hooks)
   useEffect(() => {
@@ -1369,251 +1320,25 @@ function CinematicUniverseCreate() {
                 )}
               </div>
 
-              {/* Step 2: Token Deployment (only shown when launching token with universe) */}
-              {universeMode === 'monetize' && deploymentStep !== DeploymentStep.IDLE && (
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold">Step 2: Deploy Token & Pool</h3>
-                    {(deploymentStep as DeploymentStep) === DeploymentStep.COMPLETED && (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="tokenSymbol" className="text-sm font-semibold mb-2 block">
-                      Token Symbol
-                    </Label>
-                    <Input
-                      id="tokenSymbol"
-                      placeholder="e.g., MCU"
-                      value={tokenSymbol}
-                      onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-                      disabled={
-                        (deploymentStep as DeploymentStep) === DeploymentStep.TOKEN_DEPLOYED ||
-                        (deploymentStep as DeploymentStep) === DeploymentStep.COMPLETED
-                      }
-                      maxLength={10}
-                      className="h-11"
-                    />
-                  </div>
-
-                  {/* Tokenomics Configuration */}
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvancedTokenomics(!showAdvancedTokenomics)}
-                      className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Sliders className="h-4 w-4" />
-                      Token Allocation
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {showAdvancedTokenomics ? 'Custom' : 'Default'}
-                      </Badge>
-                    </button>
-
-                    {showAdvancedTokenomics && (
-                      <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                          <Info className="h-3 w-3" />
-                          <span>100B tokens total supply. Adjust how they're distributed.</span>
-                        </div>
-
-                        {/* Allocation Pie Visual */}
-                        <div className="flex gap-2 h-3 rounded-full overflow-hidden mb-4">
-                          <div
-                            className="bg-blue-500 transition-all"
-                            style={{ width: `${lpBps / 100}%` }}
-                            title={`LP: ${lpBps / 100}%`}
-                          />
-                          <div
-                            className="bg-green-500 transition-all"
-                            style={{ width: `${creatorBps / 100}%` }}
-                            title={`Creator: ${creatorBps / 100}%`}
-                          />
-                          <div
-                            className="bg-purple-500 transition-all"
-                            style={{ width: `${treasuryBps / 100}%` }}
-                            title={`Treasury: ${treasuryBps / 100}%`}
-                          />
-                          <div
-                            className="bg-amber-500 transition-all"
-                            style={{ width: `${communityBps / 100}%` }}
-                            title={`Community: ${communityBps / 100}%`}
-                          />
-                        </div>
-
-                        {/* LP Allocation */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                              <Label className="text-xs font-medium">Liquidity Pool</Label>
-                            </div>
-                            <span className="text-xs font-bold tabular-nums">
-                              {(lpBps / 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <Slider
-                            value={[lpBps]}
-                            onValueChange={([v]) => handleAllocationChange('lp', v)}
-                            min={5000}
-                            max={9000}
-                            step={100}
-                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            Locked forever. Higher = safer for buyers. Min 50%
-                          </p>
-                        </div>
-
-                        {/* Creator Allocation */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                              <Label className="text-xs font-medium">Creator</Label>
-                            </div>
-                            <span className="text-xs font-bold tabular-nums">
-                              {(creatorBps / 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <Slider
-                            value={[creatorBps]}
-                            onValueChange={([v]) => handleAllocationChange('creator', v)}
-                            min={0}
-                            max={4000}
-                            step={100}
-                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            Your governance voting power from day 1. Max 40%
-                          </p>
-                        </div>
-
-                        {/* Treasury Allocation */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                              <Label className="text-xs font-medium">Protocol Treasury</Label>
-                            </div>
-                            <span className="text-xs font-bold tabular-nums">
-                              {(treasuryBps / 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <Slider
-                            value={[treasuryBps]}
-                            onValueChange={([v]) => handleAllocationChange('treasury', v)}
-                            min={200}
-                            max={2000}
-                            step={100}
-                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            Protocol sustainability fee. Min 2%
-                          </p>
-                        </div>
-
-                        {/* Community Allocation */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                              <Label className="text-xs font-medium">Community Rewards</Label>
-                            </div>
-                            <span className="text-xs font-bold tabular-nums">
-                              {(communityBps / 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <Slider
-                            value={[communityBps]}
-                            onValueChange={([v]) => handleAllocationChange('community', v)}
-                            min={0}
-                            max={3000}
-                            step={100}
-                            disabled={deploymentStep !== DeploymentStep.UNIVERSE_CREATED}
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            Airdrops, contests, contributor rewards
-                          </p>
-                        </div>
-
-                        {/* Validation */}
-                        {!allocationValid && (
-                          <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-500">
-                            <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                            {allocationTotal !== 10000
-                              ? `Total must equal 100% (currently ${(allocationTotal / 100).toFixed(1)}%)`
-                              : lpBps < 5000
-                                ? 'LP must be at least 50%'
-                                : treasuryBps < 200
-                                  ? 'Treasury must be at least 2%'
-                                  : 'Creator cannot exceed 40%'}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Quick preview when collapsed */}
-                    {!showAdvancedTokenomics && (
-                      <div className="flex gap-3 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-blue-500" /> LP {lpBps / 100}%
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-green-500" /> Creator{' '}
-                          {creatorBps / 100}%
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-purple-500" /> Treasury{' '}
-                          {treasuryBps / 100}%
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Community{' '}
-                          {communityBps / 100}%
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {deploymentStep === DeploymentStep.UNIVERSE_CREATED && (
-                    <Button
-                      onClick={handleDeployToken}
-                      disabled={!tokenSymbol || !allocationValid || isPending || isConfirming}
-                      className="w-full h-12 text-base font-bold"
-                      size="lg"
-                    >
-                      {isPending || isConfirming ? (
-                        <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Deploying Token...
-                        </>
-                      ) : (
-                        <>
-                          <Rocket className="h-5 w-5 mr-2" />
-                          Deploy Token & Pool
-                        </>
-                      )}
-                    </Button>
-                  )}
-
-                  {deploymentStep === DeploymentStep.DEPLOYING_TOKEN && (
+              {/* Deployment in progress indicator (monetize mode — atomic, single tx) */}
+              {universeMode === 'monetize' &&
+                deploymentStep === DeploymentStep.CREATING_UNIVERSE && (
+                  <div className="pt-4 border-t">
                     <div className="p-4 bg-muted rounded-lg">
                       <div className="flex items-center gap-3">
                         <Loader2 className="h-5 w-5 text-primary animate-spin" />
                         <div>
                           <p className="text-sm font-semibold">
-                            Deploying token and setting up liquidity pool...
+                            Creating universe, deploying token & liquidity pool...
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            This may take a few moments...
+                            One transaction — confirm in your wallet and wait for confirmation.
                           </p>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
               {error && (
                 <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -1709,10 +1434,10 @@ function CinematicUniverseCreate() {
                     </p>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm">
-                        {deploymentStep !== DeploymentStep.CREATING_UNIVERSE ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        ) : (
+                        {deploymentStep === DeploymentStep.CREATING_UNIVERSE ? (
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
                         )}
                         <span
                           className={
@@ -1721,29 +1446,11 @@ function CinematicUniverseCreate() {
                               : ''
                           }
                         >
-                          Universe Contract
+                          {universeMode === 'monetize'
+                            ? 'Universe + Token + Liquidity Pool'
+                            : 'Universe Contract'}
                         </span>
                       </div>
-                      {universeMode === 'monetize' && (
-                        <div className="flex items-center gap-2 text-sm">
-                          {deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
-                          deploymentStep === DeploymentStep.TOKEN_DEPLOYED ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          ) : (
-                            <Loader2 className="h-4 w-4 opacity-40" />
-                          )}
-                          <span
-                            className={
-                              deploymentStep === DeploymentStep.DEPLOYING_TOKEN ||
-                              deploymentStep === DeploymentStep.TOKEN_DEPLOYED
-                                ? ''
-                                : 'opacity-40'
-                            }
-                          >
-                            Token & Liquidity Pool
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
