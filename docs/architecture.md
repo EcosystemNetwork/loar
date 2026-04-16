@@ -120,7 +120,7 @@ The server uses [Hono](https://hono.dev/) as the HTTP framework with middleware:
 ### tRPC Router Tree
 
 ```
-appRouter (43 routers, 150+ procedures)
+appRouter (44 routers, 400+ procedures)
 ├── healthCheck              (query, public)
 ├── privateData              (query, protected)
 ├── admin                    (sub-router) — platform configuration

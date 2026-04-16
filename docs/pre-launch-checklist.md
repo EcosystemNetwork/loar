@@ -112,9 +112,7 @@ Current state: `LoarLpLockerMultiple` locks LP **permanently** (no time-based un
   - Current: per-IP only. Multiple wallets from same IP share limit.
   - Add: per-authenticated-user limit (extract from SIWE JWT in tRPC middleware)
 
-- [ ] **#8 Multi-Chain Cleanup** — Remove dead scaffolding if not planning multi-chain
-  - `apps/bridge/`, `apps/contracts-sol/`, `apps/contracts-sui/` are excluded from workspace
-  - Safe to delete if multi-chain is deferred to v2+
+- [x] **#8 Multi-Chain Cleanup** — Removed Solana, SUI, and bridge scaffolding (Base L2 only)
 
 ---
 

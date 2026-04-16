@@ -172,23 +172,19 @@ contract TokenVestingTest is Test {
         uint256 halfwayTs = vs.start + (DURATION / 2);
         vm.warp(halfwayTs);
 
+        uint128 expectedVested = uint128((uint256(VEST_AMOUNT) * (halfwayTs - vs.start)) / DURATION);
+        uint128 expectedUnvested = VEST_AMOUNT - expectedVested;
         uint256 ownerBalBefore = token.balanceOf(owner);
 
         vm.prank(owner);
         vesting.revokeVesting(id);
 
-        // BUG NOTE: revokeVesting sets v.revoked=true BEFORE calling _vestedAmount(),
-        // and _vestedAmount() returns v.vestedAtRevoke (=0) when revoked=true.
-        // This means ALL tokens are returned as "unvested" regardless of actual vesting progress.
-        // The beneficiary loses their vested tokens on revocation.
-        // Expected behavior: unvested = totalAmount - actualVested = 5000e18
-        // Actual behavior: unvested = totalAmount - 0 = 10000e18 (all returned to owner)
-        assertEq(token.balanceOf(owner), ownerBalBefore + VEST_AMOUNT);
+        // Only unvested tokens returned to owner; vested portion stays for beneficiary
+        assertEq(token.balanceOf(owner), ownerBalBefore + expectedUnvested);
 
         TokenVesting.VestingSchedule memory v = vesting.getVesting(id);
         assertTrue(v.revoked);
-        // vestedAtRevoke is 0 due to the bug (should be 5000e18)
-        assertEq(v.vestedAtRevoke, 0);
+        assertEq(v.vestedAtRevoke, expectedVested);
     }
 
     function test_claim_afterRevoke() public {
@@ -199,11 +195,19 @@ contract TokenVestingTest is Test {
         uint256 halfwayTs = vs.start + (DURATION / 2);
         vm.warp(halfwayTs);
 
+        uint128 vestedAtRevoke = uint128((uint256(VEST_AMOUNT) * (halfwayTs - vs.start)) / DURATION);
+
         vm.prank(owner);
         vesting.revokeVesting(id);
 
-        // Due to the revoked-before-snapshot bug, vestedAtRevoke = 0
-        // So beneficiary has nothing to claim even though they should have 50%
+        // Beneficiary can still claim the vested portion
+        vm.prank(beneficiary);
+        vesting.claim(id);
+
+        assertEq(token.balanceOf(beneficiary), vestedAtRevoke);
+
+        // Even warping further, no more tokens vest (frozen at revoke snapshot)
+        vm.warp(vs.start + DURATION);
         vm.prank(beneficiary);
         vm.expectRevert(TokenVesting.NothingToClaim.selector);
         vesting.claim(id);

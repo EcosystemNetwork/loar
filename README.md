@@ -39,9 +39,9 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Token Deployment**              | Deploy governance token for existing universes via `/universe/$id/deploy-token`. Custom token symbol, configurable allocation splits (LP/creator/treasury/community), multi-recipient LP fee distribution |
 | **LP Yield & Fee Management**     | On-chain fee collection from Uniswap v4 pools, multi-recipient BPS splits, claim UI in dashboard via `LPYieldManager` component. Anyone can trigger fee harvest; recipients claim their share             |
 | **Narrative Timeline Editor**     | ReactFlow-based visual story builder. Create, link, and branch narrative nodes                                                                                                                            |
-| **AI Video Generation**           | 5 providers (Veo3, Kling, Wan2.5, Sora, **ByteDance Seedance 2.0**) via FAL AI + ModelArk. 1-60s duration, configurable                                                                                   |
-| **AI Image Generation**           | 4 models (Nano Banana, Flux/dev, Flux-pro, Flux/schnell) via FAL AI                                                                                                                                       |
-| **Model Routing (Smart Auto)**    | Auto-selects best model by quality/speed/cost. Manual override available. 14+ models, cost tracked per generation                                                                                         |
+| **AI Video Generation**           | 10+ providers (Veo 3.1, Kling 3.0, Wan 2.7, Sora 2, Seedance 2.0, LTX, HunYuan, CogVideoX, PixVerse V6, Runway Gen-3) via FAL AI + ModelArk. 44 model variants, 1-60s duration                            |
+| **AI Image Generation**           | 21 models (FLUX Schnell/Dev/Pro/2 Pro/Kontext, Nano Banana/2/Pro, Recraft V4, Ideogram V3, Seedream 5.0, GPT Image, and more) via FAL AI                                                                  |
+| **Model Routing (Smart Auto)**    | Auto-selects best model by quality/speed/cost. Manual override available. 65 models (44 video + 21 image), cost tracked per generation                                                                    |
 | **Quest & Affiliate System**      | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards                                                                                              |
 | **AI Wiki Generation**            | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                                                                                                         |
 | **On-Chain Node Storage**         | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                                                                                                               |
@@ -51,7 +51,7 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Content Upload**                | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                                                                                                     |
 | **Content Discovery**             | Search/filter by classification, media type, tags. Creator gallery + content feed                                                                                                                         |
 | **Character Wiki**                | Browse, search, filter characters by collection/traits. Individual character pages                                                                                                                        |
-| **Blockchain Indexer**            | Ponder v0.15 indexing all contract events into 37+ GraphQL tables                                                                                                                                         |
+| **Blockchain Indexer**            | Ponder v0.15 indexing all contract events into 29 GraphQL tables                                                                                                                                          |
 | **ETH Purchase Flow**             | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order                                                                                              |
 | **Identity NFTs**                 | Minted by UniverseManager per universe creator. Tracks co-creators and multi-sig signers                                                                                                                  |
 | **TimelockController Governance** | `UniverseTimelockGovernor` with 24-hour execution delay for major proposals. Per-universe Governor with configurable voting delay/period/quorum                                                           |
@@ -86,6 +86,9 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 | Feature                | Notes                                                                                         |
 | ---------------------- | --------------------------------------------------------------------------------------------- |
 | **Mainnet Deployment** | Contracts on Sepolia + Base Sepolia. Multi-chain infra ready. Needs audit before Base Mainnet |
+| **Solana Deployment**  | 8 Anchor programs code-complete (`apps/contracts-sol`). Not yet deployed to devnet            |
+| **Sui Deployment**     | 8 Move modules code-complete (`apps/contracts-sui`). Not yet deployed to testnet              |
+| **Wormhole Bridge**    | NTT v3 config ready for Base↔Solana↔Sui token bridging. Testnet only                          |
 | **Fiat On-Ramp**       | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp             |
 | **Social Features**    | No follows, comments, activity feed, or notifications                                         |
 | **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders                                  |
@@ -104,16 +107,16 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
                             │ tRPC              │ wagmi
                             ▼                   ▼
               ┌─────────────────────┐  ┌──────────────────────┐
-              │   API Server        │  │  Sepolia/Base        │
-              │   Hono + tRPC       │  │  30+ contracts       │
-              │   45+ routers       │  │  (proxied +          │
-              │   150+ procedures   │  │  upgradeable)        │
+              │   API Server        │  │  Sepolia/Base (EVM)  │
+              │   Hono + tRPC       │  │  48 contracts        │
+              │   44 routers        │  │  (proxied +          │
+              │   400+ procedures   │  │  upgradeable)        │
               │   Port 3000         │  └──────────┬───────────┘
-              │   Port 3000         │             │ events
+              │                     │             │ events
               └──────────┬──────────┘             ▼
                          │               ┌──────────────────┐
                          ▼               │  Ponder Indexer   │
-              ┌──────────────────┐       │  37+ tables       │
+              ┌──────────────────┐       │  29 tables        │
               │  Firestore       │       │  GraphQL API      │
               │  (user data,     │       │  Port 42069       │
               │   content meta,  │       └──────────────────┘
@@ -121,15 +124,18 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
               └──────────────────┘
 ```
 
-| App              | Stack                                                  | Description                                            |
-| ---------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, thirdweb | Frontend SPA                                           |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                 | API server (45+ routers, 150+ procedures)              |
-| `apps/indexer`   | Ponder v0.15, GraphQL                                  | Blockchain event indexer (37+ tables)                  |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                              | Smart contracts (Sepolia/Base, 30+ contracts)          |
-| `apps/mcp`       | MCP Server                                             | AI agent gateway (20+ tools for MCP-compatible agents) |
-| `apps/mobile`    | Expo 52, React Native, NativeWind                      | iOS + Android app                                      |
-| `packages/abis`  | Auto-generated wagmi hooks                             | Shared contract bindings                               |
+| App                  | Stack                                                  | Description                                            |
+| -------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
+| `apps/web`           | React 18, Vite, TanStack Router/Query, wagmi, thirdweb | Frontend SPA (62 routes)                               |
+| `apps/server`        | Hono, tRPC, Firebase Admin (Firestore)                 | API server (44 routers, 400+ procedures)               |
+| `apps/indexer`       | Ponder v0.15, GraphQL                                  | Blockchain event indexer (29 tables)                   |
+| `apps/contracts`     | Foundry, Solidity ^0.8.30                              | EVM smart contracts (Sepolia/Base, 48 contracts)       |
+| `apps/contracts-sol` | Anchor, Solana SPL                                     | Solana smart contracts (8 programs, not yet deployed)  |
+| `apps/contracts-sui` | Move 2024.beta                                         | Sui Move smart contracts (8 modules, not yet deployed) |
+| `apps/bridge`        | Wormhole NTT v3                                        | Cross-chain bridge config (planned: Base↔Solana↔Sui)   |
+| `apps/mcp`           | MCP Server                                             | AI agent gateway (24 tools for MCP-compatible agents)  |
+| `apps/mobile`        | Expo 52, React Native, NativeWind                      | iOS + Android app                                      |
+| `packages/abis`      | Auto-generated wagmi hooks                             | Shared contract bindings                               |
 
 ### Key Flows
 
@@ -147,7 +153,9 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 
 ## Smart Contracts (Sepolia)
 
-Contracts are deployed on **Sepolia testnet** (chain ID 11155111) with multi-chain support for **Base Sepolia** (84532) and **Base Mainnet** (8453). Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
+48 EVM contracts are deployed on **Sepolia testnet** (chain ID 11155111) with multi-chain support for **Base Sepolia** (84532) and **Base Mainnet** (8453). Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
+
+**Multi-chain roadmap:** Solana (8 Anchor programs) and Sui (8 Move modules) contract ports are code-complete but not yet deployed. Cross-chain token bridging via **Wormhole NTT v3** is configured for testnet.
 
 ### Core Protocol
 
@@ -339,32 +347,40 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 
 ## Documentation
 
-| Document                                                 | Description                                          |
-| -------------------------------------------------------- | ---------------------------------------------------- |
-| [MVP Scope](docs/mvp.md)                                 | What's in the MVP, what's deferred, success criteria |
-| [Roadmap](docs/roadmap.md)                               | 3 milestones with concrete deliverables              |
-| [Creator Journey](docs/creator-journey.md)               | Step-by-step from wallet connect to revenue          |
-| [IP & Content Policy](docs/ip-policy.md)                 | Copyright rules, licensing, compliance               |
-| [Monetization Map](docs/monetization-map.md)             | How money flows, who pays, what's owned              |
-| [Product Loops](docs/product-loops.md)                   | Core loops with status assessment                    |
-| [Architecture](docs/architecture.md)                     | System design, auth flow, service connections        |
-| [Trust Model](docs/trust-model.md)                       | Contract ownership, admin powers, security model     |
-| [Environment](docs/environment.md)                       | All env vars, Firebase setup guide                   |
-| [API Reference](docs/api.md)                             | REST + tRPC + GraphQL endpoints                      |
-| [Smart Contracts](docs/contracts.md)                     | Contract guide, ABI generation                       |
-| [Database](docs/database.md)                             | Firestore + Ponder schema reference                  |
-| [Deployment](docs/deployment.md)                         | Docker, CI/CD, manual deploy                         |
-| [Agents & MCP](docs/agents.md)                           | AI agent pipelines, API keys, MCP server             |
-| [Troubleshooting](docs/troubleshooting.md)               | Common issues and fixes                              |
-| [GTM Strategy](docs/gtm-prd.md)                          | Go-to-market positioning and phased rollout          |
-| [Moderation & Rights](docs/prd-moderation-rights-ops.md) | Content flagging, DMCA, admin review, audit log      |
-| [Worldbuilding Studio](docs/prd-worldbuilding-studio.md) | Entity kinds, wiki, create hub                       |
-| [Security](docs/security.md)                             | Security architecture and threat model               |
-| [Pre-Launch Checklist](docs/pre-launch-checklist.md)     | Validation checklist before launch                   |
+| Document                                                                 | Description                                          |
+| ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [MVP Scope](docs/mvp.md)                                                 | What's in the MVP, what's deferred, success criteria |
+| [Roadmap](docs/roadmap.md)                                               | 3 milestones with concrete deliverables              |
+| [Creator Journey](docs/creator-journey.md)                               | Step-by-step from wallet connect to revenue          |
+| [IP & Content Policy](docs/ip-policy.md)                                 | Copyright rules, licensing, compliance               |
+| [Monetization Map](docs/monetization-map.md)                             | How money flows, who pays, what's owned              |
+| [Product Loops](docs/product-loops.md)                                   | Core loops with status assessment                    |
+| [Architecture](docs/architecture.md)                                     | System design, auth flow, service connections        |
+| [Trust Model](docs/trust-model.md)                                       | Contract ownership, admin powers, security model     |
+| [Environment](docs/environment.md)                                       | All env vars, Firebase setup guide                   |
+| [API Reference](docs/api.md)                                             | REST + tRPC + GraphQL endpoints                      |
+| [Smart Contracts](docs/contracts.md)                                     | Contract guide, ABI generation                       |
+| [Database](docs/database.md)                                             | Firestore + Ponder schema reference                  |
+| [Deployment](docs/deployment.md)                                         | Docker, CI/CD, manual deploy                         |
+| [Agents & MCP](docs/agents.md)                                           | AI agent pipelines, API keys, MCP server             |
+| [Troubleshooting](docs/troubleshooting.md)                               | Common issues and fixes                              |
+| [GTM Strategy](docs/gtm-prd.md)                                          | Go-to-market positioning and phased rollout          |
+| [Analytics Spec](docs/analytics-spec.md)                                 | Analytics events and tracking specification          |
+| [Rights Classification UI](docs/rights-classification-ui.md)             | Three-lane model, badge system, data migration       |
+| [Moderation & Rights](docs/prd-moderation-rights-ops.md)                 | Content flagging, DMCA, admin review, audit log      |
+| [Worldbuilding Studio](docs/prd-worldbuilding-studio.md)                 | Entity kinds, wiki, create hub                       |
+| [Likeness Marketplace](docs/prd-likeness-marketplace.md)                 | Verified likeness KYC + consent (deferred to V2)     |
+| [Alpha 01: Brand Unification](docs/prd-alpha-01-brand-unification.md)    | Brand consistency and UI unification PRD             |
+| [Alpha 02: Revenue Loop](docs/prd-alpha-02-revenue-loop.md)              | Closing the revenue loop for alpha launch            |
+| [Mobile: Portfolio & Wallet](docs/prd-mobile-portfolio-wallet-assets.md) | Mobile portfolio, wallet, and assets PRD             |
+| [Mobile: Consumer Feed](docs/prd-mobile-consumer-feed-create.md)         | Mobile consumer feed and creation PRD                |
+| [Mobile: Market & Shop](docs/prd-mobile-market-shop-seller.md)           | Mobile marketplace and seller PRD                    |
+| [Security](docs/security.md)                                             | Security architecture and threat model               |
+| [Pre-Launch Checklist](docs/pre-launch-checklist.md)                     | Validation checklist before launch                   |
 
 ---
 
-## Web App Routes (60+ pages)
+## Web App Routes (62 pages)
 
 ### Core
 
@@ -471,15 +487,18 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 ```
 loar/
 ├── apps/
-│   ├── web/             # React 18 SPA (Vite + TanStack Router, 60+ routes)
-│   ├── server/          # Hono + tRPC API (45+ routers, 150+ procedures)
-│   ├── indexer/         # Ponder v0.15 blockchain indexer (37+ tables)
-│   ├── contracts/       # Foundry/Solidity (30+ contracts, upgradeable, Sepolia/Base)
-│   ├── mcp/             # MCP server — AI agent gateway (20+ tools)
+│   ├── web/             # React 18 SPA (Vite + TanStack Router, 62 routes)
+│   ├── server/          # Hono + tRPC API (44 routers, 400+ procedures)
+│   ├── indexer/         # Ponder v0.15 blockchain indexer (29 tables)
+│   ├── contracts/       # Foundry/Solidity EVM (48 contracts, upgradeable, Sepolia/Base)
+│   ├── contracts-sol/   # Solana Anchor smart contracts (8 programs, planned)
+│   ├── contracts-sui/   # Sui Move smart contracts (8 modules, planned)
+│   ├── bridge/          # Wormhole NTT v3 cross-chain bridge config (planned)
+│   ├── mcp/             # MCP server — AI agent gateway (24 tools)
 │   └── mobile/          # Expo 52 / React Native (iOS + Android)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs + addresses
-├── docs/                # Product + technical documentation (27 docs)
+├── docs/                # Product + technical documentation (28 docs)
 ├── .env.example         # Environment variable template
 ├── setup.sh             # First-time setup script
 ├── Makefile             # Command shortcuts

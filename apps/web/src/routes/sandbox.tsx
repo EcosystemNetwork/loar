@@ -46,9 +46,11 @@ export const Route = createFileRoute('/sandbox')({
   component: SandboxPage,
 });
 
-type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3';
+type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3' | 'seedance' | 'seedance-fast';
 
-const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
+const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
+  { value: 'seedance', label: 'Seedance 2.0', badge: 'Free' },
+  { value: 'seedance-fast', label: 'Seedance 2.0 Fast', badge: 'Free' },
   { value: 'fal-kling', label: 'Kling 2.5' },
   { value: 'fal-wan25', label: 'Wan 2.5' },
   { value: 'fal-veo3', label: 'Veo 3' },
@@ -71,7 +73,7 @@ function SandboxPage() {
   const [imageSize, setImageSize] = useState<'landscape_16_9' | 'portrait_16_9' | 'square_hd'>(
     'landscape_16_9'
   );
-  const [videoModel, setVideoModel] = useState<VideoModel>('fal-kling');
+  const [videoModel, setVideoModel] = useState<VideoModel>('seedance');
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
 
@@ -92,39 +94,36 @@ function SandboxPage() {
     onError: (err: any) => toast.error(err.message || 'Image generation failed'),
   });
 
-  // Video generation from image
+  // Map sandbox model IDs to registry model IDs for the unified generate endpoint
+  const MODEL_REGISTRY_MAP: Record<VideoModel, { t2v: string; i2v: string }> = {
+    seedance: { t2v: 'seedance2-t2v', i2v: 'seedance2-i2v' },
+    'seedance-fast': { t2v: 'seedance2-fast-t2v', i2v: 'seedance2-fast-i2v' },
+    'fal-kling': { t2v: 'kling-t2v', i2v: 'kling-i2v' },
+    'fal-wan25': { t2v: 'wan25-t2v', i2v: 'wan25-i2v' },
+    'fal-veo3': { t2v: 'veo31-t2v', i2v: 'veo31-i2v' },
+  };
+
+  // Video generation — uses unified generate endpoint (correct pricing per model)
   const generateVideoMutation = useMutation({
     mutationFn: async () => {
-      if (!generatedImageUrl) throw new Error('Generate an image first');
+      const hasImage = !!generatedImageUrl;
+      const mode = hasImage ? 'image_to_video' : 'text_to_video';
+      const modelIds = MODEL_REGISTRY_MAP[videoModel];
+      const selectedModelId = hasImage ? modelIds.i2v : modelIds.t2v;
+      const isSeedance = videoModel === 'seedance' || videoModel === 'seedance-fast';
 
-      if (videoModel === 'fal-veo3') {
-        const r = await trpcClient.generation.generateVideo.mutate({
-          prompt,
-          imageUrl: generatedImageUrl,
-          model: 'fal-ai/veo3.1/fast/image-to-video',
-          duration: 5,
-          aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
-        });
-        return r.videoUrl;
-      } else if (videoModel === 'fal-wan25') {
-        const r = await trpcClient.generation.wan25ImageToVideo.mutate({
-          prompt,
-          imageUrl: generatedImageUrl,
-          duration: 5,
-          resolution: '1080p',
-          enablePromptExpansion: true,
-        });
-        return r.videoUrl;
-      } else {
-        const r = await trpcClient.generation.klingVideo.mutate({
-          prompt,
-          imageUrl: generatedImageUrl,
-          duration: 5,
-          aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
-          cfgScale: 0.5,
-        });
-        return r.videoUrl;
-      }
+      const r = await trpcClient.generation.generate.mutate({
+        prompt,
+        mode,
+        routingMode: 'manual',
+        selectedModelId,
+        ...(hasImage ? { imageUrl: generatedImageUrl } : {}),
+        durationSec: 5,
+        resolution: '720p',
+        aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
+        audio: isSeedance, // Seedance supports native audio
+      });
+      return r.videoUrl;
     },
     onSuccess: (url) => {
       setGeneratedVideoUrl(url ?? null);
@@ -247,7 +246,14 @@ function SandboxPage() {
                     <SelectContent>
                       {VIDEO_MODELS.map((m) => (
                         <SelectItem key={m.value} value={m.value}>
-                          {m.label}
+                          <span className="flex items-center gap-1.5">
+                            {m.label}
+                            {m.badge && (
+                              <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-medium">
+                                {m.badge}
+                              </span>
+                            )}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -272,14 +278,30 @@ function SandboxPage() {
                 <Button
                   variant="outline"
                   onClick={() => generateVideoMutation.mutate()}
-                  disabled={!generatedImageUrl || isGeneratingImage || isGeneratingVideo}
+                  disabled={
+                    (!generatedImageUrl &&
+                      videoModel !== 'seedance' &&
+                      videoModel !== 'seedance-fast') ||
+                    !prompt.trim() ||
+                    isGeneratingImage ||
+                    isGeneratingVideo
+                  }
+                  title={
+                    videoModel === 'seedance' || videoModel === 'seedance-fast'
+                      ? 'Seedance supports text-to-video — no image needed'
+                      : 'Generate an image first, then animate'
+                  }
                 >
                   {isGeneratingVideo ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <Video className="h-4 w-4 mr-2" />
                   )}
-                  {isGeneratingVideo ? 'Animating…' : 'Animate'}
+                  {isGeneratingVideo
+                    ? 'Generating…'
+                    : generatedImageUrl
+                      ? 'Animate'
+                      : 'Generate Video'}
                 </Button>
               </div>
 
@@ -299,8 +321,10 @@ function SandboxPage() {
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <Loader2 className="h-8 w-8 animate-spin" />
                       <p className="text-sm">
-                        Animating with {VIDEO_MODELS.find((m) => m.value === videoModel)?.label}…
+                        {generatedImageUrl ? 'Animating' : 'Generating video'} with{' '}
+                        {VIDEO_MODELS.find((m) => m.value === videoModel)?.label}…
                       </p>
+                      <p className="text-xs text-muted-foreground/60">This can take 1-3 minutes</p>
                     </div>
                   )}
                   {!isGeneratingImage && !isGeneratingVideo && generatedVideoUrl && (
@@ -347,10 +371,7 @@ function SandboxPage() {
                       )}
                       Save Draft
                     </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
-                    >
+                    <Button className="flex-1" onClick={() => navigate({ to: '/create' })}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create Universe
                       <ArrowRight className="h-4 w-4 ml-2" />

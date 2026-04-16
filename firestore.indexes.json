@@ -41,6 +41,14 @@
         { "fieldPath": "tokenAddress", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "sandboxDrafts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "creatorAddress", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

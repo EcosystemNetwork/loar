@@ -601,15 +601,15 @@ export const generationRouter = router({
       const record: VideoGenerationRecord & { entityId?: string; originalPrompt?: string } = {
         id: generationId,
         userId: ctx.user.uid,
-        entityId: input.entityId,
-        universeId: input.universeId,
+        ...(input.entityId ? { entityId: input.entityId } : {}),
+        ...(input.universeId ? { universeId: input.universeId } : {}),
         routingMode: input.routingMode,
-        requestedModelId,
+        ...(requestedModelId ? { requestedModelId } : {}),
         finalModelId,
         provider: model.provider,
         status: 'queued',
         prompt: input.prompt,
-        originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
+        ...(originalPrompt !== input.prompt ? { originalPrompt } : {}),
         mode: input.mode,
         durationSec: input.durationSec,
         resolution: input.resolution,
@@ -627,36 +627,38 @@ export const generationRouter = router({
       await saveGenerationRecord(record);
 
       // ── Deduct credits (transactional) ─────────────────────────────
-      const userCreditsCol = db.collection('userCredits');
-      const userCreditsRef = userCreditsCol.doc(ctx.user.uid);
+      if (creditsCharged > 0) {
+        const userCreditsCol = db.collection('userCredits');
+        const userCreditsRef = userCreditsCol.doc(ctx.user.uid);
 
-      try {
-        await db.runTransaction(async (tx) => {
-          const userCreditsDoc = await tx.get(userCreditsRef);
-          const currentBalance = userCreditsDoc.exists ? userCreditsDoc.data()?.balance || 0 : 0;
+        try {
+          await db.runTransaction(async (tx) => {
+            const userCreditsDoc = await tx.get(userCreditsRef);
+            const currentBalance = userCreditsDoc.exists ? userCreditsDoc.data()?.balance || 0 : 0;
 
-          if (currentBalance < creditsCharged) {
-            throw new Error(
-              `Insufficient credits. Need ${creditsCharged}, have ${currentBalance}. Purchase more credits to continue.`
-            );
-          }
+            if (currentBalance < creditsCharged) {
+              throw new Error(
+                `Insufficient credits. Need ${creditsCharged}, have ${currentBalance}. Purchase more credits to continue.`
+              );
+            }
 
-          tx.update(userCreditsRef, {
-            balance: currentBalance - creditsCharged,
-            totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
-            updatedAt: new Date(),
+            tx.update(userCreditsRef, {
+              balance: currentBalance - creditsCharged,
+              totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
+              updatedAt: new Date(),
+            });
           });
-        });
-      } catch (creditErr) {
-        await generationsCol()
-          .doc(generationId)
-          .update({
-            status: 'failed',
-            failureReason:
-              creditErr instanceof Error ? creditErr.message : 'Credit deduction failed',
-            completedAt: new Date(),
-          });
-        throw creditErr;
+        } catch (creditErr) {
+          await generationsCol()
+            .doc(generationId)
+            .update({
+              status: 'failed',
+              failureReason:
+                creditErr instanceof Error ? creditErr.message : 'Credit deduction failed',
+              completedAt: new Date(),
+            });
+          throw creditErr;
+        }
       }
 
       // ── Generate ────────────────────────────────────────────────────

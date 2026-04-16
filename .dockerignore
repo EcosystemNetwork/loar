@@ -30,8 +30,5 @@ apps/contracts/cache/
 apps/contracts/lib/
 apps/contracts/test/
 apps/contracts/script/
-apps/contracts-sol/
-apps/contracts-sui/
-apps/bridge/
 coverage
 .DS_Store

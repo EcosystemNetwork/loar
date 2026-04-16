@@ -2,23 +2,18 @@
 set -euo pipefail
 
 # ============================================================================
-# LOAR — Multi-Chain Testnet Deployment Orchestrator
+# LOAR — Base Sepolia Testnet Deployment
 # ============================================================================
 #
-# Deploys the full LOAR protocol to:
-#   - Base Sepolia (EVM)
-#   - Solana Devnet
-#   - SUI Testnet
+# Deploys the full LOAR protocol to Base Sepolia (EVM).
 #
 # Prerequisites:
 #   - foundryup installed (forge, cast)
-#   - anchor-cli installed
-#   - sui-cli installed
-#   - Wallets funded on all 3 chains
+#   - Wallet funded on Base Sepolia
 #   - .env file with PRIVATE_KEY set
 #
 # Usage:
-#   ./scripts/deploy-testnet.sh [evm|solana|sui|all]
+#   ./scripts/deploy-testnet.sh
 #
 # ============================================================================
 
@@ -109,87 +104,7 @@ deploy_evm() {
 }
 
 # ============================================================================
-# Solana — Devnet
-# ============================================================================
-deploy_solana() {
-    section "Solana — Devnet Deployment"
-
-    cd "$ROOT_DIR/apps/contracts-sol"
-
-    # Check anchor
-    if ! command -v anchor &> /dev/null; then
-        err "Anchor not installed. Run: cargo install --git https://github.com/coral-xyz/anchor anchor-cli"
-        return 1
-    fi
-
-    # Check solana CLI
-    if ! command -v solana &> /dev/null; then
-        err "Solana CLI not installed. Run: sh -c \"\$(curl -sSfL https://release.anza.xyz/stable/install)\""
-        return 1
-    fi
-
-    # Check balance
-    DEPLOYER=$(solana address 2>/dev/null || echo "unknown")
-    log "Deployer: $DEPLOYER"
-
-    BALANCE=$(solana balance 2>/dev/null || echo "0 SOL")
-    log "Balance: $BALANCE"
-
-    # Build
-    log "Building Anchor programs..."
-    anchor build 2>&1 | tee "$LOG_DIR/solana-build.log"
-
-    # Deploy
-    log "Deploying to devnet..."
-    anchor deploy --provider.cluster devnet 2>&1 | tee "$LOG_DIR/solana-deploy.log"
-
-    # Initialize
-    log "Initializing programs..."
-    npx ts-node scripts/init-programs.ts 2>&1 | tee "$LOG_DIR/solana-init.log"
-
-    log "Solana deployment complete!"
-    log "Addresses logged to $LOG_DIR/solana-*.log"
-
-    echo ""
-    log "ACTION NEEDED: Update apps/web/src/configs/addresses.ts with program IDs from Anchor.toml"
-}
-
-# ============================================================================
-# SUI — Testnet
-# ============================================================================
-deploy_sui() {
-    section "SUI — Testnet Deployment"
-
-    cd "$ROOT_DIR/apps/contracts-sui"
-
-    # Check sui CLI
-    if ! command -v sui &> /dev/null; then
-        err "SUI CLI not installed. Run: cargo install --locked --git https://github.com/MystenLabs/sui.git sui"
-        return 1
-    fi
-
-    # Check balance
-    DEPLOYER=$(sui client active-address 2>/dev/null || echo "unknown")
-    log "Deployer: $DEPLOYER"
-
-    # Run publish script
-    log "Publishing Move package..."
-    bash scripts/publish-and-init.sh 2>&1 | tee "$LOG_DIR/sui-publish.log"
-
-    # Copy addresses file
-    if [ -f "deployed-addresses.json" ]; then
-        cp deployed-addresses.json "$LOG_DIR/sui-addresses.json"
-        log "Addresses saved to $LOG_DIR/sui-addresses.json"
-    fi
-
-    log "SUI deployment complete!"
-
-    echo ""
-    log "ACTION NEEDED: Update apps/web/src/configs/addresses.ts with package ID"
-}
-
-# ============================================================================
-# Post-deploy: Update frontend addresses
+# Post-deploy checklist
 # ============================================================================
 post_deploy() {
     section "Post-Deploy Checklist"
@@ -208,15 +123,11 @@ post_deploy() {
     echo "║  3. Run: cd apps/web && pnpm build                   ║"
     echo "║     Verify no TypeScript errors                      ║"
     echo "║                                                      ║"
-    echo "║  4. Test on each chain:                              ║"
-    echo "║     - Connect wallet on Base Sepolia                 ║"
-    echo "║     - Connect Phantom on Solana Devnet               ║"
-    echo "║     - Connect SUI Wallet on SUI Testnet              ║"
-    echo "║     - Create a universe on each chain                ║"
-    echo "║     - Mint an entity on each chain                   ║"
-    echo "║     - Purchase credits on each chain                 ║"
-    echo "║                                                      ║"
-    echo "║  5. Test bridge: /bridge page                        ║"
+    echo "║  4. Test on Base Sepolia:                            ║"
+    echo "║     - Connect wallet                                 ║"
+    echo "║     - Create a universe                              ║"
+    echo "║     - Mint an entity                                 ║"
+    echo "║     - Purchase credits                               ║"
     echo "║                                                      ║"
     echo "╚══════════════════════════════════════════════════════╝"
 }
@@ -224,26 +135,5 @@ post_deploy() {
 # ============================================================================
 # Main
 # ============================================================================
-TARGET="${1:-all}"
-
-case "$TARGET" in
-    evm)
-        deploy_evm
-        ;;
-    solana)
-        deploy_solana
-        ;;
-    sui)
-        deploy_sui
-        ;;
-    all)
-        deploy_evm
-        deploy_solana
-        deploy_sui
-        post_deploy
-        ;;
-    *)
-        echo "Usage: $0 [evm|solana|sui|all]"
-        exit 1
-        ;;
-esac
+deploy_evm
+post_deploy

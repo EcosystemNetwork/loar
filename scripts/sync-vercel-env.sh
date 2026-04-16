@@ -84,9 +84,6 @@ add_env "VITE_PONDER_URL"               "https://idx.loar.fun"
 add_env "VITE_LOAR_TOKEN_ADDRESS"       "0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F"
 add_env "VITE_TREASURY_ADDRESS"         "0x116C28e6DCABCa363f83217C712d79DCE168d90e"
 
-# ── SUI ──────────────────────────────────────────────────────
-add_env "VITE_SUI_NETWORK"              "testnet"
-
 # ── Firebase web client (public SDK credentials) ─────────────
 add_env "VITE_FIREBASE_PROJECT_ID"          "loar-db"
 add_env "VITE_FIREBASE_API_KEY"             "AIzaSyBw0t7WI6W9sHL5UQi2XG7CZ9jVosGNdRU"
@@ -94,10 +91,6 @@ add_env "VITE_FIREBASE_AUTH_DOMAIN"         "loar-db.firebaseapp.com"
 add_env "VITE_FIREBASE_STORAGE_BUCKET"      "loar-db.firebasestorage.app"
 add_env "VITE_FIREBASE_MESSAGING_SENDER_ID" "969698925631"
 add_env "VITE_FIREBASE_APP_ID"              "1:969698925631:web:0689e201946506fb132c8a"
-
-# ── Solana ───────────────────────────────────────────────────
-add_env "VITE_SOLANA_CLUSTER"           "devnet"
-add_env "VITE_SOLANA_RPC_URL"           "https://api.devnet.solana.com"
 
 echo ""
 echo "🎉 Done! Run 'vercel env ls' to verify."

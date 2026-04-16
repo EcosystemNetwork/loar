@@ -66,28 +66,49 @@ function VideosPage() {
     getNextPageParam: (last: any) => last.nextCursor ?? undefined,
   });
 
-  // Also fetch unformatted videos (legacy / no format set) as "all videos" fallback
-  const allVideosQuery = useInfiniteQuery({
-    queryKey: ['videos-all', debouncedSearch],
+  // Fetch ai-video without format filter to catch promoted sandbox videos (which have no format)
+  const aiVideoQuery = useInfiniteQuery({
+    queryKey: ['videos-ai', debouncedSearch],
     queryFn: ({ pageParam }: { pageParam?: string }) =>
       trpcClient.content.feed.query({
-        mediaType: 'video',
+        mediaType: 'ai-video',
         search: debouncedSearch || undefined,
-        limit: 12,
+        limit: 24,
         cursor: pageParam,
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last: any) => last.nextCursor ?? undefined,
-    enabled: !debouncedSearch, // only load on initial view
+  });
+
+  // Also fetch non-AI videos
+  const rawVideoQuery = useInfiniteQuery({
+    queryKey: ['videos-raw', debouncedSearch],
+    queryFn: ({ pageParam }: { pageParam?: string }) =>
+      trpcClient.content.feed.query({
+        mediaType: 'video',
+        search: debouncedSearch || undefined,
+        limit: 24,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: any) => last.nextCursor ?? undefined,
   });
 
   const shortItems = shortQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
   const longItems = longQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
-  const allVideoItems = allVideosQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
+  const aiVideoItems = aiVideoQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
+  const rawVideoItems = rawVideoQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
 
-  // Merge all-videos into appropriate buckets for display when format isn't set
-  const displayShort =
-    shortItems.length > 0 ? shortItems : allVideoItems.filter((i: any) => !i.format);
+  // Collect IDs already shown in short/long sections
+  const shortIds = new Set(shortItems.map((i: any) => i.id));
+  const longIds = new Set(longItems.map((i: any) => i.id));
+  const categorizedIds = new Set([...shortIds, ...longIds]);
+
+  // Videos without a format (most sandbox promotions) go into short-form display
+  const unformatted = [...aiVideoItems, ...rawVideoItems].filter(
+    (i: any) => !i.format && !categorizedIds.has(i.id)
+  );
+  const displayShort = [...shortItems, ...unformatted];
   const displayLong = longItems;
 
   return (
@@ -126,10 +147,10 @@ function VideosPage() {
             label="Short-Form"
             sublabel="Clips · Reels · Shorts"
             accentClass="text-pink-500"
-            count={shortItems.length}
+            count={displayShort.length}
           />
 
-          {shortQuery.isLoading ? (
+          {shortQuery.isLoading || aiVideoQuery.isLoading ? (
             <LoadingRow />
           ) : displayShort.length === 0 ? (
             <EmptySection

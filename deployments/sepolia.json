@@ -1,7 +1,7 @@
 {
   "chainId": 11155111,
   "environment": "sepolia",
-  "startBlock": 10672900,
+  "startBlock": 10672920,
   "updatedAt": "2026-04-16T00:00:00.000Z",
   "contracts": {
     "UniverseManager": "0xB82dE188841a799e0dBB58D885D81BEE7A735f00",

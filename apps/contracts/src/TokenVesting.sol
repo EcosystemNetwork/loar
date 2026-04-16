@@ -159,9 +159,8 @@ contract TokenVesting is Ownable {
         if (v.totalAmount == 0) revert VestingNotFound();
         if (v.revoked) revert VestingAlreadyRevoked();
 
-        v.revoked = true;
-
         uint128 vested = _vestedAmount(v);
+        v.revoked = true;
         v.vestedAtRevoke = vested;
         uint128 unvested = v.totalAmount - vested;
 
