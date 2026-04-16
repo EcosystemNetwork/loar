@@ -1,13 +1,15 @@
 /**
  * useThirdwebWrite — Drop-in replacements for wagmi's useWriteContract and
- * useSendTransaction that route through the thirdweb wallet adapter.
+ * useSendTransaction that route through thirdweb's native transaction pipeline.
  *
  * Problem: wagmi has zero connectors configured because thirdweb manages wallet
  * connections. Wagmi's useWriteContract/useSendTransaction require an active
  * connector, so they throw "Connector not connected".
  *
- * Solution: Convert the active thirdweb account to a viem WalletClient via
- * thirdweb's viem adapter, then call writeContract/sendTransaction on it directly.
+ * Solution: Use thirdweb's native `prepareTransaction` + `sendTransaction`
+ * which properly signs via the thirdweb account (in-app or external wallet)
+ * and sends via `eth_sendRawTransaction`. The previous viem adapter approach
+ * tried `eth_sendTransaction` against public RPCs which don't support it.
  *
  * Both hooks expose the same API shape as their wagmi counterparts so consumers
  * can switch imports without changing call sites.
@@ -15,27 +17,9 @@
 import { useState, useCallback } from 'react';
 import { useChainId } from 'wagmi';
 import { useActiveAccount } from 'thirdweb/react';
-import { viemAdapter } from 'thirdweb/adapters/viem';
-import { defineChain } from 'thirdweb';
+import { defineChain, prepareTransaction, sendTransaction } from 'thirdweb';
 import { thirdwebClient } from '@/lib/thirdweb';
-import type { Abi } from 'viem';
-
-/** Build a viem WalletClient from the active thirdweb account + current chain. */
-function useWalletClient() {
-  const thirdwebAccount = useActiveAccount();
-  const chainId = useChainId();
-
-  const getClient = useCallback(() => {
-    if (!thirdwebAccount) throw new Error('Wallet not connected');
-    return viemAdapter.walletClient.toViem({
-      account: thirdwebAccount,
-      client: thirdwebClient,
-      chain: defineChain(chainId),
-    });
-  }, [thirdwebAccount, chainId]);
-
-  return { getClient, isReady: !!thirdwebAccount };
-}
+import { encodeFunctionData, type Abi } from 'viem';
 
 // ─── useWriteContract replacement ────────────────────────────────────────────
 
@@ -45,7 +29,8 @@ function useWalletClient() {
  * Provides both `writeContract` (fire-and-forget) and `writeContractAsync` (returns hash).
  */
 export function useWriteContract() {
-  const { getClient } = useWalletClient();
+  const thirdwebAccount = useActiveAccount();
+  const chainId = useChainId();
   const [data, setData] = useState<`0x${string}` | undefined>();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -59,16 +44,27 @@ export function useWriteContract() {
       value?: bigint;
       chainId?: number;
     }): Promise<`0x${string}`> => {
+      if (!thirdwebAccount) throw new Error('Wallet not connected');
       setIsPending(true);
       setError(null);
       setData(undefined);
       try {
-        const walletClient = getClient();
-        const txHash = await walletClient.writeContract({
-          ...params,
-          chain: walletClient.chain!,
-          account: walletClient.account!,
-        } as any);
+        const calldata = encodeFunctionData({
+          abi: params.abi as Abi,
+          functionName: params.functionName,
+          args: (params.args as any[]) ?? [],
+        });
+
+        const tx = prepareTransaction({
+          client: thirdwebClient,
+          chain: defineChain(params.chainId ?? chainId),
+          to: params.address as `0x${string}`,
+          data: calldata,
+          value: params.value,
+        });
+
+        const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
+        const txHash = result.transactionHash;
         setData(txHash);
         return txHash;
       } catch (e) {
@@ -79,7 +75,7 @@ export function useWriteContract() {
         setIsPending(false);
       }
     },
-    [getClient]
+    [thirdwebAccount, chainId]
   );
 
   /** Fire-and-forget variant — sets `data`/`error` state but doesn't throw. */
@@ -116,23 +112,29 @@ export function useWriteContract() {
  * Provides `sendTransactionAsync` (returns hash).
  */
 export function useSendTransaction() {
-  const { getClient } = useWalletClient();
+  const thirdwebAccount = useActiveAccount();
+  const chainId = useChainId();
   const [data, setData] = useState<`0x${string}` | undefined>();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const sendTransactionAsync = useCallback(
     async (params: { to: string; value?: bigint; data?: string }): Promise<`0x${string}`> => {
+      if (!thirdwebAccount) throw new Error('Wallet not connected');
       setIsPending(true);
       setError(null);
       setData(undefined);
       try {
-        const walletClient = getClient();
-        const txHash = await walletClient.sendTransaction({
-          ...params,
-          chain: walletClient.chain!,
-          account: walletClient.account!,
-        } as any);
+        const tx = prepareTransaction({
+          client: thirdwebClient,
+          chain: defineChain(chainId),
+          to: params.to as `0x${string}`,
+          value: params.value,
+          data: params.data as `0x${string}` | undefined,
+        });
+
+        const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
+        const txHash = result.transactionHash;
         setData(txHash);
         return txHash;
       } catch (e) {
@@ -143,7 +145,7 @@ export function useSendTransaction() {
         setIsPending(false);
       }
     },
-    [getClient]
+    [thirdwebAccount, chainId]
   );
 
   const reset = useCallback(() => {

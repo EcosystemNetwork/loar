@@ -567,6 +567,7 @@ function CinematicUniverseCreate() {
               description: description,
               onChainUniverseId: parsedUniverseId?.toString(),
               mintTxHash: hash,
+              chainId,
               signature,
               message,
               nonce,

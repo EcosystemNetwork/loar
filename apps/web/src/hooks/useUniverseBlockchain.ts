@@ -105,6 +105,7 @@ function useUniverseCanonChain(contractAddress?: string) {
     query: {
       enabled: !!contractAddress,
       retry: false, // CanonNotSet() revert is expected when no canon has been set
+      meta: { silent: true }, // Tells global error handler to skip this
     },
   });
 }
