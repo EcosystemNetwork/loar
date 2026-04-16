@@ -7,6 +7,7 @@ import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIS
 import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
@@ -14,7 +15,7 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 /// @notice ERC-721 for unique world-building entities: places, events, vehicles.
 ///         Each mint is a 1-of-1 token. Owners earn royalties on secondary sales.
 ///         Free to mint (mintPrice=0) or paid — payment routed through PaymentRouter.
-contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable {
+contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum EntityKind { PLACE, EVENT, VEHICLE }
 
     struct Entity {
