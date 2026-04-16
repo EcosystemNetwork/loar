@@ -22,6 +22,7 @@ import {
   deleteEntity,
   addNodeToEntity,
   removeNodeFromEntity,
+  swapNodesBetweenEntities,
   assertMintEligible,
 } from './entities.handlers';
 import { geminiService } from '../../services/gemini';
@@ -241,6 +242,40 @@ export const entitiesRouter = router({
       const entity = await removeNodeFromEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
     }),
+  /** Swap node IDs between two entities. Only the creator (must own both) can do this. */
+  swapNodes: protectedProcedure
+    .use(requirePermission('entities.update'))
+    .input(
+      z.object({
+        entityIdA: z.string().min(1),
+        nodeIdA: z.number().int().nonnegative(),
+        entityIdB: z.string().min(1),
+        nodeIdB: z.number().int().nonnegative(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const [entityA, entityB] = await Promise.all([
+        getEntity(input.entityIdA),
+        getEntity(input.entityIdB),
+      ]);
+      if (!entityA) throw new Error('Entity A not found');
+      if (!entityB) throw new Error('Entity B not found');
+      const addr = ctx.user.address?.toLowerCase();
+      if (entityA.creator?.toLowerCase() !== addr) {
+        throw new Error('Forbidden: you must own entity A to swap nodes');
+      }
+      if (entityB.creator?.toLowerCase() !== addr) {
+        throw new Error('Forbidden: you must own entity B to swap nodes');
+      }
+      const result = await swapNodesBetweenEntities(
+        input.entityIdA,
+        input.nodeIdA,
+        input.entityIdB,
+        input.nodeIdB
+      );
+      return { success: true, data: result };
+    }),
+
   /** Check if an entity is eligible for NFT minting (monetized + rights declared). */
   mintEligibility: publicProcedure
     .input(z.object({ entityId: z.string().min(1) }))

@@ -46,6 +46,7 @@ import {
 import { trackQuests } from '../../services/quest-tracker';
 import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { getStorageManager } from '../../services/storage';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
 
 // ── Collections ───────────────────────────────────────────────────────
@@ -192,6 +193,66 @@ async function autoAttachImages(opts: {
     } catch (err) {
       console.error(`Failed to auto-attach image ${i}:`, err);
     }
+  }
+}
+
+// ── Persist images to permanent storage (fire-and-forget) ───────────
+
+async function persistImagesToStorage(opts: {
+  generationId: string;
+  imageUrls: string[];
+  userId: string;
+}) {
+  try {
+    const manager = getStorageManager();
+
+    for (let i = 0; i < opts.imageUrls.length; i++) {
+      const url = opts.imageUrls[i];
+      const filename = `generation-${opts.generationId}-${i}.png`;
+      console.log(`[persist] Uploading ${filename} to permanent storage...`);
+
+      const manifest = await manager.uploadFromUrl(url, filename, opts.userId);
+      const permanentUrl = manifest.uploads[0]?.url;
+      if (!permanentUrl) continue;
+
+      // Update generation record with permanent URLs
+      const genDoc = await imageGenerationsCol().doc(opts.generationId).get();
+      if (genDoc.exists) {
+        const existing = genDoc.data()?.imageUrls as string[] | undefined;
+        if (existing && existing[i] === url) {
+          existing[i] = permanentUrl;
+          await imageGenerationsCol().doc(opts.generationId).update({
+            imageUrls: existing,
+            storagePersisted: true,
+          });
+        }
+      }
+
+      // Update media attachments that reference this generation
+      const attachments = await db!
+        .collection('mediaAttachments')
+        .where('url', '==', url)
+        .limit(5)
+        .get();
+      for (const doc of attachments.docs) {
+        await doc.ref.update({ url: permanentUrl, contentHash: manifest.contentHash });
+      }
+
+      // Update gallery content docs that still point to the temp URL
+      const contentDocs = await db!
+        .collection('content')
+        .where('mediaUrl', '==', url)
+        .limit(5)
+        .get();
+      for (const doc of contentDocs.docs) {
+        await doc.ref.update({ mediaUrl: permanentUrl, thumbnailUrl: permanentUrl });
+      }
+
+      console.log(`[persist] ${filename} saved permanently: ${permanentUrl}`);
+    }
+  } catch (err) {
+    // Non-fatal — the temporary URL still works for now
+    console.error(`[persist] Failed to persist images ${opts.generationId}:`, err);
   }
 }
 
@@ -503,6 +564,13 @@ export const imageRouter = router({
           universeId: input.universeId,
           generationId: genId,
         }).catch((err) => console.error('[image] gallery publish failed:', err.message));
+
+        // Persist to permanent storage so gallery images don't expire
+        persistImagesToStorage({
+          generationId: genId,
+          imageUrls,
+          userId: ctx.user.uid,
+        }).catch((err) => console.error('[image] storage persist failed:', err.message));
 
         return {
           generationId: genId,
@@ -816,6 +884,11 @@ export const imageRouter = router({
           model: input.model || 'fal-ai/nano-banana',
           generationId: imgGenId,
         }).catch((err) => console.error('[legacy image] gallery publish failed:', err.message));
+        persistImagesToStorage({
+          generationId: imgGenId,
+          imageUrls,
+          userId: ctx.user.uid,
+        }).catch((err) => console.error('[legacy image] storage persist failed:', err.message));
       }
       return result;
     }),
@@ -891,6 +964,11 @@ export const imageRouter = router({
           model: 'fal-ai/nano-banana/edit',
           generationId: editGenId,
         }).catch((err) => console.error('[legacy edit] gallery publish failed:', err.message));
+        persistImagesToStorage({
+          generationId: editGenId,
+          imageUrls,
+          userId: ctx.user.uid,
+        }).catch((err) => console.error('[legacy edit] storage persist failed:', err.message));
       }
       if (result.status === 'failed')
         throw wrapError(new Error(result.error), 'Image editing failed');
@@ -973,6 +1051,11 @@ export const imageRouter = router({
           model: 'fal-ai/nano-banana/edit',
           generationId: i2iGenId,
         }).catch((err) => console.error('[legacy i2i] gallery publish failed:', err.message));
+        persistImagesToStorage({
+          generationId: i2iGenId,
+          imageUrls,
+          userId: ctx.user.uid,
+        }).catch((err) => console.error('[legacy i2i] storage persist failed:', err.message));
       }
       if (result.status === 'failed')
         throw wrapError(new Error(result.error), 'Image-to-image failed');

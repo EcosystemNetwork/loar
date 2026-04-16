@@ -401,3 +401,52 @@ export async function removeNodeFromEntity(
 
   return { ...existing, id: entityId, nodeIds: updatedNodeIds };
 }
+
+/**
+ * Atomically swap a node ID between two entities.
+ * Removes nodeIdA from entityA and adds nodeIdB; removes nodeIdB from entityB and adds nodeIdA.
+ * This is the off-chain counterpart to Universe.swapNodes() on-chain.
+ */
+export async function swapNodesBetweenEntities(
+  entityIdA: string,
+  nodeIdA: number,
+  entityIdB: string,
+  nodeIdB: number
+): Promise<{ entityA: Entity; entityB: Entity }> {
+  const col = entitiesCol();
+  const refA = col.doc(entityIdA);
+  const refB = col.doc(entityIdB);
+
+  const [docA, docB] = await Promise.all([refA.get(), refB.get()]);
+
+  if (!docA.exists) throw new Error('Entity A not found');
+  if (!docB.exists) throw new Error('Entity B not found');
+
+  const existingA = docA.data() as Entity;
+  const existingB = docB.data() as Entity;
+
+  const nodeIdsA = existingA.nodeIds || [];
+  const nodeIdsB = existingB.nodeIds || [];
+
+  if (!nodeIdsA.includes(nodeIdA)) {
+    throw new Error(`Node ${nodeIdA} not found on entity ${entityIdA}`);
+  }
+  if (!nodeIdsB.includes(nodeIdB)) {
+    throw new Error(`Node ${nodeIdB} not found on entity ${entityIdB}`);
+  }
+
+  // Swap: replace nodeIdA with nodeIdB in A, replace nodeIdB with nodeIdA in B
+  const updatedNodeIdsA = nodeIdsA.map((id) => (id === nodeIdA ? nodeIdB : id));
+  const updatedNodeIdsB = nodeIdsB.map((id) => (id === nodeIdB ? nodeIdA : id));
+
+  const now = new Date();
+  await Promise.all([
+    refA.update({ nodeIds: updatedNodeIdsA, updatedAt: now }),
+    refB.update({ nodeIds: updatedNodeIdsB, updatedAt: now }),
+  ]);
+
+  return {
+    entityA: { ...existingA, id: entityIdA, nodeIds: updatedNodeIdsA },
+    entityB: { ...existingB, id: entityIdB, nodeIds: updatedNodeIdsB },
+  };
+}
