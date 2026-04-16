@@ -82,13 +82,24 @@ export function useGetMedia(id: number) {
  */
 export function useGetCanonChain() {
   const chainId = useChainId();
+  const address = TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address;
+
+  // Read currentCanonId first — only fetch the chain when a canon is set.
+  // This avoids the CanonNotSet() revert entirely.
+  const { data: currentCanonId } = useReadContract({
+    abi: universeAbi,
+    address,
+    functionName: 'currentCanonId',
+  });
+
+  const hasCanon = currentCanonId != null && BigInt(currentCanonId as any) !== 0n;
 
   return useReadContract({
     abi: universeAbi,
-    address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
+    address,
     functionName: 'getCanonChain',
     query: {
-      retry: false, // CanonNotSet() revert is expected when no canon has been set
+      enabled: hasCanon,
     },
   });
 }

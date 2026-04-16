@@ -98,14 +98,25 @@ export function useUniverseGraphPage(contractAddress?: string, startId = 1, coun
 }
 
 function useUniverseCanonChain(contractAddress?: string) {
+  // Read currentCanonId first — only fetch the chain when a canon is set.
+  // This avoids the CanonNotSet() revert entirely instead of catching it.
+  const { data: currentCanonId } = useReadContract({
+    abi: universeAbi,
+    address: (contractAddress || '0x') as Address,
+    functionName: 'currentCanonId',
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+
+  const hasCanon = currentCanonId != null && BigInt(currentCanonId as any) !== 0n;
+
   return useReadContract({
     abi: universeAbi,
     address: (contractAddress || '0x') as Address,
     functionName: 'getCanonChain',
     query: {
-      enabled: !!contractAddress,
-      retry: false, // CanonNotSet() revert is expected when no canon has been set
-      meta: { silent: true }, // Tells global error handler to skip this
+      enabled: !!contractAddress && hasCanon,
     },
   });
 }
