@@ -1187,8 +1187,9 @@ export const generationRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Video generation failed');
       }
+      const legacyGenId = result.id || randomUUID();
       saveLegacyVideoRecord({
-        id: result.id || randomUUID(),
+        id: legacyGenId,
         userId: ctx.user?.uid || 'anonymous',
         prompt: input.prompt,
         model: input.model || 'fal-ai/ltx-video',
@@ -1202,6 +1203,17 @@ export const generationRouter = router({
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
       });
+      if (result.videoUrl) {
+        autoPublishVideoToGallery({
+          creatorUid: ctx.user.uid,
+          videoUrl: result.videoUrl,
+          prompt: input.prompt,
+          model: input.model || 'fal-ai/ltx-video',
+          generationId: legacyGenId,
+        }).catch((err: Error) =>
+          console.error('[legacy video] gallery publish failed:', err.message)
+        );
+      }
       return result;
     }),
 
@@ -1238,8 +1250,9 @@ export const generationRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Veo3 video generation failed');
       }
+      const veo3GenId = result.id || randomUUID();
       saveLegacyVideoRecord({
-        id: result.id || randomUUID(),
+        id: veo3GenId,
         userId: ctx.user?.uid || 'anonymous',
         prompt: input.prompt,
         model: 'fal-ai/veo3.1/fast/image-to-video',
@@ -1252,6 +1265,17 @@ export const generationRouter = router({
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
       });
+      if (result.videoUrl) {
+        autoPublishVideoToGallery({
+          creatorUid: ctx.user.uid,
+          videoUrl: result.videoUrl,
+          prompt: input.prompt,
+          model: 'fal-ai/veo3.1/fast/image-to-video',
+          generationId: veo3GenId,
+        }).catch((err: Error) =>
+          console.error('[legacy veo3] gallery publish failed:', err.message)
+        );
+      }
       return result;
     }),
 
@@ -1290,8 +1314,9 @@ export const generationRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Kling video generation failed');
       }
+      const klingGenId = result.id || randomUUID();
       saveLegacyVideoRecord({
-        id: result.id || randomUUID(),
+        id: klingGenId,
         userId: ctx.user?.uid || 'anonymous',
         prompt: input.prompt,
         model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
@@ -1304,6 +1329,17 @@ export const generationRouter = router({
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
       });
+      if (result.videoUrl) {
+        autoPublishVideoToGallery({
+          creatorUid: ctx.user.uid,
+          videoUrl: result.videoUrl,
+          prompt: input.prompt,
+          model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+          generationId: klingGenId,
+        }).catch((err: Error) =>
+          console.error('[legacy kling] gallery publish failed:', err.message)
+        );
+      }
       return result;
     }),
 
@@ -1342,8 +1378,9 @@ export const generationRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Wan25 video generation failed');
       }
+      const wan25GenId = result.id || randomUUID();
       saveLegacyVideoRecord({
-        id: result.id || randomUUID(),
+        id: wan25GenId,
         userId: ctx.user?.uid || 'anonymous',
         prompt: input.prompt,
         model: 'fal-ai/wan-25-preview/image-to-video',
@@ -1356,6 +1393,17 @@ export const generationRouter = router({
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
       });
+      if (result.videoUrl) {
+        autoPublishVideoToGallery({
+          creatorUid: ctx.user.uid,
+          videoUrl: result.videoUrl,
+          prompt: input.prompt,
+          model: 'fal-ai/wan-25-preview/image-to-video',
+          generationId: wan25GenId,
+        }).catch((err: Error) =>
+          console.error('[legacy wan25] gallery publish failed:', err.message)
+        );
+      }
       return result;
     }),
 
@@ -1392,8 +1440,9 @@ export const generationRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Sora video generation failed');
       }
+      const soraGenId = result.id || randomUUID();
       saveLegacyVideoRecord({
-        id: result.id || randomUUID(),
+        id: soraGenId,
         userId: ctx.user?.uid || 'anonymous',
         prompt: input.prompt,
         model: 'fal-ai/sora-2/image-to-video',
@@ -1407,6 +1456,17 @@ export const generationRouter = router({
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
       });
+      if (result.videoUrl) {
+        autoPublishVideoToGallery({
+          creatorUid: ctx.user.uid,
+          videoUrl: result.videoUrl,
+          prompt: input.prompt,
+          model: 'fal-ai/sora-2/image-to-video',
+          generationId: soraGenId,
+        }).catch((err: Error) =>
+          console.error('[legacy sora] gallery publish failed:', err.message)
+        );
+      }
       return result;
     }),
 

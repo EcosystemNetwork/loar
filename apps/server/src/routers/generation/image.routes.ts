@@ -788,11 +788,12 @@ export const imageRouter = router({
         throw genError;
       }
       if (result.status === 'completed' && result.imageUrl) {
+        const imgGenId = result.id || randomUUID();
         try {
           await imageGenerationsCol()
-            .doc(result.id || randomUUID())
+            .doc(imgGenId)
             .set({
-              id: result.id || randomUUID(),
+              id: imgGenId,
               userId: ctx.user?.uid || 'anonymous',
               prompt: input.prompt,
               model: input.model || 'fal-ai/nano-banana',
@@ -807,6 +808,14 @@ export const imageRouter = router({
         } catch (e) {
           /* db save is best-effort */
         }
+        const imageUrls = result.images?.map((i) => i.url) || [result.imageUrl];
+        autoPublishToGallery({
+          creatorUid: ctx.user.uid,
+          imageUrls,
+          prompt: input.prompt,
+          model: input.model || 'fal-ai/nano-banana',
+          generationId: imgGenId,
+        }).catch((err) => console.error('[legacy image] gallery publish failed:', err.message));
       }
       return result;
     }),
@@ -854,11 +863,12 @@ export const imageRouter = router({
         throw genError;
       }
       if (result.status === 'completed' && result.imageUrl) {
+        const editGenId = result.id || randomUUID();
         try {
           await imageGenerationsCol()
-            .doc(result.id || randomUUID())
+            .doc(editGenId)
             .set({
-              id: result.id || randomUUID(),
+              id: editGenId,
               userId: ctx.user?.uid || 'anonymous',
               prompt: input.prompt,
               model: 'fal-ai/nano-banana/edit',
@@ -873,6 +883,14 @@ export const imageRouter = router({
         } catch (e) {
           /* db save is best-effort */
         }
+        const imageUrls = result.images?.map((i) => i.url) || [result.imageUrl];
+        autoPublishToGallery({
+          creatorUid: ctx.user.uid,
+          imageUrls,
+          prompt: input.prompt,
+          model: 'fal-ai/nano-banana/edit',
+          generationId: editGenId,
+        }).catch((err) => console.error('[legacy edit] gallery publish failed:', err.message));
       }
       if (result.status === 'failed')
         throw wrapError(new Error(result.error), 'Image editing failed');
@@ -927,11 +945,12 @@ export const imageRouter = router({
         throw genError;
       }
       if (result.status === 'completed' && result.imageUrl) {
+        const i2iGenId = result.id || randomUUID();
         try {
           await imageGenerationsCol()
-            .doc(result.id || randomUUID())
+            .doc(i2iGenId)
             .set({
-              id: result.id || randomUUID(),
+              id: i2iGenId,
               userId: ctx.user?.uid || 'anonymous',
               prompt: input.prompt,
               model: 'fal-ai/nano-banana/edit',
@@ -946,6 +965,14 @@ export const imageRouter = router({
         } catch (e) {
           /* db save is best-effort */
         }
+        const imageUrls = result.images?.map((i) => i.url) || [result.imageUrl];
+        autoPublishToGallery({
+          creatorUid: ctx.user.uid,
+          imageUrls,
+          prompt: input.prompt,
+          model: 'fal-ai/nano-banana/edit',
+          generationId: i2iGenId,
+        }).catch((err) => console.error('[legacy i2i] gallery publish failed:', err.message));
       }
       if (result.status === 'failed')
         throw wrapError(new Error(result.error), 'Image-to-image failed');

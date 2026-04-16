@@ -114,7 +114,10 @@ export async function verifySiweSignature(
   const domainMatch = domainLine?.match(/^(.+?) wants you to sign in/);
   if (domainMatch) {
     const messageDomain = domainMatch[1];
-    if (!ALLOWED_DOMAINS.has(messageDomain)) {
+    // Strip port from domain for comparison — window.location.host includes the port
+    // (e.g. "localhost:3001") but ALLOWED_DOMAINS lists hostnames only.
+    const messageDomainHostname = messageDomain.replace(/:\d+$/, '');
+    if (!ALLOWED_DOMAINS.has(messageDomain) && !ALLOWED_DOMAINS.has(messageDomainHostname)) {
       throw new Error(`SIWE domain "${messageDomain}" is not allowed`);
     }
 
