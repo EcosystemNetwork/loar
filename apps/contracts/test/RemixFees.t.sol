@@ -5,10 +5,12 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import {RemixFees} from "../src/revenue/RemixFees.sol";
 import {MockLoarToken} from "./mocks/MockLoarToken.sol";
+import {MockUniverseManager} from "./mocks/MockUniverseManager.sol";
 
 contract RemixFeesTest is Test {
     RemixFees public remix;
     MockLoarToken public loar;
+    MockUniverseManager public universeManager;
 
     address deployer = makeAddr("deployer");
     address treasury = makeAddr("treasury");
@@ -37,6 +39,8 @@ contract RemixFeesTest is Test {
 
     function setUp() public {
         loar = new MockLoarToken();
+        universeManager = new MockUniverseManager();
+        universeManager.setOwner(UNIVERSE_ID, creator);
 
         vm.startPrank(deployer);
         RemixFees impl = new RemixFees();
@@ -45,8 +49,10 @@ contract RemixFeesTest is Test {
             abi.encodeCall(RemixFees.initialize, (address(loar), treasury, lp, platform))
         )));
 
+        remix.setUniverseManager(address(universeManager));
+
         // Register universe
-        remix.registerUniverse(UNIVERSE_ID, creator);
+        remix.registerUniverse(UNIVERSE_ID);
         vm.stopPrank();
 
         // Fund remixer and approve
@@ -409,26 +415,29 @@ contract RemixFeesTest is Test {
 
     function test_registerUniverse_byPlatform() public {
         address newCreator = makeAddr("newCreator");
+        universeManager.setOwner(42, newCreator);
 
         vm.prank(platform);
-        remix.registerUniverse(42, newCreator);
+        remix.registerUniverse(42);
 
         assertEq(remix.universeCreators(42), newCreator);
     }
 
     function test_registerUniverse_byOwner() public {
         address newCreator = makeAddr("newCreator");
+        universeManager.setOwner(42, newCreator);
 
         vm.prank(deployer);
-        remix.registerUniverse(42, newCreator);
+        remix.registerUniverse(42);
 
         assertEq(remix.universeCreators(42), newCreator);
     }
 
     function test_registerUniverse_revert_unauthorized() public {
+        universeManager.setOwner(42, anyone);
         vm.prank(anyone);
         vm.expectRevert("Unauthorized");
-        remix.registerUniverse(42, anyone);
+        remix.registerUniverse(42);
     }
 
     // ═══════════════════════════════════════════════════════════

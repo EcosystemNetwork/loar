@@ -70,24 +70,24 @@ contract RightsRegistryTest is Test {
 
     function test_setRights_revert_frozen() public {
         vm.startPrank(platform);
-        registry.freeze(hash1, "DMCA");
+        registry.emergencyFreeze(hash1, "DMCA");
         vm.expectRevert(RightsRegistry.AlreadyFrozen.selector);
         registry.setRights(hash1, IRightsRegistry.RightsType.ORIGINAL);
         vm.stopPrank();
     }
 
-    // ── freeze ──
+    // ── emergencyFreeze ──
 
-    function test_freeze() public {
+    function test_emergencyFreeze() public {
         vm.prank(platform);
-        registry.freeze(hash1, "DMCA takedown");
+        registry.emergencyFreeze(hash1, "DMCA takedown");
         assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.FROZEN));
     }
 
-    function test_freeze_revert_zeroHash() public {
+    function test_emergencyFreeze_revert_zeroHash() public {
         vm.prank(platform);
         vm.expectRevert(RightsRegistry.ZeroHash.selector);
-        registry.freeze(bytes32(0), "reason");
+        registry.emergencyFreeze(bytes32(0), "reason");
     }
 
     // ── isMonetizable ──
@@ -116,7 +116,7 @@ contract RightsRegistryTest is Test {
 
     function test_isMonetizable_frozen_blocked() public {
         vm.prank(platform);
-        registry.freeze(hash1, "dispute");
+        registry.emergencyFreeze(hash1, "dispute");
         assertFalse(registry.isMonetizable(hash1));
     }
 

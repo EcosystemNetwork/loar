@@ -97,6 +97,7 @@ import { BulkOperationsToolbar } from '@/components/flow/BulkOperationsToolbar';
 import { NodeContextMenu } from '@/components/flow/NodeContextMenu';
 import { ShortcutsHelpDialog } from '@/components/flow/ShortcutsHelpDialog';
 import { NodeArcOverlay } from '@/components/flow/NodeArcOverlay';
+import { EpisodeBuilder } from '@/components/episodes/EpisodeBuilder';
 import { useNodeArcs } from '@/hooks/useNodeArcs';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
@@ -212,6 +213,7 @@ function UniverseTimelineEditorInner() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSelectionPlayer, setShowSelectionPlayer] = useState(false);
   const [showAudioToolbar, setShowAudioToolbar] = useState(false);
+  const [showEpisodeBuilder, setShowEpisodeBuilder] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -2270,8 +2272,9 @@ function UniverseTimelineEditorInner() {
               onDragOver={handleDragOver}
               nodeTypes={nodeTypes}
               onNodeContextMenu={handleNodeContextMenu}
-              selectionOnDrag
-              panOnDrag={[1, 2]}
+              panOnDrag
+              panOnScroll
+              selectionOnDrag={false}
               selectionMode={SelectionMode.Partial}
               multiSelectionKeyCode="Shift"
               deleteKeyCode={null}
@@ -2620,6 +2623,7 @@ function UniverseTimelineEditorInner() {
                     onAssignToArc={handleAssignSelectedToArc}
                     onCreateArc={handleCreateArcAndAssign}
                     onShowAudioToolbar={() => setShowAudioToolbar(true)}
+                    onBuildEpisode={() => setShowEpisodeBuilder(true)}
                   />
                 </Panel>
               )}
@@ -3086,6 +3090,16 @@ function UniverseTimelineEditorInner() {
       {/* Selection Playlist Player */}
       {showSelectionPlayer && selectionVideos.length > 0 && (
         <SelectionPlayer videos={selectionVideos} onClose={() => setShowSelectionPlayer(false)} />
+      )}
+
+      {/* Episode Builder */}
+      {showEpisodeBuilder && (
+        <EpisodeBuilder
+          universeId={id}
+          nodes={nodes}
+          initialNodeIds={[...selectedNodeIds]}
+          onClose={() => setShowEpisodeBuilder(false)}
+        />
       )}
 
       {/* Audio Toolbar — Music, SFX, Lip Sync */}

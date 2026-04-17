@@ -1,0 +1,32 @@
+{
+  "NOVA": {
+    "name": "NOVA",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "st": 0.5,
+    "sy": 0.35
+  },
+  "ORIN": {
+    "name": "ORIN",
+    "voiceId": "IKne3meq5aSn9XLyUdCD",
+    "st": 0.6,
+    "sy": 0.25
+  },
+  "ECHO": {
+    "name": "ECHO",
+    "voiceId": "XrExE9yKIg1WjnnlVkGX",
+    "st": 0.4,
+    "sy": 0.45
+  },
+  "VOSS": {
+    "name": "VOSS",
+    "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+    "st": 0.75,
+    "sy": 0.4
+  },
+  "NARRATOR": {
+    "name": "NARRATOR",
+    "voiceId": "nPczCjzI2devNBz1zQrb",
+    "st": 0.8,
+    "sy": 0.15
+  }
+}

@@ -5,10 +5,12 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import {LicensingRegistry} from "../src/revenue/LicensingRegistry.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
+import {MockUniverseManager} from "./mocks/MockUniverseManager.sol";
 
 contract LicensingRegistryTest is Test {
     LicensingRegistry public lr;
     MockPaymentRouter public router;
+    MockUniverseManager public universeManager;
 
     address platform = makeAddr("platform");
     address treasury = makeAddr("treasury");
@@ -27,6 +29,8 @@ contract LicensingRegistryTest is Test {
         vm.deal(buyer, 100 ether);
 
         router = new MockPaymentRouter(treasury);
+        universeManager = new MockUniverseManager();
+        universeManager.setOwner(UNIVERSE_ID, creator);
 
         LicensingRegistry impl = new LicensingRegistry();
         lr = LicensingRegistry(
@@ -38,8 +42,10 @@ contract LicensingRegistryTest is Test {
             )
         );
 
+        lr.setUniverseManager(address(universeManager));
+
         vm.prank(platform);
-        lr.registerUniverse(UNIVERSE_ID, creator);
+        lr.registerUniverse(UNIVERSE_ID);
     }
 
     // ---- helper to read License struct cleanly ----

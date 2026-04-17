@@ -14,6 +14,20 @@ export const adPlacementAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'BID_CANCEL_COOLDOWN',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'BID_EXPIRY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'MAX_FEE_BPS',
     outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
     stateMutability: 'view',
@@ -59,6 +73,20 @@ export const adPlacementAbi = [
     name: 'bid',
     outputs: [],
     stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'bidPlacedAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'slotId', internalType: 'uint256', type: 'uint256' }],
+    name: 'cancelBid',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -195,10 +223,7 @@ export const adPlacementAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'creator', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
     name: 'registerUniverse',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -207,6 +232,13 @@ export const adPlacementAbi = [
     type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    name: 'setUniverseManager',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -236,6 +268,13 @@ export const adPlacementAbi = [
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     name: 'universeCreators',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeManager',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -303,6 +342,31 @@ export const adPlacementAbi = [
       },
     ],
     name: 'AdSlotCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'slotId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'bidder',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'BidCancelled',
   },
   {
     type: 'event',
@@ -1267,13 +1331,6 @@ export const characterNftAbi = [
       },
     ],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'claimRoyalties',
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -2567,6 +2624,7 @@ export const contentLicensingAbi = [
       { name: '_platform', internalType: 'address', type: 'address' },
       { name: '_splitRouter', internalType: 'address', type: 'address' },
       { name: '_paymentRouter', internalType: 'address', type: 'address' },
+      { name: '_rightsRegistry', internalType: 'address', type: 'address' },
       { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
     ],
     name: 'initialize',
@@ -2701,6 +2759,13 @@ export const contentLicensingAbi = [
     name: 'rentContent',
     outputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rightsRegistry',
+    outputs: [{ name: '', internalType: 'contract IRightsRegistry', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -3014,6 +3079,7 @@ export const contentLicensingAbi = [
   },
   { type: 'error', inputs: [], name: 'AlreadyRegistered' },
   { type: 'error', inputs: [], name: 'ContentNotActive' },
+  { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
   { type: 'error', inputs: [], name: 'DealExpired' },
   { type: 'error', inputs: [], name: 'DealNotActive' },
   { type: 'error', inputs: [], name: 'DurationTooLong' },
@@ -3103,6 +3169,20 @@ export const creditManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'currentGrantDay',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'dailyGrantLimit',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'packageId', internalType: 'uint256', type: 'uint256' }],
     name: 'deactivatePackage',
     outputs: [],
@@ -3154,6 +3234,13 @@ export const creditManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'grantedToday',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: '', internalType: 'address', type: 'address' }],
     name: 'holderDiscountBps',
     outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
@@ -3176,6 +3263,13 @@ export const creditManagerAbi = [
     inputs: [],
     name: 'loarToken',
     outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'maxGrantPerUser',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -3275,6 +3369,13 @@ export const creditManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '_limit', internalType: 'uint256', type: 'uint256' }],
+    name: 'setDailyGrantLimit',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'genType', internalType: 'string', type: 'string' },
       { name: 'cost', internalType: 'uint256', type: 'uint256' },
@@ -3290,6 +3391,20 @@ export const creditManagerAbi = [
       { name: 'discountBps', internalType: 'uint16', type: 'uint16' },
     ],
     name: 'setHolderDiscount',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_limit', internalType: 'uint256', type: 'uint256' }],
+    name: 'setMaxGrantPerUser',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newPlatform', internalType: 'address', type: 'address' }],
+    name: 'setPlatform',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -3566,6 +3681,25 @@ export const creditManagerAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'oldPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'PlatformUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'account',
         internalType: 'address',
         type: 'address',
@@ -3602,6 +3736,7 @@ export const creditManagerAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'AddressInsufficientBalance',
   },
+  { type: 'error', inputs: [], name: 'DailyGrantLimitExceeded' },
   {
     type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
@@ -3617,6 +3752,7 @@ export const creditManagerAbi = [
   { type: 'error', inputs: [], name: 'InsufficientLoarBalance' },
   { type: 'error', inputs: [], name: 'InsufficientPayment' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'MaxGrantPerUserExceeded' },
   { type: 'error', inputs: [], name: 'NotInitializing' },
   { type: 'error', inputs: [], name: 'NotPlatform' },
   {
@@ -4342,7 +4478,7 @@ export const entityNftAbi = [
     inputs: [],
     name: 'name',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'pure',
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -4472,7 +4608,7 @@ export const entityNftAbi = [
     inputs: [],
     name: 'symbol',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'pure',
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -7857,10 +7993,7 @@ export const licensingRegistryAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'creator', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
     name: 'registerUniverse',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -7876,6 +8009,13 @@ export const licensingRegistryAbi = [
     type: 'function',
     inputs: [{ name: 'licenseId', internalType: 'uint256', type: 'uint256' }],
     name: 'revokeLicense',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    name: 'setUniverseManager',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -7901,6 +8041,13 @@ export const licensingRegistryAbi = [
     ],
     name: 'universeLicenses',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeManager',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -9264,6 +9411,13 @@ export const loarHookStaticFeeAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'LOCKER_CLAIM_INTERVAL',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'MAX_LP_FEE',
     outputs: [{ name: '', internalType: 'uint24', type: 'uint24' }],
     stateMutability: 'view',
@@ -9664,6 +9818,13 @@ export const loarHookStaticFeeAbi = [
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'PoolId', type: 'bytes32' }],
+    name: 'lastLockerClaimTimestamp',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'PoolId', type: 'bytes32' }],
     name: 'loarFee',
     outputs: [{ name: '', internalType: 'uint24', type: 'uint24' }],
     stateMutability: 'view',
@@ -9925,8 +10086,25 @@ export const loarLpLockerMultipleAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'REWARD_CHANGE_DELAY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'VERSION',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'adminChangeRequestedAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -9940,6 +10118,26 @@ export const loarLpLockerMultipleAbi = [
     type: 'function',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'collectRewardsWithoutUnlock',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'executeRewardAdminChange',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'executeRewardRecipientChange',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -9973,6 +10171,26 @@ export const loarLpLockerMultipleAbi = [
     type: 'function',
     inputs: [],
     name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'pendingRewardAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'pendingRewardRecipient',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -10057,8 +10275,40 @@ export const loarLpLockerMultipleAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'recipientChangeRequestedAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256' },
+      { name: 'newAdmin', internalType: 'address', type: 'address' },
+    ],
+    name: 'requestRewardAdminChange',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256' },
+      { name: 'newRecipient', internalType: 'address', type: 'address' },
+    ],
+    name: 'requestRewardRecipientChange',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -10118,28 +10368,6 @@ export const loarLpLockerMultipleAbi = [
     type: 'function',
     inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
     name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256' },
-      { name: 'newAdmin', internalType: 'address', type: 'address' },
-    ],
-    name: 'updateRewardAdmin',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'rewardIndex', internalType: 'uint256', type: 'uint256' },
-      { name: 'newRecipient', internalType: 'address', type: 'address' },
-    ],
-    name: 'updateRewardRecipient',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -10247,6 +10475,37 @@ export const loarLpLockerMultipleAbi = [
         indexed: true,
       },
       {
+        name: 'newAdmin',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'effectiveAt',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RewardAdminChangeRequested',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'rewardIndex',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
         name: 'oldAdmin',
         internalType: 'address',
         type: 'address',
@@ -10260,6 +10519,37 @@ export const loarLpLockerMultipleAbi = [
       },
     ],
     name: 'RewardAdminUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'rewardIndex',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'newRecipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'effectiveAt',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'RewardRecipientChangeRequested',
   },
   {
     type: 'event',
@@ -10400,6 +10690,8 @@ export const loarLpLockerMultipleAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'RewardChangeDelayNotMet' },
+  { type: 'error', inputs: [], name: 'RewardChangeNotRequested' },
   {
     type: 'error',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
@@ -10433,13 +10725,6 @@ export const loarTokenAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'BPS_DENOMINATOR',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'DOMAIN_SEPARATOR',
     outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'view',
@@ -10447,28 +10732,7 @@ export const loarTokenAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'FEE_CHANGE_COOLDOWN',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'MAX_FEE_INCREASE_PER_CHANGE',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'MAX_SUPPLY',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'MAX_TRANSFER_FEE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -10557,27 +10821,6 @@ export const loarTokenAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: '', internalType: 'address', type: 'address' }],
-    name: 'feeExemptPairs',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'lastFeeChangeAt',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'liquidityPool',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [
       { name: 'to', internalType: 'address', type: 'address' },
       { name: 'amount', internalType: 'uint256', type: 'uint256' },
@@ -10616,6 +10859,20 @@ export const loarTokenAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'owner', internalType: 'address', type: 'address' },
       { name: 'spender', internalType: 'address', type: 'address' },
@@ -10649,34 +10906,10 @@ export const loarTokenAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'accounts', internalType: 'address[]', type: 'address[]' },
-      { name: 'exempt', internalType: 'bool', type: 'bool' },
-    ],
-    name: 'setFeeExemptBatch',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'newPool', internalType: 'address', type: 'address' }],
-    name: 'setLiquidityPool',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
       { name: 'minter', internalType: 'address', type: 'address' },
       { name: 'authorized', internalType: 'bool', type: 'bool' },
     ],
     name: 'setMinter',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'newFeeBps', internalType: 'uint256', type: 'uint256' }],
-    name: 'setTransferFeeBps',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -10720,13 +10953,6 @@ export const loarTokenAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'transferFeeBps',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [
       { name: 'from', internalType: 'address', type: 'address' },
       { name: 'to', internalType: 'address', type: 'address' },
@@ -10749,6 +10975,13 @@ export const loarTokenAbi = [
     name: 'treasury',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'event',
@@ -10794,35 +11027,6 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'from', internalType: 'address', type: 'address', indexed: true },
-      { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      { name: 'fee', internalType: 'uint256', type: 'uint256', indexed: false },
-    ],
-    name: 'LiquidityFeeCollected',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'oldPool',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'newPool',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-    ],
-    name: 'LiquidityPoolUpdated',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
       {
         name: 'minter',
         internalType: 'address',
@@ -10861,6 +11065,19 @@ export const loarTokenAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
       { name: 'from', internalType: 'address', type: 'address', indexed: true },
       { name: 'to', internalType: 'address', type: 'address', indexed: true },
       {
@@ -10871,25 +11088,6 @@ export const loarTokenAbi = [
       },
     ],
     name: 'Transfer',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'oldFeeBps',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'newFeeBps',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'TransferFeeUpdated',
   },
   {
     type: 'event',
@@ -10909,6 +11107,19 @@ export const loarTokenAbi = [
       },
     ],
     name: 'TreasuryUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
   },
   { type: 'error', inputs: [], name: 'ECDSAInvalidSignature' },
   {
@@ -10972,10 +11183,9 @@ export const loarTokenAbi = [
     ],
     name: 'ERC2612InvalidSigner',
   },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
   { type: 'error', inputs: [], name: 'ExceedsMaxSupply' },
-  { type: 'error', inputs: [], name: 'FeeChangeCooldownActive' },
-  { type: 'error', inputs: [], name: 'FeeIncreaseExceedsLimit' },
-  { type: 'error', inputs: [], name: 'FeeTooHigh' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
   {
     type: 'error',
     inputs: [
@@ -11528,6 +11738,7 @@ export const paymentRouterAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'AddressInsufficientBalance',
   },
+  { type: 'error', inputs: [], name: 'CannotSetSelfAsTreasury' },
   { type: 'error', inputs: [], name: 'DiscountTooHigh' },
   {
     type: 'error',
@@ -11699,10 +11910,7 @@ export const remixFeesAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'creator', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
     name: 'registerUniverse',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -11764,6 +11972,13 @@ export const remixFeesAbi = [
     type: 'function',
     inputs: [{ name: 'newTreasury', internalType: 'address', type: 'address' }],
     name: 'setTreasury',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    name: 'setUniverseManager',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -11840,6 +12055,13 @@ export const remixFeesAbi = [
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     name: 'universeCreators',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeManager',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -12079,11 +12301,25 @@ export const rightsRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'confirmFreeze',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'contentCreator',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'reason', internalType: 'string', type: 'string' },
     ],
-    name: 'freeze',
+    name: 'emergencyFreeze',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -12117,6 +12353,20 @@ export const rightsRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'pendingFreeze',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'pendingFreezeReason',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'proxiableUUID',
     outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
@@ -12126,6 +12376,16 @@ export const rightsRegistryAbi = [
     type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'reason', internalType: 'string', type: 'string' },
+    ],
+    name: 'requestFreeze',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -12175,6 +12435,13 @@ export const rightsRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'unfreeze',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'newImplementation', internalType: 'address', type: 'address' },
       { name: 'data', internalType: 'bytes', type: 'bytes' },
@@ -12201,6 +12468,44 @@ export const rightsRegistryAbi = [
       },
     ],
     name: 'ContentFrozen',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+    ],
+    name: 'FreezeCancelled',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'requestedBy',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'reason',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+    ],
+    name: 'FreezeRequested',
   },
   {
     type: 'event',
@@ -12299,6 +12604,9 @@ export const rightsRegistryAbi = [
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'NoPendingFreeze' },
+  { type: 'error', inputs: [], name: 'NotCreatorOrOwner' },
+  { type: 'error', inputs: [], name: 'NotFrozen' },
   { type: 'error', inputs: [], name: 'NotInitializing' },
   { type: 'error', inputs: [], name: 'NotOperator' },
   {
@@ -12681,6 +12989,27 @@ export const splitRouterAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'ROUTER_CHANGE_DELAY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'SPLIT_CHANGE_COOLDOWN',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'executePaymentRouterChange',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'entityHash', internalType: 'bytes32', type: 'bytes32' }],
     name: 'getSplits',
     outputs: [
@@ -12712,6 +13041,20 @@ export const splitRouterAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'paymentRouterChangeRequestedAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingPaymentRouter',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'entityHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'owner_', internalType: 'address', type: 'address' },
@@ -12736,6 +13079,13 @@ export const splitRouterAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '_paymentRouter', internalType: 'address', type: 'address' }],
+    name: 'requestPaymentRouterChange',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'entityHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'platformFeeBps', internalType: 'uint16', type: 'uint16' },
@@ -12743,13 +13093,6 @@ export const splitRouterAbi = [
     name: 'routeWithSplits',
     outputs: [],
     stateMutability: 'payable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '_paymentRouter', internalType: 'address', type: 'address' }],
-    name: 'setPaymentRouter',
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -12788,6 +13131,13 @@ export const splitRouterAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'splitsLastChangedAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
     name: 'transferOwnership',
     outputs: [],
@@ -12821,6 +13171,44 @@ export const splitRouterAbi = [
       },
     ],
     name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'pendingRouter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'executeAfter',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'PaymentRouterChangeRequested',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldRouter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newRouter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'PaymentRouterChanged',
   },
   {
     type: 'event',
@@ -12899,6 +13287,7 @@ export const splitRouterAbi = [
   },
   { type: 'error', inputs: [], name: 'FeeTooHigh' },
   { type: 'error', inputs: [], name: 'InvalidSplitTotal' },
+  { type: 'error', inputs: [], name: 'NoChangeRequested' },
   { type: 'error', inputs: [], name: 'NoSplitsConfigured' },
   { type: 'error', inputs: [], name: 'NotRegistrar' },
   { type: 'error', inputs: [], name: 'NotSplitOwner' },
@@ -12913,6 +13302,8 @@ export const splitRouterAbi = [
     name: 'OwnableUnauthorizedAccount',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  { type: 'error', inputs: [], name: 'SplitChangeCooldownActive' },
+  { type: 'error', inputs: [], name: 'TimelockNotElapsed' },
   { type: 'error', inputs: [], name: 'TooManyRecipients' },
   { type: 'error', inputs: [], name: 'ZeroAddress' },
 ] as const;
@@ -12923,6 +13314,13 @@ export const splitRouterAbi = [
 
 export const storyBountiesAbi = [
   { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'AWARD_GRACE_PERIOD',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
   {
     type: 'function',
     inputs: [],
@@ -13707,10 +14105,7 @@ export const subscriptionManagerAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'creator', internalType: 'address', type: 'address' },
-    ],
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
     name: 'registerUniverse',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -13719,6 +14114,13 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    name: 'setUniverseManager',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -13804,6 +14206,13 @@ export const subscriptionManagerAbi = [
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     name: 'universeCreators',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeManager',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -14057,6 +14466,7 @@ export const subscriptionManagerAbi = [
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   { type: 'error', inputs: [], name: 'RefundFailed' },
+  { type: 'error', inputs: [], name: 'TierDowngradeNotAllowed' },
   { type: 'error', inputs: [], name: 'TierNotActive' },
   { type: 'error', inputs: [], name: 'TransferFailed' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
@@ -14521,6 +14931,37 @@ export const universeAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
+      {
+        name: 'nodeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'updater',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'originalCreator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+    ],
+    name: 'MediaUpdatedAttribution',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
       { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
       {
         name: 'canonizer',
@@ -14701,6 +15142,7 @@ export const universeGovernorAbi = [
         internalType: 'contract TimelockController',
         type: 'address',
       },
+      { name: '_earlyLifeBlocks', internalType: 'uint256', type: 'uint256' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -15609,6 +16051,13 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'claimableTokens',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'name', internalType: 'string', type: 'string' },
       { name: 'imageURL', internalType: 'string', type: 'string' },
@@ -15967,8 +16416,22 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'lockMetadataRenderer',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'metadataRenderer',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'metadataRendererLocked',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -16060,6 +16523,16 @@ export const universeManagerAbi = [
       { name: 'halted', internalType: 'bool', type: 'bool' },
     ],
     name: 'setBondingCurveHalted',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'allowed', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setClaimableToken',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -16157,13 +16630,6 @@ export const universeManagerAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'teamFee',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'teamFeeRecipient',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -16241,6 +16707,20 @@ export const universeManagerAbi = [
     name: 'weth',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      { name: 'to', internalType: 'address', type: 'address', indexed: false },
+    ],
+    name: 'AdminSyncFailed',
   },
   {
     type: 'event',
@@ -16367,6 +16847,19 @@ export const universeManagerAbi = [
       },
     ],
     name: 'EthClaimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'renderer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'MetadataRendererLocked',
   },
   {
     type: 'event',
@@ -17153,6 +17646,22 @@ export const useAdPlacement_undefined_read = /*#__PURE__*/ createUseReadContract
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"BID_CANCEL_COOLDOWN"`
+ */
+export const useAdPlacement_BidCancelCooldown_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'BID_CANCEL_COOLDOWN',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"BID_EXPIRY"`
+ */
+export const useAdPlacement_BidExpiry_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'BID_EXPIRY',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"MAX_FEE_BPS"`
  */
 export const useAdPlacement_MaxFeeBps_read = /*#__PURE__*/ createUseReadContract({
@@ -17174,6 +17683,14 @@ export const useAdPlacement_UpgradeInterfaceVersion_read = /*#__PURE__*/ createU
 export const useAdPlacement_AdSlots_read = /*#__PURE__*/ createUseReadContract({
   abi: adPlacementAbi,
   functionName: 'adSlots',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"bidPlacedAt"`
+ */
+export const useAdPlacement_BidPlacedAt_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'bidPlacedAt',
 });
 
 /**
@@ -17289,6 +17806,14 @@ export const useAdPlacement_UniverseCreators_read = /*#__PURE__*/ createUseReadC
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"universeManager"`
+ */
+export const useAdPlacement_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: adPlacementAbi,
+  functionName: 'universeManager',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"universeSlots"`
  */
 export const useAdPlacement_UniverseSlots_read = /*#__PURE__*/ createUseReadContract({
@@ -17317,6 +17842,14 @@ export const useAdPlacement_AcceptBid_write = /*#__PURE__*/ createUseWriteContra
 export const useAdPlacement_Bid_write = /*#__PURE__*/ createUseWriteContract({
   abi: adPlacementAbi,
   functionName: 'bid',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"cancelBid"`
+ */
+export const useAdPlacement_CancelBid_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'cancelBid',
 });
 
 /**
@@ -17365,6 +17898,14 @@ export const useAdPlacement_RegisterUniverse_write = /*#__PURE__*/ createUseWrit
 export const useAdPlacement_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
   abi: adPlacementAbi,
   functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useAdPlacement_SetUniverseManager_write = /*#__PURE__*/ createUseWriteContract({
+  abi: adPlacementAbi,
+  functionName: 'setUniverseManager',
 });
 
 /**
@@ -17423,6 +17964,14 @@ export const useAdPlacement_Bid_simulate = /*#__PURE__*/ createUseSimulateContra
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"cancelBid"`
+ */
+export const useAdPlacement_CancelBid_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'cancelBid',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"createAdSlot"`
  */
 export const useAdPlacement_CreateAdSlot_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -17471,6 +18020,14 @@ export const useAdPlacement_RenounceOwnership_simulate = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useAdPlacement_SetUniverseManager_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: adPlacementAbi,
+  functionName: 'setUniverseManager',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link adPlacementAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useAdPlacement_TransferOwnership_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -17515,6 +18072,14 @@ export const useAdPlacement_undefined_watch = /*#__PURE__*/ createUseWatchContra
 export const useAdPlacement_AdSlotCreated_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: adPlacementAbi,
   eventName: 'AdSlotCreated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link adPlacementAbi}__ and `eventName` set to `"BidCancelled"`
+ */
+export const useAdPlacement_BidCancelled_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: adPlacementAbi,
+  eventName: 'BidCancelled',
 });
 
 /**
@@ -18428,14 +18993,6 @@ export const useCharacterNft_Approve_write = /*#__PURE__*/ createUseWriteContrac
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"claimRoyalties"`
- */
-export const useCharacterNft_ClaimRoyalties_write = /*#__PURE__*/ createUseWriteContract({
-  abi: characterNftAbi,
-  functionName: 'claimRoyalties',
-});
-
-/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"createCharacter"`
  */
 export const useCharacterNft_CreateCharacter_write = /*#__PURE__*/ createUseWriteContract({
@@ -18528,14 +19085,6 @@ export const useCharacterNft_undefined_simulate = /*#__PURE__*/ createUseSimulat
 export const useCharacterNft_Approve_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: characterNftAbi,
   functionName: 'approve',
-});
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link characterNftAbi}__ and `functionName` set to `"claimRoyalties"`
- */
-export const useCharacterNft_ClaimRoyalties_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: characterNftAbi,
-  functionName: 'claimRoyalties',
 });
 
 /**
@@ -19342,6 +19891,14 @@ export const useContentLicensing_Registrations_read = /*#__PURE__*/ createUseRea
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"rightsRegistry"`
+ */
+export const useContentLicensing_RightsRegistry_read = /*#__PURE__*/ createUseReadContract({
+  abi: contentLicensingAbi,
+  functionName: 'rightsRegistry',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"splitRouter"`
  */
 export const useContentLicensing_SplitRouter_read = /*#__PURE__*/ createUseReadContract({
@@ -19755,6 +20312,22 @@ export const useCreditManager_UpgradeInterfaceVersion_read = /*#__PURE__*/ creat
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"currentGrantDay"`
+ */
+export const useCreditManager_CurrentGrantDay_read = /*#__PURE__*/ createUseReadContract({
+  abi: creditManagerAbi,
+  functionName: 'currentGrantDay',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"dailyGrantLimit"`
+ */
+export const useCreditManager_DailyGrantLimit_read = /*#__PURE__*/ createUseReadContract({
+  abi: creditManagerAbi,
+  functionName: 'dailyGrantLimit',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"generationCosts"`
  */
 export const useCreditManager_GenerationCosts_read = /*#__PURE__*/ createUseReadContract({
@@ -19787,6 +20360,14 @@ export const useCreditManager_GetUserStats_read = /*#__PURE__*/ createUseReadCon
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"grantedToday"`
+ */
+export const useCreditManager_GrantedToday_read = /*#__PURE__*/ createUseReadContract({
+  abi: creditManagerAbi,
+  functionName: 'grantedToday',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"holderDiscountBps"`
  */
 export const useCreditManager_HolderDiscountBps_read = /*#__PURE__*/ createUseReadContract({
@@ -19800,6 +20381,14 @@ export const useCreditManager_HolderDiscountBps_read = /*#__PURE__*/ createUseRe
 export const useCreditManager_LoarToken_read = /*#__PURE__*/ createUseReadContract({
   abi: creditManagerAbi,
   functionName: 'loarToken',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"maxGrantPerUser"`
+ */
+export const useCreditManager_MaxGrantPerUser_read = /*#__PURE__*/ createUseReadContract({
+  abi: creditManagerAbi,
+  functionName: 'maxGrantPerUser',
 });
 
 /**
@@ -19946,6 +20535,14 @@ export const useCreditManager_RenounceOwnership_write = /*#__PURE__*/ createUseW
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setDailyGrantLimit"`
+ */
+export const useCreditManager_SetDailyGrantLimit_write = /*#__PURE__*/ createUseWriteContract({
+  abi: creditManagerAbi,
+  functionName: 'setDailyGrantLimit',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setGenerationCost"`
  */
 export const useCreditManager_SetGenerationCost_write = /*#__PURE__*/ createUseWriteContract({
@@ -19959,6 +20556,22 @@ export const useCreditManager_SetGenerationCost_write = /*#__PURE__*/ createUseW
 export const useCreditManager_SetHolderDiscount_write = /*#__PURE__*/ createUseWriteContract({
   abi: creditManagerAbi,
   functionName: 'setHolderDiscount',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setMaxGrantPerUser"`
+ */
+export const useCreditManager_SetMaxGrantPerUser_write = /*#__PURE__*/ createUseWriteContract({
+  abi: creditManagerAbi,
+  functionName: 'setMaxGrantPerUser',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setPlatform"`
+ */
+export const useCreditManager_SetPlatform_write = /*#__PURE__*/ createUseWriteContract({
+  abi: creditManagerAbi,
+  functionName: 'setPlatform',
 });
 
 /**
@@ -20073,6 +20686,16 @@ export const useCreditManager_RenounceOwnership_simulate = /*#__PURE__*/ createU
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setDailyGrantLimit"`
+ */
+export const useCreditManager_SetDailyGrantLimit_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: creditManagerAbi,
+    functionName: 'setDailyGrantLimit',
+  }
+);
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setGenerationCost"`
  */
 export const useCreditManager_SetGenerationCost_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -20086,6 +20709,24 @@ export const useCreditManager_SetGenerationCost_simulate = /*#__PURE__*/ createU
 export const useCreditManager_SetHolderDiscount_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: creditManagerAbi,
   functionName: 'setHolderDiscount',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setMaxGrantPerUser"`
+ */
+export const useCreditManager_SetMaxGrantPerUser_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: creditManagerAbi,
+    functionName: 'setMaxGrantPerUser',
+  }
+);
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"setPlatform"`
+ */
+export const useCreditManager_SetPlatform_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: creditManagerAbi,
+  functionName: 'setPlatform',
 });
 
 /**
@@ -20209,6 +20850,14 @@ export const useCreditManager_PackageCreated_watch = /*#__PURE__*/ createUseWatc
 export const useCreditManager_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: creditManagerAbi,
   eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link creditManagerAbi}__ and `eventName` set to `"PlatformUpdated"`
+ */
+export const useCreditManager_PlatformUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: creditManagerAbi,
+  eventName: 'PlatformUpdated',
 });
 
 /**
@@ -23503,6 +24152,14 @@ export const useLicensingRegistry_UniverseLicenses_read = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"universeManager"`
+ */
+export const useLicensingRegistry_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: licensingRegistryAbi,
+  functionName: 'universeManager',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"universeMerch"`
  */
 export const useLicensingRegistry_UniverseMerch_read = /*#__PURE__*/ createUseReadContract({
@@ -23595,6 +24252,14 @@ export const useLicensingRegistry_RenounceOwnership_write = /*#__PURE__*/ create
 export const useLicensingRegistry_RevokeLicense_write = /*#__PURE__*/ createUseWriteContract({
   abi: licensingRegistryAbi,
   functionName: 'revokeLicense',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useLicensingRegistry_SetUniverseManager_write = /*#__PURE__*/ createUseWriteContract({
+  abi: licensingRegistryAbi,
+  functionName: 'setUniverseManager',
 });
 
 /**
@@ -23710,6 +24375,15 @@ export const useLicensingRegistry_RevokeLicense_simulate = /*#__PURE__*/ createU
   abi: licensingRegistryAbi,
   functionName: 'revokeLicense',
 });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useLicensingRegistry_SetUniverseManager_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: licensingRegistryAbi,
+    functionName: 'setUniverseManager',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link licensingRegistryAbi}__ and `functionName` set to `"transferOwnership"`
@@ -24770,6 +25444,14 @@ export const useLoarHookStaticFee_FeeDenominator_read = /*#__PURE__*/ createUseR
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"LOCKER_CLAIM_INTERVAL"`
+ */
+export const useLoarHookStaticFee_LockerClaimInterval_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarHookStaticFeeAbi,
+  functionName: 'LOCKER_CLAIM_INTERVAL',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"MAX_LP_FEE"`
  */
 export const useLoarHookStaticFee_MaxLpFee_read = /*#__PURE__*/ createUseReadContract({
@@ -24800,6 +25482,15 @@ export const useLoarHookStaticFee_GetHookPermissions_read = /*#__PURE__*/ create
   abi: loarHookStaticFeeAbi,
   functionName: 'getHookPermissions',
 });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"lastLockerClaimTimestamp"`
+ */
+export const useLoarHookStaticFee_LastLockerClaimTimestamp_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: loarHookStaticFeeAbi,
+    functionName: 'lastLockerClaimTimestamp',
+  });
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"loarFee"`
@@ -25187,12 +25878,29 @@ export const useLoarLpLockerMultiple_MaxRewardParticipants_read =
   });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"REWARD_CHANGE_DELAY"`
+ */
+export const useLoarLpLockerMultiple_RewardChangeDelay_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'REWARD_CHANGE_DELAY',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"VERSION"`
  */
 export const useLoarLpLockerMultiple_Version_read = /*#__PURE__*/ createUseReadContract({
   abi: loarLpLockerMultipleAbi,
   functionName: 'VERSION',
 });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"adminChangeRequestedAt"`
+ */
+export const useLoarLpLockerMultiple_AdminChangeRequestedAt_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'adminChangeRequestedAt',
+  });
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"factory"`
@@ -25219,6 +25927,23 @@ export const useLoarLpLockerMultiple_Owner_read = /*#__PURE__*/ createUseReadCon
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"pendingRewardAdmin"`
+ */
+export const useLoarLpLockerMultiple_PendingRewardAdmin_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarLpLockerMultipleAbi,
+  functionName: 'pendingRewardAdmin',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"pendingRewardRecipient"`
+ */
+export const useLoarLpLockerMultiple_PendingRewardRecipient_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'pendingRewardRecipient',
+  });
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"permit2"`
  */
 export const useLoarLpLockerMultiple_Permit2_read = /*#__PURE__*/ createUseReadContract({
@@ -25241,6 +25966,15 @@ export const useLoarLpLockerMultiple_ProtectedToken_read = /*#__PURE__*/ createU
   abi: loarLpLockerMultipleAbi,
   functionName: 'protectedToken',
 });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"recipientChangeRequestedAt"`
+ */
+export const useLoarLpLockerMultiple_RecipientChangeRequestedAt_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'recipientChangeRequestedAt',
+  });
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"supportsInterface"`
@@ -25283,6 +26017,24 @@ export const useLoarLpLockerMultiple_CollectRewardsWithoutUnlock_write =
   });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"executeRewardAdminChange"`
+ */
+export const useLoarLpLockerMultiple_ExecuteRewardAdminChange_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'executeRewardAdminChange',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"executeRewardRecipientChange"`
+ */
+export const useLoarLpLockerMultiple_ExecuteRewardRecipientChange_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'executeRewardRecipientChange',
+  });
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"onERC721Received"`
  */
 export const useLoarLpLockerMultiple_OnErc721Received_write = /*#__PURE__*/ createUseWriteContract({
@@ -25309,6 +26061,24 @@ export const useLoarLpLockerMultiple_RenounceOwnership_write = /*#__PURE__*/ cre
 );
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"requestRewardAdminChange"`
+ */
+export const useLoarLpLockerMultiple_RequestRewardAdminChange_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'requestRewardAdminChange',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"requestRewardRecipientChange"`
+ */
+export const useLoarLpLockerMultiple_RequestRewardRecipientChange_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'requestRewardRecipientChange',
+  });
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useLoarLpLockerMultiple_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract(
@@ -25317,25 +26087,6 @@ export const useLoarLpLockerMultiple_TransferOwnership_write = /*#__PURE__*/ cre
     functionName: 'transferOwnership',
   }
 );
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardAdmin"`
- */
-export const useLoarLpLockerMultiple_UpdateRewardAdmin_write = /*#__PURE__*/ createUseWriteContract(
-  {
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'updateRewardAdmin',
-  }
-);
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardRecipient"`
- */
-export const useLoarLpLockerMultiple_UpdateRewardRecipient_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'updateRewardRecipient',
-  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"withdrawERC20"`
@@ -25379,6 +26130,24 @@ export const useLoarLpLockerMultiple_CollectRewardsWithoutUnlock_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"executeRewardAdminChange"`
+ */
+export const useLoarLpLockerMultiple_ExecuteRewardAdminChange_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'executeRewardAdminChange',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"executeRewardRecipientChange"`
+ */
+export const useLoarLpLockerMultiple_ExecuteRewardRecipientChange_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'executeRewardRecipientChange',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"onERC721Received"`
  */
 export const useLoarLpLockerMultiple_OnErc721Received_simulate =
@@ -25406,30 +26175,30 @@ export const useLoarLpLockerMultiple_RenounceOwnership_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"requestRewardAdminChange"`
+ */
+export const useLoarLpLockerMultiple_RequestRewardAdminChange_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'requestRewardAdminChange',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"requestRewardRecipientChange"`
+ */
+export const useLoarLpLockerMultiple_RequestRewardRecipientChange_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: loarLpLockerMultipleAbi,
+    functionName: 'requestRewardRecipientChange',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useLoarLpLockerMultiple_TransferOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: loarLpLockerMultipleAbi,
     functionName: 'transferOwnership',
-  });
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardAdmin"`
- */
-export const useLoarLpLockerMultiple_UpdateRewardAdmin_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'updateRewardAdmin',
-  });
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `functionName` set to `"updateRewardRecipient"`
- */
-export const useLoarLpLockerMultiple_UpdateRewardRecipient_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: loarLpLockerMultipleAbi,
-    functionName: 'updateRewardRecipient',
   });
 
 /**
@@ -25485,12 +26254,30 @@ export const useLoarLpLockerMultiple_Received_watch = /*#__PURE__*/ createUseWat
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"RewardAdminChangeRequested"`
+ */
+export const useLoarLpLockerMultiple_RewardAdminChangeRequested_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: loarLpLockerMultipleAbi,
+    eventName: 'RewardAdminChangeRequested',
+  });
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"RewardAdminUpdated"`
  */
 export const useLoarLpLockerMultiple_RewardAdminUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: loarLpLockerMultipleAbi,
     eventName: 'RewardAdminUpdated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarLpLockerMultipleAbi}__ and `eventName` set to `"RewardRecipientChangeRequested"`
+ */
+export const useLoarLpLockerMultiple_RewardRecipientChangeRequested_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: loarLpLockerMultipleAbi,
+    eventName: 'RewardRecipientChangeRequested',
   });
 
 /**
@@ -25519,14 +26306,6 @@ export const useLoarToken_undefined_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"BPS_DENOMINATOR"`
- */
-export const useLoarToken_BpsDenominator_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'BPS_DENOMINATOR',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"DOMAIN_SEPARATOR"`
  */
 export const useLoarToken_DomainSeparator_read = /*#__PURE__*/ createUseReadContract({
@@ -25535,35 +26314,11 @@ export const useLoarToken_DomainSeparator_read = /*#__PURE__*/ createUseReadCont
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"FEE_CHANGE_COOLDOWN"`
- */
-export const useLoarToken_FeeChangeCooldown_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'FEE_CHANGE_COOLDOWN',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"MAX_FEE_INCREASE_PER_CHANGE"`
- */
-export const useLoarToken_MaxFeeIncreasePerChange_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'MAX_FEE_INCREASE_PER_CHANGE',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"MAX_SUPPLY"`
  */
 export const useLoarToken_MaxSupply_read = /*#__PURE__*/ createUseReadContract({
   abi: loarTokenAbi,
   functionName: 'MAX_SUPPLY',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"MAX_TRANSFER_FEE_BPS"`
- */
-export const useLoarToken_MaxTransferFeeBps_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'MAX_TRANSFER_FEE_BPS',
 });
 
 /**
@@ -25607,30 +26362,6 @@ export const useLoarToken_FeeExempt_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"feeExemptPairs"`
- */
-export const useLoarToken_FeeExemptPairs_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'feeExemptPairs',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"lastFeeChangeAt"`
- */
-export const useLoarToken_LastFeeChangeAt_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'lastFeeChangeAt',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"liquidityPool"`
- */
-export const useLoarToken_LiquidityPool_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'liquidityPool',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"minters"`
  */
 export const useLoarToken_Minters_read = /*#__PURE__*/ createUseReadContract({
@@ -25663,6 +26394,14 @@ export const useLoarToken_Owner_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"paused"`
+ */
+export const useLoarToken_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: loarTokenAbi,
+  functionName: 'paused',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"symbol"`
  */
 export const useLoarToken_Symbol_read = /*#__PURE__*/ createUseReadContract({
@@ -25684,14 +26423,6 @@ export const useLoarToken_TotalMinted_read = /*#__PURE__*/ createUseReadContract
 export const useLoarToken_TotalSupply_read = /*#__PURE__*/ createUseReadContract({
   abi: loarTokenAbi,
   functionName: 'totalSupply',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"transferFeeBps"`
- */
-export const useLoarToken_TransferFeeBps_read = /*#__PURE__*/ createUseReadContract({
-  abi: loarTokenAbi,
-  functionName: 'transferFeeBps',
 });
 
 /**
@@ -25750,6 +26481,14 @@ export const useLoarToken_Mint_write = /*#__PURE__*/ createUseWriteContract({
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLoarToken_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarTokenAbi,
+  functionName: 'pause',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"permit"`
  */
 export const useLoarToken_Permit_write = /*#__PURE__*/ createUseWriteContract({
@@ -25774,35 +26513,11 @@ export const useLoarToken_SetFeeExempt_write = /*#__PURE__*/ createUseWriteContr
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setFeeExemptBatch"`
- */
-export const useLoarToken_SetFeeExemptBatch_write = /*#__PURE__*/ createUseWriteContract({
-  abi: loarTokenAbi,
-  functionName: 'setFeeExemptBatch',
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setLiquidityPool"`
- */
-export const useLoarToken_SetLiquidityPool_write = /*#__PURE__*/ createUseWriteContract({
-  abi: loarTokenAbi,
-  functionName: 'setLiquidityPool',
-});
-
-/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setMinter"`
  */
 export const useLoarToken_SetMinter_write = /*#__PURE__*/ createUseWriteContract({
   abi: loarTokenAbi,
   functionName: 'setMinter',
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setTransferFeeBps"`
- */
-export const useLoarToken_SetTransferFeeBps_write = /*#__PURE__*/ createUseWriteContract({
-  abi: loarTokenAbi,
-  functionName: 'setTransferFeeBps',
 });
 
 /**
@@ -25835,6 +26550,14 @@ export const useLoarToken_TransferFrom_write = /*#__PURE__*/ createUseWriteContr
 export const useLoarToken_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
   abi: loarTokenAbi,
   functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLoarToken_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: loarTokenAbi,
+  functionName: 'unpause',
 });
 
 /**
@@ -25885,6 +26608,14 @@ export const useLoarToken_Mint_simulate = /*#__PURE__*/ createUseSimulateContrac
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLoarToken_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarTokenAbi,
+  functionName: 'pause',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"permit"`
  */
 export const useLoarToken_Permit_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -25909,35 +26640,11 @@ export const useLoarToken_SetFeeExempt_simulate = /*#__PURE__*/ createUseSimulat
 });
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setFeeExemptBatch"`
- */
-export const useLoarToken_SetFeeExemptBatch_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: loarTokenAbi,
-  functionName: 'setFeeExemptBatch',
-});
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setLiquidityPool"`
- */
-export const useLoarToken_SetLiquidityPool_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: loarTokenAbi,
-  functionName: 'setLiquidityPool',
-});
-
-/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setMinter"`
  */
 export const useLoarToken_SetMinter_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: loarTokenAbi,
   functionName: 'setMinter',
-});
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"setTransferFeeBps"`
- */
-export const useLoarToken_SetTransferFeeBps_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: loarTokenAbi,
-  functionName: 'setTransferFeeBps',
 });
 
 /**
@@ -25973,6 +26680,14 @@ export const useLoarToken_TransferOwnership_simulate = /*#__PURE__*/ createUseSi
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link loarTokenAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLoarToken_Unpause_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: loarTokenAbi,
+  functionName: 'unpause',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__
  */
 export const useLoarToken_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -26004,22 +26719,6 @@ export const useLoarToken_FeeExemptUpdated_watch = /*#__PURE__*/ createUseWatchC
 });
 
 /**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"LiquidityFeeCollected"`
- */
-export const useLoarToken_LiquidityFeeCollected_watch = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: loarTokenAbi,
-  eventName: 'LiquidityFeeCollected',
-});
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"LiquidityPoolUpdated"`
- */
-export const useLoarToken_LiquidityPoolUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: loarTokenAbi,
-  eventName: 'LiquidityPoolUpdated',
-});
-
-/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"MinterUpdated"`
  */
 export const useLoarToken_MinterUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -26036,6 +26735,14 @@ export const useLoarToken_OwnershipTransferred_watch = /*#__PURE__*/ createUseWa
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useLoarToken_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarTokenAbi,
+  eventName: 'Paused',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"Transfer"`
  */
 export const useLoarToken_Transfer_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -26044,19 +26751,19 @@ export const useLoarToken_Transfer_watch = /*#__PURE__*/ createUseWatchContractE
 });
 
 /**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"TransferFeeUpdated"`
- */
-export const useLoarToken_TransferFeeUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: loarTokenAbi,
-  eventName: 'TransferFeeUpdated',
-});
-
-/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"TreasuryUpdated"`
  */
 export const useLoarToken_TreasuryUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: loarTokenAbi,
   eventName: 'TreasuryUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link loarTokenAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useLoarToken_Unpaused_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: loarTokenAbi,
+  eventName: 'Unpaused',
 });
 
 /**
@@ -26780,6 +27487,14 @@ export const useRemixFees_UniverseCreators_read = /*#__PURE__*/ createUseReadCon
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"universeManager"`
+ */
+export const useRemixFees_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: remixFeesAbi,
+  functionName: 'universeManager',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link remixFeesAbi}__
  */
 export const useRemixFees_undefined_write = /*#__PURE__*/ createUseWriteContract({
@@ -26880,6 +27595,14 @@ export const useRemixFees_SetSplitRatios_write = /*#__PURE__*/ createUseWriteCon
 export const useRemixFees_SetTreasury_write = /*#__PURE__*/ createUseWriteContract({
   abi: remixFeesAbi,
   functionName: 'setTreasury',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useRemixFees_SetUniverseManager_write = /*#__PURE__*/ createUseWriteContract({
+  abi: remixFeesAbi,
+  functionName: 'setUniverseManager',
 });
 
 /**
@@ -27018,6 +27741,14 @@ export const useRemixFees_SetTreasury_simulate = /*#__PURE__*/ createUseSimulate
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useRemixFees_SetUniverseManager_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: remixFeesAbi,
+  functionName: 'setUniverseManager',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link remixFeesAbi}__ and `functionName` set to `"setUniverseRemixFee"`
  */
 export const useRemixFees_SetUniverseRemixFee_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -27136,6 +27867,14 @@ export const useRightsRegistry_UpgradeInterfaceVersion_read = /*#__PURE__*/ crea
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"contentCreator"`
+ */
+export const useRightsRegistry_ContentCreator_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'contentCreator',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"isMonetizable"`
  */
 export const useRightsRegistry_IsMonetizable_read = /*#__PURE__*/ createUseReadContract({
@@ -27157,6 +27896,22 @@ export const useRightsRegistry_Operators_read = /*#__PURE__*/ createUseReadContr
 export const useRightsRegistry_Owner_read = /*#__PURE__*/ createUseReadContract({
   abi: rightsRegistryAbi,
   functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"pendingFreeze"`
+ */
+export const useRightsRegistry_PendingFreeze_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'pendingFreeze',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"pendingFreezeReason"`
+ */
+export const useRightsRegistry_PendingFreezeReason_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'pendingFreezeReason',
 });
 
 /**
@@ -27183,11 +27938,19 @@ export const useRightsRegistry_undefined_write = /*#__PURE__*/ createUseWriteCon
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"freeze"`
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"confirmFreeze"`
  */
-export const useRightsRegistry_Freeze_write = /*#__PURE__*/ createUseWriteContract({
+export const useRightsRegistry_ConfirmFreeze_write = /*#__PURE__*/ createUseWriteContract({
   abi: rightsRegistryAbi,
-  functionName: 'freeze',
+  functionName: 'confirmFreeze',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"emergencyFreeze"`
+ */
+export const useRightsRegistry_EmergencyFreeze_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'emergencyFreeze',
 });
 
 /**
@@ -27204,6 +27967,14 @@ export const useRightsRegistry_Initialize_write = /*#__PURE__*/ createUseWriteCo
 export const useRightsRegistry_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
   abi: rightsRegistryAbi,
   functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"requestFreeze"`
+ */
+export const useRightsRegistry_RequestFreeze_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'requestFreeze',
 });
 
 /**
@@ -27231,6 +28002,14 @@ export const useRightsRegistry_TransferOwnership_write = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"unfreeze"`
+ */
+export const useRightsRegistry_Unfreeze_write = /*#__PURE__*/ createUseWriteContract({
+  abi: rightsRegistryAbi,
+  functionName: 'unfreeze',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const useRightsRegistry_UpgradeToAndCall_write = /*#__PURE__*/ createUseWriteContract({
@@ -27246,11 +28025,19 @@ export const useRightsRegistry_undefined_simulate = /*#__PURE__*/ createUseSimul
 });
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"freeze"`
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"confirmFreeze"`
  */
-export const useRightsRegistry_Freeze_simulate = /*#__PURE__*/ createUseSimulateContract({
+export const useRightsRegistry_ConfirmFreeze_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: rightsRegistryAbi,
-  functionName: 'freeze',
+  functionName: 'confirmFreeze',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"emergencyFreeze"`
+ */
+export const useRightsRegistry_EmergencyFreeze_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'emergencyFreeze',
 });
 
 /**
@@ -27270,6 +28057,14 @@ export const useRightsRegistry_RenounceOwnership_simulate = /*#__PURE__*/ create
     functionName: 'renounceOwnership',
   }
 );
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"requestFreeze"`
+ */
+export const useRightsRegistry_RequestFreeze_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'requestFreeze',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setOperator"`
@@ -27298,6 +28093,14 @@ export const useRightsRegistry_TransferOwnership_simulate = /*#__PURE__*/ create
 );
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"unfreeze"`
+ */
+export const useRightsRegistry_Unfreeze_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: rightsRegistryAbi,
+  functionName: 'unfreeze',
+});
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"upgradeToAndCall"`
  */
 export const useRightsRegistry_UpgradeToAndCall_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -27318,6 +28121,22 @@ export const useRightsRegistry_undefined_watch = /*#__PURE__*/ createUseWatchCon
 export const useRightsRegistry_ContentFrozen_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: rightsRegistryAbi,
   eventName: 'ContentFrozen',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"FreezeCancelled"`
+ */
+export const useRightsRegistry_FreezeCancelled_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'FreezeCancelled',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link rightsRegistryAbi}__ and `eventName` set to `"FreezeRequested"`
+ */
+export const useRightsRegistry_FreezeRequested_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: rightsRegistryAbi,
+  eventName: 'FreezeRequested',
 });
 
 /**
@@ -27653,6 +28472,22 @@ export const useSplitRouter_MaxRecipients_read = /*#__PURE__*/ createUseReadCont
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"ROUTER_CHANGE_DELAY"`
+ */
+export const useSplitRouter_RouterChangeDelay_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'ROUTER_CHANGE_DELAY',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"SPLIT_CHANGE_COOLDOWN"`
+ */
+export const useSplitRouter_SplitChangeCooldown_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'SPLIT_CHANGE_COOLDOWN',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"getSplits"`
  */
 export const useSplitRouter_GetSplits_read = /*#__PURE__*/ createUseReadContract({
@@ -27677,6 +28512,23 @@ export const useSplitRouter_PaymentRouter_read = /*#__PURE__*/ createUseReadCont
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"paymentRouterChangeRequestedAt"`
+ */
+export const useSplitRouter_PaymentRouterChangeRequestedAt_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: splitRouterAbi,
+    functionName: 'paymentRouterChangeRequestedAt',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"pendingPaymentRouter"`
+ */
+export const useSplitRouter_PendingPaymentRouter_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'pendingPaymentRouter',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"registrars"`
  */
 export const useSplitRouter_Registrars_read = /*#__PURE__*/ createUseReadContract({
@@ -27693,11 +28545,29 @@ export const useSplitRouter_SplitOwner_read = /*#__PURE__*/ createUseReadContrac
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"splitsLastChangedAt"`
+ */
+export const useSplitRouter_SplitsLastChangedAt_read = /*#__PURE__*/ createUseReadContract({
+  abi: splitRouterAbi,
+  functionName: 'splitsLastChangedAt',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__
  */
 export const useSplitRouter_undefined_write = /*#__PURE__*/ createUseWriteContract({
   abi: splitRouterAbi,
 });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"executePaymentRouterChange"`
+ */
+export const useSplitRouter_ExecutePaymentRouterChange_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: splitRouterAbi,
+    functionName: 'executePaymentRouterChange',
+  }
+);
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"registerSplitOwner"`
@@ -27716,19 +28586,21 @@ export const useSplitRouter_RenounceOwnership_write = /*#__PURE__*/ createUseWri
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"requestPaymentRouterChange"`
+ */
+export const useSplitRouter_RequestPaymentRouterChange_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: splitRouterAbi,
+    functionName: 'requestPaymentRouterChange',
+  }
+);
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"routeWithSplits"`
  */
 export const useSplitRouter_RouteWithSplits_write = /*#__PURE__*/ createUseWriteContract({
   abi: splitRouterAbi,
   functionName: 'routeWithSplits',
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setPaymentRouter"`
- */
-export const useSplitRouter_SetPaymentRouter_write = /*#__PURE__*/ createUseWriteContract({
-  abi: splitRouterAbi,
-  functionName: 'setPaymentRouter',
 });
 
 /**
@@ -27771,6 +28643,15 @@ export const useSplitRouter_undefined_simulate = /*#__PURE__*/ createUseSimulate
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"executePaymentRouterChange"`
+ */
+export const useSplitRouter_ExecutePaymentRouterChange_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: splitRouterAbi,
+    functionName: 'executePaymentRouterChange',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"registerSplitOwner"`
  */
 export const useSplitRouter_RegisterSplitOwner_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -27787,19 +28668,20 @@ export const useSplitRouter_RenounceOwnership_simulate = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"requestPaymentRouterChange"`
+ */
+export const useSplitRouter_RequestPaymentRouterChange_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: splitRouterAbi,
+    functionName: 'requestPaymentRouterChange',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"routeWithSplits"`
  */
 export const useSplitRouter_RouteWithSplits_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: splitRouterAbi,
   functionName: 'routeWithSplits',
-});
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link splitRouterAbi}__ and `functionName` set to `"setPaymentRouter"`
- */
-export const useSplitRouter_SetPaymentRouter_simulate = /*#__PURE__*/ createUseSimulateContract({
-  abi: splitRouterAbi,
-  functionName: 'setPaymentRouter',
 });
 
 /**
@@ -27851,6 +28733,23 @@ export const useSplitRouter_OwnershipTransferred_watch = /*#__PURE__*/ createUse
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"PaymentRouterChangeRequested"`
+ */
+export const useSplitRouter_PaymentRouterChangeRequested_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: splitRouterAbi,
+    eventName: 'PaymentRouterChangeRequested',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"PaymentRouterChanged"`
+ */
+export const useSplitRouter_PaymentRouterChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: splitRouterAbi,
+  eventName: 'PaymentRouterChanged',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link splitRouterAbi}__ and `eventName` set to `"RegistrarUpdated"`
  */
 export const useSplitRouter_RegistrarUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -27879,6 +28778,14 @@ export const useSplitRouter_SplitsConfigured_watch = /*#__PURE__*/ createUseWatc
  */
 export const useStoryBounties_undefined_read = /*#__PURE__*/ createUseReadContract({
   abi: storyBountiesAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link storyBountiesAbi}__ and `functionName` set to `"AWARD_GRACE_PERIOD"`
+ */
+export const useStoryBounties_AwardGracePeriod_read = /*#__PURE__*/ createUseReadContract({
+  abi: storyBountiesAbi,
+  functionName: 'AWARD_GRACE_PERIOD',
 });
 
 /**
@@ -28550,6 +29457,14 @@ export const useSubscriptionManager_UniverseCreators_read = /*#__PURE__*/ create
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"universeManager"`
+ */
+export const useSubscriptionManager_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
+  abi: subscriptionManagerAbi,
+  functionName: 'universeManager',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__
  */
 export const useSubscriptionManager_undefined_write = /*#__PURE__*/ createUseWriteContract({
@@ -28613,6 +29528,16 @@ export const useSubscriptionManager_RenounceOwnership_write = /*#__PURE__*/ crea
   abi: subscriptionManagerAbi,
   functionName: 'renounceOwnership',
 });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useSubscriptionManager_SetUniverseManager_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: subscriptionManagerAbi,
+    functionName: 'setUniverseManager',
+  }
+);
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"subscribe"`
@@ -28712,6 +29637,15 @@ export const useSubscriptionManager_RenounceOwnership_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: subscriptionManagerAbi,
     functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link subscriptionManagerAbi}__ and `functionName` set to `"setUniverseManager"`
+ */
+export const useSubscriptionManager_SetUniverseManager_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: subscriptionManagerAbi,
+    functionName: 'setUniverseManager',
   });
 
 /**
@@ -29334,6 +30268,14 @@ export const useUniverse_CanonChanged_watch = /*#__PURE__*/ createUseWatchContra
 export const useUniverse_MediaUpdated_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeAbi,
   eventName: 'MediaUpdated',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"MediaUpdatedAttribution"`
+ */
+export const useUniverse_MediaUpdatedAttribution_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'MediaUpdatedAttribution',
 });
 
 /**
@@ -30143,6 +31085,14 @@ export const useUniverseManager_BalanceOf_read = /*#__PURE__*/ createUseReadCont
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimableTokens"`
+ */
+export const useUniverseManager_ClaimableTokens_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'claimableTokens',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"deprecated"`
  */
 export const useUniverseManager_Deprecated_read = /*#__PURE__*/ createUseReadContract({
@@ -30215,6 +31165,14 @@ export const useUniverseManager_MetadataRenderer_read = /*#__PURE__*/ createUseR
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"metadataRendererLocked"`
+ */
+export const useUniverseManager_MetadataRendererLocked_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'metadataRendererLocked',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"mintFee"`
  */
 export const useUniverseManager_MintFee_read = /*#__PURE__*/ createUseReadContract({
@@ -30268,14 +31226,6 @@ export const useUniverseManager_SupportsInterface_read = /*#__PURE__*/ createUse
 export const useUniverseManager_Symbol_read = /*#__PURE__*/ createUseReadContract({
   abi: universeManagerAbi,
   functionName: 'symbol',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"teamFee"`
- */
-export const useUniverseManager_TeamFee_read = /*#__PURE__*/ createUseReadContract({
-  abi: universeManagerAbi,
-  functionName: 'teamFee',
 });
 
 /**
@@ -30408,6 +31358,14 @@ export const useUniverseManager_GraduateFromBondingCurve_write =
   });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"lockMetadataRenderer"`
+ */
+export const useUniverseManager_LockMetadataRenderer_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'lockMetadataRenderer',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"pause"`
  */
 export const useUniverseManager_Pause_write = /*#__PURE__*/ createUseWriteContract({
@@ -30445,6 +31403,14 @@ export const useUniverseManager_SetApprovalForAll_write = /*#__PURE__*/ createUs
 export const useUniverseManager_SetBondingCurveHalted_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeManagerAbi,
   functionName: 'setBondingCurveHalted',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setClaimableToken"`
+ */
+export const useUniverseManager_SetClaimableToken_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setClaimableToken',
 });
 
 /**
@@ -30618,6 +31584,15 @@ export const useUniverseManager_GraduateFromBondingCurve_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"lockMetadataRenderer"`
+ */
+export const useUniverseManager_LockMetadataRenderer_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'lockMetadataRenderer',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"pause"`
  */
 export const useUniverseManager_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -30660,6 +31635,15 @@ export const useUniverseManager_SetBondingCurveHalted_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
     functionName: 'setBondingCurveHalted',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setClaimableToken"`
+ */
+export const useUniverseManager_SetClaimableToken_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'setClaimableToken',
   });
 
 /**
@@ -30780,6 +31764,14 @@ export const useUniverseManager_undefined_watch = /*#__PURE__*/ createUseWatchCo
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"AdminSyncFailed"`
+ */
+export const useUniverseManager_AdminSyncFailed_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'AdminSyncFailed',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"Approval"`
  */
 export const useUniverseManager_Approval_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -30819,6 +31811,15 @@ export const useUniverseManager_EthClaimed_watch = /*#__PURE__*/ createUseWatchC
   abi: universeManagerAbi,
   eventName: 'EthClaimed',
 });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"MetadataRendererLocked"`
+ */
+export const useUniverseManager_MetadataRendererLocked_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeManagerAbi,
+    eventName: 'MetadataRendererLocked',
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"MintFeeUpdated"`

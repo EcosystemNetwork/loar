@@ -49,475 +49,445 @@ interface EntityDef {
 
 const ENTITIES: EntityDef[] = [
   // ═══════════════════════════════════════════════════════════════════════
-  // CHARACTERS
+  // CHARACTERS — Pilot Episode: "Return"
   // ═══════════════════════════════════════════════════════════════════════
   {
-    name: 'Eli Vance',
+    name: 'Eric',
     kind: 'person',
     description:
-      'A 24-year-old junior analyst at the Defense Analysis Center. Sharp, ambitious, wiry, and intensely focused. Eli plays the obedient patriot — saying the right things, climbing the ladder — while secretly hunting for proof of the hidden space program. He scored unusually high on anomaly pattern recognition, which earned him a fast-track promotion to Level 3 Public Misattribution Review and eventually temporary access to Project Orpheus. He carries a hidden data wafer and records private video logs on an encrypted laptop. His apartment wall is covered in printed launch windows, defense budgets, redacted memos, and amateur astronomy images. His goal: expose the greatest cover-up in human history.',
+      "A young man in his early 20s, half-Asian mixed heritage, with messy black hair that falls over his eyes. Quiet, introspective, and deeply sensitive to sound and emotion — though he doesn't know why yet. Eric went to the rave with his friends Mikel and Jeff expecting a normal night of music and chaos. When his phone died and he got separated in a mosh pit, he stumbled alone into a crowd at a massive stage. On psilocybin mushrooms, he discovered something impossible: he could feel the music as physical architecture, and when his emotions shifted, the music shifted with him. The bass followed his heartbeat. The drops hit when his adrenaline spiked. The crowd moved with his breathing. Then a voice spoke from inside the sound — ancient, alien, patient — and said it had been waiting for him to return. Eric ran. He doesn't understand what happened. But something opened inside him that night, and it isn't closing.",
     metadata: {
       role: 'Protagonist',
       appearance:
-        '24-year-old male, wiry build, intense dark eyes, cheap suit and tie, deliberately ordinary appearance. Carries a government badge and notebook filled with sketches of triangular craft.',
+        'Early 20s male, half-Asian mixed heritage, messy black hair falling over eyes, slim build, slightly underdressed for the cold — black hoodie, dark jeans, beat-up Vans. Dilated pupils from psilocybin. Sweat on his temples from the crowd. Cheap festival wristband. Expression shifts from lost and overwhelmed to transcendent focus when the power activates.',
       motivations:
-        'Expose the hidden space program to the public. Refuses to be gaslit by institutional lies.',
+        'Just wanted a good night out with friends. Now questioning everything about who he is and what the voice meant by "return."',
       abilities:
-        'Exceptional anomaly pattern recognition, social manipulation (plays dumb convincingly), data exfiltration',
-      homePlace: 'Small apartment near the Defense Analysis Center',
-      affiliations: 'Defense Analysis Center (cover), secretly working to expose Project Orpheus',
+        "Psychedelic-activated sonic entropy manipulation — can control music, bass frequencies, crowd energy, and stage lighting through emotional state. Only works under psilocybin. Doesn't understand or control it yet.",
+      homePlace: 'Southern California — lives with roommates near San Bernardino',
+      affiliations:
+        'Friend group: Mikel (experienced raver, secretly a vampire) and Jeff (the driver, big and dumb and lovable)',
     },
     imagePrompt:
-      'Full-body character portrait of Eli Vance, a 24-year-old male intelligence analyst. Wiry build, intense dark eyes that miss nothing, wearing a cheap government suit with a thin tie. Deliberately ordinary and forgettable appearance. Government ID badge clipped to his jacket. In one hand a small notebook with sketches of triangular aircraft. Expression of controlled determination — a man hiding his true purpose behind perfect obedience. Sterile gray government hallway behind him. Paranoid thriller aesthetic, muted government colors with cool blue undertones, cinematic lighting, 4K quality.',
+      'Full-body character portrait of Eric, a young man in his early 20s. Half-Asian mixed heritage, messy black hair falling over his dark eyes. Slim build, wearing a black hoodie over a plain dark t-shirt, dark jeans, and beat-up Vans sneakers. Cheap neon festival wristband on his left wrist. His pupils are dilated. Sweat glistens on his temples. He stands in a crowd with colored stage lights washing over him — magenta, cyan, ultraviolet. His expression is intense and overwhelmed, caught between fear and wonder. Rave festival atmosphere, psychedelic lighting, photorealistic, 4K quality.',
     threeDPrompt:
-      'Young male intelligence analyst, wiry build, cheap government suit and tie, government ID badge, intense focused expression, holding notebook, standing pose, thriller cinematic style',
+      'Young half-Asian male, messy black hair, black hoodie, slim build, dilated pupils, festival wristband, psychedelic rave lighting, overwhelmed expression, standing pose',
   },
   {
-    name: 'Mara Chen',
+    name: 'Mikel',
     kind: 'person',
     description:
-      'A woman in her 30s who works at the Defense Analysis Center. Cheerful on the surface but razor-sharp underneath. Mara knows far more than she lets on — she is already part of Project Orpheus when Eli discovers it, wearing the same black uniform in the sublevel facility. She tests Eli with provocative comments about the cover stories, watching who flinches. Her advice to Eli: "Play dumb better." She understands the system from the inside and walks the line between loyalty and conscience. Her final warning to Eli: "If you ever do leak it... make sure the world gets proof, not a story. They\'ve trained people to laugh at stories."',
+      "Eric's close friend and rave mentor. Mikel has been going to raves and festivals for years — he knows every DJ, every stage, every secret entrance. Lean and angular with sharp features, always dressed in all-black techwear that looks expensive. He moves through crowds like water, never bumping anyone, always appearing exactly where he needs to be. There's a reason for this: Mikel is a vampire. Not the Hollywood kind — something older, quieter. The bass and the darkness and the anonymous bodies are perfect cover. He feeds rarely and carefully, and genuinely loves the music. He cares about Eric and Jeff, and when Eric gets separated, Mikel is the one who senses something wrong before Jeff does. He can feel Eric's fear through the crowd like a frequency.",
     metadata: {
-      role: 'Deuteragonist / Mentor figure',
+      role: 'Deuteragonist / Secret protector',
       appearance:
-        '30s female, sharp and professional, cheerful demeanor masking deep awareness. Wears standard government attire above ground, black Orpheus uniform below.',
+        'Mid-20s male, lean and angular build, sharp cheekbones, pale skin that looks natural under rave lighting. All-black techwear — fitted tactical jacket, slim cargo pants, matte-black boots. Dark eyes that reflect stage lights unnaturally. Moves through crowds with inhuman grace. Small silver ring on left hand.',
       motivations:
-        "Navigating the system from within. Possibly shares Eli's desire for truth but plays the longer game.",
+        "Loves the rave scene genuinely. Protects Eric and Jeff without them knowing what he is. Feeds discreetly. When Eric's power activates, Mikel recognizes something ancient — and it terrifies him.",
       abilities:
-        'Deep institutional knowledge, social intelligence, classified clearance within Orpheus',
-      homePlace: 'Unknown — compartmentalized',
-      affiliations: 'Defense Analysis Center (official), Project Orpheus (classified)',
+        'Vampiric senses — heightened hearing, smell, spatial awareness. Can sense emotions through proximity. Moves through crowds without physical contact. Enhanced speed and strength (rarely used). Immune to bass damage.',
+      homePlace: 'Unknown — changes apartments frequently. Always has cash.',
+      affiliations:
+        'Eric (genuine friend), Jeff (genuine friend). No vampire clan mentioned — appears to be solitary.',
     },
     imagePrompt:
-      'Full-body character portrait of Mara Chen, a sharp woman in her 30s. Professional government attire — smart blazer, practical clothes. Cheerful expression that masks deep intelligence and awareness. Sharp eyes that evaluate everyone. One hand holding a government coffee cup casually. Split lighting — warm on her cheerful side, cold blue on the calculating side. Government facility background with fluorescent lighting. Paranoid thriller aesthetic, 4K quality.',
+      'Full-body character portrait of Mikel, a lean angular young man in his mid-20s. Sharp cheekbones, pale skin, dark eyes that catch light strangely. All-black techwear outfit — fitted tactical jacket with subtle zippers, slim black cargo pants, matte-black boots. A small silver ring on his left hand. He stands at the edge of a rave crowd, the only still figure in a sea of movement. Colored stage lights — red, violet, blue — wash across him but he seems to absorb them rather than reflect them. His expression is watchful, predatory, but not cruel. Rave atmosphere, dark techwear aesthetic, photorealistic, 4K quality.',
     threeDPrompt:
-      'Professional woman in her 30s, smart blazer and government attire, sharp evaluating expression, holding coffee cup, standing confident pose, government thriller style',
+      'Lean angular male, sharp cheekbones, pale skin, all-black techwear tactical outfit, dark eyes reflecting light, standing still in rave crowd, predatory watchful pose',
   },
   {
-    name: 'Director Halden',
+    name: 'Jeff',
     kind: 'person',
     description:
-      'The head of the Defense Analysis Center and a senior figure within Project Orpheus. In his 50s, clean, polished, and completely unreadable. Halden is the gatekeeper between the public facade and the hidden truth. He assigns Eli to the disinformation triage queue — ostensibly a promotion, actually a test. His warnings are veiled threats: "Ambition is useful here. Curiosity is not the same thing." He ultimately reveals the hidden fleet to Eli, offering him a choice: spend his life shouting from outside the wall, or come inside and see why the wall exists. He demands loyalty, competence, and silence.',
+      "The third member of the friend group and the one with the car — which makes him essential. Jeff is big, muscular, classically handsome in a way that gets him free drinks, and not the sharpest. He's the heart of the group: loyal, loud, always having the best time, always losing his shirt by midnight. He doesn't understand half the music but he loves the energy. He's the one who drove everyone to NOS Event Center in his lifted truck. When Eric goes missing, Jeff's first instinct is to climb something tall and yell Eric's name over the bass, which is both useless and endearing. He doesn't know Mikel is a vampire. He thinks Mikel is just \"really good at raves.\"",
     metadata: {
-      role: 'Antagonist / Gatekeeper',
+      role: 'Comic relief / Heart of the group',
       appearance:
-        '50s male, clean-shaven, immaculate suit, polished shoes. Military bearing hidden under bureaucratic calm. Completely unreadable face.',
+        'Early 20s male, big and muscular, 6\'2", classically handsome square jaw, short-cropped brown hair. Shirtless by Act 2 (lost his tank top in the mosh pit). Athletic build glistening with sweat. Cargo shorts, high-top sneakers, multiple festival wristbands from past events stacked on both wrists. Huge grin. Always holding a water bottle.',
       motivations:
-        'Maintain the secrecy of the hidden space program. Believes public disclosure would collapse civilization. Recruits talent he can control.',
+        "Have the best night ever. Keep the group together. Drive everyone home safe. He's simple and that's what makes him good.",
       abilities:
-        'Institutional authority, psychological manipulation, classified intelligence access',
-      homePlace: 'Sublevel offices beneath the Defense Analysis Center',
-      affiliations: 'Defense Analysis Center (Director), Project Orpheus (senior command)',
+        'Can bench 315. Has the car keys. Can be heard yelling over any bass drop. Surprisingly good at finding lost people by pure optimistic persistence.',
+      homePlace: 'San Bernardino area — lives with his parents, works at a gym',
+      affiliations:
+        "Eric (best friend since high school), Mikel (rave buddy, thinks he's just cool)",
     },
     imagePrompt:
-      'Full-body character portrait of Director Halden, a man in his 50s. Immaculate dark suit, perfectly polished shoes, clean-shaven with steel-gray hair. Face completely unreadable — neither kind nor cruel, just calculating. Standing in a polished black corridor with minimalist design. Behind him, reinforced glass reveals faint telemetry displays. Cold authority radiates from every detail. Government thriller villain aesthetic, dramatic low lighting, 4K quality.',
+      "Full-body character portrait of Jeff, a big muscular young man in his early 20s. 6'2\", classically handsome with a square jaw and short-cropped brown hair. SHIRTLESS with a tanned athletic build glistening with sweat. Cargo shorts, high-top sneakers, and multiple stacked festival wristbands on both wrists. He holds a water bottle in one hand and has a massive grin on his face. Festival lights illuminate his excited expression — he's having the best night of his life. Rave atmosphere, warm energy, photorealistic, 4K quality.",
     threeDPrompt:
-      'Authoritative man in 50s, immaculate dark suit, steel gray hair, unreadable expression, hands clasped behind back, standing in dark corridor, government thriller style',
+      'Big muscular shirtless male, square jaw, short brown hair, cargo shorts, sneakers, festival wristbands, huge grin, holding water bottle, rave lighting, excited pose',
   },
   {
-    name: 'The Voice',
+    name: 'The Frequency',
     kind: 'person',
     description:
-      'An unknown figure who contacts Eli via his burner phone during the cold open. A calm, older male voice who knows Eli\'s name, knows he stopped to watch the launches, and warns him: "If you want the truth, Mr. Vance... stop looking up in places where civilians can see you." Identity unknown. Possibly an ally within the system, possibly a handler monitoring Eli. The voice represents the invisible surveillance apparatus that tracks anyone who gets too close to the truth.',
+      'The dark alien voice that speaks to Eric through the music when his power activates. Not a physical being — it exists inside sound itself, between frequencies, in the spaces where bass becomes vibration becomes thought. It has been dormant, waiting, listening through every speaker and subwoofer on Earth for the one who can hear it back. When Eric\'s psilocybin-enhanced emotions began reshaping the music at the main stage, The Frequency recognized its host — or its heir, or its weapon. It said only one thing: "I have been waiting for you to return." The voice is ancient, patient, genderless but deep, and it speaks not through ears but through the chest cavity, through bone conduction, through the bass itself. Eric is the first human in millennia who can hear it. It is unclear whether The Frequency is benevolent, predatory, or something beyond human moral categories entirely.',
     metadata: {
-      role: 'Mysterious contact',
-      appearance: 'Unknown — voice only. Calm, older male voice with authority.',
+      role: 'Antagonist / Ancient entity / Mystery',
+      appearance:
+        "No physical form. Manifests as: a dark resonance felt in the chest, impossible sub-bass that vibrates bone, visual distortion in stage lighting — colors inverting, shadows moving wrong, the crowd momentarily frozen in a single frame. When it speaks, the music doesn't stop — it restructures around the voice like the universe making room.",
       motivations:
-        'Unknown — could be warning Eli for his protection or threatening him into compliance',
+        'Unknown. Has waited millennia for someone who can "return." Whether this means Eric specifically, or a type of being, or something else entirely, is the central mystery of the series.',
       abilities:
-        "Access to Eli's identity, location, and burner phone number. Surveillance capabilities.",
-      homePlace: 'Unknown',
-      affiliations: 'Unknown — possibly Project Orpheus intelligence division',
+        "Can speak through any sound system. Can restructure music in real-time. Can freeze crowd perception momentarily. Seems to amplify Eric's emotional-sonic connection. May be able to do much more.",
+      homePlace: 'Exists between frequencies — lives in sound itself',
+      affiliations:
+        'Spoke to Eric. Implied previous relationship ("return"). No other known contacts.',
     },
     imagePrompt:
-      'Abstract character concept for a mysterious unnamed caller. A silhouette of a man in shadow, only the outline visible against a field of surveillance monitors and signal waveforms. A glowing phone line connects from darkness to a desert highway below. One eye barely visible in the shadow, reflecting starlight. Cold blue and black color palette with thin green signal lines. Paranoid thriller mystery aesthetic, 4K quality.',
+      "Abstract entity concept art for The Frequency — an alien presence that lives inside sound. A massive dark void opens behind a rave stage's speaker wall, visible only as a distortion in the light — colors inverting to negative, bass frequencies rendered as visible dark ripples in the air. The crowd is frozen mid-dance for a single impossible frame. At the center of the void, the suggestion of something vast and patient — not eyes but awareness, not a mouth but a voice shaped from pure sub-bass. The stage lights bend toward it like gravity. Psychedelic horror meets cosmic entity. Dark ultraviolet, impossible geometry in sound waves, 4K quality.",
     threeDPrompt:
-      'Shadowy male silhouette against surveillance monitors, only outline visible, mysterious anonymous figure, thriller spy aesthetic',
+      'Abstract dark void entity behind rave speakers, inverted light distortion, visible bass waves, frozen crowd, cosmic horror in sound, psychedelic dark entity',
   },
 
   // ═══════════════════════════════════════════════════════════════════════
   // PLACES
   // ═══════════════════════════════════════════════════════════════════════
   {
-    name: 'Defense Analysis Center',
+    name: 'NOS Event Center',
     kind: 'place',
     description:
-      'A gray, windowless government facility with badge scanners and frosted glass. The public-facing workplace where Eli and Mara operate. Wall screens show news anchors debunking UFO sightings. Below the listed floors lies the sublevel facility housing Project Orpheus — a polished black corridor leading to the underground hangar and launch infrastructure. The upper floors maintain the illusion of routine intelligence work; the sublevels contain the truth.',
+      "The NOS Event Center in San Bernardino, California — a massive indoor/outdoor venue that hosts some of the biggest raves and EDM festivals in Southern California. On this night, it's packed with tens of thousands of people across multiple stages. The parking lot is a sea of cars and lifted trucks. Inside, the main building is a cavernous warehouse space with industrial ceilings, laser grids, and a wall of speakers that can be felt in your teeth. Outside, additional stages spread across concrete lots with temporary structures, LED towers, and art installations. The air smells like fog machine fluid, sweat, and desert dust. Bass from competing stages creates interference patterns you can feel in your sternum.",
     metadata: {
-      placeType: 'Government facility / Secret military installation',
+      placeType: 'Indoor/outdoor rave venue — massive multi-stage EDM festival',
       atmosphere:
-        'Sterile, quiet, controlled. Fluorescent lighting above, dramatic minimalism below. The mundane concealing the extraordinary.',
+        'Overwhelming sensory assault. Bass you feel in your organs. Laser grids cutting through fog. Tens of thousands of bodies moving in the dark. The smell of fog fluid and desert dust. Competing stages creating bass interference patterns. Pure controlled chaos.',
       rulesAndDangers:
-        'Badge-restricted access. Sublevel access requires elevated clearance. Surveillance everywhere. Saying the wrong thing gets you relocated to offices with no clocks.',
-      inhabitants: 'Analysts, intelligence officers, Project Orpheus personnel',
-      governingFaction: 'Project Orpheus / US Government (classified division)',
+        "Easy to get separated. Dead zones where phones don't work. Security is lax past the gates. The mosh pit near the main stage is violent. The outdoor areas are dark between stages.",
+      inhabitants: 'Tens of thousands of ravers, DJs, security, medics, vendors',
+      governingFaction: 'Insomniac Events / NOS Events (promoters)',
     },
     imagePrompt:
-      'Architectural portrait of the Defense Analysis Center. A brutalist gray government building with no windows, surrounded by security fencing and badge-access checkpoints. Above ground: sterile fluorescent-lit offices with frosted glass walls and rows of analyst terminals. Below: a reveal showing a polished black corridor descending into a vast underground hangar. Split composition — mundane gray government above, sleek black military-industrial below. Paranoid thriller architecture, cinematic lighting, 4K quality.',
+      'Massive rave venue at night — the NOS Event Center in San Bernardino. An enormous industrial building glowing from within with laser beams shooting through open bay doors. Outside, additional stages with LED towers and art installations spread across concrete lots. Tens of thousands of people flow between stages, lit by pulsing colored lights — magenta, cyan, ultraviolet. Fog machines create thick atmosphere. The desert sky above is purple-black. Cars and trucks pack the surrounding lots. The scale is overwhelming. Wide establishing shot, festival atmosphere, photorealistic, 4K quality.',
     threeDPrompt:
-      'Brutalist gray government building, no windows, security fencing, split to reveal polished black underground facility below, government thriller architecture, miniature style',
+      'Massive rave venue at night, industrial building with lasers, outdoor stages with LED towers, tens of thousands of people, fog machines, festival lights, aerial view',
   },
   {
-    name: 'Triage Office',
+    name: 'Main Stage — The Cathedral',
     kind: 'place',
     description:
-      'A dim room within the Defense Analysis Center filled with rows of screens. This is the Level 3 Public Misattribution Review station where Eli is assigned. Endless social posts, leaked clips, civilian telescope footage, and cockpit recordings scroll across terminals. Each piece of evidence is tagged with recommended cover explanations: sensor bloom, viral fabrication, classified test aircraft misidentified. It is here that Eli discovers the ACCESS RESTRICTED file referencing "Section Orpheus."',
+      'The indoor main stage at NOS Event Center — nicknamed "The Cathedral" by regulars because of the vaulted industrial ceiling and the religious experience of the bass. A wall of speakers 40 feet wide and 20 feet tall. LED panels behind the DJ booth display fractal patterns that sync with the beat. Laser grids cut geometric shapes through fog so thick you can barely see 30 feet ahead. The crowd here is the densest — 10,000+ packed shoulder to shoulder, a single organism moving to the drop. This is where Eric discovers his power. When his emotions surge under psilocybin, the music bends. The bass follows his heartbeat. The lasers track his gaze. The drop hits when his adrenaline spikes. And somewhere behind the wall of speakers, something ancient notices.',
     metadata: {
-      placeType: 'Intelligence review station',
+      placeType: 'Indoor main stage — massive speaker wall, laser grid, fog machine cathedral',
       atmosphere:
-        'Dim, screen-lit, claustrophobic. The blue glow of monitors illuminating analysts who sort truth from fiction — then bury the truth.',
+        'Transcendent and terrifying. The bass is physical — you breathe it, your vision pulses with it. Fog so thick the crowd becomes silhouettes. Lasers create impossible geometries overhead. The DJ is invisible behind the light wall. This is where sound becomes a living thing.',
       rulesAndDangers:
-        'Strict access protocols. Attempting to access restricted files triggers alerts. Everything is logged.',
-      inhabitants: 'Junior analysts assigned to disinformation triage',
-      governingFaction: 'Defense Analysis Center',
+        "The mosh pit up front is dangerous — people get crushed and separated. The bass can disorient. Under psychedelics, the sensory overload can break reality. And on this night, the stage itself becomes responsive to one person's emotions.",
+      inhabitants:
+        'DJ (unseen behind LED wall), 10,000+ ravers packed dense, Eric (alone in the crowd)',
+      governingFaction: "The DJ controls the music — until Eric doesn't let them",
     },
     imagePrompt:
-      'Interior of a dimly lit government intelligence office. Rows of glowing screens display social media posts, UFO footage, cockpit recordings, and satellite imagery. Each screen has overlay tags: SENSOR BLOOM, VIRAL FABRICATION, ARTIFACT. A single analyst sits alone at a terminal, face illuminated by blue screen light. On one screen, a red ACCESS RESTRICTED warning. Paranoid, surveillance-heavy atmosphere. Cold blue monitor light, dark surroundings, 4K quality.',
+      'The indoor main stage at a massive rave — a cathedral of sound. A wall of speakers 40 feet wide and 20 feet tall dominates the far end. Behind it, LED panels display fractal patterns synced to the beat. Laser beams — green, magenta, white — cut geometric grids through thick fog. The crowd is a dense sea of silhouettes, arms raised, moving as one organism. The vaulted industrial ceiling disappears into fog and laser light. The bass is visible as vibration in the fog. Overwhelming, transcendent, borderline religious. Shot from within the crowd looking toward the stage, immersive, 4K quality.',
     threeDPrompt:
-      'Dim government office with rows of glowing surveillance monitors, analyst at terminal, ACCESS RESTRICTED on screen, cold blue lighting, intelligence review room style',
+      'Indoor rave main stage, massive speaker wall, LED fractal display, laser grid through fog, dense crowd of silhouettes, industrial cathedral, immersive angle',
   },
   {
-    name: "Eli's Apartment",
+    name: 'The Mosh Pit',
     kind: 'place',
     description:
-      'A small, cheap apartment near the Defense Analysis Center. Sparse furniture but one wall is covered in Eli\'s investigation: printed launch windows, defense budgets, redacted government memos, and amateur astronomy images. Pinned in the center: "IF THEY\'RE LYING ABOUT THE TECHNOLOGY, WHAT ELSE ARE THEY LYING ABOUT?" He records encrypted video logs here. One night, a black SUV with no plates idles outside, and a message appears unbidden on his laptop: "YOU WANT TO EXPOSE THE SECRET. FIRST SURVIVE IT."',
+      "The front section of the main stage crowd where the energy is most violent. Bodies crash into each other, people are lifted and thrown. It's where Eric gets separated from Mikel and Jeff. In the chaos of a bass drop, the crowd surges like a wave. Eric's phone falls from his pocket and gets stomped. Mikel reaches for him but the crowd pushes them apart. Jeff's voice is swallowed by the bass. Eric is alone in seconds — one moment shoulder-to-shoulder with his best friends, the next swallowed by a sea of strangers. The mosh pit doesn't care who you came with.",
     metadata: {
-      placeType: 'Personal apartment / Investigation headquarters',
+      placeType: 'Dense crowd zone — front of main stage',
       atmosphere:
-        'Paranoid, cramped, obsessive. A conspiracy board dominates one wall. The mundane life of a government worker hiding an extraordinary pursuit.',
+        "Violent energy. Bodies colliding. Bass drops triggering crowd surges. Sweat and adrenaline. Impossible to communicate — voices don't carry. Phones die from impacts and sweat.",
       rulesAndDangers:
-        'Under surveillance. Black SUVs appear outside. His laptop has been compromised — messages appear from unknown sources.',
-      inhabitants: 'Eli Vance (sole occupant)',
-      governingFaction: 'N/A — private residence (surveilled by unknown parties)',
+        "Easy to get separated instantly. Phones get destroyed. People get trampled if they fall. The crowd moves like a fluid — you can't fight the current.",
+      inhabitants: 'Hundreds of ravers in close physical contact, moshing, pushing, surging',
+      governingFaction: 'Nobody — pure entropy',
     },
     imagePrompt:
-      'Interior of a small, sparse apartment. Cheap furniture, bare walls except for ONE wall completely covered in an investigation board: printed satellite photos, launch window calendars, redacted government memos with black bars, amateur telescope images of strange lights, and red string connecting pieces. A handwritten note pinned in the center. A laptop glows on a desk. Through the window, a black SUV with no plates idles on the street below. Paranoid thriller aesthetic, warm lamplight vs cold surveillance blue, 4K quality.',
+      "The mosh pit at the front of a massive rave stage. Bodies packed so tight they move as one surging mass. Arms reaching up, people being lifted and thrown. Sweat flying through laser beams. A phone screen cracking under someone's foot. The stage's bass speakers are a blinding wall of light ahead. Two friends reaching for each other as the crowd pulls them apart — fingertips almost touching. Chaos, energy, violence and joy mixed. Close-up immersive shot from within the pit, motion blur, 4K quality.",
     threeDPrompt:
-      'Small apartment interior with conspiracy investigation wall, printed documents and red string, laptop on desk, black SUV visible through window, thriller paranoia style, diorama',
+      'Dense mosh pit crowd at rave, bodies surging, arms reaching, phone cracking underfoot, friends being separated, laser light from stage, chaotic motion',
   },
   {
-    name: 'Underground Hangar',
+    name: 'The Dark Corridor',
     kind: 'place',
     description:
-      'A cavernous underground hangar beneath the Defense Analysis Center, accessed via a sublevel elevator that descends below all listed floors. The facility is labeled "Aerospace Logistics Command" — a lie so obvious it feels insulting. Inside: a matte-black craft the size of a destroyer section, suspended in a magnetic cradle. Angular but elegant. Human-made, yet impossibly advanced. Service crews work beneath it. This is where Eli first sees proof that the hidden space program is real — not prototypes, not experiments, but operational warships.',
+      "The space between the indoor main stage and the outdoor areas at NOS Event Center. A long concrete corridor with minimal lighting — just emergency exit signs casting red glow. The bass from the main stage makes the walls vibrate. This is where Eric runs after The Frequency speaks to him. He's terrified, sweating, pupils massive, heart racing. The corridor feels endless under psilocybin — the red exit signs stretching into infinity, his own footsteps echoing wrong, the bass behind him sounding like breathing. He bursts through the doors at the end into the outdoor area and the desert air hits him like cold water.",
     metadata: {
-      placeType: 'Secret military shipyard / Underground hangar',
+      placeType: 'Transit corridor between indoor/outdoor venue areas',
       atmosphere:
-        'Awe-inspiring, terrifying, revelatory. The scale of the deception becomes physical here. The craft is impossible yet undeniable.',
+        'Claustrophobic, bass-vibrating, red emergency lighting only. Under psychedelics it becomes a tunnel that stretches and breathes. The walls vibrate with the music behind you. Your footsteps echo wrong.',
       rulesAndDangers:
-        'Maximum security clearance required. Lethal force authorized for unauthorized access. No personal devices permitted.',
-      inhabitants: 'Orpheus engineering crews, flight personnel, security forces',
-      governingFaction: 'Project Orpheus / Aerospace Logistics Command',
+        'Disorienting under psychedelics. The bass vibration is physical. The minimal lighting creates shadow play that tricks the eye. Easy to panic here.',
+      inhabitants: 'Occasional ravers walking between stages, Eric running alone',
+      governingFaction: 'Venue infrastructure — uncontrolled, liminal',
     },
     imagePrompt:
-      'A vast underground military hangar carved from rock. At the center, a matte-black angular warship the size of a destroyer section floats in a glowing magnetic cradle. The craft is angular but elegant — human engineering pushed to impossible limits. Service crews in dark uniforms work beneath it on elevated platforms. Blue-white magnetic field energy courses through cradle arms. The hangar stretches into darkness. A tiny human figure (Eli in a suit) stands at an observation window, dwarfed by the scale. Military sci-fi meets government thriller, dramatic lighting, 4K quality.',
+      'A long concrete corridor inside a rave venue, lit only by red emergency exit signs. The walls vibrate visibly from bass on the other side. A single figure — young man in a black hoodie — runs toward camera, face showing pure terror, pupils dilated, sweat visible. The corridor behind him seems to stretch impossibly long. The red lighting creates shadow distortions on the concrete walls. Under the influence of psychedelics, the space breathes and pulses. Claustrophobic, horror-tinged, psychedelic distortion, 4K quality.',
     threeDPrompt:
-      'Vast underground hangar with matte-black angular warship suspended in magnetic cradle, service crews below, observation window with tiny figure, military sci-fi underground base',
+      'Long concrete corridor with red emergency lighting, vibrating walls, young man running in terror, psychedelic distortion, claustrophobic rave venue passage',
   },
   {
-    name: 'Launch Spine Two',
+    name: 'Outdoor Stage Area',
     kind: 'place',
     description:
-      'A towering vertical launch chamber humming with impossible energy. The matte-black ship sits sealed and fueled at the base. When the massive blast doors part overhead, they reveal not open sky but a hidden shaft leading up through mountain rock to the stars. The ship rises soundlessly through the shaft as sunlight pours down like revelation. Wall screens update: "FLEET MOVEMENT CONFIRMED — DESTINATION: OUTER PERIMETER COMMAND" alongside "PUBLIC NARRATIVE PACKAGE PREPARED — COVER STORY: METEOROLOGICAL TEST FAILURE." This is the moment Eli fully understands the scale of what has been hidden.',
+      "The outdoor section of NOS Event Center — concrete lots transformed into festival grounds with secondary stages, LED art installations, food vendors, and chill zones. The desert air is cool compared to the indoor furnace. Stars are visible above the light pollution. Competing bass from multiple stages creates weird interference patterns. This is where Eric bursts out of the dark corridor and where he eventually finds Jeff and Mikel again. Jeff spots him from atop a concrete barrier he's been using as a lookout post. Mikel appears from nowhere, as he does.",
     metadata: {
-      placeType: 'Secret vertical launch facility',
+      placeType: 'Outdoor festival grounds — secondary stages, art installations, vendor areas',
       atmosphere:
-        'Reverential, terrifying, transcendent. The sound of impossible energy. Sunlight pouring through a shaft in mountain rock as a warship rises silently.',
+        'Cool desert air after the indoor heat. Multiple stages creating overlapping bass. LED art installations throwing colored shadows. More space to breathe. Stars barely visible above light pollution. The relief of open sky.',
       rulesAndDangers:
-        'Maximum security. Launch protocols active. The energy output alone is dangerous at close range.',
-      inhabitants: 'Orpheus launch crews, transfer teams',
-      governingFaction: 'Project Orpheus',
+        "Easier to find people than indoors. Phone dead zones still exist. The desert cold hits hard when you're soaked in sweat from inside.",
+      inhabitants:
+        'Thousands of ravers between stages, vendors, art installations, Jeff standing on a barrier yelling',
+      governingFaction: 'NOS Events / festival promoters',
     },
     imagePrompt:
-      'A towering vertical launch chamber inside a mountain. At the base, a matte-black angular warship sealed and ready. Above, massive blast doors have parted to reveal a shaft carved through solid rock, leading up to a circle of blue sky and stars. Brilliant sunlight pours down the shaft like a column of divine light. The ship is beginning to rise silently, leaving trails of energy. Personnel in dark uniforms watch in reverent silence. On a wall screen: fleet status updates. The scale is cathedral-like. Military sci-fi launch facility, dramatic vertical composition, 4K quality.',
+      'Outdoor rave festival area at night in the desert — concrete lots with secondary stages, LED art installations glowing in the dark, food vendor lights. Cool desert air visible as slight fog. Multiple stages in the distance with different colored light shows creating overlapping beams. Ravers walking between stages, some sitting on concrete barriers. A shirtless muscular guy stands on top of a barrier, cupping his hands to yell. Stars barely visible above the light pollution. Open sky, relief of space after indoor chaos, 4K quality.',
     threeDPrompt:
-      'Vertical launch chamber inside mountain, matte-black warship rising through shaft to sky, sunlight pouring down, personnel watching below, military sci-fi cathedral scale',
+      'Outdoor rave festival area at night, desert setting, LED art installations, multiple stages with colored lights, people walking between stages, open sky, wide shot',
   },
   {
-    name: 'Desert Highway',
+    name: "Jeff's Truck",
     kind: 'place',
     description:
-      'A lonely two-lane road cutting through black desert under a sky crowded with stars. The cold open location where Eli witnesses three streaks of white light rising silently — too fast, too vertical, too controlled to be aircraft. The air shimmers and the stars behind the streaks distort like heat over asphalt. Something MASSIVE moves above, implied only by its effect on the sky. This is where Eli receives the mysterious phone call warning him to stop looking up.',
+      "Jeff's lifted truck in the NOS Event Center parking lot — the ride home and the meeting point if anything goes wrong. A lifted white Tacoma with aftermarket wheels, a gym bag in the back seat, and an aux cord dangling from the stereo. The truck represents safety — the known world, the ride home, the end of the night. After the events of the pilot, Eric sits in the passenger seat staring at the dashboard while Jeff drives and Mikel is silent in the back. The bass from inside the venue is still audible, faintly, through the truck's closed windows. Eric can feel it. He can feel all of it now.",
     metadata: {
-      placeType: 'Desert road / Observation point',
+      placeType: 'Vehicle — lifted white Toyota Tacoma in venue parking lot',
       atmosphere:
-        "Isolated, exposed, paranoid. A vast empty landscape under an impossibly full sky. The silence is broken only by launches that shouldn't exist.",
+        "Safety and normalcy after chaos. The truck is warm, familiar, smells like Jeff's gym bag and energy drinks. The dashboard glow is the only light. Bass from the venue still faintly audible. The ride home where nobody talks about what happened.",
       rulesAndDangers:
-        'Restricted airspace above. Civilian observation is monitored. Being seen here marks you.',
-      inhabitants: 'None visible — but surveillance is active',
-      governingFaction: 'N/A — public road near restricted airspace',
+        "The one safe space. But Eric can still feel the bass from the venue through the truck frame. The power doesn't turn off.",
+      inhabitants:
+        'Jeff (driving), Eric (passenger, shattered), Mikel (back seat, watching Eric carefully)',
+      governingFaction: "Jeff. It's his truck.",
     },
     imagePrompt:
-      'A lonely two-lane desert highway at night cutting through pitch-black desert terrain. Above, an impossibly star-filled sky. Three streaks of white light rise vertically from behind distant mountains — too fast, too controlled, too silent. The air around them shimmers and distorts, bending the starfield. A beat-up sedan is stopped on the roadside, door open. A lone figure stands beside it, looking up. The sense of something massive and invisible moving above. Paranoid sci-fi thriller, vast empty landscape, dramatic sky, 4K quality.',
+      "A lifted white Toyota Tacoma in a dark parking lot, festival venue visible in the background with laser beams and LED towers. The truck's interior is lit by warm dashboard glow. Three figures inside: the driver (big muscular guy) looking straight ahead, the passenger (slim young man in black hoodie) staring blankly at the dashboard, and a figure in the back seat watching the passenger with sharp dark eyes. The venue bass is suggested by subtle vibration in the side mirrors. Safety after chaos. Night, parking lot, aftermath energy, photorealistic, 4K quality.",
     threeDPrompt:
-      'Desert highway at night, three vertical light streaks rising from mountains, stopped sedan with figure looking up, distorted starfield, sci-fi thriller landscape',
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // FACTIONS
-  // ═══════════════════════════════════════════════════════════════════════
-  {
-    name: 'Project Orpheus',
-    kind: 'faction',
-    description:
-      'The classified program responsible for humanity\'s hidden space fleet. Orpheus operates an industrial-scale interstellar military capability that the public is told does not exist. The project maintains orbital shipyards, lunar extraction corridors, civilian observation suppression protocols, encounter management procedures, and deep-range fleet groups. A single line in the classified briefings hints at the ultimate scope: "NON-HUMAN SIGNAL EVENT / OUTER PERIMETER / ACTIVE." Orpheus is not just hiding technology — it may be hiding a war. Personnel are recruited through careful vetting and given the choice: loyalty, competence, and silence — or obscurity.',
-    metadata: {
-      mission:
-        "Maintain and operate humanity's hidden interstellar fleet while keeping its existence secret from the public",
-      ideology:
-        'Secrecy as civilization preservation. Public disclosure would collapse markets, fracture alliances, and split religions.',
-      leader: 'Director Halden (visible command); higher echelons unknown',
-      rivals: 'Potential whistleblowers, civilian astronomers, investigative journalists',
-      hq: 'Sublevel facility beneath the Defense Analysis Center; distributed across hidden installations',
-      resources:
-        'Orbital shipyards, 40,000+ warships, deep-space colonies, lunar extraction, encounter management systems',
-    },
-    imagePrompt:
-      'Faction emblem and concept art for Project Orpheus. A stylized black shield containing a hidden constellation pattern — stars connected by thin lines forming the shape of a fleet in formation. Below the shield, the word ORPHEUS in minimal military typography. Behind the emblem, a ghostly fleet of angular warships stretches to the horizon in deep space. The color palette is matte black, steel gray, and cold blue with pinpoints of white starlight. Military classification aesthetic — stamps, redaction bars, TOP SECRET overlays. 4K quality.',
-    threeDPrompt:
-      'Military faction emblem, black shield with constellation pattern forming fleet silhouette, ORPHEUS text, angular warships in background, classified military aesthetic',
-  },
-  {
-    name: 'Aerospace Logistics Command',
-    kind: 'faction',
-    description:
-      'The official cover name for the underground military infrastructure supporting the hidden fleet. A sign on the sublevel wall reads "AEROSPACE LOGISTICS COMMAND — AUTHORIZED PERSONNEL ONLY." The name is deliberately boring — designed to deflect curiosity. In reality, behind the signage lies the hangar housing operational warships, fleet telemetry monitoring, and launch spine access. The name itself is a weapon of narrative control: mundane enough to be overlooked, official enough to discourage questions.',
-    metadata: {
-      mission: 'Provide cover identity for Project Orpheus ground operations and infrastructure',
-      ideology: 'Institutional camouflage — hide the extraordinary behind bureaucratic mediocrity',
-      leader: 'Director Halden',
-      rivals: 'Anyone who digs below the surface of the name',
-      hq: 'Sublevel facility beneath the Defense Analysis Center',
-      resources: 'Underground hangars, launch spines, fleet telemetry systems, engineering crews',
-    },
-    imagePrompt:
-      'A boring government sign reading "AEROSPACE LOGISTICS COMMAND — AUTHORIZED PERSONNEL ONLY" mounted on a polished black wall in a minimalist corridor. The sign is deliberately dull and bureaucratic. But reflected in the polished floor beneath it, the reflection shows the truth: a vast underground hangar with a warship floating in a magnetic cradle. The contrast between the mundane sign and the impossible reflection. Split reality composition, government thriller aesthetic, 4K quality.',
-    threeDPrompt:
-      'Boring government sign on polished black wall, but floor reflection reveals vast underground hangar with warship, split reality concept, thriller aesthetic',
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // ORGANIZATIONS
-  // ═══════════════════════════════════════════════════════════════════════
-  {
-    name: 'Public Disinformation Bureau',
-    kind: 'organization',
-    description:
-      'The apparatus responsible for manufacturing and distributing cover stories for Space Fleet activities. When civilians film launches, the Bureau generates explanations: sensor bloom, viral fabrication, classified test aircraft misidentified, astrophotography artifact, atmospheric distortion, weather balloons, ion reflections, swamp gas, cosmic dust. The Level 3 Triage Office is their operational center, where analysts review footage and tag it with recommended dismissals. News chyrons reading "MYSTERY LIGHTS OVER NEVADA DEBUNKED AS ATMOSPHERIC DISTORTION" originate here. As Mara notes: "The truth is never hidden. It\'s buried under seven acceptable lies."',
-    metadata: {
-      orgType: 'Intelligence / Narrative control division',
-      purpose:
-        'Generate and maintain cover stories for all civilian observations of Space Fleet activity',
-      structure:
-        'Hierarchical — junior analysts in triage, senior staff in narrative design, director-level approval for major cover operations',
-      members: 'Eli Vance (Level 3 analyst), Mara Chen, Director Halden (oversight)',
-      influence: 'Controls public perception of all aerospace anomalies worldwide',
-    },
-    imagePrompt:
-      'Concept art for the Public Disinformation Bureau. A wall of screens showing UFO footage, civilian telescope images, and cockpit recordings — each with an overlay stamp: SENSOR BLOOM, FABRICATION, ATMOSPHERIC ARTIFACT. In front of the screens, analysts in government attire work at terminals, crafting cover stories. A news broadcast plays on one screen: "MYSTERY LIGHTS DEBUNKED." The irony is palpable — the truth is on every screen, being systematically buried. Cold blue monitor light, government office aesthetic, 4K quality.',
-    threeDPrompt:
-      'Government office wall of screens showing UFO footage with debunking overlay stamps, analysts at terminals, news broadcast debunking on screen, intelligence office diorama',
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // TECHNOLOGY
-  // ═══════════════════════════════════════════════════════════════════════
-  {
-    name: 'Orpheus-Class Warship',
-    kind: 'technology',
-    description:
-      'The matte-black angular craft Eli sees in the underground hangar — the size of a destroyer section, suspended in a magnetic cradle. Angular but elegant. Human-made, yet impossibly advanced. The craft rises soundlessly through Launch Spine Two and vanishes upward in a column of white light. Fleet readiness dashboards show these ships organized into deep-range fleet groups operating at the Outer Perimeter. The technology represents decades of secret development — propulsion systems that produce no visible bloom, stealth capabilities that make the craft invisible except by their effect on the starfield, and the ability to reach destinations described only as "Outer Perimeter Command."',
-    metadata: {
-      techType: 'Military starship / Stealth warship',
-      inventor: 'Unknown — classified development program spanning decades',
-      howItWorks:
-        'Propulsion produces no visible bloom. Rises soundlessly. Causes atmospheric distortion and starfield bending. Launches vertically through concealed mountain shafts.',
-      limitations: "Unknown — classified. The public is told these don't exist.",
-      users: 'Project Orpheus fleet personnel',
-    },
-    imagePrompt:
-      'Technical concept art of the Orpheus-Class Warship. A matte-black angular craft the size of a naval destroyer, elegant and menacing. Sharp angular surfaces designed for stealth, no visible engine nozzles or traditional propulsion. The craft is shown suspended in a glowing magnetic cradle inside an underground hangar, with blue-white energy coursing through the cradle arms. Inset detail: the craft rising silently through a vertical mountain shaft, trailing distorted light. Military sci-fi design document aesthetic, technical blueprint feel with dramatic rendering, 4K quality.',
-    threeDPrompt:
-      'Matte-black angular stealth warship, destroyer-sized, sharp angular surfaces, no visible engines, suspended in magnetic cradle with blue energy, military sci-fi ship design',
-  },
-  {
-    name: 'Magnetic Cradle System',
-    kind: 'technology',
-    description:
-      'The suspension and maintenance system used in the underground hangar to hold the Orpheus-Class warship. Blue-white energy courses through massive cradle arms that hold the ship in place without physical contact. The cradle serves as both a docking system and a maintenance platform, allowing service crews to work beneath the suspended craft. The technology implies mastery of electromagnetic or gravitational manipulation far beyond anything in the public scientific record.',
-    metadata: {
-      techType: 'Electromagnetic suspension / Ship maintenance platform',
-      inventor: 'Project Orpheus engineering division',
-      howItWorks:
-        'Massive arms generate fields that suspend the warship without physical contact. Blue-white energy visibly courses through the cradle structure.',
-      limitations:
-        'Requires enormous power infrastructure — only possible in purpose-built underground facilities',
-      users: 'Project Orpheus hangar crews',
-    },
-    imagePrompt:
-      'Technical concept art of the Magnetic Cradle System. Massive mechanical arms extending from the walls of an underground hangar, tips glowing with blue-white electromagnetic energy. Between the arms, a matte-black warship floats without any physical support. Energy arcs and fields visible between the cradle and the hull. Service crews on platforms work beneath the hovering craft. Blueprint overlay with technical annotations. Military engineering aesthetic, 4K quality.',
-    threeDPrompt:
-      'Massive mechanical cradle arms with glowing blue energy tips suspending a warship in underground hangar, electromagnetic field effects visible, military engineering tech',
-  },
-  {
-    name: 'Vertical Launch Spine',
-    kind: 'technology',
-    description:
-      'A concealed vertical launch system built inside a mountain. The launch chamber hums with impossible energy. When activated, massive blast doors part overhead to reveal a shaft carved through solid rock leading to the sky. Ships rise soundlessly through the shaft. The system is completely hidden from satellite observation — from above, it appears to be an ordinary mountain. The cover story infrastructure generates "METEOROLOGICAL TEST FAILURE" narratives for any anomalous signatures detected by civilian instruments during launches.',
-    metadata: {
-      techType: 'Concealed launch facility / Vertical ship deployment system',
-      inventor: 'Project Orpheus infrastructure division',
-      howItWorks:
-        'Ships rise soundlessly through vertical shafts carved through mountain rock. Blast doors conceal the shaft opening. Sunlight pours down during launches. Energy signature is massive but brief.',
-      limitations:
-        'Fixed location — cannot be relocated. Launch signature may be detectable by sufficiently advanced civilian instruments.',
-      users: 'Project Orpheus launch operations',
-    },
-    imagePrompt:
-      'Cross-section technical illustration of a Vertical Launch Spine built inside a mountain. Shows the vertical shaft carved through rock, blast doors at the top opening to reveal sky, a warship rising silently through the shaft. Sunlight pouring down the shaft. At the base, the launch chamber with energy conduits feeding into the walls. From the outside, the mountain appears completely ordinary. Cutaway architectural drawing with dramatic rendering, military engineering blueprint aesthetic, 4K quality.',
-    threeDPrompt:
-      'Cross-section mountain with vertical launch shaft, warship rising through rock tunnel to sky above, blast doors opening, sunlight pouring down, cutaway military facility model',
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // VEHICLES
-  // ═══════════════════════════════════════════════════════════════════════
-  {
-    name: "Eli's Sedan",
-    kind: 'vehicle',
-    description:
-      "A beat-up sedan Eli drives through the desert in the cold open. The car is deliberately unimpressive — part of his ordinary cover. On the passenger seat: a government badge, a cheap burner phone, and a notebook filled with sketches of strange triangular craft. The car represents Eli's dual existence: the mundane government worker on the surface, the relentless investigator underneath.",
-    metadata: {
-      vehicleType: 'Civilian automobile',
-      crew: 'Eli Vance (sole driver)',
-      capabilities: 'Basic transportation — nothing special. Its ordinariness is the point.',
-      origin: 'Standard civilian vehicle',
-      currentStatus: "Active — Eli's personal transport",
-    },
-    imagePrompt:
-      'A beat-up sedan stopped on a lonely desert highway at night. Door ajar, interior light on. On the passenger seat: a government ID badge, a cheap burner phone, and an open notebook showing hand-drawn sketches of triangular aircraft. Through the windshield, an impossibly star-filled sky. The contrast between the mundane vehicle and the cosmic mystery above it. Cinematic thriller composition, warm interior light vs cold desert blue, 4K quality.',
-    threeDPrompt:
-      'Beat-up sedan on desert highway at night, door open, government badge and notebook on seat, starry sky above, thriller atmosphere, miniature model',
-  },
-  {
-    name: 'Black SUV',
-    kind: 'vehicle',
-    description:
-      'A black SUV with no license plates that appears outside Eli\'s apartment at night. It idles silently, watching. When Eli notices it, it drives away. The SUV represents the surveillance apparatus — the unseen watchers who know Eli is getting too close. Its appearance coincides with a message appearing on his laptop: "YOU WANT TO EXPOSE THE SECRET. FIRST SURVIVE IT."',
-    metadata: {
-      vehicleType: 'Surveillance vehicle',
-      crew: 'Unknown — occupants never visible',
-      capabilities: 'Silent operation, no identifying marks, surveillance equipment (implied)',
-      origin: 'Unknown government or intelligence agency',
-      currentStatus: 'Active — appears and disappears without explanation',
-    },
-    imagePrompt:
-      'A black SUV with no license plates idling on a dark residential street at night. Tinted windows reflect nothing. Street lamp light slides off the polished surface. From an apartment window above, a faint blue glow (laptop screen). The SUV represents pure surveillance menace — anonymous, patient, watching. Paranoid thriller aesthetic, high contrast between dark vehicle and dim street lighting, 4K quality.',
-    threeDPrompt:
-      'Black SUV with no plates idling on dark residential street at night, tinted windows, surveillance menace, apartment window glowing above, thriller miniature',
+      'Lifted white Toyota Tacoma in dark parking lot, rave venue with lasers in background, three figures inside lit by dashboard glow, aftermath mood, night scene',
   },
 
   // ═══════════════════════════════════════════════════════════════════════
   // LORE
   // ═══════════════════════════════════════════════════════════════════════
   {
-    name: 'The Orpheus Briefing',
+    name: 'Sonic Entropy',
     kind: 'lore',
     description:
-      'The classified document Eli reads on the tablet Halden gives him: "PROJECT ORPHEUS — STRATEGIC FLEET READINESS / CIVILIAN DISCLOSURE RISK MATRIX." The briefing reveals the full scope of what has been hidden: orbital shipyards, lunar extraction corridors, civilian observation suppression protocols, encounter management procedures, and deep-range fleet groups. But one line stops him cold: "NON-HUMAN SIGNAL EVENT / OUTER PERIMETER / ACTIVE." This single line transforms the story from government conspiracy to something far larger — the fleet isn\'t just hidden technology, it may be responding to an alien presence.',
+      'The name Eric will eventually give to his ability — though in the pilot he has no name for it, only terror. Under psilocybin, Eric can perceive music as physical architecture: bass as foundation, melody as structure, rhythm as motion. More importantly, his emotional state directly influences the output of any sound system within his proximity. Fear makes the bass drop harder. Joy makes the melody soar. Anger creates distortion. Calm creates silence. The effect is not metaphorical — it is literal, measurable, and terrifying. The DJ on the main stage noticed their set was playing itself. The crowd felt the shift as religious ecstasy. Only Eric knew it was coming from him.',
     metadata: {
-      loreType: 'Classified military briefing',
+      loreType: 'Supernatural ability / Psychedelic power system',
       article:
-        "The Orpheus Briefing contains the following classified sections: (1) Orbital Shipyard Locations and Capacity, (2) Lunar Extraction Corridor Operations, (3) Civilian Observation Suppression Protocol, (4) Encounter Management Procedures, (5) Deep-Range Fleet Group Deployments, (6) Non-Human Signal Event — Outer Perimeter — Active. The existence of Section 6 implies that the fleet's purpose extends beyond human territorial expansion into active response to extraterrestrial contact.",
-      relatedConcepts:
-        'Project Orpheus, Civilian Disclosure Risk Matrix, Outer Perimeter Command, Non-Human Signal Event',
+        "Sonic Entropy: The ability to manipulate sound output through emotional state. Requires psilocybin activation (possibly other psychedelics — untested). Range unknown but affects at minimum a 40-foot speaker wall and 10,000-person crowd. The mechanism is unclear — Eric doesn't touch anything. His emotions simply become the music. Whether this is telekinesis applied to air pressure, some form of frequency manipulation at the quantum level, or something non-human entirely is the central scientific mystery. The Frequency entity seems to recognize and amplify this ability.",
+      relatedConcepts: 'The Frequency, psilocybin activation, emotional-sonic bridge, the Return',
       canonWeight: 'Hard Canon',
     },
     imagePrompt:
-      'A classified military document displayed on a slim government tablet. The header reads "PROJECT ORPHEUS — STRATEGIC FLEET READINESS / CIVILIAN DISCLOSURE RISK MATRIX" with TOP SECRET stamps and classification markings. Sections visible include orbital shipyard data, fleet deployment maps, and highlighted in red: "NON-HUMAN SIGNAL EVENT / OUTER PERIMETER / ACTIVE." The tablet glows in a dark room. Dramatic close-up, classified document aesthetic with redaction bars and security watermarks, 4K quality.',
+      'Abstract concept art for Sonic Entropy — the ability to control music through emotion. A young man stands at the center of a massive rave crowd, his body radiating visible sound waves in concentric rings. The waves are colored by emotion: deep red for fear, gold for joy, black distortion for anger. The speaker wall behind the stage bends toward him. The crowd moves in patterns that mirror his breathing. His eyes glow faintly. The air between him and the speakers is visible — filled with geometric patterns of sound made physical. Psychedelic, transcendent, terrifying. 4K quality.',
     threeDPrompt:
-      'Government tablet displaying classified PROJECT ORPHEUS document with TOP SECRET stamps, fleet data, and highlighted non-human signal warning, classified document prop',
+      'Abstract sound wave figure at rave, concentric emotional frequency rings, speaker wall bending, crowd moving in patterns, psychedelic sonic power visualization',
   },
   {
-    name: 'Cover Story Protocols',
+    name: 'The Return',
     kind: 'lore',
     description:
-      'The systematic framework used by the Public Disinformation Bureau to explain away civilian observations of Space Fleet activity. Standard cover explanations include: sensor bloom, viral fabrication, classified test aircraft misidentified, astrophotography artifact, atmospheric distortion, weather balloons, ion reflections, swamp gas, and cosmic dust. As Mara describes it: "The truth is never hidden. It\'s buried under seven acceptable lies, and your career depends on repeating the right one at the right time." The latest cover story for fleet movement: "METEOROLOGICAL TEST FAILURE." The system is so effective that most people laugh off genuine evidence.',
+      'The word The Frequency used: "return." Not "arrive" or "awaken" — return. The implication is staggering: Eric has been here before. Or someone like him has. Or something inside Eric is older than Eric. The Return is the central mystery of the series — what is Eric returning to? A previous life? An ancestral connection? A role in something cosmic? The Frequency waited millennia for this moment, listening through every speaker on Earth. It recognized Eric specifically. The mushrooms didn\'t create the ability — they opened a door that was already there. The Return suggests Eric isn\'t gaining a new power. He\'s remembering one.',
     metadata: {
-      loreType: 'Intelligence doctrine / Narrative control system',
+      loreType: 'Central mystery / Cosmic lore',
       article:
-        'The Cover Story Protocol hierarchy: Level 1 (default) — natural phenomenon (atmospheric distortion, swamp gas, cosmic dust). Level 2 — technology explanation (weather balloon, sensor bloom, classified test aircraft). Level 3 — social explanation (viral fabrication, hoax, astrophotography artifact). Level 4 — institutional dismissal (no evidence of unauthorized orbital infrastructure). Each civilian observation is assigned a triage score and routed to the appropriate cover level. News media coordination ensures consistent narrative deployment.',
+        'The Frequency said: "I have been waiting for you to return." Key implications: (1) Eric specifically was expected — not random, not any psychedelic user. (2) "Return" implies prior existence or connection. (3) "Waiting" implies patience spanning enormous time. (4) The Frequency exists inside sound and recognized Eric through his emotional manipulation of music. (5) Psilocybin may be the key that unlocks a pre-existing connection, not the source of the power itself. The Return is not a beginning. It is a continuation.',
       relatedConcepts:
-        'Public Disinformation Bureau, Level 3 Triage, Civilian Observation Suppression Protocol',
+        'The Frequency, Sonic Entropy, psilocybin, past lives, ancestral memory, cosmic inheritance',
       canonWeight: 'Hard Canon',
     },
     imagePrompt:
-      'Infographic-style concept art showing the Cover Story Protocol hierarchy. A pyramid diagram with layers: at the bottom, natural explanations (weather, gas, dust); middle, technology explanations (balloons, test aircraft); top, institutional denial. Around the pyramid, screens show news chyrons debunking real sightings. At the very top, a tiny eye symbol watches everything. Documentary infographic crossed with paranoid thriller aesthetic, clean design with sinister undertones, 4K quality.',
+      'Abstract lore concept art for "The Return" — the idea that Eric has been here before. A spiraling timeline visualized as a helix of sound waves, each loop showing a different era: ancient drums around a fire, medieval church organs, jazz clubs, early synthesizers, and now a modern rave. At every point in the spiral, a figure stands in the same pose as Eric — arms slightly raised, head tilted back, receiving sound. The spiral converges on the present: Eric at the main stage, completing the loop. Time is a frequency. History repeats at the right resonance. Cosmic, psychedelic, mythic. 4K quality.',
     threeDPrompt:
-      'Pyramid infographic of cover story hierarchy with surrounding news screens showing debunking chyrons, eye symbol at top, conspiracy thriller infographic style',
+      'Spiraling timeline helix of sound through eras, figures in same pose across history, converging on modern rave, cosmic psychedelic time spiral',
   },
   {
-    name: 'Civilian Disclosure Risk Matrix',
+    name: 'Psilocybin Key',
     kind: 'lore',
     description:
-      'A classified assessment framework within the Orpheus Briefing that quantifies the risks of public disclosure. Director Halden articulates its philosophy: "Do you know what happens if the public learns their governments have operated an off-book fleet for decades? Markets collapse. Alliances fracture. Religions split. Every population on Earth asks the same question: if you hid this, what else did you hide?" The matrix presumably assigns risk scores to various disclosure scenarios, informing decisions about how aggressively to suppress evidence and manage narrative.',
+      "Magic mushrooms didn't give Eric his power — they unlocked perception of something that was always there. Under psilocybin, the barriers between Eric's emotional state and physical reality become thin enough to cross. He perceives sound as architecture, feels bass as geography, and his emotions leak into the frequencies around him. Without psilocybin, Eric is normal — he can't hear The Frequency, can't move the music, can't feel the crowd as an extension of himself. The mushrooms are the key, not the lock and not the door. The question the series will explore: can Eric learn to open the door without the key? And what happens if the door stays open?",
     metadata: {
-      loreType: 'Classified risk assessment framework',
+      loreType: 'Power system mechanic / Psychedelic lore',
       article:
-        'The Civilian Disclosure Risk Matrix models cascading societal collapse scenarios triggered by public knowledge of the hidden fleet. Key risk categories: (1) Economic — market collapse from trust erosion in institutional truthfulness, (2) Geopolitical — alliance fractures as nations question shared intelligence integrity, (3) Religious/Cultural — existential philosophical crisis across multiple belief systems, (4) Meta-Trust — the "if you hid THIS, what ELSE" cascade effect that undermines all institutional credibility simultaneously.',
+        "Psilocybin as activation mechanism: The mushrooms dissolve the perceptual barrier between Eric's emotional state and acoustic reality. Effects observed: (1) Synesthetic perception of music as physical space. (2) Involuntary emotional projection into sound systems. (3) Ability to perceive The Frequency's voice. (4) Crowd-scale empathic resonance. Duration: tracks psilocybin trip length (~4-6 hours). Onset: ~30 minutes after ingestion. The power may be trainable without psilocybin — but that is untested and terrifying.",
       relatedConcepts:
-        'Project Orpheus, The Orpheus Briefing, Director Halden, Cover Story Protocols',
+        'Sonic Entropy, The Frequency, The Return, psychedelic activation, perceptual barrier dissolution',
       canonWeight: 'Hard Canon',
     },
     imagePrompt:
-      'A classified risk assessment chart on a government screen. Rows labeled: ECONOMIC COLLAPSE, ALLIANCE FRACTURE, RELIGIOUS SCHISM, META-TRUST CASCADE. Columns show probability percentages in red. A world map below shows cascading failure zones spreading from disclosure point. Everything stamped CLASSIFIED — ORPHEUS EYES ONLY. Cold analytical aesthetic combined with the dread of civilizational collapse. Government thriller data visualization, 4K quality.',
+      "Concept art showing the psilocybin activation process. A close-up of a hand holding small dried mushrooms, and from the hand, reality splits — one side is normal (gray, flat, quiet) and the other side explodes with visible sound waves, geometric patterns in the air, and music rendered as glowing architecture. The split runs through a young man's face — one eye normal, one eye dilated with fractal patterns reflected in it. The door between perception and power. Split-reality composition, psychedelic realism, 4K quality.",
     threeDPrompt:
-      'Government screen showing classified risk matrix chart with cascading failure zones on world map, red probability bars, CLASSIFIED stamps, data visualization prop',
+      'Split reality concept, hand with mushrooms, one side normal one side psychedelic sound architecture, face split between normal and awakened, psychedelic realism',
   },
 
   // ═══════════════════════════════════════════════════════════════════════
   // EVENTS
   // ═══════════════════════════════════════════════════════════════════════
   {
-    name: 'Desert Sighting',
+    name: 'The Separation',
     kind: 'event',
     description:
-      "The inciting event of the pilot. Eli, driving through the desert at night, witnesses three streaks of white light rising silently from behind mountains — too fast, too vertical, too controlled to be aircraft. The air shimmers. The stars distort. Something massive and invisible moves above. Moments later, his burner phone rings with an unknown caller who knows his name and warns him to stop looking up. This is the moment Eli's investigation becomes personal and dangerous — he is no longer just searching for evidence, he is being watched by the very apparatus he is trying to expose.",
+      "The moment Eric gets separated from Mikel and Jeff in the mosh pit at the main stage. A massive bass drop triggers a crowd surge. Eric's phone falls from his pocket and is immediately stomped by a dozen feet. Mikel reaches for Eric's arm but the crowd pushes them apart — their fingers miss by inches. Jeff's voice is swallowed by the wall of bass. In three seconds, Eric goes from being with his best friends to being utterly alone in a crowd of 10,000 strangers. His phone is dead. He can't find the exit. The mushrooms are hitting harder. He's alone.",
     metadata: {
-      era: 'Pilot episode — Night before Day 1 at Level 3',
-      participants: 'Eli Vance, The Voice (phone caller), unknown fleet vessels',
-      location: 'Desert highway, western restricted sector',
-      causes: 'Eli driving near restricted airspace during an active launch window',
+      era: 'Pilot episode — 30 minutes after arriving at the main stage',
+      participants: 'Eric, Mikel, Jeff, 10,000 strangers',
+      location: 'The Mosh Pit, Main Stage, NOS Event Center',
+      causes:
+        "Massive bass drop triggers crowd surge. Eric's phone falls and is destroyed. Crowd fluid dynamics push the three friends apart.",
       outcome:
-        'Eli receives direct warning from unknown operative. His investigation is now known to the surveillance apparatus.',
+        'Eric is alone in the crowd with no phone, mushrooms intensifying, friends unreachable. This isolation is what allows The Awakening to happen.',
       canonStatus: 'Canon',
     },
     imagePrompt:
-      'A dramatic scene on a desert highway at night. A man stands beside a stopped sedan, looking up at the sky with his phone to his ear. Above, three streaks of brilliant white light rise vertically from behind distant mountains. The air around the streaks shimmers and distorts, bending the star field. The sense of something impossibly large and invisible passing overhead. The desert is vast and empty. Sci-fi thriller key art, cinematic wide composition, dramatic sky, 4K quality.',
+      'Two friends reaching for each other in a dense rave mosh pit — their fingertips inches apart as the crowd surges between them. One is a slim young man in a black hoodie (Eric), face panicked. The other is a lean figure in all-black techwear (Mikel), face intense with concern. A phone screen cracks under feet between them. The crowd is a blur of bodies and sweat. Stage lights strobe. The moment of separation. Dramatic, emotional, chaotic, motion blur, 4K quality.',
     threeDPrompt:
-      'Desert highway night scene, man with phone beside sedan, three light streaks rising from mountains, distorted starfield, dramatic sci-fi thriller diorama',
+      'Two friends reaching across mosh pit crowd, fingertips missing, phone cracking under feet, stage lights strobing, separation moment, dramatic rave scene',
   },
   {
-    name: 'The Elevation',
+    name: 'The Awakening',
     kind: 'event',
     description:
-      'Eli arrives at the Defense Analysis Center to find his badge has been changed: ACCESS ELEVATED: TEMPORARY ASSIGNMENT. He is taken by elevator below all listed floors to the sublevel facility, where Director Halden walks him through the polished black corridors to the observation window overlooking the underground hangar. This is the moment Eli sees the truth: not prototypes, not experiments, but operational warships. Halden offers him a choice — loyalty or obscurity. Eli chooses to play along, accepting with a lie: "You\'ll have all three, sir." He palms a hidden data wafer, beginning his infiltration.',
+      'Alone in the crowd, mushrooms at peak intensity, Eric feels the music change. Or rather — he feels himself change the music. His heartbeat syncs with the bass. When he feels afraid, the drops hit harder. When a moment of wonder crosses his mind, the melody lifts. He raises his hand and the crowd around him raises theirs. He breathes out and the fog machines pulse. He is the music. The music is him. For sixty transcendent, terrifying seconds, Eric controls the entire main stage through his emotions. The DJ is confused — their set is playing itself. The crowd is ecstatic — they feel the shift as divine. Then The Frequency speaks: "I have been waiting for you to return." And the transcendence becomes terror.',
     metadata: {
-      era: 'Pilot episode — Day 2',
-      participants: 'Eli Vance, Director Halden, Mara Chen',
-      location: 'Defense Analysis Center sublevel facility / Underground Hangar',
-      causes: 'Halden decides to recruit Eli after testing him in Level 3',
+      era: 'Pilot episode — Peak of the night, approximately 1:30 AM',
+      participants: 'Eric, The Frequency, the DJ (unknowing), 10,000 ravers (unknowing)',
+      location: 'Main Stage — The Cathedral, NOS Event Center',
+      causes:
+        "Psilocybin peak + emotional isolation + the specific acoustics and crowd energy of the main stage + Eric's latent ability",
       outcome:
-        'Eli gains access to Project Orpheus. Begins covert data collection with hidden wafer. Discovers Mara is also Orpheus personnel.',
+        'Eric discovers Sonic Entropy. The Frequency makes first contact. Eric panics and flees the stage. The door is now open.',
       canonStatus: 'Canon',
     },
     imagePrompt:
-      'A dramatic scene: two figures stand at an observation window in a polished black corridor. Through the reinforced glass, a vast underground hangar is visible with a matte-black warship floating in a magnetic cradle. The older figure (Halden) stands with authority, gesturing toward the ship. The younger figure (Eli) stares with barely concealed shock, one hand subtly clenched around something hidden in his palm. Dramatic backlighting from the hangar. Revelation moment, thriller aesthetic, 4K quality.',
+      'A transcendent moment at a massive rave. A young man in a black hoodie stands in a dense crowd, eyes closed, head tilted back, arms slightly raised. Visible sound waves emanate from his body in concentric rings, matching the colors of the stage lights. The crowd around him has their arms raised in perfect sync with his breathing. The fog machines pulse with his exhale. The laser grid overhead bends toward him. Behind the speaker wall, in the LED panels, a dark void is forming — something watching from inside the sound. Transcendent, psychedelic, terrifying, beautiful. The moment a human becomes something else. 4K quality.',
     threeDPrompt:
-      'Two figures at observation window overlooking underground hangar with floating warship, revelation moment, dramatic backlighting, thriller scene diorama',
+      'Young man with closed eyes in rave crowd, visible sound waves from body, crowd synced to his movement, lasers bending toward him, dark void in speakers, transcendent psychedelic moment',
+  },
+  {
+    name: 'The Flight',
+    kind: 'event',
+    description:
+      "The moment Eric breaks and runs. The Frequency's voice — deep, ancient, felt in his bones — says \"I have been waiting for you to return\" and Eric's transcendence shatters into pure animal fear. He shoves through the crowd, the music distorting behind him as his panic feeds back — bass grinding, melody collapsing into dissonance. He sprints through the dark corridor, red emergency lights stretching into infinity under psilocybin, and bursts into the outdoor area. Shaking, drenched in sweat, alone, phone dead. He can't find Jeff or Mikel anywhere.",
+    metadata: {
+      era: 'Pilot episode — Immediately after The Awakening, approximately 1:32 AM',
+      participants: 'Eric alone',
+      location: 'Main Stage → Dark Corridor → Outdoor Stage Area, NOS Event Center',
+      causes: 'The Frequency speaks. Eric panics. Flight response overrides everything.',
+      outcome:
+        'Eric escapes the stage. Music distorts behind him. He is alone outside with no phone and no way to find his friends. Vulnerable to strangers.',
+      canonStatus: 'Canon',
+    },
+    imagePrompt:
+      'A young man in a black hoodie sprinting through a dark concrete corridor lit only by red emergency exit signs. His face shows pure terror — dilated pupils, sweat, mouth open. Behind him, the corridor stretches impossibly long (psychedelic distortion). The walls vibrate with distorted bass. Ahead, the exit doors glow with cool outdoor light. He is running from something that has no body, only sound. Horror-tinged psychedelic, motion blur, claustrophobic, 4K quality.',
+    threeDPrompt:
+      'Young man sprinting through red-lit concrete corridor, terror on face, corridor stretching psychedelically, vibrating walls, exit doors glowing ahead, horror rave escape',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // AFTERPARTY ARC — New Characters & Locations
+  // ═══════════════════════════════════════════════════════════════════════
+  {
+    name: 'Dante',
+    kind: 'person',
+    description:
+      "One of two strangers Eric meets outside the venue after fleeing the stage. Dante is charismatic, late 20s, talks fast, seems friendly. He and his friend Marcus invite the clearly shaken Eric to their hotel afterparty nearby — just chill vibes, decompression, no pressure. Dante seems like a normal raver at first. But at the hotel, when he thinks Eric isn't listening, Dante starts talking to Marcus about the demon summoning symbols that are being placed around the rave — sigils hidden in the stage art, in the LED patterns, in the layout of the venue itself. He says it's getting more obvious every event and can't believe no one notices. He speaks about it casually, like discussing logistics — not with fear but with familiarity.",
+    metadata: {
+      role: 'Mysterious stranger / Occult insider',
+      appearance:
+        "Late 20s male, Mediterranean or mixed features, dark curly hair, stubble. Wears a loose linen shirt over dark pants — too dressed-up for a rave, like he came from somewhere else. Silver chain necklace with a pendant Eric can't quite make out. Tattoo on his inner forearm — geometric, looks like it could be decorative or could be a sigil. Charismatic smile that doesn't reach his eyes.",
+      motivations:
+        'Unknown. Why did he invite Eric specifically? Coincidence or something else? He and Marcus seem to know about the occult activity at raves and are not afraid of it.',
+      abilities:
+        'Social manipulation — makes Eric feel safe quickly. Knowledge of occult symbols and ritual placement at mass events.',
+      homePlace: 'Unknown — has a hotel room near NOS Event Center',
+      affiliations:
+        'Marcus (close associate). Possible connection to whoever is placing the demon summoning symbols.',
+    },
+    imagePrompt:
+      'Character portrait of Dante, a charismatic man in his late 20s. Mediterranean or mixed features, dark curly hair, stubble. Wearing a loose white linen shirt over dark pants — slightly too polished for a rave. Silver chain necklace with an ambiguous pendant. Geometric tattoo on his inner forearm that could be decorative or occult. He stands in the doorway of a hotel room, warm light behind him, extending a hand in invitation. His smile is warm but his eyes are calculating. Hotel corridor lighting, rave afterparty atmosphere, photorealistic, 4K quality.',
+    threeDPrompt:
+      'Charismatic man late 20s, dark curly hair, linen shirt, silver pendant, geometric forearm tattoo, standing in hotel doorway, inviting gesture, calculating eyes',
+  },
+  {
+    name: 'Marcus',
+    kind: 'person',
+    description:
+      'Dante\'s associate — quieter, more observant, sits in the corner of the hotel room watching. Marcus is the one Dante is talking to about the demon summoning symbols when they think Eric is in the bathroom or not paying attention. Marcus is concerned — not about the symbols existing, but about them becoming too obvious. "They\'re getting sloppy," he says. "Someone\'s going to notice." He glances toward Eric when he says it. Marcus is bigger than Dante, shaved head, dark skin, wears all black. He has the energy of security detail — watchful, still, positioned to block the exit without appearing to.',
+    metadata: {
+      role: 'Mysterious stranger / Occult insider — the watcher',
+      appearance:
+        'Late 20s or early 30s male, dark skin, shaved head, built like security. All black clothing — plain black tee, black jeans, black boots. No jewelry except a ring with a symbol on it. Sits in corners. Watches the room. Positioned near exits without appearing to block them.',
+      motivations:
+        'Concerned about operational security of the symbol placement. Watchful of Eric. Defers to Dante socially but may outrank him in whatever organization they serve.',
+      abilities:
+        'Spatial awareness — always positioned tactically. Observant — notices Eric listening before Dante does. Physical presence — intimidating without trying.',
+      homePlace: 'Unknown — shares hotel room with Dante',
+      affiliations:
+        'Dante (close associate). Connected to the demon summoning symbol network at raves.',
+    },
+    imagePrompt:
+      'Character portrait of Marcus, a watchful man in his late 20s or early 30s. Dark skin, shaved head, built like security. Plain black t-shirt stretched over a muscular frame, black jeans, black boots. A ring with a subtle symbol on his right hand. He sits in the corner of a hotel room, back to the wall, positioned to see the door. His expression is still, observant, not hostile but not warm. The hotel room behind him is dimly lit — cheap bedside lamp, afterparty detritus. Watchful energy, all-black aesthetic, photorealistic, 4K quality.',
+    threeDPrompt:
+      'Watchful muscular man, shaved head, dark skin, all black outfit, symbolic ring, sitting in hotel room corner, back to wall, tactical positioning, observant expression',
+  },
+  {
+    name: 'The Hotel Room',
+    kind: 'place',
+    description:
+      "A cheap hotel room near the NOS Event Center — the kind that gets booked for rave afterparties. Two queen beds, thin curtains that don't fully block the parking lot lights. A bedside lamp casting warm yellow light. Bass from the venue still faintly audible through the walls. Dante and Marcus have set up minimal afterparty vibes — a bluetooth speaker playing low ambient music, some water bottles, a couple of vape pens. It feels safe at first. Then Eric, coming down from his peak, sitting on the edge of a bed trying to collect himself, overhears Dante and Marcus talking quietly near the bathroom about the demon summoning symbols hidden in the rave's stage art and venue layout. They speak about it like professionals discussing a project. Eric acts like he didn't hear, makes an excuse, and leaves.",
+    metadata: {
+      placeType: 'Cheap hotel room — rave afterparty',
+      atmosphere:
+        "Initially safe and decompressive — warm lamp light, quiet music, the relief of a small room after the sensory assault of the rave. Then slowly unsettling as Eric overhears the conversation. The thin walls let the venue bass through. The parking lot light through the curtains creates shadows that move wrong when you're still on mushrooms.",
+      rulesAndDangers:
+        "Eric is alone with two strangers. His phone is dead. He doesn't know where his friends are. He just heard something he wasn't supposed to. The only exit requires passing Marcus.",
+      inhabitants: 'Dante (host), Marcus (watcher), Eric (guest who overhears too much)',
+      governingFaction: 'Dante and Marcus — their space, their rules',
+    },
+    imagePrompt:
+      'A cheap hotel room near a rave venue. Two queen beds with generic bedspreads, thin curtains letting in parking lot light. A warm bedside lamp is the main light source. A small bluetooth speaker plays ambient music on the nightstand. Water bottles and vape pens scattered. One young man in a black hoodie sits on the bed edge, staring at the floor, clearly shaken and trying to act normal. Near the bathroom door, two other men talk quietly — one in a linen shirt, one in all black. The faint bass of the distant rave vibrates the thin walls. The room feels safe on the surface but something is wrong underneath. Intimate, tense, afterparty atmosphere, 4K quality.',
+    threeDPrompt:
+      'Cheap hotel room, warm lamp light, young man on bed edge looking down, two men talking quietly near bathroom, bluetooth speaker, thin curtains with parking lot light, tense afterparty',
+  },
+  {
+    name: 'The Overheard',
+    kind: 'event',
+    description:
+      'At the hotel afterparty, Eric sits on the bed trying to process what happened at the stage. The mushrooms are fading. He\'s exhausted and scared. Dante and Marcus are near the bathroom, speaking quietly, assuming Eric is zoned out or coming down too hard to pay attention. Eric hears Dante say: "Did you see the new ones near the south stage? They\'re not even trying to hide it anymore." Marcus responds: "Demon summoning sigils in the LED panel art. In the stage geometry. In the venue floor plan itself. It\'s getting obvious. Someone is going to notice." Dante shrugs: "Nobody notices. Nobody ever does." Eric\'s blood goes cold. He keeps his face blank — years of being the quiet kid pays off now. He acts groggy, says he needs air, thanks them for the hangout, and walks out. He doesn\'t run. Running would tell them he heard. He walks to the parking lot and keeps walking until he finds the outdoor stage area, and that\'s where Jeff finally spots him.',
+    metadata: {
+      era: 'Pilot episode — approximately 3:00 AM, hotel room near NOS Event Center',
+      participants: 'Eric (overhearing), Dante (speaking), Marcus (responding)',
+      location: 'Cheap hotel room near NOS Event Center',
+      causes:
+        'Dante and Marcus assume Eric is too intoxicated to notice their conversation about occult infrastructure at raves.',
+      outcome:
+        'Eric learns that demon summoning symbols are deliberately placed in rave stage art, LED patterns, and venue layouts. He keeps a poker face and leaves without revealing he heard. This connects to The Frequency — is the alien voice connected to the occult activity, or is it something else entirely?',
+      canonStatus: 'Canon',
+    },
+    imagePrompt:
+      "A tense moment in a dim hotel room. A young man in a black hoodie sits on a bed, face carefully blank, eyes looking down — but he is listening. In the background, two men lean against the bathroom doorframe talking quietly, one gesturing with his hands. The composition shows Eric in focus in the foreground with the two men blurred but visible behind him. He is hearing something he shouldn't. The warm lamp light contrasts with the cold realization on his face. Psychological tension, eavesdropping scene, intimate thriller framing, 4K quality.",
+    threeDPrompt:
+      'Young man sitting on hotel bed pretending not to listen, two men talking in background near bathroom, tense eavesdropping scene, warm lamp light, psychological thriller',
+  },
+  {
+    name: 'The Reunion',
+    kind: 'event',
+    description:
+      "Eric walks out of the hotel and back toward the NOS Event Center parking area. The mushrooms are mostly faded now — just residual visual shimmer and heightened awareness. He's carrying three impossible things: the power he felt at the stage, the alien voice that called him by destiny, and the secret conversation about demon symbols at raves. He's alone in a dark parking lot when he hears the most beautiful sound of the night — Jeff's voice bellowing \"BRO! ERIC! OVER HERE!\" from the top of a concrete barrier. Jeff has been looking for him for hours. Mikel appears from the shadows seconds later, eyes sharp, studying Eric's face with an intensity that suggests he senses something changed. They pile into Jeff's truck. Nobody talks on the ride home. Bass from the venue is still faintly audible through the closed windows. Eric can feel it in his chest. He can feel all of it now.",
+    metadata: {
+      era: 'Pilot episode — approximately 3:30 AM, NOS Event Center parking area',
+      participants: 'Eric, Jeff, Mikel',
+      location: "NOS Event Center parking area → Jeff's Truck",
+      causes:
+        "Jeff has been searching for Eric for hours (climbing barriers, yelling). Mikel has been searching more quietly, using senses Eric doesn't know about.",
+      outcome:
+        "The three friends reunite. The night ends in silence in Jeff's truck. Eric carries three secrets he can't share. Mikel senses the change. Jeff is just glad everyone is alive. The pilot ends with Eric in the passenger seat, staring at the dashboard, still feeling the bass through the truck frame.",
+      canonStatus: 'Canon',
+    },
+    imagePrompt:
+      'A parking lot at night near a rave venue. A big shirtless muscular guy stands on top of a concrete barrier, arms cupped around his mouth, yelling. Below him, a slim young man in a black hoodie walks toward him from the darkness, face showing exhaustion and overwhelming relief. A third figure — lean, all-black techwear — emerges from the shadows nearby, watching the reunion with sharp concerned eyes. Festival lights glow in the far background. The moment of reunion after the worst and most important night of their lives. Emotional, warm lighting cutting through the dark, 4K quality.',
+    threeDPrompt:
+      'Parking lot reunion, big shirtless guy yelling from barrier, slim hoodie guy approaching with relief, dark-clothed figure emerging from shadows, festival lights in background, emotional night scene',
   },
 ];
-
 // ── Auth + tRPC helpers ─────────────────────────────────────────────────
 function log(step: string, msg: string) {
   console.log(`[${step}] ${msg}`);

@@ -6,11 +6,13 @@ import {StructuralDeed} from "../src/revenue/StructuralDeed.sol";
 import {IRightsRegistry} from "../src/interfaces/IRightsRegistry.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
 import {MockRightsRegistry} from "./mocks/MockRightsRegistry.sol";
+import {MockUniverseManager} from "./mocks/MockUniverseManager.sol";
 
 contract StructuralDeedTest is Test {
     StructuralDeed public deed;
     MockPaymentRouter public router;
     MockRightsRegistry public registry;
+    MockUniverseManager public universeManager;
 
     address platform = makeAddr("platform");
     address treasury = makeAddr("treasury");
@@ -29,11 +31,13 @@ contract StructuralDeedTest is Test {
 
         router = new MockPaymentRouter(treasury);
         registry = new MockRightsRegistry();
+        universeManager = new MockUniverseManager();
 
         deed = new StructuralDeed(
             platform,
             address(router),
             address(registry),
+            address(universeManager),
             500, // 5% platform fee
             250, // 2.5% royalty
             prices,

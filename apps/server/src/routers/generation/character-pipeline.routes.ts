@@ -205,9 +205,10 @@ async function executePipeline(opts: {
 
     const { taskId: meshyTaskId } = await meshyService.imageTo3D({
       imageUrl,
-      enablePbr: true,
-      aiModel: 'meshy-4',
-      topology: 'quad',
+      enablePbr: false,
+      aiModel: 'meshy-6',
+      topology: 'triangle',
+      targetPolycount: 30000,
     });
 
     await updatePipeline(pipelineId, {

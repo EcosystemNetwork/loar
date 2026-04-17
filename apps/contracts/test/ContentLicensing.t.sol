@@ -6,11 +6,13 @@ import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import {ContentLicensing} from "../src/revenue/ContentLicensing.sol";
 import {SplitRouter} from "../src/SplitRouter.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
+import {MockRightsRegistry} from "./mocks/MockRightsRegistry.sol";
 
 contract ContentLicensingTest is Test {
     ContentLicensing public licensing;
     SplitRouter public splitRouter;
     MockPaymentRouter public paymentRouter;
+    MockRightsRegistry public rightsRegistry;
 
     address deployer = makeAddr("deployer");
     address platform = makeAddr("platform");
@@ -54,6 +56,9 @@ contract ContentLicensingTest is Test {
         vm.prank(creator);
         splitRouter.setSplits(SPLIT_ENTITY_HASH, splits);
 
+        // Deploy mock rights registry (defaults to monetizable=true)
+        rightsRegistry = new MockRightsRegistry();
+
         // Deploy ContentLicensing via UUPS proxy
         vm.startPrank(deployer);
         ContentLicensing impl = new ContentLicensing();
@@ -63,7 +68,7 @@ contract ContentLicensingTest is Test {
                     address(impl),
                     abi.encodeCall(
                         ContentLicensing.initialize,
-                        (platform, address(splitRouter), address(paymentRouter), PLATFORM_FEE_BPS)
+                        (platform, address(splitRouter), address(paymentRouter), address(rightsRegistry), PLATFORM_FEE_BPS)
                     )
                 )
             )
@@ -101,7 +106,7 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (address(0), address(splitRouter), address(paymentRouter), PLATFORM_FEE_BPS))
+            abi.encodeCall(ContentLicensing.initialize, (address(0), address(splitRouter), address(paymentRouter), address(rightsRegistry), PLATFORM_FEE_BPS))
         );
     }
 
@@ -110,7 +115,7 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(0), address(paymentRouter), PLATFORM_FEE_BPS))
+            abi.encodeCall(ContentLicensing.initialize, (platform, address(0), address(paymentRouter), address(rightsRegistry), PLATFORM_FEE_BPS))
         );
     }
 
@@ -119,7 +124,7 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(0), PLATFORM_FEE_BPS))
+            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(0), address(rightsRegistry), PLATFORM_FEE_BPS))
         );
     }
 
@@ -128,7 +133,7 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.FeeTooHigh.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(paymentRouter), 5001))
+            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(paymentRouter), address(rightsRegistry), 5001))
         );
     }
 
@@ -137,7 +142,7 @@ contract ContentLicensingTest is Test {
         // 5000 bps (50%) is the maximum allowed
         ContentLicensing l = ContentLicensing(address(new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(paymentRouter), 5000))
+            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(paymentRouter), address(rightsRegistry), 5000))
         )));
         assertEq(l.platformFeeBps(), 5000);
     }

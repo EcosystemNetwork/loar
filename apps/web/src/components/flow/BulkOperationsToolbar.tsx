@@ -22,6 +22,7 @@ import {
   Plus,
   MousePointerSquareDashed,
   CheckCheck,
+  Film,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -51,6 +52,7 @@ interface BulkOperationsToolbarProps {
   onAssignToArc: (arcId: string) => void;
   onCreateArc: (name: string) => void;
   onShowAudioToolbar: () => void;
+  onBuildEpisode: () => void;
 }
 
 export function BulkOperationsToolbar({
@@ -69,6 +71,7 @@ export function BulkOperationsToolbar({
   onAssignToArc,
   onCreateArc,
   onShowAudioToolbar,
+  onBuildEpisode,
 }: BulkOperationsToolbarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [newArcName, setNewArcName] = useState('');
@@ -269,6 +272,19 @@ export function BulkOperationsToolbar({
           Lip Sync
         </Button>
       </div>
+
+      {/* Episode builder */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+        onClick={onBuildEpisode}
+        disabled={!hasVideoInSelection}
+        title="Build episode from selected clips"
+      >
+        <Film className="h-4 w-4" />
+        Episode
+      </Button>
 
       {/* Delete */}
       <Button

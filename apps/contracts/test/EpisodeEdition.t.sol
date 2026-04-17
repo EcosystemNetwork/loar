@@ -166,7 +166,7 @@ contract EpisodeEditionTest is Test {
 
     function test_createEdition_revert_frozenContent() public {
         vm.prank(platform);
-        registry.freeze(contentHash, "DMCA");
+        registry.emergencyFreeze(contentHash, "DMCA");
 
         vm.prank(creator);
         vm.expectRevert(EpisodeEditionCollection.ContentNotMonetizable.selector);

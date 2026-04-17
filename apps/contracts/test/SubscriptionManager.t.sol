@@ -5,10 +5,12 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import {SubscriptionManager} from "../src/revenue/SubscriptionManager.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
+import {MockUniverseManager} from "./mocks/MockUniverseManager.sol";
 
 contract SubscriptionManagerTest is Test {
     SubscriptionManager public sub;
     MockPaymentRouter public router;
+    MockUniverseManager public universeManager;
 
     address platform = makeAddr("platform");
     address treasury = makeAddr("treasury");
@@ -29,6 +31,9 @@ contract SubscriptionManagerTest is Test {
         router = new MockPaymentRouter(treasury);
         vm.deal(address(router), 0);
 
+        universeManager = new MockUniverseManager();
+        universeManager.setOwner(UNIVERSE_ID, creator);
+
         SubscriptionManager impl = new SubscriptionManager();
         sub = SubscriptionManager(
             address(
@@ -39,9 +44,11 @@ contract SubscriptionManagerTest is Test {
             )
         );
 
+        sub.setUniverseManager(address(universeManager));
+
         // Register universe and configure BASIC tier
         vm.prank(platform);
-        sub.registerUniverse(UNIVERSE_ID, creator);
+        sub.registerUniverse(UNIVERSE_ID);
 
         vm.prank(creator);
         sub.configureTier(
@@ -610,23 +617,26 @@ contract SubscriptionManagerTest is Test {
     }
 
     function test_registerUniverse_revert_notPlatform() public {
+        universeManager.setOwner(2, creator);
         vm.prank(alice);
         vm.expectRevert(SubscriptionManager.NotPlatform.selector);
-        sub.registerUniverse(2, creator);
+        sub.registerUniverse(2);
     }
 
     function test_registerUniverse_revert_zeroCreator() public {
+        // universeManager has no owner set for id 2, so ownerOf reverts
         vm.prank(platform);
-        vm.expectRevert(SubscriptionManager.ZeroAddress.selector);
-        sub.registerUniverse(2, address(0));
+        vm.expectRevert("ERC721: invalid token ID");
+        sub.registerUniverse(2);
     }
 
     function test_registerUniverse_emitsEvent() public {
+        universeManager.setOwner(42, bob);
         vm.expectEmit(true, false, false, true);
         emit SubscriptionManager.UniverseRegistered(42, bob);
 
         vm.prank(platform);
-        sub.registerUniverse(42, bob);
+        sub.registerUniverse(42);
     }
 
     // -- owner-only functions --
@@ -775,8 +785,9 @@ contract SubscriptionManagerTest is Test {
 
     function test_subscribe_multipleUniverses() public {
         // Register second universe
+        universeManager.setOwner(UNIVERSE_ID_2, bob);
         vm.prank(platform);
-        sub.registerUniverse(UNIVERSE_ID_2, bob);
+        sub.registerUniverse(UNIVERSE_ID_2);
 
         vm.prank(bob);
         sub.configureTier(

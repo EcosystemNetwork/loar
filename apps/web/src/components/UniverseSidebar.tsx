@@ -162,10 +162,11 @@ export function UniverseSidebar({
         className={`
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0
-          fixed md:relative z-40 md:z-auto
+          fixed top-[57px] left-0 bottom-0 md:top-0
+          md:relative z-40 md:z-auto
           w-72 ${pinned ? 'md:w-80' : 'md:w-16 md:hover:w-80'}
-          group border-r bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 backdrop-blur-sm flex flex-col shadow-xl border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out overflow-hidden
-          h-full
+          shrink-0 group border-r bg-white dark:bg-slate-900 flex flex-col shadow-xl border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out overflow-hidden
+          md:h-full
         `}
       >
         {/* Mobile close button */}

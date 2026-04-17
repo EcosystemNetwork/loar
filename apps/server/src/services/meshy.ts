@@ -251,7 +251,8 @@ class MeshyService {
   }
 
   async getTextToTextureTask(taskId: string): Promise<MeshyTextureTask> {
-    return this.get<MeshyTextureTask>(`/text-to-texture/${taskId}`);
+    const task = await this.get<MeshyTextureTask>(`/text-to-texture/${taskId}`);
+    return this.normalizeTask(task) as MeshyTextureTask;
   }
 
   /**

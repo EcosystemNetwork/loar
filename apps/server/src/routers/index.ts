@@ -96,6 +96,7 @@ import { cutdownRouter } from './generation/cutdown.routes';
 import { sceneAudioRouter } from './generation/sceneAudio.routes';
 import { universeStyleRouter } from './universeStyle/universeStyle.routes';
 import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.routes';
+import { episodesRouter } from './episodes/episodes.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -281,6 +282,9 @@ export const appRouter = router({
 
   // ── Revenue Dashboard (creator analytics) ──────────────────────────
   revenueDashboard: revenueDashboardRouter,
+
+  // ── Episodes (clip arrangement + export) ──────────────────────────
+  episodes: episodesRouter,
 });
 
 export type AppRouter = typeof appRouter;
