@@ -13,9 +13,10 @@ import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, Music } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
+import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
@@ -104,6 +105,7 @@ function EntityPage() {
   const { address } = useAccount();
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
+  const [showMusicPanel, setShowMusicPanel] = useState(false);
 
   const {
     data: entity,
@@ -285,18 +287,42 @@ function EntityPage() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center justify-between">
                   Media &amp; Assets
-                  {isOwner && (
-                    <Link to="/upload" search={{}}>
-                      <button className="text-xs font-normal text-primary hover:underline">
-                        + Upload &amp; attach
+                  <div className="flex items-center gap-2">
+                    {isOwner && (
+                      <button
+                        className="text-xs font-normal text-primary hover:underline flex items-center gap-1"
+                        onClick={() => setShowMusicPanel((v) => !v)}
+                      >
+                        <Music className="h-3 w-3" />
+                        {showMusicPanel ? 'Hide Music Gen' : 'Generate Music'}
                       </button>
-                    </Link>
-                  )}
+                    )}
+                    {isOwner && (
+                      <Link to="/upload" search={{}}>
+                        <button className="text-xs font-normal text-primary hover:underline">
+                          + Upload &amp; attach
+                        </button>
+                      </Link>
+                    )}
+                  </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {showMusicPanel && isOwner && (
+                  <MusicGenerationPanel
+                    entityId={id}
+                    universeId={entity.universeAddress || undefined}
+                    entityName={entity.name}
+                    entityKind={entity.kind}
+                    onGenerated={() => {
+                      queryClient.invalidateQueries({
+                        queryKey: ['media-attachments', 'entity', id],
+                      });
+                    }}
+                  />
+                )}
                 <MediaGallery targetType="entity" targetId={id} isOwner={isOwner} />
-                {mediaAttachments.length === 0 && (
+                {mediaAttachments.length === 0 && !showMusicPanel && (
                   <p className="text-sm text-muted-foreground">
                     No media attached yet.{' '}
                     <Link to="/upload" search={{}} className="text-primary hover:underline">

@@ -334,6 +334,126 @@ app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 
+// ── SSE: Real-time collaboration stream ──────────────────────────────
+app.get('/api/collaboration/stream/:entityId', async (c) => {
+  const entityId = c.req.param('entityId');
+  if (!entityId) return c.json({ error: 'entityId required' }, 400);
+
+  // Auth check — extract token from query param or cookie
+  let user: any;
+  try {
+    user = await verifyAuth(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  } catch {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const { db: fireDb } = await import('./lib/firebase');
+  if (!fireDb) return c.json({ error: 'Firebase not configured' }, 503);
+
+  // Set up SSE
+  c.header('Content-Type', 'text/event-stream');
+  c.header('Cache-Control', 'no-cache');
+  c.header('Connection', 'keep-alive');
+
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      const send = (event: string, data: any) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      };
+
+      // Watch entity document for changes
+      const entityUnsub = fireDb
+        .collection('entities')
+        .doc(entityId)
+        .onSnapshot(
+          (snap) => {
+            if (snap.exists) {
+              send('entity_update', { id: snap.id, ...snap.data() });
+            }
+          },
+          (err) => {
+            console.error('Entity snapshot error:', err);
+          }
+        );
+
+      // Watch edit sessions for this entity
+      const sessionsUnsub = fireDb
+        .collection('editSessions')
+        .where('entityId', '==', entityId)
+        .where('status', '==', 'active')
+        .onSnapshot(
+          (snap) => {
+            const editors = snap.docs.map((doc) => ({
+              sessionId: doc.data().sessionId,
+              userId: doc.data().userId,
+              displayName: doc.data().displayName,
+              activeField: doc.data().activeField,
+              walletAddress: doc.data().walletAddress,
+            }));
+            send('presence', { editors });
+          },
+          (err) => {
+            console.error('Sessions snapshot error:', err);
+          }
+        );
+
+      // Watch field locks
+      const locksUnsub = fireDb
+        .collection('fieldLocks')
+        .doc(entityId)
+        .onSnapshot(
+          (snap) => {
+            if (snap.exists) {
+              const locks: Record<string, any> = {};
+              const data = snap.data() || {};
+              for (const [field, lock] of Object.entries(data)) {
+                if (field === '_entityId') continue;
+                locks[field] = {
+                  userId: (lock as any).userId,
+                  displayName: (lock as any).displayName,
+                };
+              }
+              send('locks', { lockedFields: locks });
+            }
+          },
+          (err) => {
+            console.error('Locks snapshot error:', err);
+          }
+        );
+
+      // Send initial heartbeat
+      send('connected', { entityId, userId: user.uid });
+
+      // Heartbeat every 30s to keep connection alive
+      const heartbeatInterval = setInterval(() => {
+        try {
+          send('heartbeat', { ts: Date.now() });
+        } catch {
+          clearInterval(heartbeatInterval);
+        }
+      }, 30_000);
+
+      // Cleanup on disconnect
+      c.req.raw.signal.addEventListener('abort', () => {
+        entityUnsub();
+        sessionsUnsub();
+        locksUnsub();
+        clearInterval(heartbeatInterval);
+      });
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
+});
+
 app.use(
   '/trpc/*',
   trpcServer({

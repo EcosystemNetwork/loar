@@ -174,8 +174,8 @@ function PortfolioPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {/* Header */}
-            <div className="grid grid-cols-7 gap-2 text-[10px] text-muted-foreground font-semibold uppercase px-4 pb-1">
+            {/* Header — hidden on mobile, visible on md+ */}
+            <div className="hidden md:grid grid-cols-7 gap-2 text-[10px] text-muted-foreground font-semibold uppercase px-4 pb-1">
               <span className="col-span-2">Token</span>
               <span className="text-right">Holding</span>
               <span className="text-right">Avg Buy</span>

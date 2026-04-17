@@ -182,8 +182,8 @@ function TokenDetailPage() {
     if (token && totalSwaps < 5 && holderStats.total < 3) {
       warnings.push('Very early token — low liquidity and few holders');
     }
-    // No vesting detected (creator got tokens immediately)
-    if (token) {
+    // Only warn about vesting if creator still holds a large share
+    if (holderStats.topHolderPct > 10 && holderStats.total < 20) {
       warnings.push('Creator allocation is not vested — tokens were distributed immediately');
     }
     return warnings;
@@ -224,14 +224,14 @@ function TokenDetailPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
           <Link to="/tokens">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Button>
           </Link>
-          <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             {token.imageURL && (
               <img
                 src={token.imageURL}
@@ -281,7 +281,7 @@ function TokenDetailPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Watchlist */}
             {userAddress && (
               <Button

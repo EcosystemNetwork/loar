@@ -59,6 +59,7 @@ import { mediaRouter } from './media/media.routes';
 import { voiceRouter } from './generation/voice.routes';
 import { threedRouter } from './generation/threed.routes';
 import { audioRouter } from './generation/audio.routes';
+import { collaborationRouter } from './collaboration/collaboration.routes';
 import { studioRouter } from './studio/studio.routes';
 import { governanceRouter } from './governance/governance.routes';
 import { revenueRouter } from './revenue/revenue.routes';
@@ -160,6 +161,7 @@ export const appRouter = router({
   comments: commentsRouter,
   entities: entitiesRouter,
   media: mediaRouter,
+  collaboration: collaborationRouter,
 
   // ── Generation domain ───────────────────────────────────────────────
   generation: generationRouter,

@@ -51,6 +51,10 @@ import { useContractSave } from '@/hooks/useContractSave';
 import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { PrivateSection } from '@/components/private/PrivateSection';
+import { SceneControlsPanel } from '@/components/flow/SceneControlsPanel';
+import { CastManager } from '@/components/flow/CastManager';
+import { MotionBrush } from '@/components/flow/MotionBrush';
+import type { SceneControls } from '@/components/flow/TimelineNodes';
 
 // Register custom node types
 const nodeTypes = {
@@ -147,6 +151,12 @@ function UniverseTimelineEditor() {
 
   // Creator's Room state
   const [showCreatorsRoom, setShowCreatorsRoom] = useState(false);
+
+  // Scene Controls state (Node Editor Expansion v1)
+  const [showCastManager, setShowCastManager] = useState(false);
+  const [showMotionBrush, setShowMotionBrush] = useState(false);
+  const [selectedNodeControls, setSelectedNodeControls] = useState<SceneControls>({});
+  const [isSavingControls, setIsSavingControls] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -291,6 +301,78 @@ function UniverseTimelineEditor() {
     queryKey: ['characters', id],
     queryFn: () => trpcClient.wiki.characters.query({ universeId: id }),
   });
+
+  // Fetch cast members for the universe (Feature 3 - Character Consistency)
+  const { data: castMembersData } = useQuery({
+    queryKey: ['cast', id],
+    queryFn: () => trpcClient.cast.list.query({ universeId: id }),
+  });
+
+  // Fetch scene controls for all nodes in this universe
+  const { data: nodeControlsMap } = useQuery({
+    queryKey: ['nodeSceneControls', id],
+    queryFn: () => trpcClient.sceneControls.getUniverseNodeControls.query({ universeId: id }),
+  });
+
+  // Save scene controls for the selected node
+  const handleSaveSceneControls = useCallback(async () => {
+    if (!selectedNode?.data.eventId) return;
+    setIsSavingControls(true);
+    try {
+      await trpcClient.sceneControls.saveNodeControls.mutate({
+        universeId: id,
+        nodeId: selectedNode.data.eventId,
+        controls: selectedNodeControls,
+      });
+      // Update the node's scene controls in the flow state
+      setNodes((nds: any) =>
+        nds.map((n: any) =>
+          n.id === selectedNode.id
+            ? { ...n, data: { ...n.data, sceneControls: selectedNodeControls } }
+            : n
+        )
+      );
+    } catch (err) {
+      console.error('Failed to save scene controls:', err);
+    } finally {
+      setIsSavingControls(false);
+    }
+  }, [selectedNode, selectedNodeControls, id, setNodes]);
+
+  // Load scene controls when a node is selected
+  useEffect(() => {
+    if (selectedNode?.data.eventId && nodeControlsMap) {
+      const controls = nodeControlsMap[selectedNode.data.eventId];
+      setSelectedNodeControls(controls || {});
+    }
+  }, [selectedNode?.data.eventId, nodeControlsMap]);
+
+  // Handle motion brush save
+  const handleMotionBrushSave = useCallback(
+    async (maskDataUrl: string) => {
+      try {
+        // Convert data URL to base64 and upload
+        const base64 = maskDataUrl.split(',')[1];
+        if (!base64) return;
+
+        const manifest = await trpcClient.storage.uploadDirect.mutate({
+          data: base64,
+          filename: `motion-mask-${selectedNode?.data.eventId}-${Date.now()}.png`,
+          mimeType: 'image/png',
+        });
+
+        setSelectedNodeControls((prev) => ({
+          ...prev,
+          motionMaskHash: manifest.contentHash,
+        }));
+        setShowMotionBrush(false);
+      } catch (err) {
+        console.error('Failed to upload motion mask:', err);
+        alert('Failed to save motion mask. Please try again.');
+      }
+    },
+    [selectedNode]
+  );
 
   // Analyze character image with Gemini
   const analyzeCharacterMutation = useMutation({
@@ -1460,6 +1542,71 @@ function UniverseTimelineEditor() {
           finalUniverse={finalUniverse}
           nodes={nodes}
           onRefresh={handleRefreshTimeline}
+        />
+
+        {/* Scene Controls Panel — appears when a scene node is selected */}
+        {selectedNode &&
+          selectedNode.data.nodeType === 'scene' &&
+          !showGovernanceSidebar &&
+          !showCreatorsRoom &&
+          !showCastManager && (
+            <div className="w-[320px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+                <span className="text-sm text-zinc-400">
+                  Node {selectedNode.data.displayName || selectedNode.data.eventId}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedNode(null)}
+                  className="text-zinc-500 hover:text-white h-6 w-6 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3">
+                {/* Motion Brush overlay */}
+                {showMotionBrush && selectedNode.data.videoUrl ? (
+                  <MotionBrush
+                    imageUrl={selectedNode.data.videoUrl}
+                    onSave={handleMotionBrushSave}
+                    onCancel={() => setShowMotionBrush(false)}
+                  />
+                ) : (
+                  <SceneControlsPanel
+                    nodeId={selectedNode.data.eventId || ''}
+                    universeId={id}
+                    controls={selectedNodeControls}
+                    onChange={setSelectedNodeControls}
+                    onSave={handleSaveSceneControls}
+                    isSaving={isSavingControls}
+                    castMembers={
+                      castMembersData?.map((m: any) => ({
+                        id: m.id,
+                        name: m.name,
+                        referenceImageUrls: m.referenceImageUrls,
+                      })) || []
+                    }
+                    onOpenCastManager={() => setShowCastManager(true)}
+                    onOpenMotionBrush={() => setShowMotionBrush(true)}
+                    siblingNodes={nodes
+                      .filter((n: any) => n.data.nodeType === 'scene' && n.data.eventId)
+                      .map((n: any) => ({
+                        id: n.data.eventId,
+                        label: n.data.displayName || n.data.eventId,
+                        videoUrl: n.data.videoUrl,
+                      }))}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+        {/* Cast Manager Sidebar (Feature 3) */}
+        <CastManager
+          universeId={id}
+          isOpen={showCastManager}
+          onClose={() => setShowCastManager(false)}
         />
 
         {/* Creator's Room Sidebar */}
