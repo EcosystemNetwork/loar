@@ -863,6 +863,8 @@ export const imageRouter = router({
         }
         await userRef.update({ balance: balance - cost, updatedAt: new Date() });
       }
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
       let result;
       try {
@@ -945,6 +947,8 @@ export const imageRouter = router({
         }
         await userRef.update({ balance: balance - cost, updatedAt: new Date() });
       }
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
       let result;
       try {

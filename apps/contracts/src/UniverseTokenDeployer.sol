@@ -40,6 +40,7 @@ contract UniverseTokenDeployer is ReentrancyGuard {
 
     error InvalidAllocation();
     error AllocationSupplyMismatch();
+    error DeprecatedUseV2();
 
     event TokenDeployed(
         uint256 indexed universeId,
@@ -55,8 +56,19 @@ contract UniverseTokenDeployer is ReentrancyGuard {
         uint256 communityAmount
     );
 
+    /// @notice When true, all new deployments revert. Set by owner to force migration to V2/V3.
+    bool public deprecated;
+    address public owner;
+
     constructor(address _universeManager) {
         universeManager = IUniverseManager(_universeManager);
+        owner = msg.sender;
+    }
+
+    /// @notice Deprecate this deployer. New token deployments will revert.
+    function setDeprecated(bool _deprecated) external {
+        require(msg.sender == owner, "Only owner");
+        deprecated = _deprecated;
     }
 
     /**
@@ -76,6 +88,7 @@ contract UniverseTokenDeployer is ReentrancyGuard {
         address bondingCurveAddress
     ) {
         require(msg.sender == address(universeManager), "Only UniverseManager can call");
+        if (deprecated) revert DeprecatedUseV2();
 
         tokenAddress = LoarDeployer.deployToken(
             deploymentConfig.tokenConfig,
