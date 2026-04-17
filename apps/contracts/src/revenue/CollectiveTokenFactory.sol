@@ -98,6 +98,12 @@ contract CollectiveTokenFactory {
         string calldata symbol,
         string calldata metadataURI
     ) external returns (uint256 collectiveId, address token) {
+        // L2 fix: only universe creator or universe manager can deploy collectives
+        if (msg.sender != universeManager) {
+            address universeOwner = IUniverseManagerOwner(universeManager).ownerOf(universeId);
+            if (msg.sender != universeOwner) revert NotUniverseCreatorOrManager();
+        }
+
         collectiveId = nextCollectiveId++;
 
         CollectiveERC20 t = new CollectiveERC20(

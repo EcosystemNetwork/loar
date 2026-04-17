@@ -12,9 +12,10 @@ import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
 
 /**
  * @title UniverseTokenDeployer
- * @notice Deploys universe tokens with a graduated bonding curve.
- * @dev Tokens are sold via a linear bonding curve. When the curve fills,
- *      unsold tokens + raised ETH auto-migrate to Uniswap v4 LP.
+ * @notice DEPRECATED — Use UniverseTokenDeployerV2 (with creator vesting) or V3 (factory pattern).
+ * @dev V1 sends creator tokens immediately with no vesting, creating dump risk.
+ *      This contract is kept for ABI compatibility with existing deployments.
+ *      New deployments should use V2 or V3 via UniverseManager.setTokenDeployer().
  */
 contract UniverseTokenDeployer is ReentrancyGuard {
     using SafeERC20 for IERC20;
