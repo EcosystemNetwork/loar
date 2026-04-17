@@ -38,6 +38,11 @@ contract CollectiveERC20 is ERC20, ERC20Permit, Ownable {
 ///         Each collective gets 1 billion tokens (same pattern as GovernanceERC20)
 ///         minted entirely to the creator for self-managed distribution.
 ///         These tokens represent membership/ownership shares in a narrative collective.
+/// @dev Minimal interface to look up universe owner for access control (L2 fix)
+interface IUniverseManagerOwner {
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+
 contract CollectiveTokenFactory {
     enum CollectiveKind { FACTION, ORGANIZATION }
 
@@ -52,6 +57,9 @@ contract CollectiveTokenFactory {
     /// @notice 1 billion tokens per collective — same as universe governance tokens
     uint256 public constant DEFAULT_SUPPLY = 1_000_000_000e18;
 
+    /// @notice UniverseManager contract for access control (L2 fix)
+    address public immutable universeManager;
+
     uint256 public nextCollectiveId;
     mapping(uint256 => Collective) public collectives;
 
@@ -60,6 +68,13 @@ contract CollectiveTokenFactory {
 
     // token address => collectiveId (reverse lookup)
     mapping(address => uint256) public collectiveByToken;
+
+    error NotUniverseCreatorOrManager();
+
+    constructor(address _universeManager) {
+        require(_universeManager != address(0), "Zero address");
+        universeManager = _universeManager;
+    }
 
     event CollectiveDeployed(
         uint256 indexed collectiveId,
