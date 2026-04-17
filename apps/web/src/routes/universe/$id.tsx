@@ -9,7 +9,28 @@
 
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Home, Upload, Link2, Video, X, Music, Trash2, Copy, CheckSquare } from 'lucide-react';
+import {
+  Home,
+  Upload,
+  Link2,
+  Video,
+  X,
+  Music,
+  Trash2,
+  Copy,
+  CheckSquare,
+  Search,
+  Maximize2,
+  Minimize2,
+  LayoutGrid,
+  ZoomIn,
+  ZoomOut,
+  Locate,
+  Undo2,
+  Redo2,
+  Keyboard,
+  Play,
+} from 'lucide-react';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import {
   Dialog,
@@ -23,6 +44,7 @@ import { Label } from '@/components/ui/label';
 import ReactFlow, {
   Background,
   Controls,
+  MiniMap,
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
@@ -30,6 +52,7 @@ import ReactFlow, {
   MarkerType,
   addEdge,
   useOnSelectionChange,
+  useReactFlow,
   type Node,
   type Edge,
   type Connection,
@@ -58,6 +81,7 @@ import { SceneControlsPanel } from '@/components/flow/SceneControlsPanel';
 import { CastManager } from '@/components/flow/CastManager';
 import { MotionBrush } from '@/components/flow/MotionBrush';
 import type { SceneControls } from '@/components/flow/TimelineNodes';
+import { SelectionPlayer, type SelectionVideo } from '@/components/player/SelectionPlayer';
 
 // Register custom node types
 const nodeTypes = {
@@ -167,6 +191,7 @@ function UniverseTimelineEditorInner() {
   // Multi-select state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSelectionPlayer, setShowSelectionPlayer] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -177,7 +202,21 @@ function UniverseTimelineEditorInner() {
   const [soundtrackUrl, setSoundtrackUrl] = useState<string>('');
   const [soundtrackName, setSoundtrackName] = useState<string>('');
 
+  // Canvas UI state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [showMiniMap, setShowMiniMap] = useState(true);
+
+  // Undo/redo state
+  const undoStack = useRef<{ nodes: Node<TimelineNodeData>[]; edges: Edge[] }[]>([]);
+  const redoStack = useRef<{ nodes: Node<TimelineNodeData>[]; edges: Edge[] }[]>([]);
+  const isUndoRedoAction = useRef(false);
+
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const { fitView, zoomIn, zoomOut, setCenter, getZoom } = useReactFlow();
 
   // Ref to track latest nodes without causing callback identity changes
   const nodesRef = useRef(nodes);
@@ -697,6 +736,276 @@ function UniverseTimelineEditorInner() {
     // Deselect all nodes in ReactFlow
     setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: false })));
   }, [setNodes]);
+
+  // Build playlist from selected nodes and open the selection player
+  const handlePlaySelected = useCallback(() => {
+    if (selectedNodeIds.size === 0) return;
+    // Collect selected nodes that have video URLs, preserving canvas order (top-to-bottom, left-to-right)
+    const selectedWithVideo = nodes
+      .filter(
+        (n: any) => selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
+      )
+      .sort((a: any, b: any) => {
+        // Sort by vertical position first, then horizontal
+        if (Math.abs(a.position.y - b.position.y) > 50) return a.position.y - b.position.y;
+        return a.position.x - b.position.x;
+      });
+    if (selectedWithVideo.length === 0) return;
+    setShowSelectionPlayer(true);
+  }, [selectedNodeIds, nodes]);
+
+  // Get the selection playlist videos (memoized to avoid recalc on every render)
+  const selectionVideos: SelectionVideo[] = useMemo(() => {
+    if (!showSelectionPlayer || selectedNodeIds.size === 0) return [];
+    return nodes
+      .filter(
+        (n: any) => selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
+      )
+      .sort((a: any, b: any) => {
+        if (Math.abs(a.position.y - b.position.y) > 50) return a.position.y - b.position.y;
+        return a.position.x - b.position.x;
+      })
+      .map((n: any) => ({
+        nodeId: n.id,
+        label: n.data.label || n.data.displayName || `Event ${n.data.eventId || n.id}`,
+        videoUrl: n.data.videoUrl,
+      }));
+  }, [showSelectionPlayer, selectedNodeIds, nodes]);
+
+  // ── Undo / Redo ────────────────────────────────────────────────────
+  const pushUndoState = useCallback(() => {
+    undoStack.current.push({
+      nodes: JSON.parse(JSON.stringify(nodesRef.current)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    });
+    if (undoStack.current.length > 50) undoStack.current.shift();
+    redoStack.current = [];
+  }, [edges]);
+
+  const handleUndo = useCallback(() => {
+    const prev = undoStack.current.pop();
+    if (!prev) return;
+    isUndoRedoAction.current = true;
+    redoStack.current.push({
+      nodes: JSON.parse(JSON.stringify(nodesRef.current)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    });
+    setNodes(prev.nodes as any);
+    setEdges(prev.edges);
+    requestAnimationFrame(() => {
+      isUndoRedoAction.current = false;
+    });
+  }, [edges, setNodes, setEdges]);
+
+  const handleRedo = useCallback(() => {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    isUndoRedoAction.current = true;
+    undoStack.current.push({
+      nodes: JSON.parse(JSON.stringify(nodesRef.current)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    });
+    setNodes(next.nodes as any);
+    setEdges(next.edges);
+    requestAnimationFrame(() => {
+      isUndoRedoAction.current = false;
+    });
+  }, [edges, setNodes, setEdges]);
+
+  // ── Node Search ───────────────────────────────────────────────────
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return nodes.filter(
+      (n: any) =>
+        n.data.nodeType === 'scene' &&
+        (n.data.label?.toLowerCase().includes(q) ||
+          n.data.description?.toString().toLowerCase().includes(q) ||
+          n.data.eventId?.toString().includes(q) ||
+          n.data.displayName?.toLowerCase().includes(q))
+    );
+  }, [nodes, searchQuery]);
+
+  const handleSearchSelect = useCallback(
+    (node: Node<TimelineNodeData>) => {
+      setCenter(node.position.x + 160, node.position.y + 136, {
+        zoom: 1,
+        duration: 500,
+      });
+      setSelectedNode(node);
+      setShowSearch(false);
+      setSearchQuery('');
+    },
+    [setCenter]
+  );
+
+  // ── Auto-layout ───────────────────────────────────────────────────
+  const handleAutoLayout = useCallback(() => {
+    pushUndoState();
+    const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
+    if (sceneNodes.length === 0) return;
+
+    // Build ID arrays for the layout algorithm
+    const nodeIds = sceneNodes.map((n: any) => {
+      const eid = n.data.blockchainNodeId || parseInt(n.data.eventId) || 0;
+      return eid;
+    });
+    const previousNodes = sceneNodes.map((n: any) => {
+      // Find parent from edges
+      const parentEdge = edges.find((e) => e.target === n.id);
+      if (!parentEdge) return 0;
+      const parentNode = sceneNodes.find((pn: any) => pn.id === parentEdge.source);
+      if (!parentNode) return 0;
+      return parentNode.data.blockchainNodeId || parseInt(parentNode.data.eventId) || 0;
+    });
+
+    const layout = calculateTreeLayout(nodeIds, previousNodes, {
+      horizontalSpacing: 420,
+      verticalSpacing: 320,
+      startX: 100,
+      startY: 100,
+    });
+
+    // Apply positions
+    setNodes((nds: any) =>
+      nds.map((n: any) => {
+        if (n.data.nodeType !== 'scene') {
+          // Reposition add nodes relative to their source
+          const sourceEdge = edges.find((e) => e.target === n.id);
+          if (sourceEdge) {
+            const sourceNode = nds.find((sn: any) => sn.id === sourceEdge.source);
+            if (sourceNode) {
+              const sourcePos = layout.nodePositions.get(
+                sourceNode.data.blockchainNodeId || parseInt(sourceNode.data.eventId) || 0
+              );
+              if (sourcePos) {
+                return { ...n, position: { x: sourcePos.x + 420, y: sourcePos.y } };
+              }
+            }
+          }
+          return n;
+        }
+        const eid = n.data.blockchainNodeId || parseInt(n.data.eventId) || 0;
+        const pos = layout.nodePositions.get(eid);
+        return pos ? { ...n, position: pos } : n;
+      })
+    );
+
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.15, duration: 500 });
+    });
+  }, [nodes, edges, setNodes, fitView, pushUndoState]);
+
+  // ── Keyboard Shortcuts ────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(
+        (e.target as HTMLElement)?.tagName || ''
+      );
+
+      // Ctrl/Cmd+K — search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch((v) => !v);
+        return;
+      }
+
+      // Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !isInput) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+
+      // Skip remaining shortcuts if typing in an input
+      if (isInput) return;
+
+      // F — fit view
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
+        fitView({ padding: 0.15, duration: 300 });
+        return;
+      }
+
+      // 1 — zoom to 100%
+      if (e.key === '1' && !e.metaKey && !e.ctrlKey) {
+        const currentNodes = nodesRef.current;
+        if (currentNodes.length > 0) {
+          const centerNode = currentNodes[Math.floor(currentNodes.length / 2)];
+          setCenter(centerNode.position.x + 160, centerNode.position.y + 136, {
+            zoom: 1,
+            duration: 300,
+          });
+        }
+        return;
+      }
+
+      // + / = — zoom in
+      if (e.key === '+' || e.key === '=') {
+        zoomIn({ duration: 200 });
+        return;
+      }
+
+      // - — zoom out
+      if (e.key === '-') {
+        zoomOut({ duration: 200 });
+        return;
+      }
+
+      // Delete / Backspace — delete selected nodes
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeIds.size > 0) {
+        e.preventDefault();
+        setShowDeleteConfirm(true);
+        return;
+      }
+
+      // Escape — close search, clear selection
+      if (e.key === 'Escape') {
+        if (showSearch) {
+          setShowSearch(false);
+          setSearchQuery('');
+        } else if (selectedNodeIds.size > 0) {
+          handleClearSelection();
+        }
+        return;
+      }
+
+      // ? — toggle shortcuts help
+      if (e.key === '?') {
+        setShowShortcutsHelp((v) => !v);
+        return;
+      }
+
+      // M — toggle minimap
+      if (e.key === 'm') {
+        setShowMiniMap((v) => !v);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [
+    fitView,
+    zoomIn,
+    zoomOut,
+    setCenter,
+    handleUndo,
+    handleRedo,
+    handleClearSelection,
+    selectedNodeIds,
+    showSearch,
+  ]);
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (showSearch) {
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [showSearch]);
 
   // Handle showing video generation dialog
   // Preserves character selections, video model, duration, ratio, and image format
@@ -1468,14 +1777,31 @@ function UniverseTimelineEditorInner() {
 
       if (previousNodeStr && String(previousNodeStr) !== '0') {
         const previousNodeId = normalizeNodeId(previousNodeStr);
-        const color = graphData.flags[index] ? colors[0] : colors[(index + 1) % colors.length];
+        const isCanonEdge = graphData.flags[index];
+        const color = isCanonEdge ? colors[0] : colors[(index + 1) % colors.length];
+
+        // Check if this is a branch (parent has multiple children)
+        const parentChildren = layout.nodesByParent.get(previousNodeId) || [];
+        const isBranch = parentChildren.length > 1 && parentChildren.indexOf(nodeId) > 0;
 
         blockchainEdges.push({
           id: `edge-${previousNodeId}-${nodeId}`,
           source: `blockchain-node-${previousNodeId}`,
           target: `blockchain-node-${nodeId}`,
           animated: true,
-          style: { stroke: color, strokeWidth: 3 },
+          label: isCanonEdge ? 'Canon' : isBranch ? 'Branch' : undefined,
+          labelStyle: {
+            fill: isCanonEdge ? '#eab308' : '#94a3b8',
+            fontSize: 10,
+            fontWeight: 600,
+          },
+          labelBgStyle: {
+            fill: '#09090b',
+            fillOpacity: 0.85,
+          },
+          labelBgPadding: [4, 2] as [number, number],
+          labelBgBorderRadius: 4,
+          style: { stroke: color, strokeWidth: isCanonEdge ? 3 : 2 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: color,
@@ -1513,6 +1839,11 @@ function UniverseTimelineEditorInner() {
     setNodes(blockchainNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
+
+    // Re-fit the viewport after nodes are rendered so outlier nodes are reachable
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.15, duration: 300 });
+    });
   }, [
     graphData,
     finalUniverse?.id,
@@ -1521,6 +1852,7 @@ function UniverseTimelineEditorInner() {
     handleEditScene,
     handleDeleteNode,
     getArchivedNodeIds,
+    fitView,
   ]);
 
   // Handle connections between nodes
@@ -1666,14 +1998,27 @@ function UniverseTimelineEditorInner() {
 
       {/* Main Content Area */}
       <TokenGateGuard universeId={id} target="view">
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
+        <div
+          className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}
+        >
           <div className="flex-1 relative overflow-hidden w-full h-full">
             <ReactFlow
               nodes={nodes}
               edges={edges}
-              onNodesChange={onNodesChange}
+              onNodesChange={(changes) => {
+                if (!isUndoRedoAction.current) {
+                  const hasDrag = changes.some(
+                    (c) => c.type === 'position' && c.dragging === false
+                  );
+                  if (hasDrag) pushUndoState();
+                }
+                onNodesChange(changes);
+              }}
               onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
+              onConnect={(connection) => {
+                pushUndoState();
+                onConnect(connection);
+              }}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               nodeTypes={nodeTypes}
@@ -1688,10 +2033,204 @@ function UniverseTimelineEditorInner() {
               maxZoom={2}
             >
               <Background />
-              <Controls />
+              <Controls showInteractive={false} />
+
+              {/* MiniMap — togglable */}
+              {showMiniMap && (
+                <MiniMap
+                  nodeColor={(n: any) => {
+                    if (n.data?.isInCanonChain) return '#eab308';
+                    if (n.data?.nodeType === 'add') return '#64748b';
+                    return n.data?.timelineColor || '#10b981';
+                  }}
+                  maskColor="rgba(0, 0, 0, 0.6)"
+                  style={{ background: '#0a0a0a', border: '1px solid #27272a', borderRadius: 8 }}
+                  pannable
+                  zoomable
+                />
+              )}
+
+              {/* Search Overlay */}
+              {showSearch && (
+                <Panel position="top-center" className="z-50 mt-2">
+                  <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl w-96 overflow-hidden animate-in slide-in-from-top-2 duration-150">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-800">
+                      <Search className="h-4 w-4 text-zinc-400 shrink-0" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setShowSearch(false);
+                            setSearchQuery('');
+                          }
+                          if (e.key === 'Enter' && searchResults.length > 0) {
+                            handleSearchSelect(searchResults[0]);
+                          }
+                        }}
+                        placeholder="Search nodes by title, description, or ID..."
+                        className="flex-1 bg-transparent text-sm text-white placeholder:text-zinc-500 outline-none"
+                      />
+                      <kbd className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                        ESC
+                      </kbd>
+                    </div>
+                    {searchQuery.trim() && (
+                      <div className="max-h-64 overflow-y-auto">
+                        {searchResults.length === 0 ? (
+                          <div className="px-3 py-4 text-center text-sm text-zinc-500">
+                            No nodes found
+                          </div>
+                        ) : (
+                          searchResults.slice(0, 8).map((node: any) => (
+                            <button
+                              key={node.id}
+                              onClick={() => handleSearchSelect(node)}
+                              className="w-full text-left px-3 py-2 hover:bg-zinc-800 transition-colors flex items-center gap-3 group"
+                            >
+                              <div
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: node.data.timelineColor || '#10b981' }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-white truncate">
+                                  {node.data.label || node.data.displayName}
+                                </div>
+                                <div className="text-xs text-zinc-500 truncate">
+                                  {node.data.eventId ? `Event ${node.data.eventId}` : ''}
+                                  {node.data.isInCanonChain ? ' · Canon' : ''}
+                                </div>
+                              </div>
+                              <Locate className="h-3.5 w-3.5 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Panel>
+              )}
+
+              {/* Keyboard Shortcuts Help */}
+              {showShortcutsHelp && (
+                <Panel position="bottom-center" className="z-50 mb-2">
+                  <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl p-4 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-white flex items-center gap-2">
+                        <Keyboard className="h-4 w-4" /> Keyboard Shortcuts
+                      </span>
+                      <button
+                        onClick={() => setShowShortcutsHelp(false)}
+                        className="text-zinc-500 hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs">
+                      {[
+                        ['Ctrl+K', 'Search nodes'],
+                        ['Ctrl+Z', 'Undo'],
+                        ['Ctrl+Shift+Z', 'Redo'],
+                        ['F', 'Fit to view'],
+                        ['1', 'Zoom to 100%'],
+                        ['+/-', 'Zoom in/out'],
+                        ['M', 'Toggle minimap'],
+                        ['Del', 'Delete selected'],
+                        ['Shift+Click', 'Multi-select'],
+                        ['Esc', 'Clear selection'],
+                        ['?', 'Toggle shortcuts'],
+                      ].map(([key, desc]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <kbd className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded font-mono min-w-[60px] text-center">
+                            {key}
+                          </kbd>
+                          <span className="text-zinc-400">{desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Panel>
+              )}
 
               <Panel position="top-right">
                 <div className="flex gap-2">
+                  {/* Zoom & Layout Controls */}
+                  <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => zoomIn({ duration: 200 })}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      title="Zoom in (+)"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => zoomOut({ duration: 200 })}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      title="Zoom out (-)"
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => fitView({ padding: 0.15, duration: 300 })}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      title="Fit to view (F)"
+                    >
+                      <Locate className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={handleAutoLayout}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      title="Auto-layout nodes"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSearch(true);
+                      }}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      title="Search nodes (Ctrl+K)"
+                    >
+                      <Search className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={handleUndo}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white disabled:opacity-30"
+                      title="Undo (Ctrl+Z)"
+                      disabled={undoStack.current.length === 0}
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={handleRedo}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white disabled:opacity-30"
+                      title="Redo (Ctrl+Shift+Z)"
+                      disabled={redoStack.current.length === 0}
+                    >
+                      <Redo2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setIsFullscreen(!isFullscreen)}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen canvas'}
+                    >
+                      {isFullscreen ? (
+                        <Minimize2 className="h-4 w-4" />
+                      ) : (
+                        <Maximize2 className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setShowShortcutsHelp((v) => !v)}
+                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white text-xs font-bold"
+                      title="Keyboard shortcuts (?)"
+                    >
+                      ?
+                    </button>
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -1763,6 +2302,25 @@ function UniverseTimelineEditorInner() {
                     <CheckSquare className="h-4 w-4 text-blue-400" />
                     <span className="font-medium">{selectedNodeIds.size} selected</span>
                   </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                    onClick={handlePlaySelected}
+                    disabled={
+                      nodes.filter(
+                        (n: any) =>
+                          selectedNodeIds.has(n.id) &&
+                          n.data?.videoUrl &&
+                          n.data.nodeType === 'scene'
+                      ).length === 0
+                    }
+                    title="Play selected videos in sequence"
+                  >
+                    <Play className="h-4 w-4" />
+                    Play
+                  </Button>
 
                   <Button
                     variant="ghost"
@@ -2239,6 +2797,11 @@ function UniverseTimelineEditorInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Selection Playlist Player */}
+      {showSelectionPlayer && selectionVideos.length > 0 && (
+        <SelectionPlayer videos={selectionVideos} onClose={() => setShowSelectionPlayer(false)} />
+      )}
     </div>
   );
 }

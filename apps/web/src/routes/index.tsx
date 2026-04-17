@@ -1326,17 +1326,18 @@ function HomeComponent() {
       };
     });
 
-    // Add any Ponder-only universes not in Firestore
+    // Add any Ponder-only universes not in Firestore (skip duplicates by name)
     if (ponderUniverses) {
       const baseIds = new Set(base.map((u: any) => u.id.toLowerCase()));
+      const baseNames = new Set(base.map((u: any) => (u.name || '').toLowerCase()));
       ponderUniverses.forEach((pu) => {
-        if (!baseIds.has(pu.id.toLowerCase())) {
-          const tokenData = tokenMap.get(pu.id.toLowerCase());
-          const poolId = tokenData?.poolId;
-          const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
-          const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
-          enriched.push({ ...pu, tokenData, swapVolume, holderCount });
-        }
+        if (baseIds.has(pu.id.toLowerCase())) return;
+        if (baseNames.has((pu.name || '').toLowerCase())) return;
+        const tokenData = tokenMap.get(pu.id.toLowerCase());
+        const poolId = tokenData?.poolId;
+        const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
+        const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
+        enriched.push({ ...pu, tokenData, swapVolume, holderCount });
       });
     }
 

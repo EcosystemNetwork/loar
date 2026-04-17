@@ -51,9 +51,9 @@ function CreditsPage() {
   const isLow = credits < 10;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="bg-background flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+      <div className="bg-background border-b px-4 py-3 flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"

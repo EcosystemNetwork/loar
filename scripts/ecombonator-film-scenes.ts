@@ -712,9 +712,17 @@ async function main() {
   let previousId = latestId;
   const results: Array<{ id: string; title: string; nodeId: bigint }> = [];
 
+  // Skip scenes already confirmed on-chain from previous run
+  const DONE = new Set(['S01', 'S03', 'S04', 'S05', 'S06', 'S15']);
+
   for (let i = 0; i < SCENES.length; i++) {
     const scene = SCENES[i];
     const label = `${scene.id} (${i + 1}/${SCENES.length})`;
+
+    if (DONE.has(scene.id)) {
+      log(label, `SKIP — already on-chain`);
+      continue;
+    }
 
     console.log(`\n--- ${scene.id}: ${scene.title} ---`);
 

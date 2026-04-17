@@ -707,7 +707,25 @@ async function main() {
   let completed = 0;
 
   // Skip already-completed scenes from previous runs
-  const DONE_IDS = new Set(['S01', 'S04', 'S05', 'S06']); // Nodes #37-40
+  const DONE_IDS = new Set([
+    'S01',
+    'S02',
+    'S03',
+    'S04',
+    'S05',
+    'S06',
+    'S07',
+    'S08',
+    'S09',
+    'S10',
+    'S11',
+    'S12',
+    'S13',
+    'S14',
+    'S15',
+    'S16',
+    'S17',
+  ]);
 
   for (let i = 0; i < SCENES.length; i++) {
     if (DONE_IDS.has(SCENES[i].id)) {
