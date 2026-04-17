@@ -23,7 +23,7 @@ test.describe('Login Page', () => {
   test('shows LOAR logo on login page', async ({ page }) => {
     await page.goto('/login');
     // Login page renders the LOAR logo SVG
-    await expect(page.locator('img[src*="loarlogo"]')).toBeVisible();
+    await expect(page.locator('img[alt="LOAR"]').first()).toBeVisible();
   });
 
   test('shows "Powered by thirdweb" attribution', async ({ page }) => {

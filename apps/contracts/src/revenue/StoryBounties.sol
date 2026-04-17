@@ -221,7 +221,7 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function expireBounty(uint256 bountyId) external nonReentrant whenNotPaused {
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
-        if (block.timestamp < b.deadline) revert DeadlineNotPassed();
+        if (block.timestamp <= b.deadline) revert DeadlineNotPassed();
 
         b.status = BountyStatus.EXPIRED;
         loarToken.safeTransfer(b.poster, b.reward);

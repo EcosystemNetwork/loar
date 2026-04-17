@@ -162,6 +162,11 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
 
     // ---- ERC721 Overrides ----
 
+    /// @dev Override name/symbol to return constants — the non-upgradeable ERC721
+    ///      constructor sets these in implementation storage, not the proxy's storage.
+    function name() public pure override returns (string memory) { return "LOAR Entities"; }
+    function symbol() public pure override returns (string memory) { return "ENTITY"; }
+
     function tokenURI(uint256 tokenId)
         public view override(ERC721, ERC721URIStorage) returns (string memory)
     {

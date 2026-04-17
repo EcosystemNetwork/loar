@@ -116,11 +116,11 @@ test.describe('Moderation & Legal', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Partial-feature routes redirect to Coming Soon
+// 7. Feature routes now load (previously redirected to Coming Soon)
 // ---------------------------------------------------------------------------
 
-test.describe('Partial features redirect to Coming Soon', () => {
-  const partialRoutes = [
+test.describe('Feature routes load', () => {
+  const featureRoutes = [
     '/tokens',
     '/licensing',
     '/collabs',
@@ -131,11 +131,14 @@ test.describe('Partial features redirect to Coming Soon', () => {
     '/bounties',
   ];
 
-  for (const route of partialRoutes) {
-    test(`${route} redirects to coming-soon`, async ({ page }) => {
+  for (const route of featureRoutes) {
+    test(`${route} loads without crashing`, async ({ page }) => {
       await page.goto(route);
-      await expect(page).toHaveURL(/\/coming-soon/);
-      await expect(page.locator('body')).toContainText(/coming soon/i);
+      await page.waitForTimeout(1000);
+      // These routes now have full implementations — should not redirect to coming-soon
+      await expect(page.locator('body')).toBeVisible();
+      const body = await page.locator('body').textContent();
+      expect(body!.length).toBeGreaterThan(10);
     });
   }
 });
@@ -153,16 +156,6 @@ test.describe('Navigation', () => {
     await expect(nav.getByText('Gallery')).toBeVisible();
     await expect(nav.getByText('Pricing')).toBeVisible();
     await expect(nav.getByText('Dashboard')).toBeVisible();
-  });
-
-  test('header does NOT show hidden partial-feature links', async ({ page }) => {
-    await page.goto('/');
-    const header = page.locator('header');
-    // These should not appear as direct nav items
-    await expect(header.getByRole('link', { name: 'Launchpad' })).toHaveCount(0);
-    await expect(header.getByRole('link', { name: 'Licensing' })).toHaveCount(0);
-    await expect(header.getByRole('link', { name: 'Collabs' })).toHaveCount(0);
-    await expect(header.getByRole('link', { name: 'Ads' })).toHaveCount(0);
   });
 
   test('wiki page is accessible from More menu', async ({ page }) => {

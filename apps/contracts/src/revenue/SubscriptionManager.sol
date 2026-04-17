@@ -181,10 +181,13 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
         uint256 expiry = startTime + (months * 30 days);
 
+        // Read startedAt before overwriting — sub is a storage ref to the same slot
+        uint256 preservedStartedAt = sub.startedAt;
+
         subscriptions[msg.sender][universeId] = Subscription({
             universeId: universeId,
             tier: tier,
-            startedAt: sub.startedAt == 0 ? block.timestamp : sub.startedAt,
+            startedAt: preservedStartedAt == 0 ? block.timestamp : preservedStartedAt,
             expiresAt: expiry,
             autoRenew: true
         });

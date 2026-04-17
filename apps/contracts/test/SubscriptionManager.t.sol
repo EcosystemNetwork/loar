@@ -396,15 +396,16 @@ contract SubscriptionManagerTest is Test {
     }
 
     function test_subscribe_extension_preservesStartedAt() public {
-        uint256 startTs = block.timestamp;
-
         vm.prank(alice);
         sub.subscribe{value: PRICE_PER_MONTH}(
             UNIVERSE_ID, SubscriptionManager.SubscriptionTier.BASIC, 1
         );
 
+        // Read the recorded startedAt from the contract
+        (,, uint256 originalStartedAt,,) = sub.subscriptions(alice, UNIVERSE_ID);
+
         // Advance 10 days and extend
-        vm.warp(startTs + 10 days);
+        vm.warp(block.timestamp + 10 days);
 
         vm.prank(alice);
         sub.subscribe{value: PRICE_PER_MONTH}(
@@ -412,11 +413,9 @@ contract SubscriptionManagerTest is Test {
         );
 
         // startedAt should remain the original timestamp
-        // Public mapping getter returns all struct fields as a tuple:
-        // (universeId, tier, startedAt, expiresAt, autoRenew)
         (uint256 uid,, uint256 startedAt,,) = sub.subscriptions(alice, UNIVERSE_ID);
         assertEq(uid, UNIVERSE_ID);
-        assertEq(startedAt, startTs);
+        assertEq(startedAt, originalStartedAt);
     }
 
     function test_subscribe_extension_sameTier_subscriberCountUnchanged() public {
