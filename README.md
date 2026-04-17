@@ -14,6 +14,8 @@
 
 </div>
 
+> **Last updated:** April 17, 2026 | **Status:** Testnet Alpha (Sepolia + Base Sepolia)
+
 ---
 
 ## What is LOAR?
