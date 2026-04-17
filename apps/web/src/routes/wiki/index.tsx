@@ -166,13 +166,19 @@ function EntityCard({ entity }: { entity: Entity }) {
   return (
     <Link to="/wiki/entity/$id" params={{ id: entity.id }} className="block">
       <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-        <div className="aspect-video w-full overflow-hidden rounded-t-lg">
-          {entity.imageUrl ? (
-            <img src={entity.imageUrl} alt={entity.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-muted flex items-center justify-center">
-              <KindIcon className="h-10 w-10 text-muted-foreground/30" />
-            </div>
+        <div className="aspect-video w-full overflow-hidden rounded-t-lg relative bg-muted">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <KindIcon className="h-10 w-10 text-muted-foreground/30" />
+          </div>
+          {entity.imageUrl && (
+            <img
+              src={entity.imageUrl}
+              alt={entity.name}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           )}
         </div>
         <CardHeader className="pb-2">
@@ -344,11 +350,14 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
           return (
             <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video bg-muted relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                </div>
                 {isVideo && item.mediaUrl ? (
                   <video
                     src={item.mediaUrl}
                     poster={item.thumbnailUrl || undefined}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
                     muted
                     playsInline
                     onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
@@ -362,13 +371,12 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
                   <img
                     src={item.mediaUrl || item.thumbnailUrl}
                     alt={item.title}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-                  </div>
-                )}
+                ) : null}
                 {isVideo && (
                   <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
                     <Video className="h-2.5 w-2.5 mr-1" />
@@ -438,17 +446,19 @@ function CollectionTab() {
         {filtered.map((char) => (
           <Link key={char.id} to="/wiki/character/$id" params={{ id: char.id }} className="block">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-              <div className="aspect-square w-full overflow-hidden rounded-t-lg">
-                {char.image_url ? (
+              <div className="aspect-square w-full overflow-hidden rounded-t-lg relative bg-muted">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Users className="h-10 w-10 text-muted-foreground/30" />
+                </div>
+                {char.image_url && (
                   <img
                     src={char.image_url}
                     alt={char.character_name}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <Users className="h-10 w-10 text-muted-foreground/30" />
-                  </div>
                 )}
               </div>
               <CardHeader className="pb-2">
@@ -477,9 +487,55 @@ function CollectionTab() {
   );
 }
 
+/** Global search across all entity kinds. */
+function GlobalSearchResults({
+  query,
+  universeAddress,
+}: {
+  query: string;
+  universeAddress?: string;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['entity-search', query, universeAddress],
+    queryFn: () =>
+      trpcClient.entities.search.query({
+        query,
+        universeAddress,
+        limit: 30,
+      }),
+    enabled: query.length >= 2,
+  });
+
+  if (query.length < 2) return null;
+  if (isLoading) return <div className="text-center py-8 text-muted-foreground">Searching...</div>;
+
+  const entities = data?.entities ?? [];
+  if (entities.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <p>No results for "{query}"</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">
+        {entities.length} result{entities.length !== 1 ? 's' : ''} for "{query}"
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {entities.map((entity: Entity) => (
+          <EntityCard key={entity.id} entity={entity} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WikiPage() {
   const { universe: universeAddress } = useSearch({ from: '/wiki/' });
   const [activeTab, setActiveTab] = useState<WikiTab>('person');
+  const [globalSearch, setGlobalSearch] = useState('');
 
   // Fetch universe info if scoped
   const { data: universeResult } = useQuery({
@@ -522,6 +578,17 @@ function WikiPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Global search */}
+          <div className="relative w-56">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="Search all entities..."
+              className="pl-9 h-9 text-xs"
+            />
+          </div>
+
           {/* Universe filter */}
           <Select
             value={universeAddress ?? '__all__'}
@@ -611,8 +678,10 @@ function WikiPage() {
         ))}
       </div>
 
-      {/* Tab content */}
-      {activeTabDef.kind ? (
+      {/* Tab content — global search overrides tab view */}
+      {globalSearch.trim().length >= 2 ? (
+        <GlobalSearchResults query={globalSearch.trim()} universeAddress={universeAddress} />
+      ) : activeTabDef.kind ? (
         <EntityTab kind={activeTabDef.kind} universeAddress={universeAddress} />
       ) : activeTab === 'gallery' ? (
         <GalleryTab universeAddress={universeAddress} />

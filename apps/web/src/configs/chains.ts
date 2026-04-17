@@ -49,9 +49,19 @@ export const CHAIN_NAMES: Record<number, string> = {
   [baseSepolia.id]: 'Base Sepolia',
 };
 
+export const EXPLORER_NAMES: Record<number, string> = {
+  [sepolia.id]: 'Etherscan',
+  [base.id]: 'Basescan',
+  [baseSepolia.id]: 'Basescan',
+};
+
 // ---------------------------------------------------------------------------
 // Explorer Helpers
 // ---------------------------------------------------------------------------
+
+export function getExplorerName(chainId: number): string {
+  return EXPLORER_NAMES[chainId] ?? EXPLORER_NAMES[SUPPORTED_EVM_CHAIN_IDS[0]] ?? 'Explorer';
+}
 
 export function getExplorerAddressUrl(chainId: number, address: string): string {
   const baseUrl = BLOCK_EXPLORER_URLS[chainId] ?? BLOCK_EXPLORER_URLS[SUPPORTED_EVM_CHAIN_IDS[0]];

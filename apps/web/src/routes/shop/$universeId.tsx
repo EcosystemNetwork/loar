@@ -29,6 +29,7 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
+import { LoarIcon } from '@/components/loar-icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -709,7 +710,7 @@ function SubTierCard({ tier, universeId }: { tier: any; universeId: string }) {
           <ul className="text-xs text-muted-foreground space-y-1 mb-3">
             {features.map((f) => (
               <li key={f as string} className="flex items-center gap-1">
-                <span className="text-primary">✓</span> {f as string}
+                <LoarIcon name="check" size={12} className="text-primary" /> {f as string}
               </li>
             ))}
           </ul>

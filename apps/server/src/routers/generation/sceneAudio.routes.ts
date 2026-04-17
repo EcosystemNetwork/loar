@@ -126,9 +126,9 @@ async function refundCredits(userId: string, credits: number, jobId?: string): P
 // ── Upload helper ───────────────────────────────────────────────────────
 
 async function uploadAudioBuffer(buffer: Buffer, filename: string): Promise<string> {
-  // firebaseStorageService.upload() prefixes with videos/ and returns a storage key
   const key = await firebaseStorageService.upload(buffer, `scene-audio-${filename}`);
-  return key;
+  // upload() returns a storage key — convert to a playable public URL
+  return firebaseStorageService.getPublicUrl(key);
 }
 
 // ── Schemas ─────────────────────────────────────────────────────────────
@@ -237,6 +237,55 @@ export const sceneAudioRouter = router({
         .orderBy('createdAt', 'desc')
         .get();
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }),
+
+  /**
+   * Delete a voice profile.
+   */
+  deleteVoiceProfile: protectedProcedure
+    .input(z.object({ profileId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const ref = voiceProfilesCol().doc(input.profileId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new Error('Voice profile not found');
+      if (doc.data()?.createdBy !== ctx.user.uid) {
+        throw new Error('Not authorized to delete this voice profile');
+      }
+      await ref.delete();
+      return { deleted: true };
+    }),
+
+  /**
+   * Preview a voice profile with custom text (on-demand TTS sample).
+   * No credits charged — uses short preview text.
+   */
+  previewVoice: protectedProcedure
+    .input(
+      z.object({
+        profileId: z.string().min(1),
+        text: z.string().min(1).max(200),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const doc = await voiceProfilesCol().doc(input.profileId).get();
+      if (!doc.exists) throw new Error('Voice profile not found');
+      const profile = doc.data()!;
+
+      const result = await elevenLabsService.textToSpeech({
+        text: sanitizePrompt(input.text),
+        voiceId: profile.voiceId,
+        modelId: 'eleven_v3',
+        stability: profile.stability ?? 0.5,
+        similarityBoost: 0.75,
+        style: profile.style ?? 0.3,
+      });
+
+      const audioUrl = await uploadAudioBuffer(
+        result.audioBuffer,
+        `voice-preview/${input.profileId}-${Date.now()}.mp3`
+      );
+
+      return { audioUrl };
     }),
 
   /**
@@ -545,7 +594,11 @@ export const sceneAudioRouter = router({
           const audioBuffers: Buffer[] = [];
           for (const line of scene.dialogue) {
             const profile = profiles[line.voiceProfileId];
-            if (!profile) continue;
+            if (!profile) {
+              throw new Error(
+                `Voice profile ${line.voiceProfileId} not found for speaker "${line.speaker}"`
+              );
+            }
 
             const ttsResult = await elevenLabsService.textToSpeech({
               text: sanitizePrompt(line.text),
@@ -567,6 +620,11 @@ export const sceneAudioRouter = router({
               `dialogue/${universeId}/${scene.sceneId}-${jobId}.mp3`
             );
             results.dialogueUrl = dialogueUrl;
+            const totalChars = scene.dialogue.reduce((s, d) => s + d.text.length, 0);
+            creditsUsed += Math.max(
+              2,
+              toCredits(totalChars * TTS_COST_PER_CHAR_USD, (await getMargins()).fiatMargin)
+            );
           }
         }
 
@@ -583,6 +641,7 @@ export const sceneAudioRouter = router({
             `sfx/${universeId}/${scene.sceneId}-${jobId}.mp3`
           );
           results.sfxUrl = sfxUrl;
+          creditsUsed += toCredits(SFX_COST_USD, (await getMargins()).fiatMargin);
         }
 
         // ── 3. Generate Music ──
@@ -596,6 +655,7 @@ export const sceneAudioRouter = router({
           if (musicResult.status === 'completed' && musicResult.audioUrl) {
             musicUrl = musicResult.audioUrl;
             results.musicUrl = musicUrl;
+            creditsUsed += toCredits(MUSIC_COST_USD, (await getMargins()).fiatMargin);
           }
         }
 
@@ -609,6 +669,7 @@ export const sceneAudioRouter = router({
           if (lipsyncResult.status === 'completed' && lipsyncResult.videoUrl) {
             lipsyncVideoUrl = lipsyncResult.videoUrl;
             results.lipsyncVideoUrl = lipsyncVideoUrl;
+            creditsUsed += toCredits(LIPSYNC_COST_USD, (await getMargins()).fiatMargin);
           }
         }
 
@@ -705,12 +766,6 @@ export const sceneAudioRouter = router({
       const results: Array<{ sceneId: string; status: string; [key: string]: any }> = [];
 
       for (const scene of scenes) {
-        // If scene has no music prompt but shared music exists, use that
-        const sceneWithMusic = {
-          ...scene,
-          musicPrompt: scene.musicPrompt || (sharedMusicUrl ? undefined : undefined),
-        };
-
         try {
           // For scenes without their own music, we'll skip music gen
           // and the frontend can layer the shared music
@@ -750,7 +805,9 @@ export const sceneAudioRouter = router({
             const buffers: Buffer[] = [];
             for (const line of scene.dialogue) {
               const profile = profiles[line.voiceProfileId];
-              if (!profile) continue;
+              if (!profile) {
+                throw new Error(`Voice profile ${line.voiceProfileId} not found`);
+              }
               const tts = await elevenLabsService.textToSpeech({
                 text: sanitizePrompt(line.text),
                 voiceId: profile.voiceId,

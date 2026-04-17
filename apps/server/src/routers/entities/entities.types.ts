@@ -191,3 +191,71 @@ export interface UpdateEntityInput {
   /** Optional Unstoppable Domains name (e.g. "mycharacter.crypto"). */
   unstoppableDomain?: string | null;
 }
+
+/** Relationship type between entities. */
+export type EntityRelationType =
+  | 'allied_with'
+  | 'enemy_of'
+  | 'member_of'
+  | 'located_in'
+  | 'created_by'
+  | 'owns'
+  | 'related_to'
+  | 'appears_in'
+  | 'rules'
+  | 'uses';
+
+export const ENTITY_RELATION_TYPES: EntityRelationType[] = [
+  'allied_with',
+  'enemy_of',
+  'member_of',
+  'located_in',
+  'created_by',
+  'owns',
+  'related_to',
+  'appears_in',
+  'rules',
+  'uses',
+];
+
+/** Human-readable labels for relation types. */
+export const RELATION_LABELS: Record<EntityRelationType, string> = {
+  allied_with: 'Allied With',
+  enemy_of: 'Enemy Of',
+  member_of: 'Member Of',
+  located_in: 'Located In',
+  created_by: 'Created By',
+  owns: 'Owns',
+  related_to: 'Related To',
+  appears_in: 'Appears In',
+  rules: 'Rules',
+  uses: 'Uses',
+};
+
+/** Inverse relation types for bidirectional display. */
+export const INVERSE_RELATIONS: Partial<Record<EntityRelationType, string>> = {
+  allied_with: 'Allied With',
+  enemy_of: 'Enemy Of',
+  member_of: 'Has Member',
+  located_in: 'Contains',
+  created_by: 'Creator Of',
+  owns: 'Owned By',
+  related_to: 'Related To',
+  appears_in: 'Features',
+  rules: 'Ruled By',
+  uses: 'Used By',
+};
+
+/** Firestore document for an entity relationship. */
+export interface EntityRelation {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  type: EntityRelationType;
+  /** Optional description of how the relationship manifests. */
+  description: string;
+  /** Universe this relationship belongs to (for scoping). */
+  universeAddress: string | null;
+  creator: string;
+  createdAt: Date;
+}

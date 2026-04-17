@@ -10,6 +10,7 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import { LoarIcon, type LoarIconName } from '@/components/loar-icons';
 
 export const CharacterNode = memo(({ data, isConnectable, selected }: NodeProps) => {
   return (
@@ -18,7 +19,7 @@ export const CharacterNode = memo(({ data, isConnectable, selected }: NodeProps)
     >
       <div className="flex items-center">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-blue-100 dark:bg-blue-900">
-          {data.emoji || '👤'}
+          <LoarIcon name={(data.emoji as LoarIconName) || 'hero'} size={20} />
         </div>
         <div className="ml-2">
           <div className="text-lg font-bold">{data.label}</div>
@@ -41,7 +42,7 @@ export const PlotPointNode = memo(({ data, isConnectable, selected }: NodeProps)
     >
       <div className="flex items-center">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-green-100 dark:bg-green-900">
-          {data.emoji || '📝'}
+          <LoarIcon name={(data.emoji as LoarIconName) || 'memo'} size={20} />
         </div>
         <div className="ml-2">
           <div className="text-lg font-bold">{data.label}</div>
@@ -66,7 +67,7 @@ export const MediaNode = memo(({ data, isConnectable, selected }: NodeProps) => 
     >
       <div className="flex items-center">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-purple-100 dark:bg-purple-900">
-          {data.emoji || '🎬'}
+          <LoarIcon name={(data.emoji as LoarIconName) || 'clapperboard'} size={20} />
         </div>
         <div className="ml-2">
           <div className="text-lg font-bold">{data.label}</div>
@@ -91,7 +92,7 @@ export const VotingNode = memo(({ data, isConnectable, selected }: NodeProps) =>
     >
       <div className="flex items-center">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-amber-100 dark:bg-amber-900">
-          {data.emoji || '🗳️'}
+          <LoarIcon name={(data.emoji as LoarIconName) || 'ballot'} size={20} />
         </div>
         <div className="ml-2">
           <div className="text-lg font-bold">{data.label}</div>

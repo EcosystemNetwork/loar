@@ -262,6 +262,59 @@ export function useSwapNodesBetweenEntities() {
   });
 }
 
+/** Search entities by name/description across all kinds. */
+export function useEntitySearch(query: string, universeAddress?: string) {
+  return useQuery({
+    queryKey: ['entity-search', query, universeAddress],
+    queryFn: () =>
+      trpcClient.entities.search.query({
+        query,
+        universeAddress: universeAddress as `0x${string}` | undefined,
+        limit: 30,
+      }),
+    enabled: query.length >= 2,
+  });
+}
+
+/** Get all relationships for a specific entity. */
+export function useEntityRelations(entityId: string | undefined) {
+  return useQuery({
+    queryKey: ['entity-relations', entityId],
+    queryFn: () => trpcClient.entities.relations.query({ entityId: entityId! }),
+    enabled: !!entityId,
+  });
+}
+
+/** Create a relationship between two entities. */
+export function useCreateRelation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      sourceId: string;
+      targetId: string;
+      type: string;
+      description?: string;
+    }) => trpcClient.entities.createRelation.mutate(input as any),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['entity-relations', variables.sourceId] });
+      queryClient.invalidateQueries({ queryKey: ['entity-relations', variables.targetId] });
+    },
+  });
+}
+
+/** Delete a relationship. */
+export function useDeleteRelation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (relationId: string) => trpcClient.entities.deleteRelation.mutate({ relationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['entity-relations'] });
+    },
+  });
+}
+
 /**
  * Build a tree structure from a flat list of entities.
  * Returns root entities (parentId === null) with nested children.

@@ -28,6 +28,7 @@ import {
   Zap,
   Eye,
 } from 'lucide-react';
+import { LoarIcon } from '@/components/loar-icons';
 import { useQuery } from '@tanstack/react-query';
 import {
   ponderGql,
@@ -1372,7 +1373,12 @@ function HomeComponent() {
         <Search className="h-3.5 w-3.5" />
         <span>Search</span>
         <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">
-          {navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}K
+          {navigator.platform?.includes('Mac') ? (
+            <LoarIcon name="command" size={10} className="inline-block" />
+          ) : (
+            'Ctrl'
+          )}
+          K
         </kbd>
       </button>
 

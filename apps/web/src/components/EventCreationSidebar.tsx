@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { LoarIcon } from '@/components/loar-icons';
 
 interface EventCreationSidebarProps {
   showVideoDialog: boolean;
@@ -432,7 +433,7 @@ export function EventCreationSidebar({
             <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">
-                  ✓
+                  <LoarIcon name="check" size={14} />
                 </span>
                 <Label className="text-sm font-medium">Extracted Last Frame</Label>
               </div>
@@ -864,7 +865,7 @@ export function EventCreationSidebar({
             <div className="border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">
-                  ✓
+                  <LoarIcon name="check" size={14} />
                 </span>
                 <Label className="text-sm font-medium">First Frame Generated</Label>
               </div>
@@ -1200,7 +1201,7 @@ export function EventCreationSidebar({
             <div className="border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">
-                  ✓
+                  <LoarIcon name="check" size={14} />
                 </span>
                 <Label className="text-sm font-medium">Video Generated</Label>
               </div>
@@ -1238,7 +1239,7 @@ export function EventCreationSidebar({
                     </>
                   ) : contractSaved ? (
                     <>
-                      <span className="text-green-600">✓</span>
+                      <LoarIcon name="check" size={14} className="text-green-600" />
                       <span className="ml-2">Saved to Timeline & Filecoin</span>
                     </>
                   ) : (
@@ -1252,7 +1253,12 @@ export function EventCreationSidebar({
                 {contractSaved && (
                   <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
                     <div className="text-green-700 font-medium">
-                      ✅ Successfully saved to universe timeline
+                      <LoarIcon
+                        name="check-circle"
+                        size={14}
+                        className="inline-block align-[-0.125em] mr-1"
+                      />
+                      Successfully saved to universe timeline
                       {filecoinSaved ? ' and Filecoin' : ''}!
                     </div>
                     {filecoinSaved && pieceCid && (

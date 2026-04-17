@@ -32,6 +32,7 @@ const HIDDEN_ROUTES = new Set<string>([]);
 const primaryLinks = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
+  { to: '/wiki', label: 'Wiki' },
   { to: '/gallery', label: 'Gallery' },
   { to: '/tokens', label: 'Launchpad' },
   { to: '/faucet', label: 'Faucet' },
@@ -40,7 +41,6 @@ const primaryLinks = [
 ].filter((l) => !HIDDEN_ROUTES.has(l.to));
 
 const moreLinks = [
-  { to: '/wiki', label: 'Wiki' },
   { to: '/market', label: 'Marketplace' },
   { to: '/bounties', label: 'Bounties' },
   { to: '/staking', label: 'Staking' },

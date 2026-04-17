@@ -15,7 +15,10 @@ import {
   type CreateEntityInput,
   type UpdateEntityInput,
   type EntityKind,
+  type EntityRelation,
+  type EntityRelationType,
   ENTITY_KINDS,
+  ENTITY_RELATION_TYPES,
   VALID_PARENTS,
   STRUCTURAL_KINDS,
 } from './entities.types';
@@ -151,20 +154,10 @@ export async function getEntitiesByUniverse(
     query = query.where('kind', '==', kind);
   }
 
+  query = query.orderBy('createdAt', 'desc');
+
   const snapshot = await query.get();
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
-    .sort((a, b) => {
-      const aTime =
-        a.createdAt instanceof Date
-          ? a.createdAt.getTime()
-          : new Date(a.createdAt as any).getTime();
-      const bTime =
-        b.createdAt instanceof Date
-          ? b.createdAt.getTime()
-          : new Date(b.createdAt as any).getTime();
-      return aTime - bTime;
-    });
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
 export async function getEntitiesByKind(kind: EntityKind, limit = 100): Promise<Entity[]> {
@@ -188,21 +181,10 @@ export async function getEntitiesByCreator(
     query = query.where('kind', '==', kind);
   }
 
+  query = query.orderBy('createdAt', 'desc').limit(limit);
+
   const snapshot = await query.get();
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
-    .sort((a, b) => {
-      const aTime =
-        a.createdAt instanceof Date
-          ? a.createdAt.getTime()
-          : new Date(a.createdAt as any).getTime();
-      const bTime =
-        b.createdAt instanceof Date
-          ? b.createdAt.getTime()
-          : new Date(b.createdAt as any).getTime();
-      return bTime - aTime;
-    })
-    .slice(0, limit);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
 export async function getChildEntities(parentId: string, limit?: number): Promise<Entity[]>;
@@ -221,22 +203,13 @@ export async function getChildEntities(first: string, second?: string | number):
     parentId = first;
     if (typeof second === 'number') limit = second;
   }
-  const snapshot = await entitiesCol().where('parentId', '==', parentId).get();
+  const snapshot = await entitiesCol()
+    .where('parentId', '==', parentId)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
 
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
-    .sort((a, b) => {
-      const aTime =
-        a.createdAt instanceof Date
-          ? a.createdAt.getTime()
-          : new Date(a.createdAt as any).getTime();
-      const bTime =
-        b.createdAt instanceof Date
-          ? b.createdAt.getTime()
-          : new Date(b.createdAt as any).getTime();
-      return aTime - bTime;
-    })
-    .slice(0, limit);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
 export async function updateEntity(entityId: string, input: UpdateEntityInput): Promise<Entity>;
@@ -396,6 +369,176 @@ export async function removeNodeFromEntity(
   await ref.update({ nodeIds: updatedNodeIds, updatedAt: new Date() });
 
   return { ...existing, id: entityId, nodeIds: updatedNodeIds };
+}
+
+// ── Search ──────────────────────────────────────────────────────────
+
+/**
+ * Search entities by name/description substring.
+ * Firestore doesn't support full-text search, so we use a prefix-based
+ * approach on the `name` field with client-side description filtering.
+ */
+export async function searchEntities(opts: {
+  query: string;
+  universeAddress?: string;
+  kind?: EntityKind;
+  limit?: number;
+}): Promise<Entity[]> {
+  const { query, universeAddress, kind, limit = 50 } = opts;
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+
+  // Build base query
+  let firestoreQuery: FirebaseFirestore.Query = entitiesCol();
+
+  if (universeAddress) {
+    firestoreQuery = firestoreQuery.where('universeAddress', '==', universeAddress.toLowerCase());
+  }
+  if (kind) {
+    firestoreQuery = firestoreQuery.where('kind', '==', kind);
+  }
+
+  // Firestore doesn't support LIKE, so we fetch more and filter in memory.
+  // For a production system, use Algolia/Typesense/Meilisearch.
+  const fetchLimit = Math.min(limit * 5, 500);
+  const snapshot = await firestoreQuery.orderBy('createdAt', 'desc').limit(fetchLimit).get();
+
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
+    .filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.description && e.description.toLowerCase().includes(q))
+    )
+    .slice(0, limit);
+}
+
+// ── Relationships ────────────────────────────────────────────────────
+
+function relationsCol() {
+  return db.collection('entityRelations');
+}
+
+export async function createRelation(
+  sourceId: string,
+  targetId: string,
+  type: EntityRelationType,
+  description: string,
+  creator: string
+): Promise<EntityRelation> {
+  if (!ENTITY_RELATION_TYPES.includes(type)) {
+    throw new Error(`Invalid relation type: ${type}`);
+  }
+
+  // Validate both entities exist
+  const [sourceDoc, targetDoc] = await Promise.all([
+    entitiesCol().doc(sourceId).get(),
+    entitiesCol().doc(targetId).get(),
+  ]);
+  if (!sourceDoc.exists) throw new Error('Source entity not found');
+  if (!targetDoc.exists) throw new Error('Target entity not found');
+  if (sourceId === targetId) throw new Error('Cannot create a relationship to itself');
+
+  const source = sourceDoc.data() as Entity;
+
+  // Check for duplicate
+  const existing = await relationsCol()
+    .where('sourceId', '==', sourceId)
+    .where('targetId', '==', targetId)
+    .where('type', '==', type)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    throw new Error('This relationship already exists');
+  }
+
+  const ref = relationsCol().doc();
+  const now = new Date();
+  const relation: EntityRelation = {
+    id: ref.id,
+    sourceId,
+    targetId,
+    type,
+    description,
+    universeAddress: source.universeAddress,
+    creator: creator.toLowerCase(),
+    createdAt: now,
+  };
+
+  await ref.set(relation);
+  return relation;
+}
+
+export async function deleteRelation(relationId: string): Promise<void> {
+  const ref = relationsCol().doc(relationId);
+  const doc = await ref.get();
+  if (!doc.exists) throw new Error('Relationship not found');
+  await ref.delete();
+}
+
+/** Get all relationships where entity is source OR target. */
+export async function getEntityRelations(
+  entityId: string
+): Promise<
+  Array<
+    EntityRelation & {
+      sourceName: string;
+      targetName: string;
+      sourceKind: string;
+      targetKind: string;
+      sourceImageUrl: string | null;
+      targetImageUrl: string | null;
+    }
+  >
+> {
+  // Firestore doesn't support OR queries across different fields,
+  // so we run two queries in parallel
+  const [asSourceSnap, asTargetSnap] = await Promise.all([
+    relationsCol().where('sourceId', '==', entityId).get(),
+    relationsCol().where('targetId', '==', entityId).get(),
+  ]);
+
+  const relations = [
+    ...asSourceSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EntityRelation),
+    ...asTargetSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EntityRelation),
+  ];
+
+  if (relations.length === 0) return [];
+
+  // Batch-fetch related entity names to avoid N+1
+  const relatedIds = new Set<string>();
+  for (const rel of relations) {
+    relatedIds.add(rel.sourceId);
+    relatedIds.add(rel.targetId);
+  }
+
+  const entityDocs = await Promise.all([...relatedIds].map((id) => entitiesCol().doc(id).get()));
+  const entityMap = new Map<string, { name: string; kind: string; imageUrl: string | null }>();
+  for (const doc of entityDocs) {
+    if (doc.exists) {
+      const data = doc.data() as Entity;
+      entityMap.set(doc.id, { name: data.name, kind: data.kind, imageUrl: data.imageUrl });
+    }
+  }
+
+  return relations.map((rel) => ({
+    ...rel,
+    sourceName: entityMap.get(rel.sourceId)?.name ?? 'Unknown',
+    targetName: entityMap.get(rel.targetId)?.name ?? 'Unknown',
+    sourceKind: entityMap.get(rel.sourceId)?.kind ?? 'unknown',
+    targetKind: entityMap.get(rel.targetId)?.kind ?? 'unknown',
+    sourceImageUrl: entityMap.get(rel.sourceId)?.imageUrl ?? null,
+    targetImageUrl: entityMap.get(rel.targetId)?.imageUrl ?? null,
+  }));
+}
+
+/** Get all relationships within a universe. */
+export async function getUniverseRelations(universeAddress: string): Promise<EntityRelation[]> {
+  const snapshot = await relationsCol()
+    .where('universeAddress', '==', universeAddress.toLowerCase())
+    .limit(200)
+    .get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EntityRelation);
 }
 
 /**

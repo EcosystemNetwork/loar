@@ -30,7 +30,13 @@ import {
   Redo2,
   Keyboard,
   Play,
+  Waves,
+  Megaphone,
+  Settings,
+  EyeOff,
+  Map,
 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import {
   Dialog,
@@ -71,6 +77,7 @@ import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { GenerationsPanel } from '@/components/GenerationsPanel';
+import { AudioToolbar, type SelectedClip } from '@/components/AudioToolbar';
 import { calculateTreeLayout, normalizeNodeId, getEventLabel } from '@/utils/treeLayout';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
@@ -193,6 +200,7 @@ function UniverseTimelineEditorInner() {
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSelectionPlayer, setShowSelectionPlayer] = useState(false);
+  const [showAudioToolbar, setShowAudioToolbar] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -209,6 +217,12 @@ function UniverseTimelineEditorInner() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [miniMapPosition, setMiniMapPosition] = useState<
+    'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  >('bottom-right');
+  const [miniMapZoomStep, setMiniMapZoomStep] = useState(10); // 1-20, default 10
+  const [miniMapSize, setMiniMapSize] = useState<number>(150); // 100-300
+  const [showMiniMapSettings, setShowMiniMapSettings] = useState(false);
 
   // Undo/redo state
   const undoStack = useRef<{ nodes: Node<TimelineNodeData>[]; edges: Edge[] }[]>([]);
@@ -777,6 +791,25 @@ function UniverseTimelineEditorInner() {
       }));
   }, [showSelectionPlayer, selectedNodeIds, nodes]);
 
+  // Build selected clips for AudioToolbar
+  const selectedClips: SelectedClip[] = useMemo(() => {
+    if (selectedNodeIds.size === 0) return [];
+    return nodes
+      .filter(
+        (n: any) => selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
+      )
+      .sort((a: any, b: any) => {
+        if (Math.abs(a.position.y - b.position.y) > 50) return a.position.y - b.position.y;
+        return a.position.x - b.position.x;
+      })
+      .map((n: any) => ({
+        videoUrl: n.data.videoUrl,
+        title: n.data.label || n.data.displayName || `Event ${n.data.eventId || n.id}`,
+        generationId: n.data.generationId || n.data.eventId || n.id,
+        nodeId: n.data.eventId ? parseInt(n.data.eventId, 10) : undefined,
+      }));
+  }, [selectedNodeIds, nodes]);
+
   // ── Undo / Redo ────────────────────────────────────────────────────
   const pushUndoState = useCallback(() => {
     undoStack.current.push({
@@ -986,7 +1019,10 @@ function UniverseTimelineEditorInner() {
 
       // M — toggle minimap
       if (e.key === 'm') {
-        setShowMiniMap((v) => !v);
+        setShowMiniMap((v) => {
+          if (v) setShowMiniMapSettings(false);
+          return !v;
+        });
         return;
       }
     };
@@ -2040,19 +2076,133 @@ function UniverseTimelineEditorInner() {
               <Background />
               <Controls showInteractive={false} />
 
-              {/* MiniMap — togglable */}
+              {/* MiniMap — togglable with settings */}
               {showMiniMap && (
-                <MiniMap
-                  nodeColor={(n: any) => {
-                    if (n.data?.isInCanonChain) return '#eab308';
-                    if (n.data?.nodeType === 'add') return '#64748b';
-                    return n.data?.timelineColor || '#10b981';
-                  }}
-                  maskColor="rgba(0, 0, 0, 0.6)"
-                  style={{ background: '#0a0a0a', border: '1px solid #27272a', borderRadius: 8 }}
-                  pannable
-                  zoomable
-                />
+                <Panel position={miniMapPosition} className="!m-2">
+                  <div className="relative group">
+                    <MiniMap
+                      nodeColor={(n: any) => {
+                        if (n.data?.isInCanonChain) return '#eab308';
+                        if (n.data?.nodeType === 'add') return '#64748b';
+                        return n.data?.timelineColor || '#10b981';
+                      }}
+                      maskColor="rgba(0, 0, 0, 0.6)"
+                      style={{
+                        background: '#0a0a0a',
+                        border: '1px solid #27272a',
+                        borderRadius: 8,
+                        width: miniMapSize,
+                        height: miniMapSize * 0.75,
+                        position: 'relative',
+                      }}
+                      pannable
+                      zoomable
+                      zoomStep={miniMapZoomStep}
+                    />
+                    {/* Settings gear — visible on hover */}
+                    <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setShowMiniMapSettings((v) => !v)}
+                        className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                        title="Minimap settings"
+                      >
+                        <Settings className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => setShowMiniMap(false)}
+                        className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                        title="Hide minimap (M)"
+                      >
+                        <EyeOff className="h-3 w-3" />
+                      </button>
+                    </div>
+                    {/* Settings panel */}
+                    {showMiniMapSettings && (
+                      <div
+                        className="absolute z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-lg shadow-2xl p-3 w-56 space-y-3"
+                        style={{
+                          [miniMapPosition.includes('bottom') ? 'bottom' : 'top']: '100%',
+                          [miniMapPosition.includes('right') ? 'right' : 'left']: 0,
+                          marginBottom: miniMapPosition.includes('bottom') ? 4 : undefined,
+                          marginTop: miniMapPosition.includes('top') ? 4 : undefined,
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-zinc-300">
+                            Minimap Settings
+                          </span>
+                          <button
+                            onClick={() => setShowMiniMapSettings(false)}
+                            className="p-0.5 hover:bg-zinc-700 rounded text-zinc-500 hover:text-white"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Sensitivity */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-zinc-400">Zoom Sensitivity</label>
+                          <Slider
+                            value={[miniMapZoomStep]}
+                            onValueChange={([v]) => setMiniMapZoomStep(v)}
+                            min={1}
+                            max={20}
+                            step={1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-[10px] text-zinc-500">
+                            <span>Low</span>
+                            <span>High</span>
+                          </div>
+                        </div>
+
+                        {/* Size */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-zinc-400">Size</label>
+                          <Slider
+                            value={[miniMapSize]}
+                            onValueChange={([v]) => setMiniMapSize(v)}
+                            min={100}
+                            max={300}
+                            step={10}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-[10px] text-zinc-500">
+                            <span>Small</span>
+                            <span>Large</span>
+                          </div>
+                        </div>
+
+                        {/* Position */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-zinc-400">Position</label>
+                          <div className="grid grid-cols-2 gap-1">
+                            {(
+                              [
+                                ['top-left', 'Top Left'],
+                                ['top-right', 'Top Right'],
+                                ['bottom-left', 'Bottom Left'],
+                                ['bottom-right', 'Bottom Right'],
+                              ] as const
+                            ).map(([pos, label]) => (
+                              <button
+                                key={pos}
+                                onClick={() => setMiniMapPosition(pos)}
+                                className={`text-[11px] px-2 py-1 rounded transition-colors ${
+                                  miniMapPosition === pos
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Panel>
               )}
 
               {/* Search Overlay */}
@@ -2190,6 +2340,13 @@ function UniverseTimelineEditorInner() {
                       title="Auto-layout nodes"
                     >
                       <LayoutGrid className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setShowMiniMap((v) => !v)}
+                      className={`p-1.5 hover:bg-zinc-700 transition-colors ${showMiniMap ? 'text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                      title={showMiniMap ? 'Hide minimap (M)' : 'Show minimap (M)'}
+                    >
+                      <Map className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => {
@@ -2336,6 +2493,42 @@ function UniverseTimelineEditorInner() {
                     <Copy className="h-4 w-4" />
                     Duplicate
                   </Button>
+
+                  <div className="border-l border-zinc-700 pl-3 flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                      onClick={() => setShowAudioToolbar(true)}
+                      disabled={selectedClips.length === 0}
+                      title="Add background music"
+                    >
+                      <Music className="h-4 w-4" />
+                      Music
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                      onClick={() => setShowAudioToolbar(true)}
+                      disabled={selectedClips.length === 0}
+                      title="Add sound effects"
+                    >
+                      <Waves className="h-4 w-4" />
+                      SFX
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                      onClick={() => setShowAudioToolbar(true)}
+                      disabled={selectedClips.length === 0}
+                      title="Lip sync dialogue"
+                    >
+                      <Megaphone className="h-4 w-4" />
+                      Lip Sync
+                    </Button>
+                  </div>
 
                   <Button
                     variant="ghost"
@@ -2806,6 +2999,20 @@ function UniverseTimelineEditorInner() {
       {/* Selection Playlist Player */}
       {showSelectionPlayer && selectionVideos.length > 0 && (
         <SelectionPlayer videos={selectionVideos} onClose={() => setShowSelectionPlayer(false)} />
+      )}
+
+      {/* Audio Toolbar — Music, SFX, Lip Sync */}
+      {showAudioToolbar && selectedClips.length > 0 && (
+        <AudioToolbar
+          universeId={id}
+          selectedClips={selectedClips}
+          onClearSelection={() => {
+            setShowAudioToolbar(false);
+          }}
+          onSoundNodeCreated={() => {
+            // Keep selection so user can add more layers to same clips
+          }}
+        />
       )}
     </div>
   );

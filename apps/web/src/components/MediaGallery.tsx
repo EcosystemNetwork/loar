@@ -41,9 +41,10 @@ import {
   Bone,
   Image as ImageIcon,
 } from 'lucide-react';
+import { LoarIcon } from '@/components/loar-icons';
 
 const CATEGORY_ICONS: Record<MediaCategory, React.ReactNode> = {
-  image: <span className="text-base leading-none">🖼</span>,
+  image: <LoarIcon name="gallery" size={14} />,
   video: <Video className="w-3.5 h-3.5" />,
   music: <Music className="w-3.5 h-3.5" />,
   sound: <Volume2 className="w-3.5 h-3.5" />,

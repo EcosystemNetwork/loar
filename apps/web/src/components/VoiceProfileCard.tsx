@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { Mic, Loader2, Volume2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mic, Loader2, Volume2, Sparkles, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 interface VoiceProfileCardProps {
   entityId: string;
@@ -185,6 +185,31 @@ export function VoiceProfileCard({
     },
   });
 
+  // Delete voice profile
+  const deleteVoice = useMutation({
+    mutationFn: (profileId: string) =>
+      trpcClient.sceneAudio.deleteVoiceProfile.mutate({ profileId }),
+    onSuccess: () => {
+      toast.success('Voice profile deleted');
+      queryClient.invalidateQueries({ queryKey: ['voice-profiles', universeId] });
+    },
+    onError: (err: any) => toast.error(err.message ?? 'Delete failed'),
+  });
+
+  // Preview voice with custom text
+  const previewVoice = useMutation({
+    mutationFn: (input: { profileId: string; text: string }) =>
+      trpcClient.sceneAudio.previewVoice.mutate(input),
+    onSuccess: (data: any) => {
+      setPreviewAudioUrl(data.audioUrl);
+    },
+    onError: (err: any) => toast.error(err.message ?? 'Preview failed'),
+  });
+
+  const [previewAudioUrl, setPreviewAudioUrl] = useState<string | null>(null);
+  const [previewProfileId, setPreviewProfileId] = useState<string | null>(null);
+  const [previewCustomText, setPreviewCustomText] = useState('');
+
   const handleDesignVoice = () => {
     if (!universeId) {
       toast.error('Entity must belong to a universe to design a voice');
@@ -256,14 +281,32 @@ export function VoiceProfileCard({
         )}
 
         {entityProfiles.map((profile: any) => (
-          <div key={profile.id} className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Volume2 className="w-3.5 h-3.5 text-primary" />
-              <span className="font-medium">{profile.characterName}</span>
-              <Badge variant="outline" className="text-[10px]">
-                {profile.gender} / {profile.age?.replace('_', ' ')} / {profile.accent}
-              </Badge>
+          <div key={profile.id} className="space-y-2 rounded-lg border p-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <Volume2 className="w-3.5 h-3.5 text-primary" />
+                <span className="font-medium">{profile.characterName}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {profile.gender} / {profile.age?.replace('_', ' ')} / {profile.accent}
+                </Badge>
+              </div>
+              {isOwner && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    if (confirm('Delete this voice profile?')) {
+                      deleteVoice.mutate(profile.id);
+                    }
+                  }}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
             </div>
+
+            {/* Audio preview */}
             {profile.previewUrl && (
               <AudioPlayer
                 src={profile.previewUrl}
@@ -271,8 +314,54 @@ export function VoiceProfileCard({
                 compact
               />
             )}
+
             {profile.description && (
               <p className="text-xs text-muted-foreground">{profile.description}</p>
+            )}
+
+            {/* Custom preview text */}
+            {isOwner && (
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Test with custom text..."
+                  className="flex-1 h-7 text-xs rounded border bg-background px-2"
+                  value={previewProfileId === profile.id ? previewCustomText : ''}
+                  onChange={(e) => {
+                    setPreviewProfileId(profile.id);
+                    setPreviewCustomText(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && previewCustomText.trim()) {
+                      previewVoice.mutate({ profileId: profile.id, text: previewCustomText });
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[10px] px-2"
+                  disabled={
+                    previewVoice.isPending ||
+                    !previewCustomText.trim() ||
+                    previewProfileId !== profile.id
+                  }
+                  onClick={() =>
+                    previewVoice.mutate({ profileId: profile.id, text: previewCustomText })
+                  }
+                >
+                  {previewVoice.isPending && previewProfileId === profile.id ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    'Test'
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Custom preview result */}
+            {previewAudioUrl && previewProfileId === profile.id && (
+              <AudioPlayer src={previewAudioUrl} title="Custom Preview" compact />
             )}
           </div>
         ))}

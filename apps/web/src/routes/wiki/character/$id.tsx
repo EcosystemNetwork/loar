@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { trpc } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Users } from 'lucide-react';
 
 interface Character {
   id: string;
@@ -77,12 +77,20 @@ function CharacterPage() {
         <div className="space-y-4">
           <Card>
             <CardContent className="p-6">
-              <div className="aspect-square w-full">
-                <img
-                  src={character.image_url}
-                  alt={character.character_name}
-                  className="w-full h-full object-cover rounded-lg"
-                />
+              <div className="aspect-square w-full relative bg-muted rounded-lg overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Users className="h-16 w-16 text-muted-foreground/20" />
+                </div>
+                {character.image_url && (
+                  <img
+                    src={character.image_url}
+                    alt={character.character_name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

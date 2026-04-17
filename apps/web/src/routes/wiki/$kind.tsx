@@ -167,20 +167,22 @@ function WikiKindPage() {
               className="block"
             >
               <Card className="h-full bg-zinc-900 border-zinc-800 hover:border-violet-600 hover:shadow-lg hover:shadow-violet-600/10 transition-all cursor-pointer">
-                <div className="aspect-video w-full overflow-hidden rounded-t-lg">
-                  {entity.imageUrl ? (
+                <div className="aspect-video w-full overflow-hidden rounded-t-lg relative bg-zinc-800">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {(() => {
+                      const Icon = KIND_ICONS[kind];
+                      return <Icon className="h-10 w-10 text-muted-foreground/30" />;
+                    })()}
+                  </div>
+                  {entity.imageUrl && (
                     <img
                       src={entity.imageUrl}
                       alt={entity.name}
-                      className="w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                      {(() => {
-                        const Icon = KIND_ICONS[kind];
-                        return <Icon className="h-10 w-10 text-muted-foreground/30" />;
-                      })()}
-                    </div>
                   )}
                 </div>
                 <CardHeader className="pb-2">

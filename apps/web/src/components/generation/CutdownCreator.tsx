@@ -19,6 +19,7 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { trpc } from '../../utils/trpc';
+import { LoarIcon, type LoarIconName } from '@/components/loar-icons';
 import { useWalletAuth } from '../../lib/wallet-auth';
 import { toast } from 'sonner';
 
@@ -32,10 +33,10 @@ type AspectRatio = '9:16' | '1:1' | '4:5';
 type Mode = 'auto' | 'highlight' | 'full';
 type CaptionStyle = 'default' | 'bold' | 'minimal' | 'karaoke';
 
-const ASPECT_LABELS: Record<AspectRatio, { label: string; icon: string }> = {
-  '9:16': { label: 'Vertical (9:16)', icon: '📱' },
-  '1:1': { label: 'Square (1:1)', icon: '⬛' },
-  '4:5': { label: 'Portrait (4:5)', icon: '📷' },
+const ASPECT_LABELS: Record<AspectRatio, { label: string; icon: LoarIconName }> = {
+  '9:16': { label: 'Vertical (9:16)', icon: 'mobile' },
+  '1:1': { label: 'Square (1:1)', icon: 'square' },
+  '4:5': { label: 'Portrait (4:5)', icon: 'camera' },
 };
 
 const MODE_LABELS: Record<Mode, { label: string; description: string }> = {
@@ -149,7 +150,10 @@ export function CutdownCreator({
             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Format</label>
             <div className="flex gap-2">
               {(
-                Object.entries(ASPECT_LABELS) as [AspectRatio, { label: string; icon: string }][]
+                Object.entries(ASPECT_LABELS) as [
+                  AspectRatio,
+                  { label: string; icon: LoarIconName },
+                ][]
               ).map(([ratio, { label, icon }]) => (
                 <button
                   key={ratio}
@@ -160,7 +164,7 @@ export function CutdownCreator({
                       : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600'
                   }`}
                 >
-                  <span>{icon}</span>
+                  <LoarIcon name={icon} size={16} />
                   <span>{label}</span>
                 </button>
               ))}

@@ -9,10 +9,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { LoarIcon, type LoarIconName } from '@/components/loar-icons';
 
 const DAY_LABELS = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
 const DAY_REWARDS = [5, 10, 20, 35, 50, 75, 150];
-const DAY_ICONS = ['🌱', '⚡', '🔥', '💥', '🌟', '💎', '👑'];
+const DAY_ICON_NAMES: LoarIconName[] = [
+  'seedling',
+  'bolt',
+  'flame',
+  'explosion',
+  'glowing-star',
+  'gem',
+  'crown',
+];
 
 export function DailyCheckin() {
   const queryClient = useQueryClient();
@@ -79,8 +88,8 @@ export function DailyCheckin() {
             <div className="flex items-center gap-2">
               <span className="text-base font-bold text-white">Daily Check-in</span>
               {s.currentStreak >= 3 && (
-                <span className="text-orange-400 text-sm font-bold">
-                  🔥 {s.currentStreak} day streak
+                <span className="text-orange-400 text-sm font-bold inline-flex items-center gap-1">
+                  <LoarIcon name="flame" size={14} /> {s.currentStreak} day streak
                 </span>
               )}
             </div>
@@ -121,8 +130,12 @@ export function DailyCheckin() {
                       : 'bg-zinc-800 border border-zinc-700'
                 }`}
               >
-                <span className="text-sm leading-none">
-                  {isPast ? '✅' : isCurrent && alreadyClaimed ? '✅' : DAY_ICONS[i]}
+                <span className="text-sm leading-none flex items-center justify-center">
+                  {isPast || (isCurrent && alreadyClaimed) ? (
+                    <LoarIcon name="check-circle" size={16} className="text-green-400" />
+                  ) : (
+                    <LoarIcon name={DAY_ICON_NAMES[i]} size={16} />
+                  )}
                 </span>
                 <span
                   className={`text-[9px] font-bold leading-none mt-1 ${
@@ -152,7 +165,9 @@ export function DailyCheckin() {
       <div className="px-4 pb-4">
         {alreadyClaimed ? (
           <div className="w-full py-2 rounded-lg bg-green-900/40 border border-green-800 text-green-400 text-sm font-medium text-center">
-            ✓ Checked in today
+            <span className="inline-flex items-center gap-1">
+              <LoarIcon name="check" size={14} /> Checked in today
+            </span>
           </div>
         ) : (
           <button

@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft,
   Plus,
   Vote,
   Users,
@@ -30,8 +29,8 @@ import { useReadContract, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { universeGovernorAbi, governanceErc20Abi, universeAbi } from '@loar/abis/generated';
-import { type Address } from 'viem';
-import { encodeFunctionData, keccak256, encodeAbiParameters, getAddress } from 'viem';
+import { type Address, formatUnits } from 'viem';
+import { encodeFunctionData, keccak256, getAddress } from 'viem';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import {
@@ -44,11 +43,19 @@ import {
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { SafeSignerList } from '@/components/SafeSignerList';
 import { SafeTransactionQueue } from '@/components/SafeTransactionQueue';
+import { toast } from 'sonner';
+import type { UniverseData } from '@/types/universe';
+
+/** Max characters for on-chain proposal descriptions to limit gas usage */
+const MAX_PROPOSAL_DESCRIPTION = 500;
+
+/** Number of blocks to look back when fetching proposals. ~500k blocks on Base L2 ≈ ~11.5 days */
+const PROPOSAL_LOOKBACK_BLOCKS = 500_000n;
 
 interface GovernanceSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  finalUniverse: any;
+  finalUniverse: UniverseData | null;
   nodes: Node<TimelineNodeData>[];
   onRefresh?: () => void;
 }
@@ -82,6 +89,28 @@ const ProposalState = {
   7: 'Executed',
 } as const;
 
+/** Format raw token amount to human-readable (assumes 18 decimals) */
+function formatTokenAmount(amount: bigint | undefined): string {
+  if (amount === undefined) return '0';
+  return formatUnits(amount, 18);
+}
+
+/** Sanitize proposal description: strip control chars, limit newlines */
+function sanitizeDescription(desc: string): string {
+  return desc
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars except \n \r \t
+    .slice(0, MAX_PROPOSAL_DESCRIPTION);
+}
+
+/** Safely compute voting progress percentage */
+function computeVotingProgress(currentBlock: bigint, startBlock: bigint, endBlock: bigint): number {
+  const total = endBlock - startBlock;
+  if (total <= 0n) return 0;
+  const elapsed = currentBlock - startBlock;
+  const pct = Number((elapsed * 100n) / total);
+  return Math.min(100, Math.max(0, pct));
+}
+
 export function GovernanceSidebar({
   isOpen,
   onClose,
@@ -101,10 +130,9 @@ export function GovernanceSidebar({
 
   // Get governance addresses from universe data
   const ZERO = '0x0000000000000000000000000000000000000000';
-  const rawGovernanceAddress = finalUniverse?.governanceAddress;
-  const rawTokenAddress = finalUniverse?.tokenAddress;
+  const rawGovernanceAddress = finalUniverse?.governanceAddress ?? undefined;
+  const rawTokenAddress = finalUniverse?.tokenAddress ?? undefined;
   // Treat zero-address as undefined to prevent contract calls to address(0)
-  // Use getAddress() to normalize checksums — addresses from Firestore/indexer may have invalid EIP-55 casing
   const governanceAddress = (
     rawGovernanceAddress && rawGovernanceAddress !== ZERO
       ? getAddress(rawGovernanceAddress)
@@ -193,50 +221,38 @@ export function GovernanceSidebar({
   const eventIdToContractId = useMemo(() => {
     const mapping = new Map<string, number>();
     const sortedNodes = [...sceneNodes].sort((a, b) => {
-      // Sort to ensure consistent mapping: main sequence first, then branches
       const aEventId = a.data.eventId || '0';
       const bEventId = b.data.eventId || '0';
-
-      // Extract numeric part for primary sorting
       const aNumeric = parseInt(aEventId.replace(/[a-z]/g, ''));
       const bNumeric = parseInt(bEventId.replace(/[a-z]/g, ''));
-
-      if (aNumeric !== bNumeric) {
-        return aNumeric - bNumeric;
-      }
-
-      // For same numeric part, sort alphabetically (2 < 2b < 2c)
+      if (aNumeric !== bNumeric) return aNumeric - bNumeric;
       return aEventId.localeCompare(bEventId);
     });
-
-    // Assign sequential contract IDs starting from 1
     sortedNodes.forEach((node, index) => {
       const eventId = node.data.eventId;
-      if (eventId) {
-        mapping.set(eventId, index + 1);
-      }
+      if (eventId) mapping.set(eventId, index + 1);
     });
-
     return mapping;
   }, [sceneNodes]);
-
-  // Create reverse mapping for displaying UI event IDs in proposals
-  const contractIdToEventId = useMemo(() => {
-    const reverseMapping = new Map<number, string>();
-    eventIdToContractId.forEach((contractId, eventId) => {
-      reverseMapping.set(contractId, eventId);
-    });
-    return reverseMapping;
-  }, [eventIdToContractId]);
 
   // Check if user needs to delegate tokens to themselves
   const needsDelegation =
     address && currentDelegate !== address && tokenBalance && tokenBalance > 0n;
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   // Handle token delegation to self
   const handleSelfDelegate = useCallback(async () => {
     if (!address || !tokenAddress) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -245,14 +261,13 @@ export function GovernanceSidebar({
         abi: governanceErc20Abi,
         address: tokenAddress,
         functionName: 'delegate',
-        args: [address], // Delegate to self
+        args: [address],
       });
 
-      alert(`Successfully delegated tokens! Transaction: ${txHash}`);
+      toast.success(`Tokens delegated! Tx: ${txHash}`);
     } catch (error) {
-      // Error surfaced via alert
-      alert(
-        'Failed to delegate tokens: ' + (error instanceof Error ? error.message : 'Unknown error')
+      toast.error(
+        'Failed to delegate: ' + (error instanceof Error ? error.message : 'Unknown error')
       );
     }
   }, [address, tokenAddress, writeContractAsync]);
@@ -267,14 +282,12 @@ export function GovernanceSidebar({
         try {
           const block = await publicClient.getBlockNumber();
           setCurrentBlock(block);
-        } catch (error) {
+        } catch {
           // Silently retry on next interval
         }
       }
     };
-
     updateBlockNumber();
-    // Update every 30 seconds
     const interval = setInterval(updateBlockNumber, 30000);
     return () => clearInterval(interval);
   }, [publicClient]);
@@ -285,22 +298,20 @@ export function GovernanceSidebar({
 
     setIsLoadingProposals(true);
     try {
-      // Get current block number
-      const currentBlock = await publicClient.getBlockNumber();
-      setCurrentBlock(currentBlock);
-      const fromBlock = currentBlock - 10000n; // Look back ~10k blocks (adjust as needed)
+      const latestBlock = await publicClient.getBlockNumber();
+      setCurrentBlock(latestBlock);
+      const fromBlock =
+        latestBlock > PROPOSAL_LOOKBACK_BLOCKS ? latestBlock - PROPOSAL_LOOKBACK_BLOCKS : 0n;
 
-      // Fetch ProposalCreated events
       const events = await publicClient.getContractEvents({
         address: governanceAddress,
         abi: universeGovernorAbi,
         eventName: 'ProposalCreated',
-        fromBlock: fromBlock,
+        fromBlock,
         toBlock: 'latest',
       });
 
-      // Convert events to proposal objects
-      const proposals: Proposal[] = await Promise.all(
+      const fetchedProposals: Proposal[] = await Promise.all(
         events.map(async (event) => {
           const args = event.args as {
             proposalId: bigint;
@@ -314,14 +325,12 @@ export function GovernanceSidebar({
             description: string;
           };
 
-          // Try to get current proposal state and vote counts
-          let state = 1; // Default to Active
+          let state = 1;
           let forVotes = 0n;
           let againstVotes = 0n;
           let abstainVotes = 0n;
 
           try {
-            // Get proposal state
             const proposalState = (await publicClient.readContract({
               address: governanceAddress,
               abi: universeGovernorAbi,
@@ -330,7 +339,6 @@ export function GovernanceSidebar({
             })) as number;
             state = proposalState;
 
-            // Get vote counts
             const votes = (await publicClient.readContract({
               address: governanceAddress,
               abi: universeGovernorAbi,
@@ -341,21 +349,17 @@ export function GovernanceSidebar({
             againstVotes = votes[0];
             forVotes = votes[1];
             abstainVotes = votes[2];
-          } catch (error) {
+          } catch {
             // Could not fetch proposal state/votes
           }
 
-          // Parse description to extract node info
           const nodeMatch = args.description.match(/Set Event (.+?) as Canon/);
-          const displayedNodeId = nodeMatch ? nodeMatch[1] : 'Unknown';
-
-          // The displayed node ID is the UI event ID (like "2b"), not the contract ID
-          const nodeId = displayedNodeId;
+          const nodeId = nodeMatch ? nodeMatch[1] : 'Unknown';
 
           return {
             id: args.proposalId.toString(),
-            description: args.description.split('\n\n')[0], // Just the first line for display
-            fullDescription: args.description, // Store full description for execution
+            description: args.description.split('\n\n')[0],
+            fullDescription: args.description,
             proposalId: args.proposalId,
             targets: args.targets,
             values: args.values,
@@ -371,9 +375,9 @@ export function GovernanceSidebar({
         })
       );
 
-      setProposals(proposals.reverse()); // Show newest first
-    } catch (error) {
-      // Error handled by loading state
+      setProposals(fetchedProposals.reverse());
+    } catch {
+      toast.error('Failed to load proposals');
     } finally {
       setIsLoadingProposals(false);
     }
@@ -389,75 +393,60 @@ export function GovernanceSidebar({
   // Handle proposal creation
   const handleCreateProposal = useCallback(async () => {
     if (!isConnected || !address || !selectedNodeId || !proposalDescription) {
-      alert('Please connect wallet, select a node, and provide a description');
+      toast.error('Please connect wallet, select a node, and provide a description');
       return;
     }
 
     if (!votingPower || votingPower === 0n) {
-      alert('You need governance tokens to create proposals');
+      toast.error('You need governance tokens to create proposals');
       return;
     }
 
     if (proposalThreshold && votingPower < proposalThreshold) {
-      alert(`You need at least ${proposalThreshold.toString()} tokens to create a proposal`);
+      toast.error(
+        `You need at least ${formatTokenAmount(proposalThreshold)} tokens to create a proposal`
+      );
       return;
     }
 
     setIsCreatingProposal(true);
     try {
-      // Find the selected node
       const selectedNode = sceneNodes.find(
         (node) => node.data.eventId === selectedNodeId || node.id === selectedNodeId
       );
 
-      if (!selectedNode) {
-        throw new Error('Selected node not found');
-      }
+      if (!selectedNode) throw new Error('Selected node not found');
 
-      // Get the contract ID from our mapping
       const contractNodeId = eventIdToContractId.get(selectedNode.data.eventId || '');
-
       if (!contractNodeId) {
         throw new Error(`No contract ID found for event ID: ${selectedNode.data.eventId}`);
       }
 
-      // Encode the setCanon function call properly
       const setCanonCalldata = encodeFunctionData({
         abi: universeAbi,
         functionName: 'setCanon',
         args: [BigInt(contractNodeId)],
       });
 
-      const description = `Set Event ${selectedNode.data.displayName || selectedNode.data.eventId} as Canon\n\n${proposalDescription}`;
+      const sanitizedDesc = sanitizeDescription(proposalDescription);
+      const description = `Set Event ${selectedNode.data.displayName || selectedNode.data.eventId} as Canon\n\n${sanitizedDesc}`;
 
-      // Create proposal
       const txHash = await writeContractAsync({
         abi: universeGovernorAbi,
         address: governanceAddress!,
         functionName: 'propose',
-        args: [
-          [timelineAddress], // targets
-          [0n], // values (no ETH sent)
-          [setCanonCalldata], // calldatas
-          description,
-        ],
+        args: [[timelineAddress], [0n], [setCanonCalldata], description],
       });
 
-      alert(
-        `Proposal created successfully! Transaction: ${txHash}\n\nThe proposal will appear once the transaction is confirmed.`
-      );
-
-      // Reset form
+      toast.success(`Proposal created! Tx: ${txHash}`);
       setSelectedNodeId('');
       setProposalDescription('');
 
-      // Refresh proposals after a delay to allow for blockchain confirmation
       setTimeout(() => {
         fetchProposalsFromEvents();
       }, 5000);
     } catch (error) {
-      // Error surfaced via alert
-      alert(
+      toast.error(
         'Failed to create proposal: ' + (error instanceof Error ? error.message : 'Unknown error')
       );
     } finally {
@@ -475,18 +464,19 @@ export function GovernanceSidebar({
     governanceAddress,
     timelineAddress,
     eventIdToContractId,
+    fetchProposalsFromEvents,
   ]);
 
   // Handle voting on proposal
   const handleVote = useCallback(
     async (proposalId: bigint, support: number) => {
       if (!isConnected || !address) {
-        alert('Please connect your wallet');
+        toast.error('Please connect your wallet');
         return;
       }
 
       if (!votingPower || votingPower === 0n) {
-        alert('You need governance tokens to vote');
+        toast.error('You need governance tokens to vote');
         return;
       }
 
@@ -495,20 +485,18 @@ export function GovernanceSidebar({
           abi: universeGovernorAbi,
           address: governanceAddress!,
           functionName: 'castVote',
-          args: [proposalId, support], // 0 = Against, 1 = For, 2 = Abstain
+          args: [proposalId, support],
         });
 
-        alert(
-          `Vote cast successfully! Transaction: ${txHash}\nYour ${votingPower.toString()} votes have been recorded.\n\nVote counts will update once the transaction is confirmed.`
-        );
+        toast.success(`Vote cast! ${formatTokenAmount(votingPower)} votes recorded. Tx: ${txHash}`);
 
-        // Refresh proposals after a delay to get updated vote counts
         setTimeout(() => {
           fetchProposalsFromEvents();
         }, 5000);
       } catch (error) {
-        // Error surfaced via alert
-        alert('Failed to cast vote: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        toast.error(
+          'Failed to cast vote: ' + (error instanceof Error ? error.message : 'Unknown error')
+        );
       }
     },
     [
@@ -525,7 +513,7 @@ export function GovernanceSidebar({
   const handleExecuteProposal = useCallback(
     async (proposal: Proposal) => {
       if (!isConnected || !address) {
-        alert('Please connect your wallet');
+        toast.error('Please connect your wallet');
         return;
       }
 
@@ -544,18 +532,14 @@ export function GovernanceSidebar({
           ],
         });
 
-        alert(
-          `Proposal executed successfully! Transaction: ${txHash}\n\nThe canon node has been updated.`
-        );
+        toast.success(`Proposal executed! Canon updated. Tx: ${txHash}`);
 
-        // Refresh proposals to show updated state
         setTimeout(() => {
           fetchProposalsFromEvents();
-          onRefresh?.(); // Also refresh the timeline to show canon changes
+          onRefresh?.();
         }, 5000);
       } catch (error) {
-        // Error surfaced via alert
-        alert(
+        toast.error(
           'Failed to execute proposal: ' +
             (error instanceof Error ? error.message : 'Unknown error')
         );
@@ -601,6 +585,7 @@ export function GovernanceSidebar({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
+                aria-label="Close governance panel"
                 className="hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="h-4 w-4" />
@@ -631,9 +616,7 @@ export function GovernanceSidebar({
                             className="text-xs"
                           >
                             {isConnected
-                              ? tokenBalance
-                                ? `${tokenBalance.toString()} tokens`
-                                : '0 tokens'
+                              ? `${formatTokenAmount(tokenBalance)} tokens`
                               : 'Not Connected'}
                           </Badge>
                         </div>
@@ -647,9 +630,7 @@ export function GovernanceSidebar({
                             className="text-xs"
                           >
                             {isConnected
-                              ? votingPower
-                                ? `${votingPower.toString()} votes`
-                                : '0 votes'
+                              ? `${formatTokenAmount(votingPower)} votes`
                               : 'Not Connected'}
                           </Badge>
                         </div>
@@ -726,7 +707,11 @@ export function GovernanceSidebar({
                     placeholder="Explain why this event should be canon..."
                     value={proposalDescription}
                     onChange={(e) => setProposalDescription(e.target.value)}
+                    maxLength={MAX_PROPOSAL_DESCRIPTION}
                   />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {proposalDescription.length}/{MAX_PROPOSAL_DESCRIPTION}
+                  </p>
                 </div>
 
                 <Button
@@ -776,228 +761,160 @@ export function GovernanceSidebar({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {proposals.map((proposal) => (
-                      <Card key={proposal.id} className="border-slate-200 dark:border-slate-700">
-                        <CardContent className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100 line-clamp-2">
-                                  {proposal.description}
-                                </h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  {proposal.nodeId && (
-                                    <Badge variant="outline" className="text-xs">
-                                      <Crown className="h-3 w-3 mr-1" />
-                                      Event {proposal.nodeId}
-                                    </Badge>
-                                  )}
-                                  <Badge
-                                    variant={
-                                      proposal.state === 4
-                                        ? 'default'
-                                        : proposal.state === 1
-                                          ? 'secondary'
-                                          : proposal.state === 7
-                                            ? 'default'
-                                            : 'destructive'
-                                    }
-                                    className={`text-xs ${
-                                      proposal.state === 4
-                                        ? 'bg-green-500 hover:bg-green-600'
-                                        : proposal.state === 7
-                                          ? 'bg-gray-500 hover:bg-gray-600'
-                                          : ''
-                                    }`}
-                                  >
-                                    {ProposalState[proposal.state as keyof typeof ProposalState] ||
-                                      'Unknown'}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
+                    {proposals.map((proposal) => {
+                      const votingEnded = currentBlock > 0n && currentBlock >= proposal.endBlock;
 
-                            {/* Voting Section with Better Layout */}
+                      return (
+                        <Card key={proposal.id} className="border-slate-200 dark:border-slate-700">
+                          <CardContent className="p-4">
                             <div className="space-y-3">
-                              {/* Voting Buttons in Column */}
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleVote(proposal.proposalId, 1)}
-                                    disabled={
-                                      !votingPower || votingPower === 0n || proposal.state !== 1
-                                    }
-                                    className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-xs h-7 px-2 disabled:opacity-50"
-                                  >
-                                    <CheckCircle className="h-3 w-3" />
-                                    For
-                                  </Button>
-                                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                                    {proposal.forVotes.toString()} votes
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center justify-between">
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleVote(proposal.proposalId, 0)}
-                                    disabled={
-                                      !votingPower || votingPower === 0n || proposal.state !== 1
-                                    }
-                                    className="flex items-center gap-1 text-xs h-7 px-2 disabled:opacity-50"
-                                  >
-                                    <XCircle className="h-3 w-3" />
-                                    Against
-                                  </Button>
-                                  <span className="text-xs font-medium text-red-700 dark:text-red-300">
-                                    {proposal.againstVotes.toString()} votes
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center justify-between">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleVote(proposal.proposalId, 2)}
-                                    disabled={
-                                      !votingPower || votingPower === 0n || proposal.state !== 1
-                                    }
-                                    className="flex items-center gap-1 text-xs h-7 px-2 disabled:opacity-50"
-                                  >
-                                    <Clock className="h-3 w-3" />
-                                    Abstain
-                                  </Button>
-                                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                    {proposal.abstainVotes.toString()} votes
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Voting Progress and Execute Button */}
-                              {proposal.state === 1 && currentBlock > 0n && (
-                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                                  <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                                    <div className="flex justify-between items-center mb-1">
-                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                                        Voting Progress
-                                      </span>
-                                      <span className="text-xs text-blue-600 dark:text-blue-400">
-                                        {(() => {
-                                          try {
-                                            if (!proposal.endBlock || !currentBlock) {
-                                              return 'Loading...';
-                                            }
-                                            const currentBlockBig = BigInt(currentBlock.toString());
-                                            const endBlockBig = BigInt(
-                                              proposal.endBlock.toString()
-                                            );
-                                            if (currentBlockBig >= endBlockBig) {
-                                              return 'Voting Ended';
-                                            } else {
-                                              const remaining = endBlockBig - currentBlockBig;
-                                              return `${remaining.toString()} blocks left`;
-                                            }
-                                          } catch (error) {
-                                            // Block calculation failed, show fallback
-                                            return 'Loading...';
-                                          }
-                                        })()}
-                                      </span>
-                                    </div>
-                                    {(() => {
-                                      try {
-                                        if (!proposal.endBlock || !currentBlock) {
-                                          return false;
-                                        }
-                                        const currentBlockBig = BigInt(currentBlock.toString());
-                                        const endBlockBig = BigInt(proposal.endBlock.toString());
-                                        return currentBlockBig >= endBlockBig;
-                                      } catch (error) {
-                                        // Block comparison failed, default to not ended
-                                        return false;
-                                      }
-                                    })() ? (
-                                      <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
-                                        ⏰ Voting period ended. Refresh to see if proposal succeeded
-                                        and execute it.
-                                      </div>
-                                    ) : (
-                                      <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-                                        <div
-                                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                                          style={{
-                                            width: `${(() => {
-                                              try {
-                                                if (
-                                                  !proposal.endBlock ||
-                                                  !proposal.startBlock ||
-                                                  !currentBlock
-                                                ) {
-                                                  return 0;
-                                                }
-                                                const totalBlocks =
-                                                  BigInt(proposal.endBlock.toString()) -
-                                                  BigInt(proposal.startBlock.toString());
-                                                const currentBlockBigInt = BigInt(
-                                                  currentBlock.toString()
-                                                );
-                                                const blocksElapsed =
-                                                  currentBlockBigInt -
-                                                  BigInt(proposal.startBlock.toString());
-                                                if (totalBlocks <= 0n) return 0;
-                                                const percentage =
-                                                  (blocksElapsed * 100n) / totalBlocks;
-                                                return Math.min(
-                                                  100,
-                                                  Math.max(0, Number(percentage.toString()))
-                                                );
-                                              } catch (error) {
-                                                // Progress calculation failed, default to 0
-                                                return 0;
-                                              }
-                                            })()}%`,
-                                          }}
-                                        />
-                                      </div>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100 line-clamp-2">
+                                    {proposal.description}
+                                  </h4>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {proposal.nodeId && (
+                                      <Badge variant="outline" className="text-xs">
+                                        <Crown className="h-3 w-3 mr-1" />
+                                        Event {proposal.nodeId}
+                                      </Badge>
                                     )}
+                                    <Badge
+                                      variant={
+                                        proposal.state === 4
+                                          ? 'default'
+                                          : proposal.state === 1
+                                            ? 'secondary'
+                                            : proposal.state === 7
+                                              ? 'default'
+                                              : 'destructive'
+                                      }
+                                      className={`text-xs ${
+                                        proposal.state === 4
+                                          ? 'bg-green-500 hover:bg-green-600'
+                                          : proposal.state === 7
+                                            ? 'bg-gray-500 hover:bg-gray-600'
+                                            : ''
+                                      }`}
+                                    >
+                                      {ProposalState[
+                                        proposal.state as keyof typeof ProposalState
+                                      ] || 'Unknown'}
+                                    </Badge>
                                   </div>
                                 </div>
-                              )}
+                              </div>
 
-                              {/* Execute Button - only show if proposal succeeded */}
-                              {proposal.state === 4 && (
-                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                                  <Button
-                                    onClick={() => handleExecuteProposal(proposal)}
-                                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-8 text-xs"
-                                    size="sm"
-                                  >
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Execute Proposal
-                                  </Button>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center">
-                                    This will set the canon node and update the timeline
-                                  </p>
+                              {/* Voting Section */}
+                              <div className="space-y-3">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleVote(proposal.proposalId, 1)}
+                                      disabled={
+                                        !votingPower || votingPower === 0n || proposal.state !== 1
+                                      }
+                                      className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-xs h-7 px-2 disabled:opacity-50"
+                                    >
+                                      <CheckCircle className="h-3 w-3" />
+                                      For
+                                    </Button>
+                                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                      {formatTokenAmount(proposal.forVotes)} votes
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between">
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleVote(proposal.proposalId, 0)}
+                                      disabled={
+                                        !votingPower || votingPower === 0n || proposal.state !== 1
+                                      }
+                                      className="flex items-center gap-1 text-xs h-7 px-2 disabled:opacity-50"
+                                    >
+                                      <XCircle className="h-3 w-3" />
+                                      Against
+                                    </Button>
+                                    <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                                      {formatTokenAmount(proposal.againstVotes)} votes
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleVote(proposal.proposalId, 2)}
+                                      disabled={
+                                        !votingPower || votingPower === 0n || proposal.state !== 1
+                                      }
+                                      className="flex items-center gap-1 text-xs h-7 px-2 disabled:opacity-50"
+                                    >
+                                      <Clock className="h-3 w-3" />
+                                      Abstain
+                                    </Button>
+                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                      {formatTokenAmount(proposal.abstainVotes)} votes
+                                    </span>
+                                  </div>
                                 </div>
-                              )}
 
-                              {/* Manual refresh button for when voting ends */}
-                              {proposal.state === 1 &&
-                                (() => {
-                                  try {
-                                    if (!proposal.endBlock || !currentBlock) {
-                                      return false;
-                                    }
-                                    const currentBlockBig = BigInt(currentBlock.toString());
-                                    const endBlockBig = BigInt(proposal.endBlock.toString());
-                                    return currentBlockBig >= endBlockBig;
-                                  } catch (error) {
-                                    // Block comparison failed, default to not ended
-                                    return false;
-                                  }
-                                })() && (
+                                {/* Voting Progress */}
+                                {proposal.state === 1 && currentBlock > 0n && (
+                                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                      <div className="flex justify-between items-center mb-1">
+                                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                                          Voting Progress
+                                        </span>
+                                        <span className="text-xs text-blue-600 dark:text-blue-400">
+                                          {votingEnded
+                                            ? 'Voting Ended'
+                                            : `${(proposal.endBlock - currentBlock).toString()} blocks left`}
+                                        </span>
+                                      </div>
+                                      {votingEnded ? (
+                                        <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                                          Voting period ended. Refresh to see if proposal succeeded
+                                          and execute it.
+                                        </div>
+                                      ) : (
+                                        <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                          <div
+                                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                            style={{
+                                              width: `${computeVotingProgress(currentBlock, proposal.startBlock, proposal.endBlock)}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Execute Button - only show if proposal succeeded */}
+                                {proposal.state === 4 && (
+                                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <Button
+                                      onClick={() => handleExecuteProposal(proposal)}
+                                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-8 text-xs"
+                                      size="sm"
+                                    >
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Execute Proposal
+                                    </Button>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center">
+                                      This will set the canon node and update the timeline
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Manual refresh button for when voting ends */}
+                                {proposal.state === 1 && votingEnded && (
                                   <div className="pt-2">
                                     <Button
                                       onClick={fetchProposalsFromEvents}
@@ -1010,11 +927,12 @@ export function GovernanceSidebar({
                                     </Button>
                                   </div>
                                 )}
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -1053,7 +971,7 @@ export function GovernanceSidebar({
                         Proposal Threshold:
                       </span>
                       <span className="text-slate-800 dark:text-slate-200">
-                        {proposalThreshold.toString()} tokens
+                        {formatTokenAmount(proposalThreshold)} tokens
                       </span>
                     </div>
                   )}

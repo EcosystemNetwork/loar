@@ -9,10 +9,11 @@ import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { CreditStore } from '@/components/CreditStore';
 import { useVocab } from '@/hooks/use-vocab';
+import { LoarIcon, type LoarIconName } from '@/components/loar-icons';
 
 interface Stream {
   id: string;
-  icon: string;
+  icon: LoarIconName;
   label: string;
   desc: string;
   potential: string;
@@ -24,7 +25,7 @@ interface Stream {
 const STREAMS: Stream[] = [
   {
     id: 'credits',
-    icon: '⚡',
+    icon: 'bolt',
     label: 'AI Credits',
     desc: 'Buy credits with card, ETH, or $LOAR. 25% margin discount with token.',
     potential: 'Up to 35% margin',
@@ -34,7 +35,7 @@ const STREAMS: Stream[] = [
   },
   {
     id: 'nfts',
-    icon: '🎬',
+    icon: 'clapperboard',
     label: 'Own Episodes',
     desc: 'Tokenize your episodes. Set your own price and supply.',
     potential: 'Resale royalties',
@@ -44,7 +45,7 @@ const STREAMS: Stream[] = [
   },
   {
     id: 'characters',
-    icon: '🧬',
+    icon: 'dna',
     label: 'Own Characters',
     desc: 'Tokenize characters — earn 5% royalty each time they appear in content.',
     potential: '5% appearance royalty',
@@ -54,7 +55,7 @@ const STREAMS: Stream[] = [
   },
   {
     id: 'subs',
-    icon: '👥',
+    icon: 'crowd',
     label: 'Subscriptions',
     desc: 'Tier-based fan subscriptions. Early access, voting power, credit bonuses.',
     potential: 'Recurring revenue',
@@ -64,7 +65,7 @@ const STREAMS: Stream[] = [
   },
   {
     id: 'canon',
-    icon: '🗳️',
+    icon: 'ballot',
     label: 'Canon Shop',
     desc: 'Community votes on storylines. License winning submissions for royalties.',
     potential: 'License fees',
@@ -74,7 +75,7 @@ const STREAMS: Stream[] = [
   },
   {
     id: 'ads',
-    icon: '📢',
+    icon: 'megaphone',
     label: 'Ad Placements',
     desc: 'Auction episode and placement ad slots. Creators earn the winning bid.',
     potential: 'Bid-based earnings',
@@ -84,7 +85,7 @@ const STREAMS: Stream[] = [
   },
   {
     id: 'license',
-    icon: '📜',
+    icon: 'scroll',
     label: 'IP Licensing',
     desc: 'License your universe IP to third parties — merch, adaptations, collabs.',
     potential: 'One-time + royalties',
@@ -153,7 +154,7 @@ export function MonetizationOverview() {
             >
               {/* Top row */}
               <div className="flex items-start justify-between">
-                <span className="text-2xl">{stream.icon}</span>
+                <LoarIcon name={stream.icon} size={24} className="text-amber-400" />
                 <span
                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded border tracking-widest ${STATUS_STYLES[stream.status]}`}
                 >
@@ -191,7 +192,7 @@ export function MonetizationOverview() {
         {/* Summary card */}
         <div className="bg-gradient-to-br from-amber-950/60 to-zinc-900 border border-amber-800/40 rounded-xl p-4 flex flex-col justify-between">
           <div>
-            <div className="text-2xl">💰</div>
+            <LoarIcon name="money-bag" size={24} className="text-amber-400" />
             <div className="text-sm font-bold text-white mt-2">$LOAR Advantage</div>
             <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
               Hold $LOAR to get 25% margin on credits vs 35% for card/ETH — plus 10% bonus credits

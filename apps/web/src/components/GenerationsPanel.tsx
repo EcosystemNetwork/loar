@@ -11,7 +11,10 @@ import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Film, GripVertical, Play, Clock, Sparkles, ExternalLink, Loader2 } from 'lucide-react';
+import { X, Film, GripVertical, Play, Clock, Sparkles, Loader2 } from 'lucide-react';
+
+/** How many generations to load per page */
+const PAGE_SIZE = 20;
 
 interface GenerationsPanelProps {
   universeId: string;
@@ -33,6 +36,7 @@ export function GenerationsPanel({
   onSelectGeneration,
 }: GenerationsPanelProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Fetch all generations for this universe
   const { data: generations, isLoading } = useQuery({
@@ -69,6 +73,10 @@ export function GenerationsPanel({
   const extraMedia = videoMedia.filter(
     (m: any) => !m.generationId || !generationIds.has(m.generationId)
   );
+
+  const allItems = [...videoGenerations, ...extraMedia];
+  const visibleItems = allItems.slice(0, visibleCount);
+  const hasMore = visibleCount < allItems.length;
 
   const handleDragStart = (e: React.DragEvent, gen: any) => {
     const data = {
@@ -115,20 +123,28 @@ export function GenerationsPanel({
     'sora2-i2v': 'Sora 2',
   };
 
+  const isGeneration = (item: any) => 'prompt' in item;
+
   return (
-    <div className="fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-xl z-50 flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-xl z-[55] flex flex-col animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Film className="h-5 w-5 text-purple-500" />
           <h2 className="font-semibold text-sm">Generations</h2>
-          {videoGenerations.length > 0 && (
+          {allItems.length > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {videoGenerations.length + extraMedia.length}
+              {allItems.length}
             </Badge>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onClose}
+          aria-label="Close generations panel"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -148,7 +164,7 @@ export function GenerationsPanel({
           </div>
         )}
 
-        {!isLoading && videoGenerations.length === 0 && extraMedia.length === 0 && (
+        {!isLoading && allItems.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <Film className="h-10 w-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">No generations yet</p>
@@ -156,12 +172,12 @@ export function GenerationsPanel({
           </div>
         )}
 
-        {/* Generation cards */}
-        {videoGenerations.map((gen: any) => (
+        {/* Generation / media cards */}
+        {visibleItems.map((item: any) => (
           <div
-            key={gen.id}
+            key={item.id}
             draggable
-            onDragStart={(e) => handleDragStart(e, gen)}
+            onDragStart={(e) => handleDragStart(e, item)}
             className="group relative rounded-lg border border-border bg-card hover:border-purple-400 hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing"
           >
             {/* Drag handle */}
@@ -171,9 +187,9 @@ export function GenerationsPanel({
 
             {/* Video preview */}
             <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
-              {playingId === gen.id ? (
+              {playingId === item.id ? (
                 <video
-                  src={gen.permanentVideoUrl || gen.videoUrl}
+                  src={item.permanentVideoUrl || item.videoUrl || item.url}
                   className="w-full h-full object-cover"
                   autoPlay
                   muted
@@ -183,32 +199,34 @@ export function GenerationsPanel({
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-950/80 to-slate-950 cursor-pointer"
-                  onClick={() => setPlayingId(gen.id)}
+                  onClick={() => setPlayingId(item.id)}
                 >
                   <Play className="h-8 w-8 text-white/70 hover:text-white transition-colors" />
                 </div>
               )}
 
               {/* Model badge */}
-              <Badge
-                variant="secondary"
-                className="absolute top-1.5 right-1.5 text-[10px] bg-black/60 text-white border-0"
-              >
-                {modelDisplayNames[gen.finalModelId] || gen.finalModelId || 'AI'}
-              </Badge>
+              {isGeneration(item) && (
+                <Badge
+                  variant="secondary"
+                  className="absolute top-1.5 right-1.5 text-[10px] bg-black/60 text-white border-0"
+                >
+                  {modelDisplayNames[item.finalModelId] || item.finalModelId || 'AI'}
+                </Badge>
+              )}
 
               {/* Duration badge */}
-              {gen.durationSec && (
+              {item.durationSec && (
                 <Badge
                   variant="secondary"
                   className="absolute bottom-1.5 right-1.5 text-[10px] bg-black/60 text-white border-0"
                 >
-                  {gen.durationSec}s
+                  {item.durationSec}s
                 </Badge>
               )}
 
               {/* Persisted indicator */}
-              {gen.storagePersisted && (
+              {item.storagePersisted && (
                 <Badge
                   variant="secondary"
                   className="absolute bottom-1.5 left-1.5 text-[10px] bg-green-600/80 text-white border-0"
@@ -221,19 +239,19 @@ export function GenerationsPanel({
             {/* Info */}
             <div className="p-2.5">
               <p className="text-xs text-foreground line-clamp-2 leading-relaxed">
-                {gen.prompt?.slice(0, 100) || 'Untitled generation'}
-                {gen.prompt?.length > 100 ? '...' : ''}
+                {((item.prompt || item.label || 'Untitled generation') as string).slice(0, 100)}
+                {(item.prompt || item.label || '').length > 100 ? '...' : ''}
               </p>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {formatDate(gen.createdAt)}
+                  {formatDate(item.createdAt)}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-[10px] text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/30"
-                  onClick={() => handleClickAdd(gen)}
+                  onClick={() => handleClickAdd(item)}
                 >
                   <Sparkles className="h-3 w-3 mr-1" />
                   Add to Timeline
@@ -243,53 +261,17 @@ export function GenerationsPanel({
           </div>
         ))}
 
-        {/* Extra media (not from tracked generations) */}
-        {extraMedia.map((media: any) => (
-          <div
-            key={media.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, media)}
-            className="group relative rounded-lg border border-border bg-card hover:border-purple-400 hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing"
+        {/* Load more button */}
+        {hasMore && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
           >
-            <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
-              <div
-                className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-950/80 to-slate-900 cursor-pointer"
-                onClick={() => setPlayingId(media.id)}
-              >
-                {playingId === media.id ? (
-                  <video
-                    src={media.url}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    muted
-                    loop
-                  />
-                ) : (
-                  <Play className="h-8 w-8 text-white/70 hover:text-white transition-colors" />
-                )}
-              </div>
-            </div>
-            <div className="p-2.5">
-              <p className="text-xs text-foreground line-clamp-2">
-                {media.label || 'Video attachment'}
-              </p>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-[10px] text-muted-foreground">
-                  {formatDate(media.createdAt)}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[10px] text-purple-600 hover:text-purple-700"
-                  onClick={() => handleClickAdd(media)}
-                >
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  Add to Timeline
-                </Button>
-              </div>
-            </div>
-          </div>
-        ))}
+            Show more ({allItems.length - visibleCount} remaining)
+          </Button>
+        )}
       </div>
     </div>
   );

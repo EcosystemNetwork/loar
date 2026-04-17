@@ -10,7 +10,7 @@
  */
 import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
-import { ENTITY_KINDS, CREATOR_KINDS } from './entities.types';
+import { ENTITY_KINDS, CREATOR_KINDS, ENTITY_RELATION_TYPES } from './entities.types';
 import {
   createEntity,
   getEntity,
@@ -24,6 +24,11 @@ import {
   removeNodeFromEntity,
   swapNodesBetweenEntities,
   assertMintEligible,
+  searchEntities,
+  createRelation,
+  deleteRelation,
+  getEntityRelations,
+  getUniverseRelations,
 } from './entities.handlers';
 import { geminiService } from '../../services/gemini';
 import { db } from '../../lib/firebase';
@@ -292,6 +297,76 @@ export const entitiesRouter = router({
             ? 'No rights declaration on file'
             : null,
       };
+    }),
+
+  /** Search entities by name or description. */
+  search: publicProcedure
+    .input(
+      z.object({
+        query: z.string().min(1).max(200),
+        universeAddress: ethereumAddress.optional(),
+        kind: entityKindSchema.optional(),
+        limit: z.number().int().positive().max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      const entities = await searchEntities(input);
+      return { entities, total: entities.length };
+    }),
+
+  // ── Relationships ──────────────────────────────────────────────────
+
+  /** Get all relationships for a specific entity. */
+  relations: publicProcedure
+    .input(z.object({ entityId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const relations = await getEntityRelations(input.entityId);
+      return { relations };
+    }),
+
+  /** Get all relationships within a universe. */
+  universeRelations: publicProcedure
+    .input(z.object({ universeAddress: ethereumAddress }))
+    .query(async ({ input }) => {
+      const relations = await getUniverseRelations(input.universeAddress);
+      return { relations };
+    }),
+
+  /** Create a relationship between two entities. */
+  createRelation: protectedProcedure
+    .use(requirePermission('entities.update'))
+    .input(
+      z.object({
+        sourceId: z.string().min(1),
+        targetId: z.string().min(1),
+        type: z.enum(ENTITY_RELATION_TYPES as unknown as [string, ...string[]]),
+        description: z.string().max(500).default(''),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Must own the source entity
+      const source = await getEntity(input.sourceId);
+      if (!source) throw new Error('Source entity not found');
+      if (source.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: you must own the source entity to create relationships');
+      }
+      const relation = await createRelation(
+        input.sourceId,
+        input.targetId,
+        input.type as any,
+        input.description,
+        ctx.user.address!
+      );
+      return { success: true, data: relation };
+    }),
+
+  /** Delete a relationship. Only the relationship creator or entity owner can delete. */
+  deleteRelation: protectedProcedure
+    .use(requirePermission('entities.update'))
+    .input(z.object({ relationId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      await deleteRelation(input.relationId);
+      return { success: true };
     }),
 
   /** Generate an AI profile (description + metadata) for a new or existing entity. */

@@ -7,8 +7,8 @@
  * with the universe's established characters, places, factions, lore, etc.
  */
 import { db } from '../lib/firebase';
-import type { Entity, EntityKind } from '../routers/entities/entities.types';
-import { CREATOR_KINDS } from '../routers/entities/entities.types';
+import type { Entity, EntityKind, EntityRelation } from '../routers/entities/entities.types';
+import { CREATOR_KINDS, RELATION_LABELS } from '../routers/entities/entities.types';
 
 /** Max entities per kind to include in context (prevents prompt bloat). */
 const MAX_PER_KIND = 8;
@@ -157,6 +157,42 @@ export async function buildEntityContext(entityId: string): Promise<string | nul
         parts.push(`${key}: ${val}`);
       }
     }
+  }
+
+  // Fetch explicit relationships
+  const [asSourceSnap, asTargetSnap] = await Promise.all([
+    db.collection('entityRelations').where('sourceId', '==', entityId).limit(20).get(),
+    db.collection('entityRelations').where('targetId', '==', entityId).limit(20).get(),
+  ]);
+
+  const relations = [
+    ...asSourceSnap.docs.map((doc) => doc.data() as EntityRelation),
+    ...asTargetSnap.docs.map((doc) => doc.data() as EntityRelation),
+  ];
+
+  if (relations.length > 0) {
+    // Batch-fetch related entity names
+    const relatedIds = new Set<string>();
+    for (const rel of relations) {
+      relatedIds.add(rel.sourceId === entityId ? rel.targetId : rel.sourceId);
+    }
+    const relDocs = await Promise.all(
+      [...relatedIds].map((id) => db.collection('entities').doc(id).get())
+    );
+    const nameMap = new Map<string, string>();
+    for (const doc of relDocs) {
+      if (doc.exists) nameMap.set(doc.id, (doc.data() as Entity).name);
+    }
+
+    const relLines: string[] = [];
+    for (const rel of relations) {
+      const isSource = rel.sourceId === entityId;
+      const otherId = isSource ? rel.targetId : rel.sourceId;
+      const otherName = nameMap.get(otherId) ?? 'Unknown';
+      const label = isSource ? (RELATION_LABELS[rel.type] ?? rel.type) : rel.type; // inverse direction
+      relLines.push(`- ${label}: ${otherName}${rel.description ? ` (${rel.description})` : ''}`);
+    }
+    parts.push(`\n[RELATIONSHIPS]\n${relLines.join('\n')}`);
   }
 
   // If entity belongs to a universe, fetch related entities for cross-reference

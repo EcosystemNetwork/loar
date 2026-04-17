@@ -28,6 +28,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { LoarIcon } from '@/components/loar-icons';
 import {
   Dialog,
   DialogContent,
@@ -1356,7 +1357,8 @@ export function FlowCreationPanel({
               {/* Success Footer */}
               {contractSaved && filecoinSaved && pieceCid && (
                 <div className="text-xs text-center text-muted-foreground pt-2 border-t">
-                  ✓ Saved to blockchain & Filecoin • CID: {pieceCid.substring(0, 16)}...
+                  <LoarIcon name="check" size={12} className="inline-block align-[-0.125em] mr-1" />
+                  Saved to blockchain & Filecoin • CID: {pieceCid.substring(0, 16)}...
                 </div>
               )}
             </div>

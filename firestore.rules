@@ -34,10 +34,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Entity/wiki data — public unless explicitly marked private
+    // Entity/wiki data — public read (entities have no visibility field; access is open)
     match /entities/{entityId} {
-      allow read: if resource == null || resource.data.visibility != 'private'
-                   || (request.auth != null && resource.data.creatorUid == request.auth.uid);
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Entity relationships — public read
+    match /entityRelations/{relationId} {
+      allow read: if true;
       allow write: if false;
     }
 

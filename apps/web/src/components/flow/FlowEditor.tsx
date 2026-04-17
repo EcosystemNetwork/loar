@@ -25,6 +25,7 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CharacterNode, PlotPointNode, MediaNode, VotingNode } from './CustomNodes';
+import { LoarIcon } from '@/components/loar-icons';
 
 // Initial nodes and edges for the flow with custom node types
 const initialNodes: Node[] = [
@@ -33,7 +34,7 @@ const initialNodes: Node[] = [
     type: 'character',
     data: {
       label: 'Hero Character',
-      emoji: '🦸',
+      emoji: 'hero',
       description: 'Main protagonist with NFT ownership',
       nftId: 'NFT #1234',
     },
@@ -44,7 +45,7 @@ const initialNodes: Node[] = [
     type: 'plotPoint',
     data: {
       label: 'Origin Story',
-      emoji: '📜',
+      emoji: 'scroll',
       description: 'The beginning of the hero journey',
       canonicity: 'Canon',
     },
@@ -55,7 +56,7 @@ const initialNodes: Node[] = [
     type: 'media',
     data: {
       label: 'Cinematic Scene',
-      emoji: '🎬',
+      emoji: 'clapperboard',
       description: 'Key visual moment in the narrative',
       storageType: 'Walrus Protocol',
     },
@@ -66,7 +67,7 @@ const initialNodes: Node[] = [
     type: 'voting',
     data: {
       label: 'Plot Resolution Vote',
-      emoji: '🗳️',
+      emoji: 'ballot',
       description: 'Community decides the canonical ending',
       status: 'Active',
     },
@@ -113,7 +114,7 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
       type: 'plotPoint',
       data: {
         label: `Timeline Node ${node.id}`,
-        emoji: node.isCanon ? '⭐' : '📝',
+        emoji: node.isCanon ? 'star' : 'memo',
         description: node.description || `Timeline event ${node.id}`,
         canonicity: node.isCanon ? 'Canon' : 'Branch',
         timelineId: node.id,
@@ -336,7 +337,8 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
               Create and connect narrative elements to establish canon
               {timelineData && timelineData.length > 0 && (
                 <span className="block text-green-600 font-medium mt-1">
-                  ✓ {timelineData.length} timeline nodes loaded
+                  <LoarIcon name="check" size={14} className="inline-block align-[-0.125em] mr-1" />
+                  {timelineData.length} timeline nodes loaded
                 </span>
               )}
             </p>

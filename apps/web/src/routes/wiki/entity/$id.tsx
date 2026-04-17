@@ -46,6 +46,11 @@ import {
   Crown,
   ImageIcon,
   ShieldCheck,
+  Link2,
+  ChevronRight,
+  Plus,
+  Trash2,
+  Search,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
@@ -54,6 +59,14 @@ import { MintContentDialog } from '@/components/MintContentDialog';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
 import { VoiceProfileCard } from '@/components/VoiceProfileCard';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
@@ -308,6 +321,358 @@ function PipelineStatus({ pipelineId }: { pipelineId: string }) {
   );
 }
 
+const RELATION_TYPES = [
+  { value: 'allied_with', label: 'Allied With' },
+  { value: 'enemy_of', label: 'Enemy Of' },
+  { value: 'member_of', label: 'Member Of' },
+  { value: 'located_in', label: 'Located In' },
+  { value: 'created_by', label: 'Created By' },
+  { value: 'owns', label: 'Owns' },
+  { value: 'related_to', label: 'Related To' },
+  { value: 'appears_in', label: 'Appears In' },
+  { value: 'rules', label: 'Rules' },
+  { value: 'uses', label: 'Uses' },
+] as const;
+
+const INVERSE_LABELS: Record<string, string> = {
+  allied_with: 'Allied With',
+  enemy_of: 'Enemy Of',
+  member_of: 'Has Member',
+  located_in: 'Contains',
+  created_by: 'Creator Of',
+  owns: 'Owned By',
+  related_to: 'Related To',
+  appears_in: 'Features',
+  rules: 'Ruled By',
+  uses: 'Used By',
+};
+
+/** Relationships card — shows all entity connections and allows adding new ones. */
+function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: boolean }) {
+  const queryClient = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
+  const [relationType, setRelationType] = useState('related_to');
+  const [relDescription, setRelDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: relData, isLoading: loadingRels } = useQuery({
+    queryKey: ['entity-relations', entityId],
+    queryFn: () => trpcClient.entities.relations.query({ entityId }),
+  });
+
+  const { data: searchResults } = useQuery({
+    queryKey: ['entity-search', searchQuery],
+    queryFn: () => trpcClient.entities.search.query({ query: searchQuery, limit: 10 }),
+    enabled: searchQuery.length >= 2,
+  });
+
+  const relations = relData?.relations ?? [];
+
+  const handleAdd = async () => {
+    if (!selectedTarget) return;
+    setSaving(true);
+    try {
+      await trpcClient.entities.createRelation.mutate({
+        sourceId: entityId,
+        targetId: selectedTarget,
+        type: relationType as any,
+        description: relDescription,
+      });
+      queryClient.invalidateQueries({ queryKey: ['entity-relations', entityId] });
+      setAdding(false);
+      setSearchQuery('');
+      setSelectedTarget(null);
+      setRelDescription('');
+      toast.success('Relationship added');
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to add relationship');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (relationId: string) => {
+    try {
+      await trpcClient.entities.deleteRelation.mutate({ relationId });
+      queryClient.invalidateQueries({ queryKey: ['entity-relations', entityId] });
+      toast.success('Relationship removed');
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to remove relationship');
+    }
+  };
+
+  if (loadingRels) return null;
+
+  // Don't render if no relations and not owner
+  if (relations.length === 0 && !isOwner) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Link2 className="w-4 h-4" />
+            Relationships
+            {relations.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {relations.length}
+              </Badge>
+            )}
+          </span>
+          {isOwner && !adding && (
+            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+              <Plus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Add relationship form */}
+        {adding && (
+          <div className="space-y-3 p-3 rounded-lg border border-dashed">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search for an entity to link..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSelectedTarget(null);
+                }}
+                className="pl-9"
+              />
+            </div>
+            {searchResults?.entities && searchResults.entities.length > 0 && !selectedTarget && (
+              <div className="max-h-32 overflow-y-auto space-y-1 rounded border p-1">
+                {searchResults.entities
+                  .filter((e: any) => e.id !== entityId)
+                  .map((e: any) => (
+                    <button
+                      key={e.id}
+                      onClick={() => {
+                        setSelectedTarget(e.id);
+                        setSearchQuery(e.name);
+                      }}
+                      className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center gap-2"
+                    >
+                      {e.imageUrl ? (
+                        <img
+                          src={e.imageUrl}
+                          alt=""
+                          className="w-5 h-5 rounded-full object-cover"
+                          onError={(ev) => {
+                            ev.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-muted" />
+                      )}
+                      <span className="font-medium">{e.name}</span>
+                      <Badge variant="outline" className="text-[10px] ml-auto">
+                        {e.kind}
+                      </Badge>
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Select value={relationType} onValueChange={setRelationType}>
+                <SelectTrigger className="w-40 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATION_TYPES.map((rt) => (
+                    <SelectItem key={rt.value} value={rt.value} className="text-xs">
+                      {rt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Description (optional)"
+                value={relDescription}
+                onChange={(e) => setRelDescription(e.target.value)}
+                className="h-8 text-xs flex-1"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setAdding(false);
+                  setSearchQuery('');
+                  setSelectedTarget(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleAdd} disabled={!selectedTarget || saving}>
+                {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                Add Relationship
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Existing relationships */}
+        {relations.length === 0 && !adding && (
+          <p className="text-sm text-muted-foreground">
+            No connections yet. Add relationships to build your universe's lore graph.
+          </p>
+        )}
+        <div className="space-y-2">
+          {relations.map((rel: any) => {
+            const isSource = rel.sourceId === entityId;
+            const otherName = isSource ? rel.targetName : rel.sourceName;
+            const otherId = isSource ? rel.targetId : rel.sourceId;
+            const otherKind = isSource ? rel.targetKind : rel.sourceKind;
+            const otherImage = isSource ? rel.targetImageUrl : rel.sourceImageUrl;
+            const label = isSource
+              ? (RELATION_TYPES.find((rt) => rt.value === rel.type)?.label ?? rel.type)
+              : (INVERSE_LABELS[rel.type] ?? rel.type);
+
+            return (
+              <div
+                key={rel.id}
+                className="flex items-center gap-3 group p-2 rounded-md hover:bg-muted/50"
+              >
+                <Link to="/wiki/entity/$id" params={{ id: otherId }} className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center relative overflow-hidden">
+                    {(() => {
+                      const Icon = DETAIL_KIND_ICONS[otherKind] ?? Package;
+                      return <Icon className="w-4 h-4 text-muted-foreground/40" />;
+                    })()}
+                    {otherImage && (
+                      <img
+                        src={otherImage}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                  </div>
+                </Link>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      {label}
+                    </Badge>
+                    <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <Link
+                      to="/wiki/entity/$id"
+                      params={{ id: otherId }}
+                      className="text-sm font-medium hover:underline truncate"
+                    >
+                      {otherName}
+                    </Link>
+                  </div>
+                  {rel.description && (
+                    <p className="text-xs text-muted-foreground truncate">{rel.description}</p>
+                  )}
+                </div>
+                {isOwner && (
+                  <button
+                    onClick={() => handleDelete(rel.id)}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                    title="Remove relationship"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Parent chain breadcrumb — walks up the parent hierarchy. */
+function EntityBreadcrumb({ entity }: { entity: any }) {
+  const { data: parent } = useQuery({
+    queryKey: ['entity', entity.parentId],
+    queryFn: () => trpcClient.entities.get.query({ entityId: entity.parentId }),
+    enabled: !!entity.parentId,
+  });
+
+  if (!entity.parentId) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+      {parent && (
+        <>
+          {parent.parentId && <span className="text-muted-foreground/40">... /</span>}
+          <Link
+            to="/wiki/entity/$id"
+            params={{ id: parent.id }}
+            className="hover:underline hover:text-foreground"
+          >
+            {parent.name}
+          </Link>
+          <ChevronRight className="w-3 h-3" />
+        </>
+      )}
+      <span className="text-foreground font-medium">{entity.name}</span>
+    </div>
+  );
+}
+
+/** Child entities section — shows direct children of this entity. */
+function ChildEntities({ entityId }: { entityId: string }) {
+  const { data } = useQuery({
+    queryKey: ['entity-children', entityId],
+    queryFn: () => trpcClient.entities.children.query({ parentId: entityId, limit: 20 }),
+  });
+
+  const children = data?.children ?? [];
+  if (children.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Contains ({children.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {children.map((child: any) => {
+            const Icon = DETAIL_KIND_ICONS[child.kind] ?? Package;
+            return (
+              <Link
+                key={child.id}
+                to="/wiki/entity/$id"
+                params={{ id: child.id }}
+                className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="w-6 h-6 rounded bg-muted flex items-center justify-center relative overflow-hidden shrink-0">
+                  <Icon className="w-4 h-4 text-muted-foreground/40" />
+                  {child.imageUrl && (
+                    <img
+                      src={child.imageUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                </div>
+                <span className="text-sm truncate">{child.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EntityPage() {
   const { id } = Route.useParams();
   const { address } = useAccount();
@@ -492,11 +857,13 @@ function EntityPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Link to="/wiki">
-        <Button variant="outline" className="mb-6">
+        <Button variant="outline" className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Wiki
         </Button>
       </Link>
+
+      <EntityBreadcrumb entity={entity} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — image + metadata */}
@@ -682,6 +1049,12 @@ function EntityPage() {
             universeId={entity.universeAddress || null}
             isOwner={isOwner}
           />
+
+          {/* Relationships */}
+          <RelationshipsCard entityId={id} isOwner={isOwner} />
+
+          {/* Child entities */}
+          <ChildEntities entityId={id} />
 
           {/* Character pipeline status */}
           {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}
