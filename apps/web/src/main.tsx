@@ -28,7 +28,9 @@ import { queryClient, trpc } from './utils/trpc';
 
 import { WalletWrapper } from './lib/wallet-provider';
 import { Web3ModeProvider } from './lib/web3-mode';
-import { hasSession } from './lib/wallet-auth';
+import { hasSession, initWalletAuth } from './lib/wallet-auth';
+
+initWalletAuth();
 
 const router = createRouter({
   routeTree,

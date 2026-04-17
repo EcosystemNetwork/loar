@@ -142,40 +142,48 @@ export function isSessionValidated(): boolean {
   return _sessionValidated;
 }
 
-// Proactive session refresh — refresh 1 hour before expiry.
-// JWT has 24h TTL, so refresh at the 23h mark.
-// Module-level interval is safe here — wallet-auth is a singleton module loaded once.
-// The interval must persist for the lifetime of the app (not tied to any component).
-if (typeof window !== 'undefined') {
-  setInterval(
-    async () => {
+// ── Deferred initialisation (called from main.tsx) ─────────────
+// Moved out of module scope to avoid top-level side effects that
+// trigger TDZ errors when Rollup reorders import initialisers.
+let _initDone = false;
+
+export function initWalletAuth() {
+  if (_initDone) return;
+  _initDone = true;
+
+  // Proactive session refresh — refresh 1 hour before expiry.
+  // JWT has 24h TTL, so refresh at the 23h mark.
+  if (typeof window !== 'undefined') {
+    setInterval(
+      async () => {
+        const expiry = localStorage.getItem(EXPIRY_KEY);
+        if (!expiry) return;
+
+        const expiresIn = Number(expiry) - Date.now();
+        if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
+          await refreshSession();
+        }
+      },
+      5 * 60 * 1000
+    );
+  }
+
+  // Refresh token when user returns to a backgrounded tab.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState !== 'visible') return;
       const expiry = localStorage.getItem(EXPIRY_KEY);
       if (!expiry) return;
 
       const expiresIn = Number(expiry) - Date.now();
-      if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
-        await refreshSession();
+      if (expiresIn <= 0) {
+        clearSiweSession();
+      } else if (expiresIn < 60 * 60 * 1000) {
+        const ok = await refreshSession();
+        if (!ok) clearSiweSession();
       }
-    },
-    5 * 60 * 1000
-  );
-}
-
-// Refresh token when user returns to a backgrounded tab.
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState !== 'visible') return;
-    const expiry = localStorage.getItem(EXPIRY_KEY);
-    if (!expiry) return;
-
-    const expiresIn = Number(expiry) - Date.now();
-    if (expiresIn <= 0) {
-      clearSiweSession();
-    } else if (expiresIn < 60 * 60 * 1000) {
-      const ok = await refreshSession();
-      if (!ok) clearSiweSession();
-    }
-  });
+    });
+  }
 }
 
 // ── SIWE message construction ───────────────────────────────────

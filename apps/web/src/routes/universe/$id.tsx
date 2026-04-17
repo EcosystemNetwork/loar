@@ -691,6 +691,72 @@ function UniverseTimelineEditorInner() {
     setShowDeleteConfirm(false);
   }, [selectedNodeIds, id, getArchivedNodeIds, saveArchivedNodeIds, setNodes, setEdges]);
 
+  // Clear selection
+  const handleClearSelection = useCallback(() => {
+    setSelectedNodeIds(new Set());
+    // Deselect all nodes in ReactFlow
+    setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: false })));
+  }, [setNodes]);
+
+  // Handle showing video generation dialog
+  // Preserves character selections, video model, duration, ratio, and image format
+  // across sequential deploys so users don't re-pick everything for each node.
+  // Only per-node content (title, description, generated media) is reset.
+  const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
+    setAdditionType(type);
+    setSourceNodeId(nodeId || null);
+    // Per-node content — always reset
+    setVideoTitle('');
+    setVideoDescription('');
+    setGeneratedImageUrl(null);
+    setGeneratedVideoUrl(null);
+    setShowVideoStep(false);
+    setUploadedUrl(null);
+    setContractSaved(false);
+    setIsSavingToContract(false);
+    setNegativePrompt(''); // Reset negative prompt (scene-specific)
+    setVideoPrompt(''); // Reset video prompt (scene-specific)
+    setSoundtrackUrl(''); // Reset soundtrack URL
+    setSoundtrackName(''); // Reset soundtrack name
+    setStatusMessage(null); // Clear any status messages
+    // Carried forward between sequential deploys:
+    // - selectedVideoModel (kept)
+    // - selectedVideoDuration (kept)
+    // - videoRatio (kept)
+    // - imageFormat (kept)
+    // - selectedCharacters (kept)
+    // - selectedImageCharacters (kept)
+    setShowVideoDialog(true);
+  }, []);
+
+  // Handle editing video on an existing node
+  // Uses nodesRef to avoid depending on `nodes` — prevents infinite
+  // useEffect loop (setNodes → handleEditScene identity change → effect re-fires).
+  const handleEditScene = useCallback(
+    (eventId: string) => {
+      if (!eventId) return;
+
+      // Load current video URL from localStorage or from the node
+      const storageKey = `universe_events_${id}`;
+      const storedEvents = localStorage.getItem(storageKey);
+      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventData = eventsData[eventId];
+
+      // Also check the current node in the flow for its videoUrl
+      const node = nodesRef.current.find(
+        (n) => n.data.eventId === eventId || n.data.blockchainNodeId?.toString() === eventId
+      );
+      const currentUrl = eventData?.videoUrl || node?.data.videoUrl || '';
+
+      setEditingEventId(eventId);
+      setEditVideoUrl(currentUrl);
+      setEditVideoFile(null);
+      setEditVideoPreview(currentUrl || null);
+      setEditVideoDialogOpen(true);
+    },
+    [id]
+  );
+
   // Duplicate selected nodes
   const handleDuplicateSelected = useCallback(() => {
     if (selectedNodeIds.size === 0) return;
@@ -790,72 +856,6 @@ function UniverseTimelineEditorInner() {
     setNodes,
     setEdges,
   ]);
-
-  // Clear selection
-  const handleClearSelection = useCallback(() => {
-    setSelectedNodeIds(new Set());
-    // Deselect all nodes in ReactFlow
-    setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: false })));
-  }, [setNodes]);
-
-  // Handle showing video generation dialog
-  // Preserves character selections, video model, duration, ratio, and image format
-  // across sequential deploys so users don't re-pick everything for each node.
-  // Only per-node content (title, description, generated media) is reset.
-  const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
-    setAdditionType(type);
-    setSourceNodeId(nodeId || null);
-    // Per-node content — always reset
-    setVideoTitle('');
-    setVideoDescription('');
-    setGeneratedImageUrl(null);
-    setGeneratedVideoUrl(null);
-    setShowVideoStep(false);
-    setUploadedUrl(null);
-    setContractSaved(false);
-    setIsSavingToContract(false);
-    setNegativePrompt(''); // Reset negative prompt (scene-specific)
-    setVideoPrompt(''); // Reset video prompt (scene-specific)
-    setSoundtrackUrl(''); // Reset soundtrack URL
-    setSoundtrackName(''); // Reset soundtrack name
-    setStatusMessage(null); // Clear any status messages
-    // Carried forward between sequential deploys:
-    // - selectedVideoModel (kept)
-    // - selectedVideoDuration (kept)
-    // - videoRatio (kept)
-    // - imageFormat (kept)
-    // - selectedCharacters (kept)
-    // - selectedImageCharacters (kept)
-    setShowVideoDialog(true);
-  }, []);
-
-  // Handle editing video on an existing node
-  // Uses nodesRef to avoid depending on `nodes` — prevents infinite
-  // useEffect loop (setNodes → handleEditScene identity change → effect re-fires).
-  const handleEditScene = useCallback(
-    (eventId: string) => {
-      if (!eventId) return;
-
-      // Load current video URL from localStorage or from the node
-      const storageKey = `universe_events_${id}`;
-      const storedEvents = localStorage.getItem(storageKey);
-      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
-      const eventData = eventsData[eventId];
-
-      // Also check the current node in the flow for its videoUrl
-      const node = nodesRef.current.find(
-        (n) => n.data.eventId === eventId || n.data.blockchainNodeId?.toString() === eventId
-      );
-      const currentUrl = eventData?.videoUrl || node?.data.videoUrl || '';
-
-      setEditingEventId(eventId);
-      setEditVideoUrl(currentUrl);
-      setEditVideoFile(null);
-      setEditVideoPreview(currentUrl || null);
-      setEditVideoDialogOpen(true);
-    },
-    [id]
-  );
 
   // Handle file selection for edit video
   const handleEditVideoFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
