@@ -107,37 +107,34 @@ export async function refreshSession(): Promise<boolean> {
   }
 }
 
-// Verify session on page load — clear stale localStorage if server cookie is gone.
-// Exported so components can wait for validation before trusting isAuthenticated.
+// Session validation — lazy getter avoids TDZ errors from Rollup reordering
+// module-level code. No live `export let` binding to get trapped in the dead zone.
 let _sessionValidated = false;
-export let sessionValidationDone: Promise<void>;
+let _sessionValidationDone: Promise<void> | null = null;
 
-// Deferred to avoid TDZ errors in production bundles — Rollup may reorder
-// module-level code so that `clearSiweSession` isn't initialized yet when
-// this block executes. Using an inline arrow avoids referencing the function
-// declaration before its bundled assignment.
-if (typeof window !== 'undefined' && localStorage.getItem(ADDRESS_KEY)) {
-  sessionValidationDone = fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
+export function getSessionValidationDone(): Promise<void> {
+  if (_sessionValidationDone) return _sessionValidationDone;
+  if (typeof window === 'undefined' || !localStorage.getItem(ADDRESS_KEY)) {
+    _sessionValidated = true;
+    _sessionValidationDone = Promise.resolve();
+    return _sessionValidationDone;
+  }
+  _sessionValidationDone = fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
     .then((res) => res.json())
     .then((data) => {
       if (!data.authenticated) {
-        // Inline the clear logic to avoid TDZ — clearSiweSession may not
-        // be initialized yet at module-evaluation time in production builds.
         localStorage.removeItem(ADDRESS_KEY);
         localStorage.removeItem(EXPIRY_KEY);
         emitChange();
       }
     })
     .catch(() => {
-      // Server unreachable — keep the existing session rather than logging users out
-      // on transient network errors. The session will be validated on the next request.
+      // Server unreachable — keep existing session rather than logging out
     })
     .finally(() => {
       _sessionValidated = true;
     });
-} else {
-  sessionValidationDone = Promise.resolve();
-  _sessionValidated = true;
+  return _sessionValidationDone;
 }
 
 /** Whether the initial session validation has completed. */
@@ -276,7 +273,7 @@ export function useWalletAuth() {
   // Wait for session validation before trusting localStorage
   useEffect(() => {
     if (!validated) {
-      sessionValidationDone.then(() => setValidated(true));
+      getSessionValidationDone().then(() => setValidated(true));
     }
   }, [validated]);
 

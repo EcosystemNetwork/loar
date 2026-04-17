@@ -578,22 +578,37 @@ const universeAbi = [
 ] as const;
 
 async function generateVideo(prompt: string, label: string): Promise<string> {
-  log(label, 'Generating...');
-  const taskRes = await fetch(`${BD_BASE}/contents/generations/tasks`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
-    body: JSON.stringify({
-      model: 'dreamina-seedance-2-0-260128',
-      content: [{ type: 'text', text: prompt }],
-      duration: 10,
-      aspect_ratio: '16:9',
-      resolution: '720p',
-      generate_audio: false,
-    }),
-  });
-  if (!taskRes.ok) throw new Error(`ByteDance ${taskRes.status}`);
-  const { id: taskId } = (await taskRes.json()) as any;
-  if (!taskId) throw new Error('No task ID');
+  // Retry task creation up to 3 times on fetch failure
+  let taskId: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      log(label, attempt === 0 ? 'Generating...' : `Retrying generate (${attempt + 1}/3)...`);
+      const taskRes = await fetch(`${BD_BASE}/contents/generations/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${BYTEDANCE_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'dreamina-seedance-2-0-260128',
+          content: [{ type: 'text', text: prompt }],
+          duration: 10,
+          aspect_ratio: '16:9',
+          resolution: '720p',
+          generate_audio: false,
+        }),
+      });
+      if (!taskRes.ok) throw new Error(`ByteDance ${taskRes.status}`);
+      const data = (await taskRes.json()) as any;
+      taskId = data.id;
+      if (!taskId) throw new Error('No task ID');
+      break;
+    } catch (err: any) {
+      log(label, `Attempt ${attempt + 1} failed: ${err.message?.slice(0, 60)}`);
+      if (attempt < 2) await sleep(5000);
+    }
+  }
+  if (!taskId) throw new Error('ByteDance task creation failed after 3 attempts');
   log(label, `Task: ${taskId}`);
 
   for (let i = 0; i < 60; i++) {
@@ -691,24 +706,41 @@ async function main() {
   let previousId = latestId;
   let completed = 0;
 
+  // Skip already-completed scenes from previous runs
+  const DONE_IDS = new Set(['S01', 'S04', 'S05', 'S06']); // Nodes #37-40
+
   for (let i = 0; i < SCENES.length; i++) {
+    if (DONE_IDS.has(SCENES[i].id)) {
+      log(SCENES[i].id, `Already done — skipping`);
+      completed++;
+      continue;
+    }
     const scene = SCENES[i];
     const label = scene.id;
 
     console.log(`\n── ${scene.id}: ${scene.title} (${i + 1}/${SCENES.length}) ──`);
 
-    try {
-      const videoUrl = await generateVideo(scene.prompt, label);
-      const contentHash = `cw-${scene.id}-${Date.now()}`;
-      const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
-      previousId = nodeId;
-      completed++;
-      log(label, `DONE — Node #${nodeId}`);
-    } catch (err: any) {
-      log(label, `FAILED: ${err.message?.slice(0, 150)}`);
+    // Retry whole scene up to 2 times
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const videoUrl = await generateVideo(scene.prompt, label);
+        const contentHash = `cw-${scene.id}-${Date.now()}`;
+        const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
+        previousId = nodeId;
+        completed++;
+        log(label, `DONE — Node #${nodeId}`);
+        break;
+      } catch (err: any) {
+        if (attempt === 0) {
+          log(label, `FAILED (attempt 1): ${err.message?.slice(0, 100)} — retrying in 10s`);
+          await sleep(10_000);
+        } else {
+          log(label, `FAILED (attempt 2): ${err.message?.slice(0, 100)} — skipping`);
+        }
+      }
     }
 
-    if (i < SCENES.length - 1) await sleep(2000);
+    if (i < SCENES.length - 1) await sleep(3000);
   }
 
   console.log('\n' + '═'.repeat(60));
