@@ -2,15 +2,15 @@
  * $LOAR Faucet — big, obvious testnet token claim page.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
-import { useChainId, useReadContract } from 'wagmi';
+import { useState } from 'react';
+import { useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { formatUnits, type Address } from 'viem';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Droplets, Coins, ArrowRight, Clock, CheckCircle2, Wallet } from 'lucide-react';
+import { Droplets, Coins, ArrowRight, CheckCircle2, Wallet } from 'lucide-react';
 
 export const Route = createFileRoute('/faucet')({
   component: FaucetPage,
@@ -39,16 +39,6 @@ const FAUCET_ABI = [
     outputs: [],
   },
   {
-    name: 'canClaim',
-    type: 'function' as const,
-    stateMutability: 'view' as const,
-    inputs: [{ name: 'user', type: 'address' }],
-    outputs: [
-      { name: 'ok', type: 'bool' },
-      { name: 'availableAt', type: 'uint256' },
-    ],
-  },
-  {
     name: 'claimAmount',
     type: 'function' as const,
     stateMutability: 'view' as const,
@@ -73,14 +63,6 @@ function FaucetPage() {
   const hasFaucet = !!LOAR_FAUCET_ADDRESS && LOAR_FAUCET_ADDRESS !== '0x';
 
   // Faucet reads
-  const { data: canClaimData, refetch: refetchCanClaim } = useReadContract({
-    address: LOAR_FAUCET_ADDRESS,
-    abi: FAUCET_ABI,
-    functionName: 'canClaim',
-    args: address ? [address] : undefined,
-    query: { enabled: hasFaucet && !!address },
-  });
-
   const { data: claimAmountData } = useReadContract({
     address: LOAR_FAUCET_ADDRESS,
     abi: FAUCET_ABI,
@@ -110,9 +92,6 @@ function FaucetPage() {
     },
   });
 
-  const canClaimResult = canClaimData as [boolean, bigint] | undefined;
-  const canClaimNow = canClaimResult?.[0] ?? false;
-  const nextClaimAt = canClaimResult?.[1] ? Number(canClaimResult[1]) : 0;
   const faucetAmount = claimAmountData ? Number(formatUnits(claimAmountData as bigint, 18)) : 1000;
   const faucetBalance = faucetBalanceData
     ? Number(formatUnits(faucetBalanceData as bigint, 18))
@@ -120,31 +99,7 @@ function FaucetPage() {
   const userBalance =
     userBalanceRaw != null ? Number(formatUnits(userBalanceRaw as bigint, 18)) : 0;
 
-  // Countdown timer
-  const [countdown, setCountdown] = useState('');
-  useEffect(() => {
-    if (!nextClaimAt || canClaimNow) {
-      setCountdown('');
-      return;
-    }
-    const tick = () => {
-      const diff = nextClaimAt * 1000 - Date.now();
-      if (diff <= 0) {
-        setCountdown('');
-        refetchCanClaim();
-        return;
-      }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setCountdown(
-        `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-      );
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [nextClaimAt, canClaimNow, refetchCanClaim]);
+  // No cooldown — testnet faucet is unlimited
 
   const handleClaim = async () => {
     if (!hasFaucet) return;
@@ -158,7 +113,6 @@ function FaucetPage() {
       });
       toast.success(`Claimed ${faucetAmount.toLocaleString()} $LOAR!`);
       setJustClaimed(true);
-      refetchCanClaim();
       refetchBalance();
     } catch (err) {
       if (err instanceof Error && !err.message.includes('rejected')) {
@@ -241,7 +195,7 @@ function FaucetPage() {
                   Done
                 </Button>
               </div>
-            ) : canClaimNow ? (
+            ) : (
               <button
                 disabled={isClaiming}
                 onClick={handleClaim}
@@ -273,20 +227,6 @@ function FaucetPage() {
                   </span>
                 )}
               </button>
-            ) : (
-              <div className="text-center py-6 space-y-3">
-                <Clock className="w-10 h-10 text-zinc-500 mx-auto" />
-                <div>
-                  <p className="text-zinc-400 font-medium">Cooldown Active</p>
-                  {countdown && (
-                    <p className="text-3xl font-mono font-bold text-zinc-300 mt-2">{countdown}</p>
-                  )}
-                  <p className="text-xs text-zinc-500 mt-2">
-                    Next claim available{' '}
-                    {nextClaimAt > 0 ? new Date(nextClaimAt * 1000).toLocaleString() : 'soon'}
-                  </p>
-                </div>
-              </div>
             )}
 
             {/* Your balance */}
@@ -367,7 +307,7 @@ function FaucetPage() {
         <p className="text-center text-xs text-zinc-600">
           This faucet distributes testnet $LOAR tokens. Tokens have no monetary value.
           <br />
-          24-hour cooldown between claims.
+          No cooldown — claim as often as you need.
         </p>
       </div>
     </div>

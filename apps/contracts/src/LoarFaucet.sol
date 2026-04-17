@@ -16,8 +16,8 @@ contract LoarFaucet is Ownable {
     /// @notice Amount of $LOAR dispensed per claim (default: 1000 tokens)
     uint256 public claimAmount = 1_000 * 1e18;
 
-    /// @notice Cooldown between claims per address (default: 24 hours)
-    uint256 public cooldown = 24 hours;
+    /// @notice Cooldown between claims per address (disabled for testnet)
+    uint256 public cooldown = 0;
 
     /// @notice Last claim timestamp per address
     mapping(address => uint256) public lastClaimed;
