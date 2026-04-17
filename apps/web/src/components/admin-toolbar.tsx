@@ -39,7 +39,7 @@ const ADMIN_ADDRESSES = (import.meta.env.VITE_ADMIN_ADDRESSES ?? '')
 
 function isAdmin(address: string | null | undefined): boolean {
   if (!address) return false;
-  if (ADMIN_ADDRESSES.length === 0) return true;
+  if (ADMIN_ADDRESSES.length === 0) return false;
   return ADMIN_ADDRESSES.includes(address.toLowerCase());
 }
 
@@ -393,10 +393,11 @@ export default function AdminToolbar() {
     setExpandedSection((prev) => (prev === section ? null : section));
   };
 
+  // Show only whether env vars are configured, never expose actual values
   const envVars = {
-    VITE_SERVER_URL: import.meta.env.VITE_SERVER_URL,
-    VITE_PONDER_URL: import.meta.env.VITE_PONDER_URL,
-    VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    VITE_SERVER_URL: import.meta.env.VITE_SERVER_URL ? 'configured' : 'missing',
+    VITE_PONDER_URL: import.meta.env.VITE_PONDER_URL ? 'configured' : 'missing',
+    VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID ? 'configured' : 'missing',
     MODE: import.meta.env.MODE,
     DEV: import.meta.env.DEV ? 'true' : 'false',
     PROD: import.meta.env.PROD ? 'true' : 'false',

@@ -22,6 +22,7 @@ import { sepolia, baseSepolia } from 'viem/chains';
 import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { assertContentOperable } from '../../lib/content-status';
 
 // ── Chain clients for on-chain TX verification ──────────────────────
 const sepoliaClient = createPublicClient({
@@ -82,6 +83,9 @@ export const nftRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        // Block minting of moderated content
+        await assertContentOperable(input.contentId);
+
         // 1. Load the content from gallery
         const contentRef = contentCol().doc(input.contentId);
         const contentDoc = await contentRef.get();
@@ -374,23 +378,7 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const epRef = episodesCol().doc(input.episodeId);
-      const epDoc = await epRef.get();
-      if (!epDoc.exists) throwApiError('NOT_FOUND', 'Episode not found');
-
-      const episode = epDoc.data()!;
-      if (!episode.active) throwApiError('BAD_REQUEST', 'Episode is not active');
-      if (episode.maxSupply > 0 && episode.minted >= episode.maxSupply) {
-        throwApiError('BAD_REQUEST', 'Sold out');
-      }
-
-      // Dedup: reject if txHash was already used
-      const existingMint = await nftMintsCol().where('txHash', '==', input.txHash).limit(1).get();
-      if (!existingMint.empty) {
-        throwApiError('BAD_REQUEST', 'This transaction has already been recorded');
-      }
-
-      // Verify on-chain TX succeeded
+      // Verify on-chain TX succeeded (outside transaction to avoid holding locks during RPC)
       const client = getChainClient(input.chainId);
       try {
         const receipt = await client.getTransactionReceipt({
@@ -404,36 +392,59 @@ export const nftRouter = router({
         throwApiError('BAD_REQUEST', 'Mint transaction not found on-chain');
       }
 
-      // Record the mint
-      const now = new Date();
-      const tokenId = (episode.minted || 0) + 1;
-      const mintData = {
-        episodeId: input.episodeId,
-        tokenId,
-        txHash: input.txHash,
-        price: episode.mintPrice,
-        buyerUid: ctx.user.uid,
-        buyerAddress: ctx.user.address || null,
-        mintedAt: now,
-      };
+      // Atomic: dedup by txHash doc ID + episode update in one transaction
+      const purchaseRef = nftMintsCol().doc(input.txHash);
+      const epRef = episodesCol().doc(input.episodeId);
 
-      await nftMintsCol().add(mintData);
-      await epRef.update({
-        minted: tokenId,
-        updatedAt: now,
+      const result = await db.runTransaction(async (transaction) => {
+        const [existingPurchase, epDoc] = await Promise.all([
+          transaction.get(purchaseRef),
+          transaction.get(epRef),
+        ]);
+
+        if (existingPurchase.exists) {
+          throw new Error('This transaction has already been recorded');
+        }
+        if (!epDoc.exists) throw new Error('Episode not found');
+
+        const episode = epDoc.data()!;
+        if (!episode.active) throw new Error('Episode is not active');
+        if (episode.maxSupply > 0 && episode.minted >= episode.maxSupply) {
+          throw new Error('Sold out');
+        }
+
+        const now = new Date();
+        const tokenId = (episode.minted || 0) + 1;
+        const mintData = {
+          episodeId: input.episodeId,
+          tokenId,
+          txHash: input.txHash,
+          price: episode.mintPrice,
+          buyerUid: ctx.user.uid,
+          buyerAddress: ctx.user.address || null,
+          mintedAt: now,
+        };
+
+        transaction.set(purchaseRef, mintData);
+        transaction.update(epRef, {
+          minted: tokenId,
+          updatedAt: now,
+        });
+
+        return { tokenId, mintData, episode };
       });
 
-      // Auto-record revenue for the creator
+      // Auto-record revenue for the creator (fire-and-forget, outside transaction)
       recordRevenueEvent({
-        creatorUid: episode.creatorUid,
-        creatorAddress: episode.creatorAddress,
+        creatorUid: result.episode.creatorUid,
+        creatorAddress: result.episode.creatorAddress,
         source: 'nft_sales',
-        amountWei: episode.mintPrice || '0',
-        universeId: episode.universeId,
+        amountWei: result.episode.mintPrice || '0',
+        universeId: result.episode.universeId,
         metadata: { episodeId: input.episodeId, txHash: input.txHash },
       }).catch(() => {});
 
-      return { ok: true, tokenId, mint: mintData };
+      return { ok: true, tokenId: result.tokenId, mint: result.mintData };
     }),
 
   /**
@@ -450,20 +461,7 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const charRef = characterNFTsCol().doc(input.characterId);
-      const charDoc = await charRef.get();
-      if (!charDoc.exists) throwApiError('NOT_FOUND', 'Character not found');
-
-      const character = charDoc.data()!;
-      if (!character.active) throwApiError('BAD_REQUEST', 'Character is not active');
-
-      // Dedup
-      const existingMint = await nftMintsCol().where('txHash', '==', input.txHash).limit(1).get();
-      if (!existingMint.empty) {
-        throwApiError('BAD_REQUEST', 'This transaction has already been recorded');
-      }
-
-      // Verify on-chain TX
+      // Verify on-chain TX (outside transaction to avoid holding locks during RPC)
       const client = getChainClient(input.chainId);
       try {
         const receipt = await client.getTransactionReceipt({
@@ -477,29 +475,50 @@ export const nftRouter = router({
         throwApiError('BAD_REQUEST', 'Mint transaction not found on-chain');
       }
 
-      const now = new Date();
-      const mintData = {
-        characterId: input.characterId,
-        txHash: input.txHash,
-        price: input.price,
-        buyerUid: ctx.user.uid,
-        buyerAddress: ctx.user.address || null,
-        mintedAt: now,
-      };
+      // Atomic: dedup by txHash doc ID + character validation in one transaction
+      const purchaseRef = nftMintsCol().doc(input.txHash);
+      const charRef = characterNFTsCol().doc(input.characterId);
 
-      await nftMintsCol().add(mintData);
+      const result = await db.runTransaction(async (transaction) => {
+        const [existingPurchase, charDoc] = await Promise.all([
+          transaction.get(purchaseRef),
+          transaction.get(charRef),
+        ]);
 
-      // Auto-record revenue for creator
+        if (existingPurchase.exists) {
+          throw new Error('This transaction has already been recorded');
+        }
+        if (!charDoc.exists) throw new Error('Character not found');
+
+        const character = charDoc.data()!;
+        if (!character.active) throw new Error('Character is not active');
+
+        const now = new Date();
+        const mintData = {
+          characterId: input.characterId,
+          txHash: input.txHash,
+          price: input.price,
+          buyerUid: ctx.user.uid,
+          buyerAddress: ctx.user.address || null,
+          mintedAt: now,
+        };
+
+        transaction.set(purchaseRef, mintData);
+
+        return { mintData, character };
+      });
+
+      // Auto-record revenue for creator (fire-and-forget, outside transaction)
       recordRevenueEvent({
-        creatorUid: character.creatorUid,
-        creatorAddress: character.creatorAddress,
+        creatorUid: result.character.creatorUid,
+        creatorAddress: result.character.creatorAddress,
         source: 'nft_sales',
         amountWei: input.price,
-        universeId: character.universeId,
+        universeId: result.character.universeId,
         metadata: { characterId: input.characterId, txHash: input.txHash },
       }).catch(() => {});
 
-      return { ok: true, mint: mintData };
+      return { ok: true, mint: result.mintData };
     }),
 
   getMyNFTs: protectedProcedure.query(async ({ ctx }) => {

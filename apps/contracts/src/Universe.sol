@@ -5,8 +5,10 @@ import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 
-contract Universe is IUniverse {
+contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
     struct VideoNode {
         bytes32 contentHash;   // SHA-256 hash of media file
@@ -86,6 +88,17 @@ contract Universe is IUniverse {
         emit WhitelistedUpdated(user, status);
     }
 
+    /// @notice Batch whitelist multiple addresses in a single transaction.
+    /// @param users Array of addresses to update
+    /// @param status Whitelist status to set for all addresses
+    function batchSetWhitelisted(address[] calldata users, bool status) external onlyAdmin {
+        require(users.length <= 200, "Batch too large");
+        for (uint i = 0; i < users.length; i++) {
+            isWhitelisted[users[i]] = status;
+            emit WhitelistedUpdated(users[i], status);
+        }
+    }
+
     function getWhitelisted(address user) public view returns (bool) {
         return isWhitelisted[user];
     }
@@ -93,6 +106,15 @@ contract Universe is IUniverse {
     function setVaultWhitelisted(address user, bool status) public onlyAdmin {
         vaultWhitelisted[user] = status;
         emit VaultWhitelistUpdated(user, status);
+    }
+
+    /// @notice Batch vault whitelist multiple addresses in a single transaction.
+    function batchSetVaultWhitelisted(address[] calldata users, bool status) external onlyAdmin {
+        require(users.length <= 200, "Batch too large");
+        for (uint i = 0; i < users.length; i++) {
+            vaultWhitelisted[users[i]] = status;
+            emit VaultWhitelistUpdated(users[i], status);
+        }
     }
 
     function getVaultWhitelisted(address user) public view returns (bool) {
@@ -111,7 +133,7 @@ contract Universe is IUniverse {
         uint _previous,
         string calldata _link,
         string calldata _plot
-    ) public returns (uint) {
+    ) public nonReentrant whenNotPaused returns (uint) {
         if (nodeCreationOption == NodeCreationOptions.WHITELISTED) {
             require(isWhitelisted[msg.sender], "Not whitelisted");
         }
@@ -202,6 +224,39 @@ contract Universe is IUniverse {
             leaves[j] = temp[j];
         }
         return leaves;
+    }
+
+    /// @notice Paginated version of getLeaves() (L1 fix)
+    function getLeavesPage(uint256 offset, uint256 limit) public view returns (uint[] memory) {
+        // First pass: count all leaves
+        uint256 count = 0;
+        for (uint i = 1; i <= latestNodeId; i++) {
+            if (nodes[i].id != 0 && nodes[i].next.length == 0) {
+                count++;
+            }
+        }
+
+        if (offset >= count) return new uint[](0);
+
+        uint256 end = offset + limit;
+        if (end > count) end = count;
+        uint256 resultSize = end - offset;
+
+        uint[] memory result = new uint[](resultSize);
+        uint256 leafIndex = 0;
+        uint256 resultIndex = 0;
+
+        for (uint i = 1; i <= latestNodeId && resultIndex < resultSize; i++) {
+            if (nodes[i].id != 0 && nodes[i].next.length == 0) {
+                if (leafIndex >= offset) {
+                    result[resultIndex] = i;
+                    resultIndex++;
+                }
+                leafIndex++;
+            }
+        }
+
+        return result;
     }
 
     function getMedia(uint id) public view returns (bytes32) {
@@ -344,13 +399,15 @@ contract Universe is IUniverse {
             revert NodeDoesNotExist();
         }
 
+        uint previousCanon = currentCanonId;
+
         // O(1) — unset previous canon, set new one
-        if (currentCanonId != 0) {
-            nodes[currentCanonId].canon = false;
+        if (previousCanon != 0) {
+            nodes[previousCanon].canon = false;
         }
         nodes[id].canon = true;
         currentCanonId = id;
-        emit NodeCanonized(id, msg.sender);
+        emit CanonChanged(id, previousCanon, msg.sender);
     }
 
     function getCanonChain() public view returns (uint[] memory) {
@@ -376,5 +433,17 @@ contract Universe is IUniverse {
     }
     function getAdmin() external view returns(address) {
       return universeAdmin;
+    }
+
+    // ---- Pausable (emergency stop) ----
+
+    /// @notice Pause node creation. Only callable by admin (governor after token deploy).
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    /// @notice Unpause node creation.
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 }

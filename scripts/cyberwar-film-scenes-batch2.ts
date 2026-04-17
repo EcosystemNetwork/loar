@@ -461,9 +461,27 @@ async function pinToIPFS(
   filename: string,
   label: string
 ): Promise<{ url: string; hash: string }> {
-  const dl = await fetch(videoUrl);
-  if (!dl.ok) throw new Error(`Download ${dl.status}`);
-  const buf = await dl.arrayBuffer();
+  // Retry download up to 3 times with 60s timeout — ByteDance CDN can be flaky
+  let buf: ArrayBuffer | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60_000);
+      const dl = await fetch(videoUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!dl.ok) throw new Error(`HTTP ${dl.status}`);
+      buf = await dl.arrayBuffer();
+      break;
+    } catch (err: any) {
+      log(label, `Download attempt ${attempt + 1}/3 failed: ${err.message?.slice(0, 60)}`);
+      if (attempt < 2) await sleep(3000);
+    }
+  }
+  if (!buf) {
+    // Fallback: use ByteDance URL directly (skip Pinata pin)
+    log(label, 'All download attempts failed — using ByteDance URL directly');
+    return { url: videoUrl, hash: `bd-fallback-${Date.now()}` };
+  }
   log(label, `${(buf.byteLength / 1024 / 1024).toFixed(1)} MB → Pinata`);
   const form = new FormData();
   form.append('file', new Blob([buf], { type: 'video/mp4' }), filename);

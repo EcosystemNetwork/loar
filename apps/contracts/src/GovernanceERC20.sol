@@ -10,12 +10,23 @@ import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 /// @notice ERC20 token with voting and permit capabilities for universe governance.
 /// @dev Extends OpenZeppelin's ERC20Votes for on-chain vote delegation and ERC20Permit for gasless approvals.
 ///      Mints the full supply to the deployer (UniverseTokenDeployer) on construction.
+///      H4 fix: Symbol validated for length and checked against a blocklist of common stock tickers.
 contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
     string public imageUrl;
     string public metadata;
     string public context;
     address public immutable admin;
     address public constant universe = address(0);
+
+    /// @notice Deployer address that can manage the symbol blocklist
+    address public immutable deployer;
+
+    /// @notice Blocked symbols to prevent NYSE/NASDAQ ticker collisions (H4 fix)
+    mapping(string => bool) public blockedSymbols;
+
+    error SymbolTooShort();
+    error SymbolTooLong();
+    error SymbolBlocked();
 
     constructor(
         string memory _name,
@@ -26,12 +37,38 @@ contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
         string memory _metadata,
         string memory _context
     ) ERC20(_name, _symbol) ERC20Permit(_name) {
+        // H4 fix: validate symbol length (3-10 characters)
+        require(bytes(_symbol).length >= 3, "Symbol too short");
+        require(bytes(_symbol).length <= 10, "Symbol too long");
+
         imageUrl = _imageUrl;
         metadata = _metadata;
         context = _context;
         admin = _admin;
+        deployer = msg.sender;
         // Mint initial supply to the deployer
         _mint(msg.sender, _maxSupply);
+    }
+
+    /// @notice Add symbols to the blocklist (deployer only, H4 fix)
+    function addBlockedSymbols(string[] calldata symbols) external {
+        require(msg.sender == deployer || msg.sender == admin, "Not authorized");
+        for (uint256 i = 0; i < symbols.length; i++) {
+            blockedSymbols[symbols[i]] = true;
+        }
+    }
+
+    /// @notice Remove symbols from the blocklist (deployer only, H4 fix)
+    function removeBlockedSymbols(string[] calldata symbols) external {
+        require(msg.sender == deployer || msg.sender == admin, "Not authorized");
+        for (uint256 i = 0; i < symbols.length; i++) {
+            blockedSymbols[symbols[i]] = false;
+        }
+    }
+
+    /// @notice Check if a symbol is blocked
+    function isSymbolBlocked(string calldata _symbol) external view returns (bool) {
+        return blockedSymbols[_symbol];
     }
 
     // The following functions are overrides required by Solidity.

@@ -182,10 +182,10 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         // C5 fix: Validate universeToken is the actual governance token for this universe.
         // Prevents sockpuppet token attacks where an attacker deploys their own IVotes token
         // and uses it to vote their own submissions into another universe's canon.
-        if (address(universeManager) != address(0)) {
-            (, address registeredToken,,,,) = universeManager.getUniverseData(universeId);
-            if (registeredToken != universeToken) revert TokenMismatch();
-        }
+        // C1 fix: Always require universeManager to be set — never skip validation.
+        require(address(universeManager) != address(0), "Universe manager not set");
+        (, address registeredToken,,,,) = universeManager.getUniverseData(universeId);
+        if (registeredToken != universeToken) revert TokenMismatch();
 
         // Validate the token implements IVotes (will revert if not)
         try IVotes(universeToken).getPastTotalSupply(block.number - 1) {} catch { revert InvalidToken(); }
@@ -364,4 +364,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (_universeManager == address(0)) revert ZeroAddress();
         universeManager = IUniverseManagerLookup(_universeManager);
     }
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

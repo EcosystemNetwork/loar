@@ -218,13 +218,24 @@ contract Escrow is
 
     // ── Internal ────────────────────────────────────────────────────────
 
-    /// @dev Distribute escrowed amount: platform fee to treasury, rest to seller (pull pattern).
+    /// @dev Distribute escrowed amount: platform fee routed through PaymentRouter (M2 fix),
+    ///      rest accrues to seller via pull pattern.
     function _distribute(EscrowData storage e) internal {
         uint256 fee = (e.amount * e.platformFeeBps) / 10000;
         uint256 sellerAmount = e.amount - fee;
 
         if (fee > 0) {
-            claimable[platform] += fee;
+            // M2 fix: route through PaymentRouter if available, otherwise fallback to claimable
+            if (address(paymentRouter) != address(0)) {
+                try paymentRouter.routeToTreasury{value: fee}() {
+                    // Successfully routed through PaymentRouter
+                } catch {
+                    // Fallback: accumulate in claimable mapping
+                    claimable[platform] += fee;
+                }
+            } else {
+                claimable[platform] += fee;
+            }
         }
         if (sellerAmount > 0) {
             claimable[e.seller] += sellerAmount;
@@ -240,4 +251,7 @@ contract Escrow is
     // ── Upgrade ─────────────────────────────────────────────────────────
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

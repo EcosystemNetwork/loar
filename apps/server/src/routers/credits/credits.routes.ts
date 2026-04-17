@@ -849,37 +849,41 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const userRef = creditsCol().doc(input.targetUid);
-      const userDoc = await userRef.get();
+      await db.runTransaction(async (transaction) => {
+        const userRef = creditsCol().doc(input.targetUid);
+        const userDoc = await transaction.get(userRef);
+        const now = new Date();
 
-      if (userDoc.exists) {
-        const data = userDoc.data()!;
-        await userRef.update({
-          balance: (data.balance || 0) + input.credits,
-          totalBonusReceived: (data.totalBonusReceived || 0) + input.credits,
-          updatedAt: new Date(),
-        });
-      } else {
-        await userRef.set({
+        if (userDoc.exists) {
+          const data = userDoc.data()!;
+          transaction.update(userRef, {
+            balance: (data.balance || 0) + input.credits,
+            totalBonusReceived: (data.totalBonusReceived || 0) + input.credits,
+            updatedAt: now,
+          });
+        } else {
+          transaction.set(userRef, {
+            uid: input.targetUid,
+            balance: input.credits,
+            totalPurchased: 0,
+            totalSpent: 0,
+            totalBonusReceived: input.credits,
+            totalLoarPurchases: 0,
+            totalFiatPurchases: 0,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+
+        const txRef = creditTxCol().doc();
+        transaction.set(txRef, {
           uid: input.targetUid,
-          balance: input.credits,
-          totalPurchased: 0,
-          totalSpent: 0,
-          totalBonusReceived: input.credits,
-          totalLoarPurchases: 0,
-          totalFiatPurchases: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          type: 'grant',
+          source: input.source,
+          credits: input.credits,
+          reason: input.reason,
+          createdAt: now,
         });
-      }
-
-      await creditTxCol().add({
-        uid: input.targetUid,
-        type: 'grant',
-        source: input.source,
-        credits: input.credits,
-        reason: input.reason,
-        createdAt: new Date(),
       });
 
       return { ok: true };

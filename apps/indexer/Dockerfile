@@ -2,7 +2,7 @@
 FROM node:20.18.1-alpine AS builder
 
 RUN apk add --no-cache curl
-ENV COREPACK_INTEGRITY_KEYS=0
+ENV COREPACK_INTEGRITY_KEYS=""
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN node -e "\
   const p=JSON.parse(fs.readFileSync('./apps/indexer/package.json')); \
   if(p.devDependencies)delete p.devDependencies.vitest; \
   fs.writeFileSync('./apps/indexer/package.json',JSON.stringify(p,null,2))"
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy indexer source (selective — no vitest.config.ts, no __tests__)
 COPY apps/indexer/src/api ./apps/indexer/src/api
@@ -41,7 +41,7 @@ RUN pnpm prune --prod --no-optional
 FROM node:20.18.1-alpine
 
 RUN apk add --no-cache curl
-ENV COREPACK_INTEGRITY_KEYS=0
+ENV COREPACK_INTEGRITY_KEYS=""
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 

@@ -8,6 +8,7 @@ import {IUniverseMetadataRenderer} from "./interfaces/IUniverseMetadataRenderer.
 import {IBondingCurve} from "./interfaces/IBondingCurve.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -48,7 +49,7 @@ interface IUniverseTokenDeployer {
 ///         The NFT shows up in wallets (OpenSea, Rainbow, etc.) and proves universe ownership.
 ///         Before governance token deployment, transferring the NFT transfers admin control.
 ///         After governance, the NFT represents creator identity; admin is the governor.
-contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
+contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, Pausable {
     uint public constant teamFee = 0;
     address public teamFeeRecipient;
     address public tokenDeployer;
@@ -142,6 +143,12 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         emit EthClaimed(recipient, claimable);
     }
 
+    /// @notice Emergency pause (H3 fix)
+    function pause() external onlyOwner { _pause(); }
+
+    /// @notice Unpause (H3 fix)
+    function unpause() external onlyOwner { _unpause(); }
+
     receive() external payable {}
 
     // ── Public entry points (thin wrappers) ─────────────────────────
@@ -154,7 +161,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) public payable nonReentrant returns (uint256 _id, address) {
+    ) public payable nonReentrant whenNotPaused returns (uint256 _id, address) {
         return _createUniverse(name, imageURL, description, nodeCreationOptions, nodeVisibilityOptions, initialOwner);
     }
 
@@ -162,7 +169,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     function deployUniverseToken(
         DeploymentConfig memory deploymentConfig,
         uint id
-    ) public nonReentrant returns (address tokenAddress) {
+    ) public nonReentrant whenNotPaused returns (address tokenAddress) {
         return _deployUniverseToken(deploymentConfig, id);
     }
 
@@ -177,7 +184,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner,
         DeploymentConfig memory deploymentConfig
-    ) external payable nonReentrant returns (
+    ) external payable nonReentrant whenNotPaused returns (
         uint256 universeId,
         address universeAddress,
         address tokenAddress
@@ -348,7 +355,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         uint256 ethAmount,
         uint256 tokenAmount,
         address _token
-    ) external payable nonReentrant {
+    ) external payable nonReentrant whenNotPaused {
         UniverseData storage data = universeDatas[universeId];
         require(msg.sender == data.bondingCurve, "Only bonding curve can graduate");
         require(address(data.token) == _token, "Token mismatch");

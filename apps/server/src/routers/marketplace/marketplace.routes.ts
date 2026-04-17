@@ -10,6 +10,7 @@ import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig'
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
 import { resolveActingUid } from '../../services/agentAuth';
+import { assertContentOperable } from '../../lib/content-status';
 
 const submissionsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -89,10 +90,11 @@ export const marketplaceRouter = router({
       z.object({
         submissionId: z.string(),
         support: z.boolean(),
+        // TODO: verify vote weight on-chain via governance token balanceOf
         weight: z.string().refine((w) => {
           const num = parseFloat(w);
-          return !isNaN(num) && num > 0 && num <= 10_000_000_000;
-        }, 'Vote weight must be between 0 and 10B'),
+          return !isNaN(num) && num > 0 && num <= 1e24;
+        }, 'Vote weight must be between 0 and 1e24'),
         txHash: z.string().optional(),
       })
     )
@@ -301,6 +303,11 @@ export const marketplaceRouter = router({
       if (!subDoc.exists) throw new Error('Submission not found');
       const sub = subDoc.data()!;
       if (sub.status !== 'ACCEPTED') throw new Error('Not accepted canon');
+
+      // Block licensing of moderated content
+      if (sub.contentId) {
+        await assertContentOperable(sub.contentId);
+      }
 
       const config = await getPlatformConfig();
       const feeBps = config.marketplacePlatformFeeBps;

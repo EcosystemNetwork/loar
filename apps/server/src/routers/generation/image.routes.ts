@@ -49,6 +49,7 @@ import { logFailedRefund } from '../../lib/refund-audit';
 import { getStorageManager } from '../../services/storage';
 import { signWithProvenance } from '../../services/provenance';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
 
 // ── Collections ───────────────────────────────────────────────────────
 
@@ -321,6 +322,10 @@ export const imageRouter = router({
     .use(requirePermission('generation.image'))
     .input(generateSchema)
     .mutation(async ({ input, ctx }) => {
+      // Sanitize user-supplied prompts
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
+
       const genId = randomUUID();
       const startTime = Date.now();
 

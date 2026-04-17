@@ -35,6 +35,10 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     /// @notice Addresses exempt from the transfer fee (treasury, LP, minters, etc.)
     mapping(address => bool) public feeExempt;
 
+    /// @notice Fee-exempt trading pairs (DEX pools). Transfers between two fee-exempt
+    ///         addresses skip fee logic entirely, preventing double-fee on DEX swaps.
+    mapping(address => bool) public feeExemptPairs;
+
     /// @notice Addresses authorized to mint (platform backend, quest rewards, etc.)
     mapping(address => bool) public minters;
 
@@ -78,23 +82,18 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         feeExempt[_initialHolder] = true;
         feeExempt[address(this)] = true;
 
-        // Initial distribution:
-        // 40% — platform treasury (rewards, liquidity, operations)
-        // 30% — initial holder (team/founder vesting)
-        // 20% — community rewards pool (quests, affiliates)
-        // 10% — reserved for future partnerships
-        uint256 treasuryAmount = (MAX_SUPPLY * 40) / 100;
-        uint256 holderAmount = (MAX_SUPPLY * 30) / 100;
-        uint256 communityAmount = (MAX_SUPPLY * 20) / 100;
-        uint256 reserveAmount = MAX_SUPPLY - treasuryAmount - holderAmount - communityAmount;
+        // Initial distribution: 20% of MAX_SUPPLY
+        // Remaining 80% mintable via quest rewards, faucet, affiliates, etc.
+        // 10% — platform treasury (operations, initial liquidity)
+        // 10% — initial holder (team/founder vesting)
+        uint256 treasuryAmount = (MAX_SUPPLY * 10) / 100;
+        uint256 holderAmount = (MAX_SUPPLY * 10) / 100;
 
         _mint(_treasury, treasuryAmount);
         _mint(_initialHolder, holderAmount);
-        _mint(_treasury, communityAmount); // community pool managed by treasury
-        _mint(_treasury, reserveAmount);   // reserve managed by treasury
 
         // Track initial distribution against the permanent cap
-        totalMinted = MAX_SUPPLY;
+        totalMinted = treasuryAmount + holderAmount;
     }
 
     /// @notice Mint new tokens (for quest rewards, affiliate payouts, etc.)
@@ -167,9 +166,27 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         }
     }
 
+    /// @notice Batch-set fee exemptions (C3 alias). Sets both feeExempt and feeExemptPairs.
+    function setFeeExemptBatch(address[] calldata accounts, bool exempt) external onlyOwner {
+        require(accounts.length <= 200, "Batch too large");
+        for (uint256 i = 0; i < accounts.length; i++) {
+            if (accounts[i] == address(0)) revert ZeroAddress();
+            feeExempt[accounts[i]] = exempt;
+            feeExemptPairs[accounts[i]] = exempt;
+            emit FeeExemptUpdated(accounts[i], exempt);
+        }
+    }
+
     /// @dev Override ERC20 _update to skim a transfer fee to the liquidity pool.
-    ///      Fee is skipped for mints, burns, and exempt addresses.
+    ///      Fee is skipped for mints, burns, exempt addresses, and transfers
+    ///      between two fee-exempt addresses (e.g. DEX router <-> pool).
     function _update(address from, address to, uint256 amount) internal override {
+        // C3 fix: skip fee entirely when both sides are fee-exempt (DEX pair optimization)
+        if (feeExempt[from] && feeExempt[to]) {
+            super._update(from, to, amount);
+            return;
+        }
+
         bool shouldTakeFee = liquidityPool != address(0)
             && transferFeeBps > 0
             && from != address(0)       // not a mint

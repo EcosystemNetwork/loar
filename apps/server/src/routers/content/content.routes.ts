@@ -244,51 +244,48 @@ export const contentRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = contentCol()
+      let query: FirebaseFirestore.Query = contentCol()
         .where('creatorUid', '==', input.creatorUid)
-        .where('visibility', '==', 'public') as FirebaseFirestore.Query;
+        .where('visibility', '==', 'public');
 
       if (input.classification) {
-        query = contentCol()
-          .where('creatorUid', '==', input.creatorUid)
-          .where('visibility', '==', 'public')
-          .where('classification', '==', input.classification);
+        query = query.where('classification', '==', input.classification);
       }
 
-      const snapshot = await query.get();
-      const allDocs = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            mediaUrl: data.mediaUrl,
-            thumbnailUrl: data.thumbnailUrl || null,
-            mediaType: data.mediaType,
-            classification: data.classification,
-            tags: data.tags || [],
-            views: data.views || 0,
-            likes: data.likes || 0,
-            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
-            _createdAtMs: data.createdAt?.toMillis?.() ?? new Date(data.createdAt).getTime(),
-          };
-        })
-        .sort((a, b) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
+      query = query.orderBy('createdAt', 'desc');
 
-      // Find cursor position for in-memory pagination
-      let startIdx = 0;
+      // Cursor-based pagination: start after the cursor document
       if (input.cursor) {
-        const idx = allDocs.findIndex((d) => d.id === input.cursor);
-        if (idx >= 0) startIdx = idx + 1;
+        const cursorDoc = await contentCol().doc(input.cursor).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
+        }
       }
 
-      const page = allDocs.slice(startIdx, startIdx + input.limit + 1);
-      const hasMore = page.length > input.limit;
+      // Fetch one extra to determine hasMore
+      const snapshot = await query.limit(input.limit + 1).get();
+      const docs = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title,
+          description: data.description,
+          mediaUrl: data.mediaUrl,
+          thumbnailUrl: data.thumbnailUrl || null,
+          mediaType: data.mediaType,
+          classification: data.classification,
+          tags: data.tags || [],
+          views: data.views || 0,
+          likes: data.likes || 0,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+        };
+      });
+
+      const hasMore = docs.length > input.limit;
 
       return {
-        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }) => rest),
-        nextCursor: hasMore ? page[input.limit - 1]?.id : null,
+        items: docs.slice(0, input.limit),
+        nextCursor: hasMore ? docs[input.limit - 1]?.id : null,
       };
     }),
 
@@ -302,50 +299,48 @@ export const contentRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      let query = contentCol().where('creatorUid', '==', ctx.user.uid) as FirebaseFirestore.Query;
+      let query: FirebaseFirestore.Query = contentCol().where('creatorUid', '==', ctx.user.uid);
 
       if (input.classification) {
-        query = contentCol()
-          .where('creatorUid', '==', ctx.user.uid)
-          .where('classification', '==', input.classification);
+        query = query.where('classification', '==', input.classification);
       }
 
-      const snapshot = await query.get();
-      const allDocs = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            mediaUrl: data.mediaUrl,
-            thumbnailUrl: data.thumbnailUrl || null,
-            mediaType: data.mediaType,
-            classification: data.classification,
-            tags: data.tags || [],
-            ipDeclaration: data.ipDeclaration,
-            visibility: data.visibility,
-            views: data.views || 0,
-            likes: data.likes || 0,
-            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
-            _createdAtMs: data.createdAt?.toMillis?.() ?? new Date(data.createdAt).getTime(),
-          };
-        })
-        .sort((a, b) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
+      query = query.orderBy('createdAt', 'desc');
 
-      // Find cursor position for in-memory pagination
-      let startIdx = 0;
+      // Cursor-based pagination: start after the cursor document
       if (input.cursor) {
-        const idx = allDocs.findIndex((d) => d.id === input.cursor);
-        if (idx >= 0) startIdx = idx + 1;
+        const cursorDoc = await contentCol().doc(input.cursor).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
+        }
       }
 
-      const page = allDocs.slice(startIdx, startIdx + input.limit + 1);
-      const hasMore = page.length > input.limit;
+      // Fetch one extra to determine hasMore
+      const snapshot = await query.limit(input.limit + 1).get();
+      const docs = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title,
+          description: data.description,
+          mediaUrl: data.mediaUrl,
+          thumbnailUrl: data.thumbnailUrl || null,
+          mediaType: data.mediaType,
+          classification: data.classification,
+          tags: data.tags || [],
+          ipDeclaration: data.ipDeclaration,
+          visibility: data.visibility,
+          views: data.views || 0,
+          likes: data.likes || 0,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+        };
+      });
+
+      const hasMore = docs.length > input.limit;
 
       return {
-        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }) => rest),
-        nextCursor: hasMore ? page[input.limit - 1]?.id : null,
+        items: docs.slice(0, input.limit),
+        nextCursor: hasMore ? docs[input.limit - 1]?.id : null,
       };
     }),
 
@@ -362,16 +357,71 @@ export const contentRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = contentCol().where('visibility', '==', 'public') as FirebaseFirestore.Query;
+      const needsJsFilter = !!(input.mediaType || input.format || input.search);
+
+      let query: FirebaseFirestore.Query = contentCol().where('visibility', '==', 'public');
 
       if (input.classification) {
-        query = contentCol()
-          .where('visibility', '==', 'public')
-          .where('classification', '==', input.classification);
+        query = query.where('classification', '==', input.classification);
       }
 
-      const snapshot = await query.get();
+      query = query.orderBy('createdAt', 'desc');
+
+      // Filter out moderated content from public feeds
+      const HIDDEN_STATUSES = ['flagged', 'under_review', 'hidden', 'removed'];
+
+      if (!needsJsFilter) {
+        // Fast path: no JS filters needed, use Firestore cursor pagination
+        if (input.cursor) {
+          const cursorDoc = await contentCol().doc(input.cursor).get();
+          if (cursorDoc.exists) {
+            query = query.startAfter(cursorDoc);
+          }
+        }
+
+        // Over-fetch to account for moderation filtering, then trim
+        const snapshot = await query.limit((input.limit + 1) * 3).get();
+        const items = snapshot.docs
+          .filter((doc) => {
+            const status = doc.data().contentStatus;
+            return !status || !HIDDEN_STATUSES.includes(status);
+          })
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              title: data.title,
+              description: data.description,
+              mediaUrl: data.mediaUrl,
+              thumbnailUrl: data.thumbnailUrl || null,
+              mediaType: data.mediaType,
+              format: (data.format as 'short' | 'long') || null,
+              classification: data.classification,
+              tags: data.tags || [],
+              creatorUid: data.creatorUid,
+              generationId: data.generationId || null,
+              views: data.views || 0,
+              likes: data.likes || 0,
+              createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+            };
+          });
+
+        const hasMore = items.length > input.limit;
+
+        return {
+          items: items.slice(0, input.limit),
+          nextCursor: hasMore ? items[input.limit - 1]?.id : null,
+        };
+      }
+
+      // Slow path: JS filters required — load a bounded set and filter in memory
+      const snapshot = await query.limit(1000).get();
+
       let allItems = snapshot.docs
+        .filter((doc) => {
+          const status = doc.data().contentStatus;
+          return !status || !HIDDEN_STATUSES.includes(status);
+        })
         .map((doc) => {
           const data = doc.data();
           return {
@@ -389,10 +439,8 @@ export const contentRouter = router({
             views: data.views || 0,
             likes: data.likes || 0,
             createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
-            _createdAtMs: data.createdAt?.toMillis?.() ?? new Date(data.createdAt).getTime(),
           };
-        })
-        .sort((a, b) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
+        });
 
       // Client-side filters for fields Firestore can't compound-query easily
       if (input.mediaType) {
@@ -422,7 +470,7 @@ export const contentRouter = router({
       const hasMore = page.length > input.limit;
 
       return {
-        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }) => rest),
+        items: page.slice(0, input.limit),
         nextCursor: hasMore ? page[input.limit - 1]?.id : null,
       };
     }),

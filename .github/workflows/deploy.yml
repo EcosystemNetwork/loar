@@ -41,18 +41,20 @@ jobs:
           restore-keys: |
             Linux-docker
 
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Deploy via SSH
         env:
           SSH_HOST: ${{secrets.SSH_HOST}}
           SSH_USER: ${{secrets.SSH_USER}}
           WORK_DIR: ${{secrets.WORK_DIR}}
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key.pem
-          chmod 600 private_key.pem
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts 2>/dev/null
 
-          ssh-keyscan -H $SSH_HOST >> known_hosts 2>/dev/null
-
-          ssh -i private_key.pem -o StrictHostKeyChecking=yes -o UserKnownHostsFile=known_hosts -tt $SSH_USER@$SSH_HOST << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=yes $SSH_USER@$SSH_HOST << 'ENDSSH'
             set -e
             cd ${{ secrets.WORK_DIR }}
 
@@ -132,5 +134,3 @@ jobs:
             echo "  Time     : $DEPLOY_TIME"
             echo "========================================"
           ENDSSH
-
-          rm -f private_key.pem known_hosts

@@ -99,11 +99,14 @@ export async function consumeNonce(nonce: string): Promise<void> {
     if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
     await col.doc(nonce).update({ used: true });
   } else {
+    // Atomic nonce consumption: delete IMMEDIATELY to prevent TOCTOU race.
+    // If two requests arrive with the same nonce, only the first delete returns
+    // truthy data; the second sees undefined and is rejected.
     const nonceData = memoryNonces.get(nonce);
     if (!nonceData) throw new Error('Invalid or expired nonce');
+    memoryNonces.delete(nonce); // consume before any async work
     if (nonceData.used) throw new Error('Invalid or expired nonce');
     if (new Date() > nonceData.expiresAt) throw new Error('Invalid or expired nonce');
-    memoryNonces.delete(nonce);
   }
 }
 
@@ -221,16 +224,14 @@ export async function verifySiweSignature(
       transaction.update(nonceRef, { used: true });
     });
   } else {
+    // Atomic nonce consumption: delete IMMEDIATELY before any async work
+    // to prevent TOCTOU race. The nonce is consumed even if validation
+    // fails below — this is intentional (a malformed nonce should not be reusable).
     const nonceData = memoryNonces.get(nonce);
     if (!nonceData) throw new Error('Invalid or expired nonce');
+    memoryNonces.delete(nonce);
     if (nonceData.used) throw new Error('Invalid or expired nonce');
     if (new Date() > nonceData.expiresAt) throw new Error('Invalid or expired nonce');
-
-    // Atomically consume the nonce — delete prevents any concurrent use.
-    // In Node.js single-threaded model, delete between awaits is safe, but
-    // using delete (instead of a flag) makes double-use impossible even if
-    // two requests interleave across microtask boundaries.
-    memoryNonces.delete(nonce);
   }
 
   return address;

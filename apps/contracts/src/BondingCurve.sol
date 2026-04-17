@@ -60,6 +60,12 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     bool public graduated;
     bool public tradingHalted;
 
+    /// @notice Pending refunds for buyers whose refund transfer failed (pull pattern, H1 fix)
+    mapping(address => uint256) public pendingRefunds;
+
+    event RefundPending(address indexed buyer, uint256 amount);
+    event RefundClaimed(address indexed buyer, uint256 amount);
+
     /// @notice Emergency halt/resume callable by UniverseManager (owner-gated there).
     function setTradingHalted(bool halted) external {
         require(msg.sender == universeManager, "Only universe manager");
@@ -127,11 +133,15 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
 
         IERC20(token).safeTransfer(msg.sender, tokensBought);
 
-        // Refund excess ETH
+        // Refund excess ETH (H1 fix: gas-limited call + pull pattern fallback)
         uint256 refund = msg.value - actualCost;
         if (refund > 0) {
-            (bool sent,) = msg.sender.call{value: refund}("");
-            if (!sent) revert TransferFailed();
+            (bool sent,) = msg.sender.call{value: refund, gas: 50000}("");
+            if (!sent) {
+                // Store for later withdrawal instead of reverting
+                pendingRefunds[msg.sender] += refund;
+                emit RefundPending(msg.sender, refund);
+            }
         }
 
         uint256 newPrice = _getCurrentPrice();
@@ -206,6 +216,18 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         graduated = true;
 
         emit Graduated(universeId, token, ethForLp, unsoldTokens);
+    }
+
+    // ── Refund claim (H1 pull pattern) ──────────────────────────────────
+
+    /// @notice Claim pending refund that failed during buy()
+    function claimRefund() external nonReentrant {
+        uint256 amount = pendingRefunds[msg.sender];
+        require(amount > 0, "No pending refund");
+        pendingRefunds[msg.sender] = 0;
+        (bool sent,) = msg.sender.call{value: amount}("");
+        if (!sent) revert TransferFailed();
+        emit RefundClaimed(msg.sender, amount);
     }
 
     // ── View functions ─────────────────────────────────────────────────

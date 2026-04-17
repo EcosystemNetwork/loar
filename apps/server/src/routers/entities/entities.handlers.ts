@@ -168,22 +168,13 @@ export async function getEntitiesByUniverse(
 }
 
 export async function getEntitiesByKind(kind: EntityKind, limit = 100): Promise<Entity[]> {
-  const snapshot = await entitiesCol().where('kind', '==', kind).get();
+  const snapshot = await entitiesCol()
+    .where('kind', '==', kind)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
 
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
-    .sort((a, b) => {
-      const aTime =
-        a.createdAt instanceof Date
-          ? a.createdAt.getTime()
-          : new Date(a.createdAt as any).getTime();
-      const bTime =
-        b.createdAt instanceof Date
-          ? b.createdAt.getTime()
-          : new Date(b.createdAt as any).getTime();
-      return bTime - aTime;
-    })
-    .slice(0, limit);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
 export async function getEntitiesByCreator(
@@ -422,36 +413,36 @@ export async function swapNodesBetweenEntities(
   const refA = col.doc(entityIdA);
   const refB = col.doc(entityIdB);
 
-  const [docA, docB] = await Promise.all([refA.get(), refB.get()]);
+  return await db.runTransaction(async (transaction) => {
+    const [docA, docB] = await Promise.all([transaction.get(refA), transaction.get(refB)]);
 
-  if (!docA.exists) throw new Error('Entity A not found');
-  if (!docB.exists) throw new Error('Entity B not found');
+    if (!docA.exists) throw new Error('Entity A not found');
+    if (!docB.exists) throw new Error('Entity B not found');
 
-  const existingA = docA.data() as Entity;
-  const existingB = docB.data() as Entity;
+    const existingA = docA.data() as Entity;
+    const existingB = docB.data() as Entity;
 
-  const nodeIdsA = existingA.nodeIds || [];
-  const nodeIdsB = existingB.nodeIds || [];
+    const nodeIdsA = existingA.nodeIds || [];
+    const nodeIdsB = existingB.nodeIds || [];
 
-  if (!nodeIdsA.includes(nodeIdA)) {
-    throw new Error(`Node ${nodeIdA} not found on entity ${entityIdA}`);
-  }
-  if (!nodeIdsB.includes(nodeIdB)) {
-    throw new Error(`Node ${nodeIdB} not found on entity ${entityIdB}`);
-  }
+    if (!nodeIdsA.includes(nodeIdA)) {
+      throw new Error(`Node ${nodeIdA} not found on entity ${entityIdA}`);
+    }
+    if (!nodeIdsB.includes(nodeIdB)) {
+      throw new Error(`Node ${nodeIdB} not found on entity ${entityIdB}`);
+    }
 
-  // Swap: replace nodeIdA with nodeIdB in A, replace nodeIdB with nodeIdA in B
-  const updatedNodeIdsA = nodeIdsA.map((id) => (id === nodeIdA ? nodeIdB : id));
-  const updatedNodeIdsB = nodeIdsB.map((id) => (id === nodeIdB ? nodeIdA : id));
+    // Swap: replace nodeIdA with nodeIdB in A, replace nodeIdB with nodeIdA in B
+    const updatedNodeIdsA = nodeIdsA.map((id) => (id === nodeIdA ? nodeIdB : id));
+    const updatedNodeIdsB = nodeIdsB.map((id) => (id === nodeIdB ? nodeIdA : id));
 
-  const now = new Date();
-  await Promise.all([
-    refA.update({ nodeIds: updatedNodeIdsA, updatedAt: now }),
-    refB.update({ nodeIds: updatedNodeIdsB, updatedAt: now }),
-  ]);
+    const now = new Date();
+    transaction.update(refA, { nodeIds: updatedNodeIdsA, updatedAt: now });
+    transaction.update(refB, { nodeIds: updatedNodeIdsB, updatedAt: now });
 
-  return {
-    entityA: { ...existingA, id: entityIdA, nodeIds: updatedNodeIdsA },
-    entityB: { ...existingB, id: entityIdB, nodeIds: updatedNodeIdsB },
-  };
+    return {
+      entityA: { ...existingA, id: entityIdA, nodeIds: updatedNodeIdsA },
+      entityB: { ...existingB, id: entityIdB, nodeIds: updatedNodeIdsB },
+    };
+  });
 }

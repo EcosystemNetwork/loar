@@ -87,24 +87,31 @@ export const NON_SPONSORED_ACTIONS = [
 
 // ── Paymaster Configuration ─────────────────────────────────────────────────
 
-const secretKey = import.meta.env.VITE_THIRDWEB_SECRET_KEY as string | undefined;
+/**
+ * The thirdweb client ID (public, safe to embed in client bundle).
+ * Used for paymaster requests routed through the LOAR server proxy.
+ *
+ * SECURITY: The thirdweb secret key must ONLY be used server-side.
+ * Client-side paymaster requests are proxied through the server at
+ * POST /api/paymaster, which attaches the secret key on the backend.
+ */
+const clientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID as string | undefined;
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || '';
 
 /**
  * Whether gas sponsorship is available.
  *
  * Requires:
- *   1. VITE_THIRDWEB_SECRET_KEY is set
- *   2. The action is in SPONSORED_ACTIONS
+ *   1. VITE_THIRDWEB_CLIENT_ID is set (public key)
+ *   2. Server proxy at /api/paymaster is running (handles secret key server-side)
+ *   3. The action is in SPONSORED_ACTIONS
  *
- * NOTE: VITE_THIRDWEB_SECRET_KEY is exposed in the client bundle. This is
- * acceptable because thirdweb's paymaster policies (set in their dashboard)
- * control which contracts/methods can actually be sponsored. The secret key
- * alone cannot drain funds — it only authorizes requests that match the
- * dashboard policy. For production, configure allowlists in the thirdweb
- * dashboard to restrict sponsorship to your deployed contract addresses.
+ * NOTE: The thirdweb secret key is never sent to the client. All paymaster
+ * requests are proxied through the LOAR server which attaches the secret key.
+ * TODO: Create server endpoint POST /api/paymaster to proxy thirdweb paymaster requests.
  */
 export function isPaymasterAvailable(): boolean {
-  return !!secretKey;
+  return !!clientId;
 }
 
 /**
@@ -129,7 +136,7 @@ export function isSponsoredAction(functionName: string): boolean {
  * ```
  */
 export function getSmartAccountConfig() {
-  if (!secretKey) {
+  if (!clientId) {
     return null;
   }
 
@@ -140,8 +147,9 @@ export function getSmartAccountConfig() {
      * `sponsorGas: true` tells thirdweb to use its bundled paymaster
      * to sponsor the UserOperation gas fees.
      *
-     * The secret key authenticates with thirdweb's paymaster service.
-     * Dashboard policies control actual sponsorship rules.
+     * Paymaster requests are proxied through the LOAR server at
+     * POST /api/paymaster. The server attaches the secret key.
+     * The clientId (public) is used for client-side SDK initialization.
      */
     sponsorGas: true,
     /**
@@ -172,7 +180,7 @@ export function getSmartAccountConfig() {
  * ```
  */
 export function getConnectButtonAAConfig() {
-  if (!secretKey) {
+  if (!clientId) {
     return undefined;
   }
 
@@ -183,6 +191,9 @@ export function getConnectButtonAAConfig() {
 }
 
 // ── Daily Sponsor Rate Limiting ─────────────────────────────────────────
+// WARNING: Client-side rate limiting is advisory only. Server-side enforcement required.
+// The server endpoint (POST /api/paymaster) should track per-user daily counts in
+// Firestore and reject requests exceeding the limit, independent of this client check.
 
 /** Maximum sponsored transactions per user per day. */
 export const DAILY_SPONSOR_LIMIT = 50;

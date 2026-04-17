@@ -89,8 +89,16 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error SplitRouterFailed();
     error RefundFailed();
     error MaxDealsReached();
+    error DurationTooLong();
+    error RentPriceTooHigh();
 
     uint16 public constant MAX_FEE_BPS = 5000;
+
+    /// @notice Maximum rental/license duration in days (M3 fix)
+    uint256 public constant MAX_DURATION_DAYS = 365;
+
+    /// @notice Maximum rent price per day to prevent absurd pricing (M3 fix)
+    uint256 public constant MAX_RENT_PRICE_PER_DAY = 1000 ether;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -199,6 +207,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (!reg.active) revert ContentNotActive();
         if (reg.rentPricePerDay == 0) revert NotForRent();
         if (durationDays == 0) revert InvalidDuration();
+        if (durationDays > MAX_DURATION_DAYS) revert DurationTooLong();
+        if (reg.rentPricePerDay > MAX_RENT_PRICE_PER_DAY) revert RentPriceTooHigh();
 
         uint256 totalCost = reg.rentPricePerDay * durationDays;
         if (msg.value < totalCost) revert InsufficientPayment();
@@ -235,6 +245,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (!reg.active) revert ContentNotActive();
         if (reg.licenseFee == 0) revert NotLicensable();
         if (durationDays == 0) revert InvalidDuration();
+        if (durationDays > MAX_DURATION_DAYS) revert DurationTooLong();
         if (msg.value < reg.licenseFee) revert InsufficientPayment();
 
         uint256 endTime = block.timestamp + (durationDays * 1 days);

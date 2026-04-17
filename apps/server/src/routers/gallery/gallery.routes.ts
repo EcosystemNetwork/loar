@@ -115,28 +115,36 @@ export const galleryRouter = router({
 
       const snapshot = await query.limit(input.limit).get();
 
-      const items = snapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          title: data.title || 'Untitled',
-          description: data.description || '',
-          mediaUrl: data.mediaUrl || null,
-          thumbnailUrl: data.thumbnailUrl || null,
-          mediaType: data.mediaType || 'image',
-          classification: data.classification || 'fan',
-          tags: data.tags || [],
-          creatorUid: data.creatorUid || null,
-          creatorAddress: data.creatorAddress || null,
-          universeId: data.universeId || null,
-          contentHash: data.contentHash || null,
-          generationId: data.generationId || null,
-          views: data.views || 0,
-          likes: data.likes || 0,
-          visibility: data.visibility || 'public',
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-        };
-      });
+      // Filter out moderated content from public gallery
+      const HIDDEN_STATUSES = ['flagged', 'under_review', 'hidden', 'removed'];
+
+      const items = snapshot.docs
+        .filter((d) => {
+          const status = d.data().contentStatus;
+          return !status || !HIDDEN_STATUSES.includes(status);
+        })
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.title || 'Untitled',
+            description: data.description || '',
+            mediaUrl: data.mediaUrl || null,
+            thumbnailUrl: data.thumbnailUrl || null,
+            mediaType: data.mediaType || 'image',
+            classification: data.classification || 'fan',
+            tags: data.tags || [],
+            creatorUid: data.creatorUid || null,
+            creatorAddress: data.creatorAddress || null,
+            universeId: data.universeId || null,
+            contentHash: data.contentHash || null,
+            generationId: data.generationId || null,
+            views: data.views || 0,
+            likes: data.likes || 0,
+            visibility: data.visibility || 'public',
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+          };
+        });
 
       // Enrich with licensing data if available
       const contentHashes = items.map((i: any) => i.contentHash).filter(Boolean);
@@ -192,22 +200,29 @@ export const galleryRouter = router({
 
       const snapshot = await query.orderBy('views', 'desc').limit(input.limit).get();
 
-      return snapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          title: data.title || 'Untitled',
-          description: data.description || '',
-          mediaUrl: data.mediaUrl || null,
-          thumbnailUrl: data.thumbnailUrl || null,
-          mediaType: data.mediaType || 'image',
-          creatorUid: data.creatorUid || null,
-          creatorAddress: data.creatorAddress || null,
-          views: data.views || 0,
-          likes: data.likes || 0,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-        };
-      });
+      const HIDDEN_STATUSES_TRENDING = ['flagged', 'under_review', 'hidden', 'removed'];
+
+      return snapshot.docs
+        .filter((d) => {
+          const status = d.data().contentStatus;
+          return !status || !HIDDEN_STATUSES_TRENDING.includes(status);
+        })
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.title || 'Untitled',
+            description: data.description || '',
+            mediaUrl: data.mediaUrl || null,
+            thumbnailUrl: data.thumbnailUrl || null,
+            mediaType: data.mediaType || 'image',
+            creatorUid: data.creatorUid || null,
+            creatorAddress: data.creatorAddress || null,
+            views: data.views || 0,
+            likes: data.likes || 0,
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+          };
+        });
     }),
 
   /** Get admin-curated featured content for a universe */

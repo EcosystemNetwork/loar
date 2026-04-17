@@ -13,6 +13,21 @@ import { z } from 'zod';
 import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 
+// ── In-memory rate limiter for public DMCA endpoint ──────────────────────
+// Max 3 takedown requests per email per hour
+const takedownRateMap = new Map<string, number[]>();
+
+function checkTakedownRateLimit(email: string): void {
+  const now = Date.now();
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const timestamps = (takedownRateMap.get(email) || []).filter((t) => t > oneHourAgo);
+  if (timestamps.length >= 3) {
+    throw new Error('Rate limit exceeded: max 3 takedown requests per hour');
+  }
+  timestamps.push(now);
+  takedownRateMap.set(email, timestamps);
+}
+
 const flagsCol = () => (firebaseAvailable ? db.collection('flags') : null);
 const takedownCol = () => (firebaseAvailable ? db.collection('takedownRequests') : null);
 const auditCol = () => (firebaseAvailable ? db.collection('contentAuditLog') : null);
@@ -55,23 +70,9 @@ export const moderationRouter = router({
 
       const ref = await col.add(flag);
 
-      // Auto-escalate: if 3+ unique flags, set content status to under_review
+      // Count flags for informational purposes only.
+      // Status escalation is admin-triggered only to prevent abuse.
       const allFlags = await col.where('contentId', '==', input.contentId).get();
-      if (allFlags.size >= 3) {
-        const cCol = contentCol();
-        if (cCol) {
-          await cCol
-            .doc(input.contentId)
-            .update({
-              contentStatus: 'under_review',
-              contentStatusUpdatedAt: now.toISOString(),
-              contentStatusUpdatedBy: 'auto_escalation',
-            })
-            .catch(() => {
-              /* Content doc may not exist */
-            });
-        }
-      }
 
       return { id: ref.id, flagCount: allFlags.size };
     }),
@@ -92,6 +93,9 @@ export const moderationRouter = router({
       const col = takedownCol();
       if (!col) throw new Error('Not available');
       if (!input.goodFaith) throw new Error('Good faith declaration required');
+
+      // Rate limit: max 3 takedown requests per email per hour
+      checkTakedownRateLimit(input.claimantEmail.toLowerCase());
 
       // Dedup: prevent same email from filing multiple takedowns for same content
       const existing = await col
@@ -116,18 +120,9 @@ export const moderationRouter = router({
 
       const ref = await col.add(request);
 
-      // Auto-flag the content
-      const cCol = contentCol();
-      if (cCol) {
-        await cCol
-          .doc(input.contentId)
-          .update({
-            contentStatus: 'flagged',
-            contentStatusUpdatedAt: now.toISOString(),
-            contentStatusUpdatedBy: 'dmca_takedown',
-          })
-          .catch(() => {});
-      }
+      // Do NOT auto-flag content on takedown submission.
+      // Content status changes are admin-triggered only after review,
+      // to prevent abuse of the DMCA process for censorship.
 
       return { id: ref.id };
     }),

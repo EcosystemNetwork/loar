@@ -11,6 +11,7 @@ import { createPublicClient, http, parseEther, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { assertContentOperable } from '../../lib/content-status';
 
 const sepoliaClient = createPublicClient({
   chain: sepolia,
@@ -133,6 +134,11 @@ export const listingsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       if (!db) throwApiError('INTERNAL_SERVER_ERROR', 'Firebase not configured');
+
+      // Block listing of moderated content
+      if (input.assetRef) {
+        await assertContentOperable(input.assetRef);
+      }
 
       const now = new Date();
       const listing = {

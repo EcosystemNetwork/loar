@@ -29,19 +29,49 @@ import {TimelockController} from "@openzeppelin/governance/TimelockController.so
 ///                        |                 | proposal passes. Prevents instant execution.
 ///
 /// Anti-takeover considerations:
-///   - At T=0 the universe creator holds most tokens (minus LP). With 10% quorum
-///     the creator can pass any proposal immediately, but the 24h timelock delay
-///     gives the community time to exit positions.
+///   - At T=0 the universe creator holds most tokens (minus LP). The 24h timelock
+///     delay gives the community time to exit positions if a hostile proposal passes.
+///   - Early-life protection: quorum is 20% for the first 30 days (EARLY_LIFE_BLOCKS),
+///     then drops to 10%. This prevents the creator from rubber-stamping proposals
+///     before token distribution has a chance to diversify.
 ///   - Additional mitigations: (1) vesting for creator allocation via
-///     UniverseTokenDeployerV2, (2) consider increasing quorum to 20% for first 30 days.
+///     UniverseTokenDeployerV2, (2) 24h timelock on all proposals.
 contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
+
+    /// @notice Block at which this governor was deployed.
+    uint256 public immutable deployedAtBlock;
+
+    /// @notice Early-life period: ~30 days on Base L2 at 2s blocks (30 * 24 * 3600 / 2).
+    uint256 public constant EARLY_LIFE_BLOCKS = 1_296_000;
+
+    /// @notice Quorum during early-life period (20% of total supply).
+    uint256 public constant EARLY_LIFE_QUORUM_FRACTION = 20;
+
     constructor(IVotes _token, TimelockController _timelock)
         Governor("UniverseGovernor")
         GovernorSettings(7200 /* ~1 day on Base L2 @ 2s blocks */, 50400 /* ~7 days */, 1_000_000e18 /* 1M tokens */)
         GovernorVotes(_token)
-        GovernorVotesQuorumFraction(10)
+        GovernorVotesQuorumFraction(10) // steady-state quorum = 10%
         GovernorTimelockControl(_timelock)
-    {}
+    {
+        deployedAtBlock = block.number;
+    }
+
+    /// @notice Returns the quorum for a given timepoint. During the early-life period
+    ///         (first ~30 days), quorum is 20% to prevent creator self-dealing.
+    ///         After that, it falls back to the configurable GovernorVotesQuorumFraction (10%).
+    function quorum(uint256 timepoint)
+        public
+        view
+        override(Governor, GovernorVotesQuorumFraction)
+        returns (uint256)
+    {
+        if (block.number < deployedAtBlock + EARLY_LIFE_BLOCKS) {
+            // Early life: 20% quorum (double the steady-state 10%)
+            return (token().getPastTotalSupply(timepoint) * EARLY_LIFE_QUORUM_FRACTION) / 100;
+        }
+        return super.quorum(timepoint);
+    }
 
     // The following functions are overrides required by Solidity.
 

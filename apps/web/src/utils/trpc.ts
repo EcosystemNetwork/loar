@@ -52,7 +52,13 @@ export const queryClient = new QueryClient({
       ) {
         return;
       }
-      toast.error(error.message || 'Operation failed');
+      // Log raw error for debugging, show sanitized message to user
+      console.error('[mutation error]', error.message);
+      toast.error(
+        error.message?.toLowerCase().includes('unauthorized')
+          ? 'Unauthorized'
+          : 'An error occurred. Please try again.'
+      );
     },
   }),
   queryCache: new QueryCache({
@@ -84,14 +90,21 @@ export const queryClient = new QueryClient({
         return;
       }
 
-      toast.error(error.message, {
-        action: {
-          label: 'retry',
-          onClick: () => {
-            queryClient.invalidateQueries();
+      // Log raw error for debugging, show sanitized message to user
+      console.error('[query error]', error.message);
+      toast.error(
+        error.message?.toLowerCase().includes('unauthorized')
+          ? 'Unauthorized'
+          : 'An error occurred. Please try again.',
+        {
+          action: {
+            label: 'retry',
+            onClick: () => {
+              queryClient.invalidateQueries();
+            },
           },
-        },
-      });
+        }
+      );
     },
   }),
 });

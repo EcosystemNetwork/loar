@@ -27,6 +27,12 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @notice Accumulated ETH per creator, claimable via pull pattern
     mapping(address => uint256) public claimable;
 
+    /// @notice Pending withdrawals for failed treasury transfers (M1 pull pattern fallback)
+    mapping(address => uint256) public pendingWithdrawals;
+
+    event PendingWithdrawal(address indexed account, uint256 amount);
+    event PendingClaimed(address indexed account, uint256 amount);
+
     /// @notice $LOAR token for dual-currency payments
     IERC20 public loarToken;
 
@@ -116,7 +122,11 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         }
         if (platformCut > 0) {
             (bool s,) = treasury.call{value: platformCut}("");
-            if (!s) revert TransferFailed();
+            if (!s) {
+                // M1 fix: store for later claim instead of reverting
+                pendingWithdrawals[treasury] += platformCut;
+                emit PendingWithdrawal(treasury, platformCut);
+            }
         }
 
         emit PaymentRouted(creator, creatorCut, platformCut, bps);
@@ -127,7 +137,11 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     function routeToTreasury() external payable nonReentrant whenNotPaused {
         if (msg.value == 0) return;
         (bool s,) = treasury.call{value: msg.value}("");
-        if (!s) revert TransferFailed();
+        if (!s) {
+            // M1 fix: store for later claim instead of reverting
+            pendingWithdrawals[treasury] += msg.value;
+            emit PendingWithdrawal(treasury, msg.value);
+        }
     }
 
     /// @notice Creator pulls accumulated earnings
@@ -138,6 +152,16 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         (bool success,) = msg.sender.call{value: amount}("");
         if (!success) revert TransferFailed();
         emit Claimed(msg.sender, amount);
+    }
+
+    /// @notice Claim pending withdrawals from failed treasury transfers (M1 fix)
+    function claimPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        pendingWithdrawals[msg.sender] = 0;
+        (bool success,) = msg.sender.call{value: amount}("");
+        if (!success) revert TransferFailed();
+        emit PendingClaimed(msg.sender, amount);
     }
 
     function setTreasury(address newTreasury) external onlyOwner {

@@ -10,7 +10,8 @@ interface IUniverse {
     error CallerNotManager();
     error CallerNotAdmin(address caller);
 
-    event NodeCanonized(uint id, address canonizer);
+    event NodeCanonized(uint id, address canonizer); // deprecated — use CanonChanged
+    event CanonChanged(uint indexed newCanonId, uint indexed previousCanonId, address canonizer);
     event NodeCreated(
         uint indexed id,
         uint indexed previous,
@@ -35,6 +36,10 @@ interface IUniverse {
     function getToken() external view returns (address);
     function setVaultWhitelisted(address user, bool status) external;
     function getVaultWhitelisted(address user) external view returns (bool);
+    function batchSetWhitelisted(address[] calldata users, bool status) external;
+    function batchSetVaultWhitelisted(address[] calldata users, bool status) external;
+    function pause() external;
+    function unpause() external;
 
     // Metadata accessors (used by UniverseManager for on-chain tokenURI)
     function universeName() external view returns (string memory);

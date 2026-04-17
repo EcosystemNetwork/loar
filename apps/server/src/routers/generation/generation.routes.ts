@@ -51,6 +51,7 @@ import {
   type StylePresetId,
   type VfxPresetId,
 } from '../../services/scene-controls';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -469,29 +470,33 @@ const LEGACY_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as co
 async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
   if (!db) return;
   const userRef = db.collection('userCredits').doc(uid);
-  const userDoc = await userRef.get();
-  const balance = userDoc.data()?.balance || 0;
 
-  if (balance < cost) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+  await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const balance = userDoc.data()?.balance || 0;
+
+    if (balance < cost) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+      });
+    }
+
+    transaction.update(userRef, {
+      balance: balance - cost,
+      totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
+      updatedAt: new Date(),
     });
-  }
 
-  await userRef.update({
-    balance: balance - cost,
-    totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
-    updatedAt: new Date(),
-  });
-
-  await db.collection('creditTransactions').add({
-    uid,
-    type: 'spend',
-    generationType,
-    credits: -cost,
-    source: 'generation_legacy',
-    createdAt: new Date(),
+    const txRef = db.collection('creditTransactions').doc();
+    transaction.set(txRef, {
+      uid,
+      type: 'spend',
+      generationType,
+      credits: -cost,
+      source: 'generation_legacy',
+      createdAt: new Date(),
+    });
   });
 }
 
@@ -678,6 +683,10 @@ export const generationRouter = router({
     .use(requirePermission('generation.video'))
     .input(generateInputSchema)
     .mutation(async ({ input, ctx }) => {
+      // Sanitize user-supplied prompt before any processing
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
+
       const generationId = randomUUID();
       const startTime = Date.now();
 
@@ -1569,6 +1578,9 @@ export const generationRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
+
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video');
       const startTime = Date.now();
 
@@ -1705,6 +1717,7 @@ export const generationRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_veo3');
       const startTime = Date.now();
       let result;
@@ -1769,6 +1782,8 @@ export const generationRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_kling');
       const startTime = Date.now();
       let result;
@@ -1834,6 +1849,8 @@ export const generationRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_wan25');
       const startTime = Date.now();
       let result;
@@ -1898,6 +1915,7 @@ export const generationRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_sora');
       const startTime = Date.now();
       let result;
