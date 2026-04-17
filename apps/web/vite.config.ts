@@ -48,7 +48,7 @@ export default defineConfig({
       '@loar/abis/generated': path.resolve(__dirname, '../../packages/abis/src/generated.ts'),
       '@loar/shared/trpc': path.resolve(__dirname, '../../packages/shared/src/trpc.ts'),
     },
-    dedupe: ['wagmi', 'viem', '@tanstack/react-query', 'react', 'react-dom'],
+    dedupe: ['wagmi', 'viem', 'thirdweb', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
     // Let Vite/Rollup handle code splitting automatically.

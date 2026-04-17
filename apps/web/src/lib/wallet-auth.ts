@@ -112,12 +112,20 @@ export async function refreshSession(): Promise<boolean> {
 let _sessionValidated = false;
 export let sessionValidationDone: Promise<void>;
 
+// Deferred to avoid TDZ errors in production bundles — Rollup may reorder
+// module-level code so that `clearSiweSession` isn't initialized yet when
+// this block executes. Using an inline arrow avoids referencing the function
+// declaration before its bundled assignment.
 if (typeof window !== 'undefined' && localStorage.getItem(ADDRESS_KEY)) {
   sessionValidationDone = fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
     .then((res) => res.json())
     .then((data) => {
       if (!data.authenticated) {
-        clearSiweSession();
+        // Inline the clear logic to avoid TDZ — clearSiweSession may not
+        // be initialized yet at module-evaluation time in production builds.
+        localStorage.removeItem(ADDRESS_KEY);
+        localStorage.removeItem(EXPIRY_KEY);
+        emitChange();
       }
     })
     .catch(() => {
