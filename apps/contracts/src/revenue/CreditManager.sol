@@ -183,10 +183,15 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         userCredits[msg.sender].totalPurchased += pkg.credits;
         userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits + bonusFromDiscount;
 
-        // Route ETH to treasury via PaymentRouter
-        paymentRouter.routeToTreasury{value: msg.value}();
+        // Route exact price to treasury; refund overpayment
+        paymentRouter.routeToTreasury{value: pkg.priceWei}();
+        uint256 refund = msg.value - pkg.priceWei;
+        if (refund > 0) {
+            (bool sent,) = msg.sender.call{value: refund}("");
+            if (!sent) revert TransferFailed();
+        }
 
-        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits + bonusFromDiscount, msg.value);
+        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits + bonusFromDiscount, pkg.priceWei);
     }
 
     /// @notice Buy credits with ETH (no holder discount).
@@ -200,9 +205,15 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         userCredits[msg.sender].totalPurchased += pkg.credits;
         userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits;
 
-        paymentRouter.routeToTreasury{value: msg.value}();
+        // Route exact price to treasury; refund overpayment
+        paymentRouter.routeToTreasury{value: pkg.priceWei}();
+        uint256 refund = msg.value - pkg.priceWei;
+        if (refund > 0) {
+            (bool sent,) = msg.sender.call{value: refund}("");
+            if (!sent) revert TransferFailed();
+        }
 
-        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits, msg.value);
+        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits, pkg.priceWei);
     }
 
     // ── Purchase with $LOAR (25% margin) ─────────────────────────

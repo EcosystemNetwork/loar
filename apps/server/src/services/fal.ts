@@ -70,6 +70,22 @@ export interface FalImageGenerationResult {
   error?: string;
 }
 
+// ── Audio Generation Types ────────────────────────────────────────────
+
+export interface FalAudioGenerationOptions {
+  prompt: string;
+  model?: 'fal-ai/stable-audio' | 'fal-ai/musicgen/large' | 'fal-ai/musicgen/stereo-large';
+  durationSec?: number;
+  steps?: number;
+}
+
+export interface FalAudioGenerationResult {
+  id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  audioUrl?: string;
+  error?: string;
+}
+
 export interface FalVideoGenerationOptions {
   prompt: string;
   model?: // Text-to-Video models
@@ -849,6 +865,62 @@ export class FalService {
         id: '',
         status: 'failed',
         error: errorMessage,
+      };
+    }
+  }
+
+  async generateAudio(options: FalAudioGenerationOptions): Promise<FalAudioGenerationResult> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/stable-audio';
+      const input: any = { prompt: options.prompt };
+
+      if (model === 'fal-ai/stable-audio') {
+        // Stable Audio: duration in seconds (float), steps for quality
+        input.seconds_total = options.durationSec || 30;
+        input.steps = options.steps || 100;
+      } else if (model === 'fal-ai/musicgen/large' || model === 'fal-ai/musicgen/stereo-large') {
+        // MusicGen: duration in seconds
+        input.duration = options.durationSec || 15;
+      }
+
+      const result = await fal.subscribe(model, {
+        input,
+        logs: true,
+      });
+
+      const resultAny = result as any;
+      const data = resultAny.data || resultAny;
+
+      // Extract audio URL from various response shapes
+      let audioUrl: string | undefined;
+      if (data.audio_file?.url) {
+        audioUrl = data.audio_file.url;
+      } else if (data.audio?.url) {
+        audioUrl = data.audio.url;
+      } else if (data.audio_url) {
+        audioUrl = data.audio_url;
+      } else if (data.url) {
+        audioUrl = data.url;
+      } else if (typeof data.audio === 'string') {
+        audioUrl = data.audio;
+      }
+
+      if (!audioUrl) {
+        throw new Error(`No audio URL found. Response keys: ${Object.keys(data).join(', ')}`);
+      }
+
+      return {
+        id: resultAny.requestId || Date.now().toString(),
+        status: 'completed',
+        audioUrl,
+      };
+    } catch (error: any) {
+      console.error('❌ Audio generation failed:', error.message || error);
+      return {
+        id: Date.now().toString(),
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Audio generation failed',
       };
     }
   }

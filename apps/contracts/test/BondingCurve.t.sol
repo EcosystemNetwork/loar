@@ -44,8 +44,8 @@ contract BondingCurveTest is Test {
     uint256 constant TOKEN_SUPPLY_V1 = 1_000_000_000e18;
     uint256 constant CURVE_SUPPLY_V1 = (TOKEN_SUPPLY_V1 * 8000) / 10000; // 80%
 
-    // ── V2/V3 params: 100B supply ──
-    uint256 constant TOKEN_SUPPLY_V3 = 100_000_000_000e18;
+    // ── V2/V3 params: 1B supply (aligned with UniverseManager after C7 fix) ──
+    uint256 constant TOKEN_SUPPLY_V3 = 1_000_000_000e18;
     uint256 constant CURVE_SUPPLY_V3 = (TOKEN_SUPPLY_V3 * 8000) / 10000;
 
     uint256 constant GRADUATION_ETH = 4 ether;
@@ -72,7 +72,7 @@ contract BondingCurveTest is Test {
         );
         tokenV1.transfer(address(curveV1), CURVE_SUPPLY_V1);
 
-        // Deploy V3 curve (100B supply)
+        // Deploy V3 curve (1B supply, same as V1 after C7 fix)
         tokenV3 = new MockToken("TokenV3", "TV3", TOKEN_SUPPLY_V3, address(this));
         curveV3 = new BondingCurve(
             address(tokenV3), address(manager), 2,

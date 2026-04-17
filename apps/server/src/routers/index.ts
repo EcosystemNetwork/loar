@@ -58,6 +58,7 @@ import { portfolioRouter } from './portfolio/portfolio.routes';
 import { mediaRouter } from './media/media.routes';
 import { voiceRouter } from './generation/voice.routes';
 import { threedRouter } from './generation/threed.routes';
+import { audioRouter } from './generation/audio.routes';
 import { studioRouter } from './studio/studio.routes';
 import { governanceRouter } from './governance/governance.routes';
 import { revenueRouter } from './revenue/revenue.routes';
@@ -82,6 +83,8 @@ import { stripeRouter } from './credits/stripe.routes';
 import { pricingRouter } from './pricing/pricing.routes';
 import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
 import { platformSubscriptionsRouter } from './platformSubscriptions/platformSubscriptions.routes';
+import { castRouter } from './cast/cast.routes';
+import { sceneControlsRouter } from './sceneControls/sceneControls.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -162,6 +165,7 @@ export const appRouter = router({
   generation: generationRouter,
   image: imageRouter,
   voice: voiceRouter,
+  audio: audioRouter,
   threed: threedRouter,
   lora: loraRouter,
 
@@ -243,6 +247,10 @@ export const appRouter = router({
 
   // ── Token Social (comments, watchlist, portfolio) ──────────────────
   tokenSocial: tokenSocialRouter,
+
+  // ── Node Editor Expansion (v1) ────────────────────────────────────
+  cast: castRouter,
+  sceneControls: sceneControlsRouter,
 });
 
 export type AppRouter = typeof appRouter;

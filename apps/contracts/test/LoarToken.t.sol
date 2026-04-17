@@ -53,27 +53,30 @@ contract LoarTokenTest is Test {
 
     // ── Minting ──
 
-    function test_mint_byOwner() public {
-        // Burn some first to make room
+    function test_mint_byOwner_reverts_afterFullDistribution() public {
+        // Constructor distributes MAX_SUPPLY and sets totalMinted = MAX_SUPPLY.
+        // Burns reduce totalSupply() but NOT totalMinted, so mint headroom
+        // can never be reopened — this is the correct C2 fix behavior.
         vm.prank(treasury);
         token.burn(1000e18);
 
+        // Even after burn, owner cannot mint because totalMinted is still MAX_SUPPLY
         vm.prank(owner);
+        vm.expectRevert(LoarToken.ExceedsMaxSupply.selector);
         token.mint(alice, 1000e18);
-        assertEq(token.balanceOf(alice), 1000e18);
     }
 
-    function test_mint_byMinter() public {
+    function test_mint_byMinter_reverts_afterFullDistribution() public {
         vm.prank(owner);
         token.setMinter(minter, true);
 
-        // Burn some to make room
         vm.prank(treasury);
         token.burn(500e18);
 
+        // Even after burn, minter cannot mint — totalMinted is permanent
         vm.prank(minter);
+        vm.expectRevert(LoarToken.ExceedsMaxSupply.selector);
         token.mint(alice, 500e18);
-        assertEq(token.balanceOf(alice), 500e18);
     }
 
     function test_mint_revert_notMinter() public {
@@ -179,6 +182,9 @@ contract LoarTokenTest is Test {
         // First increase to 11
         vm.prank(owner);
         token.setTransferFeeBps(11);
+
+        // Wait past cooldown
+        vm.warp(block.timestamp + 1 days + 1);
 
         // Now decrease all the way to 0 — unlimited decrease
         vm.prank(owner);

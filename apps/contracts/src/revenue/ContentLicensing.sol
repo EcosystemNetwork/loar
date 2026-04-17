@@ -219,7 +219,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         });
         if (_contentDeals[contentHash].length >= MAX_DEALS_PER_CONTENT) revert MaxDealsReached();
         _contentDeals[contentHash].push(dealId);
-        _buyerLatestDeal[contentHash][msg.sender] = dealId;
+        // Don't overwrite _buyerLatestDeal if user already has a permanent BUY deal —
+        // hasAccessFast relies on latest deal to determine access, and a BUY is always valid.
+        _updateLatestDealIfSafe(contentHash, msg.sender, dealId);
 
         _routePayment(reg.splitEntityHash, totalCost);
         _refundExcess(msg.value, totalCost);
@@ -251,7 +253,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         });
         if (_contentDeals[contentHash].length >= MAX_DEALS_PER_CONTENT) revert MaxDealsReached();
         _contentDeals[contentHash].push(dealId);
-        _buyerLatestDeal[contentHash][msg.sender] = dealId;
+        // Don't overwrite _buyerLatestDeal if user already has a permanent BUY deal
+        _updateLatestDealIfSafe(contentHash, msg.sender, dealId);
 
         _routePayment(reg.splitEntityHash, reg.licenseFee);
         _refundExcess(msg.value, reg.licenseFee);
@@ -268,10 +271,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (deal.dealType != DealType.LICENSE) revert DealNotActive();
         if (deal.status != DealStatus.ACTIVE) revert DealNotActive();
 
-        // Enforce expiry — auto-transition to EXPIRED, revert with clear error
-        if (deal.endTime > 0 && block.timestamp > deal.endTime) {
-            deal.status = DealStatus.EXPIRED;
-            revert DealExpired();
+        // Enforce expiry — reject payments on expired deals
+        if (deal.endTime > 0 && block.timestamp >= deal.endTime) {
+            revert DealNotActive();
         }
 
         ContentRegistration storage reg = registrations[deal.contentHash];
@@ -405,6 +407,19 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @dev Reserved storage gap for future upgrades
     uint256[39] private __gap;
+
+    /// @dev Only update _buyerLatestDeal if the existing entry is NOT an active permanent BUY.
+    ///      Prevents RENT/LICENSE from overwriting a BUY, which would break hasAccessFast().
+    function _updateLatestDealIfSafe(bytes32 contentHash, address buyer, uint256 newDealId) internal {
+        uint256 existingDealId = _buyerLatestDeal[contentHash][buyer];
+        if (existingDealId != 0) {
+            Deal storage existing = deals[existingDealId];
+            if (existing.dealType == DealType.BUY && existing.status == DealStatus.ACTIVE) {
+                return; // preserve permanent BUY reference
+            }
+        }
+        _buyerLatestDeal[contentHash][buyer] = newDealId;
+    }
 
     /// @dev Refund any overpayment to the buyer
     function _refundExcess(uint256 paid, uint256 price) internal {

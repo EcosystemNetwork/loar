@@ -105,6 +105,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @param feeBps Platform fee in basis points; pass USE_DEFAULT_FEE to use defaultPlatformFeeBps, 0 for no fee
     function route(address creator, uint16 feeBps) external payable nonReentrant whenNotPaused {
         if (msg.value == 0) return;
+        if (creator == address(0)) revert ZeroAddress();
         uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;
         if (bps > 5000) revert FeeTooHigh();
         uint256 platformCut = (msg.value * bps) / 10_000;
@@ -159,6 +160,7 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @param amount $LOAR amount to route
     function routeLoar(address creator, uint16 feeBps, uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) return;
+        if (creator == address(0)) revert ZeroAddress();
         if (address(loarToken) == address(0)) revert ZeroAddress();
 
         uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;

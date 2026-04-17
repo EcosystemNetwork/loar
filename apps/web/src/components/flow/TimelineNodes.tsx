@@ -11,8 +11,81 @@
 import { Handle, Position } from 'reactflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Film } from 'lucide-react';
+import { Plus, Film, Camera, Users, Paintbrush, Palette, Sparkles, Link2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+// ── Scene Control Types (mirrors server scene-controls/types.ts) ──────
+
+export type CameraPresetId =
+  | 'locked'
+  | 'handheld_subtle'
+  | 'dolly_in_slow'
+  | 'dolly_in_fast'
+  | 'dolly_out_slow'
+  | 'dolly_out_fast'
+  | 'pan_left'
+  | 'pan_right'
+  | 'tilt_up'
+  | 'tilt_down'
+  | 'orbit_left_slow'
+  | 'orbit_right_slow'
+  | 'orbit_right_fast'
+  | 'crane_up'
+  | 'crane_down'
+  | 'whip_pan_right';
+
+export type CameraIntensity = 'subtle' | 'standard' | 'pronounced';
+
+export type StylePresetId =
+  | 'noir'
+  | 'watercolor'
+  | 'vhs_80s'
+  | 'anime'
+  | 'cyberpunk'
+  | 'fantasy'
+  | 'horror'
+  | 'documentary'
+  | 'comic_book'
+  | 'cinematic'
+  | 'surreal'
+  | 'steampunk';
+
+export type VfxPresetId =
+  | 'noir_grade'
+  | 'sunset_grade'
+  | 'teal_orange'
+  | 'bleach_bypass'
+  | 'film_grain'
+  | 'vhs_effect'
+  | 'lens_flare'
+  | 'light_leak'
+  | 'slow_motion'
+  | 'speed_ramp'
+  | 'rain_overlay'
+  | 'dust_motes'
+  | 'glitch'
+  | 'vignette';
+
+export interface SceneControls {
+  // Feature 2: Camera
+  cameraPreset?: CameraPresetId | null;
+  cameraIntensity?: CameraIntensity;
+  // Feature 3: Cast
+  castMemberIds?: string[];
+  // Feature 4: Motion mask
+  motionMaskHash?: string | null;
+  useSourceMask?: boolean;
+  // Feature 5: Keyframe handoff
+  startFrameFrom?: string | null;
+  endFrameTarget?: string | null;
+  // Feature 6: VFX
+  vfxPresets?: VfxPresetId[];
+  // Feature 7: Style
+  stylePreset?: StylePresetId | null;
+  styleInherits?: boolean;
+  inheritedStylePreset?: StylePresetId | null; // resolved from ancestor walk
+  inheritedStyleSource?: string | null; // nodeId of the ancestor that set the style
+}
 
 export interface TimelineNodeData {
   label: string;
@@ -35,6 +108,29 @@ export interface TimelineNodeData {
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
   onEditScene?: (eventId: string) => void;
   wiki?: { title?: string; summary?: string; plot?: string };
+
+  // ── Scene Controls (Node Editor Expansion v1) ──────────────────
+  sceneControls?: SceneControls;
+}
+
+// Style preset colors for visual indicators
+const STYLE_COLORS: Record<string, string> = {
+  noir: '#1a1a2e',
+  watercolor: '#a8d8ea',
+  vhs_80s: '#ff6b9d',
+  anime: '#c44dff',
+  cyberpunk: '#00fff5',
+  fantasy: '#ffd700',
+  horror: '#2d0a0a',
+  documentary: '#8b7355',
+  comic_book: '#ff4444',
+  cinematic: '#2c3e50',
+  surreal: '#9b59b6',
+  steampunk: '#b87333',
+};
+function getStyleColor(styleId: string | null | undefined): string {
+  if (!styleId) return 'transparent';
+  return STYLE_COLORS[styleId] || '#666';
 }
 
 export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
@@ -176,7 +272,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 </div>
 
                 {/* Status badges - top right */}
-                <div className="absolute top-2 right-2 flex gap-1">
+                <div className="absolute top-2 right-2 flex gap-1 flex-wrap max-w-[180px] justify-end">
                   {data.segmentCount && data.segmentCount > 1 && (
                     <Badge
                       variant="secondary"
@@ -193,7 +289,58 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                       Canon
                     </Badge>
                   )}
+                  {/* Scene control indicators */}
+                  {data.sceneControls?.cameraPreset && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-indigo-500/90 text-white text-xs px-1 py-0.5"
+                      title={`Camera: ${data.sceneControls.cameraPreset}`}
+                    >
+                      <Camera className="h-3 w-3" />
+                    </Badge>
+                  )}
+                  {data.sceneControls?.castMemberIds &&
+                    data.sceneControls.castMemberIds.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-pink-500/90 text-white text-xs px-1 py-0.5"
+                        title={`${data.sceneControls.castMemberIds.length} cast`}
+                      >
+                        <Users className="h-3 w-3" />
+                      </Badge>
+                    )}
+                  {data.sceneControls?.vfxPresets && data.sceneControls.vfxPresets.length > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-orange-500/90 text-white text-xs px-1 py-0.5"
+                      title={`${data.sceneControls.vfxPresets.length} VFX`}
+                    >
+                      <Sparkles className="h-3 w-3" />
+                    </Badge>
+                  )}
+                  {data.sceneControls?.startFrameFrom && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-cyan-500/90 text-white text-xs px-1 py-0.5"
+                      title="Keyframe linked"
+                    >
+                      <Link2 className="h-3 w-3" />
+                    </Badge>
+                  )}
                 </div>
+
+                {/* Style indicator — colored bar at bottom of video */}
+                {(data.sceneControls?.stylePreset || data.sceneControls?.inheritedStylePreset) && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-1"
+                    style={{
+                      backgroundColor: getStyleColor(
+                        data.sceneControls.stylePreset || data.sceneControls.inheritedStylePreset
+                      ),
+                    }}
+                    title={`Style: ${data.sceneControls.stylePreset || data.sceneControls.inheritedStylePreset}${data.sceneControls.inheritedStyleSource ? ` (inherited from node ${data.sceneControls.inheritedStyleSource})` : ''}`}
+                  />
+                )}
               </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">

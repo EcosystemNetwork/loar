@@ -98,10 +98,10 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     }
 
     /// @notice Mint new tokens (for quest rewards, affiliate payouts, etc.)
-    /// @dev Only callable by authorized minters or owner. totalSupply() cannot exceed MAX_SUPPLY.
-    ///      Burns reduce totalSupply, reopening minting headroom for quest/affiliate rewards.
+    /// @dev Only callable by authorized minters or owner. Uses totalMinted (not totalSupply())
+    ///      so that burns cannot reopen minting headroom — the cap is permanent.
     function mint(address to, uint256 amount) external onlyMinter {
-        if (totalSupply() + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
+        if (totalMinted + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
         totalMinted += amount;
         _mint(to, amount);
     }

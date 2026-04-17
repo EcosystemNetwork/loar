@@ -97,7 +97,7 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public immutable universeManager;
-    uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18;
+    uint256 public constant TOKEN_SUPPLY = 1_000_000_000e18; // 1B with 18 decimals (must match UniverseManager)
 
     // Default allocation splits
     uint16 public constant DEFAULT_LP_BPS = 8000;

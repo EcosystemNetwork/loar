@@ -148,11 +148,12 @@ contract PaymentRouterTest is Test {
         assertEq(treasury.balance, 0.5 ether);
     }
 
-    function test_route_zeroCreatorAddress() public {
-        // address(0) as creator — funds still accrue (no revert)
+    function test_route_zeroCreatorAddress_reverts() public {
+        // address(0) as creator now correctly reverts to prevent
+        // funds accruing at an unclaimable address
         vm.prank(user);
+        vm.expectRevert(PaymentRouter.ZeroAddress.selector);
         router.route{value: 1 ether}(address(0), 1000);
-        assertEq(router.claimable(address(0)), 0.9 ether);
     }
 
     function test_route_multipleCreators() public {

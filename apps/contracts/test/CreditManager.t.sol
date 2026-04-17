@@ -270,18 +270,22 @@ contract CreditManagerTest is Test {
     }
 
     function test_purchaseWithEth_overpayment() public {
-        // Overpaying should succeed (excess goes to treasury via router)
+        // Overpaying should succeed — only priceWei goes to treasury,
+        // excess is refunded to the buyer
         vm.prank(platform);
         credits.createPackage("Starter", 100, 0.01 ether, 50e18, 10);
 
         uint256 treasuryBalBefore = treasury.balance;
+        uint256 userBalBefore = user.balance;
 
         vm.prank(user);
         credits.purchaseWithEth{value: 1 ether}(0);
 
         assertEq(credits.getBalance(user), 110);
-        // All ETH routed to treasury
-        assertEq(treasury.balance - treasuryBalBefore, 1 ether);
+        // Only package price routed to treasury
+        assertEq(treasury.balance - treasuryBalBefore, 0.01 ether);
+        // Overpayment refunded to user
+        assertEq(userBalBefore - user.balance, 0.01 ether);
     }
 
     function test_purchaseWithEth_exactMinimum() public {

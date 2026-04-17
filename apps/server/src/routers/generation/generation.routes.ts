@@ -41,6 +41,15 @@ import type {
   RoutingReasonCode,
   VideoGenerationMode,
 } from '../../services/video-models/types';
+import {
+  translateCameraPreset,
+  applyStyleToPrompt,
+  PROVIDER_CAPABILITIES,
+  type CameraPresetId,
+  type CameraIntensity,
+  type StylePresetId,
+  type VfxPresetId,
+} from '../../services/scene-controls';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -81,6 +90,24 @@ const generateInputSchema = z.object({
   qualityTarget: z.enum(['draft', 'standard', 'premium']).optional(),
   costBudget: z.enum(['low', 'medium', 'any']).optional(),
   latencyPreference: z.enum(['fast', 'balanced', 'quality']).optional(),
+
+  // ── Scene Controls (Node Editor Expansion v1) ──────────────────────
+  // Camera motion preset (Feature 2)
+  cameraPreset: z.string().nullable().optional(),
+  cameraIntensity: z.enum(['subtle', 'standard', 'pronounced']).optional(),
+
+  // Cast / character identity conditioning (Feature 3)
+  castMemberIds: z.array(z.string()).max(5).optional(),
+
+  // Motion mask (Feature 4)
+  motionMaskUrl: z.string().url().optional(),
+
+  // Keyframe handoff (Feature 5) — start frame from a previous node's output
+  startFrameUrl: z.string().url().optional(),
+  endFrameUrl: z.string().url().optional(),
+
+  // Style preset (Feature 7)
+  stylePreset: z.string().nullable().optional(),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -114,19 +141,20 @@ function buildFalInput(
 /** Build input for ByteDance ModelArk direct API */
 function buildByteDanceInput(
   model: ReturnType<typeof getModelById>,
-  input: z.infer<typeof generateInputSchema>
+  input: z.infer<typeof generateInputSchema>,
+  resolvedCastUrls?: string[]
 ): ByteDanceVideoOptions {
   if (!model) throw new Error('Model not found');
 
   // Determine mode based on model ID suffix and input
   let mode: ByteDanceVideoOptions['mode'] = 'text_to_video';
-  if (model.id.includes('-ref')) {
+  if (model.id.includes('-ref') || (resolvedCastUrls && resolvedCastUrls.length > 0)) {
     mode = 'reference_to_video';
   } else if (model.id.includes('-i2v') || input.imageUrl) {
     mode = 'image_to_video';
   }
 
-  return {
+  const opts: ByteDanceVideoOptions = {
     prompt: input.prompt,
     model: model.bytedanceModelId || 'seedance-2.0',
     mode,
@@ -136,17 +164,76 @@ function buildByteDanceInput(
     resolution: input.resolution === '1080p' ? '720p' : input.resolution || '720p',
     audio: input.audio && model.supportsAudio ? true : undefined,
     negativePrompt: input.negativePrompt,
-    seed: undefined, // can be added if user passes seed
+    seed: undefined,
   };
+
+  // Scene Controls: Camera preset → native ByteDance camera params
+  if (input.cameraPreset) {
+    const cameraResult = translateCameraPreset(
+      'bytedance',
+      input.cameraPreset as CameraPresetId,
+      (input.cameraIntensity as CameraIntensity) || 'standard'
+    );
+    // Merge structured camera params into the options
+    // ByteDance passes these as top-level body params
+    Object.assign(opts, cameraResult.providerParams);
+  }
+
+  // Scene Controls: Cast reference images → reference_to_video mode
+  if (resolvedCastUrls && resolvedCastUrls.length > 0) {
+    opts.referenceImages = resolvedCastUrls.map((url) => ({ url, role: 'subject' as const }));
+  }
+
+  // Scene Controls: End frame URL for keyframe handoff
+  if (input.endFrameUrl) {
+    opts.endImageUrl = input.endFrameUrl;
+  }
+
+  return opts;
 }
 
 /** Dispatch video generation to the correct provider */
 async function dispatchGeneration(
   model: NonNullable<ReturnType<typeof getModelById>>,
-  input: z.infer<typeof generateInputSchema>
+  input: z.infer<typeof generateInputSchema>,
+  resolvedCastUrls?: string[]
 ): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
+  // ── Scene Controls: Apply style preset to prompt ────────────────
+  if (input.stylePreset) {
+    input.prompt = applyStyleToPrompt(input.prompt, input.stylePreset as StylePresetId);
+  }
+
+  // ── Scene Controls: Apply camera as prompt suffix for non-structured providers ──
+  if (input.cameraPreset && model.provider !== 'bytedance') {
+    const cameraResult = translateCameraPreset(
+      model.provider,
+      input.cameraPreset as CameraPresetId,
+      (input.cameraIntensity as CameraIntensity) || 'standard'
+    );
+    if (cameraResult.promptSuffix) {
+      input.prompt = `${input.prompt}, ${cameraResult.promptSuffix}`;
+    }
+  }
+
+  // ── Scene Controls: Start frame as image input for keyframe handoff ──
+  if (input.startFrameUrl && !input.imageUrl) {
+    input.imageUrl = input.startFrameUrl;
+    // Switch to image_to_video mode for seamless frame continuity
+    (input as any).mode = 'image_to_video';
+  }
+
+  // ── Scene Controls: Cast reference images as prompt description for non-identity providers ──
+  if (resolvedCastUrls && resolvedCastUrls.length > 0 && model.provider !== 'bytedance') {
+    // For FAL and other providers without identity conditioning, we'll pass
+    // the first reference image as the input image for I2V mode if not already set
+    if (!input.imageUrl && resolvedCastUrls[0]) {
+      input.imageUrl = resolvedCastUrls[0];
+      (input as any).mode = 'image_to_video';
+    }
+  }
+
   if (model.provider === 'bytedance') {
-    const bdInput = buildByteDanceInput(model, input);
+    const bdInput = buildByteDanceInput(model, input, resolvedCastUrls);
     return bytedanceService.generateVideo(bdInput);
   }
 
@@ -711,12 +798,29 @@ export const generationRouter = router({
         }
       }
 
+      // ── Resolve cast member reference images (Feature 3) ──────────
+      let resolvedCastUrls: string[] | undefined;
+      if (input.castMemberIds && input.castMemberIds.length > 0 && db) {
+        try {
+          const castDocs = await Promise.all(
+            input.castMemberIds.map((id) => db.collection('castMembers').doc(id).get())
+          );
+          resolvedCastUrls = castDocs
+            .filter((doc) => doc.exists)
+            .flatMap((doc) => doc.data()?.referenceImageUrls || [])
+            .filter(Boolean);
+        } catch (err) {
+          console.error('[generation] Failed to resolve cast members:', err);
+          // Non-fatal — generation continues without identity conditioning
+        }
+      }
+
       // ── Generate ────────────────────────────────────────────────────
       try {
         record.status = 'running';
         await generationsCol().doc(generationId).update({ status: 'running' });
 
-        const result = await dispatchGeneration(model, input);
+        const result = await dispatchGeneration(model, input, resolvedCastUrls);
 
         const latencyMs = Date.now() - startTime;
 

@@ -146,8 +146,9 @@ function getClientKey(c: Context): string {
     const realIp = c.req.header('x-real-ip');
     if (realIp && IP_RE.test(realIp)) return realIp;
   }
-  // Fallback to connection-level IP — never share a single bucket for all unknowns
-  return (c.req.raw as any)?.socket?.remoteAddress || 'unknown-' + Date.now();
+  // Fallback to connection-level IP — fail closed with a shared bucket rather than
+  // creating a unique key per request (which would bypass rate limiting entirely)
+  return (c.req.raw as any)?.socket?.remoteAddress || 'unknown-shared';
 }
 
 // ── Middleware ───────────────────────────────────────────────────────────

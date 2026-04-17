@@ -10,6 +10,15 @@ import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
+/// @dev Minimal interface for looking up the actual governance token of a universe.
+///      Prevents sockpuppet token attacks (C5) by validating caller-supplied token
+///      against the on-chain source of truth.
+interface IUniverseManagerLookup {
+    function getUniverseData(uint id) external view returns (
+        address universe, address token, address governor, address hook, address locker, address bondingCurve
+    );
+}
+
 /// @title CanonMarketplace
 /// @notice Governance-gated marketplace for submitting world-building entities into canon.
 ///         Covers all creator entity kinds: characters, plot arcs, locations, lore rules,
@@ -85,6 +94,10 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @notice Minimum vote participation (basis points of total supply) for finalization
     uint16 public quorumBps;
 
+    /// @notice UniverseManager contract — used to validate that caller-supplied
+    ///         universeToken is the actual governance token for the universeId (C5 fix).
+    IUniverseManagerLookup public universeManager;
+
     event SubmissionCreated(uint256 indexed id, uint256 universeId, SubmissionType subType, address creator, bytes32 contentHash);
     event VoteCast(uint256 indexed submissionId, address voter, bool support, uint256 weight);
     event SubmissionAccepted(uint256 indexed submissionId, uint256 universeId);
@@ -115,6 +128,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     uint256 public constant MIN_SNAPSHOT_AGE = 15;
 
     error ZeroAddress();
+    error TokenMismatch();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -153,7 +167,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error InvalidToken();
 
     /// @notice Submit content for canon consideration
-    /// @param universeToken Must be a valid IVotes token (governance token for the universe)
+    /// @param universeToken Must be the governance token registered in UniverseManager for this universeId
     function submit(
         uint256 universeId,
         address universeToken,
@@ -164,6 +178,15 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (universeToken == address(0)) revert InvalidToken();
         if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         if (msg.value < minSubmissionFee) revert InsufficientFee();
+
+        // C5 fix: Validate universeToken is the actual governance token for this universe.
+        // Prevents sockpuppet token attacks where an attacker deploys their own IVotes token
+        // and uses it to vote their own submissions into another universe's canon.
+        if (address(universeManager) != address(0)) {
+            (, address registeredToken,,,,) = universeManager.getUniverseData(universeId);
+            if (registeredToken != universeToken) revert TokenMismatch();
+        }
+
         // Validate the token implements IVotes (will revert if not)
         try IVotes(universeToken).getPastTotalSupply(block.number - 1) {} catch { revert InvalidToken(); }
 
@@ -198,18 +221,25 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Vote on a submission (weighted by governance token snapshot at submission time)
-    /// @dev Uses getPastVotes() for flash-loan protection — vote weight is locked at snapshotBlock
-    function vote(uint256 submissionId, bool support) external whenNotPaused {
+    /// @dev Uses getPastVotes() for flash-loan protection — vote weight is locked at snapshotBlock.
+    ///      C6 fix: nonReentrant + CEI ordering — hasVoted is set BEFORE the external call
+    ///      to getPastVotes, preventing reentrancy via a malicious IVotes implementation.
+    function vote(uint256 submissionId, bool support) external nonReentrant whenNotPaused {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert VotingNotActive();
         if (block.timestamp > sub.votingDeadline) revert VotingNotActive();
         if (hasVoted[submissionId][msg.sender]) revert AlreadyVoted();
 
-        // Use snapshot voting power (block before submission) — immune to flash loans
-        uint256 weight = IVotes(sub.universeToken).getPastVotes(msg.sender, sub.snapshotBlock);
-        if (weight == 0) revert NoVotingPower();
-
+        // CEI: Set state BEFORE external call to prevent reentrancy
         hasVoted[submissionId][msg.sender] = true;
+
+        // External call: use snapshot voting power (block before submission) — immune to flash loans
+        uint256 weight = IVotes(sub.universeToken).getPastVotes(msg.sender, sub.snapshotBlock);
+        if (weight == 0) {
+            // Revert undoes the hasVoted state change
+            revert NoVotingPower();
+        }
+
         voteWeight[submissionId][msg.sender] = weight;
 
         if (support) {
@@ -326,5 +356,12 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     function setQuorumBps(uint16 _quorumBps) external onlyOwner {
         require(_quorumBps <= 5000, "Max 50% quorum");
         quorumBps = _quorumBps;
+    }
+
+    /// @notice Set the UniverseManager for token validation (C5 fix).
+    ///         Must be called after upgrade to enable sockpuppet-token protection.
+    function setUniverseManager(address _universeManager) external onlyOwner {
+        if (_universeManager == address(0)) revert ZeroAddress();
+        universeManager = IUniverseManagerLookup(_universeManager);
     }
 }

@@ -100,7 +100,8 @@ export const stripeRouter = router({
 export async function verifyStripePayment(
   paymentIntentId: string,
   expectedPackageId: string,
-  expectedAmountCents: number
+  expectedAmountCents: number,
+  expectedUserId?: string
 ): Promise<void> {
   const stripeClient = getStripe();
   if (!stripeClient) {
@@ -132,6 +133,13 @@ export async function verifyStripePayment(
   if (intent.amount < expectedAmountCents) {
     throw new Error(
       `Payment amount ($${(intent.amount / 100).toFixed(2)}) is less than the package price ($${(expectedAmountCents / 100).toFixed(2)}).`
+    );
+  }
+
+  // C4 fix: Verify the payment was created by the authenticated user
+  if (expectedUserId && intent.metadata?.userId !== expectedUserId) {
+    throw new Error(
+      'Payment was not created by your account. You can only claim credits for your own payments.'
     );
   }
 }

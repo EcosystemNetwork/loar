@@ -234,6 +234,8 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         emit MerchCreated(merchId, universeId, name, price);
     }
 
+    error RefundFailed();
+
     /// @notice Purchase merchandise
     function purchaseMerch(uint256 merchId) external payable nonReentrant whenNotPaused {
         MerchItem storage item = merchItems[merchId];
@@ -242,12 +244,17 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
         item.sold++;
 
-        // Route merch payment through PaymentRouter
-        if (msg.value > 0) {
-            paymentRouter.route{value: msg.value}(item.creator, platformFeeBps);
+        // Route exact price through PaymentRouter; refund overpayment
+        if (item.price > 0) {
+            paymentRouter.route{value: item.price}(item.creator, platformFeeBps);
+        }
+        uint256 refund = msg.value - item.price;
+        if (refund > 0) {
+            (bool ok,) = msg.sender.call{value: refund}("");
+            if (!ok) revert RefundFailed();
         }
 
-        emit MerchSold(merchId, msg.sender, msg.value);
+        emit MerchSold(merchId, msg.sender, item.price);
     }
 
     // ---- Views ----

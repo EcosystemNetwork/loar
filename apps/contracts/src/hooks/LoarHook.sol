@@ -163,10 +163,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     function _beforeSwap(
         address,
         PoolKey calldata poolKey,
-        SwapParams calldata swapParams
+        SwapParams calldata swapParams,
+        bytes calldata
     )
         internal
         virtual
+        override
         returns (bytes4, BeforeSwapDelta delta, uint24)
     {
         // set the fee for this swap
@@ -244,8 +246,9 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         address,
         PoolKey calldata poolKey,
         SwapParams calldata swapParams,
-        BalanceDelta delta
-    ) internal returns (bytes4, int128 unspecifiedDelta) {
+        BalanceDelta delta,
+        bytes calldata
+    ) internal override returns (bytes4, int128 unspecifiedDelta) {
         // variables to determine how to collect protocol fee
         bool token0IsLoar = loarIsToken0[poolKey.toId()];
         bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;

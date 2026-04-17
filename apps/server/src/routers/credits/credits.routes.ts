@@ -90,7 +90,8 @@ const TRANSFER_TOPIC =
 async function verifyEthPayment(
   paymentRef: string,
   chainId?: number,
-  expectedWei?: string
+  expectedWei?: string,
+  expectedSender?: string
 ): Promise<void> {
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
     throw new Error('TREASURY_ADDRESS is not configured on the server');
@@ -129,6 +130,13 @@ async function verifyEthPayment(
     );
   }
 
+  // C4 fix: Verify the transaction was sent by the authenticated user
+  if (expectedSender && tx.from?.toLowerCase() !== expectedSender.toLowerCase()) {
+    throw new Error(
+      'Transaction sender does not match your wallet address. You can only claim credits for your own payments.'
+    );
+  }
+
   // Enforce minimum payment amount when a price is configured
   if (expectedWei && expectedWei !== '0') {
     const expected = BigInt(expectedWei);
@@ -144,7 +152,8 @@ async function verifyEthPayment(
 async function verifyLoarPayment(
   txHash: string,
   expectedLoarWei: bigint,
-  chainId?: number
+  chainId?: number,
+  expectedSender?: string
 ): Promise<void> {
   if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
     throw new Error('LOAR_TOKEN_ADDRESS is not configured on the server');
@@ -185,6 +194,16 @@ async function verifyLoarPayment(
     throw new Error(
       'Transaction does not contain a $LOAR Transfer to the platform treasury. Ensure you sent $LOAR to the correct address.'
     );
+  }
+
+  // C4 fix: Verify the transfer was sent by the authenticated user
+  if (expectedSender && transferLog.topics[1]) {
+    const sender = `0x${transferLog.topics[1].slice(26)}`.toLowerCase();
+    if (sender !== expectedSender.toLowerCase()) {
+      throw new Error(
+        'Token transfer sender does not match your wallet address. You can only claim credits for your own payments.'
+      );
+    }
   }
 
   // Decode the transfer amount from the log data
@@ -414,11 +433,11 @@ export const creditsRouter = router({
         if (!pkg.ethPriceWei || pkg.ethPriceWei === '0') {
           throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
         }
-        await verifyEthPayment(input.paymentRef, input.chainId, pkg.ethPriceWei);
+        await verifyEthPayment(input.paymentRef, input.chainId, pkg.ethPriceWei, ctx.user.address);
       } else {
         // card: Verify Stripe PaymentIntent succeeded with correct package and amount
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
-        await verifyStripePayment(input.paymentRef, input.packageId, expectedCents);
+        await verifyStripePayment(input.paymentRef, input.packageId, expectedCents, ctx.user.uid);
         // Dedup is enforced atomically inside the transaction below
       }
 
@@ -499,7 +518,7 @@ export const creditsRouter = router({
 
       // Verify the on-chain transfer before issuing any credits
       const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
-      await verifyLoarPayment(input.txHash, expectedWei, input.chainId);
+      await verifyLoarPayment(input.txHash, expectedWei, input.chainId, ctx.user.address);
 
       // $LOAR buyers get: base credits + package bonus + 10% LOAR bonus
       const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;

@@ -190,19 +190,16 @@ contract StructuralDeedTest is Test {
 
     function test_mintDeed_routesPayment() public {
         uint256 treasuryBefore = treasury.balance;
-        uint256 routerBefore = address(router).balance;
 
         vm.prank(alice);
         deed.mintDeed{value: 0.001 ether}(
             UNIVERSE_ID, StructuralDeed.Layer.DOMAIN, "Domain1", CONTENT, 0, URI
         );
 
-        // 5% of 0.001 = 0.00005 to treasury
-        uint256 expectedPlatformCut = (0.001 ether * 500) / 10000;
-        uint256 expectedCreatorCut = 0.001 ether - expectedPlatformCut;
-
-        assertEq(treasury.balance - treasuryBefore, expectedPlatformCut);
-        assertEq(router._claimable(alice), expectedCreatorCut);
+        // Mint fee is routed entirely to treasury via routeToTreasury()
+        // (not split between creator and platform)
+        assertEq(treasury.balance - treasuryBefore, 0.001 ether);
+        assertEq(router._claimable(alice), 0);
     }
 
     // ---- View functions ----

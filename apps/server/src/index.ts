@@ -332,6 +332,7 @@ app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 
 app.use(
   '/trpc/*',

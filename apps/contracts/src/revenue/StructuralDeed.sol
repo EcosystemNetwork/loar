@@ -154,8 +154,9 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         _setTokenURI(tokenId, metadataURI);
         _setTokenRoyalty(tokenId, msg.sender, royaltyBps);
 
+        // Route mint fee entirely to treasury (not back to minter)
         if (msg.value > 0) {
-            paymentRouter.route{value: msg.value}(msg.sender, platformFeeBps);
+            paymentRouter.routeToTreasury{value: msg.value}();
         }
 
         emit DeedMinted(tokenId, universeId, layer, name, msg.sender, parentTokenId);

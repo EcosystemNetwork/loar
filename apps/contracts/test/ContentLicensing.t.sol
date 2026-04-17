@@ -93,7 +93,7 @@ contract ContentLicensingTest is Test {
         assertEq(address(licensing.paymentRouter()), address(paymentRouter));
         assertEq(licensing.platformFeeBps(), PLATFORM_FEE_BPS);
         assertEq(licensing.owner(), deployer);
-        assertEq(licensing.nextDealId(), 0);
+        assertEq(licensing.nextDealId(), 1); // starts at 1 (0 reserved as sentinel)
     }
 
     function test_initialize_revert_zeroPlatform() public {
@@ -204,8 +204,8 @@ contract ContentLicensingTest is Test {
         vm.prank(buyer);
         uint256 dealId = licensing.buyContent{value: BUY_PRICE}(CONTENT_HASH);
 
-        assertEq(dealId, 0);
-        assertEq(licensing.nextDealId(), 1);
+        assertEq(dealId, 1);
+        assertEq(licensing.nextDealId(), 2);
 
         // Check deal state
         (
@@ -214,7 +214,7 @@ contract ContentLicensingTest is Test {
             address dealBuyer, uint256 pricePaid, uint256 startTime, uint256 endTime
         ) = licensing.deals(dealId);
 
-        assertEq(id, 0);
+        assertEq(id, 1);
         assertEq(contentHash, CONTENT_HASH);
         assertEq(splitHash, SPLIT_ENTITY_HASH);
         assertTrue(dealType == ContentLicensing.DealType.BUY);
@@ -230,12 +230,12 @@ contract ContentLicensingTest is Test {
         // Content deals array updated
         uint256[] memory dealIds = licensing.getContentDeals(CONTENT_HASH);
         assertEq(dealIds.length, 1);
-        assertEq(dealIds[0], 0);
+        assertEq(dealIds[0], 1);
     }
 
     function test_buyContent_emitsEvent() public {
         vm.expectEmit(true, false, false, true);
-        emit ContentLicensing.ContentBought(0, CONTENT_HASH, buyer, BUY_PRICE);
+        emit ContentLicensing.ContentBought(1, CONTENT_HASH, buyer, BUY_PRICE);
         vm.prank(buyer);
         licensing.buyContent{value: BUY_PRICE}(CONTENT_HASH);
     }
@@ -312,8 +312,8 @@ contract ContentLicensingTest is Test {
         uint256 deal2 = licensing.buyContent{value: BUY_PRICE}(CONTENT_HASH);
         assertEq(licensing.contentOwner(CONTENT_HASH), alice);
 
-        assertEq(deal1, 0);
-        assertEq(deal2, 1);
+        assertEq(deal1, 1);
+        assertEq(deal2, 2);
 
         uint256[] memory dealIds = licensing.getContentDeals(CONTENT_HASH);
         assertEq(dealIds.length, 2);
@@ -330,7 +330,7 @@ contract ContentLicensingTest is Test {
         vm.prank(buyer);
         uint256 dealId = licensing.rentContent{value: totalCost}(CONTENT_HASH, durationDays);
 
-        assertEq(dealId, 0);
+        assertEq(dealId, 1);
 
         (
             uint256 id, bytes32 contentHash, bytes32 splitHash,
@@ -338,7 +338,7 @@ contract ContentLicensingTest is Test {
             address dealBuyer, uint256 pricePaid, uint256 startTime, uint256 endTime
         ) = licensing.deals(dealId);
 
-        assertEq(id, 0);
+        assertEq(id, 1);
         assertEq(contentHash, CONTENT_HASH);
         assertTrue(dealType == ContentLicensing.DealType.RENT);
         assertTrue(status == ContentLicensing.DealStatus.ACTIVE);
@@ -353,7 +353,7 @@ contract ContentLicensingTest is Test {
         uint256 expectedEndTime = block.timestamp + (durationDays * 1 days);
 
         vm.expectEmit(true, false, false, true);
-        emit ContentLicensing.ContentRented(0, CONTENT_HASH, buyer, totalCost, expectedEndTime);
+        emit ContentLicensing.ContentRented(1, CONTENT_HASH, buyer, totalCost, expectedEndTime);
         vm.prank(buyer);
         licensing.rentContent{value: totalCost}(CONTENT_HASH, durationDays);
     }
@@ -445,7 +445,7 @@ contract ContentLicensingTest is Test {
         vm.prank(buyer);
         uint256 dealId = licensing.licenseContent{value: LICENSE_FEE}(CONTENT_HASH, durationDays);
 
-        assertEq(dealId, 0);
+        assertEq(dealId, 1);
 
         (
             uint256 id, bytes32 contentHash, bytes32 splitHash,
@@ -465,7 +465,7 @@ contract ContentLicensingTest is Test {
         uint256 expectedEndTime = block.timestamp + (durationDays * 1 days);
 
         vm.expectEmit(true, false, false, true);
-        emit ContentLicensing.ContentLicensed(0, CONTENT_HASH, buyer, LICENSE_FEE, expectedEndTime);
+        emit ContentLicensing.ContentLicensed(1, CONTENT_HASH, buyer, LICENSE_FEE, expectedEndTime);
         vm.prank(buyer);
         licensing.licenseContent{value: LICENSE_FEE}(CONTENT_HASH, durationDays);
     }
@@ -600,12 +600,12 @@ contract ContentLicensingTest is Test {
         vm.warp(block.timestamp + 31 days);
 
         vm.prank(buyer);
-        vm.expectRevert(ContentLicensing.DealExpired.selector);
+        vm.expectRevert(ContentLicensing.DealNotActive.selector);
         licensing.payRoyalty{value: 0.1 ether}(dealId);
 
-        // Deal should now be marked EXPIRED
-        (, , , , ContentLicensing.DealStatus status, , , ,) = licensing.deals(dealId);
-        assertTrue(status == ContentLicensing.DealStatus.EXPIRED);
+        // Deal is still ACTIVE in storage (revert rolled back the state change),
+        // but isDealActive correctly reports it as expired based on endTime.
+        assertFalse(licensing.isDealActive(dealId));
     }
 
     function test_payRoyalty_revert_afterAutoExpire() public {
@@ -616,7 +616,7 @@ contract ContentLicensingTest is Test {
         vm.warp(block.timestamp + 31 days);
 
         vm.prank(buyer);
-        vm.expectRevert(ContentLicensing.DealExpired.selector);
+        vm.expectRevert(ContentLicensing.DealNotActive.selector);
         licensing.payRoyalty{value: 0.1 ether}(dealId);
 
         // Second attempt reverts with DealNotActive (status is now EXPIRED)
@@ -938,14 +938,14 @@ contract ContentLicensingTest is Test {
         (uint256[] memory page1, uint256 total) = licensing.getContentDealsPaginated(CONTENT_HASH, 0, 2);
         assertEq(total, 3);
         assertEq(page1.length, 2);
-        assertEq(page1[0], 0);
-        assertEq(page1[1], 1);
+        assertEq(page1[0], 1);
+        assertEq(page1[1], 2);
 
         // Get page 2 (offset=2, limit=2)
         (uint256[] memory page2, uint256 total2) = licensing.getContentDealsPaginated(CONTENT_HASH, 2, 2);
         assertEq(total2, 3);
         assertEq(page2.length, 1);
-        assertEq(page2[0], 2);
+        assertEq(page2[0], 3);
 
         // Offset past end
         (uint256[] memory page3, uint256 total3) = licensing.getContentDealsPaginated(CONTENT_HASH, 10, 2);
@@ -988,10 +988,10 @@ contract ContentLicensingTest is Test {
         uint256 d3 = licensing.licenseContent{value: LICENSE_FEE}(CONTENT_HASH, 30);
         vm.stopPrank();
 
-        assertEq(d1, 0);
-        assertEq(d2, 1);
-        assertEq(d3, 2);
-        assertEq(licensing.nextDealId(), 3);
+        assertEq(d1, 1);
+        assertEq(d2, 2);
+        assertEq(d3, 3);
+        assertEq(licensing.nextDealId(), 4);
 
         uint256[] memory dealIds = licensing.getContentDeals(CONTENT_HASH);
         assertEq(dealIds.length, 3);
