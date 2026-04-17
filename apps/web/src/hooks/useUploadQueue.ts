@@ -7,6 +7,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
 
 export interface UploadJobStatus {
   id: string;
@@ -35,6 +36,7 @@ export interface UploadJobStatus {
  */
 export function useUploadQueue() {
   const [activeJobIds, setActiveJobIds] = useState<string[]>([]);
+  const pollInterval = useVisibilityAwareInterval(POLL_INTERVALS.ACTIVE);
 
   /**
    * Initiates an async upload from a URL via the storage tRPC endpoint.
@@ -77,7 +79,7 @@ export function useUploadQueue() {
       );
       return results.filter(Boolean) as UploadJobStatus[];
     },
-    refetchInterval: activeJobIds.length > 0 ? 2000 : false,
+    refetchInterval: activeJobIds.length > 0 ? pollInterval : false,
     enabled: activeJobIds.length > 0,
   });
 

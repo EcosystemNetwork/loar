@@ -198,9 +198,28 @@ function buildSiweMessage(params: { address: string; nonce: string; chainId: num
 
 // ── SIWE handshake ──────────────────────────────────────────────
 
+// Track nonce fetch failures to implement backoff
+let _nonceFailCount = 0;
+let _nonceBackoffUntil = 0;
+
 async function fetchNonce(): Promise<string> {
+  // Respect backoff window from previous 429s
+  const now = Date.now();
+  if (now < _nonceBackoffUntil) {
+    throw new Error('Rate limited — please wait before signing in');
+  }
+
   const res = await fetch(`${SERVER_URL}/auth/nonce`, { credentials: 'include' });
+  if (res.status === 429) {
+    _nonceFailCount++;
+    // Exponential backoff: 5s, 10s, 20s, 40s, capped at 60s
+    const delay = Math.min(5000 * Math.pow(2, _nonceFailCount - 1), 60_000);
+    _nonceBackoffUntil = Date.now() + delay;
+    throw new Error('Rate limited — please wait before signing in');
+  }
   if (!res.ok) throw new Error('Failed to fetch nonce');
+
+  _nonceFailCount = 0; // Reset on success
   const data = await res.json();
   return data.nonce;
 }
@@ -242,6 +261,9 @@ export function useWalletAuth() {
   const rejectedRef = useRef(false);
   // Track the last address we auto-signed for to avoid duplicate attempts
   const autoSignedForRef = useRef<string | null>(null);
+  // Track failed sign-in attempts to prevent infinite retry loop
+  const signInFailCountRef = useRef(0);
+  const MAX_AUTO_SIGN_IN_ATTEMPTS = 2;
 
   // Wait for session validation before trusting localStorage
   useEffect(() => {
@@ -273,6 +295,7 @@ export function useWalletAuth() {
       const signature = await thirdwebAccount.signMessage({ message });
       const result = await verifySignature(message, signature);
       setSession(result.address, result.expiresAt);
+      signInFailCountRef.current = 0;
       autoSignedForRef.current = address.toLowerCase();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Sign-in failed';
@@ -280,6 +303,7 @@ export function useWalletAuth() {
       if (msg.includes('User rejected') || msg.includes('user rejected')) {
         rejectedRef.current = true;
       } else {
+        signInFailCountRef.current++;
         setError(msg);
       }
       // Mark this address as attempted so auto-sign-in doesn't retry in a loop
@@ -294,6 +318,7 @@ export function useWalletAuth() {
     clearSiweSession(true); // revoke = true
     rejectedRef.current = false;
     autoSignedForRef.current = null;
+    signInFailCountRef.current = 0;
     disconnect();
   }, [disconnect]);
 
@@ -302,17 +327,24 @@ export function useWalletAuth() {
     if (!isConnected || !address) {
       if (storedAddress) clearSiweSession();
       rejectedRef.current = false;
-      autoSignedForRef.current = null;
+      // Only reset autoSignedForRef if we had a stored session (real disconnect),
+      // not on transient wagmi↔thirdweb sync flickers
+      if (storedAddress) {
+        autoSignedForRef.current = null;
+        signInFailCountRef.current = 0;
+      }
     } else if (storedAddress && storedAddress.toLowerCase() !== address.toLowerCase()) {
-      // Address changed — clear old session and reset rejection flag for new address
+      // Address changed — clear old session and reset for new address
       clearSiweSession();
       rejectedRef.current = false;
       autoSignedForRef.current = null;
+      signInFailCountRef.current = 0;
     }
   }, [isConnected, address, storedAddress]);
 
   // Auto-trigger SIWE sign-in when wallet connects without an existing session.
   // Requires thirdwebAccount to be available so signIn has a signer.
+  // Guards against infinite retry: stops after MAX_AUTO_SIGN_IN_ATTEMPTS failures.
   useEffect(() => {
     if (
       isConnected &&
@@ -321,6 +353,7 @@ export function useWalletAuth() {
       !storedAddress &&
       !isAuthenticating &&
       !rejectedRef.current &&
+      signInFailCountRef.current < MAX_AUTO_SIGN_IN_ATTEMPTS &&
       autoSignedForRef.current !== address.toLowerCase()
     ) {
       signIn();

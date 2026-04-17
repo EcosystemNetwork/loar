@@ -17,19 +17,9 @@ const BASE_URL = 'https://api.meshy.ai/v2';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-export type MeshyArtStyle =
-  | 'realistic'
-  | 'cartoon'
-  | 'low-poly'
-  | 'sculpture'
-  | 'pbr'; // physically based rendering
+export type MeshyArtStyle = 'realistic' | 'cartoon' | 'low-poly' | 'sculpture' | 'pbr'; // physically based rendering
 
-export type MeshyTaskStatus =
-  | 'PENDING'
-  | 'IN_PROGRESS'
-  | 'SUCCEEDED'
-  | 'FAILED'
-  | 'EXPIRED';
+export type MeshyTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
 
 export interface MeshyTaskOutput {
   glb?: string; // GLB model URL
@@ -83,6 +73,26 @@ export interface MultiImageTo3DOptions {
   enablePbr?: boolean;
   topology?: 'quad' | 'triangle';
   targetPolycount?: number;
+}
+
+export interface TextToTextureOptions {
+  /** Meshy model URL (GLB) or a previous task ID to re-texture */
+  modelUrl: string;
+  /** Text description of the desired texture/material */
+  prompt: string;
+  negativePrompt?: string;
+  /** Art style for texturing */
+  artStyle?: MeshyArtStyle;
+  /** Resolution: 1024, 2048, or 4096 */
+  resolution?: number;
+  enableOriginalUV?: boolean;
+  enablePbr?: boolean;
+  /** Painting style: texture or vertex-color */
+  paintingStyle?: 'texture' | 'vertex-color';
+}
+
+export interface MeshyTextureTask extends MeshyTask {
+  textureUrls?: string[];
 }
 
 // ── Service ───────────────────────────────────────────────────────────
@@ -185,6 +195,56 @@ class MeshyService {
       target_polycount: options.targetPolycount,
     });
     return { taskId: data.result };
+  }
+
+  // ── Text-to-Texture ───────────────────────────────────────────────────
+
+  /**
+   * Apply AI-generated textures to an existing 3D model.
+   * Pass a GLB model URL and a text description of the desired texture.
+   */
+  async textToTexture(options: TextToTextureOptions): Promise<{ taskId: string }> {
+    const data = await this.post<{ result: string }>('/text-to-texture', {
+      model_url: options.modelUrl,
+      object_prompt: options.prompt,
+      negative_prompt: options.negativePrompt || '',
+      style_prompt: options.artStyle || 'realistic',
+      resolution: options.resolution || 2048,
+      enable_original_uv: options.enableOriginalUV ?? true,
+      enable_pbr: options.enablePbr ?? true,
+      art_style: options.artStyle || 'realistic',
+      painting_style: options.paintingStyle || 'texture',
+    });
+    return { taskId: data.result };
+  }
+
+  async getTextToTextureTask(taskId: string): Promise<MeshyTextureTask> {
+    return this.get<MeshyTextureTask>(`/text-to-texture/${taskId}`);
+  }
+
+  /**
+   * Poll a texture task until terminal state.
+   */
+  async waitForTextureTask(
+    taskId: string,
+    maxWaitMs = 10 * 60 * 1000,
+    pollIntervalMs = 5000
+  ): Promise<MeshyTextureTask> {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      const task = await this.getTextToTextureTask(taskId);
+      if (task.status === 'SUCCEEDED') return task;
+      if (task.status === 'FAILED') {
+        throw new Error(
+          `Meshy texture task ${taskId} failed: ${task.taskError?.message || 'unknown'}`
+        );
+      }
+      if (task.status === 'EXPIRED') {
+        throw new Error(`Meshy texture task ${taskId} expired`);
+      }
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+    throw new Error(`Meshy texture task ${taskId} timed out after ${maxWaitMs / 1000}s`);
   }
 
   // ── Status / Polling ──────────────────────────────────────────────────

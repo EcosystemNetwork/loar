@@ -45,6 +45,30 @@ export const SPONSORED_ACTIONS = new Set<string>([
 
   // Entity creation — worldbuilding studio actions
   'createEntity',
+
+  // Social / engagement actions (free for growth)
+  'follow',
+  'unfollow',
+  'submitCanon',
+  'submitCanonProposal',
+  'delegate',
+  'delegateVotes',
+  'claimReward',
+  'claimQuest',
+  'registerIdentity',
+  'mintIdentityNFT',
+  'propose',
+  'queue',
+  'execute',
+
+  // Content creation (subsidize creators)
+  'createContent',
+  'updateContent',
+  'createCharacter',
+  'updateCharacter',
+  'mintEdition',
+  'mintCollective',
+  'setTokenGate',
 ]);
 
 /**
@@ -155,5 +179,98 @@ export function getConnectButtonAAConfig() {
   return {
     chain: undefined as any, // Will use the connected chain
     sponsorGas: true,
+  };
+}
+
+// ── Daily Sponsor Rate Limiting ─────────────────────────────────────────
+
+/** Maximum sponsored transactions per user per day. */
+export const DAILY_SPONSOR_LIMIT = 50;
+
+const SPONSOR_STORAGE_PREFIX = 'loar_sponsor_';
+
+/** Get the localStorage key for today's sponsor count. */
+function getSponsorKey(userAddress: string): string {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return `${SPONSOR_STORAGE_PREFIX}${userAddress.toLowerCase()}_${today}`;
+}
+
+/** Read today's sponsored tx count for a user from localStorage. */
+function getTodaySponsorCount(userAddress: string): number {
+  try {
+    const raw = localStorage.getItem(getSponsorKey(userAddress));
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Check whether a user can still receive sponsored transactions today.
+ * Returns false if the user has exceeded the daily limit.
+ */
+export function canSponsor(userAddress: string): boolean {
+  if (!isPaymasterAvailable()) return false;
+  return getTodaySponsorCount(userAddress) < DAILY_SPONSOR_LIMIT;
+}
+
+/**
+ * Increment the daily sponsor count for a user.
+ * Call this after a sponsored transaction succeeds.
+ */
+export function recordSponsoredTx(userAddress: string): void {
+  try {
+    const key = getSponsorKey(userAddress);
+    const current = getTodaySponsorCount(userAddress);
+    localStorage.setItem(key, String(current + 1));
+
+    // Clean up stale keys from previous days
+    cleanStaleSponsorKeys(userAddress);
+  } catch {
+    // localStorage unavailable — fail silently
+  }
+}
+
+/** Remove localStorage entries from previous days to prevent unbounded growth. */
+function cleanStaleSponsorKeys(userAddress: string): void {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const prefix = `${SPONSOR_STORAGE_PREFIX}${userAddress.toLowerCase()}_`;
+    const keysToRemove: string[] = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix) && !key.endsWith(today)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Ignore cleanup failures
+  }
+}
+
+/**
+ * Get the full sponsorship status for the current session.
+ * Useful for UI display (e.g., "12 of 50 sponsored txs remaining today").
+ */
+export function getSponsorshipStatus(userAddress?: string): {
+  available: boolean;
+  sponsoredActions: string[];
+  dailyLimit: number;
+  remainingToday: number;
+} {
+  const paymasterReady = isPaymasterAvailable();
+  const used = userAddress ? getTodaySponsorCount(userAddress) : 0;
+  const remaining = Math.max(0, DAILY_SPONSOR_LIMIT - used);
+
+  return {
+    available: paymasterReady && remaining > 0,
+    sponsoredActions: Array.from(SPONSORED_ACTIONS),
+    dailyLimit: DAILY_SPONSOR_LIMIT,
+    remainingToday: paymasterReady ? remaining : 0,
   };
 }

@@ -586,6 +586,80 @@ export const creditsRouter = router({
       };
     }),
 
+  // ── Purchase with LOAR Balance (reward credits → package credits) ──
+
+  purchaseWithBalance: protectedProcedure
+    .input(
+      z.object({
+        packageId: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const livePackages = await buildPackagesFromConfig();
+      const pkg = livePackages.find((p) => p.id === input.packageId);
+      if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
+
+      const loarCost = pkg.loarTokenAmount; // platform LOAR to deduct
+
+      // Atomic: check balance, deduct cost, add package credits
+      const result = await db.runTransaction(async (tx) => {
+        const userRef = creditsCol().doc(ctx.user.uid);
+        const userDoc = await tx.get(userRef);
+        const prev = userDoc.data() ?? {};
+        const currentBalance = prev.balance || 0;
+
+        if (currentBalance < loarCost) {
+          throw new Error(
+            `Insufficient LOAR balance. You have ${currentBalance} but need ${loarCost}.`
+          );
+        }
+
+        // Balance payment gets base + package bonus (no extra LOAR bonus)
+        const totalCredits = pkg.credits + pkg.bonusCredits;
+        const netChange = totalCredits - loarCost;
+
+        tx.set(
+          userRef,
+          {
+            uid: ctx.user.uid,
+            balance: currentBalance + netChange,
+            totalPurchased: (prev.totalPurchased || 0) + pkg.credits,
+            totalBonusReceived: (prev.totalBonusReceived || 0) + pkg.bonusCredits,
+            totalSpent: prev.totalSpent || 0,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+
+        // Record the transaction
+        const txDocId = `balance-${ctx.user.uid}-${Date.now()}`;
+        tx.set(creditTxCol().doc(txDocId), {
+          id: txDocId,
+          uid: ctx.user.uid,
+          type: 'purchase',
+          paymentMethod: 'balance',
+          packageId: input.packageId,
+          packageName: pkg.name,
+          credits: pkg.credits,
+          bonusCredits: pkg.bonusCredits,
+          totalCredits,
+          loarDeducted: loarCost,
+          createdAt: new Date(),
+        });
+
+        return { totalCredits, netChange };
+      });
+
+      return {
+        ok: true,
+        creditsAdded: result.totalCredits,
+        baseCredits: pkg.credits,
+        bonusCredits: pkg.bonusCredits,
+        loarDeducted: loarCost,
+        paymentMethod: 'balance' as const,
+      };
+    }),
+
   // ── Spend Credits ───────────────────────────────────────────────
 
   spend: protectedProcedure

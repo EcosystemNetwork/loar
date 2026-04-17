@@ -86,6 +86,11 @@ export async function createEntity(
   const parentId = input.parentId ?? null;
   await validateParent(input.kind, parentId);
 
+  // Structural kinds must belong to a universe
+  if (STRUCTURAL_KINDS.includes(input.kind as any) && !input.universeAddress) {
+    throw new Error(`Structural kind "${input.kind}" requires a universeAddress`);
+  }
+
   const col = entitiesCol();
   const ref = col.doc();
   const now = new Date();

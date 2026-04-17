@@ -3,17 +3,34 @@
  *
  * Route: /wiki/entity/:id
  * Works for all creator kinds: person, place, thing, faction, event, lore, etc.
+ *
+ * Includes:
+ *   - Character pipeline status (2D → 3D → Textured)
+ *   - Inline image gallery and 3D model viewer
+ *   - Music generation panel
+ *   - Collaborative editing
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Sparkles, Loader2, Music, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Sparkles,
+  Loader2,
+  Music,
+  Users,
+  Wand2,
+  CheckCircle2,
+  Circle,
+  XCircle,
+  Box,
+} from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -101,6 +118,158 @@ const safeUrl = (url: string | null | undefined): string | undefined => {
   }
 };
 
+/** Kinds eligible for the character pipeline (have visual 3D representations). */
+const PIPELINE_ELIGIBLE_KINDS = ['person', 'species', 'vehicle', 'technology', 'thing'];
+
+/** Step status labels for pipeline progress display. */
+const PIPELINE_STEPS = [
+  { key: 'imagen_2d', label: '2D Art (Google Imagen)' },
+  { key: 'meshy_3d', label: '3D Model (Meshy)' },
+  { key: 'meshy_texture', label: 'Textured 3D (Meshy)' },
+] as const;
+
+function getStepStatus(
+  currentStep: string,
+  stepKey: string
+): 'done' | 'active' | 'pending' | 'failed' {
+  const order = [
+    'queued',
+    'imagen_2d',
+    'imagen_2d_complete',
+    'meshy_3d',
+    'meshy_3d_complete',
+    'meshy_texture',
+    'completed',
+  ];
+  const currentIdx = order.indexOf(currentStep);
+  const stepStartMap: Record<string, number> = {
+    imagen_2d: 1,
+    meshy_3d: 3,
+    meshy_texture: 5,
+  };
+  const stepDoneMap: Record<string, number> = {
+    imagen_2d: 2,
+    meshy_3d: 4,
+    meshy_texture: 6,
+  };
+
+  if (currentStep === 'failed') return 'failed';
+  if (currentIdx >= stepDoneMap[stepKey]) return 'done';
+  if (currentIdx >= stepStartMap[stepKey]) return 'active';
+  return 'pending';
+}
+
+/** Shape of a pipeline status record from Firestore. */
+interface PipelineRecord {
+  id: string;
+  status: string;
+  currentStep?: string;
+  stepProgress?: string;
+  failureReason?: string;
+  creditsRefunded?: boolean;
+  entityId?: string;
+  [key: string]: unknown;
+}
+
+/** Pipeline status card shown when a character pipeline is running or completed. */
+function PipelineStatus({ pipelineId }: { pipelineId: string }) {
+  const queryClient = useQueryClient();
+  const { data: pipeline } = useQuery({
+    queryKey: ['character-pipeline', pipelineId],
+    queryFn: async () => {
+      const result = await trpcClient.characterPipeline.getStatus.query({ pipelineId });
+      return result as PipelineRecord | null;
+    },
+    refetchInterval: (query) => {
+      const status = (query.state.data as PipelineRecord | null)?.status;
+      if (status === 'running') return 3000;
+      // When pipeline completes, refresh media attachments to show new assets
+      if (status === 'completed' || status === 'failed') {
+        queryClient.invalidateQueries({ queryKey: ['media-attachments'] });
+        queryClient.invalidateQueries({ queryKey: ['entity'] });
+      }
+      return false;
+    },
+  });
+
+  if (!pipeline) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Box className="w-4 h-4" />
+          Character Pipeline
+          {pipeline.status === 'running' && (
+            <Badge variant="secondary" className="text-[10px]">
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              Running
+            </Badge>
+          )}
+          {pipeline.status === 'completed' && (
+            <Badge className="text-[10px] bg-green-600">
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+              Complete
+            </Badge>
+          )}
+          {pipeline.status === 'failed' && (
+            <Badge variant="destructive" className="text-[10px]">
+              <XCircle className="w-3 h-3 mr-1" />
+              Failed
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {/* Step progress */}
+        <div className="space-y-1.5">
+          {PIPELINE_STEPS.map((step) => {
+            const status = getStepStatus(pipeline.currentStep || 'queued', step.key);
+            return (
+              <div key={step.key} className="flex items-center gap-2 text-sm">
+                {status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                {status === 'active' && (
+                  <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+                )}
+                {status === 'pending' && (
+                  <Circle className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                )}
+                {status === 'failed' && <XCircle className="w-4 h-4 text-destructive shrink-0" />}
+                <span
+                  className={
+                    status === 'active'
+                      ? 'text-primary font-medium'
+                      : status === 'done'
+                        ? 'text-muted-foreground'
+                        : 'text-muted-foreground/60'
+                  }
+                >
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Current progress message */}
+        {pipeline.stepProgress && pipeline.status === 'running' && (
+          <p className="text-xs text-muted-foreground italic">{pipeline.stepProgress}</p>
+        )}
+
+        {/* Failure reason */}
+        {pipeline.failureReason && (
+          <p className="text-xs text-destructive">{pipeline.failureReason}</p>
+        )}
+
+        {/* Credits */}
+        {pipeline.creditsRefunded && (
+          <p className="text-xs text-muted-foreground">Credits refunded due to failure.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function EntityPage() {
   const { id } = Route.useParams();
   const { address } = useAccount();
@@ -108,6 +277,8 @@ function EntityPage() {
   const [generating, setGenerating] = useState(false);
   const [showMusicPanel, setShowMusicPanel] = useState(false);
   const [collaborativeMode, setCollaborativeMode] = useState(false);
+  const [launchingPipeline, setLaunchingPipeline] = useState(false);
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
 
   const {
     data: entity,
@@ -119,6 +290,23 @@ function EntityPage() {
   });
 
   const { data: mediaAttachments = [] } = useMediaAttachments('entity', id);
+
+  // Check if this entity has an active/completed pipeline
+  const { data: pipelineHistory } = useQuery({
+    queryKey: ['character-pipeline-history', id],
+    queryFn: async () => {
+      const history = await trpcClient.characterPipeline.history.query({ limit: 5 });
+      return history.filter((p: any) => p.entityId === id);
+    },
+    enabled: !!entity && PIPELINE_ELIGIBLE_KINDS.includes(entity.kind),
+  });
+
+  // Auto-set pipelineId from history if we don't have one from this session
+  useEffect(() => {
+    if (!pipelineId && pipelineHistory?.length) {
+      setPipelineId((pipelineHistory[0] as any).id);
+    }
+  }, [pipelineHistory, pipelineId]);
 
   if (isLoading) {
     return (
@@ -171,6 +359,34 @@ function EntityPage() {
       setGenerating(false);
     }
   };
+
+  const handleLaunchPipeline = async () => {
+    if (!entity) return;
+    setLaunchingPipeline(true);
+    try {
+      const result = await trpcClient.characterPipeline.launch.mutate({
+        name: entity.name,
+        description: entity.description || `A ${entity.kind} character`,
+        kind: entity.kind as any,
+        universeAddress: entity.universeAddress || undefined,
+        metadata: (entity.metadata as Record<string, string>) || undefined,
+        characterStyle: 'realistic',
+        artStyle: 'realistic',
+      });
+      setPipelineId(result.pipelineId);
+      toast.success(`Character pipeline started! ${result.creditsCharged} credits charged.`);
+      // Refresh entity data as the pipeline will update imageUrl
+      queryClient.invalidateQueries({ queryKey: ['entity', id] });
+      queryClient.invalidateQueries({ queryKey: ['media-attachments', 'entity', id] });
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to launch pipeline');
+    } finally {
+      setLaunchingPipeline(false);
+    }
+  };
+
+  const isPipelineEligible = entity && PIPELINE_ELIGIBLE_KINDS.includes(entity.kind);
+  const hasPipeline = !!pipelineId;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -252,7 +468,22 @@ function EntityPage() {
               <Card>
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <CardTitle className="text-2xl">{entity.name}</CardTitle>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    {isOwner && isPipelineEligible && !hasPipeline && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleLaunchPipeline}
+                        disabled={launchingPipeline}
+                      >
+                        {launchingPipeline ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Wand2 className="w-4 h-4 mr-2" />
+                        )}
+                        {launchingPipeline ? 'Starting...' : 'Generate 3D Character'}
+                      </Button>
+                    )}
                     {isOwner && (
                       <Button
                         variant="outline"
@@ -308,6 +539,9 @@ function EntityPage() {
               )}
             </>
           )}
+
+          {/* Character pipeline status */}
+          {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}
 
           {(mediaAttachments.length > 0 || isOwner) && (
             <Card>

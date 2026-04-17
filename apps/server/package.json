@@ -15,26 +15,25 @@
     "node": ">=20"
   },
   "dependencies": {
-    "c2pa-node": "^0.32.0",
     "@fal-ai/serverless-client": "^0.15.0",
     "@google/generative-ai": "^0.24.1",
     "@hono/node-server": "^1.19.11",
-    "@sentry/node": "^9.0.0",
     "@hono/trpc-server": "^0.4.0",
+    "@sentry/node": "^9.0.0",
     "@trpc/client": "^11.7.0",
     "@trpc/server": "^11.7.0",
+    "bullmq": "^5.74.1",
+    "c2pa-node": "^0.5.26",
     "dotenv": "^17.2.1",
     "firebase-admin": "^13.0.0",
     "formdata-node": "^6.0.3",
     "hono": "^4.8.2",
+    "ioredis": "^5.6.1",
     "jose": "^6.2.2",
     "openai": "^6.3.0",
     "pinata": "^2.5.5",
     "viem": "~2.47.6",
     "zod": "^4.0.2"
-  },
-  "optionalDependencies": {
-    "ioredis": "^5.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

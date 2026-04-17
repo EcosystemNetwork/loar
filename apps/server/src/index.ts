@@ -479,6 +479,10 @@ app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 
+// ── Job status SSE (real-time generation progress) ───────────────────
+const { jobStatusRouter } = await import('./routes/job-status');
+app.route('/api/jobs', jobStatusRouter);
+
 // ── SSE: Real-time collaboration stream ──────────────────────────────
 app.get('/api/collaboration/stream/:entityId', async (c) => {
   const entityId = c.req.param('entityId');
@@ -627,12 +631,34 @@ app.get('/health', async (c) => {
 
   const redisHealthy = await isRedisHealthy();
 
-  const checks = {
+  const checks: Record<string, string> = {
     firebase: firebaseAvailable ? 'ok' : 'degraded',
     redis: process.env.REDIS_URL ? (redisHealthy ? 'ok' : 'degraded') : 'not_configured',
   };
 
-  const status = Object.values(checks).every((v) => v === 'ok' || v === 'not_configured')
+  // Queue metrics (if Redis is configured)
+  let queueMetrics: any = null;
+  let circuitBreakers: any = null;
+  if (process.env.REDIS_URL) {
+    try {
+      const { getQueueMetrics } = await import('./lib/queue');
+      queueMetrics = await getQueueMetrics();
+      checks.queue = queueMetrics.healthy ? 'ok' : 'degraded';
+    } catch {
+      checks.queue = 'not_initialized';
+    }
+
+    try {
+      const { getAllCircuitStates } = await import('./lib/circuit-breaker');
+      circuitBreakers = await getAllCircuitStates();
+    } catch {
+      // Not initialized yet
+    }
+  }
+
+  const status = Object.values(checks).every(
+    (v) => v === 'ok' || v === 'not_configured' || v === 'not_initialized'
+  )
     ? 'healthy'
     : 'degraded';
 
@@ -645,18 +671,44 @@ app.get('/health', async (c) => {
     env: env.NODE_ENV,
     checks,
     pricing: getPricingStatus(),
+    ...(queueMetrics ? { queue: queueMetrics } : {}),
+    ...(circuitBreakers && Object.keys(circuitBreakers).length > 0 ? { circuitBreakers } : {}),
   });
 });
+
+// ── Start generation worker (in-process, if Redis configured) ─────────
+if (process.env.REDIS_URL) {
+  import('./workers/generation.worker')
+    .then(({ startGenerationWorker }) => {
+      const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
+      startGenerationWorker(concurrency);
+    })
+    .catch((err) => console.warn('[worker] Failed to start generation worker:', err));
+}
 
 // ── Graceful shutdown ──────────────────────────────────────────────────
 async function gracefulShutdown(signal: string) {
   console.log(`\n[server] Received ${signal} — shutting down gracefully...`);
+  const shutdownOps: Promise<void>[] = [];
+
   try {
     const { shutdownRedis } = await import('./lib/redis');
-    await shutdownRedis();
-  } catch (err) {
-    console.warn('[server] Error during Redis shutdown:', err);
+    shutdownOps.push(shutdownRedis());
+  } catch {}
+
+  if (process.env.REDIS_URL) {
+    try {
+      const { stopGenerationWorker } = await import('./workers/generation.worker');
+      shutdownOps.push(stopGenerationWorker());
+    } catch {}
+
+    try {
+      const { shutdownQueues } = await import('./lib/queue');
+      shutdownOps.push(shutdownQueues());
+    } catch {}
   }
+
+  await Promise.allSettled(shutdownOps);
   process.exit(0);
 }
 

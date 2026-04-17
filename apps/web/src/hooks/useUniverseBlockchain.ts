@@ -43,6 +43,10 @@ export interface UseUniverseBlockchainReturn {
   isLoadingCanonChain: boolean;
   isLoadingAny: boolean;
 
+  // Error states
+  isError: boolean;
+  graphError: Error | null;
+
   // Refetch functions
   refetchLeaves: () => Promise<any>;
   refetchFullGraph: () => Promise<any>;
@@ -190,6 +194,8 @@ export function useUniverseBlockchain({
   const {
     data: fullGraphData,
     isLoading: isLoadingFullGraph,
+    isError: isGraphError,
+    error: graphFetchError,
     refetch: refetchFullGraph,
   } = useUniverseFullGraph(contractAddress);
   const {
@@ -275,6 +281,8 @@ export function useUniverseBlockchain({
     isLoadingFullGraph,
     isLoadingCanonChain,
     isLoadingAny,
+    isError: isGraphError,
+    graphError: graphFetchError ?? null,
     refetchLeaves,
     refetchFullGraph,
     refetchCanonChain,

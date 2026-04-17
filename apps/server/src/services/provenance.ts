@@ -111,8 +111,8 @@ export async function signWithProvenance(
     const c2paInstance = createC2pa({
       signer: {
         type: 'local',
-        certificate: signingConfig.certificate,
-        privateKey: signingConfig.privateKey,
+        certificate: Buffer.from(signingConfig.certificate),
+        privateKey: Buffer.from(signingConfig.privateKey),
         algorithm: SigningAlgorithm.ES256,
         tsaUrl: 'http://timestamp.digicert.com',
       },
@@ -124,7 +124,7 @@ export async function signWithProvenance(
         buffer,
         mimeType,
       },
-      manifest: manifestDefinition,
+      manifest: manifestDefinition as any,
     });
 
     console.log(

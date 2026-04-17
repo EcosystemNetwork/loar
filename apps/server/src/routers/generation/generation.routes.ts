@@ -351,7 +351,7 @@ async function persistVideoToStorage(opts: {
     // Fetch the video, sign with C2PA provenance, then upload
     const response = await fetch(opts.videoUrl);
     const arrayBuf = await response.arrayBuffer();
-    let videoBuffer = Buffer.from(new Uint8Array(arrayBuf));
+    let videoBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
 
     // Sign with C2PA content provenance metadata
     videoBuffer = await signWithProvenance(videoBuffer, filename, {
@@ -753,11 +753,16 @@ export const generationRouter = router({
       }
 
       // ── Build initial record ────────────────────────────────────────
-      const record: VideoGenerationRecord & { entityId?: string; originalPrompt?: string } = {
+      const record: VideoGenerationRecord & {
+        entityId?: string;
+        originalPrompt?: string;
+        imageUrl?: string;
+      } = {
         id: generationId,
         userId: ctx.user.uid,
         ...(input.entityId ? { entityId: input.entityId } : {}),
         ...(input.universeId ? { universeId: input.universeId } : {}),
+        ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
         routingMode: input.routingMode,
         ...(requestedModelId ? { requestedModelId } : {}),
         finalModelId,
@@ -831,7 +836,88 @@ export const generationRouter = router({
         }
       }
 
-      // ── Generate ────────────────────────────────────────────────────
+      // ── Admission control ────────────────────────────────────────────
+      // Check if queue can accept new jobs (prevents overload)
+      let useQueue = !!process.env.REDIS_URL;
+      if (useQueue) {
+        try {
+          const { checkAdmission } = await import('../../lib/queue');
+          const admission = await checkAdmission();
+          if (!admission.allowed) {
+            // Refund credits before rejecting
+            if (creditsCharged > 0) {
+              await userCreditsRef.update({
+                balance: FieldValue.increment(creditsCharged),
+                totalSpent: FieldValue.increment(-creditsCharged),
+                updatedAt: new Date(),
+              });
+            }
+            await generationsCol().doc(generationId).update({
+              status: 'failed',
+              failureReason: admission.reason,
+              completedAt: new Date(),
+            });
+            throw new TRPCError({
+              code: 'TOO_MANY_REQUESTS',
+              message: admission.reason || 'Server at capacity. Please try again shortly.',
+            });
+          }
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          // Queue check failed — fall back to inline processing
+          useQueue = false;
+        }
+      }
+
+      // ── Enqueue or inline generate ─────────────────────────────────
+      if (useQueue) {
+        // Async queue-based generation: return immediately, client uses SSE to watch progress
+        try {
+          const { getGenerationQueue } = await import('../../lib/queue');
+          const queue = getGenerationQueue();
+
+          await queue.add(
+            generationId,
+            {
+              generationId,
+              userId: ctx.user.uid,
+              input: { ...input },
+              finalModelId,
+              provider: model.provider,
+              creditsCharged,
+              fiatPriceUsd,
+              loarPriceUsd,
+              providerCostUsd,
+              reasonCode,
+              originalPrompt,
+              resolvedCastUrls,
+              genConfig,
+            },
+            { jobId: generationId }
+          );
+
+          return {
+            generationId,
+            status: 'queued' as const,
+            modelUsed: finalModelId,
+            modelDisplayName: model.displayName,
+            routingMode: input.routingMode,
+            reasonCode,
+            creditsCharged,
+            fiatPriceUsd,
+            wasFallback: false,
+            originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
+            // Client should subscribe to /api/jobs/{generationId}/stream for real-time updates
+            streamUrl: `/api/jobs/${generationId}/stream`,
+          };
+        } catch (queueErr) {
+          // Queue add failed — fall back to inline
+          console.warn('[generation] Queue unavailable, falling back to inline:', queueErr);
+          useQueue = false;
+        }
+      }
+
+      // ── Inline fallback (no Redis / queue failure) ─────────────────
       try {
         record.status = 'running';
         await generationsCol().doc(generationId).update({ status: 'running' });
@@ -841,14 +927,11 @@ export const generationRouter = router({
         const latencyMs = Date.now() - startTime;
 
         if (result.status === 'failed' || result.error || !result.videoUrl) {
-          // Mark provider unhealthy on failure
           markProviderUnhealthy(model.provider);
 
-          // Attempt fallback in auto mode
           if (input.routingMode === 'auto' && input.allowFallback) {
             const fallbackResult = await attemptFallback(input, model.id, generationId);
             if (fallbackResult) {
-              // Update record with fallback info
               await generationsCol()
                 .doc(generationId)
                 .update({
@@ -859,7 +942,6 @@ export const generationRouter = router({
                   completedAt: new Date(),
                 });
 
-              // Auto-attach fallback video to entity
               autoAttachVideo({
                 creator: ctx.user.uid,
                 entityId: input.entityId,
@@ -868,7 +950,6 @@ export const generationRouter = router({
                 prompt: originalPrompt,
               });
 
-              // Fire-and-forget: persist to permanent storage
               persistVideoToStorage({
                 generationId,
                 videoUrl: fallbackResult.videoUrl,
@@ -877,7 +958,6 @@ export const generationRouter = router({
                 prompt: originalPrompt,
               }).catch(() => {});
 
-              // Auto-publish fallback video to gallery
               autoPublishVideoToGallery({
                 creatorUid: ctx.user.uid,
                 videoUrl: fallbackResult.videoUrl,
@@ -908,7 +988,6 @@ export const generationRouter = router({
             }
           }
 
-          // No fallback or manual mode — fail
           await generationsCol().doc(generationId).update({
             status: 'failed',
             failureReason: result.error,
@@ -919,10 +998,8 @@ export const generationRouter = router({
           throw new Error(result.error || 'Video generation failed');
         }
 
-        // Success — mark provider healthy + track quests
         markProviderHealthy(model.provider);
 
-        // Fire-and-forget quest tracking
         trackQuests(ctx.user.uid, [
           { questId: 'first_generation' },
           { questId: 'daily_generation' },
@@ -939,7 +1016,6 @@ export const generationRouter = router({
           completedAt: new Date(),
         });
 
-        // Auto-attach video to entity
         autoAttachVideo({
           creator: ctx.user.uid,
           entityId: input.entityId,
@@ -948,16 +1024,14 @@ export const generationRouter = router({
           prompt: originalPrompt,
         });
 
-        // Fire-and-forget: persist to permanent storage (Pinata/IPFS)
         persistVideoToStorage({
           generationId,
           videoUrl: result.videoUrl!,
           userId: ctx.user.uid,
           modelId: finalModelId,
           prompt: originalPrompt,
-        }).catch(() => {}); // swallow — non-blocking
+        }).catch(() => {});
 
-        // Auto-publish video to gallery
         autoPublishVideoToGallery({
           creatorUid: ctx.user.uid,
           videoUrl: result.videoUrl!,
@@ -985,7 +1059,6 @@ export const generationRouter = router({
         const latencyMs = Date.now() - startTime;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        // Refund credits atomically on failure
         if (creditsCharged > 0) {
           try {
             await userCreditsRef.update({
@@ -993,7 +1066,6 @@ export const generationRouter = router({
               totalSpent: FieldValue.increment(-creditsCharged),
               updatedAt: new Date(),
             });
-            console.log(`Refunded ${creditsCharged} credits to ${ctx.user.uid}`);
           } catch (refundErr) {
             console.error(
               `CRITICAL: Credit refund failed for user ${ctx.user.uid}, ${creditsCharged} credits:`,
@@ -1065,6 +1137,66 @@ export const generationRouter = router({
 
       const snapshot = await query.get();
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }),
+
+  /**
+   * Public gallery of all completed video generations.
+   * Returns items shaped like content feed entries so the frontend can
+   * merge them with the content.feed results and de-duplicate by generationId.
+   */
+  gallery: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const snapshot = await generationsCol().where('status', '==', 'completed').limit(1000).get();
+
+      let items = snapshot.docs
+        .map((doc) => {
+          const d = doc.data();
+          if (!d.videoUrl) return null;
+          const createdAt = d.createdAt?.toDate?.()?.toISOString?.() ?? null;
+          return {
+            id: `gen:${doc.id}`,
+            generationId: doc.id,
+            title: (d.originalPrompt || d.prompt || '').slice(0, 100) || 'Generated Video',
+            description: d.originalPrompt || d.prompt || '',
+            mediaUrl: d.permanentVideoUrl || d.videoUrl,
+            thumbnailUrl: (d.imageUrl as string) || null,
+            mediaType: 'ai-video' as const,
+            format: null as string | null,
+            classification: 'original' as const,
+            tags: [] as string[],
+            creatorUid: d.userId || '',
+            views: 0,
+            likes: 0,
+            createdAt,
+            _createdAtMs: d.createdAt?.toMillis?.() ?? 0,
+            generationModel: d.finalModelId || d.model || null,
+          };
+        })
+        .filter(Boolean) as any[];
+
+      // Sort by creation time descending
+      items.sort((a: any, b: any) => (b._createdAtMs ?? 0) - (a._createdAtMs ?? 0));
+
+      // Cursor-based pagination
+      let startIdx = 0;
+      if (input.cursor) {
+        const idx = items.findIndex((i: any) => i.id === input.cursor);
+        if (idx >= 0) startIdx = idx + 1;
+      }
+
+      const page = items.slice(startIdx, startIdx + input.limit + 1);
+      const hasMore = page.length > input.limit;
+
+      return {
+        items: page.slice(0, input.limit).map(({ _createdAtMs, ...rest }: any) => rest),
+        nextCursor: hasMore ? page[input.limit - 1]?.id : null,
+      };
     }),
 
   // ── Admin Endpoints ───────────────────────────────────────────────
@@ -1214,6 +1346,97 @@ export const generationRouter = router({
           totalCreditsCharged: totalCreditsCharged,
         },
         modelStats: modelStats.sort((a, b) => b.count - a.count),
+      };
+    }),
+
+  /**
+   * Admin: Backfill gallery — scan all completed videoGenerations that have no
+   * corresponding content doc and create one for each.
+   */
+  adminBackfillGallery: adminProcedure
+    .input(
+      z
+        .object({
+          dryRun: z.boolean().default(false),
+        })
+        .optional()
+    )
+    .mutation(async ({ input }) => {
+      const dryRun = input?.dryRun ?? false;
+
+      // 1. Fetch all completed generations with a videoUrl
+      const genSnap = await generationsCol().where('status', '==', 'completed').get();
+
+      const completedGens = genSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as any)
+        .filter((g: any) => g.videoUrl);
+
+      if (completedGens.length === 0) {
+        return { created: 0, total: 0, dryRun };
+      }
+
+      // 2. Fetch all content docs that already have a generationId or matching URL
+      const contentSnap = await contentCol().get();
+      const existingGenIds = new Set<string>();
+      const existingUrls = new Set<string>();
+      for (const doc of contentSnap.docs) {
+        const data = doc.data();
+        if (data.generationId) existingGenIds.add(data.generationId);
+        if (data.mediaUrl) existingUrls.add(data.mediaUrl);
+      }
+
+      // 3. Find generations missing from content
+      const missing = completedGens.filter(
+        (g: any) => !existingGenIds.has(g.id) && !existingUrls.has(g.videoUrl)
+      );
+
+      if (dryRun) {
+        return { created: 0, wouldCreate: missing.length, total: completedGens.length, dryRun };
+      }
+
+      // 4. Batch-create content entries
+      let created = 0;
+      const BATCH_SIZE = 400;
+      for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+        const batch = db.batch();
+        const chunk = missing.slice(i, i + BATCH_SIZE);
+        for (const gen of chunk) {
+          const ref = contentCol().doc();
+          const createdAt = gen.createdAt?.toDate?.() ?? gen.createdAt ?? new Date();
+          batch.set(ref, {
+            title: (gen.originalPrompt || gen.prompt || '').slice(0, 100) || 'Generated Video',
+            description: gen.originalPrompt || gen.prompt || '',
+            mediaUrl: gen.permanentVideoUrl || gen.videoUrl,
+            thumbnailUrl: gen.imageUrl || null,
+            mediaType: 'ai-video',
+            classification: 'original',
+            tags: [],
+            ipDeclaration: {
+              isOriginal: true,
+              usesCopyrightedMaterial: false,
+              license: 'all-rights-reserved',
+            },
+            visibility: 'public',
+            creatorUid: gen.userId,
+            ...(gen.universeId ? { universeId: gen.universeId } : {}),
+            createdAt,
+            updatedAt: createdAt,
+            views: 0,
+            likes: 0,
+            reviewStatus: 'not_required',
+            generationId: gen.id,
+            generationModel: gen.finalModelId || gen.model || null,
+          });
+          created++;
+        }
+        await batch.commit();
+      }
+
+      return {
+        created,
+        total: completedGens.length,
+        alreadyExisted: completedGens.length - missing.length,
+        dryRun,
       };
     }),
 

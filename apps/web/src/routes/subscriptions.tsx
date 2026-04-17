@@ -34,8 +34,7 @@ function SubscriptionsPage() {
   const qc = useQueryClient();
 
   const cancelMutation = useMutation({
-    mutationFn: (subscriptionId: string) =>
-      trpcClient.subscriptions.cancel.mutate({ subscriptionId }),
+    mutationFn: (universeId: string) => trpcClient.subscriptions.cancel.mutate({ universeId }),
     onSuccess: () => {
       toast.success('Subscription cancelled successfully.');
       qc.invalidateQueries({ queryKey: ['my-subs'] });
@@ -45,12 +44,12 @@ function SubscriptionsPage() {
     },
   });
 
-  function handleCancel(subscriptionId: string, universeName: string) {
+  function handleCancel(universeId: string, universeName: string) {
     const confirmed = window.confirm(
       `Are you sure you want to cancel your subscription to "${universeName}"? This action cannot be undone.`
     );
     if (confirmed) {
-      cancelMutation.mutate(subscriptionId);
+      cancelMutation.mutate(universeId);
     }
   }
 
@@ -160,7 +159,12 @@ function SubscriptionsPage() {
                       size="sm"
                       className="w-full border-zinc-600 text-zinc-300 hover:bg-red-900/30 hover:border-red-700 hover:text-red-300"
                       disabled={cancelMutation.isPending}
-                      onClick={() => handleCancel(sub.id, sub.universeName || sub.universeAddress)}
+                      onClick={() =>
+                        handleCancel(
+                          sub.universeAddress || sub.id,
+                          sub.universeName || sub.universeAddress
+                        )
+                      }
                     >
                       {cancelMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

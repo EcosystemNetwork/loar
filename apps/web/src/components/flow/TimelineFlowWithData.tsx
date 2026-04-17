@@ -13,7 +13,7 @@ import type { Node, Edge } from 'reactflow';
 import { MarkerType } from 'reactflow';
 import { TimelineFlowEditor } from './TimelineFlowEditor';
 import type { TimelineNodeData } from './TimelineNodes';
-import { useGetFullGraph } from '@/hooks/useTimeline';
+import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 
 export function TimelineFlowWithData({
   universeId,
@@ -37,48 +37,44 @@ export function TimelineFlowWithData({
   const [isLoading, setIsLoading] = useState(true);
   const { isConnected } = useAccount();
 
-  // Use the hook to get the full graph data from the blockchain
-  // Pass the timeline address if it's a blockchain universe
-  const {
-    data: graphData,
-    isLoading: isLoadingGraph,
-    isError,
-  } = useGetFullGraph(universeId?.startsWith('0x') ? universeId : timelineAddress);
+  const isBlockchainUniverse = !!universeId?.startsWith('0x');
+  const contractAddress = isBlockchainUniverse ? universeId : timelineAddress;
 
-  // Process the graph data from the blockchain into ReactFlow nodes and edges
+  // Fetch graph data with Ponder-resolved content (URLs + descriptions)
+  const { graphData, isLoadingAny: isLoadingGraph } = useUniverseBlockchain({
+    universeId,
+    contractAddress,
+    isBlockchainUniverse,
+  });
+
+  const isError = !isLoadingGraph && !graphData.nodeIds.length && !!contractAddress;
+
+  // Process the resolved graph data into ReactFlow nodes and edges
   useEffect(() => {
-    if (!isConnected || isLoadingGraph || !graphData) {
+    if (!isConnected || isLoadingGraph || !graphData.nodeIds.length) {
       return;
     }
 
     try {
       setIsLoading(true);
 
-      // Extract data from the blockchain response
-      const [ids, links, plots, previousIds, nextIds, canonFlags] = graphData;
-
-      // Create nodes for ReactFlow
       const nodes: Node<TimelineNodeData>[] = [];
       const edges: Edge[] = [];
 
-      // Process each node from the blockchain data
-      for (let i = 0; i < ids.length; i++) {
-        const id = Number(ids[i]);
-        const videoUrl = String(links[i]);
-        const plot = String(plots[i]);
-        const previousId = Number(previousIds[i]);
-        const isCanon = Boolean(canonFlags[i]);
+      for (let i = 0; i < graphData.nodeIds.length; i++) {
+        const id = Number(graphData.nodeIds[i]);
+        const videoUrl = String(graphData.urls[i] || '');
+        const plot = String(graphData.descriptions[i] || '');
+        const previousId = Number(graphData.previousNodes[i]);
+        const isCanon = Boolean(graphData.flags[i]);
 
         // Skip empty nodes (id === 0)
         if (id === 0) continue;
 
-        // Create a node for the graph
         const newNode: Node<TimelineNodeData> = {
           id: `node-${id}`,
           type: 'timelineEvent',
           position: {
-            // Position nodes in a tree-like structure
-            // This is a simple layout algorithm that will be improved
             x: (id % 3) * 300,
             y: Math.floor(id / 3) * 200,
           },
@@ -95,7 +91,6 @@ export function TimelineFlowWithData({
 
         nodes.push(newNode);
 
-        // Create an edge if this node has a previous node
         if (previousId > 0) {
           const newEdge: Edge = {
             id: `edge-node-${previousId}-node-${id}`,

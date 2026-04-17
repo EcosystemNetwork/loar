@@ -385,6 +385,7 @@ export const contentRouter = router({
             classification: data.classification,
             tags: data.tags || [],
             creatorUid: data.creatorUid,
+            generationId: data.generationId || null,
             views: data.views || 0,
             likes: data.likes || 0,
             createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,

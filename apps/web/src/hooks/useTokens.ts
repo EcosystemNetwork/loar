@@ -12,6 +12,7 @@ import {
   type Swap,
   type TokenHolder,
 } from '@/utils/ponder-api';
+import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
 
 // ─── List all launched tokens ──────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function useSwapHistory(poolId: string | undefined, limit = 50) {
     },
     enabled: !!poolId,
     ...ponderQueryDefaults,
-    refetchInterval: 15_000, // Poll every 15s for live activity
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
   });
 }
 
@@ -362,7 +363,7 @@ export function useTokenListData() {
       return data.swaps?.items ?? [];
     },
     ...ponderQueryDefaults,
-    refetchInterval: 10_000,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
   });
 
   // Fetch all holder records to count per token

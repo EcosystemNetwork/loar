@@ -56,8 +56,13 @@ const envSchema = z.object({
     .regex(/^0x[0-9a-fA-F]{40}$/, 'TREASURY_ADDRESS must be a valid Ethereum address')
     .optional(),
 
-  // ── Redis (optional — enables distributed rate limiting) ──────────────────
+  // ── Redis (required for production — rate limiting, job queue, circuit breakers) ──
   REDIS_URL: z.string().url('REDIS_URL must be a valid URL (redis://...)').optional(),
+
+  // ── Scaling ─────────────────────────────────────────────────────────────
+  MAX_CONCURRENT_GENERATIONS: z.string().default('50'),
+  MAX_QUEUED_GENERATIONS: z.string().default('200'),
+  WORKER_CONCURRENCY: z.string().default('5'),
 
   // ── Stripe (optional — enables card payments) ────────────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -171,6 +176,13 @@ export function validateEnv(): Env {
     if (!env.ADMIN_ADDRESSES && !env.ADMIN_WALLET) {
       prodErrors.push(
         'At least one of ADMIN_ADDRESSES or ADMIN_WALLET must be set in production for admin authorization'
+      );
+    }
+
+    if (!env.REDIS_URL) {
+      console.warn(
+        '⚠️  REDIS_URL is not set — rate limiting, job queues, and circuit breakers will use in-memory fallbacks. ' +
+          'This means no horizontal scaling and data loss on restart. Set REDIS_URL for production.'
       );
     }
 

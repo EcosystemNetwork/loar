@@ -364,6 +364,23 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     },
   });
 
+  // On-chain $LOAR token balance
+  const { data: onChainLoarRaw } = useReadContract({
+    address: LOAR_TOKEN_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: {
+      enabled:
+        !!address &&
+        !!LOAR_TOKEN_ADDRESS &&
+        LOAR_TOKEN_ADDRESS !== '0x0000000000000000000000000000000000000000',
+      refetchInterval: 15000,
+    },
+  });
+  const onChainLoar =
+    onChainLoarRaw != null ? Number(formatUnits(onChainLoarRaw as bigint, 18)) : 0;
+
   const pkgs = (packages || []) as CreditPackage[];
 
   // ── Faucet state ───────────────────────────────────────────────────
@@ -428,10 +445,16 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-white">Buy Credits</h2>
-          <p className="text-xs text-zinc-400">
-            Current balance:{' '}
-            <span className="text-amber-400 font-bold">{balance?.balance || 0} credits</span>
-          </p>
+          <div className="flex items-center gap-3 text-xs text-zinc-400 mt-0.5">
+            <span>
+              <span className="text-emerald-400 font-bold">{onChainLoar.toLocaleString()}</span>{' '}
+              $LOAR
+            </span>
+            <span className="text-zinc-600">|</span>
+            <span>
+              <span className="text-amber-400 font-bold">{balance?.balance || 0}</span> credits
+            </span>
+          </div>
         </div>
         {onClose && (
           <button onClick={onClose} className="text-zinc-400 hover:text-white text-sm">
@@ -588,64 +611,71 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
               Connect your wallet to purchase credits
             </p>
           ) : paymentTab === 'loar' ? (
-            <button
-              disabled={isPaying}
-              onClick={async () => {
-                const pkg = pkgs.find((p) => p.id === selectedPkg);
-                if (!pkg) return;
-                setIsPaying(true);
-                try {
-                  const loarAmount = parseUnits(pkg.loarTokenAmount.toString(), 18);
+            <div className="space-y-2">
+              {/* Pay with on-chain $LOAR tokens */}
+              <button
+                disabled={isPaying}
+                onClick={async () => {
+                  const pkg = pkgs.find((p) => p.id === selectedPkg);
+                  if (!pkg) return;
+                  setIsPaying(true);
+                  try {
+                    const loarAmount = parseUnits(pkg.loarTokenAmount.toString(), 18);
 
-                  // Pre-check: verify user has enough $LOAR balance
-                  if (address && publicClient) {
-                    const balance = (await publicClient.readContract({
+                    // Pre-check: verify user has enough on-chain $LOAR
+                    if (address && publicClient) {
+                      const onChainBalance = (await publicClient.readContract({
+                        address: LOAR_TOKEN_ADDRESS,
+                        abi: ERC20_ABI,
+                        functionName: 'balanceOf',
+                        args: [address],
+                      })) as bigint;
+                      if (onChainBalance < loarAmount) {
+                        const have = formatUnits(onChainBalance, 18);
+                        const need = pkg.loarTokenAmount.toLocaleString();
+                        toast.error(
+                          `Insufficient on-chain $LOAR. You have ${Number(have).toLocaleString()} tokens but need ${need}. Use the faucet or pay with your LOAR balance above.`
+                        );
+                        setIsPaying(false);
+                        return;
+                      }
+                    }
+
+                    toast.info('Confirm $LOAR transfer in your wallet...');
+                    const txHash = await writeContractAsync({
                       address: LOAR_TOKEN_ADDRESS,
                       abi: ERC20_ABI,
-                      functionName: 'balanceOf',
-                      args: [address],
-                    })) as bigint;
-                    if (balance < loarAmount) {
-                      const have = formatUnits(balance, 18);
-                      const need = pkg.loarTokenAmount.toLocaleString();
-                      toast.error(
-                        `Insufficient $LOAR balance. You have ${Number(have).toLocaleString()} but need ${need} $LOAR.`
-                      );
-                      setIsPaying(false);
-                      return;
+                      functionName: 'transfer',
+                      args: [TREASURY_ADDRESS, loarAmount],
+                    });
+                    toast.info('$LOAR sent! Confirming credits...');
+                    await purchaseLoarMutation.mutateAsync({
+                      packageId: pkg.id,
+                      txHash,
+                      loarAmount: loarAmount.toString(),
+                      chainId,
+                    });
+                  } catch (err) {
+                    if (err instanceof Error && !err.message.includes('rejected')) {
+                      const msg = err.message;
+                      if (msg.includes('ERC20InsufficientBalance') || msg.includes('e450d38c')) {
+                        toast.error(
+                          'Insufficient on-chain $LOAR. Use the faucet or pay with your LOAR balance.'
+                        );
+                      } else {
+                        toast.error('$LOAR payment failed: ' + msg);
+                      }
                     }
+                    setIsPaying(false);
                   }
-
-                  toast.info('Confirm $LOAR transfer in your wallet...');
-                  const txHash = await writeContractAsync({
-                    address: LOAR_TOKEN_ADDRESS,
-                    abi: ERC20_ABI,
-                    functionName: 'transfer',
-                    args: [TREASURY_ADDRESS, loarAmount],
-                  });
-                  toast.info('$LOAR sent! Confirming credits...');
-                  await purchaseLoarMutation.mutateAsync({
-                    packageId: pkg.id,
-                    txHash,
-                    loarAmount: loarAmount.toString(),
-                    chainId,
-                  });
-                } catch (err) {
-                  if (err instanceof Error && !err.message.includes('rejected')) {
-                    const msg = err.message;
-                    if (msg.includes('ERC20InsufficientBalance') || msg.includes('e450d38c')) {
-                      toast.error('Insufficient $LOAR balance. Please acquire more tokens first.');
-                    } else {
-                      toast.error('$LOAR payment failed: ' + msg);
-                    }
-                  }
-                  setIsPaying(false);
-                }
-              }}
-              className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
-            >
-              {isPaying ? 'Processing...' : 'Pay with $LOAR'}
-            </button>
+                }}
+                className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+              >
+                {isPaying
+                  ? 'Processing...'
+                  : `Pay with $LOAR (${onChainLoar.toLocaleString()} available)`}
+              </button>
+            </div>
           ) : paymentTab === 'card' ? (
             (() => {
               const pkg = pkgs.find((p) => p.id === selectedPkg);

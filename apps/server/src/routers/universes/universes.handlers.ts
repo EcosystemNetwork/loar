@@ -64,14 +64,32 @@ export async function createUniverse(input: CreateUniverseInput) {
 
     await collection().doc(id).set(data);
 
-    await seedUniverseCreditPool(id, input.creator, input.mintTxHash);
-    await seedPrivateSectionConfig(id);
+    // Seeding failures are logged but must not silently break the onboarding flow.
+    // Surface errors so callers know credits/config may need manual intervention.
+    const seedingErrors: string[] = [];
+
+    try {
+      await seedUniverseCreditPool(id, input.creator, input.mintTxHash);
+    } catch (err) {
+      console.error(`[createUniverse] Credit seeding failed for ${id}:`, err);
+      seedingErrors.push('credit_pool');
+    }
+
+    try {
+      await seedPrivateSectionConfig(id);
+    } catch (err) {
+      console.error(`[createUniverse] Private section config failed for ${id}:`, err);
+      seedingErrors.push('private_section');
+    }
 
     return {
       success: true,
       data: { id, ...data },
-      message: 'Universe created successfully',
-      mintCreditsAwarded: UNIVERSE_MINT_CREDITS,
+      message: seedingErrors.length
+        ? `Universe created but seeding failed for: ${seedingErrors.join(', ')}`
+        : 'Universe created successfully',
+      mintCreditsAwarded: seedingErrors.includes('credit_pool') ? 0 : UNIVERSE_MINT_CREDITS,
+      seedingErrors: seedingErrors.length ? seedingErrors : undefined,
     };
   } catch (error) {
     console.error('Error creating universe:', error);
@@ -144,23 +162,19 @@ export async function getUniversesByCreator(creator: string) {
 // ── Internal: seed private section config for Creator's Room ─────────────
 
 async function seedPrivateSectionConfig(universeId: string) {
-  try {
-    const configRef = db.collection('privateSectionConfig').doc(universeId);
-    const existing = await configRef.get();
-    if (existing.exists) return;
+  const configRef = db.collection('privateSectionConfig').doc(universeId);
+  const existing = await configRef.get();
+  if (existing.exists) return;
 
-    const now = new Date();
-    await configRef.set({
-      universeId,
-      vaultEnabled: true,
-      notesEnabled: true,
-      holderMinPercentage: 1, // default 1% token ownership for vault access
-      createdAt: now,
-      updatedAt: now,
-    });
-  } catch (err) {
-    console.error(`[seedPrivateSectionConfig] Failed for ${universeId}:`, err);
-  }
+  const now = new Date();
+  await configRef.set({
+    universeId,
+    vaultEnabled: true,
+    notesEnabled: true,
+    holderMinPercentage: 1, // default 1% token ownership for vault access
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 // ── Internal: seed universe credit pool from mint fee ────────────────────
@@ -170,20 +184,22 @@ async function seedUniverseCreditPool(
   creatorUid: string,
   mintTxHash?: string | null
 ) {
-  try {
-    const poolRef = db.collection('universeCredits').doc(universeId);
-    const existing = await poolRef.get();
+  const poolRef = db.collection('universeCredits').doc(universeId);
+
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(poolRef);
 
     if (
       existing.exists &&
       (existing.data()?.seedTxHash === mintTxHash || existing.data()?.balance > 0)
     ) {
-      return;
+      return; // Already seeded
     }
 
     const now = new Date();
 
-    await poolRef.set(
+    tx.set(
+      poolRef,
       {
         universeId,
         balance: UNIVERSE_MINT_CREDITS,
@@ -198,7 +214,8 @@ async function seedUniverseCreditPool(
       { merge: true }
     );
 
-    await db.collection('universeCreditTransactions').add({
+    const txRef = db.collection('universeCreditTransactions').doc();
+    tx.set(txRef, {
       id: randomUUID(),
       universeId,
       type: 'fund',
@@ -211,7 +228,5 @@ async function seedUniverseCreditPool(
       note: '50% of 0.05 ETH universe mint fee converted to team credits',
       createdAt: now,
     });
-  } catch (err) {
-    console.error(`[seedUniverseCreditPool] Failed to seed credits for ${universeId}:`, err);
-  }
+  });
 }

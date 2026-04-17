@@ -36,7 +36,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { trpcClient } from '@/utils/trpc';
-import { useGetFullGraph } from '@/hooks/useTimeline';
+import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 import { useCreateEpisodeListing } from '@/hooks/useRevenue';
 import { keccak256, toBytes } from 'viem';
 import { SegmentPlayer } from '@/components/segments/SegmentPlayer';
@@ -53,64 +53,48 @@ function EventPage() {
   const navigate = useNavigate();
 
   const isBlockchainUniverse = universeId?.startsWith('0x');
+  const contractAddress = isBlockchainUniverse ? universeId : undefined;
 
-  // Fetch blockchain graph data to get event details
-  const { data: graphData, isLoading: isLoadingGraph } = useGetFullGraph(
-    isBlockchainUniverse ? universeId : undefined
-  );
+  // Fetch blockchain graph data with Ponder-resolved content (URLs + descriptions)
+  const { graphData, isLoadingAny: isLoadingGraph } = useUniverseBlockchain({
+    universeId,
+    contractAddress,
+    isBlockchainUniverse: !!isBlockchainUniverse,
+  });
+
+  // Helper to normalize node IDs to numbers
+  const toNumericId = (id: string | number | bigint): number =>
+    typeof id === 'bigint' ? Number(id) : typeof id === 'number' ? id : parseInt(String(id));
 
   // Find the event in the graph
-  const eventIndex = graphData
-    ? graphData[0]?.findIndex((id: any) => {
-        const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
-        return numericId === parseInt(eventId);
-      })
-    : -1;
+  const eventIndex =
+    graphData.nodeIds.length > 0
+      ? graphData.nodeIds.findIndex((id) => toNumericId(id) === parseInt(eventId))
+      : -1;
 
-  const eventVideoUrl = eventIndex !== -1 ? String(graphData?.[1]?.[eventIndex] || '') : '';
-  const rawDescription = eventIndex !== -1 ? graphData?.[2]?.[eventIndex] : '';
+  const eventVideoUrl = eventIndex !== -1 ? String(graphData.urls[eventIndex] || '') : '';
   const eventDescription =
-    typeof rawDescription === 'object' && rawDescription !== null && 'description' in rawDescription
-      ? String((rawDescription as any).description)
-      : String(rawDescription || '');
+    eventIndex !== -1 ? String(graphData.descriptions[eventIndex] || '') : '';
 
   // Find previous event (the parent node)
-  const previousNodeId = eventIndex !== -1 ? graphData?.[3]?.[eventIndex] : null;
+  const previousNodeId = eventIndex !== -1 ? graphData.previousNodes[eventIndex] : null;
   const previousEventId =
-    previousNodeId && String(previousNodeId) !== '0'
-      ? typeof previousNodeId === 'bigint'
-        ? Number(previousNodeId)
-        : parseInt(String(previousNodeId))
-      : null;
+    previousNodeId && String(previousNodeId) !== '0' ? toNumericId(previousNodeId) : null;
 
-  // Find next events (all children of this node)
+  // Find next events (all nodes whose parent is this node)
   const nextEventIds: number[] = [];
   const nextEventData: Array<{ id: number; videoUrl: string; description: string }> = [];
-  if (graphData && eventIndex !== -1) {
-    const currentNodeId = graphData[0][eventIndex];
-    const currentId =
-      typeof currentNodeId === 'bigint' ? Number(currentNodeId) : parseInt(String(currentNodeId));
+  if (graphData.nodeIds.length > 0 && eventIndex !== -1) {
+    const currentId = toNumericId(graphData.nodeIds[eventIndex]);
 
-    // Find all nodes that have this node as their parent
-    graphData[3]?.forEach((parentId: any, idx: number) => {
-      const parentNumeric =
-        typeof parentId === 'bigint' ? Number(parentId) : parseInt(String(parentId));
-      if (parentNumeric === currentId) {
-        const childId = graphData[0][idx];
-        const childNumeric =
-          typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
+    graphData.previousNodes.forEach((parentId, idx) => {
+      if (toNumericId(parentId) === currentId) {
+        const childNumeric = toNumericId(graphData.nodeIds[idx]);
         nextEventIds.push(childNumeric);
-
-        const rawDesc = graphData[2]?.[idx];
-        const description =
-          typeof rawDesc === 'object' && rawDesc !== null && 'description' in rawDesc
-            ? String((rawDesc as any).description)
-            : String(rawDesc || `Event ${childNumeric}`);
-
         nextEventData.push({
           id: childNumeric,
-          videoUrl: String(graphData[1]?.[idx] || ''),
-          description,
+          videoUrl: String(graphData.urls[idx] || ''),
+          description: String(graphData.descriptions[idx] || `Event ${childNumeric}`),
         });
       }
     });
@@ -118,22 +102,13 @@ function EventPage() {
 
   // Get previous event data
   let previousEventData: { id: number; videoUrl: string; description: string } | null = null;
-  if (previousEventId && graphData) {
-    const prevIndex = graphData[0]?.findIndex((id: any) => {
-      const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
-      return numericId === previousEventId;
-    });
+  if (previousEventId && graphData.nodeIds.length > 0) {
+    const prevIndex = graphData.nodeIds.findIndex((id) => toNumericId(id) === previousEventId);
     if (prevIndex !== -1) {
-      const rawPrevDesc = graphData[2]?.[prevIndex];
-      const prevDescription =
-        typeof rawPrevDesc === 'object' && rawPrevDesc !== null && 'description' in rawPrevDesc
-          ? String((rawPrevDesc as any).description)
-          : String(rawPrevDesc || `Event ${previousEventId}`);
-
       previousEventData = {
         id: previousEventId,
-        videoUrl: String(graphData[1]?.[prevIndex] || ''),
-        description: prevDescription,
+        videoUrl: String(graphData.urls[prevIndex] || ''),
+        description: String(graphData.descriptions[prevIndex] || `Event ${previousEventId}`),
       };
     }
   }
@@ -314,9 +289,13 @@ function EventPage() {
 
   // Build connected node chain for "Play Timeline" (walks previous→current→next)
   const timelineChain: VideoSegment[] = [];
-  if (graphData) {
+  if (graphData.nodeIds.length > 0) {
     // Collect chain: previous → current → next events
     const chainNodeIds: number[] = [];
+
+    // Helper to find index of a node by numeric ID
+    const findNodeIndex = (targetId: number) =>
+      graphData.nodeIds.findIndex((id) => toNumericId(id) === targetId);
 
     // Walk backwards from current to find root
     let walkId = parseInt(eventId);
@@ -324,14 +303,11 @@ function EventPage() {
     while (walkId && !visited.has(walkId)) {
       visited.add(walkId);
       chainNodeIds.unshift(walkId);
-      const idx = graphData[0]?.findIndex((id: any) => {
-        const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
-        return numericId === walkId;
-      });
-      if (idx === -1 || idx === undefined) break;
-      const prevId = graphData[3]?.[idx];
+      const idx = findNodeIndex(walkId);
+      if (idx === -1) break;
+      const prevId = graphData.previousNodes[idx];
       if (!prevId || String(prevId) === '0') break;
-      walkId = typeof prevId === 'bigint' ? Number(prevId) : parseInt(String(prevId));
+      walkId = toNumericId(prevId);
     }
 
     // Walk forward from current following first child
@@ -341,13 +317,10 @@ function EventPage() {
     while (true) {
       // Find first child of walkId
       let foundChild: number | null = null;
-      graphData[3]?.forEach((parentId: any, idx: number) => {
+      graphData.previousNodes.forEach((parentId, idx) => {
         if (foundChild) return;
-        const parentNumeric =
-          typeof parentId === 'bigint' ? Number(parentId) : parseInt(String(parentId));
-        if (parentNumeric === walkId) {
-          const childId = graphData[0][idx];
-          foundChild = typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
+        if (toNumericId(parentId) === walkId) {
+          foundChild = toNumericId(graphData.nodeIds[idx]);
         }
       });
       if (!foundChild || visited.has(foundChild)) break;
@@ -358,19 +331,12 @@ function EventPage() {
 
     // Convert chain node IDs to segments
     for (const nodeId of chainNodeIds) {
-      const idx = graphData[0]?.findIndex((id: any) => {
-        const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
-        return numericId === nodeId;
-      });
-      if (idx === -1 || idx === undefined) continue;
-      const url = String(graphData[1]?.[idx] || '');
+      const idx = findNodeIndex(nodeId);
+      if (idx === -1) continue;
+      const url = String(graphData.urls[idx] || '');
       if (!url || url.startsWith('0x')) continue;
 
-      const rawDesc = graphData[2]?.[idx];
-      const desc =
-        typeof rawDesc === 'object' && rawDesc !== null && 'description' in rawDesc
-          ? String((rawDesc as any).description)
-          : String(rawDesc || `Event ${nodeId}`);
+      const desc = String(graphData.descriptions[idx] || `Event ${nodeId}`);
 
       timelineChain.push({
         id: `chain-${nodeId}`,

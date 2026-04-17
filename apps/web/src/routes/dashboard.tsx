@@ -1,66 +1,47 @@
 /**
  * Dashboard — Creator command center.
  *
- * Real data from: portfolio.summary, credits.getBalance, revenue.getDashboard,
- * staking.getProfile, useTokenListData, useMyNFTs.
- * Replaces the old static layout with a data-driven, responsive dashboard.
+ * Focused layout: stats → actions → your stuff.
+ * Heavy features (upload, AI gen, full works manager, LP yield) live on dedicated pages.
  */
 
 import { createFileRoute, redirect, Link as RouterLink } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Play,
-  Users,
   Plus,
   Wand2,
   Film,
   Rocket,
   TrendingUp,
-  Upload,
-  Search,
-  Grid3x3,
-  List,
-  Trash2,
-  Eye,
-  EyeOff,
   Globe,
-  Image as ImageIcon,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   Coins,
-  Wallet,
   BarChart3,
-  Zap,
   Crown,
   ArrowUpRight,
   ArrowDownRight,
-  ExternalLink,
   ShoppingBag,
   Activity,
-  Star,
   Bell,
   BookOpen,
   Paintbrush,
   Video,
+  Sparkles,
+  FolderOpen,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GenerativeMedia } from '@/components/GenerativeMedia';
+import { useQuery } from '@tanstack/react-query';
 import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
-import { UploadForm } from '@/components/UploadForm';
 import { useCreditBalance, useMyNFTs } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
-import { LPYieldManager } from '@/components/LPYieldManager';
-import { toast } from 'sonner';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 
 export const Route = createFileRoute('/dashboard')({
   beforeLoad: ({ context }) => {
@@ -75,7 +56,7 @@ function RouteComponent() {
   const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = Route.useNavigate();
 
-  // ── Real data hooks ─────────────────────────────────────────────────
+  // ── Data hooks ──────────────────────────────────────────────────────
   const { data: creditData } = useCreditBalance();
   const { data: myNfts } = useMyNFTs();
   const { data: tokenList } = useTokenListData();
@@ -107,26 +88,18 @@ function RouteComponent() {
     enabled: !!address,
   });
 
-  const { data: allUniverses, isLoading: isLoadingAll } = useQuery({
-    queryKey: ['all-universes'],
-    queryFn: () => trpcClient.universes.getAll.query(),
+  // Recent works — just the latest 6 for a preview
+  const { data: recentWorksData } = useQuery({
+    queryKey: ['dashboard-recent-works'],
+    queryFn: () => trpcClient.content.myContent.query({ limit: 6 }),
+    enabled: isAuthenticated,
   });
-
-  const isLoading = isLoadingMine || isLoadingAll;
 
   const selectUniverse = (universeId: string) => {
     navigate({ to: '/universe/$id', params: { id: universeId } });
   };
 
-  if (isAuthenticating || !isConnected) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (isLoading) {
+  if (isAuthenticating || !isConnected || isLoadingMine) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -135,16 +108,12 @@ function RouteComponent() {
   }
 
   const myUniverseList: any[] = (myUniverses as any)?.data ?? [];
-  const allUniverseList: any[] = (allUniverses as any)?.data ?? [];
-  const otherUniverses = allUniverseList.filter(
-    (u: any) => !myUniverseList.some((m: any) => m.id === u.id)
-  );
+  const recentWorks: any[] = (recentWorksData as any)?.items ?? [];
 
   // Derived stats
   const creditBalance = creditData?.balance ?? 0;
   const totalSpent = creditData?.totalSpent ?? 0;
   const revenue30d = (revenueData as any)?.totalEarned30d ?? 0;
-  const revenueBySource = (revenueData as any)?.bySource ?? {};
   const revenueTxCount = (revenueData as any)?.transactionCount30d ?? 0;
   const stakingTier = (stakingProfile as any)?.tier ?? 'NONE';
   const stakedAmount = (stakingProfile as any)?.stakedAmount ?? 0;
@@ -154,7 +123,7 @@ function RouteComponent() {
   const episodesListed = myNfts?.createdEpisodes?.length ?? 0;
   const nftsCollected = myNfts?.mintedEpisodes?.length ?? 0;
 
-  // Token portfolio — user's deployed tokens
+  // Token portfolio
   const myTokens = useMemo(() => {
     if (!tokenList?.length || !address) return [];
     return tokenList.filter(
@@ -167,9 +136,13 @@ function RouteComponent() {
     0
   );
 
+  // Is this a brand-new user with nothing yet?
+  const isNewUser =
+    myUniverseList.length === 0 && recentWorks.length === 0 && myTokens.length === 0;
+
   return (
     <div className="min-h-screen bg-background">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="border-b bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -185,10 +158,10 @@ function RouteComponent() {
               <p className="text-sm text-muted-foreground">Your creator command center</p>
             </div>
             <div className="flex items-center gap-2">
-              <RouterLink to="/tokens">
+              <RouterLink to="/sandbox">
                 <Button variant="outline" size="sm" className="gap-1.5">
-                  <Rocket className="h-3.5 w-3.5" />
-                  Launchpad
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Sandbox
                 </Button>
               </RouterLink>
               <RouterLink to="/create">
@@ -203,83 +176,129 @@ function RouteComponent() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6">
-        {/* ── Main Content ──────────────────────────────────────────────── */}
+        {/* ── Main Content ─────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 space-y-8">
-          {/* ── Stats Row ──────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard
-              icon={<Coins className="h-4 w-4 text-amber-500" />}
-              label="Credits"
-              value={creditBalance.toLocaleString()}
-              sub={totalSpent > 0 ? `${totalSpent.toLocaleString()} spent` : undefined}
-              accent="amber"
-            />
-            <StatCard
-              icon={<TrendingUp className="h-4 w-4 text-green-500" />}
-              label="Revenue (30d)"
-              value={revenue30d > 0 ? `${revenue30d.toFixed(4)} ETH` : '--'}
-              sub={revenueTxCount > 0 ? `${revenueTxCount} txns` : undefined}
-              accent="green"
-            />
-            <StatCard
-              icon={<Globe className="h-4 w-4 text-blue-500" />}
-              label="Universes"
-              value={String(universesOwned)}
-              sub={myTokens.length > 0 ? `${myTokens.length} tokenized` : undefined}
-              accent="blue"
-            />
-            <StatCard
-              icon={<Film className="h-4 w-4 text-purple-500" />}
-              label="Episodes"
-              value={String(episodesListed + nftsCollected)}
-              sub={
-                episodesListed > 0 ? `${episodesListed} listed · ${nftsCollected} owned` : undefined
-              }
-              accent="purple"
-            />
-            <StatCard
-              icon={<Crown className="h-4 w-4 text-orange-500" />}
-              label="Staking"
-              value={stakingTier !== 'NONE' ? stakingTier : '--'}
-              sub={stakedAmount > 0 ? `${stakedAmount.toLocaleString()} $LOAR` : 'Not staked'}
-              accent="orange"
-            />
-            <StatCard
-              icon={<ShoppingBag className="h-4 w-4 text-pink-500" />}
-              label="Collectibles"
-              value={String(totalCollectibles)}
-              sub={activeSubscriptions > 0 ? `${activeSubscriptions} subs` : undefined}
-              accent="pink"
-            />
-          </div>
+          {/* ── New User Onboarding ───────────────────────────────── */}
+          {isNewUser && (
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-purple-500/5">
+              <CardContent className="py-10 flex flex-col items-center gap-4 text-center">
+                <div className="p-3 rounded-full bg-primary/10">
+                  <Wand2 className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold mb-1">Start creating</h2>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Generate images and videos in the Sandbox, or create a Universe to build a full
+                    narrative world with characters, episodes, and governance.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <RouterLink to="/sandbox">
+                    <Button variant="outline" className="gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Open Sandbox
+                    </Button>
+                  </RouterLink>
+                  <RouterLink to="/create">
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Universe
+                    </Button>
+                  </RouterLink>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* ── Quick Actions ────────────────────────────────────────── */}
+          {/* ── Stats ─────────────────────────────────────────────── */}
+          {!isNewUser && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <StatCard
+                icon={<Coins className="h-4 w-4 text-amber-500" />}
+                label="Credits"
+                value={creditBalance.toLocaleString()}
+                sub={totalSpent > 0 ? `${totalSpent.toLocaleString()} spent` : undefined}
+                accent="amber"
+              />
+              <StatCard
+                icon={<TrendingUp className="h-4 w-4 text-green-500" />}
+                label="Revenue (30d)"
+                value={revenue30d > 0 ? `${revenue30d.toFixed(4)} ETH` : '--'}
+                sub={revenueTxCount > 0 ? `${revenueTxCount} txns` : undefined}
+                accent="green"
+              />
+              <StatCard
+                icon={<Globe className="h-4 w-4 text-blue-500" />}
+                label="Universes"
+                value={String(universesOwned)}
+                sub={myTokens.length > 0 ? `${myTokens.length} tokenized` : undefined}
+                accent="blue"
+              />
+              <StatCard
+                icon={<Film className="h-4 w-4 text-purple-500" />}
+                label="Episodes"
+                value={String(episodesListed + nftsCollected)}
+                sub={
+                  episodesListed > 0
+                    ? `${episodesListed} listed · ${nftsCollected} owned`
+                    : undefined
+                }
+                accent="purple"
+              />
+              <StatCard
+                icon={<Crown className="h-4 w-4 text-orange-500" />}
+                label="Staking"
+                value={stakingTier !== 'NONE' ? stakingTier : '--'}
+                sub={stakedAmount > 0 ? `${stakedAmount.toLocaleString()} $LOAR` : 'Not staked'}
+                accent="orange"
+              />
+              <StatCard
+                icon={<ShoppingBag className="h-4 w-4 text-pink-500" />}
+                label="Collectibles"
+                value={String(totalCollectibles)}
+                sub={activeSubscriptions > 0 ? `${activeSubscriptions} subs` : undefined}
+                accent="pink"
+              />
+            </div>
+          )}
+
+          {/* ── Quick Actions ─────────────────────────────────────── */}
           <section>
             <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
               Quick Actions
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <RouterLink to="/sandbox">
+                <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Sandbox" />
+              </RouterLink>
               <RouterLink to="/create">
                 <QuickAction icon={<Plus className="h-4 w-4" />} label="New Universe" />
               </RouterLink>
               <RouterLink to="/create/$kind" params={{ kind: 'person' }}>
                 <QuickAction icon={<Paintbrush className="h-4 w-4" />} label="New Character" />
               </RouterLink>
-              <RouterLink to="/videos">
-                <QuickAction icon={<Video className="h-4 w-4" />} label="Generate Video" />
-              </RouterLink>
-              <RouterLink to="/wiki">
-                <QuickAction icon={<BookOpen className="h-4 w-4" />} label="Browse Wiki" />
+              <RouterLink to="/my-works">
+                <QuickAction icon={<FolderOpen className="h-4 w-4" />} label="My Works" />
               </RouterLink>
             </div>
           </section>
 
-          {/* ── Revenue Breakdown (only if has revenue) ─────────────────── */}
-          {revenue30d > 0 && Object.keys(revenueBySource).length > 0 && (
-            <RevenueBreakdown bySource={revenueBySource} total={revenue30d} />
+          {/* ── Your Universes ────────────────────────────────────── */}
+          {myUniverseList.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">Your Universes</h2>
+                  <Badge variant="outline" className="text-xs">
+                    {myUniverseList.length}
+                  </Badge>
+                </div>
+              </div>
+              <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
+            </section>
           )}
 
-          {/* ── Token Portfolio (only if has deployed tokens) ───────────── */}
+          {/* ── Your Tokens (only if has deployed tokens) ─────────── */}
           {myTokens.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
@@ -308,112 +327,56 @@ function RouteComponent() {
             </section>
           )}
 
-          {/* ── Your Universes ─────────────────────────────────────────── */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Your Universes</h2>
-              {myUniverseList.length > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {myUniverseList.length}
-                </Badge>
-              )}
-            </div>
-            {myUniverseList.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="text-center py-12">
-                  <Globe className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="font-medium mb-1">No universes yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create your first narrative universe to start building
+          {/* ── Recent Works (compact preview) ────────────────────── */}
+          {recentWorks.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Recent Works</h2>
+                <RouterLink to="/my-works">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    View All <ArrowUpRight className="h-3 w-3" />
+                  </Button>
+                </RouterLink>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {recentWorks.slice(0, 6).map((item: any) => (
+                  <RecentWorkCard key={item.id} item={item} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Recent Activity ───────────────────────────────────── */}
+          <ActivityFeedWidget />
+        </div>
+
+        {/* ── Sidebar ─────────────────────────────────────────────── */}
+        <aside className="hidden lg:block w-80 flex-shrink-0">
+          <div className="sticky top-20 space-y-4">
+            {/* Credits quick-glance for new users */}
+            {isNewUser && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Coins className="h-4 w-4 text-amber-500" />
+                      <span className="text-sm font-semibold">Credits</span>
+                    </div>
+                    <span className="text-lg font-bold tabular-nums">
+                      {creditBalance.toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Credits are used for AI generation. Free models cost 0 credits.
                   </p>
-                  <RouterLink to="/create">
-                    <Button className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Create Universe
+                  <RouterLink to="/pricing">
+                    <Button variant="outline" size="sm" className="w-full mt-3 text-xs">
+                      Get More Credits
                     </Button>
                   </RouterLink>
                 </CardContent>
               </Card>
-            ) : (
-              <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
             )}
-          </section>
-
-          {/* ── LP Yield Management ────────────────────────────────────── */}
-          {myUniverseList.filter(
-            (u: any) =>
-              u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000'
-          ).length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="h-5 w-5" />
-                <h2 className="text-lg font-semibold">LP Yield & Fees</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {myUniverseList
-                  .filter(
-                    (u: any) =>
-                      u.tokenAddress &&
-                      u.tokenAddress !== '0x0000000000000000000000000000000000000000'
-                  )
-                  .map((u: any) => (
-                    <LPYieldManager
-                      key={u.id}
-                      tokenAddress={u.tokenAddress as `0x${string}`}
-                      universeName={u.name || 'Unnamed Universe'}
-                      onChainUniverseId={
-                        u.onChainUniverseId != null ? Number(u.onChainUniverseId) : undefined
-                      }
-                    />
-                  ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Upload ─────────────────────────────────────────────────── */}
-          <UploadSection />
-
-          {/* ── My Works ───────────────────────────────────────────────── */}
-          <MyWorksSection />
-
-          {/* ── AI Media Generation ────────────────────────────────────── */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Wand2 className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">AI Media Generation</h2>
-              {creditBalance > 0 && (
-                <Badge variant="outline" className="text-xs ml-auto">
-                  {creditBalance.toLocaleString()} credits available
-                </Badge>
-              )}
-            </div>
-            <GenerativeMedia />
-          </section>
-
-          {/* ── Recent Activity Feed ──────────────────────────────────── */}
-          <ActivityFeedWidget />
-
-          {/* ── Explore Other Universes ─────────────────────────────────── */}
-          {otherUniverses.length > 0 && (
-            <section>
-              <h2 className="text-lg font-semibold mb-4">Explore Universes</h2>
-              <UniverseGrid universes={otherUniverses.slice(0, 8)} onSelect={selectUniverse} />
-              {otherUniverses.length > 8 && (
-                <div className="text-center mt-4">
-                  <RouterLink to="/">
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      View All <ArrowUpRight className="h-3 w-3" />
-                    </Button>
-                  </RouterLink>
-                </div>
-              )}
-            </section>
-          )}
-        </div>
-
-        {/* ── Sidebar ──────────────────────────────────────────────────── */}
-        <aside className="hidden lg:block w-80 flex-shrink-0">
-          <div className="sticky top-20 space-y-4">
             <NotificationsWidget />
             <DailyCheckin />
             <QuestsPanel />
@@ -452,72 +415,6 @@ function StatCard({
         {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
       </CardContent>
     </Card>
-  );
-}
-
-// ─── Revenue Breakdown ───────────────────────────────────────────────
-
-const SOURCE_LABELS: Record<string, { label: string; icon: string }> = {
-  nft_sales: { label: 'NFT Sales', icon: '🎬' },
-  subscriptions: { label: 'Subscriptions', icon: '👥' },
-  credits: { label: 'Credits', icon: '⚡' },
-  licensing: { label: 'IP Licensing', icon: '📜' },
-  canon_royalties: { label: 'Canon Royalties', icon: '🗳️' },
-  ads: { label: 'Ad Revenue', icon: '📢' },
-  appearance_fees: { label: 'Appearance Fees', icon: '🧬' },
-  merch: { label: 'Merch', icon: '🛍️' },
-  collabs: { label: 'Collabs', icon: '🤝' },
-};
-
-function RevenueBreakdown({
-  bySource,
-  total,
-}: {
-  bySource: Record<string, number>;
-  total: number;
-}) {
-  const sorted = Object.entries(bySource).sort(([, a], [, b]) => b - a);
-
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          <h2 className="text-lg font-semibold">Revenue (30d)</h2>
-        </div>
-        <span className="text-sm font-bold text-green-500 tabular-nums">
-          {total.toFixed(4)} ETH
-        </span>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-        {sorted.map(([source, amount]) => {
-          const meta = SOURCE_LABELS[source] ?? { label: source, icon: '💰' };
-          const pct = total > 0 ? (amount / total) * 100 : 0;
-          return (
-            <div
-              key={source}
-              className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
-            >
-              <span className="text-lg">{meta.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium">{meta.label}</span>
-                  <span className="text-xs font-mono tabular-nums font-semibold">
-                    {amount.toFixed(4)}
-                  </span>
-                </div>
-                <div className="h-1 bg-secondary rounded-full mt-1.5 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-green-500"
-                    style={{ width: `${Math.max(pct, 2)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -583,224 +480,9 @@ function TokenMiniCard({ token }: { token: EnrichedToken }) {
   );
 }
 
-// ─── Upload Section ──────────────────────────────────────────────────
+// ─── Recent Work Card (compact, view-only) ──────────────────────────
 
-function UploadSection() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          <h2 className="text-lg font-semibold">Upload Content</h2>
-        </div>
-        <Button
-          variant={open ? 'secondary' : 'default'}
-          size="sm"
-          className="gap-2"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <Upload className="h-4 w-4" />
-          {open ? 'Close' : 'Upload New'}
-          {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-        </Button>
-      </div>
-      {open && <UploadForm onSuccess={() => setOpen(false)} onCancel={() => setOpen(false)} />}
-    </section>
-  );
-}
-
-// ─── My Works Section ────────────────────────────────────────────────
-
-type Classification = 'all' | 'fan' | 'original' | 'licensed';
-
-const VISIBILITY_ICONS: Record<string, React.ReactNode> = {
-  public: <Globe className="h-3 w-3" />,
-  unlisted: <Eye className="h-3 w-3" />,
-  private: <EyeOff className="h-3 w-3" />,
-};
-
-const MEDIA_ICONS: Record<string, React.ReactNode> = {
-  video: <Film className="h-3 w-3" />,
-  'ai-video': <Film className="h-3 w-3" />,
-  image: <ImageIcon className="h-3 w-3" />,
-  'ai-image': <ImageIcon className="h-3 w-3" />,
-};
-
-function MyWorksSection() {
-  const { isAuthenticated } = useWalletAuth();
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [classFilter, setClassFilter] = useState<Classification>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-    queryKey: ['my-content-dashboard', classFilter],
-    queryFn: ({ pageParam }: { pageParam?: string }) =>
-      trpcClient.content.myContent.query({
-        classification: classFilter === 'all' ? undefined : classFilter,
-        limit: 24,
-        cursor: pageParam,
-      }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage: any) => lastPage.nextCursor ?? undefined,
-    enabled: isAuthenticated,
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => trpcClient.content.delete.mutate({ id }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-content-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['my-content'] });
-      toast.success('Content deleted');
-    },
-    onError: (err: any) => toast.error(err.message || 'Delete failed'),
-  });
-
-  const allItems = useMemo(() => data?.pages.flatMap((p: any) => p.items) ?? [], [data]);
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return allItems;
-    const q = search.toLowerCase();
-    return allItems.filter(
-      (item: any) =>
-        item.title?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        (Array.isArray(item.tags) && item.tags.some((t: string) => t.toLowerCase().includes(q)))
-    );
-  }, [allItems, search]);
-
-  if (!isAuthenticated) return null;
-
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold">My Works</h2>
-          {allItems.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {allItems.length} item{allItems.length !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search your works..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex items-center gap-1 bg-muted/50 rounded-md p-1">
-          {(['all', 'fan', 'original', 'licensed'] as Classification[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setClassFilter(c)}
-              className={`px-3 py-1 rounded text-xs font-medium transition-colors capitalize ${
-                classFilter === c
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1 bg-muted/50 rounded-md p-1">
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('grid')}
-            className="h-8 w-8 p-0"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('list')}
-            className="h-8 w-8 p-0"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg border-dashed">
-          <Film className="h-10 w-10 text-muted-foreground mb-3" />
-          <h3 className="font-medium mb-1">
-            {allItems.length === 0 ? 'No works yet' : 'No results'}
-          </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            {allItems.length === 0
-              ? 'Upload your first video or image to get started'
-              : 'Try a different search or filter'}
-          </p>
-        </div>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filtered.map((item: any) => (
-            <DashboardContentCard
-              key={item.id}
-              item={item}
-              onDelete={() => deleteMutation.mutate(item.id)}
-              deleting={deleteMutation.isPending && deleteMutation.variables === item.id}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((item: any) => (
-            <DashboardContentRow
-              key={item.id}
-              item={item}
-              onDelete={() => deleteMutation.mutate(item.id)}
-              deleting={deleteMutation.isPending && deleteMutation.variables === item.id}
-            />
-          ))}
-        </div>
-      )}
-
-      {hasNextPage && (
-        <div className="flex justify-center mt-6">
-          <Button
-            variant="outline"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-            className="gap-2"
-          >
-            {isFetchingNextPage && <Loader2 className="h-4 w-4 animate-spin" />}
-            Load More
-          </Button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ─── Content Cards ───────────────────────────────────────────────────
-
-function DashboardContentCard({
-  item,
-  onDelete,
-  deleting,
-}: {
-  item: any;
-  onDelete: () => void;
-  deleting: boolean;
-}) {
+function RecentWorkCard({ item }: { item: any }) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
   return (
     <Card className="group overflow-hidden">
@@ -813,6 +495,7 @@ function DashboardContentCard({
             className="w-full h-full object-cover"
             muted
             loop
+            playsInline
             onMouseEnter={(e) => e.currentTarget.play()}
             onMouseLeave={(e) => {
               e.currentTarget.pause();
@@ -826,32 +509,13 @@ function DashboardContentCard({
             No preview
           </div>
         )}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <button
-            onClick={onDelete}
-            disabled={deleting}
-            className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
-            title="Delete"
-          >
-            {deleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-        <div className="absolute bottom-2 left-2">
+        <div className="absolute bottom-1.5 left-1.5">
           <ContentLaneBadge classification={item.classification} size="sm" />
         </div>
-        <div className="absolute top-2 right-2">
-          <span className="text-xs bg-black/60 text-white px-1.5 py-0.5 rounded capitalize">
-            {item.visibility}
-          </span>
-        </div>
       </div>
-      <div className="p-2.5">
+      <div className="p-2">
         <p className="text-xs font-medium line-clamp-1">{item.title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="text-[10px] text-muted-foreground mt-0.5">
           {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
         </p>
       </div>
@@ -859,72 +523,7 @@ function DashboardContentCard({
   );
 }
 
-function DashboardContentRow({
-  item,
-  onDelete,
-  deleting,
-}: {
-  item: any;
-  onDelete: () => void;
-  deleting: boolean;
-}) {
-  const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-  return (
-    <Card className="p-4">
-      <div className="flex gap-4 items-center">
-        <div className="w-28 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
-          {item.thumbnailUrl ? (
-            <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
-          ) : isVideo && item.mediaUrl ? (
-            <video src={item.mediaUrl} className="w-full h-full object-cover" muted />
-          ) : item.mediaUrl ? (
-            <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
-          ) : null}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-medium text-sm truncate">{item.title}</h3>
-            <ContentLaneBadge classification={item.classification} size="sm" />
-          </div>
-          <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-            {item.description || 'No description'}
-          </p>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 capitalize">
-              {VISIBILITY_ICONS[item.visibility]}
-              {item.visibility}
-            </span>
-            <span className="flex items-center gap-1">
-              {MEDIA_ICONS[item.mediaType]}
-              {item.mediaType}
-            </span>
-            <span>{item.views ?? 0} views</span>
-            <span>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</span>
-          </div>
-          {Array.isArray(item.tags) && item.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {item.tags.slice(0, 5).map((tag: string) => (
-                <Badge key={tag} variant="secondary" className="text-xs px-1.5 py-0">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-        <button
-          onClick={onDelete}
-          disabled={deleting}
-          className="p-2 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50 flex-shrink-0"
-          title="Delete"
-        >
-          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-// ─── Universe Grid ───────────────────────────────────────────────────
+// ─── Universe Grid ──────────────────────────────────────────────────
 
 function UniverseGrid({
   universes,

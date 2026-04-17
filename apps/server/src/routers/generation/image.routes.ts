@@ -217,7 +217,7 @@ async function persistImagesToStorage(opts: {
       // Fetch the image, sign with C2PA provenance, then upload
       const response = await fetch(url);
       const arrayBuf = await response.arrayBuffer();
-      let imageBuffer = Buffer.from(new Uint8Array(arrayBuf));
+      let imageBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
 
       imageBuffer = await signWithProvenance(imageBuffer, filename, {
         model: opts.modelId || 'unknown',

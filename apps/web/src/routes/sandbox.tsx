@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Wand2,
   Video,
@@ -47,6 +47,15 @@ export const Route = createFileRoute('/sandbox')({
 });
 
 type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3' | 'seedance' | 'seedance-fast';
+
+type BgGeneration = {
+  id: string;
+  prompt: string;
+  model: string;
+  status: 'generating' | 'done' | 'failed';
+  videoUrl?: string;
+  imageUrl?: string;
+};
 
 const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
   { value: 'seedance', label: 'Seedance 2.0', badge: 'Free' },
@@ -77,6 +86,14 @@ function SandboxPage() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
 
+  // Background generations — tracks generations the user has "moved on" from
+  const [bgGenerations, setBgGenerations] = useState<BgGeneration[]>([]);
+  const bgGenerationsRef = React.useRef<BgGeneration[]>([]);
+
+  // Track whether the user has "moved on" from the current generation
+  const [movedOn, setMovedOn] = useState(false);
+  const movedOnRef = React.useRef(false);
+
   // Image generation
   const generateImageMutation = useMutation({
     mutationFn: () =>
@@ -87,12 +104,72 @@ function SandboxPage() {
       }),
     onSuccess: (data) => {
       const url = data.imageUrl ?? null;
-      setGeneratedImageUrl(url);
-      setGeneratedVideoUrl(null);
-      if (!url) toast.error('No image returned');
+      if (movedOnRef.current) {
+        setBgGenerations((prev) => {
+          const next = prev.map((g) =>
+            g.status === 'generating'
+              ? { ...g, status: 'done' as const, imageUrl: url ?? undefined }
+              : g
+          );
+          bgGenerationsRef.current = next;
+          return next;
+        });
+        toast.success('Background image ready! Saved to drafts.', { duration: 5000 });
+        const bg = bgGenerationsRef.current.find((g) => g.status === 'generating');
+        if (bg && url) {
+          trpcClient.sandbox.saveDraft
+            .mutate({
+              title: bg.prompt.slice(0, 80),
+              prompt: bg.prompt,
+              imageUrl: url,
+              model: bg.model,
+            })
+            .then(() => queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] }))
+            .catch(() => {});
+        }
+      } else {
+        setGeneratedImageUrl(url);
+        setGeneratedVideoUrl(null);
+        if (!url) toast.error('No image returned');
+      }
     },
-    onError: (err: any) => toast.error(err.message || 'Image generation failed'),
+    onError: (err: any) => {
+      if (movedOnRef.current) {
+        setBgGenerations((prev) =>
+          prev.map((g) => (g.status === 'generating' ? { ...g, status: 'failed' as const } : g))
+        );
+        toast.error('Background image failed: ' + (err.message || 'Unknown error'));
+      } else {
+        toast.error(err.message || 'Image generation failed');
+      }
+    },
   });
+
+  // Reset form for a new generation while current one runs in the background
+  const startNew = () => {
+    const currentPrompt = prompt;
+    const currentModel = videoModel;
+    const currentImageUrl = generatedImageUrl;
+    const newBg: BgGeneration = {
+      id: Date.now().toString(),
+      prompt: currentPrompt,
+      model: currentModel,
+      status: 'generating',
+      imageUrl: currentImageUrl ?? undefined,
+    };
+    setBgGenerations((prev) => {
+      const next = [...prev, newBg];
+      bgGenerationsRef.current = next;
+      return next;
+    });
+    movedOnRef.current = true;
+    setMovedOn(true);
+    setPrompt('');
+    setTitle('');
+    setGeneratedImageUrl(null);
+    setGeneratedVideoUrl(null);
+    toast('Started fresh! Your generation is running in the background.', { duration: 3000 });
+  };
 
   // Map sandbox model IDs to registry model IDs for the unified generate endpoint
   const MODEL_REGISTRY_MAP: Record<VideoModel, { t2v: string; i2v: string }> = {
@@ -123,12 +200,49 @@ function SandboxPage() {
         aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
         audio: isSeedance, // Seedance supports native audio
       });
-      return r.videoUrl;
+      return 'videoUrl' in r ? r.videoUrl : undefined;
     },
     onSuccess: (url) => {
-      setGeneratedVideoUrl(url ?? null);
+      if (movedOnRef.current) {
+        // User started a new prompt — auto-save this as a draft in the background
+        setBgGenerations((prev) => {
+          const next = prev.map((g) =>
+            g.status === 'generating'
+              ? { ...g, status: 'done' as const, videoUrl: url ?? undefined }
+              : g
+          );
+          bgGenerationsRef.current = next;
+          return next;
+        });
+        toast.success('Background generation finished! Saved to drafts.', { duration: 5000 });
+        // Auto-save as draft
+        const bg = bgGenerationsRef.current.find((g) => g.status === 'generating');
+        if (bg) {
+          trpcClient.sandbox.saveDraft
+            .mutate({
+              title: bg.prompt.slice(0, 80),
+              prompt: bg.prompt,
+              imageUrl: bg.imageUrl ?? undefined,
+              videoUrl: url ?? undefined,
+              model: bg.model,
+            })
+            .then(() => queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] }))
+            .catch(() => {});
+        }
+      } else {
+        setGeneratedVideoUrl(url ?? null);
+      }
     },
-    onError: (err: any) => toast.error(err.message || 'Video generation failed'),
+    onError: (err: any) => {
+      if (movedOnRef.current) {
+        setBgGenerations((prev) =>
+          prev.map((g) => (g.status === 'generating' ? { ...g, status: 'failed' as const } : g))
+        );
+        toast.error('Background generation failed: ' + (err.message || 'Unknown error'));
+      } else {
+        toast.error(err.message || 'Video generation failed');
+      }
+    },
   });
 
   // Save draft
@@ -263,47 +377,73 @@ function SandboxPage() {
 
               {/* Action buttons */}
               <div className="flex gap-2">
-                <Button
-                  onClick={() => generateImageMutation.mutate()}
-                  disabled={!prompt.trim() || isGeneratingImage || isGeneratingVideo}
-                  className="flex-1"
-                >
-                  {isGeneratingImage ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                  )}
-                  {isGeneratingImage ? 'Generating…' : 'Generate Image'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => generateVideoMutation.mutate()}
-                  disabled={
-                    (!generatedImageUrl &&
-                      videoModel !== 'seedance' &&
-                      videoModel !== 'seedance-fast') ||
-                    !prompt.trim() ||
-                    isGeneratingImage ||
-                    isGeneratingVideo
-                  }
-                  title={
-                    videoModel === 'seedance' || videoModel === 'seedance-fast'
-                      ? 'Seedance supports text-to-video — no image needed'
-                      : 'Generate an image first, then animate'
-                  }
-                >
-                  {isGeneratingVideo ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Video className="h-4 w-4 mr-2" />
-                  )}
-                  {isGeneratingVideo
-                    ? 'Generating…'
-                    : generatedImageUrl
-                      ? 'Animate'
-                      : 'Generate Video'}
-                </Button>
+                {isGeneratingImage || isGeneratingVideo ? (
+                  /* While generating: show progress + Start New button */
+                  <>
+                    <Button disabled className="flex-1" variant="outline">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      {isGeneratingImage ? 'Generating image…' : `Generating video…`}
+                    </Button>
+                    <Button onClick={startNew} className="flex-1">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Start New
+                    </Button>
+                  </>
+                ) : (
+                  /* Normal state: Generate Image / Generate Video */
+                  <>
+                    <Button
+                      onClick={() => {
+                        movedOnRef.current = false;
+                        setMovedOn(false);
+                        generateImageMutation.mutate();
+                      }}
+                      disabled={!prompt.trim()}
+                      className="flex-1"
+                    >
+                      <ImageIcon className="h-4 w-4 mr-2" />
+                      Generate Image
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        movedOnRef.current = false;
+                        setMovedOn(false);
+                        generateVideoMutation.mutate();
+                      }}
+                      disabled={
+                        (!generatedImageUrl &&
+                          videoModel !== 'seedance' &&
+                          videoModel !== 'seedance-fast') ||
+                        !prompt.trim()
+                      }
+                      title={
+                        videoModel === 'seedance' || videoModel === 'seedance-fast'
+                          ? 'Seedance supports text-to-video — no image needed'
+                          : 'Generate an image first, then animate'
+                      }
+                    >
+                      <Video className="h-4 w-4 mr-2" />
+                      {generatedImageUrl ? 'Animate' : 'Generate Video'}
+                    </Button>
+                  </>
+                )}
               </div>
+
+              {/* Background generation banner */}
+              {bgGenerations.some((g) => g.status === 'generating') && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-primary">
+                    {bgGenerations.filter((g) => g.status === 'generating').length} generation
+                    {bgGenerations.filter((g) => g.status === 'generating').length > 1 ? 's' : ''}{' '}
+                    running in background
+                  </span>
+                  <span className="text-muted-foreground text-xs ml-auto">
+                    Auto-saves when done
+                  </span>
+                </div>
+              )}
 
               {/* Preview */}
               {(generatedImageUrl ||
@@ -315,6 +455,9 @@ function SandboxPage() {
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <Loader2 className="h-8 w-8 animate-spin" />
                       <p className="text-sm">Generating image…</p>
+                      <p className="text-xs text-muted-foreground/60">
+                        Click "Start New" above to begin another while this finishes
+                      </p>
                     </div>
                   )}
                   {isGeneratingVideo && (
@@ -324,7 +467,9 @@ function SandboxPage() {
                         {generatedImageUrl ? 'Animating' : 'Generating video'} with{' '}
                         {VIDEO_MODELS.find((m) => m.value === videoModel)?.label}…
                       </p>
-                      <p className="text-xs text-muted-foreground/60">This can take 1-3 minutes</p>
+                      <p className="text-xs text-muted-foreground/60">
+                        This can take 1-3 min — click "Start New" to keep creating
+                      </p>
                     </div>
                   )}
                   {!isGeneratingImage && !isGeneratingVideo && generatedVideoUrl && (

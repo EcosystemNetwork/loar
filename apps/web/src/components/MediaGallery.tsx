@@ -4,6 +4,11 @@
  *
  * Categories: images, video, music, sound, environments, 3D models, textures,
  * animations, rigs, docs, design.
+ *
+ * Rich previews:
+ *   - Images render inline as thumbnails
+ *   - 3D models (GLB) render in an interactive <model-viewer>
+ *   - Audio/music get inline playback
  */
 import { useState } from 'react';
 import {
@@ -19,6 +24,7 @@ import type {
 } from '@/hooks/useMediaAttachments';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ModelViewer } from '@/components/ModelViewer';
 import {
   ExternalLink,
   X,
@@ -33,6 +39,7 @@ import {
   Paintbrush,
   Clapperboard,
   Bone,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 const CATEGORY_ICONS: Record<MediaCategory, React.ReactNode> = {
@@ -97,6 +104,45 @@ interface AttachmentRowProps {
   detaching: boolean;
 }
 
+/** Check if an attachment is a displayable image */
+function isImage(item: MediaAttachment): boolean {
+  return item.category === 'image' || item.mimeType?.startsWith('image/');
+}
+
+/** Check if an attachment is a GLB/GLTF 3D model */
+function isGlb(item: MediaAttachment): boolean {
+  return (
+    item.mimeType === 'model/gltf-binary' ||
+    item.originalFilename?.endsWith('.glb') ||
+    item.originalFilename?.endsWith('.gltf') ||
+    false
+  );
+}
+
+/** Find the best GLB model from a list of 3D attachments (prefer textured) */
+function findBestGlb(items: MediaAttachment[]): MediaAttachment | null {
+  // Prefer textured model, then game_ready, then any GLB
+  const glbs = items.filter(isGlb);
+  return (
+    glbs.find((g) => g.label?.toLowerCase().includes('textured')) ||
+    glbs.find((g) => g.subCategory === 'game_ready') ||
+    glbs[0] ||
+    null
+  );
+}
+
+/** Find a thumbnail among sibling attachments (for 3D model poster) */
+function findThumbnail(items: MediaAttachment[], generationId: string | null): string | undefined {
+  if (!generationId) return undefined;
+  const thumb = items.find(
+    (a) =>
+      a.generationId === generationId &&
+      isImage(a) &&
+      (a.label?.toLowerCase().includes('thumbnail') || a.subCategory === 'concept_art')
+  );
+  return thumb?.url;
+}
+
 function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: AttachmentRowProps) {
   const [expanded, setExpanded] = useState(false);
   const hasVariants = variants.length > 0;
@@ -108,6 +154,16 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
     <div>
       <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border bg-card text-sm">
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Inline image thumbnail */}
+          {isImage(item) && item.url && (
+            <a href={item.url} target="_blank" rel="noreferrer" className="shrink-0">
+              <img
+                src={item.url}
+                alt={displayName}
+                className="w-12 h-12 rounded object-cover border"
+              />
+            </a>
+          )}
           {hasVariants && (
             <button
               onClick={() => setExpanded(!expanded)}
@@ -183,28 +239,39 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
               key={v.id}
               className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-md border border-dashed bg-muted/30 text-sm"
             >
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-medium truncate">
-                    {v.variantLabel ?? v.label ?? v.originalFilename}
-                  </p>
-                  {v.version > 1 && (
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">
-                      v{v.version}
-                    </Badge>
-                  )}
-                  {v.subCategory && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] px-1 py-0 text-muted-foreground"
-                    >
-                      {v.subCategory}
-                    </Badge>
+              <div className="flex items-center gap-2 min-w-0">
+                {isImage(v) && v.url && (
+                  <a href={v.url} target="_blank" rel="noreferrer" className="shrink-0">
+                    <img
+                      src={v.url}
+                      alt={v.label || v.originalFilename}
+                      className="w-8 h-8 rounded object-cover border"
+                    />
+                  </a>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-medium truncate">
+                      {v.variantLabel ?? v.label ?? v.originalFilename}
+                    </p>
+                    {v.version > 1 && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0">
+                        v{v.version}
+                      </Badge>
+                    )}
+                    {v.subCategory && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1 py-0 text-muted-foreground"
+                      >
+                        {v.subCategory}
+                      </Badge>
+                    )}
+                  </div>
+                  {formatBytes(v.size) && (
+                    <p className="text-xs text-muted-foreground">{formatBytes(v.size)}</p>
                   )}
                 </div>
-                {formatBytes(v.size) && (
-                  <p className="text-xs text-muted-foreground">{formatBytes(v.size)}</p>
-                )}
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
                 <a href={v.url} target="_blank" rel="noreferrer">
@@ -248,9 +315,81 @@ export function MediaGallery({ targetType, targetId, isOwner }: MediaGalleryProp
 
   if (Object.keys(byCategory).length === 0) return null;
 
+  // Find best GLB for the hero 3D viewer
+  const all3d = byCategory['3d'] || [];
+  const heroGlb = findBestGlb(all3d);
+  const heroThumbnail = heroGlb
+    ? findThumbnail(attachments as MediaAttachment[], heroGlb.generationId)
+    : undefined;
+
+  // Collect all images for a visual gallery strip
+  const allImages = (byCategory['image'] || []).filter((a) => a.url);
+
   return (
     <div className="space-y-4">
+      {/* Hero image strip — show all attached images as a visual grid */}
+      {allImages.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 text-muted-foreground">
+            {CATEGORY_ICONS['image']}
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              {CATEGORY_LABELS['image']}
+            </span>
+            <span className="text-xs text-muted-foreground/60">({allImages.length})</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {allImages.map((img) => (
+              <a
+                key={img.id}
+                href={img.url}
+                target="_blank"
+                rel="noreferrer"
+                className="group relative aspect-square rounded-lg overflow-hidden border bg-muted/30 hover:ring-2 hover:ring-primary transition-all"
+              >
+                <img
+                  src={img.url}
+                  alt={img.label || img.originalFilename}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-white text-xs truncate">{img.label || img.originalFilename}</p>
+                  {img.subCategory && (
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 mt-0.5">
+                      {img.subCategory}
+                    </Badge>
+                  )}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hero 3D model viewer — interactive GLB preview */}
+      {heroGlb && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 text-muted-foreground">
+            {CATEGORY_ICONS['3d']}
+            <span className="text-xs font-semibold uppercase tracking-wider">3D Model Preview</span>
+          </div>
+          <ModelViewer
+            src={heroGlb.url}
+            poster={heroThumbnail}
+            alt={heroGlb.label || '3D Model'}
+            className="aspect-square max-h-[400px]"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            {heroGlb.label || heroGlb.originalFilename}
+            {heroGlb.subCategory && ` — ${heroGlb.subCategory}`}
+          </p>
+        </div>
+      )}
+
+      {/* Remaining categories as file lists (skip image since we rendered the grid above) */}
       {CATEGORY_ORDER.map((cat) => {
+        // Images already rendered as grid above
+        if (cat === 'image') return null;
+
         const items = byCategory[cat];
         if (!items || items.length === 0) return null;
 

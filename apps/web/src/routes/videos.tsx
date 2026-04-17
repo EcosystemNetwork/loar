@@ -94,22 +94,60 @@ function VideosPage() {
     getNextPageParam: (last: any) => last.nextCursor ?? undefined,
   });
 
+  // Fetch all completed video generations directly (catches any not in content collection)
+  const generationGalleryQuery = useInfiniteQuery({
+    queryKey: ['videos-generations', debouncedSearch],
+    queryFn: ({ pageParam }: { pageParam?: string }) =>
+      trpcClient.generation.gallery.query({
+        limit: 50,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: any) => last.nextCursor ?? undefined,
+  });
+
   const shortItems = shortQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
   const longItems = longQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
   const aiVideoItems = aiVideoQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
   const rawVideoItems = rawVideoQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
+  const generationItems = generationGalleryQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
 
   // Collect IDs already shown in short/long sections
   const shortIds = new Set(shortItems.map((i: any) => i.id));
   const longIds = new Set(longItems.map((i: any) => i.id));
   const categorizedIds = new Set([...shortIds, ...longIds]);
 
+  // Also collect generationIds from content items to de-duplicate against generation gallery
+  const contentGenIds = new Set(
+    [...shortItems, ...longItems, ...aiVideoItems, ...rawVideoItems]
+      .map((i: any) => i.generationId)
+      .filter(Boolean)
+  );
+  const contentMediaUrls = new Set(
+    [...shortItems, ...longItems, ...aiVideoItems, ...rawVideoItems]
+      .map((i: any) => i.mediaUrl)
+      .filter(Boolean)
+  );
+
+  // Filter generation gallery items that aren't already in content feed
+  const extraFromGenerations = generationItems.filter(
+    (g: any) =>
+      !contentGenIds.has(g.generationId) &&
+      !contentMediaUrls.has(g.mediaUrl) &&
+      (!debouncedSearch ||
+        g.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        g.description?.toLowerCase().includes(debouncedSearch.toLowerCase()))
+  );
+
   // Videos without a format (most sandbox promotions) go into short-form display
   const unformatted = [...aiVideoItems, ...rawVideoItems].filter(
     (i: any) => !i.format && !categorizedIds.has(i.id)
   );
-  const displayShort = [...shortItems, ...unformatted];
-  const displayLong = longItems;
+
+  // Only show videos that have a cover image (thumbnailUrl)
+  const hasCover = (i: any) => !!i.thumbnailUrl;
+  const displayShort = [...shortItems, ...unformatted, ...extraFromGenerations].filter(hasCover);
+  const displayLong = longItems.filter(hasCover);
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,7 +188,7 @@ function VideosPage() {
             count={displayShort.length}
           />
 
-          {shortQuery.isLoading || aiVideoQuery.isLoading ? (
+          {shortQuery.isLoading || aiVideoQuery.isLoading || generationGalleryQuery.isLoading ? (
             <LoadingRow />
           ) : displayShort.length === 0 ? (
             <EmptySection
@@ -348,7 +386,7 @@ function ShortCard({ item }: { item: any }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.mediaUrl}
+            src={item.thumbnailUrl ? item.mediaUrl : `${item.mediaUrl}#t=0.5`}
             className="w-full h-full object-cover"
             muted={muted}
             loop
@@ -442,7 +480,7 @@ function LongCard({ item }: { item: any }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.mediaUrl}
+            src={item.thumbnailUrl ? item.mediaUrl : `${item.mediaUrl}#t=0.5`}
             className="w-full h-full object-cover"
             muted={muted}
             loop

@@ -22,6 +22,7 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000, // 30s default — prevents refetch-on-every-mount flickering
+      refetchOnWindowFocus: false, // Prevent refetch storms when tab regains focus
       retry: (failureCount, error: any) => {
         if (error?.data?.httpStatus >= 500 && failureCount < 3) {
           return true;

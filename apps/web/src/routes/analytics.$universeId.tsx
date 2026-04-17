@@ -121,8 +121,7 @@ function AnalyticsDashboardPage() {
     error: activityError,
   } = useQuery({
     queryKey: ['recent-activity', universeId],
-    queryFn: () =>
-      trpcClient.analytics.getRecentActivity.query({ universeAddress: universeId, limit: 20 }),
+    queryFn: () => trpcClient.analytics.getRecentActivity.query({ universeId, limit: 20 }),
     enabled: !!universeId,
   });
 
@@ -132,7 +131,7 @@ function AnalyticsDashboardPage() {
     setIsExporting(true);
     try {
       const data = await trpcClient.analytics.exportUniverseData.query({
-        universeAddress: universeId,
+        universeId,
       });
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);

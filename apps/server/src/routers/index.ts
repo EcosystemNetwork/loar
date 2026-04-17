@@ -59,6 +59,7 @@ import { mediaRouter } from './media/media.routes';
 import { voiceRouter } from './generation/voice.routes';
 import { threedRouter } from './generation/threed.routes';
 import { audioRouter } from './generation/audio.routes';
+import { characterPipelineRouter } from './generation/character-pipeline.routes';
 import { collaborationRouter } from './collaboration/collaboration.routes';
 import { studioRouter } from './studio/studio.routes';
 import { governanceRouter } from './governance/governance.routes';
@@ -86,6 +87,12 @@ import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
 import { platformSubscriptionsRouter } from './platformSubscriptions/platformSubscriptions.routes';
 import { castRouter } from './cast/cast.routes';
 import { sceneControlsRouter } from './sceneControls/sceneControls.routes';
+import { pollsRouter } from './polls/polls.routes';
+import { notificationsRouter } from './notifications/notifications.routes';
+import { lipsyncRouter } from './generation/lipsync.routes';
+import { cutdownRouter } from './generation/cutdown.routes';
+import { universeStyleRouter } from './universeStyle/universeStyle.routes';
+import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -169,7 +176,10 @@ export const appRouter = router({
   voice: voiceRouter,
   audio: audioRouter,
   threed: threedRouter,
+  characterPipeline: characterPipelineRouter,
   lora: loraRouter,
+  lipsync: lipsyncRouter,
+  cutdown: cutdownRouter,
 
   // ── Studio OS ────────────────────────────────────────────────────────
   studio: studioRouter,
@@ -253,6 +263,18 @@ export const appRouter = router({
   // ── Node Editor Expansion (v1) ────────────────────────────────────
   cast: castRouter,
   sceneControls: sceneControlsRouter,
+
+  // ── Polls & Fan-Input-to-Canon ────────────────────────────────────
+  polls: pollsRouter,
+
+  // ── Notifications (push + email preferences, device tokens) ───────
+  notifications: notificationsRouter,
+
+  // ── Universe Style Locking ─────────────────────────────────────────
+  universeStyle: universeStyleRouter,
+
+  // ── Revenue Dashboard (creator analytics) ──────────────────────────
+  revenueDashboard: revenueDashboardRouter,
 });
 
 export type AppRouter = typeof appRouter;

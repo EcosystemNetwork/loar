@@ -57,6 +57,7 @@ import { Route as PlayUniverseIdRouteImport } from './routes/play/$universeId'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as LicensingNewRouteImport } from './routes/licensing/new'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
+import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CollabsNewRouteImport } from './routes/collabs/new'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
@@ -74,6 +75,7 @@ import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id
 import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
 import { Route as UniverseIdGalleryRouteImport } from './routes/universe/$id/gallery'
 import { Route as UniverseIdDeployTokenRouteImport } from './routes/universe/$id.deploy-token'
+import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$address.polls'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
@@ -317,6 +319,11 @@ const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
   path: '/governance/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRevenueRoute = DashboardRevenueRouteImport.update({
+  id: '/revenue',
+  path: '/revenue',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const CreateKindRoute = CreateKindRouteImport.update({
   id: '/create/$kind',
   path: '/create/$kind',
@@ -402,6 +409,11 @@ const UniverseIdDeployTokenRoute = UniverseIdDeployTokenRouteImport.update({
   path: '/deploy-token',
   getParentRoute: () => UniverseIdRoute,
 } as any)
+const UniverseAddressPollsRoute = UniverseAddressPollsRouteImport.update({
+  id: '/universe/$address/polls',
+  path: '/universe/$address/polls',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TokensCreatorAddressRoute = TokensCreatorAddressRouteImport.update({
   id: '/tokens/creator/$address',
   path: '/tokens/creator/$address',
@@ -420,7 +432,7 @@ export interface FileRoutesByFullPath {
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
   '/credits': typeof CreditsRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
@@ -449,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
+  '/dashboard/revenue': typeof DashboardRevenueRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/order/$id': typeof OrderIdRoute
@@ -476,6 +489,7 @@ export interface FileRoutesByFullPath {
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$address/polls': typeof UniverseAddressPollsRoute
   '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
@@ -489,7 +503,7 @@ export interface FileRoutesByTo {
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
   '/credits': typeof CreditsRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
@@ -518,6 +532,7 @@ export interface FileRoutesByTo {
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
+  '/dashboard/revenue': typeof DashboardRevenueRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/order/$id': typeof OrderIdRoute
@@ -545,6 +560,7 @@ export interface FileRoutesByTo {
   '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$address/polls': typeof UniverseAddressPollsRoute
   '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
@@ -559,7 +575,7 @@ export interface FileRoutesById {
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
   '/credits': typeof CreditsRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
@@ -588,6 +604,7 @@ export interface FileRoutesById {
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
+  '/dashboard/revenue': typeof DashboardRevenueRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/order/$id': typeof OrderIdRoute
@@ -615,6 +632,7 @@ export interface FileRoutesById {
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$address/polls': typeof UniverseAddressPollsRoute
   '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
@@ -659,6 +677,7 @@ export interface FileRouteTypes {
     | '/canon/$universeId'
     | '/collabs/new'
     | '/create/$kind'
+    | '/dashboard/revenue'
     | '/governance/$universeId'
     | '/licensing/new'
     | '/order/$id'
@@ -686,6 +705,7 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
+    | '/universe/$address/polls'
     | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
@@ -728,6 +748,7 @@ export interface FileRouteTypes {
     | '/canon/$universeId'
     | '/collabs/new'
     | '/create/$kind'
+    | '/dashboard/revenue'
     | '/governance/$universeId'
     | '/licensing/new'
     | '/order/$id'
@@ -755,6 +776,7 @@ export interface FileRouteTypes {
     | '/wiki'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
+    | '/universe/$address/polls'
     | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
@@ -797,6 +819,7 @@ export interface FileRouteTypes {
     | '/canon/$universeId'
     | '/collabs/new'
     | '/create/$kind'
+    | '/dashboard/revenue'
     | '/governance/$universeId'
     | '/licensing/new'
     | '/order/$id'
@@ -824,6 +847,7 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
+    | '/universe/$address/polls'
     | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
@@ -838,7 +862,7 @@ export interface RootRouteChildren {
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   ComingSoonRoute: typeof ComingSoonRoute
   CreditsRoute: typeof CreditsRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   DiscoverRoute: typeof DiscoverRoute
   DmcaRoute: typeof DmcaRoute
   DocsRoute: typeof DocsRoute
@@ -894,6 +918,7 @@ export interface RootRouteChildren {
   WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
+  UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
   WikiEntityIdRoute: typeof WikiEntityIdRoute
 }
@@ -1236,6 +1261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GovernanceUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/revenue': {
+      id: '/dashboard/revenue'
+      path: '/revenue'
+      fullPath: '/dashboard/revenue'
+      preLoaderRoute: typeof DashboardRevenueRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/create/$kind': {
       id: '/create/$kind'
       path: '/create/$kind'
@@ -1355,6 +1387,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdDeployTokenRouteImport
       parentRoute: typeof UniverseIdRoute
     }
+    '/universe/$address/polls': {
+      id: '/universe/$address/polls'
+      path: '/universe/$address/polls'
+      fullPath: '/universe/$address/polls'
+      preLoaderRoute: typeof UniverseAddressPollsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tokens/creator/$address': {
       id: '/tokens/creator/$address'
       path: '/tokens/creator/$address'
@@ -1371,6 +1410,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface DashboardRouteChildren {
+  DashboardRevenueRoute: typeof DashboardRevenueRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardRevenueRoute: DashboardRevenueRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
 
 interface UniverseIdRouteChildren {
   UniverseIdDeployTokenRoute: typeof UniverseIdDeployTokenRoute
@@ -1395,7 +1446,7 @@ const rootRouteChildren: RootRouteChildren = {
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   ComingSoonRoute: ComingSoonRoute,
   CreditsRoute: CreditsRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   DiscoverRoute: DiscoverRoute,
   DmcaRoute: DmcaRoute,
   DocsRoute: DocsRoute,
@@ -1451,6 +1502,7 @@ const rootRouteChildren: RootRouteChildren = {
   WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
+  UniverseAddressPollsRoute: UniverseAddressPollsRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
   WikiEntityIdRoute: WikiEntityIdRoute,
 }

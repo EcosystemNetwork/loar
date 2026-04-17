@@ -10,6 +10,7 @@ import { useReadContract, useChainId } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useActiveAccount } from 'thirdweb/react';
 import { parseEther, formatEther, type Address } from 'viem';
+import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
 
 // ── BondingCurve ABI (minimal) ───────────────────────────────────────
 
@@ -113,13 +114,14 @@ export interface CurveProgress {
 // ── Read hooks ───────────────────────────────────────────────────────
 
 export function useCurveState(bondingCurveAddress: Address | undefined) {
+  const pollInterval = useVisibilityAwareInterval(POLL_INTERVALS.REALTIME);
   const { data, isLoading, refetch } = useReadContract({
     address: bondingCurveAddress,
     abi: BONDING_CURVE_ABI,
     functionName: 'curveState',
     query: {
       enabled: !!bondingCurveAddress,
-      refetchInterval: 10_000, // poll every 10s
+      refetchInterval: pollInterval,
     },
   });
 
@@ -139,7 +141,7 @@ export function useCurveProgress(bondingCurveAddress: Address | undefined) {
     functionName: 'getProgress',
     query: {
       enabled: !!bondingCurveAddress,
-      refetchInterval: 10_000,
+      refetchInterval: pollInterval,
     },
   });
 
