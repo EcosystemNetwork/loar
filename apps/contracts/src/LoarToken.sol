@@ -95,12 +95,6 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
 
         // Track initial distribution against the permanent cap
         totalMinted = MAX_SUPPLY;
-
-        // Allow immediate first fee change by backdating the cooldown.
-        // block.timestamp >= FEE_CHANGE_COOLDOWN is guaranteed on any real chain.
-        lastFeeChangeAt = block.timestamp >= FEE_CHANGE_COOLDOWN
-            ? block.timestamp - FEE_CHANGE_COOLDOWN
-            : 0;
     }
 
     /// @notice Mint new tokens (for quest rewards, affiliate payouts, etc.)
@@ -142,7 +136,10 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     ///         Increases are rate-limited to MAX_FEE_INCREASE_PER_CHANGE per call.
     ///         Decreases are unrestricted.
     function setTransferFeeBps(uint256 newFeeBps) external onlyOwner {
-        if (block.timestamp < lastFeeChangeAt + FEE_CHANGE_COOLDOWN) revert FeeChangeCooldownActive();
+        // Skip cooldown on first-ever fee change (lastFeeChangeAt == 0 means never changed)
+        if (lastFeeChangeAt != 0 && block.timestamp < lastFeeChangeAt + FEE_CHANGE_COOLDOWN) {
+            revert FeeChangeCooldownActive();
+        }
         if (newFeeBps > MAX_TRANSFER_FEE_BPS) revert FeeTooHigh();
         if (newFeeBps > transferFeeBps && newFeeBps - transferFeeBps > MAX_FEE_INCREASE_PER_CHANGE) {
             revert FeeIncreaseExceedsLimit();

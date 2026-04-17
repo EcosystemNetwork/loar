@@ -111,6 +111,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         splitRouter = ISplitRouter(_splitRouter);
         paymentRouter = IPaymentRouter(_paymentRouter);
         platformFeeBps = _platformFeeBps;
+        nextDealId = 1; // Reserve 0 as sentinel for "no deal" in hasAccessFast
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -291,7 +292,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (deal.buyer != user) return false;
         if (deal.status != DealStatus.ACTIVE) return false;
         if (deal.dealType == DealType.BUY) return true;
-        return deal.endTime == 0 || block.timestamp <= deal.endTime;
+        return deal.endTime == 0 || block.timestamp < deal.endTime;
     }
 
     /// @notice Check if a user has active access (view-only, does not auto-expire)
@@ -303,7 +304,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             if (deal.buyer != user) continue;
             if (deal.status != DealStatus.ACTIVE) continue;
             if (deal.dealType == DealType.BUY) return true;
-            if (deal.endTime == 0 || block.timestamp <= deal.endTime) return true;
+            if (deal.endTime == 0 || block.timestamp < deal.endTime) return true;
         }
         return false;
     }

@@ -108,18 +108,18 @@ test.describe('Gallery Content Display', () => {
     expect(hasCards > 0 || hasEmptyState > 0).toBeTruthy();
   });
 
-  test('search input is present', async ({ page }) => {
+  test('gallery has filter controls', async ({ page }) => {
     await page.goto('/gallery');
-    // Gallery uses GalleryFilters which has a search input with placeholder "Search content..."
-    const searchInput = page.getByPlaceholder(/search content/i).first();
-    await expect(searchInput).toBeVisible();
+    // Gallery page uses GalleryFilters with media type and sort buttons (no search input)
+    const allBtn = page.getByRole('button', { name: 'All' }).first();
+    await expect(allBtn).toBeVisible();
   });
 
-  test('search input accepts text', async ({ page }) => {
+  test('filter buttons are interactive', async ({ page }) => {
     await page.goto('/gallery');
-    const searchInput = page.getByPlaceholder(/search content/i).first();
-    await searchInput.fill('test query');
-    await expect(searchInput).toHaveValue('test query');
+    const videoBtn = page.getByRole('button', { name: 'Video' }).first();
+    await videoBtn.click();
+    await expect(videoBtn).toBeVisible();
   });
 });
 
