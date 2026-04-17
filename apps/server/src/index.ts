@@ -472,12 +472,12 @@ app.get('/api/takedown/:id/status', async (c) => {
   }
 });
 
-// Stricter rate limits for AI generation endpoints: 10 requests/min per IP per endpoint
-app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+// Stricter rate limits for AI generation endpoints: 50 requests/min per IP per endpoint (raised for stress testing)
+app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 50 }));
+app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 50 }));
+app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 50 }));
+app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 50 }));
+app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 50 }));
 
 // ── Job status SSE (real-time generation progress) ───────────────────
 const { jobStatusRouter } = await import('./routes/job-status');

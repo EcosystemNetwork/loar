@@ -30,6 +30,21 @@ import {
   Circle,
   XCircle,
   Box,
+  MapPin,
+  Package,
+  Swords,
+  Zap,
+  BookOpen,
+  Dna,
+  Layers,
+  Cpu,
+  Building2,
+  GitBranch,
+  Eye,
+  Hexagon,
+  Castle,
+  Crown,
+  ImageIcon,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
@@ -117,6 +132,25 @@ const safeUrl = (url: string | null | undefined): string | undefined => {
   } catch {
     return undefined;
   }
+};
+
+const DETAIL_KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  person: Users,
+  place: MapPin,
+  thing: Package,
+  faction: Swords,
+  event: Zap,
+  lore: BookOpen,
+  species: Dna,
+  vehicle: Layers,
+  technology: Cpu,
+  organization: Building2,
+  timeline: GitBranch,
+  reality: Eye,
+  dimension: Box,
+  plane: Hexagon,
+  realm: Castle,
+  domain: Crown,
 };
 
 /** Kinds eligible for the character pipeline (have visual 3D representations). */
@@ -405,19 +439,27 @@ function EntityPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — image + metadata */}
         <div className="space-y-4">
-          {safeUrl(entity.imageUrl) && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="aspect-square w-full overflow-hidden rounded-lg">
+          <Card>
+            <CardContent className="p-4">
+              <div className="aspect-square w-full overflow-hidden rounded-lg">
+                {safeUrl(entity.imageUrl) ? (
                   <img
                     src={safeUrl(entity.imageUrl)}
                     alt={entity.name}
                     className="w-full h-full object-cover"
                   />
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                ) : (
+                  <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-3">
+                    {(() => {
+                      const Icon = DETAIL_KIND_ICONS[entity.kind] ?? ImageIcon;
+                      return <Icon className="h-16 w-16 text-muted-foreground/20" />;
+                    })()}
+                    <span className="text-xs text-muted-foreground/40">No image yet</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

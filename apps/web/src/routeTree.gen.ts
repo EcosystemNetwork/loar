@@ -22,6 +22,7 @@ import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GalleryRouteImport } from './routes/gallery'
+import { Route as FaucetRouteImport } from './routes/faucet'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as DiscoverRouteImport } from './routes/discover'
@@ -142,6 +143,11 @@ const LoginRoute = LoginRouteImport.update({
 const GalleryRoute = GalleryRouteImport.update({
   id: '/gallery',
   path: '/gallery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaucetRoute = FaucetRouteImport.update({
+  id: '/faucet',
+  path: '/faucet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRoute = DocsRouteImport.update({
@@ -436,6 +442,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
+  '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
@@ -507,6 +514,7 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
+  '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
@@ -579,6 +587,7 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
+  '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
@@ -652,6 +661,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/dmca'
     | '/docs'
+    | '/faucet'
     | '/gallery'
     | '/login'
     | '/market'
@@ -723,6 +733,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/dmca'
     | '/docs'
+    | '/faucet'
     | '/gallery'
     | '/login'
     | '/market'
@@ -794,6 +805,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/dmca'
     | '/docs'
+    | '/faucet'
     | '/gallery'
     | '/login'
     | '/market'
@@ -866,6 +878,7 @@ export interface RootRouteChildren {
   DiscoverRoute: typeof DiscoverRoute
   DmcaRoute: typeof DmcaRoute
   DocsRoute: typeof DocsRoute
+  FaucetRoute: typeof FaucetRoute
   GalleryRoute: typeof GalleryRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
@@ -1014,6 +1027,13 @@ declare module '@tanstack/react-router' {
       path: '/gallery'
       fullPath: '/gallery'
       preLoaderRoute: typeof GalleryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faucet': {
+      id: '/faucet'
+      path: '/faucet'
+      fullPath: '/faucet'
+      preLoaderRoute: typeof FaucetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -1450,6 +1470,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiscoverRoute: DiscoverRoute,
   DmcaRoute: DmcaRoute,
   DocsRoute: DocsRoute,
+  FaucetRoute: FaucetRoute,
   GalleryRoute: GalleryRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,

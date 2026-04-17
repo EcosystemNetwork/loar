@@ -1335,73 +1335,268 @@ function CinematicUniverseCreate() {
                       </p>
                     </div>
 
-                    {/* Starting Price — live updating */}
+                    {/* Launch Valuation — live updating */}
                     <div className="space-y-3">
-                      <Label className="text-sm font-semibold block">Starting Price</Label>
+                      <div>
+                        <Label className="text-sm font-semibold block">Launch Valuation</Label>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Total value of all {tokenSymbol || 'tokens'} at launch — sets how much 1
+                          ETH buys.
+                        </p>
+                      </div>
 
-                      {/* Live price stats */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                            Market Cap
-                          </p>
-                          <p className="text-sm font-bold text-primary tabular-nums">
-                            {formatMarketCap(marketCapEth)}
-                          </p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                            Price / Token
-                          </p>
-                          <p className="text-sm font-bold tabular-nums">
-                            {pricePerToken.toExponential(1)}
-                          </p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-muted/50 border text-center">
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                            0.01 ETH Buys
-                          </p>
-                          <p className="text-sm font-bold tabular-nums">
-                            {formatTokenAmount(0.01 * tokensPerEth)}
-                          </p>
+                      {/* Main valuation display */}
+                      <div className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1">
+                          Initial Market Cap
+                        </p>
+                        <p className="text-2xl font-bold text-primary tabular-nums">
+                          {formatMarketCap(marketCapEth)}
+                        </p>
+                      </div>
+
+                      {/* Quick presets */}
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">
+                          Quick pick a market cap
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PRICE_PRESETS.map((preset) => (
+                            <button
+                              key={preset.tick}
+                              type="button"
+                              onClick={() => setStartingTick(preset.tick)}
+                              disabled={deploymentStep !== DeploymentStep.IDLE}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                                startingTick === preset.tick
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                              } disabled:opacity-50`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
                       {/* Slider */}
-                      <Slider
-                        value={[startingTick]}
-                        onValueChange={([v]) => {
-                          // Round to tickSpacing of 200
-                          setStartingTick(Math.round(v / 200) * 200);
-                        }}
-                        min={TICK_MIN}
-                        max={TICK_MAX}
-                        step={200}
-                        disabled={deploymentStep !== DeploymentStep.IDLE}
-                      />
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>Cheaper</span>
-                        <span>More expensive</span>
+                      <div>
+                        <Slider
+                          value={[startingTick]}
+                          onValueChange={([v]) => {
+                            // Round to tickSpacing of 200
+                            setStartingTick(Math.round(v / 200) * 200);
+                          }}
+                          min={TICK_MIN}
+                          max={TICK_MAX}
+                          step={200}
+                          disabled={deploymentStep !== DeploymentStep.IDLE}
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                          <span>Lower valuation</span>
+                          <span>Higher valuation</span>
+                        </div>
                       </div>
 
-                      {/* Quick presets */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {PRICE_PRESETS.map((preset) => (
-                          <button
-                            key={preset.tick}
-                            type="button"
-                            onClick={() => setStartingTick(preset.tick)}
-                            disabled={deploymentStep !== DeploymentStep.IDLE}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                              startingTick === preset.tick
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                            } disabled:opacity-50`}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
+                      {/* What this means — plain English */}
+                      <div className="p-3 rounded-lg bg-muted/50 border text-xs text-muted-foreground space-y-1">
+                        <div className="flex justify-between">
+                          <span>1 ETH buys</span>
+                          <span className="font-semibold text-foreground tabular-nums">
+                            {formatTokenAmount(tokensPerEth)} {tokenSymbol || 'tokens'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total supply</span>
+                          <span className="font-semibold text-foreground tabular-nums">
+                            1B {tokenSymbol || 'tokens'}
+                          </span>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Token Allocation */}
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvancedTokenomics(!showAdvancedTokenomics)}
+                        disabled={deploymentStep !== DeploymentStep.IDLE}
+                        className="flex items-center gap-2 w-full text-left group"
+                      >
+                        <Sliders className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-sm font-semibold cursor-pointer">
+                          Token Allocation
+                        </Label>
+                        <span className="text-[10px] text-muted-foreground ml-auto">
+                          {showAdvancedTokenomics ? 'Hide' : 'Customize'}
+                        </span>
+                      </button>
+
+                      {/* Summary bar — always visible */}
+                      <div className="flex h-3 rounded-full overflow-hidden border">
+                        <div
+                          className="bg-primary"
+                          style={{ width: `${curveBps / 100}%` }}
+                          title={`Liquidity Pool: ${curveBps / 100}%`}
+                        />
+                        <div
+                          className="bg-green-500"
+                          style={{ width: `${creatorBps / 100}%` }}
+                          title={`Creator: ${creatorBps / 100}%`}
+                        />
+                        <div
+                          className="bg-amber-500"
+                          style={{ width: `${treasuryBps / 100}%` }}
+                          title={`Treasury: ${treasuryBps / 100}%`}
+                        />
+                        <div
+                          className="bg-blue-500"
+                          style={{ width: `${communityBps / 100}%` }}
+                          title={`Community: ${communityBps / 100}%`}
+                        />
+                      </div>
+
+                      {/* Legend — always visible */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-sm bg-primary flex-shrink-0" />
+                          <span className="text-muted-foreground">Liquidity Pool</span>
+                          <span className="ml-auto font-semibold tabular-nums">
+                            {curveBps / 100}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-sm bg-green-500 flex-shrink-0" />
+                          <span className="text-muted-foreground">Creator</span>
+                          <span className="ml-auto font-semibold tabular-nums">
+                            {creatorBps / 100}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-sm bg-amber-500 flex-shrink-0" />
+                          <span className="text-muted-foreground">Treasury</span>
+                          <span className="ml-auto font-semibold tabular-nums">
+                            {treasuryBps / 100}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-sm bg-blue-500 flex-shrink-0" />
+                          <span className="text-muted-foreground">Community</span>
+                          <span className="ml-auto font-semibold tabular-nums">
+                            {communityBps / 100}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expanded sliders */}
+                      {showAdvancedTokenomics && (
+                        <div className="space-y-3 pt-2 border-t">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs text-muted-foreground">
+                                Liquidity Pool
+                              </label>
+                              <span className="text-xs font-semibold tabular-nums">
+                                {curveBps / 100}%
+                              </span>
+                            </div>
+                            <Slider
+                              value={[curveBps]}
+                              onValueChange={([v]) =>
+                                handleAllocationChange('lp', Math.round(v / 100) * 100)
+                              }
+                              min={5000}
+                              max={9500}
+                              step={100}
+                              disabled={deploymentStep !== DeploymentStep.IDLE}
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Locked in the liquidity pool forever. Min 50%.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs text-muted-foreground">Creator</label>
+                              <span className="text-xs font-semibold tabular-nums">
+                                {creatorBps / 100}%
+                              </span>
+                            </div>
+                            <Slider
+                              value={[creatorBps]}
+                              onValueChange={([v]) =>
+                                handleAllocationChange('creator', Math.round(v / 100) * 100)
+                              }
+                              min={0}
+                              max={4000}
+                              step={100}
+                              disabled={deploymentStep !== DeploymentStep.IDLE}
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Sent to your wallet. Max 40%.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs text-muted-foreground">Treasury</label>
+                              <span className="text-xs font-semibold tabular-nums">
+                                {treasuryBps / 100}%
+                              </span>
+                            </div>
+                            <Slider
+                              value={[treasuryBps]}
+                              onValueChange={([v]) =>
+                                handleAllocationChange('treasury', Math.round(v / 100) * 100)
+                              }
+                              min={200}
+                              max={2000}
+                              step={100}
+                              disabled={deploymentStep !== DeploymentStep.IDLE}
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Reserved for governance & operations. Min 2%.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs text-muted-foreground">Community</label>
+                              <span className="text-xs font-semibold tabular-nums">
+                                {communityBps / 100}%
+                              </span>
+                            </div>
+                            <Slider
+                              value={[communityBps]}
+                              onValueChange={([v]) =>
+                                handleAllocationChange('community', Math.round(v / 100) * 100)
+                              }
+                              min={0}
+                              max={3000}
+                              step={100}
+                              disabled={deploymentStep !== DeploymentStep.IDLE}
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Airdrops, rewards, and incentives.
+                            </p>
+                          </div>
+
+                          {!allocationValid && (
+                            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-500 flex items-start gap-2">
+                              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                              <span>
+                                {allocationTotal !== 10000
+                                  ? `Allocations must total 100% (currently ${allocationTotal / 100}%)`
+                                  : curveBps < 5000
+                                    ? 'Liquidity Pool must be at least 50%'
+                                    : creatorBps > 4000
+                                      ? 'Creator allocation cannot exceed 40%'
+                                      : 'Treasury must be at least 2%'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1596,7 +1791,7 @@ function CinematicUniverseCreate() {
                       <p className="text-[10px] text-muted-foreground uppercase font-semibold">
                         Supply
                       </p>
-                      <p className="text-sm font-bold">100B</p>
+                      <p className="text-sm font-bold">1B</p>
                     </div>
                   </div>
                 )}

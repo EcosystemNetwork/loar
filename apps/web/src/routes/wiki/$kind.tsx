@@ -11,7 +11,19 @@ import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft,
+  Users,
+  MapPin,
+  Package,
+  Swords,
+  Zap,
+  BookOpen,
+  Dna,
+  Layers,
+  Cpu,
+  Building2,
+} from 'lucide-react';
 
 const VALID_KINDS = [
   'person',
@@ -39,6 +51,19 @@ const KIND_DISPLAY_NAMES: Record<CreatorKind, string> = {
   vehicle: 'Vehicles',
   technology: 'Technology',
   organization: 'Organizations',
+};
+
+const KIND_ICONS: Record<CreatorKind, React.ComponentType<{ className?: string }>> = {
+  person: Users,
+  place: MapPin,
+  thing: Package,
+  faction: Swords,
+  event: Zap,
+  lore: BookOpen,
+  species: Dna,
+  vehicle: Layers,
+  technology: Cpu,
+  organization: Building2,
 };
 
 function isValidKind(kind: string): kind is CreatorKind {
@@ -142,15 +167,22 @@ function WikiKindPage() {
               className="block"
             >
               <Card className="h-full bg-zinc-900 border-zinc-800 hover:border-violet-600 hover:shadow-lg hover:shadow-violet-600/10 transition-all cursor-pointer">
-                {entity.imageUrl && (
-                  <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+                <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+                  {entity.imageUrl ? (
                     <img
                       src={entity.imageUrl}
                       alt={entity.name}
                       className="w-full h-full object-cover"
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                      {(() => {
+                        const Icon = KIND_ICONS[kind];
+                        return <Icon className="h-10 w-10 text-muted-foreground/30" />;
+                      })()}
+                    </div>
+                  )}
+                </div>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base leading-snug">{entity.name}</CardTitle>
                 </CardHeader>

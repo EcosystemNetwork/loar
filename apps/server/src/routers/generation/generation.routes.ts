@@ -729,7 +729,7 @@ export const generationRouter = router({
           }
 
           // Prompt modification — sanitize config values to prevent prompt injection
-          const sanitize = (s: string) => s.replace(/[\n\r]/g, ' ').slice(0, 500);
+          const sanitize = (s: string, maxLen = 2000) => s.replace(/[\n\r]/g, ' ').slice(0, maxLen);
           if (genConfig.defaultPromptPrefix) {
             input.prompt = `${sanitize(genConfig.defaultPromptPrefix)} ${input.prompt}`;
           }

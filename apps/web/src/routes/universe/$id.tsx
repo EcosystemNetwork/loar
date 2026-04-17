@@ -9,7 +9,7 @@
 
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Home, Upload, Link2, Video, X, Music } from 'lucide-react';
+import { Home, Upload, Link2, Video, X, Music, Trash2, Copy, CheckSquare } from 'lucide-react';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import {
   Dialog,
@@ -28,10 +28,13 @@ import ReactFlow, {
   ReactFlowProvider,
   Panel,
   MarkerType,
+  SelectionMode,
   addEdge,
+  useOnSelectionChange,
   type Node,
   type Edge,
   type Connection,
+  type OnSelectionChangeParams,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
@@ -62,7 +65,7 @@ const nodeTypes = {
   timelineEvent: TimelineEventNode,
 };
 
-function UniverseTimelineEditor() {
+function UniverseTimelineEditorInner() {
   const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
   const chainId = useChainId();
@@ -161,6 +164,10 @@ function UniverseTimelineEditor() {
   const [showMotionBrush, setShowMotionBrush] = useState(false);
   const [selectedNodeControls, setSelectedNodeControls] = useState<SceneControls>({});
   const [isSavingControls, setIsSavingControls] = useState(false);
+
+  // Multi-select state
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -566,6 +573,232 @@ function UniverseTimelineEditor() {
     setShowGovernanceSidebar(true);
   }, []);
 
+  // ── Multi-select & Node Management ────────────────────────────────
+
+  // Track ReactFlow selection changes
+  useOnSelectionChange({
+    onChange: useCallback(({ nodes: selectedNodes }: OnSelectionChangeParams) => {
+      setSelectedNodeIds(
+        new Set(
+          selectedNodes.filter((n: any) => n.data?.nodeType === 'scene').map((n: any) => n.id)
+        )
+      );
+    }, []),
+  });
+
+  // Get archived node IDs from localStorage
+  const getArchivedNodeIds = useCallback((): Set<string> => {
+    try {
+      const key = `universe_archived_nodes_${id}`;
+      const stored = localStorage.getItem(key);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }, [id]);
+
+  // Save archived node IDs to localStorage
+  const saveArchivedNodeIds = useCallback(
+    (archivedIds: Set<string>) => {
+      const key = `universe_archived_nodes_${id}`;
+      localStorage.setItem(key, JSON.stringify([...archivedIds]));
+    },
+    [id]
+  );
+
+  // Delete a single node
+  const handleDeleteNode = useCallback(
+    (eventId: string) => {
+      if (!eventId) return;
+
+      // Find the node
+      const nodeToDelete = nodesRef.current.find(
+        (n) => n.data.eventId === eventId || n.id === eventId
+      );
+      if (!nodeToDelete) return;
+
+      const nodeFlowId = nodeToDelete.id;
+      const isBlockchain = nodeFlowId.startsWith('blockchain-node-');
+
+      if (isBlockchain) {
+        // Soft-delete: archive the blockchain node (can't delete from chain)
+        const archived = getArchivedNodeIds();
+        archived.add(eventId);
+        saveArchivedNodeIds(archived);
+      }
+
+      // Remove from localStorage events
+      const storageKey = `universe_events_${id}`;
+      const storedEvents = localStorage.getItem(storageKey);
+      if (storedEvents) {
+        const eventsData = JSON.parse(storedEvents);
+        delete eventsData[eventId];
+        localStorage.setItem(storageKey, JSON.stringify(eventsData));
+      }
+
+      // Remove node and its connected edges from the flow
+      setNodes((nds: any) => nds.filter((n: any) => n.id !== nodeFlowId));
+      setEdges((eds: any) =>
+        eds.filter((e: any) => e.source !== nodeFlowId && e.target !== nodeFlowId)
+      );
+
+      // Clear selection if deleted node was selected
+      setSelectedNode((prev) => (prev?.id === nodeFlowId ? null : prev));
+      setSelectedNodeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(nodeFlowId);
+        return next;
+      });
+    },
+    [id, getArchivedNodeIds, saveArchivedNodeIds, setNodes, setEdges]
+  );
+
+  // Delete all selected nodes
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedNodeIds.size === 0) return;
+
+    const archived = getArchivedNodeIds();
+    const storageKey = `universe_events_${id}`;
+    const storedEvents = localStorage.getItem(storageKey);
+    const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+
+    // Process each selected node
+    for (const nodeFlowId of selectedNodeIds) {
+      const node = nodesRef.current.find((n) => n.id === nodeFlowId);
+      if (!node || node.data.nodeType !== 'scene') continue;
+
+      const eventId = node.data.eventId;
+      if (!eventId) continue;
+
+      const isBlockchain = nodeFlowId.startsWith('blockchain-node-');
+      if (isBlockchain) {
+        archived.add(eventId);
+      }
+
+      delete eventsData[eventId];
+    }
+
+    saveArchivedNodeIds(archived);
+    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+    // Remove all selected nodes and their edges from the flow
+    setNodes((nds: any) => nds.filter((n: any) => !selectedNodeIds.has(n.id)));
+    setEdges((eds: any) =>
+      eds.filter((e: any) => !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target))
+    );
+
+    setSelectedNode(null);
+    setSelectedNodeIds(new Set());
+    setShowDeleteConfirm(false);
+  }, [selectedNodeIds, id, getArchivedNodeIds, saveArchivedNodeIds, setNodes, setEdges]);
+
+  // Duplicate selected nodes
+  const handleDuplicateSelected = useCallback(() => {
+    if (selectedNodeIds.size === 0) return;
+
+    const storageKey = `universe_events_${id}`;
+    const storedEvents = localStorage.getItem(storageKey);
+    const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+
+    const newNodes: Node<TimelineNodeData>[] = [];
+    const newEdges: Edge[] = [];
+    const idMapping = new Map<string, string>(); // oldId -> newId
+
+    // First pass: create duplicated nodes with new IDs
+    for (const nodeFlowId of selectedNodeIds) {
+      const node = nodesRef.current.find((n) => n.id === nodeFlowId);
+      if (!node || node.data.nodeType !== 'scene') continue;
+
+      const eventId = node.data.eventId;
+      if (!eventId) continue;
+
+      // Generate a new unique ID
+      const newEventId = `dup-${eventId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const newFlowId = `local-node-${newEventId}`;
+      idMapping.set(nodeFlowId, newFlowId);
+
+      // Position offset (below and to the right)
+      const offsetX = 60;
+      const offsetY = 180;
+
+      // Copy local event data
+      const sourceEventData = eventsData[eventId];
+      if (sourceEventData) {
+        eventsData[newEventId] = {
+          ...sourceEventData,
+          eventId: newEventId,
+          title: `${sourceEventData.title || `Event ${eventId}`} (copy)`,
+          timestamp: Date.now(),
+        };
+      }
+
+      newNodes.push({
+        id: newFlowId,
+        type: 'timelineEvent',
+        position: { x: node.position.x + offsetX, y: node.position.y + offsetY },
+        data: {
+          ...node.data,
+          label: `${node.data.label} (copy)`,
+          eventId: newEventId,
+          blockchainNodeId: undefined, // Duplicated nodes are local-only
+          displayName: newEventId,
+          isRoot: false,
+          isInCanonChain: false,
+          isSelected: false,
+          onAddScene: handleAddEvent,
+          onEditScene: handleEditScene,
+          onDeleteNode: handleDeleteNode,
+        },
+      });
+    }
+
+    // Second pass: recreate edges between duplicated nodes
+    const currentEdges = edges;
+    for (const edge of currentEdges) {
+      const newSource = idMapping.get(edge.source);
+      const newTarget = idMapping.get(edge.target);
+      if (newSource && newTarget) {
+        newEdges.push({
+          id: `edge-dup-${newSource}-${newTarget}`,
+          source: newSource,
+          target: newTarget,
+          animated: true,
+          style: { stroke: '#8b5cf6', strokeWidth: 3 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#8b5cf6',
+          },
+        });
+      }
+    }
+
+    // Save updated localStorage
+    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+    // Add new nodes and edges to the flow
+    setNodes((nds: any) => [...nds, ...newNodes]);
+    setEdges((eds: any) => [...eds, ...newEdges]);
+
+    // Clear selection
+    setSelectedNodeIds(new Set());
+  }, [
+    selectedNodeIds,
+    id,
+    edges,
+    handleAddEvent,
+    handleEditScene,
+    handleDeleteNode,
+    setNodes,
+    setEdges,
+  ]);
+
+  // Clear selection
+  const handleClearSelection = useCallback(() => {
+    setSelectedNodeIds(new Set());
+    // Deselect all nodes in ReactFlow
+    setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: false })));
+  }, [setNodes]);
+
   // Handle showing video generation dialog
   // Preserves character selections, video model, duration, ratio, and image format
   // across sequential deploys so users don't re-pick everything for each node.
@@ -732,6 +965,62 @@ function UniverseTimelineEditor() {
     setEditVideoFile(null);
     setEditVideoPreview(null);
   }, [editingEventId, editVideoUrl, editVideoFile, id, setNodes]);
+
+  // Remove video from a node without deleting the node itself
+  const handleRemoveVideo = useCallback(() => {
+    if (!editingEventId) return;
+
+    // Clear from localStorage
+    const storageKey = `universe_events_${id}`;
+    const storedEvents = localStorage.getItem(storageKey);
+    if (storedEvents) {
+      const eventsData = JSON.parse(storedEvents);
+      if (eventsData[editingEventId]) {
+        delete eventsData[editingEventId].videoUrl;
+        localStorage.setItem(storageKey, JSON.stringify(eventsData));
+      }
+    }
+
+    // Clear videoUrl from the node
+    setNodes((nds: any) =>
+      nds.map((node: any) => {
+        const nodeEventId = node.data.eventId;
+        const nodeBlockchainId = node.data.blockchainNodeId?.toString();
+        if (nodeEventId === editingEventId || nodeBlockchainId === editingEventId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              videoUrl: undefined,
+            },
+          };
+        }
+        return node;
+      })
+    );
+
+    // Close dialog
+    setEditVideoDialogOpen(false);
+    setEditingEventId(null);
+    setEditVideoUrl('');
+    setEditVideoFile(null);
+    setEditVideoPreview(null);
+  }, [editingEventId, id, setNodes]);
+
+  // Delete the entire event node from the dialog
+  const handleDeleteFromDialog = useCallback(() => {
+    if (!editingEventId) return;
+    if (!confirm('Delete this event from the universe? This cannot be undone.')) return;
+
+    handleDeleteNode(editingEventId);
+
+    // Close dialog
+    setEditVideoDialogOpen(false);
+    setEditingEventId(null);
+    setEditVideoUrl('');
+    setEditVideoFile(null);
+    setEditVideoPreview(null);
+  }, [editingEventId, handleDeleteNode]);
 
   // Handle selecting a generation from the panel — pre-fills dialog with video ready to save
   const handleSelectGeneration = useCallback(
@@ -915,6 +1204,8 @@ function UniverseTimelineEditor() {
         universeId: id,
         onAddScene: handleAddEvent,
         onEditScene: handleEditScene,
+        onDeleteNode: handleDeleteNode,
+        isSelected: false,
       },
     };
 
@@ -1044,6 +1335,7 @@ function UniverseTimelineEditor() {
     sourceNodeId,
     handleAddEvent,
     handleEditScene,
+    handleDeleteNode,
     generatedVideoUrl,
     generatedImageUrl,
   ]);
@@ -1054,6 +1346,9 @@ function UniverseTimelineEditor() {
 
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
+
+    // Load archived (soft-deleted) node IDs
+    const archivedNodeIds = getArchivedNodeIds();
 
     // Colors for different types
     const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -1077,6 +1372,9 @@ function UniverseTimelineEditor() {
     // Create nodes from blockchain data using calculated layout
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = normalizeNodeId(nodeIdStr);
+
+      // Skip archived (soft-deleted) nodes
+      if (archivedNodeIds.has(nodeId.toString()) || archivedNodeIds.has(String(nodeId))) return;
 
       // Try to resolve actual URL and description from localStorage first
       const localEvent = localEvents[nodeId.toString()] || localEvents[String(nodeId)];
@@ -1158,6 +1456,8 @@ function UniverseTimelineEditor() {
           childCount: childCount > 1 ? childCount : undefined,
           onAddScene: handleAddEvent,
           onEditScene: handleEditScene,
+          onDeleteNode: handleDeleteNode,
+          isSelected: false,
         },
       });
     });
@@ -1214,7 +1514,15 @@ function UniverseTimelineEditor() {
     setNodes(blockchainNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
-  }, [graphData, finalUniverse?.id, id, handleAddEvent, handleEditScene]);
+  }, [
+    graphData,
+    finalUniverse?.id,
+    id,
+    handleAddEvent,
+    handleEditScene,
+    handleDeleteNode,
+    getArchivedNodeIds,
+  ]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -1237,9 +1545,36 @@ function UniverseTimelineEditor() {
     [setEdges]
   );
 
-  // Handle node selection
+  // Sync isSelected flag on node data when selection changes
+  useEffect(() => {
+    setNodes((nds: any) =>
+      nds.map((n: any) => {
+        const shouldBeSelected = selectedNodeIds.has(n.id);
+        if (n.data.isSelected !== shouldBeSelected) {
+          return { ...n, data: { ...n.data, isSelected: shouldBeSelected } };
+        }
+        return n;
+      })
+    );
+  }, [selectedNodeIds, setNodes]);
+
+  // Handle node selection — shift+click toggles multi-select without navigating
   const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: any) => {
+    (event: React.MouseEvent, node: any) => {
+      // Shift+click = toggle selection, don't navigate
+      if (event.shiftKey && node.data.nodeType === 'scene') {
+        setSelectedNodeIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(node.id)) {
+            next.delete(node.id);
+          } else {
+            next.add(node.id);
+          }
+          return next;
+        });
+        return;
+      }
+
       setSelectedNode(node);
       if (node.data.nodeType === 'scene') {
         setSelectedEventTitle(node.data.label);
@@ -1333,36 +1668,62 @@ function UniverseTimelineEditor() {
       {/* Main Content Area */}
       <TokenGateGuard universeId={id} target="view">
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
-          <ReactFlowProvider>
-            <div className="flex-1 relative overflow-hidden w-full h-full">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                nodeTypes={nodeTypes}
-                fitView
-                className="bg-gradient-to-br from-background via-background/95 to-muted/20"
-                minZoom={0.1}
-                maxZoom={2}
-              >
-                <Background />
-                <Controls />
+          <div className="flex-1 relative overflow-hidden w-full h-full">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              nodeTypes={nodeTypes}
+              selectionOnDrag
+              panOnDrag={[1, 2]}
+              selectionMode={SelectionMode.Partial}
+              multiSelectionKeyCode="Shift"
+              deleteKeyCode={null}
+              fitView
+              className="bg-gradient-to-br from-background via-background/95 to-muted/20"
+              minZoom={0.1}
+              maxZoom={2}
+            >
+              <Background />
+              <Controls />
 
-                <Panel position="top-right">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowCreatorsRoom(!showCreatorsRoom);
-                        if (!showCreatorsRoom) setShowGovernanceSidebar(false);
-                      }}
-                      className="hover:bg-amber-500/10 hover:text-amber-400 transition-all duration-300"
+              <Panel position="top-right">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowCreatorsRoom(!showCreatorsRoom);
+                      if (!showCreatorsRoom) setShowGovernanceSidebar(false);
+                    }}
+                    className="hover:bg-amber-500/10 hover:text-amber-400 transition-all duration-300"
+                  >
+                    <svg
+                      className="h-4 w-4 mr-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
                     >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                      />
+                    </svg>
+                    Creator's Room
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="hover:bg-green-500/10 hover:text-green-400 transition-all duration-300"
+                  >
+                    <Link to="/upload" search={{ universeId: id }}>
                       <svg
                         className="h-4 w-4 mr-2"
                         fill="none"
@@ -1373,62 +1734,114 @@ function UniverseTimelineEditor() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                          d="M12 4.5v15m7.5-7.5h-15"
                         />
                       </svg>
-                      Creator's Room
-                    </Button>
+                      Add Content
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                  >
+                    <Link to="/">
+                      <Home className="h-4 w-4 mr-2" />
+                      Home
+                    </Link>
+                  </Button>
+                </div>
+              </Panel>
+
+              {/* Selection Toolbar — appears when nodes are selected */}
+              {selectedNodeIds.size > 0 && (
+                <Panel
+                  position="top-center"
+                  className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 animate-in slide-in-from-top-2 duration-200"
+                >
+                  <div className="flex items-center gap-2 text-sm text-zinc-300 border-r border-zinc-700 pr-3">
+                    <CheckSquare className="h-4 w-4 text-blue-400" />
+                    <span className="font-medium">{selectedNodeIds.size} selected</span>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
+                    onClick={handleDuplicateSelected}
+                  >
+                    <Copy className="h-4 w-4" />
+                    Duplicate
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+
+                  <div className="border-l border-zinc-700 pl-3">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      asChild
-                      className="hover:bg-green-500/10 hover:text-green-400 transition-all duration-300"
+                      className="text-zinc-500 hover:text-zinc-300 text-xs px-2"
+                      onClick={handleClearSelection}
                     >
-                      <Link to="/upload" search={{ universeId: id }}>
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth={1.5}
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 4.5v15m7.5-7.5h-15"
-                          />
-                        </svg>
-                        Add Content
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
-                    >
-                      <Link to="/">
-                        <Home className="h-4 w-4 mr-2" />
-                        Home
-                      </Link>
+                      Clear
                     </Button>
                   </div>
                 </Panel>
+              )}
 
-                {isLoadingAny && (
-                  <Panel
-                    position="bottom-right"
-                    className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4"
-                  >
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                      Loading blockchain data...
-                    </div>
-                  </Panel>
-                )}
-              </ReactFlow>
-            </div>
-          </ReactFlowProvider>
+              {/* Delete Confirmation Dialog */}
+              {showDeleteConfirm && (
+                <Panel
+                  position="top-center"
+                  className="bg-zinc-900/95 backdrop-blur-md border border-red-900/50 rounded-xl shadow-2xl px-5 py-4 flex flex-col items-center gap-3 mt-16 animate-in fade-in duration-150"
+                >
+                  <p className="text-sm text-zinc-300">
+                    Delete <span className="font-bold text-white">{selectedNodeIds.size}</span> node
+                    {selectedNodeIds.size > 1 ? 's' : ''}?
+                  </p>
+                  <p className="text-xs text-zinc-500 max-w-xs text-center">
+                    Blockchain nodes will be hidden from your timeline. Local-only nodes will be
+                    permanently removed.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handleDeleteSelected}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete {selectedNodeIds.size > 1 ? 'All' : ''}
+                    </Button>
+                  </div>
+                </Panel>
+              )}
+
+              {isLoadingAny && (
+                <Panel
+                  position="bottom-right"
+                  className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4"
+                >
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    Loading blockchain data...
+                  </div>
+                </Panel>
+              )}
+            </ReactFlow>
+          </div>
         </div>
 
         {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
@@ -1687,6 +2100,18 @@ function UniverseTimelineEditor() {
                   className="w-full h-full object-contain"
                   controls
                   muted
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent && !parent.querySelector('.video-error-msg')) {
+                      const msg = document.createElement('div');
+                      msg.className =
+                        'video-error-msg absolute inset-0 flex items-center justify-center text-red-400 text-sm';
+                      msg.textContent = 'Failed to load video — check URL';
+                      parent.appendChild(msg);
+                    }
+                  }}
                 />
                 <button
                   onClick={() => {
@@ -1765,31 +2190,65 @@ function UniverseTimelineEditor() {
             </div>
           </div>
 
-          <DialogFooter className="mt-4">
-            <Button
-              variant="ghost"
-              onClick={() => setEditVideoDialogOpen(false)}
-              disabled={isUploadingEditVideo}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveEditVideo}
-              disabled={isUploadingEditVideo || (!editVideoUrl.trim() && !editVideoFile)}
-            >
-              {isUploadingEditVideo ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                  Uploading...
-                </>
-              ) : (
-                'Save Video'
+          <DialogFooter className="mt-4 flex items-center justify-between sm:justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteFromDialog}
+                disabled={isUploadingEditVideo}
+                className="gap-1"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete Event
+              </Button>
+              {editVideoPreview && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemoveVideo}
+                  disabled={isUploadingEditVideo}
+                  className="gap-1 text-red-400 border-red-500/40 hover:bg-red-500/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Remove Video
+                </Button>
               )}
-            </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setEditVideoDialogOpen(false)}
+                disabled={isUploadingEditVideo}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveEditVideo}
+                disabled={isUploadingEditVideo || (!editVideoUrl.trim() && !editVideoFile)}
+              >
+                {isUploadingEditVideo ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Save Video'
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function UniverseTimelineEditor() {
+  return (
+    <ReactFlowProvider>
+      <UniverseTimelineEditorInner />
+    </ReactFlowProvider>
   );
 }
 

@@ -34,6 +34,7 @@ const primaryLinks = [
   { to: '/create', label: 'Create' },
   { to: '/gallery', label: 'Gallery' },
   { to: '/tokens', label: 'Launchpad' },
+  { to: '/faucet', label: 'Faucet' },
   { to: '/pricing', label: 'Pricing' },
   { to: '/dashboard', label: 'Dashboard' },
 ].filter((l) => !HIDDEN_ROUTES.has(l.to));
@@ -53,7 +54,7 @@ const moreLinks = [
   { to: '/collabs', label: 'Collabs' },
   { to: '/ads', label: 'Ads' },
   { to: '/sandbox', label: 'Sandbox' },
-  { to: '/credits', label: 'Faucet' },
+  { to: '/credits', label: 'Credits' },
   { to: '/docs', label: 'Docs' },
 ].filter((l) => !HIDDEN_ROUTES.has(l.to));
 

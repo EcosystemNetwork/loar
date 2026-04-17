@@ -109,15 +109,19 @@ export class ByteDanceService {
 
   async generateVideo(options: ByteDanceVideoOptions): Promise<ByteDanceVideoResult> {
     try {
-      // Build the content array for ModelArk format
-      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      // Build content items for the user message
+      const contentItems: Array<{
+        type: string;
+        text?: string;
+        image_url?: { url: string };
+      }> = [];
 
       // Add text prompt
-      content.push({ type: 'text', text: options.prompt });
+      contentItems.push({ type: 'text', text: options.prompt });
 
       // Add images based on mode
       if (options.mode === 'image_to_video' && options.imageUrl) {
-        content.push({
+        contentItems.push({
           type: 'image_url',
           image_url: { url: options.imageUrl },
         });
@@ -126,23 +130,23 @@ export class ByteDanceService {
       if (options.mode === 'reference_to_video') {
         if (options.referenceImages?.length) {
           for (const ref of options.referenceImages) {
-            content.push({
+            contentItems.push({
               type: 'image_url',
               image_url: { url: ref.url },
             });
           }
         } else if (options.imageUrl) {
-          content.push({
+          contentItems.push({
             type: 'image_url',
             image_url: { url: options.imageUrl },
           });
         }
       }
 
-      // Build request body
+      // Build request body — content at top level, always
       const body: Record<string, any> = {
         model: options.model,
-        content,
+        content: contentItems,
       };
 
       // Optional parameters

@@ -142,15 +142,39 @@ interface ContentItem {
   createdAt: string | Date;
 }
 
+const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  person: Users,
+  place: MapPin,
+  thing: Package,
+  faction: Swords,
+  event: Zap,
+  lore: BookOpen,
+  species: Dna,
+  vehicle: Layers,
+  technology: Cpu,
+  organization: Building2,
+  timeline: GitBranch,
+  reality: Eye,
+  dimension: Box,
+  plane: Hexagon,
+  realm: Castle,
+  domain: Crown,
+};
+
 function EntityCard({ entity }: { entity: Entity }) {
+  const KindIcon = KIND_ICONS[entity.kind] ?? Package;
   return (
     <Link to="/wiki/entity/$id" params={{ id: entity.id }} className="block">
       <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-        {entity.imageUrl && (
-          <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+        <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+          {entity.imageUrl ? (
             <img src={entity.imageUrl} alt={entity.name} className="w-full h-full object-cover" />
-          </div>
-        )}
+          ) : (
+            <div className="w-full h-full bg-muted flex items-center justify-center">
+              <KindIcon className="h-10 w-10 text-muted-foreground/30" />
+            </div>
+          )}
+        </div>
         <CardHeader className="pb-2">
           <CardTitle className="text-base leading-snug">{entity.name}</CardTitle>
         </CardHeader>
@@ -415,11 +439,17 @@ function CollectionTab() {
           <Link key={char.id} to="/wiki/character/$id" params={{ id: char.id }} className="block">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
               <div className="aspect-square w-full overflow-hidden rounded-t-lg">
-                <img
-                  src={char.image_url}
-                  alt={char.character_name}
-                  className="w-full h-full object-cover"
-                />
+                {char.image_url ? (
+                  <img
+                    src={char.image_url}
+                    alt={char.character_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <Users className="h-10 w-10 text-muted-foreground/30" />
+                  </div>
+                )}
               </div>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{char.character_name}</CardTitle>

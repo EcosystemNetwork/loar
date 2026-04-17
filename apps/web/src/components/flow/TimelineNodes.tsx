@@ -21,6 +21,9 @@ import {
   Sparkles,
   Link2,
   Pencil,
+  Trash2,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -117,6 +120,8 @@ export interface TimelineNodeData {
   childCount?: number; // Number of child/branching nodes
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
   onEditScene?: (eventId: string) => void;
+  onDeleteNode?: (eventId: string) => void;
+  isSelected?: boolean;
   wiki?: { title?: string; summary?: string; plot?: string };
 
   // ── Scene Controls (Node Editor Expansion v1) ──────────────────
@@ -242,9 +247,13 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
 
       <div className="relative group">
+        {/* Selection indicator ring */}
+        {data.isSelected && (
+          <div className="absolute -inset-1 rounded-xl border-2 border-blue-500 bg-blue-500/10 pointer-events-none z-10" />
+        )}
         <div
-          className={`w-80 h-72 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
-          style={{ borderColor: data.timelineColor || '#10b981' }}
+          className={`w-80 h-72 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden ${data.isRoot ? 'ring-2 ring-primary/50' : ''} ${data.isSelected ? 'ring-2 ring-blue-500/70' : ''}`}
+          style={{ borderColor: data.isSelected ? '#3b82f6' : data.timelineColor || '#10b981' }}
           onClick={handleClick}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
@@ -426,19 +435,54 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
           </div>
         </div>
 
-        {/* Branch button - appears on hover */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="absolute -bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 w-8 h-8 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full"
-          onClick={(e) => {
-            e.stopPropagation();
-            data.onAddScene?.('branch', data.eventId);
-          }}
-          title="Create branch event"
-        >
-          <Plus className="h-4 w-4 text-primary" />
-        </Button>
+        {/* Bottom action buttons - appear on hover */}
+        <div className="absolute -bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          {/* Delete button */}
+          {data.onDeleteNode && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-8 h-8 p-0 border-2 border-red-500/60 hover:border-red-500 hover:bg-red-500/20 rounded-full bg-card"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onDeleteNode?.(data.eventId || '');
+              }}
+              title="Delete node"
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
+          {/* Branch button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-8 h-8 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full bg-card"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onAddScene?.('branch', data.eventId);
+            }}
+            title="Create branch event"
+          >
+            <Plus className="h-4 w-4 text-primary" />
+          </Button>
+        </div>
+
+        {/* Selection checkbox — top-left, appears on hover or when selected */}
+        {data.isSelected !== undefined && (
+          <div
+            className={`absolute -top-2 -left-2 z-20 ${data.isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200`}
+          >
+            <div
+              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${
+                data.isSelected
+                  ? 'bg-blue-500 border-blue-500 text-white'
+                  : 'bg-card border-zinc-500 hover:border-blue-400'
+              }`}
+            >
+              {data.isSelected && <Check className="h-3.5 w-3.5" />}
+            </div>
+          </div>
+        )}
       </div>
 
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
