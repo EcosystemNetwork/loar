@@ -98,7 +98,7 @@ function MyWorksPage() {
       (item: any) =>
         item.title?.toLowerCase().includes(q) ||
         item.description?.toLowerCase().includes(q) ||
-        item.tags?.some((t: string) => t.toLowerCase().includes(q))
+        (Array.isArray(item.tags) && item.tags.some((t: string) => t.toLowerCase().includes(q)))
     );
   }, [allItems, search]);
 
@@ -392,7 +392,7 @@ function ContentRow({
             <span>{item.views ?? 0} views</span>
             <span>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</span>
           </div>
-          {item.tags?.length > 0 && (
+          {Array.isArray(item.tags) && item.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {item.tags.slice(0, 5).map((tag: string) => (
                 <Badge key={tag} variant="secondary" className="text-xs px-1.5 py-0">

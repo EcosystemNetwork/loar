@@ -47,6 +47,7 @@ import { trackQuests } from '../../services/quest-tracker';
 import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { getStorageManager } from '../../services/storage';
+import { signWithProvenance } from '../../services/provenance';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
 
 // ── Collections ───────────────────────────────────────────────────────
@@ -202,6 +203,8 @@ async function persistImagesToStorage(opts: {
   generationId: string;
   imageUrls: string[];
   userId: string;
+  modelId?: string;
+  prompt?: string;
 }) {
   try {
     const manager = getStorageManager();
@@ -211,7 +214,19 @@ async function persistImagesToStorage(opts: {
       const filename = `generation-${opts.generationId}-${i}.png`;
       console.log(`[persist] Uploading ${filename} to permanent storage...`);
 
-      const manifest = await manager.uploadFromUrl(url, filename, opts.userId);
+      // Fetch the image, sign with C2PA provenance, then upload
+      const response = await fetch(url);
+      const arrayBuf = await response.arrayBuffer();
+      let imageBuffer = Buffer.from(new Uint8Array(arrayBuf));
+
+      imageBuffer = await signWithProvenance(imageBuffer, filename, {
+        model: opts.modelId || 'unknown',
+        prompt: opts.prompt,
+        generatedAt: new Date().toISOString(),
+        mimeType: 'image/png',
+      });
+
+      const manifest = await manager.upload(imageBuffer, filename, 'image/png', opts.userId);
       const permanentUrl = manifest.uploads[0]?.url;
       if (!permanentUrl) continue;
 
@@ -570,6 +585,8 @@ export const imageRouter = router({
           generationId: genId,
           imageUrls,
           userId: ctx.user.uid,
+          modelId: finalModelId,
+          prompt: input.prompt,
         }).catch((err) => console.error('[image] storage persist failed:', err.message));
 
         return {
@@ -888,6 +905,8 @@ export const imageRouter = router({
           generationId: imgGenId,
           imageUrls,
           userId: ctx.user.uid,
+          modelId: input.model || 'fal-ai/nano-banana',
+          prompt: input.prompt,
         }).catch((err) => console.error('[legacy image] storage persist failed:', err.message));
       }
       return result;
@@ -968,6 +987,8 @@ export const imageRouter = router({
           generationId: editGenId,
           imageUrls,
           userId: ctx.user.uid,
+          modelId: 'fal-ai/nano-banana/edit',
+          prompt: input.prompt,
         }).catch((err) => console.error('[legacy edit] storage persist failed:', err.message));
       }
       if (result.status === 'failed')
@@ -1055,6 +1076,8 @@ export const imageRouter = router({
           generationId: i2iGenId,
           imageUrls,
           userId: ctx.user.uid,
+          modelId: 'fal-ai/nano-banana/edit',
+          prompt: input.prompt,
         }).catch((err) => console.error('[legacy i2i] storage persist failed:', err.message));
       }
       if (result.status === 'failed')

@@ -11,7 +11,17 @@
 import { Handle, Position } from 'reactflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Film, Camera, Users, Paintbrush, Palette, Sparkles, Link2 } from 'lucide-react';
+import {
+  Plus,
+  Film,
+  Camera,
+  Users,
+  Paintbrush,
+  Palette,
+  Sparkles,
+  Link2,
+  Pencil,
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 // ── Scene Control Types (mirrors server scene-controls/types.ts) ──────
@@ -144,6 +154,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   useEffect(() => {
     // Simply use the video URL directly — Firebase Storage provides HTTP URLs
     setDisplayVideoUrl(data.videoUrl || null);
+    setVideoError(false);
     setIsLoadingStorage(false);
   }, [data.videoUrl]);
 
@@ -266,13 +277,31 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   <source src={displayVideoUrl} />
                 </video>
 
+                {/* Change video overlay — appears on hover */}
+                <div
+                  className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    data.onEditScene?.(data.eventId || '');
+                  }}
+                >
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center gap-1">
+                    <div className="bg-white/90 rounded-full p-2">
+                      <Pencil className="h-5 w-5 text-gray-800" />
+                    </div>
+                    <span className="text-white text-xs font-medium drop-shadow-lg">
+                      Change Video
+                    </span>
+                  </div>
+                </div>
+
                 {/* Event ID overlay - with displayName support */}
-                <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
+                <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded pointer-events-none">
                   {data.displayName || `Event ${data.eventId || '?'}`}
                 </div>
 
                 {/* Status badges - top right */}
-                <div className="absolute top-2 right-2 flex gap-1 flex-wrap max-w-[180px] justify-end">
+                <div className="absolute top-2 right-2 flex gap-1 flex-wrap max-w-[180px] justify-end pointer-events-none">
                   {data.segmentCount && data.segmentCount > 1 && (
                     <Badge
                       variant="secondary"
@@ -332,7 +361,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 {/* Style indicator — colored bar at bottom of video */}
                 {(data.sceneControls?.stylePreset || data.sceneControls?.inheritedStylePreset) && (
                   <div
-                    className="absolute bottom-0 left-0 right-0 h-1"
+                    className="absolute bottom-0 left-0 right-0 h-1 pointer-events-none"
                     style={{
                       backgroundColor: getStyleColor(
                         data.sceneControls.stylePreset || data.sceneControls.inheritedStylePreset
@@ -343,9 +372,16 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 )}
               </>
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
+              <div
+                className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center cursor-pointer hover:from-gray-500 hover:to-gray-700 transition-all duration-200"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onEditScene?.(data.eventId || '');
+                }}
+              >
                 <div className="text-white text-4xl mb-2">🎬</div>
-                <div className="text-white text-sm">No Video</div>
+                <div className="text-white text-sm font-medium">Add Video</div>
+                <div className="text-white/60 text-xs mt-1">Click to upload or paste URL</div>
               </div>
             )}
           </div>

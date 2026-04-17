@@ -9,7 +9,8 @@
 
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Home, Upload, Link2, Video, X } from 'lucide-react';
+import { Home, Upload, Link2, Video, X, Music } from 'lucide-react';
+import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import {
   Dialog,
   DialogContent,
@@ -129,6 +130,9 @@ function UniverseTimelineEditor() {
   // Generations panel state
   const [showGenerationsPanel, setShowGenerationsPanel] = useState(false);
 
+  // Music Studio panel state
+  const [showMusicStudio, setShowMusicStudio] = useState(false);
+
   // File upload state
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -168,6 +172,10 @@ function UniverseTimelineEditor() {
   const [soundtrackName, setSoundtrackName] = useState<string>('');
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+  // Ref to track latest nodes without causing callback identity changes
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
@@ -590,6 +598,8 @@ function UniverseTimelineEditor() {
   }, []);
 
   // Handle editing video on an existing node
+  // Uses nodesRef to avoid depending on `nodes` — prevents infinite
+  // useEffect loop (setNodes → handleEditScene identity change → effect re-fires).
   const handleEditScene = useCallback(
     (eventId: string) => {
       if (!eventId) return;
@@ -601,7 +611,7 @@ function UniverseTimelineEditor() {
       const eventData = eventsData[eventId];
 
       // Also check the current node in the flow for its videoUrl
-      const node = nodes.find(
+      const node = nodesRef.current.find(
         (n) => n.data.eventId === eventId || n.data.blockchainNodeId?.toString() === eventId
       );
       const currentUrl = eventData?.videoUrl || node?.data.videoUrl || '';
@@ -612,7 +622,7 @@ function UniverseTimelineEditor() {
       setEditVideoPreview(currentUrl || null);
       setEditVideoDialogOpen(true);
     },
-    [id, nodes]
+    [id]
   );
 
   // Handle file selection for edit video
@@ -896,6 +906,7 @@ function UniverseTimelineEditor() {
       data: {
         label: videoTitle,
         description: videoDescription,
+        videoUrl: generatedVideoUrl || undefined,
         timelineColor: additionType === 'branch' ? '#f59e0b' : '#10b981',
         nodeType: 'scene',
         eventId: newEventId,
@@ -1316,6 +1327,7 @@ function UniverseTimelineEditor() {
         handleRefreshTimeline={handleRefreshTimeline}
         onOpenGovernance={handleOpenGovernance}
         onOpenGenerations={() => setShowGenerationsPanel(true)}
+        onOpenMusicStudio={() => setShowMusicStudio(true)}
       />
 
       {/* Main Content Area */}
@@ -1534,6 +1546,34 @@ function UniverseTimelineEditor() {
           onClose={() => setShowGenerationsPanel(false)}
           onSelectGeneration={handleSelectGeneration}
         />
+
+        {/* Music Studio Panel */}
+        {showMusicStudio && (
+          <div className="w-[360px] border-l border-zinc-800 bg-zinc-950 overflow-y-auto flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+              <span className="text-sm font-medium flex items-center gap-2">
+                <Music className="h-4 w-4 text-amber-500" />
+                Music Studio
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setShowMusicStudio(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-3">
+              <MusicGenerationPanel
+                universeId={id}
+                onGenerated={() => {
+                  // Could refresh media or show a toast
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Governance Sidebar */}
         <GovernanceSidebar

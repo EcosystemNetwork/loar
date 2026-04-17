@@ -119,6 +119,12 @@ function TokenLaunchpad() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link to="/tokens/swap">
+              <Button variant="outline" size="lg" className="gap-2">
+                <ArrowUpDown className="h-5 w-5" />
+                Swap
+              </Button>
+            </Link>
             <Link to="/tokens/portfolio">
               <Button variant="outline" size="lg" className="gap-2">
                 <Bookmark className="h-5 w-5" />
@@ -289,10 +295,11 @@ function TokenLaunchpad() {
                   <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
                     {enrichedSwaps.map((swap) => {
                       const isBuy = BigInt(swap.amount0) > 0n;
-                      const ethAmount = Math.abs(Number(BigInt(swap.amount1))) / 1e18;
                       return (
-                        <div
+                        <Link
                           key={swap.id}
+                          to={swap.token ? '/tokens/$address' : '/tokens'}
+                          params={swap.token ? { address: swap.token.id } : undefined}
                           className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs hover:bg-muted/80 transition-colors"
                         >
                           <div
@@ -324,13 +331,10 @@ function TokenLaunchpad() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="font-mono text-[11px] font-semibold">
-                              {ethAmount >= 0.001
-                                ? `${ethAmount.toFixed(4)}`
-                                : ethAmount.toExponential(1)}
+                              {formatEth(swap.amount1)}
                             </p>
-                            <p className="text-[9px] text-muted-foreground">ETH</p>
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>

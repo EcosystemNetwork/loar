@@ -11,3 +11,8 @@ export * from './EditableNodes';
 export * from './TimelineNodes';
 export * from './TimelineFlowEditor';
 export * from './TimelineFlowWithData';
+
+// Node Editor Expansion v1
+export { SceneControlsPanel } from './SceneControlsPanel';
+export { CastManager } from './CastManager';
+export { MotionBrush } from './MotionBrush';

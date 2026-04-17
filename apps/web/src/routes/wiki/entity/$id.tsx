@@ -13,10 +13,11 @@ import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Sparkles, Loader2, Music } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, Music, Users } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
+import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
 
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
@@ -106,6 +107,7 @@ function EntityPage() {
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
   const [showMusicPanel, setShowMusicPanel] = useState(false);
+  const [collaborativeMode, setCollaborativeMode] = useState(false);
 
   const {
     data: entity,
@@ -237,49 +239,74 @@ function EntityPage() {
 
         {/* Right column — name, description, metadata fields */}
         <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <CardTitle className="text-2xl">{entity.name}</CardTitle>
-              {isOwner && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateBio}
-                  disabled={generating}
-                  className="shrink-0"
-                >
-                  {generating ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4 mr-2" />
-                  )}
-                  {generating ? 'Generating...' : 'Generate Bio'}
-                </Button>
-              )}
-            </CardHeader>
-            {entity.description && (
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
-              </CardContent>
-            )}
-          </Card>
-
-          {metadataEntries.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">World Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {metadataEntries.map(([key, value]) => (
-                  <div key={key}>
-                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                      {METADATA_LABELS[key] ?? key}
-                    </dt>
-                    <dd className="text-sm leading-relaxed whitespace-pre-wrap">{String(value)}</dd>
+          {collaborativeMode ? (
+            <CollaborativeEntityEditor
+              entityId={id}
+              initialEntity={entity as any}
+              currentUserId={address || ''}
+              currentAddress={address}
+              onClose={() => setCollaborativeMode(false)}
+            />
+          ) : (
+            <>
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <CardTitle className="text-2xl">{entity.name}</CardTitle>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isOwner && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCollaborativeMode(true)}
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Collaborate
+                      </Button>
+                    )}
+                    {isOwner && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateBio}
+                        disabled={generating}
+                      >
+                        {generating ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-2" />
+                        )}
+                        {generating ? 'Generating...' : 'Generate Bio'}
+                      </Button>
+                    )}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                {entity.description && (
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
+                  </CardContent>
+                )}
+              </Card>
+
+              {metadataEntries.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">World Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {metadataEntries.map(([key, value]) => (
+                      <div key={key}>
+                        <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                          {METADATA_LABELS[key] ?? key}
+                        </dt>
+                        <dd className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {String(value)}
+                        </dd>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           {(mediaAttachments.length > 0 || isOwner) && (

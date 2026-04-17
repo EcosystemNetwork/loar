@@ -5,6 +5,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
+// Initialize Sentry early — must be after dotenv so SENTRY_DSN is available
+await import('./lib/sentry');
+
 // Must use dynamic import — static imports are hoisted above dotenv.config()
 const { initFirebase } = await import('./lib/firebase');
 initFirebase();
@@ -327,6 +330,148 @@ app.post('/api/takedown', async (c) => {
   }
 });
 
+// ── Public DMCA counter-notice REST endpoint (no auth required) ──────
+// Respondents can file a counter-notice to dispute a takedown per 17 U.S.C. § 512(g).
+// Rate limit: 3 requests per minute per IP
+app.use('/api/counter-notice', rateLimiter({ windowMs: 60_000, max: 3 }));
+app.post('/api/counter-notice', async (c) => {
+  const counterNoticeSchema = z.object({
+    takedownRequestId: z.string().min(1),
+    respondentName: z.string().min(1).max(200),
+    respondentEmail: z.string().email(),
+    respondentAddress: z.string().min(10).max(500), // Physical address required by DMCA
+    explanation: z.string().min(50).max(5000),
+    consentToJurisdiction: z.literal(true),
+    perjuryStatement: z.literal(true),
+  });
+
+  try {
+    const body = await c.req.json();
+    const parsed = counterNoticeSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          code: 'BAD_REQUEST',
+          message: 'Validation failed',
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        400
+      );
+    }
+    const { takedownRequestId, respondentName, respondentEmail, respondentAddress, explanation } =
+      parsed.data;
+
+    const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
+    if (!fbAvail || !fireDb) {
+      return c.json({ code: 'SERVICE_UNAVAILABLE', message: 'Service not available' }, 503);
+    }
+
+    // Verify the referenced takedown request exists
+    const takedownDoc = await fireDb.collection('takedownRequests').doc(takedownRequestId).get();
+    if (!takedownDoc.exists) {
+      return c.json({ code: 'NOT_FOUND', message: 'Takedown request not found' }, 404);
+    }
+
+    // Prevent duplicate counter-notices for the same takedown from the same email
+    const existing = await fireDb
+      .collection('counterNotices')
+      .where('takedownRequestId', '==', takedownRequestId)
+      .where('respondentEmail', '==', respondentEmail)
+      .limit(1)
+      .get();
+    if (!existing.empty) {
+      return c.json(
+        {
+          code: 'CONFLICT',
+          message: 'A counter-notice for this takedown from this email already exists',
+        },
+        409
+      );
+    }
+
+    const now = new Date();
+    const counterNotice = {
+      takedownRequestId,
+      respondentName,
+      respondentEmail,
+      respondentAddress,
+      explanation,
+      status: 'pending', // pending | reviewed | rejected
+      createdAt: now.toISOString(),
+    };
+
+    const ref = await fireDb.collection('counterNotices').add(counterNotice);
+
+    // Update the original takedown request status
+    await fireDb.collection('takedownRequests').doc(takedownRequestId).update({
+      status: 'counter_notice_received',
+      counterNoticeId: ref.id,
+      counterNoticeReceivedAt: now.toISOString(),
+    });
+
+    return c.json({
+      id: ref.id,
+      status: 'pending',
+      message:
+        'Counter-notice received. Under DMCA § 512(g), the original claimant has 10-14 business days ' +
+        'to file a court action. If no action is filed, the content may be restored.',
+    });
+  } catch (error) {
+    console.error('DMCA counter-notice error:', error);
+    return c.json(
+      { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to process counter-notice' },
+      500
+    );
+  }
+});
+
+// ── Public takedown status endpoint ──────────────────────────────────
+// Anyone can check the status of a takedown request and its counter-notice.
+app.get('/api/takedown/:id/status', async (c) => {
+  try {
+    const takedownId = c.req.param('id');
+
+    const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
+    if (!fbAvail || !fireDb) {
+      return c.json({ code: 'SERVICE_UNAVAILABLE', message: 'Service not available' }, 503);
+    }
+
+    const takedownDoc = await fireDb.collection('takedownRequests').doc(takedownId).get();
+    if (!takedownDoc.exists) {
+      return c.json({ code: 'NOT_FOUND', message: 'Takedown request not found' }, 404);
+    }
+
+    const takedown = takedownDoc.data()!;
+    const result: Record<string, unknown> = {
+      id: takedownId,
+      status: takedown.status,
+      createdAt: takedown.createdAt,
+      contentId: takedown.contentId,
+    };
+
+    // Include counter-notice info if one exists
+    if (takedown.counterNoticeId) {
+      const cnDoc = await fireDb.collection('counterNotices').doc(takedown.counterNoticeId).get();
+      if (cnDoc.exists) {
+        const cn = cnDoc.data()!;
+        result.counterNotice = {
+          id: cnDoc.id,
+          status: cn.status,
+          createdAt: cn.createdAt,
+        };
+      }
+    }
+
+    return c.json(result);
+  } catch (error) {
+    console.error('Takedown status error:', error);
+    return c.json(
+      { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch takedown status' },
+      500
+    );
+  }
+});
+
 // Stricter rate limits for AI generation endpoints: 10 requests/min per IP per endpoint
 app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
@@ -339,10 +484,17 @@ app.get('/api/collaboration/stream/:entityId', async (c) => {
   const entityId = c.req.param('entityId');
   if (!entityId) return c.json({ error: 'entityId required' }, 400);
 
-  // Auth check — extract token from query param or cookie
+  // Auth check — extract cookie token from Hono context
   let user: any;
   try {
-    user = await verifyAuth(c);
+    const { getCookie } = await import('hono/cookie');
+    const cookieToken = getCookie(c, 'siwe-session');
+    const headers = new Headers();
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey) headers.set('X-API-Key', apiKey);
+    const authHeader = c.req.header('Authorization');
+    if (authHeader) headers.set('Authorization', authHeader);
+    user = await verifyAuth(headers, cookieToken);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -511,12 +663,16 @@ async function gracefulShutdown(signal: string) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', async (error) => {
   console.error('Uncaught Exception:', error);
+  const { captureException, sentryEnabled } = await import('./lib/sentry');
+  if (sentryEnabled) captureException(error);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', async (reason, promise) => {
   console.error('Unhandled Promise Rejection at:', promise, 'Reason:', reason);
+  const { captureException, sentryEnabled } = await import('./lib/sentry');
+  if (sentryEnabled && reason instanceof Error) captureException(reason);
 });
 
 // Start pricing heartbeat (12-hour cycle)

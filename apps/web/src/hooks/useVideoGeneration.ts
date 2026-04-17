@@ -29,6 +29,14 @@ export interface StatusMessage {
   };
 }
 
+export interface SceneControlGenParams {
+  cameraPreset?: string | null;
+  cameraIntensity?: 'subtle' | 'standard' | 'pronounced';
+  castMemberIds?: string[];
+  stylePreset?: string | null;
+  startFrameUrl?: string | null;
+}
+
 export interface UseVideoGenerationProps {
   videoDescription: string;
   selectedVideoModel: VideoModel;
@@ -38,6 +46,7 @@ export interface UseVideoGenerationProps {
   videoPrompt: string;
   setGeneratedVideoUrl: (url: string | null) => void;
   setStatusMessage: (message: StatusMessage | null) => void;
+  sceneControls?: SceneControlGenParams;
 }
 
 export interface UseVideoGenerationReturn {
@@ -58,6 +67,7 @@ export function useVideoGeneration({
   videoPrompt,
   setGeneratedVideoUrl,
   setStatusMessage,
+  sceneControls,
 }: UseVideoGenerationProps): UseVideoGenerationReturn {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const { checkCredits, invalidateBalance } = useCreditCheck();
@@ -306,6 +316,16 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             duration: selectedVideoDuration,
             aspectRatio: videoRatio,
             negativePrompt: negativePrompt || undefined,
+            // Scene Controls (Node Editor Expansion v1)
+            ...(sceneControls?.cameraPreset ? { cameraPreset: sceneControls.cameraPreset } : {}),
+            ...(sceneControls?.cameraIntensity
+              ? { cameraIntensity: sceneControls.cameraIntensity }
+              : {}),
+            ...(sceneControls?.castMemberIds?.length
+              ? { castMemberIds: sceneControls.castMemberIds }
+              : {}),
+            ...(sceneControls?.stylePreset ? { stylePreset: sceneControls.stylePreset } : {}),
+            ...(sceneControls?.startFrameUrl ? { startFrameUrl: sceneControls.startFrameUrl } : {}),
           });
 
           if (result.videoUrl) {
@@ -353,6 +373,7 @@ ${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       setStatusMessage,
       checkCredits,
       invalidateBalance,
+      sceneControls,
     ]
   );
 

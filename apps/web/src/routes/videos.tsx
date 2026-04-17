@@ -510,11 +510,12 @@ function LongCard({ item }: { item: any }) {
         )}
         <div className="flex items-center justify-between mt-2">
           <div className="flex flex-wrap gap-1">
-            {item.tags?.slice(0, 2).map((tag: string) => (
-              <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
-                {tag}
-              </Badge>
-            ))}
+            {Array.isArray(item.tags) &&
+              item.tags.slice(0, 2).map((tag: string) => (
+                <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                  {tag}
+                </Badge>
+              ))}
           </div>
           <span className="text-[10px] text-muted-foreground">{item.views ?? 0} views</span>
         </div>

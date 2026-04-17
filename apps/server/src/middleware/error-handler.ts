@@ -4,9 +4,21 @@
  * { code: string, message: string, details?: unknown }
  */
 import type { Context } from 'hono';
+import { captureException, sentryEnabled } from '../lib/sentry';
 
 export function errorHandler(err: Error, c: Context) {
   console.error('Unhandled error:', err);
+
+  // Report 500-level errors to Sentry (skip 4xx client errors)
+  if (sentryEnabled) {
+    captureException(err, {
+      extra: {
+        method: c.req.method,
+        url: c.req.url,
+        path: c.req.path,
+      },
+    });
+  }
 
   // Only expose error details when LOAR_DEBUG_ERRORS is explicitly set.
   // Using NODE_ENV alone risks leaking stack traces if dev mode is

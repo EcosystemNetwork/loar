@@ -44,6 +44,7 @@ import { Route as AdsIndexRouteImport } from './routes/ads/index'
 import { Route as WikiKindRouteImport } from './routes/wiki/$kind'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$universeId'
+import { Route as TokensSwapRouteImport } from './routes/tokens/swap'
 import { Route as TokensPortfolioRouteImport } from './routes/tokens/portfolio'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
@@ -251,6 +252,11 @@ const TreasuryUniverseIdRoute = TreasuryUniverseIdRouteImport.update({
   path: '/treasury/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TokensSwapRoute = TokensSwapRouteImport.update({
+  id: '/tokens/swap',
+  path: '/tokens/swap',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TokensPortfolioRoute = TokensPortfolioRouteImport.update({
   id: '/tokens/portfolio',
   path: '/tokens/portfolio',
@@ -455,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
+  '/tokens/swap': typeof TokensSwapRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
@@ -523,6 +530,7 @@ export interface FileRoutesByTo {
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
+  '/tokens/swap': typeof TokensSwapRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
@@ -592,6 +600,7 @@ export interface FileRoutesById {
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
+  '/tokens/swap': typeof TokensSwapRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
@@ -662,6 +671,7 @@ export interface FileRouteTypes {
     | '/shop/$universeId'
     | '/tokens/$address'
     | '/tokens/portfolio'
+    | '/tokens/swap'
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
@@ -730,6 +740,7 @@ export interface FileRouteTypes {
     | '/shop/$universeId'
     | '/tokens/$address'
     | '/tokens/portfolio'
+    | '/tokens/swap'
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
@@ -798,6 +809,7 @@ export interface FileRouteTypes {
     | '/shop/$universeId'
     | '/tokens/$address'
     | '/tokens/portfolio'
+    | '/tokens/swap'
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
@@ -867,6 +879,7 @@ export interface RootRouteChildren {
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
   TokensPortfolioRoute: typeof TokensPortfolioRoute
+  TokensSwapRoute: typeof TokensSwapRoute
   TreasuryUniverseIdRoute: typeof TreasuryUniverseIdRoute
   UniverseIdRoute: typeof UniverseIdRouteWithChildren
   WikiKindRoute: typeof WikiKindRoute
@@ -1130,6 +1143,13 @@ declare module '@tanstack/react-router' {
       path: '/treasury/$universeId'
       fullPath: '/treasury/$universeId'
       preLoaderRoute: typeof TreasuryUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tokens/swap': {
+      id: '/tokens/swap'
+      path: '/tokens/swap'
+      fullPath: '/tokens/swap'
+      preLoaderRoute: typeof TokensSwapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tokens/portfolio': {
@@ -1416,6 +1436,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,
   TokensPortfolioRoute: TokensPortfolioRoute,
+  TokensSwapRoute: TokensSwapRoute,
   TreasuryUniverseIdRoute: TreasuryUniverseIdRoute,
   UniverseIdRoute: UniverseIdRouteWithChildren,
   WikiKindRoute: WikiKindRoute,

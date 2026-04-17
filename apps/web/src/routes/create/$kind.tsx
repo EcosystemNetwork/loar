@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Palette,
   ImagePlus,
+  Music,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -704,6 +705,9 @@ function EntityCreateForm() {
   const [generating, setGenerating] = useState(false);
   const [artworkPrompt, setArtworkPrompt] = useState('');
   const [showArtwork, setShowArtwork] = useState(false);
+  const [musicPrompt, setMusicPrompt] = useState('');
+  const [showMusic, setShowMusic] = useState(false);
+  const [generatingMusic, setGeneratingMusic] = useState(false);
   const [generatingArt, setGeneratingArt] = useState(false);
   const [unstoppableDomain, setUnstoppableDomain] = useState('');
 
@@ -824,6 +828,25 @@ function EntityCreateForm() {
           toast.error(`Entity created but artwork failed: ${artErr.message ?? 'Unknown error'}`);
         } finally {
           setGeneratingArt(false);
+        }
+      }
+
+      // If music prompt was provided, generate theme music and auto-attach
+      if (musicPrompt.trim()) {
+        setGeneratingMusic(true);
+        try {
+          await trpcClient.audio.generate.mutate({
+            prompt: musicPrompt.trim(),
+            mode: 'text_to_music',
+            durationSec: 15,
+            routingMode: 'auto',
+            entityId: result.id,
+          });
+          toast.success('Theme music generated!');
+        } catch (musicErr: any) {
+          toast.error(`Entity created but music failed: ${musicErr.message ?? 'Unknown error'}`);
+        } finally {
+          setGeneratingMusic(false);
         }
       }
 
@@ -1147,13 +1170,89 @@ function EntityCreateForm() {
           )}
         </Card>
 
+        {/* Optional AI Theme Music */}
+        <Card>
+          <CardHeader>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-left"
+              onClick={() => setShowMusic(!showMusic)}
+            >
+              <div className="flex items-center gap-2">
+                <Music className="w-4 h-4" />
+                <CardTitle className="text-base">AI Theme Music (Optional)</CardTitle>
+              </div>
+              {showMusic ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+          </CardHeader>
+          {showMusic && (
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Describe the theme music for this {label.toLowerCase()}. A 15-second track will be
+                generated and auto-attached. Leave empty to skip.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="musicPrompt">Music Prompt</Label>
+                <Textarea
+                  id="musicPrompt"
+                  value={musicPrompt}
+                  onChange={(e) => setMusicPrompt(e.target.value)}
+                  placeholder={`e.g. Epic orchestral theme for ${name || `this ${label.toLowerCase()}`}, cinematic and dramatic...`}
+                  rows={3}
+                />
+              </div>
+              {name.trim() && !musicPrompt.trim() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const autoPrompt =
+                      typedKind === 'person'
+                        ? `Character theme music for ${name}, ${fieldValues.role || ''} archetype, cinematic orchestral`
+                        : typedKind === 'place'
+                          ? `Ambient soundscape for ${name}, ${fieldValues.atmosphere || ''}, environmental audio`
+                          : typedKind === 'faction'
+                            ? `Faction anthem for ${name}, ${fieldValues.ideology || ''}, powerful and commanding`
+                            : typedKind === 'event'
+                              ? `Dramatic score for ${name}, ${fieldValues.era || ''}, tension and resolution`
+                              : `Theme music for ${name}, cinematic orchestral, ${description || ''}`;
+                    setMusicPrompt(autoPrompt.replace(/,\s*,/g, ',').replace(/,\s*$/, ''));
+                  }}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Auto-fill prompt from details
+                </Button>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
         <div className="flex gap-3">
           <Button
             type="submit"
-            disabled={saving || generatingArt || !name.trim() || (monetized && !rightsDeclaration)}
+            disabled={
+              saving ||
+              generatingArt ||
+              generatingMusic ||
+              !name.trim() ||
+              (monetized && !rightsDeclaration)
+            }
           >
-            {(saving || generatingArt) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {generatingArt ? 'Generating Artwork...' : saving ? 'Creating...' : `Create ${label}`}
+            {(saving || generatingArt || generatingMusic) && (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            )}
+            {generatingMusic
+              ? 'Generating Music...'
+              : generatingArt
+                ? 'Generating Artwork...'
+                : saving
+                  ? 'Creating...'
+                  : `Create ${label}`}
           </Button>
           <Link to="/create">
             <Button type="button" variant="outline">

@@ -893,14 +893,15 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
           )}
           <div className="flex items-center justify-between mt-2">
             <div className="flex gap-1 flex-wrap">
-              {item.tags?.slice(0, 2).map((tag: string) => (
-                <span
-                  key={tag}
-                  className="text-[10px] bg-white/10 text-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm"
-                >
-                  {tag}
-                </span>
-              ))}
+              {Array.isArray(item.tags) &&
+                item.tags.slice(0, 2).map((tag: string) => (
+                  <span
+                    key={tag}
+                    className="text-[10px] bg-white/10 text-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm"
+                  >
+                    {tag}
+                  </span>
+                ))}
             </div>
             <span className="text-white/50 text-xs">{item.views ?? 0} views</span>
           </div>
@@ -1024,11 +1025,12 @@ function LongCard({ item }: { item: any }) {
         )}
         <div className="flex items-center justify-between mt-2">
           <div className="flex flex-wrap gap-1">
-            {item.tags?.slice(0, 2).map((tag: string) => (
-              <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
-                {tag}
-              </Badge>
-            ))}
+            {Array.isArray(item.tags) &&
+              item.tags.slice(0, 2).map((tag: string) => (
+                <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                  {tag}
+                </Badge>
+              ))}
           </div>
           <span className="text-[10px] text-muted-foreground">{item.views ?? 0} views</span>
         </div>
@@ -1094,11 +1096,12 @@ function CreatorCard({ profile }: { profile: any }) {
             )}
 
             <div className="flex flex-wrap gap-1 mt-3">
-              {profile.tags?.slice(0, 4).map((tag: string) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
+              {Array.isArray(profile.tags) &&
+                profile.tags.slice(0, 4).map((tag: string) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
             </div>
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t">
@@ -1191,11 +1194,12 @@ function ContentFeedCard({ item }: { item: any }) {
             )}
             <div className="flex items-center justify-between mt-2">
               <div className="flex gap-1">
-                {item.tags?.slice(0, 2).map((tag: string) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
+                {Array.isArray(item.tags) &&
+                  item.tags.slice(0, 2).map((tag: string) => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
               </div>
               <span className="text-xs text-muted-foreground">{item.views ?? 0} views</span>
             </div>

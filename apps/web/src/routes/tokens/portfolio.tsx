@@ -192,7 +192,8 @@ function PortfolioPage() {
               >
                 <Card className="hover:border-primary/50 transition-all cursor-pointer">
                   <CardContent className="p-3">
-                    <div className="grid grid-cols-7 gap-2 items-center text-xs">
+                    {/* Desktop: table row */}
+                    <div className="hidden md:grid grid-cols-7 gap-2 items-center text-xs">
                       <div className="col-span-2 flex items-center gap-2">
                         {pos.token?.imageURL && (
                           <img
@@ -246,6 +247,63 @@ function PortfolioPage() {
                           {pos.totalPnl >= 0 ? '+' : ''}
                           {pos.totalPnl.toFixed(4)}
                         </span>
+                      </div>
+                    </div>
+
+                    {/* Mobile: compact card */}
+                    <div className="md:hidden space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {pos.token?.imageURL && (
+                            <img
+                              src={pos.token.imageURL}
+                              alt={pos.tokenSymbol}
+                              className="w-8 h-8 rounded-lg object-cover"
+                            />
+                          )}
+                          <div>
+                            <p className="font-semibold text-sm">${pos.tokenSymbol}</p>
+                            <p className="text-[10px] text-muted-foreground">{pos.trades} trades</p>
+                          </div>
+                        </div>
+                        <span
+                          className={`font-mono tabular-nums font-semibold text-sm ${
+                            pos.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'
+                          }`}
+                        >
+                          {pos.totalPnl >= 0 ? '+' : ''}
+                          {pos.totalPnl.toFixed(4)} ETH
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                        <div className="bg-muted/50 rounded px-1 py-1">
+                          <p className="text-muted-foreground">Holding</p>
+                          <p className="font-mono font-medium">
+                            {pos.netTokens >= 1e9
+                              ? `${(pos.netTokens / 1e9).toFixed(2)}B`
+                              : pos.netTokens >= 1e6
+                                ? `${(pos.netTokens / 1e6).toFixed(2)}M`
+                                : pos.netTokens >= 1e3
+                                  ? `${(pos.netTokens / 1e3).toFixed(1)}K`
+                                  : pos.netTokens.toFixed(0)}
+                          </p>
+                        </div>
+                        <div className="bg-muted/50 rounded px-1 py-1">
+                          <p className="text-muted-foreground">Value</p>
+                          <p className="font-mono font-medium">
+                            {pos.currentValue > 0 ? `${pos.currentValue.toFixed(4)}` : '--'}
+                          </p>
+                        </div>
+                        <div className="bg-muted/50 rounded px-1 py-1">
+                          <p className="text-muted-foreground">Price</p>
+                          <p className="font-mono font-medium">
+                            {pos.currentPrice != null
+                              ? pos.currentPrice < 0.001
+                                ? pos.currentPrice.toExponential(1)
+                                : pos.currentPrice.toFixed(6)
+                              : '--'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

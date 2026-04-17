@@ -353,50 +353,150 @@ async function findCyberWarUniverse(): Promise<`0x${string}` | null> {
   return null;
 }
 
-// ── Generate Video via Seedance 2.0 (free, ByteDance direct) ─────────────────
-async function generateVideo(token: string, prompt: string, sceneIndex: number): Promise<string> {
-  log(`VIDEO ${sceneIndex + 1}/10`, `Generating via Seedance 2.0 (free)...`);
-  log(`VIDEO ${sceneIndex + 1}/10`, `Prompt: "${prompt.slice(0, 100)}..."`);
+// ── Generate Video via Seedance 2.0 (free, ByteDance direct — bypasses tRPC/credits) ──
+const BYTEDANCE_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
+const BYTEDANCE_API_KEY = process.env.BYTEDANCE_API_KEY!;
+const BD_POLL_INTERVAL = 5000;
+const BD_MAX_POLLS = 60; // 5 min
 
-  const result = await tRPCMutate<{ videoUrl: string }>(
-    'generation.generateVideo',
-    {
-      prompt,
-      model: 'bytedance/seedance-2.0/text-to-video',
-      duration: 10,
-      aspectRatio: '16:9',
-    },
-    token
-  );
-
-  log(`VIDEO ${sceneIndex + 1}/10`, `Generated: ${result.videoUrl.slice(0, 80)}...`);
-  return result.videoUrl;
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-// ── Upload to Storage ─────────────────────────────────────────────────────────
+async function generateVideo(_token: string, prompt: string, sceneIndex: number): Promise<string> {
+  if (!BYTEDANCE_API_KEY) throw new Error('BYTEDANCE_API_KEY not set in .env');
+
+  log(`VIDEO ${sceneIndex + 1}/10`, `Generating via Seedance 2.0 (direct ByteDance API, free)...`);
+  log(`VIDEO ${sceneIndex + 1}/10`, `Prompt: "${prompt.slice(0, 100)}..."`);
+
+  // Create async task
+  const taskRes = await fetch(`${BYTEDANCE_BASE}/contents/generations/tasks`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${BYTEDANCE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'dreamina-seedance-2-0-260128',
+      content: [{ type: 'text', text: prompt }],
+      duration: 10,
+      aspect_ratio: '16:9',
+      resolution: '720p',
+      generate_audio: true,
+    }),
+  });
+
+  if (!taskRes.ok) {
+    const body = await taskRes.text();
+    throw new Error(`ByteDance create task ${taskRes.status}: ${body.slice(0, 300)}`);
+  }
+
+  const taskData = (await taskRes.json()) as any;
+  const taskId = taskData.id || taskData.task_id || taskData.job_id;
+  if (!taskId) throw new Error(`No task ID returned: ${JSON.stringify(taskData).slice(0, 200)}`);
+
+  log(`VIDEO ${sceneIndex + 1}/10`, `Task created: ${taskId} — polling...`);
+
+  // Poll for completion
+  for (let attempt = 0; attempt < BD_MAX_POLLS; attempt++) {
+    await sleep(BD_POLL_INTERVAL);
+
+    const pollRes = await fetch(`${BYTEDANCE_BASE}/contents/generations/tasks/${taskId}`, {
+      headers: { Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
+    });
+    if (!pollRes.ok) {
+      if (attempt < BD_MAX_POLLS - 1) continue;
+      throw new Error(`Poll failed: ${pollRes.status}`);
+    }
+
+    const status = (await pollRes.json()) as any;
+    const s = status.status?.toLowerCase();
+
+    if (s === 'completed' || s === 'succeeded' || s === 'success') {
+      const videoUrl =
+        status.content?.video_url ||
+        status.output?.video_url ||
+        status.output?.video?.url ||
+        status.result?.video_url;
+      if (!videoUrl) throw new Error('Task completed but no video URL');
+      log(`VIDEO ${sceneIndex + 1}/10`, `Done: ${videoUrl.slice(0, 80)}...`);
+      return videoUrl;
+    }
+
+    if (s === 'failed' || s === 'error' || s === 'cancelled') {
+      const msg = typeof status.error === 'string' ? status.error : status.error?.message || s;
+      throw new Error(`Task failed: ${msg}`);
+    }
+
+    if (attempt % 6 === 0) {
+      log(
+        `VIDEO ${sceneIndex + 1}/10`,
+        `Still generating... (${Math.round((attempt * BD_POLL_INTERVAL) / 1000)}s)`
+      );
+    }
+  }
+
+  throw new Error('Video generation timed out (5 min)');
+}
+
+// ── Upload to Pinata (direct, no tRPC) ───────────────────────────────────────
+const PINATA_JWT = process.env.PINATA_JWT!;
+const PINATA_GATEWAY = process.env.PINATA_GATEWAY_URL ?? 'https://gateway.pinata.cloud';
+
 async function uploadToStorage(
-  token: string,
+  _token: string,
   videoUrl: string,
   sceneIndex: number
 ): Promise<{ storageUrl: string; contentHash: string }> {
-  log(`UPLOAD ${sceneIndex + 1}/10`, 'Uploading to decentralized storage...');
+  if (!PINATA_JWT) {
+    log(`UPLOAD ${sceneIndex + 1}/10`, 'No PINATA_JWT — using ByteDance URL directly');
+    const hash = keccak256(toBytes(videoUrl));
+    return { storageUrl: videoUrl, contentHash: hash };
+  }
 
-  const manifest = await tRPCMutate<{
-    contentHash: string;
-    uploads: { url: string; provider: string }[];
-  }>(
-    'storage.upload',
-    {
-      url: videoUrl,
-      filename: `cyberwar-ep${sceneIndex + 1}-${SCENES[sceneIndex].title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}.mp4`,
-    },
-    token
+  log(`UPLOAD ${sceneIndex + 1}/10`, 'Downloading video from ByteDance...');
+  const videoRes = await fetch(videoUrl);
+  if (!videoRes.ok) throw new Error(`Failed to download video: ${videoRes.status}`);
+  const videoBuffer = await videoRes.arrayBuffer();
+  log(
+    `UPLOAD ${sceneIndex + 1}/10`,
+    `Downloaded: ${(videoBuffer.byteLength / 1024 / 1024).toFixed(1)} MB`
   );
 
-  const storageUrl = manifest.uploads[0]?.url || videoUrl;
-  log(`UPLOAD ${sceneIndex + 1}/10`, `Stored: ${storageUrl.slice(0, 80)}...`);
-  log(`UPLOAD ${sceneIndex + 1}/10`, `Content hash: ${manifest.contentHash.slice(0, 20)}...`);
-  return { storageUrl, contentHash: manifest.contentHash };
+  log(`UPLOAD ${sceneIndex + 1}/10`, 'Pinning to IPFS via Pinata...');
+  const slug = SCENES[sceneIndex].title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const filename = `cyberwar-ep${sceneIndex + 1}-${slug}.mp4`;
+
+  const form = new FormData();
+  form.append('file', new Blob([videoBuffer], { type: 'video/mp4' }), filename);
+  form.append(
+    'pinataMetadata',
+    JSON.stringify({ name: `Cyber War Ep${sceneIndex + 1}: ${SCENES[sceneIndex].title}` })
+  );
+
+  const pinRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${PINATA_JWT}` },
+    body: form,
+  });
+
+  if (!pinRes.ok) {
+    const text = await pinRes.text();
+    log(`UPLOAD ${sceneIndex + 1}/10`, `Pinata failed (${pinRes.status}), using ByteDance URL`);
+    const hash = keccak256(toBytes(videoUrl));
+    return { storageUrl: videoUrl, contentHash: hash };
+  }
+
+  const pinData = (await pinRes.json()) as { IpfsHash: string; PinSize: number };
+  const permanentUrl = `${PINATA_GATEWAY}/ipfs/${pinData.IpfsHash}`;
+  log(
+    `UPLOAD ${sceneIndex + 1}/10`,
+    `Pinned: ${pinData.IpfsHash} (${(pinData.PinSize / 1024 / 1024).toFixed(1)} MB)`
+  );
+
+  // Use IPFS hash as content hash (pad to bytes32)
+  const contentHash = keccak256(toBytes(pinData.IpfsHash));
+  return { storageUrl: permanentUrl, contentHash };
 }
 
 // ── Create On-Chain Node ──────────────────────────────────────────────────────
@@ -495,105 +595,68 @@ async function main() {
   log('STEP 1', `Universe admin: ${admin}`);
   log('STEP 1', `Our address: ${account.address}`);
 
-  // ── Step 2: Authenticate ────────────────────────────────────────────
-  log('STEP 2', 'Authenticating with SIWE...');
-  let authToken: string;
-  try {
-    authToken = await getAuthToken();
-  } catch (err: any) {
-    log('STEP 2', `Auth failed (server may not be running): ${err.message}`);
-    log('STEP 2', 'Falling back to direct on-chain node creation (no video generation)...');
-    await createNodesWithPlaceholders(universeAddr, latestId);
-    return;
-  }
+  // ── One-by-one: Generate → Pin → On-chain per episode ───────────────
+  log('PIPELINE', 'Processing 10 episodes one-by-one: Seedance 2.0 → Pinata → On-chain');
+  log('PIPELINE', 'Each episode: ~90s generate + ~10s upload + ~12s on-chain ≈ ~2 min each');
+  log('PIPELINE', 'Total estimated: ~15-20 minutes for all 10 episodes\n');
 
-  // ── Step 3: Generate 10 videos via Seedance 2.0 ────────────────────
-  log('STEP 3', 'Generating 10 videos via Seedance 2.0 (free ByteDance API)...');
-  log('STEP 3', 'Each video ~10s @ 16:9, premium cinematic quality with native audio.');
-  console.log('');
-
+  let previousId = latestId; // Chain off the last existing node
+  const nodes: { nodeId: bigint; txHash: `0x${string}` }[] = [];
   const videos: { url: string; storageUrl: string; contentHash: string }[] = [];
 
   for (let i = 0; i < SCENES.length; i++) {
     const scene = SCENES[i];
-    console.log(`\n${'─'.repeat(50)}`);
+    console.log(`\n${'═'.repeat(60)}`);
     console.log(`  Episode ${i + 1}/10: "${scene.title}"`);
-    console.log(`${'─'.repeat(50)}`);
+    console.log(`${'═'.repeat(60)}`);
 
+    // 1. Generate video via ByteDance direct
+    let videoUrl: string;
     try {
-      const videoUrl = await generateVideo(authToken, scene.prompt, i);
-      const { storageUrl, contentHash } = await uploadToStorage(authToken, videoUrl, i);
-      videos.push({ url: videoUrl, storageUrl, contentHash });
+      videoUrl = await generateVideo('', scene.prompt, i);
     } catch (err: any) {
-      log(
-        `VIDEO ${i + 1}/10`,
-        `Generation failed: ${JSON.stringify(err.message ?? err).slice(0, 400)}`
-      );
-      log(`VIDEO ${i + 1}/10`, 'Using placeholder content hash...');
-      const placeholderHash = keccak256(toBytes(`cyberwar-ep${i + 1}-${Date.now()}`));
-      videos.push({
-        url: `https://loar.fun/cyberwar/ep-${i + 1}-placeholder.mp4`,
-        storageUrl: `https://loar.fun/cyberwar/ep-${i + 1}-placeholder.mp4`,
-        contentHash: placeholderHash,
-      });
+      log(`EP ${i + 1}`, `VIDEO FAILED: ${err.message?.slice(0, 200)}`);
+      log(`EP ${i + 1}`, 'Skipping this episode — continuing with next...');
+      continue;
     }
-  }
 
-  // ── Step 4: Deploy 10 nodes on-chain (sequential chain) ────────────
-  log('STEP 4', 'Deploying 10 sequential nodes on-chain...');
-
-  let previousId = latestId; // Chain off the last existing node (0 if empty)
-  const nodes: { nodeId: bigint; txHash: `0x${string}` }[] = [];
-
-  for (let i = 0; i < SCENES.length; i++) {
-    const scene = SCENES[i];
-    const video = videos[i];
-
-    const result = await createNode(
-      universeAddr,
-      video.contentHash,
-      scene.description,
-      previousId,
-      video.storageUrl,
-      i
-    );
-
-    nodes.push(result);
-    previousId = result.nodeId;
-  }
-
-  // ── Step 5: Generate wiki entries ───────────────────────────────────
-  log('STEP 5', 'Generating wiki entries for narrative context...');
-
-  for (let i = 0; i < SCENES.length; i++) {
-    const scene = SCENES[i];
-    const video = videos[i];
-    const node = nodes[i];
-
-    const previousEvents = SCENES.slice(0, i).map((s) => ({
-      title: s.title,
-      description: s.description,
-    }));
-
+    // 2. Pin to Pinata (or use ByteDance URL as fallback)
+    let storageUrl: string;
+    let contentHash: string;
     try {
-      await tRPCMutate(
-        'wiki.generateFromVideo',
-        {
-          universeId: universeAddr,
-          eventId: String(node.nodeId),
-          videoUrl: video.storageUrl,
-          title: scene.title,
-          description: scene.description,
-          previousEvents: previousEvents.length > 0 ? previousEvents : undefined,
-        },
-        authToken
-      );
-      log(`WIKI ${i + 1}/10`, `Wiki generated for "${scene.title}"`);
+      const uploaded = await uploadToStorage('', videoUrl, i);
+      storageUrl = uploaded.storageUrl;
+      contentHash = uploaded.contentHash;
     } catch (err: any) {
-      log(
-        `WIKI ${i + 1}/10`,
-        `Wiki generation failed (non-blocking): ${err.message?.slice(0, 100)}`
+      log(`EP ${i + 1}`, `UPLOAD FAILED: ${err.message?.slice(0, 200)}`);
+      storageUrl = videoUrl;
+      contentHash = keccak256(toBytes(videoUrl));
+    }
+
+    videos.push({ url: videoUrl, storageUrl, contentHash });
+
+    // 3. Create on-chain node
+    try {
+      const result = await createNode(
+        universeAddr,
+        contentHash,
+        scene.description,
+        previousId,
+        storageUrl,
+        i
       );
+      nodes.push(result);
+      previousId = result.nodeId;
+      log(`EP ${i + 1}`, `DONE — Node #${result.nodeId} with real Seedance 2.0 video`);
+    } catch (err: any) {
+      log(`EP ${i + 1}`, `ON-CHAIN FAILED: ${err.message?.slice(0, 200)}`);
+      log(`EP ${i + 1}`, 'Video was generated but node creation failed — continuing...');
+    }
+
+    // Brief pause between episodes to be nice to the API
+    if (i < SCENES.length - 1) {
+      log(`EP ${i + 1}`, 'Waiting 2s before next episode...');
+      await sleep(2000);
     }
   }
 

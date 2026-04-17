@@ -20,6 +20,7 @@ import { falService } from '../../services/fal';
 import { bytedanceService } from '../../services/bytedance';
 import type { ByteDanceVideoOptions } from '../../services/bytedance';
 import { getStorageManager } from '../../services/storage';
+import { signWithProvenance } from '../../services/provenance';
 import {
   routeModel,
   validateManualSelection,
@@ -339,13 +340,28 @@ async function persistVideoToStorage(opts: {
   generationId: string;
   videoUrl: string;
   userId: string;
+  modelId?: string;
+  prompt?: string;
 }) {
   try {
     const manager = getStorageManager();
     const filename = `generation-${opts.generationId}.mp4`;
     console.log(`[persist] Uploading ${filename} to permanent storage...`);
 
-    const manifest = await manager.uploadFromUrl(opts.videoUrl, filename, opts.userId);
+    // Fetch the video, sign with C2PA provenance, then upload
+    const response = await fetch(opts.videoUrl);
+    const arrayBuf = await response.arrayBuffer();
+    let videoBuffer = Buffer.from(new Uint8Array(arrayBuf));
+
+    // Sign with C2PA content provenance metadata
+    videoBuffer = await signWithProvenance(videoBuffer, filename, {
+      model: opts.modelId || 'unknown',
+      prompt: opts.prompt,
+      generatedAt: new Date().toISOString(),
+      mimeType: 'video/mp4',
+    });
+
+    const manifest = await manager.upload(videoBuffer, filename, 'video/mp4', opts.userId);
     const permanentUrl = manifest.uploads[0]?.url;
 
     if (permanentUrl) {
@@ -857,6 +873,8 @@ export const generationRouter = router({
                 generationId,
                 videoUrl: fallbackResult.videoUrl,
                 userId: ctx.user.uid,
+                modelId: fallbackResult.fallbackModelId,
+                prompt: originalPrompt,
               }).catch(() => {});
 
               // Auto-publish fallback video to gallery
@@ -935,6 +953,8 @@ export const generationRouter = router({
           generationId,
           videoUrl: result.videoUrl!,
           userId: ctx.user.uid,
+          modelId: finalModelId,
+          prompt: originalPrompt,
         }).catch(() => {}); // swallow — non-blocking
 
         // Auto-publish video to gallery
@@ -1257,36 +1277,100 @@ export const generationRouter = router({
         generateAudio: z.boolean().optional(),
         endImageUrl: z.string().url().optional(),
         seed: z.number().optional(),
+
+        // Scene Controls (Node Editor Expansion v1)
+        cameraPreset: z.string().nullable().optional(),
+        cameraIntensity: z.enum(['subtle', 'standard', 'pronounced']).optional(),
+        castMemberIds: z.array(z.string()).max(5).optional(),
+        stylePreset: z.string().nullable().optional(),
+        startFrameUrl: z.string().url().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video');
       const startTime = Date.now();
+
+      // Scene Controls: Apply style preset to prompt
+      let prompt = input.prompt;
+      if (input.stylePreset) {
+        prompt = applyStyleToPrompt(prompt, input.stylePreset as StylePresetId);
+      }
+
+      // Scene Controls: Resolve cast member reference images
+      let castRefUrls: string[] = [];
+      if (input.castMemberIds && input.castMemberIds.length > 0 && db) {
+        try {
+          const castDocs = await Promise.all(
+            input.castMemberIds.map((cid) => db.collection('castMembers').doc(cid).get())
+          );
+          castRefUrls = castDocs
+            .filter((doc) => doc.exists)
+            .flatMap((doc) => doc.data()?.referenceImageUrls || [])
+            .filter(Boolean);
+        } catch {
+          /* non-fatal */
+        }
+      }
+
+      // Scene Controls: Start frame URL as input image for keyframe handoff
+      if (input.startFrameUrl && !input.imageUrl) {
+        input.imageUrl = input.startFrameUrl;
+      }
+
       let result;
       try {
         // Dispatch Seedance models to ByteDance direct API, everything else to FAL
         const isByteDance = input.model?.startsWith('bytedance/');
+
+        // Scene Controls: Camera preset translation
+        let cameraParams: Record<string, any> = {};
+        let cameraPromptSuffix = '';
+        if (input.cameraPreset) {
+          const translated = translateCameraPreset(
+            isByteDance ? 'bytedance' : 'fal',
+            input.cameraPreset as CameraPresetId,
+            (input.cameraIntensity as CameraIntensity) || 'standard'
+          );
+          cameraParams = translated.providerParams;
+          cameraPromptSuffix = translated.promptSuffix;
+        }
+
+        if (cameraPromptSuffix) {
+          prompt = `${prompt}, ${cameraPromptSuffix}`;
+        }
+
+        // Determine ByteDance mode (accounting for cast reference images)
+        let bdMode: 'text_to_video' | 'image_to_video' | 'reference_to_video' = 'text_to_video';
+        if (isByteDance) {
+          if (input.model?.includes('reference') || castRefUrls.length > 0) {
+            bdMode = 'reference_to_video';
+          } else if (input.imageUrl) {
+            bdMode = 'image_to_video';
+          }
+        }
+
         result = isByteDance
           ? await bytedanceService.generateVideo({
-              prompt: input.prompt,
+              prompt,
               model: input.model?.includes('fast')
                 ? 'dreamina-seedance-2-0-fast-260128'
                 : 'dreamina-seedance-2-0-260128',
-              mode: input.model?.includes('reference')
-                ? 'reference_to_video'
-                : input.imageUrl
-                  ? 'image_to_video'
-                  : 'text_to_video',
+              mode: bdMode,
               imageUrl: input.imageUrl,
               endImageUrl: input.endImageUrl,
+              referenceImages:
+                castRefUrls.length > 0
+                  ? castRefUrls.map((url) => ({ url, role: 'subject' as const }))
+                  : undefined,
               duration: input.duration,
               aspectRatio: input.aspectRatio,
               resolution: input.resolution,
               audio: input.generateAudio,
               negativePrompt: input.negativePrompt,
               seed: input.seed,
+              ...cameraParams,
             })
-          : await falService.generateVideo(input);
+          : await falService.generateVideo({ ...input, prompt });
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
         throw genError;

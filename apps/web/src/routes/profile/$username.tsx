@@ -432,11 +432,12 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
           )}
           <div className="flex items-center justify-between mt-2">
             <div className="flex gap-2">
-              {item.tags?.slice(0, 3).map((tag: string) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
+              {Array.isArray(item.tags) &&
+                item.tags.slice(0, 3).map((tag: string) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
             </div>
             <span className="text-xs text-muted-foreground">{item.views} views</span>
           </div>

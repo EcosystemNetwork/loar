@@ -1,4 +1,4 @@
-# LOAR: Decentralized Narrative Control Suite
+# LOAR: Narrative Control Suite
 
 <div align="center">
 
@@ -6,7 +6,7 @@
 
 ### _Create AI-powered cinematic universes. Own them on-chain. Monetize them._
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
 [![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 [![Sepolia + Base Sepolia](https://img.shields.io/badge/Network-Sepolia%20%2B%20Base%20Sepolia-blue)](https://sepolia.etherscan.io/)
@@ -23,6 +23,26 @@ LOAR is a platform where creators deploy cinematic universes as smart contracts,
 **One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
 
 **Live testnet demo:** [loar.fun](https://loar.fun) (Sepolia + Base Sepolia)
+
+### Hybrid Architecture — What's On-Chain vs Off-Chain
+
+LOAR uses a **hybrid architecture** by design. Here's what lives where and why:
+
+| Layer                                      | Where                                 | Why                                                               |
+| ------------------------------------------ | ------------------------------------- | ----------------------------------------------------------------- |
+| **Universe ownership, governance, tokens** | On-chain (EVM)                        | Immutable ownership, trustless governance, permissionless trading |
+| **NFTs, royalties, payments, licensing**   | On-chain (EVM)                        | Enforceable revenue splits, transparent fee flows                 |
+| **Content bytes (video, images, audio)**   | Pinata (IPFS) + Lighthouse (Filecoin) | Content-addressed, redundant, accessible via gateway              |
+| **Content hashes**                         | On-chain (Universe contract)          | Proof of existence, tamper detection                              |
+| **User profiles, analytics, moderation**   | Firestore (cloud)                     | Fast reads, complex queries, mutable by design                    |
+| **AI generation orchestration**            | Cloud server (Hono/tRPC)              | API key management, model routing, rate limiting                  |
+
+**What this means in practice:**
+
+- If LOAR the platform disappears, your universe contracts, tokens, and NFTs continue to exist on-chain. Content is retrievable via IPFS/Filecoin CIDs.
+- The discovery layer (wiki, search, analytics, moderation) is centralized and would need to be rebuilt or replaced by the community.
+- We chose this tradeoff intentionally: fully on-chain content storage is cost-prohibitive for video, and centralized metadata enables the UX creators need (search, moderation, real-time collaboration).
+- The long-term goal is progressive decentralization — universe content is editable and lives in the cloud until creators commit it on-chain, at which point it becomes permanent and verifiable.
 
 ---
 

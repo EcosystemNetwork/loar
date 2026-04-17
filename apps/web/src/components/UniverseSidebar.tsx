@@ -44,7 +44,7 @@ import { TokenSwapWidget } from '@/components/TokenSwapWidget';
 import { SubscribeDialog } from '@/components/SubscribeDialog';
 import { UniverseAccessSettings } from '@/components/UniverseAccessSettings';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
-import { Crown, Settings, Pencil } from 'lucide-react';
+import { Crown, Settings, Pencil, Music } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { trpcClient } from '@/utils/trpc';
@@ -63,6 +63,7 @@ interface UniverseSidebarProps {
   handleRefreshTimeline: () => void;
   onOpenGovernance?: () => void;
   onOpenGenerations?: () => void;
+  onOpenMusicStudio?: () => void;
 }
 
 export function UniverseSidebar({
@@ -76,6 +77,7 @@ export function UniverseSidebar({
   handleRefreshTimeline,
   onOpenGovernance,
   onOpenGenerations,
+  onOpenMusicStudio,
 }: UniverseSidebarProps) {
   const chainId = useChainId();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -438,6 +440,19 @@ export function UniverseSidebar({
                 >
                   <Film className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-purple-600 dark:text-purple-400" />
                   Generations
+                </Button>
+              )}
+
+              {/* Music Studio button */}
+              {onOpenMusicStudio && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenMusicStudio}
+                  className="w-full bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-950/50 dark:hover:to-orange-950/50 border-amber-200 dark:border-amber-800 transition-all duration-300 group h-10"
+                >
+                  <Music className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300 text-amber-600 dark:text-amber-400" />
+                  Music Studio
                 </Button>
               )}
 

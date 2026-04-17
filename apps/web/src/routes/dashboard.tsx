@@ -1,12 +1,12 @@
 /**
- * Dashboard Route
+ * Dashboard — Creator command center.
  *
- * Authenticated user dashboard showing owned/available narrative universes,
- * an AI media generation section, and navigation to create new universes.
- * Redirects to /login when unauthenticated.
+ * Real data from: portfolio.summary, credits.getBalance, revenue.getDashboard,
+ * staking.getProfile, useTokenListData, useMyNFTs.
+ * Replaces the old static layout with a data-driven, responsive dashboard.
  */
 
-import { createFileRoute, redirect, useNavigate, Link as RouterLink } from '@tanstack/react-router';
+import { createFileRoute, redirect, Link as RouterLink } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import {
   Play,
   Users,
-  Calendar,
   Plus,
   Wand2,
   Film,
   Rocket,
-  ShoppingBag,
   TrendingUp,
   Upload,
   Search,
@@ -33,16 +31,31 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Coins,
+  Wallet,
+  BarChart3,
+  Zap,
+  Crown,
+  ArrowUpRight,
+  ArrowDownRight,
+  ExternalLink,
+  ShoppingBag,
+  Activity,
+  Star,
+  Bell,
+  BookOpen,
+  Paintbrush,
+  Video,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GenerativeMedia } from '@/components/GenerativeMedia';
 import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
-import { MonetizationOverview } from '@/components/MonetizationOverview';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { UploadForm } from '@/components/UploadForm';
-import { useMyNFTs } from '@/hooks/useRevenue';
+import { useCreditBalance, useMyNFTs } from '@/hooks/useRevenue';
+import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
 import { LPYieldManager } from '@/components/LPYieldManager';
 import { toast } from 'sonner';
 
@@ -62,16 +75,38 @@ function RouteComponent() {
   const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = Route.useNavigate();
 
-  // Auth is now checked in beforeLoad — no useEffect redirect needed
+  // ── Real data hooks ─────────────────────────────────────────────────
+  const { data: creditData } = useCreditBalance();
+  const { data: myNfts } = useMyNFTs();
+  const { data: tokenList } = useTokenListData();
 
-  // Fetch user's universes (by creator address)
+  const { data: portfolioData } = useQuery({
+    queryKey: ['portfolio-summary'],
+    queryFn: () => trpcClient.portfolio.summary.query(),
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+  });
+
+  const { data: revenueData } = useQuery({
+    queryKey: ['revenue-dashboard'],
+    queryFn: () => trpcClient.revenue.getDashboard.query(),
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+  });
+
+  const { data: stakingProfile } = useQuery({
+    queryKey: ['staking-profile'],
+    queryFn: () => trpcClient.staking.getProfile.query(),
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+  });
+
   const { data: myUniverses, isLoading: isLoadingMine } = useQuery({
     queryKey: ['my-universes', address],
     queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
     enabled: !!address,
   });
 
-  // Fetch all universes for discovery
   const { data: allUniverses, isLoading: isLoadingAll } = useQuery({
     queryKey: ['all-universes'],
     queryFn: () => trpcClient.universes.getAll.query(),
@@ -80,25 +115,13 @@ function RouteComponent() {
   const isLoading = isLoadingMine || isLoadingAll;
 
   const selectUniverse = (universeId: string) => {
-    navigate({
-      to: '/universe/$id',
-      params: { id: universeId },
-    });
-  };
-
-  const createNewUniverse = () => {
-    navigate({
-      to: '/cinematicUniverseCreate',
-    });
+    navigate({ to: '/universe/$id', params: { id: universeId } });
   };
 
   if (isAuthenticating || !isConnected) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Connecting...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -106,10 +129,7 @@ function RouteComponent() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading universes...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -119,117 +139,215 @@ function RouteComponent() {
   const otherUniverses = allUniverseList.filter(
     (u: any) => !myUniverseList.some((m: any) => m.id === u.id)
   );
-  const universes = [...myUniverseList, ...otherUniverses];
+
+  // Derived stats
+  const creditBalance = creditData?.balance ?? 0;
+  const totalSpent = creditData?.totalSpent ?? 0;
+  const revenue30d = (revenueData as any)?.totalEarned30d ?? 0;
+  const revenueBySource = (revenueData as any)?.bySource ?? {};
+  const revenueTxCount = (revenueData as any)?.transactionCount30d ?? 0;
+  const stakingTier = (stakingProfile as any)?.tier ?? 'NONE';
+  const stakedAmount = (stakingProfile as any)?.stakedAmount ?? 0;
+  const universesOwned = (portfolioData as any)?.universesOwned ?? myUniverseList.length;
+  const activeSubscriptions = (portfolioData as any)?.activeSubscriptions ?? 0;
+  const totalCollectibles = (portfolioData as any)?.totalCollectibles ?? 0;
+  const episodesListed = myNfts?.createdEpisodes?.length ?? 0;
+  const nftsCollected = myNfts?.mintedEpisodes?.length ?? 0;
+
+  // Token portfolio — user's deployed tokens
+  const myTokens = useMemo(() => {
+    if (!tokenList?.length || !address) return [];
+    return tokenList.filter(
+      (t: EnrichedToken) => t.deployer?.toLowerCase() === address.toLowerCase()
+    );
+  }, [tokenList, address]);
+
+  const totalTokenMarketCap = myTokens.reduce(
+    (sum: number, t: EnrichedToken) => sum + (t.marketCap ?? 0),
+    0
+  );
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Dashboard Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold">
-                Welcome back{address ? `, ${address.slice(0, 6)}...${address.slice(-4)}` : ''}
+              <h1 className="text-xl sm:text-2xl font-bold">
+                Welcome back
+                {address && (
+                  <span className="text-muted-foreground font-mono text-base sm:text-lg ml-2">
+                    {address.slice(0, 6)}...{address.slice(-4)}
+                  </span>
+                )}
               </h1>
-              <p className="text-muted-foreground">Select a narrative universe to explore</p>
+              <p className="text-sm text-muted-foreground">Your creator command center</p>
             </div>
-            <Button onClick={createNewUniverse} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create Universe
-            </Button>
+            <div className="flex items-center gap-2">
+              <RouterLink to="/tokens">
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Rocket className="h-3.5 w-3.5" />
+                  Launchpad
+                </Button>
+              </RouterLink>
+              <RouterLink to="/create">
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Universe
+                </Button>
+              </RouterLink>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8 flex gap-8">
-        {/* Main Content */}
-        <div className="flex-1 min-w-0">
-          {/* Featured Universe Section */}
-          {universes.length > 0 && (
-            <section className="mb-12">
-              <h2 className="text-xl font-semibold mb-6">Featured Universe</h2>
-              <div className="relative">
-                <Card
-                  className="cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden h-64 bg-gradient-to-r from-blue-600 to-purple-600"
-                  onClick={() => selectUniverse(universes[0].id)}
-                >
-                  <CardContent className="p-0 h-full relative">
-                    <div className="absolute inset-0 bg-black/40" />
-                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                      <h3 className="text-2xl font-bold mb-2">{universes[0].name}</h3>
-                      <p className="text-sm opacity-90 mb-4">
-                        {universes[0].description || 'A captivating narrative universe awaits'}
-                      </p>
-                      <Button
-                        variant="secondary"
-                        className="flex items-center gap-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectUniverse(universes[0].id);
-                        }}
-                      >
-                        <Play className="h-4 w-4" />
-                        Enter Timeline
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6">
+        {/* ── Main Content ──────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 space-y-8">
+          {/* ── Stats Row ──────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <StatCard
+              icon={<Coins className="h-4 w-4 text-amber-500" />}
+              label="Credits"
+              value={creditBalance.toLocaleString()}
+              sub={totalSpent > 0 ? `${totalSpent.toLocaleString()} spent` : undefined}
+              accent="amber"
+            />
+            <StatCard
+              icon={<TrendingUp className="h-4 w-4 text-green-500" />}
+              label="Revenue (30d)"
+              value={revenue30d > 0 ? `${revenue30d.toFixed(4)} ETH` : '--'}
+              sub={revenueTxCount > 0 ? `${revenueTxCount} txns` : undefined}
+              accent="green"
+            />
+            <StatCard
+              icon={<Globe className="h-4 w-4 text-blue-500" />}
+              label="Universes"
+              value={String(universesOwned)}
+              sub={myTokens.length > 0 ? `${myTokens.length} tokenized` : undefined}
+              accent="blue"
+            />
+            <StatCard
+              icon={<Film className="h-4 w-4 text-purple-500" />}
+              label="Episodes"
+              value={String(episodesListed + nftsCollected)}
+              sub={
+                episodesListed > 0 ? `${episodesListed} listed · ${nftsCollected} owned` : undefined
+              }
+              accent="purple"
+            />
+            <StatCard
+              icon={<Crown className="h-4 w-4 text-orange-500" />}
+              label="Staking"
+              value={stakingTier !== 'NONE' ? stakingTier : '--'}
+              sub={stakedAmount > 0 ? `${stakedAmount.toLocaleString()} $LOAR` : 'Not staked'}
+              accent="orange"
+            />
+            <StatCard
+              icon={<ShoppingBag className="h-4 w-4 text-pink-500" />}
+              label="Collectibles"
+              value={String(totalCollectibles)}
+              sub={activeSubscriptions > 0 ? `${activeSubscriptions} subs` : undefined}
+              accent="pink"
+            />
+          </div>
+
+          {/* ── Quick Actions ────────────────────────────────────────── */}
+          <section>
+            <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+              Quick Actions
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <RouterLink to="/create">
+                <QuickAction icon={<Plus className="h-4 w-4" />} label="New Universe" />
+              </RouterLink>
+              <RouterLink to="/create/$kind" params={{ kind: 'person' }}>
+                <QuickAction icon={<Paintbrush className="h-4 w-4" />} label="New Character" />
+              </RouterLink>
+              <RouterLink to="/videos">
+                <QuickAction icon={<Video className="h-4 w-4" />} label="Generate Video" />
+              </RouterLink>
+              <RouterLink to="/wiki">
+                <QuickAction icon={<BookOpen className="h-4 w-4" />} label="Browse Wiki" />
+              </RouterLink>
+            </div>
+          </section>
+
+          {/* ── Revenue Breakdown (only if has revenue) ─────────────────── */}
+          {revenue30d > 0 && Object.keys(revenueBySource).length > 0 && (
+            <RevenueBreakdown bySource={revenueBySource} total={revenue30d} />
+          )}
+
+          {/* ── Token Portfolio (only if has deployed tokens) ───────────── */}
+          {myTokens.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  <h2 className="text-lg font-semibold">Your Tokens</h2>
+                  {totalTokenMarketCap > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {totalTokenMarketCap >= 1000
+                        ? `${(totalTokenMarketCap / 1000).toFixed(1)}K ETH MCap`
+                        : `${totalTokenMarketCap.toFixed(2)} ETH MCap`}
+                    </Badge>
+                  )}
+                </div>
+                <RouterLink to="/tokens/portfolio">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    Full Portfolio <ArrowUpRight className="h-3 w-3" />
+                  </Button>
+                </RouterLink>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {myTokens.slice(0, 6).map((token: EnrichedToken) => (
+                  <TokenMiniCard key={token.id} token={token} />
+                ))}
               </div>
             </section>
           )}
 
-          {/* Monetization Overview */}
-          <MonetizationOverview />
-
-          {/* Creator Earnings Summary */}
-          <CreatorEarnings />
-
-          {/* Upload */}
-          <UploadSection />
-
-          {/* My Works */}
-          <MyWorksSection />
-
-          {/* AI Media Generation Section */}
-          <section className="mb-12">
-            <div className="flex items-center gap-2 mb-6">
-              <Wand2 className="h-5 w-5" />
-              <h2 className="text-xl font-semibold">AI Media Generation</h2>
+          {/* ── Your Universes ─────────────────────────────────────────── */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Your Universes</h2>
+              {myUniverseList.length > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {myUniverseList.length}
+                </Badge>
+              )}
             </div>
-            <GenerativeMedia />
-          </section>
-
-          {/* Your Universes */}
-          <section className="mb-12">
-            <h2 className="text-xl font-semibold mb-6">Your Universes</h2>
             {myUniverseList.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mb-4">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">No universes yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first narrative universe to get started
-                </p>
-                <Button onClick={createNewUniverse} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Your First Universe
-                </Button>
-              </div>
+              <Card className="border-dashed">
+                <CardContent className="text-center py-12">
+                  <Globe className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <h3 className="font-medium mb-1">No universes yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create your first narrative universe to start building
+                  </p>
+                  <RouterLink to="/create">
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Universe
+                    </Button>
+                  </RouterLink>
+                </CardContent>
+              </Card>
             ) : (
               <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
             )}
           </section>
 
-          {/* LP Yield Management — shown for universes with tokens */}
+          {/* ── LP Yield Management ────────────────────────────────────── */}
           {myUniverseList.filter(
             (u: any) =>
               u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000'
           ).length > 0 && (
-            <section className="mb-12">
-              <div className="flex items-center gap-2 mb-6">
+            <section>
+              <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="h-5 w-5" />
-                <h2 className="text-xl font-semibold">LP Yield & Fee Management</h2>
+                <h2 className="text-lg font-semibold">LP Yield & Fees</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {myUniverseList
@@ -252,18 +370,51 @@ function RouteComponent() {
             </section>
           )}
 
-          {/* Other Universes */}
+          {/* ── Upload ─────────────────────────────────────────────────── */}
+          <UploadSection />
+
+          {/* ── My Works ───────────────────────────────────────────────── */}
+          <MyWorksSection />
+
+          {/* ── AI Media Generation ────────────────────────────────────── */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Wand2 className="h-5 w-5" />
+              <h2 className="text-lg font-semibold">AI Media Generation</h2>
+              {creditBalance > 0 && (
+                <Badge variant="outline" className="text-xs ml-auto">
+                  {creditBalance.toLocaleString()} credits available
+                </Badge>
+              )}
+            </div>
+            <GenerativeMedia />
+          </section>
+
+          {/* ── Recent Activity Feed ──────────────────────────────────── */}
+          <ActivityFeedWidget />
+
+          {/* ── Explore Other Universes ─────────────────────────────────── */}
           {otherUniverses.length > 0 && (
             <section>
-              <h2 className="text-xl font-semibold mb-6">Explore All Universes</h2>
-              <UniverseGrid universes={otherUniverses} onSelect={selectUniverse} />
+              <h2 className="text-lg font-semibold mb-4">Explore Universes</h2>
+              <UniverseGrid universes={otherUniverses.slice(0, 8)} onSelect={selectUniverse} />
+              {otherUniverses.length > 8 && (
+                <div className="text-center mt-4">
+                  <RouterLink to="/">
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      View All <ArrowUpRight className="h-3 w-3" />
+                    </Button>
+                  </RouterLink>
+                </div>
+              )}
             </section>
           )}
         </div>
 
-        {/* Sidebar — Check-in + Quests & Rewards */}
+        {/* ── Sidebar ──────────────────────────────────────────────────── */}
         <aside className="hidden lg:block w-80 flex-shrink-0">
           <div className="sticky top-20 space-y-4">
+            <NotificationsWidget />
             <DailyCheckin />
             <QuestsPanel />
           </div>
@@ -273,65 +424,176 @@ function RouteComponent() {
   );
 }
 
-function CreatorEarnings() {
-  const { data: myNfts, isLoading } = useMyNFTs();
+// ─── Stats Card ──────────────────────────────────────────────────────
 
-  const episodesListed = myNfts?.createdEpisodes?.length ?? 0;
-  const totalMinted =
-    myNfts?.createdEpisodes?.reduce((sum: number, ep: any) => sum + (ep.minted || 0), 0) ?? 0;
-  const nftsCollected = myNfts?.mintedEpisodes?.length ?? 0;
+function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+  accent: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className={`p-1.5 rounded-md bg-${accent}-500/10`}>{icon}</div>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+            {label}
+          </span>
+        </div>
+        <p className="text-lg font-bold tabular-nums leading-tight">{value}</p>
+        {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+      </CardContent>
+    </Card>
+  );
+}
 
-  if (isLoading) return null;
-  if (episodesListed === 0 && nftsCollected === 0) return null;
+// ─── Revenue Breakdown ───────────────────────────────────────────────
+
+const SOURCE_LABELS: Record<string, { label: string; icon: string }> = {
+  nft_sales: { label: 'NFT Sales', icon: '🎬' },
+  subscriptions: { label: 'Subscriptions', icon: '👥' },
+  credits: { label: 'Credits', icon: '⚡' },
+  licensing: { label: 'IP Licensing', icon: '📜' },
+  canon_royalties: { label: 'Canon Royalties', icon: '🗳️' },
+  ads: { label: 'Ad Revenue', icon: '📢' },
+  appearance_fees: { label: 'Appearance Fees', icon: '🧬' },
+  merch: { label: 'Merch', icon: '🛍️' },
+  collabs: { label: 'Collabs', icon: '🤝' },
+};
+
+function RevenueBreakdown({
+  bySource,
+  total,
+}: {
+  bySource: Record<string, number>;
+  total: number;
+}) {
+  const sorted = Object.entries(bySource).sort(([, a], [, b]) => b - a);
 
   return (
-    <section className="mb-12">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="h-5 w-5" />
-        <h2 className="text-xl font-semibold">Creator Earnings</h2>
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          <h2 className="text-lg font-semibold">Revenue (30d)</h2>
+        </div>
+        <span className="text-sm font-bold text-green-500 tabular-nums">
+          {total.toFixed(4)} ETH
+        </span>
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Film className="h-4 w-4" />
-              <span className="text-sm">Episodes Listed</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {sorted.map(([source, amount]) => {
+          const meta = SOURCE_LABELS[source] ?? { label: source, icon: '💰' };
+          const pct = total > 0 ? (amount / total) * 100 : 0;
+          return (
+            <div
+              key={source}
+              className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
+            >
+              <span className="text-lg">{meta.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium">{meta.label}</span>
+                  <span className="text-xs font-mono tabular-nums font-semibold">
+                    {amount.toFixed(4)}
+                  </span>
+                </div>
+                <div className="h-1 bg-secondary rounded-full mt-1.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-green-500"
+                    style={{ width: `${Math.max(pct, 2)}%` }}
+                  />
+                </div>
+              </div>
             </div>
-            <p className="text-2xl font-bold">{episodesListed}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <ShoppingBag className="h-4 w-4" />
-              <span className="text-sm">Total Tokenized</span>
-            </div>
-            <p className="text-2xl font-bold">{totalMinted}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Film className="h-4 w-4" />
-              <span className="text-sm">Episodes Owned</span>
-            </div>
-            <p className="text-2xl font-bold">{nftsCollected}</p>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
     </section>
   );
 }
 
+// ─── Token Mini Card ─────────────────────────────────────────────────
+
+function TokenMiniCard({ token }: { token: EnrichedToken }) {
+  return (
+    <RouterLink to="/tokens/$address" params={{ address: token.id }}>
+      <Card className="hover:border-primary/40 transition-all cursor-pointer group">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            {token.imageURL ? (
+              <img
+                src={token.imageURL}
+                alt={token.name}
+                className="w-10 h-10 rounded-lg object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                <span className="text-xs font-bold text-primary/60">${token.symbol}</span>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-semibold truncate">{token.name}</span>
+                <Badge variant="outline" className="text-[9px] px-1 py-0">
+                  ${token.symbol}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 mt-0.5 text-[10px] text-muted-foreground">
+                <span className="tabular-nums">{token.holderCount} holders</span>
+                <span className="tabular-nums">{token.totalSwaps} swaps</span>
+              </div>
+            </div>
+            <div className="text-right">
+              {token.priceChange24h !== null && (
+                <div
+                  className={`flex items-center gap-0.5 text-xs font-semibold ${
+                    token.priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'
+                  }`}
+                >
+                  {token.priceChange24h >= 0 ? (
+                    <ArrowUpRight className="h-3 w-3" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3" />
+                  )}
+                  {Math.abs(token.priceChange24h).toFixed(1)}%
+                </div>
+              )}
+              {token.marketCap != null && token.marketCap > 0 && (
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {token.marketCap >= 1000
+                    ? `${(token.marketCap / 1000).toFixed(1)}K`
+                    : token.marketCap.toFixed(2)}{' '}
+                  ETH
+                </span>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </RouterLink>
+  );
+}
+
+// ─── Upload Section ──────────────────────────────────────────────────
+
 function UploadSection() {
   const [open, setOpen] = useState(false);
 
   return (
-    <section className="mb-8">
+    <section>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Upload className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Upload Content</h2>
+          <h2 className="text-lg font-semibold">Upload Content</h2>
         </div>
         <Button
           variant={open ? 'secondary' : 'default'}
@@ -348,6 +610,8 @@ function UploadSection() {
     </section>
   );
 }
+
+// ─── My Works Section ────────────────────────────────────────────────
 
 type Classification = 'all' | 'fan' | 'original' | 'licensed';
 
@@ -403,19 +667,19 @@ function MyWorksSection() {
       (item: any) =>
         item.title?.toLowerCase().includes(q) ||
         item.description?.toLowerCase().includes(q) ||
-        item.tags?.some((t: string) => t.toLowerCase().includes(q))
+        (Array.isArray(item.tags) && item.tags.some((t: string) => t.toLowerCase().includes(q)))
     );
   }, [allItems, search]);
 
   if (!isAuthenticated) return null;
 
   return (
-    <section className="mb-12">
+    <section>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-xl font-semibold">My Works</h2>
+          <h2 className="text-lg font-semibold">My Works</h2>
           {allItems.length > 0 && (
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {allItems.length} item{allItems.length !== 1 ? 's' : ''}
             </p>
           )}
@@ -526,6 +790,8 @@ function MyWorksSection() {
   );
 }
 
+// ─── Content Cards ───────────────────────────────────────────────────
+
 function DashboardContentCard({
   item,
   onDelete,
@@ -635,7 +901,7 @@ function DashboardContentRow({
             <span>{item.views ?? 0} views</span>
             <span>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</span>
           </div>
-          {item.tags?.length > 0 && (
+          {Array.isArray(item.tags) && item.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {item.tags.slice(0, 5).map((tag: string) => (
                 <Badge key={tag} variant="secondary" className="text-xs px-1.5 py-0">
@@ -658,6 +924,8 @@ function DashboardContentRow({
   );
 }
 
+// ─── Universe Grid ───────────────────────────────────────────────────
+
 function UniverseGrid({
   universes,
   onSelect,
@@ -666,15 +934,15 @@ function UniverseGrid({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {universes.map((universe: any) => (
         <Card
           key={universe.id}
-          className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden"
+          className="cursor-pointer hover:border-primary/40 transition-all group overflow-hidden"
           onClick={() => onSelect(universe.id)}
         >
           <CardContent className="p-0">
-            <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-600 relative">
+            <div className="h-32 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 relative">
               {(universe.image_url || universe.imageUrl) && (
                 <img
                   src={universe.image_url || universe.imageUrl}
@@ -682,39 +950,34 @@ function UniverseGrid({
                   className="absolute inset-0 w-full h-full object-cover"
                 />
               )}
-              <div className="absolute inset-0 bg-black/20" />
-              <div className="absolute top-2 right-2">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <Calendar className="h-4 w-4 text-white" />
-                </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-2 left-2 right-2">
+                <h3 className="text-white font-semibold text-sm truncate drop-shadow">
+                  {universe.name}
+                </h3>
               </div>
-              <div className="absolute bottom-2 left-2 flex gap-1">
+              <div className="absolute top-2 right-2 flex gap-1">
                 {universe.tokenAddress &&
                 universe.tokenAddress !== '0x0000000000000000000000000000000000000000' ? (
-                  <div className="text-white text-xs bg-green-600/80 px-2 py-1 rounded">
+                  <Badge className="bg-green-600/80 text-white border-0 text-[9px] px-1.5 py-0">
                     Token Live
-                  </div>
+                  </Badge>
                 ) : (
-                  <div className="text-white text-xs bg-amber-600/80 px-2 py-1 rounded">
+                  <Badge className="bg-zinc-600/80 text-white border-0 text-[9px] px-1.5 py-0">
                     No Token
-                  </div>
+                  </Badge>
                 )}
               </div>
             </div>
-            <div className="p-4">
-              <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
-                {universe.name}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
                 {universe.description || 'Explore this narrative universe'}
               </p>
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-muted-foreground">
-                  {universe.createdAt
-                    ? `Created ${new Date(universe.createdAt).toLocaleDateString()}`
-                    : ''}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">
+                  {universe.createdAt ? new Date(universe.createdAt).toLocaleDateString() : ''}
                 </span>
-                <div className="flex gap-1">
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   {(!universe.tokenAddress ||
                     universe.tokenAddress === '0x0000000000000000000000000000000000000000') && (
                     <RouterLink
@@ -722,12 +985,8 @@ function UniverseGrid({
                       params={{ id: (universe.address || universe.id).toLowerCase() }}
                       onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs h-7 px-2"
-                      >
-                        <Rocket className="h-3 w-3 mr-1" />
+                      <Button size="sm" variant="outline" className="text-[10px] h-6 px-2 gap-1">
+                        <Rocket className="h-2.5 w-2.5" />
                         Launch Token
                       </Button>
                     </RouterLink>
@@ -735,7 +994,7 @@ function UniverseGrid({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-6 w-6 p-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelect(universe.id);
@@ -750,5 +1009,232 @@ function UniverseGrid({
         </Card>
       ))}
     </div>
+  );
+}
+
+// ─── Quick Action Button ────────────────────────────────────────────
+
+function QuickAction({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5 p-3 rounded-lg border border-border/50 bg-card hover:bg-accent/50 hover:border-primary/30 transition-all cursor-pointer group">
+      <div className="p-1.5 rounded-md bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+        {icon}
+      </div>
+      <span className="text-sm font-medium">{label}</span>
+    </div>
+  );
+}
+
+// ─── Activity Feed Widget ───────────────────────────────────────────
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  created_universe: 'Created a universe',
+  created_content: 'Published content',
+  created_character: 'Created a character',
+  created_entity: 'Created an entity',
+  minted_nft: 'Minted an NFT',
+  voted_proposal: 'Voted on a proposal',
+  created_proposal: 'Created a proposal',
+  followed_user: 'Followed',
+  purchased_credits: 'Purchased credits',
+  subscribed_universe: 'Subscribed',
+  submitted_canon: 'Submitted to canon',
+  canon_accepted: 'Canon accepted',
+  collab_started: 'Started a collab',
+  listed_item: 'Listed an item',
+  sold_item: 'Sold an item',
+};
+
+function parseEventTime(createdAt: any): Date {
+  if (!createdAt) return new Date(0);
+  if (createdAt.toDate) return new Date(createdAt.toDate());
+  if (createdAt._seconds) return new Date(createdAt._seconds * 1000);
+  return new Date(createdAt);
+}
+
+function relativeTime(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function ActivityFeedWidget() {
+  const { isAuthenticated } = useWalletAuth();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard-activity-feed'],
+    queryFn: () => trpcClient.social.getGlobalFeed.query({ limit: 8 }),
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+  });
+
+  const events: any[] = (data as any)?.events ?? [];
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          <h2 className="text-lg font-semibold">Recent Activity</h2>
+        </div>
+        <RouterLink to="/activity">
+          <Button variant="ghost" size="sm" className="text-xs gap-1">
+            View All <ArrowUpRight className="h-3 w-3" />
+          </Button>
+        </RouterLink>
+      </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex gap-2.5 p-2.5 animate-pulse">
+              <div className="w-8 h-8 rounded-full bg-muted" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 bg-muted rounded w-3/4" />
+                <div className="h-2.5 bg-muted rounded w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : events.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="text-center py-8">
+            <Activity className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">No activity yet</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-0.5">
+          {events.map((event: any) => {
+            const time = parseEventTime(event.createdAt);
+            return (
+              <div
+                key={event.id}
+                className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
+                  {event.actorDisplayName?.[0]?.toUpperCase() || '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm leading-tight">
+                    <span className="font-medium">
+                      {event.actorDisplayName || event.actorUid?.slice(0, 8)}
+                    </span>{' '}
+                    <span className="text-muted-foreground">
+                      {ACTIVITY_LABELS[event.eventType] || event.eventType}
+                    </span>
+                    {event.targetTitle && (
+                      <span className="text-primary"> {event.targetTitle}</span>
+                    )}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {time.getTime() > 0 ? relativeTime(time) : ''}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── Notifications Widget ───────────────────────────────────────────
+
+function NotificationsWidget() {
+  const { isAuthenticated } = useWalletAuth();
+
+  const { data: unreadData } = useQuery({
+    queryKey: ['dashboard-unread-count'],
+    queryFn: () => trpcClient.social.getUnreadCount.query(),
+    enabled: isAuthenticated,
+    refetchInterval: 30_000,
+  });
+
+  const { data: notifData, isLoading } = useQuery({
+    queryKey: ['dashboard-notifications'],
+    queryFn: () => trpcClient.social.getNotifications.query({ limit: 5, unreadOnly: false }),
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+  });
+
+  const unreadCount = (unreadData as any)?.count ?? 0;
+  const notifications: any[] = (notifData as any)?.notifications ?? [];
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="text-sm font-semibold">Notifications</span>
+            {unreadCount > 0 && (
+              <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 min-w-[18px] justify-center">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Badge>
+            )}
+          </div>
+          <RouterLink to="/notifications">
+            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2">
+              View All
+            </Button>
+          </RouterLink>
+        </div>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-2 animate-pulse">
+                <div className="w-6 h-6 rounded-full bg-muted flex-shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3 bg-muted rounded w-full" />
+                  <div className="h-2 bg-muted rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : notifications.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No notifications yet</p>
+        ) : (
+          <div className="space-y-1">
+            {notifications.map((notif: any) => {
+              const time = parseEventTime(notif.createdAt);
+              return (
+                <div
+                  key={notif.id}
+                  className={`flex items-start gap-2 p-2 rounded-md text-xs transition-colors ${
+                    !notif.read ? 'bg-primary/5' : 'hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="relative flex-shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                      {notif.actorDisplayName?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    {!notif.read && (
+                      <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="leading-tight line-clamp-2">{notif.message}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {time.getTime() > 0 ? relativeTime(time) : ''}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

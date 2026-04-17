@@ -28,6 +28,7 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     SPLIT_ROUTER_ADDRESS
  *     REVENUE_MODULE_FACTORY
  *     SLOP_MARKET_ADDRESS
+ *     LOAR_FAUCET_ADDRESS
  *
  *   UUPS proxy addresses (all OwnableUpgradeable):
  *     PAYMENT_ROUTER_ADDRESS
@@ -41,6 +42,10 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     ANALYTICS_REGISTRY_ADDRESS
  *     LAUNCHPAD_STAKING_ADDRESS
  *     STORY_BOUNTIES_ADDRESS
+ *     ESCROW_ADDRESS
+ *     LOAR_BURNER_ADDRESS
+ *     REMIX_FEES_ADDRESS
+ *     CONTENT_LICENSING_ADDRESS
  *
  *   NFT beacon addresses (UpgradeableBeacon / Ownable):
  *     EPISODE_EDITION_BEACON
@@ -96,6 +101,7 @@ contract DeployGovernanceScript is Script {
         _transferOwnableIfSet("SPLIT_ROUTER_ADDRESS", timelockAddr);
         _transferOwnableIfSet("REVENUE_MODULE_FACTORY", timelockAddr);
         _transferOwnableIfSet("SLOP_MARKET_ADDRESS", timelockAddr);
+        _transferOwnableIfSet("LOAR_FAUCET_ADDRESS", timelockAddr);
 
         // ── Transfer UUPS proxy ownership to timelock ───────────────
         console.log("\n--- Transferring UUPS proxy ownership ---");
@@ -112,6 +118,9 @@ contract DeployGovernanceScript is Script {
         _transferIfSet("LAUNCHPAD_STAKING_ADDRESS", timelockAddr);
         _transferIfSet("STORY_BOUNTIES_ADDRESS", timelockAddr);
         _transferIfSet("ESCROW_ADDRESS", timelockAddr);
+        _transferIfSet("LOAR_BURNER_ADDRESS", timelockAddr);
+        _transferIfSet("REMIX_FEES_ADDRESS", timelockAddr);
+        _transferIfSet("CONTENT_LICENSING_ADDRESS", timelockAddr);
 
         // ── Transfer NFT beacon ownership to timelock ───────────────
         console.log("\n--- Transferring beacon ownership ---");
