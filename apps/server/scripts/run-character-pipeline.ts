@@ -286,6 +286,8 @@ async function processCharacter(
   );
 
   const imageUrl = await uploadImage(imageBuffer, entity.id, char.name, creator, localImagePath);
+  // For Meshy: use base64 data URI since IPFS gateway URLs can 301-redirect which Meshy can't follow
+  const imageBase64DataUri = `data:image/png;base64,${imageBuffer.toString('base64')}`;
   await entityRef.update({ imageUrl, updatedAt: new Date() });
 
   // Attach 2D portrait
@@ -301,25 +303,28 @@ async function processCharacter(
     sortOrder: 0,
   });
 
-  // ── Step 3: Meshy image-to-3D ────────────────────────────────────
-  console.log(`${label} | Step 3: Converting to 3D (Meshy)...`);
+  // ── Step 3: Meshy image-to-3D (with built-in texturing) ───────────
+  // Meshy openapi/v1 image-to-3d with should_texture=true generates
+  // a fully textured 3D model in one step (no separate texture pass needed)
+  console.log(`${label} | Step 3: Converting to textured 3D (Meshy image-to-3D)...`);
   const meshy3dStart = Date.now();
   const { taskId: meshyTaskId } = await meshyService.imageTo3D({
-    imageUrl,
+    imageUrl: imageBase64DataUri,
     enablePbr: true,
-    aiModel: 'meshy-4',
-    topology: 'quad',
+    aiModel: 'meshy-6',
+    topology: 'triangle',
+    targetPolycount: 30000,
   });
   console.log(`${label} | Meshy task: ${meshyTaskId} — polling...`);
 
   const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 15 * 60 * 1000);
   const meshy3dMs = Date.now() - meshy3dStart;
-  console.log(`${label} | 3D model generated in ${(meshy3dMs / 1000).toFixed(0)}s`);
+  console.log(`${label} | Textured 3D model generated in ${(meshy3dMs / 1000).toFixed(0)}s`);
 
   const glbUrl = meshyTask.modelUrls?.glb;
   if (!glbUrl) throw new Error(`Meshy returned no GLB for ${char.name}`);
 
-  // Attach all 3D model formats
+  // Attach all 3D model formats (these are already textured)
   for (const [fmt, url, mime] of [
     ['glb', meshyTask.modelUrls?.glb, 'model/gltf-binary'],
     ['fbx', meshyTask.modelUrls?.fbx, 'model/fbx'],
@@ -334,7 +339,7 @@ async function processCharacter(
       size: 0,
       url,
       category: '3d',
-      label: `3D model (untextured) — ${fmt.toUpperCase()}`,
+      label: `Textured 3D model — ${fmt.toUpperCase()}`,
       subCategory: 'game_ready',
       sortOrder: 5,
     });
@@ -347,64 +352,13 @@ async function processCharacter(
       size: 0,
       url: meshyTask.thumbnailUrl,
       category: 'image',
-      label: '3D model thumbnail',
-      subCategory: 'concept_art',
-      sortOrder: 1,
-    });
-  }
-
-  // ── Step 4: Meshy text-to-texture ────────────────────────────────
-  console.log(`${label} | Step 4: Texturing (Meshy)...`);
-  const texturePrompt = `${char.name}, ${char.description}, ${char.artStyle} style, detailed PBR textures, high quality materials`;
-  const textureStart = Date.now();
-  const { taskId: textureTaskId } = await meshyService.textToTexture({
-    modelUrl: glbUrl,
-    prompt: texturePrompt,
-    artStyle: char.artStyle as any,
-    enablePbr: true,
-    resolution: 2048,
-  });
-  console.log(`${label} | Texture task: ${textureTaskId} — polling...`);
-
-  const textureTask = await meshyService.waitForTextureTask(textureTaskId, 15 * 60 * 1000);
-  const textureMs = Date.now() - textureStart;
-  console.log(`${label} | Texturing done in ${(textureMs / 1000).toFixed(0)}s`);
-
-  // Attach textured models
-  for (const [fmt, url, mime] of [
-    ['glb', textureTask.modelUrls?.glb, 'model/gltf-binary'],
-    ['fbx', textureTask.modelUrls?.fbx, 'model/fbx'],
-    ['obj', textureTask.modelUrls?.obj, 'model/obj'],
-    ['usdz', textureTask.modelUrls?.usdz, 'model/usdz'],
-  ] as [string, string | undefined, string][]) {
-    if (!url) continue;
-    await addAttachment(attachmentsCol, entity.id, entity.name, creator, {
-      contentHash: `pipeline:${entity.id}:textured:${fmt}`,
-      originalFilename: `textured-model.${fmt}`,
-      mimeType: mime,
-      size: 0,
-      url,
-      category: '3d',
-      label: `Textured 3D model — ${fmt.toUpperCase()}`,
-      subCategory: 'game_ready',
-      sortOrder: 10,
-    });
-  }
-  if (textureTask.thumbnailUrl) {
-    await addAttachment(attachmentsCol, entity.id, entity.name, creator, {
-      contentHash: `pipeline:${entity.id}:textured:thumbnail`,
-      originalFilename: 'thumbnail-textured.png',
-      mimeType: 'image/png',
-      size: 0,
-      url: textureTask.thumbnailUrl,
-      category: 'image',
       label: 'Textured 3D model thumbnail',
       subCategory: 'concept_art',
       sortOrder: 11,
     });
   }
 
-  const totalMs = imagenMs + meshy3dMs + textureMs;
+  const totalMs = imagenMs + meshy3dMs;
   console.log(`${label} | DONE in ${(totalMs / 1000).toFixed(0)}s total`);
 
   return {
@@ -412,7 +366,7 @@ async function processCharacter(
     entityId: entity.id,
     imageUrl,
     glbUrl,
-    texturedGlbUrl: textureTask.modelUrls?.glb || 'N/A',
+    texturedGlbUrl: glbUrl, // same model — texture is built into image-to-3d
     totalMs,
   };
 }

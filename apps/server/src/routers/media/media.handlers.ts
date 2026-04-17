@@ -116,11 +116,16 @@ export async function reorderAttachments(
   await batch.commit();
 }
 
-export async function deleteAttachment(creator: string, id: string): Promise<void> {
+export async function deleteAttachment(
+  caller: string,
+  id: string,
+  opts?: { isUniverseAdmin?: boolean }
+): Promise<void> {
   const ref = col().doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Attachment not found');
-  if (snap.data()!.creator !== creator.toLowerCase()) throw new Error('Not authorized');
+  const isCreator = snap.data()!.creator === caller.toLowerCase();
+  if (!isCreator && !opts?.isUniverseAdmin) throw new Error('Not authorized');
   await ref.delete();
 }
 

@@ -35,6 +35,7 @@ import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
+import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
@@ -332,7 +333,11 @@ function EntityPage() {
 
   const kindLabel = KIND_LABELS[entity.kind] ?? entity.kind;
   const metadataEntries = Object.entries(entity.metadata ?? {}).filter(([, v]) => v);
-  const isOwner = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
+  const isCreator = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
+  const { isAdmin: isUniverseManager } = useIsUniverseAdmin(
+    entity.universeAddress as `0x${string}` | undefined
+  );
+  const isOwner = isCreator || isUniverseManager;
 
   const handleGenerateBio = async () => {
     setGenerating(true);

@@ -28,6 +28,8 @@ import {
   reorderAttachments,
   deleteAttachment,
 } from './media.handlers';
+import { isUniverseAdmin } from '../../lib/safe-admin';
+import { db } from '../../lib/firebase';
 
 const mediaCategoryEnum = z.enum(MEDIA_CATEGORIES);
 const targetTypeEnum = z.enum(ATTACHMENT_TARGET_TYPES);
@@ -62,14 +64,39 @@ export const mediaRouter = router({
       return createAttachment(ctx.user.address, input);
     }),
 
-  /** Remove a media attachment. Only the creator can detach. */
+  /** Remove a media attachment. Creator or universe manager can detach. */
   detach: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user.address) {
         throw new Error('Wallet address is required to detach media');
       }
-      await deleteAttachment(ctx.user.address, input.id);
+
+      // Look up attachment to check universe admin status
+      const attachDoc = await db.collection('mediaAttachments').doc(input.id).get();
+      if (!attachDoc.exists) throw new Error('Attachment not found');
+      const data = attachDoc.data()!;
+
+      let adminStatus = false;
+      const caller = ctx.user.address.toLowerCase();
+      const isCreator = data.creator === caller;
+
+      if (!isCreator) {
+        // Resolve the universe address for this attachment
+        let universeId: string | undefined;
+        if (data.targetType === 'universe') {
+          universeId = data.targetId;
+        } else if (data.targetType === 'entity') {
+          const entityDoc = await db.collection('entities').doc(data.targetId).get();
+          universeId = entityDoc.data()?.universeAddress ?? undefined;
+        }
+
+        if (universeId) {
+          adminStatus = await isUniverseAdmin(universeId, caller);
+        }
+      }
+
+      await deleteAttachment(caller, input.id, { isUniverseAdmin: adminStatus });
       return { ok: true };
     }),
 

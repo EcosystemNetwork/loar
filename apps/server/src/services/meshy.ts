@@ -13,7 +13,12 @@
  * Required env var: MESHY_API_KEY
  */
 
-const BASE_URL = 'https://api.meshy.ai/v1';
+const API_HOST = 'https://api.meshy.ai';
+// Different endpoint families use different API versions
+const IMAGE_TO_3D_BASE = `${API_HOST}/openapi/v1`;
+const TEXT_TO_3D_BASE = `${API_HOST}/openapi/v2`;
+// Legacy fallback (kept for backward compat)
+const BASE_URL = IMAGE_TO_3D_BASE;
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -35,13 +40,21 @@ export interface MeshyTask {
   id: string;
   status: MeshyTaskStatus;
   progress: number; // 0–100
-  createdAt: number;
-  startedAt?: number;
-  finishedAt?: number;
-  taskError?: { message: string };
+  created_at: number;
+  started_at?: number;
+  finished_at?: number;
+  task_error?: { message: string };
+  // API returns snake_case keys
+  model_urls: MeshyTaskOutput;
+  model_url?: string; // single GLB URL shortcut
+  thumbnail_url?: string;
+  video_url?: string; // 360° preview video
+  texture_urls?: Array<Record<string, string>>;
+  // Convenience aliases (camelCase) — populated by normalizeTask()
   modelUrls: MeshyTaskOutput;
   thumbnailUrl?: string;
-  videoUrl?: string; // 360° preview video
+  videoUrl?: string;
+  taskError?: { message: string };
 }
 
 export interface TextTo3DPreviewOptions {
@@ -112,8 +125,12 @@ class MeshyService {
     };
   }
 
-  private async post<T>(path: string, body: Record<string, unknown>): Promise<T> {
-    const response = await fetch(`${BASE_URL}${path}`, {
+  private async post<T>(
+    path: string,
+    body: Record<string, unknown>,
+    baseUrl = BASE_URL
+  ): Promise<T> {
+    const response = await fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(body),
@@ -125,8 +142,8 @@ class MeshyService {
     return response.json() as Promise<T>;
   }
 
-  private async get<T>(path: string): Promise<T> {
-    const response = await fetch(`${BASE_URL}${path}`, { headers: this.headers });
+  private async get<T>(path: string, baseUrl = BASE_URL): Promise<T> {
+    const response = await fetch(`${baseUrl}${path}`, { headers: this.headers });
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
       throw new Error(`Meshy API error ${response.status}: ${text}`);
@@ -141,16 +158,17 @@ class MeshyService {
    * Returns immediately with a task ID — poll getTask() until SUCCEEDED.
    */
   async textTo3DPreview(options: TextTo3DPreviewOptions): Promise<{ taskId: string }> {
-    const data = await this.post<{ result: string }>('/text-to-3d', {
-      mode: 'preview',
-      prompt: options.prompt,
-      negative_prompt: options.negativePrompt || '',
-      art_style: options.artStyle || 'realistic',
-      seed: options.seed,
-      ai_model: options.aiModel || 'meshy-4',
-      topology: options.topology,
-      target_polycount: options.targetPolycount,
-    });
+    const data = await this.post<{ result: string }>(
+      '/text-to-3d',
+      {
+        mode: 'preview',
+        prompt: options.prompt,
+        ai_model: options.aiModel || 'meshy-6',
+        topology: options.topology,
+        target_polycount: options.targetPolycount,
+      },
+      TEXT_TO_3D_BASE
+    );
     return { taskId: data.result };
   }
 
@@ -160,10 +178,14 @@ class MeshyService {
    */
   async textTo3DRefine(options: TextTo3DRefineOptions): Promise<{ taskId: string }> {
     const data = await this.post<{ result: string }>(
-      `/text-to-3d/${options.previewTaskId}/refine`,
+      '/text-to-3d',
       {
-        texture_richness: options.textureRichness || 'high',
-      }
+        mode: 'refine',
+        preview_task_id: options.previewTaskId,
+        enable_pbr: true,
+        texture_prompt: options.textureRichness === 'high' ? '' : undefined,
+      },
+      TEXT_TO_3D_BASE
     );
     return { taskId: data.result };
   }
@@ -171,14 +193,18 @@ class MeshyService {
   // ── Image-to-3D ───────────────────────────────────────────────────────
 
   async imageTo3D(options: ImageTo3DOptions): Promise<{ taskId: string }> {
-    const data = await this.post<{ result: string }>('/image-to-3d', {
+    const body: Record<string, unknown> = {
       image_url: options.imageUrl,
-      enable_pbr: options.enablePbr ?? true,
-      should_remount_background: options.shouldRemountBackground ?? false,
-      ai_model: options.aiModel || 'meshy-4',
-      topology: options.topology,
-      target_polycount: options.targetPolycount,
-    });
+      ai_model: options.aiModel || 'meshy-6',
+      should_texture: true,
+      enable_pbr: options.enablePbr ?? false,
+      topology: options.topology || 'triangle',
+      target_polycount: options.targetPolycount || 30000,
+    };
+    if (options.shouldRemountBackground !== undefined) {
+      body.should_remount_background = options.shouldRemountBackground;
+    }
+    const data = await this.post<{ result: string }>('/image-to-3d', body, IMAGE_TO_3D_BASE);
     return { taskId: data.result };
   }
 
@@ -188,12 +214,18 @@ class MeshyService {
     if (options.imageUrls.length < 2 || options.imageUrls.length > 4) {
       throw new Error('multiImageTo3D requires 2–4 images');
     }
-    const data = await this.post<{ result: string }>('/image-to-3d', {
-      image_urls: options.imageUrls,
-      enable_pbr: options.enablePbr ?? true,
-      topology: options.topology,
-      target_polycount: options.targetPolycount,
-    });
+    const data = await this.post<{ result: string }>(
+      '/image-to-3d',
+      {
+        image_urls: options.imageUrls,
+        ai_model: 'meshy-6',
+        should_texture: true,
+        enable_pbr: options.enablePbr ?? false,
+        topology: options.topology || 'triangle',
+        target_polycount: options.targetPolycount || 30000,
+      },
+      IMAGE_TO_3D_BASE
+    );
     return { taskId: data.result };
   }
 
@@ -249,12 +281,23 @@ class MeshyService {
 
   // ── Status / Polling ──────────────────────────────────────────────────
 
+  /** Normalize snake_case API response to include camelCase aliases */
+  private normalizeTask(task: MeshyTask): MeshyTask {
+    task.modelUrls = task.model_urls || task.modelUrls || ({} as MeshyTaskOutput);
+    task.thumbnailUrl = task.thumbnail_url || task.thumbnailUrl;
+    task.videoUrl = task.video_url || task.videoUrl;
+    task.taskError = task.task_error || task.taskError;
+    return task;
+  }
+
   async getTextTo3DTask(taskId: string): Promise<MeshyTask> {
-    return this.get<MeshyTask>(`/text-to-3d/${taskId}`);
+    const task = await this.get<MeshyTask>(`/text-to-3d/${taskId}`, TEXT_TO_3D_BASE);
+    return this.normalizeTask(task);
   }
 
   async getImageTo3DTask(taskId: string): Promise<MeshyTask> {
-    return this.get<MeshyTask>(`/image-to-3d/${taskId}`);
+    const task = await this.get<MeshyTask>(`/image-to-3d/${taskId}`, IMAGE_TO_3D_BASE);
+    return this.normalizeTask(task);
   }
 
   /**
