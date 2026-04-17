@@ -30,6 +30,11 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     /// @notice Addresses authorized to register split ownership (e.g., UniverseManager, revenue contracts)
     mapping(address => bool) public registrars;
 
+    /// @notice SPLIT-02: Tracks last split change time to enforce cooldown
+    mapping(bytes32 => uint256) public splitsLastChangedAt;
+    /// @notice SPLIT-02: Minimum delay between split reconfigurations (prevents frontrunning payments)
+    uint256 public constant SPLIT_CHANGE_COOLDOWN = 1 days;
+
     uint16 public constant MAX_RECIPIENTS = 10;
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -48,6 +53,7 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     error FeeTooHigh();
     error NoChangeRequested();
     error TimelockNotElapsed();
+    error SplitChangeCooldownActive();
 
     constructor(address _paymentRouter) Ownable(msg.sender) {
         if (_paymentRouter == address(0)) revert ZeroAddress();
@@ -78,6 +84,10 @@ contract SplitRouter is ReentrancyGuard, Ownable {
         if (splitOwner[entityHash] != msg.sender) {
             revert NotSplitOwner();
         }
+        // SPLIT-02: Enforce cooldown to prevent frontrunning payments by reconfiguring splits
+        if (block.timestamp < splitsLastChangedAt[entityHash] + SPLIT_CHANGE_COOLDOWN) {
+            revert SplitChangeCooldownActive();
+        }
         if (splits.length == 0 || splits.length > MAX_RECIPIENTS) revert TooManyRecipients();
 
         uint256 totalBps = 0;
@@ -93,6 +103,7 @@ contract SplitRouter is ReentrancyGuard, Ownable {
             _splits[entityHash].push(splits[i]);
         }
         splitOwner[entityHash] = msg.sender;
+        splitsLastChangedAt[entityHash] = block.timestamp;
 
         emit SplitsConfigured(entityHash, msg.sender, splits.length);
     }

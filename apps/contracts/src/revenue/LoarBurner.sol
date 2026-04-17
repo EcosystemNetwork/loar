@@ -10,6 +10,11 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title LoarBurner
+/// @notice WARNING: Despite the name, this contract does NOT burn $LOAR. It collects fees
+///         and redistributes to LP + treasury. See the execute/executeFor functions for
+///         the actual "premium action" behavior.
+/// @dev BURN-01: This contract should be renamed to PremiumActions or LoarFeeCollector in a
+///      future upgrade to avoid confusion. The "burn" terminology is a legacy misnomer.
 /// @notice Premium action fees — $LOAR is redirected to LP and DAO treasury.
 ///         NO supply destruction. All $LOAR stays in the ecosystem.
 ///

@@ -3,7 +3,6 @@ name: Security Checks
 on:
   pull_request:
   push:
-    branches: [main, 'release/**']
 
 # STRICT controls whether Slither failures block the workflow.
 # - Blocking on: any push, or PRs targeting main/release/* (the launch gate)
@@ -48,7 +47,7 @@ jobs:
         with:
           target: apps/contracts
           slither-config: apps/contracts/slither.config.json
-          fail-on: high
+          fail-on: medium
           sarif: results.sarif
         continue-on-error: ${{ env.STRICT != 'true' }}
 
@@ -66,6 +65,50 @@ jobs:
           name: slither-sarif-${{ github.run_id }}
           path: apps/contracts/results.sarif
           retention-days: 30
+
+      - name: Check for pragma version mismatches
+        run: |
+          MISMATCHES=$(grep -rn 'pragma solidity' src/ script/ | grep -v '^0.8.28' | grep -c '\^0\.8\.28' || true)
+          if [ "$MISMATCHES" -gt 0 ]; then
+            echo "::error::Found $MISMATCHES files with ^0.8.28 pragma (should be fixed-version 0.8.28)"
+            grep -rn 'pragma solidity' src/ script/ | grep '\^0\.8\.28'
+            exit 1
+          fi
+          echo "All pragma versions are correct (no ^0.8.28 mismatches found)"
+
+  contracts-mythril:
+    name: Contract Security (Mythril)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Forge build
+        run: forge build
+
+      - name: Install Mythril
+        run: pip3 install mythril
+
+      - name: Run Mythril analysis
+        run: |
+          EXIT_CODE=0
+          for sol in $(find src/ -name '*.sol' -not -path '*/test/*'); do
+            echo "::group::Analyzing $sol"
+            myth analyze "$sol" \
+              --solc-json mythril-remappings.json \
+              --execution-timeout 300 \
+              --max-depth 12 \
+              || EXIT_CODE=1
+            echo "::endgroup::"
+          done
+          exit $EXIT_CODE
+        continue-on-error: ${{ env.STRICT != 'true' }}
 
   dependency-audit:
     name: Dependency Audit

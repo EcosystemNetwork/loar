@@ -221,3 +221,33 @@
     transform: scale(1.15);
   }
 }
+
+/* Route transition progress bar */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.route-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 99999;
+  overflow: hidden;
+  background: transparent;
+}
+
+.route-progress-bar::after {
+  content: '';
+  display: block;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  animation: progress-indeterminate 1.2s ease-in-out infinite;
+}

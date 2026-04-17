@@ -646,14 +646,9 @@ contract CreditManagerTest is Test {
         assertEq(treasuryLoarAfter - treasuryLoarBefore, 50e18);
     }
 
-    // ── Purchase with LOAR (non-exempt user — transfer fee applies) ──
+    // ── Purchase with LOAR (non-exempt user — exact transfer, no fee) ──
 
     function test_purchaseWithLoar_nonExemptUser() public {
-        // Set up a liquidity pool to receive fees
-        address lp = makeAddr("lp");
-        vm.prank(deployer);
-        loarToken.setLiquidityPool(lp);
-
         vm.prank(platform);
         credits.createPackage("Starter", 100, 0.01 ether, 50e18, 5);
 

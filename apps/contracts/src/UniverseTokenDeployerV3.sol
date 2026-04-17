@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -75,7 +75,7 @@ interface ITokenFactory {
 }
 
 interface IGovernorFactory {
-    function deployGovernor(address token) external returns (address);
+    function deployGovernor(address token, address timelock) external returns (address);
 }
 
 interface IBondingCurveFactory {
@@ -118,6 +118,7 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     IGovernorFactory public governorFactory;
     IBondingCurveFactory public bondingCurveFactory;
     address public owner;
+    address public timelock;
 
     // ─── Vesting configuration (mirrors V2) ───────────────────────────
     address public vestingContract;
@@ -163,6 +164,10 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
 
     function setBondingCurveFactory(address _factory) external onlyOwner {
         bondingCurveFactory = IBondingCurveFactory(_factory);
+    }
+
+    function setTimelock(address _timelock) external onlyOwner {
+        timelock = _timelock;
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -266,7 +271,8 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         IERC20(tokenAddress).safeTransfer(universeManager, treasuryAmount + communityAmount);
 
         // Deploy governor via factory
-        governor = governorFactory.deployGovernor(tokenAddress);
+        require(timelock != address(0), "Timelock not set");
+        governor = governorFactory.deployGovernor(tokenAddress, timelock);
 
         emit TokenDeployed(universeId, tokenAddress, deploymentConfig.poolConfig.hook, deploymentConfig.lockerConfig.locker);
         emit TokenAllocation(universeId, lpAmount, creatorAmount, treasuryAmount, communityAmount);

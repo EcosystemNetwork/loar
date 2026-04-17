@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
-import {ERC721Enumerable} from "@openzeppelin/token/ERC721/extensions/ERC721Enumerable.sol";
-import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIStorage.sol";
-import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
+import {ERC721Upgradeable} from "@openzeppelin-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import {ERC721EnumerableUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import {ERC721URIStorageUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
-import {Context} from "@openzeppelin/utils/Context.sol";
-import {ContextUpgradeable} from "@openzeppelin-upgradeable/utils/ContextUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
@@ -17,7 +15,7 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 /// @notice ERC-721 for unique world-building entities: places, events, vehicles.
 ///         Each mint is a 1-of-1 token. Owners earn royalties on secondary sales.
 ///         Free to mint (mintPrice=0) or paid — payment routed through PaymentRouter.
-contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     enum EntityKind { PLACE, EVENT, VEHICLE }
 
     struct Entity {
@@ -64,7 +62,7 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
     uint16 public constant MAX_FEE_BPS = 5000;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() ERC721("LOAR Entities", "ENTITY") { _disableInitializers(); }
+    constructor() { _disableInitializers(); }
 
     function initialize(
         uint256 _universeId,
@@ -74,6 +72,10 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
         uint16 _platformFeeBps,
         uint16 _royaltyBps
     ) external initializer {
+        __ERC721_init("LOAR Entities", "ENTITY");
+        __ERC721Enumerable_init();
+        __ERC721URIStorage_init();
+        __ERC2981_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -162,46 +164,30 @@ contract EntityNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981
 
     // ---- ERC721 Overrides ----
 
-    /// @dev Override name/symbol to return constants — the non-upgradeable ERC721
-    ///      constructor sets these in implementation storage, not the proxy's storage.
-    function name() public pure override returns (string memory) { return "LOAR Entities"; }
-    function symbol() public pure override returns (string memory) { return "ENTITY"; }
-
     function tokenURI(uint256 tokenId)
-        public view override(ERC721, ERC721URIStorage) returns (string memory)
+        public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory)
     {
         return super.tokenURI(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
-        public view override(ERC721Enumerable, ERC721URIStorage, ERC2981) returns (bool)
+        public view override(ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable) returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
 
     function _update(address to, uint256 tokenId, address auth)
-        internal override(ERC721, ERC721Enumerable) returns (address)
+        internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address)
     {
         return super._update(to, tokenId, auth);
     }
 
     function _increaseBalance(address account, uint128 value)
-        internal override(ERC721, ERC721Enumerable)
+        internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
     {
         super._increaseBalance(account, value);
     }
 
-    // ---- Context diamond override (non-upgradeable + upgradeable) ----
-
-    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
-        return msg.sender;
-    }
-
-    function _msgData() internal pure override(Context, ContextUpgradeable) returns (bytes calldata) {
-        return msg.data;
-    }
-
-    function _contextSuffixLength() internal pure override(Context, ContextUpgradeable) returns (uint256) {
-        return 0;
-    }
+    /// @dev Storage gap for future upgrades
+    uint256[50] private __gap;
 }

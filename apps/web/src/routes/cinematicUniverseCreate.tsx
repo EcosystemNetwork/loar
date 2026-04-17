@@ -631,7 +631,10 @@ function CinematicUniverseCreate() {
     }
 
     if (!isSupportedChain(chainId)) {
-      toast.error('Wrong network — please switch to a supported network.');
+      const targetName =
+        CHAIN_NAMES[SUPPORTED_CHAIN_IDS[0] as keyof typeof CHAIN_NAMES] ??
+        `Chain ${SUPPORTED_CHAIN_IDS[0]}`;
+      toast.error(`Wrong network — please switch to ${targetName}.`);
       return;
     }
 
@@ -790,23 +793,23 @@ function CinematicUniverseCreate() {
     );
   }
 
-  // Wrong network state
+  // Wrong network state — tells user exactly which network to switch to
   if (!isSupportedChain(chainId)) {
+    const targetName =
+      CHAIN_NAMES[SUPPORTED_CHAIN_IDS[0] as keyof typeof CHAIN_NAMES] ??
+      `Chain ${SUPPORTED_CHAIN_IDS[0]}`;
     return (
       <div className="h-full flex items-center justify-center bg-background">
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-700 rounded-lg shadow-2xl">
-          <p className="text-yellow-100 font-medium">
-            Wrong Network! Please switch to a supported network.
-          </p>
-        </div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
             <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-600" />
             <h2 className="text-2xl font-bold">Wrong Network</h2>
-            <p className="text-muted-foreground">Please switch to a supported network</p>
+            <p className="text-muted-foreground">
+              LOAR runs on <strong>{targetName}</strong>. Please switch your wallet to continue.
+            </p>
             <Button size="lg" onClick={handleSwitchNetwork}>
               <Rocket className="h-5 w-5 mr-2" />
-              Switch Network
+              Switch to {targetName}
             </Button>
           </CardContent>
         </Card>
@@ -1622,6 +1625,40 @@ function CinematicUniverseCreate() {
                         </span>
                       </div>
                     )}
+
+                    {/* Early balance warning — shown before user clicks deploy */}
+                    {universeMode &&
+                      mintFee !== undefined &&
+                      balance?.value !== undefined &&
+                      (() => {
+                        const gasBuffer = BigInt(5e15);
+                        const needed = mintFee + gasBuffer;
+                        if (balance.value < needed) {
+                          return (
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm">
+                              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="font-medium text-red-500">Insufficient balance</p>
+                                <p className="text-xs text-red-400 mt-0.5">
+                                  You need at least {formatEther(needed)} ETH but have{' '}
+                                  {formatEther(balance.value)} ETH.
+                                  {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
+                                    <>
+                                      {' '}
+                                      Get testnet ETH from the{' '}
+                                      <a href="/faucet" className="underline font-medium">
+                                        Faucet
+                                      </a>
+                                      .
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
 
                     <Button
                       onClick={handleCreateUniverse}

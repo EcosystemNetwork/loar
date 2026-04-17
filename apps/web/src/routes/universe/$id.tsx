@@ -35,6 +35,7 @@ import {
   Settings,
   EyeOff,
   Map,
+  List,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -957,168 +958,6 @@ function UniverseTimelineEditorInner() {
     });
   }, [nodes, edges, setNodes, fitView, pushUndoState]);
 
-  // ── Keyboard Shortcuts ────────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(
-        (e.target as HTMLElement)?.tagName || ''
-      );
-
-      // Ctrl/Cmd+K — search & filter
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowSearch((v) => !v);
-        return;
-      }
-
-      // Ctrl/Cmd+A — select all scene nodes
-      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && !isInput) {
-        e.preventDefault();
-        handleSelectAll();
-        return;
-      }
-
-      // Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !isInput) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-        return;
-      }
-
-      // Skip remaining shortcuts if typing in an input
-      if (isInput) return;
-
-      // D — duplicate selected
-      if (e.key === 'd' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
-        e.preventDefault();
-        handleDuplicateSelected();
-        return;
-      }
-
-      // C — toggle canon on selected
-      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
-        e.preventDefault();
-        handleToggleCanon();
-        return;
-      }
-
-      // E — edit selected node (single selection)
-      if (e.key === 'e' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size === 1) {
-        e.preventDefault();
-        const nodeId = [...selectedNodeIds][0];
-        const node = nodesRef.current.find((n) => n.id === nodeId);
-        if (node?.data.eventId) handleEditScene(node.data.eventId);
-        return;
-      }
-
-      // O — toggle outline panel
-      if (e.key === 'o' && !e.metaKey && !e.ctrlKey) {
-        setShowOutlinePanel((v) => !v);
-        return;
-      }
-
-      // G — assign to arc (opens context for arc assignment)
-      if (e.key === 'g' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
-        // If only one arc exists, assign directly; otherwise handled by toolbar
-        if (nodeArcs.arcs.length === 1) {
-          nodeArcs.addNodesToArc(nodeArcs.arcs[0].id, [...selectedNodeIds]);
-        }
-        return;
-      }
-
-      // F — fit view
-      if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
-        fitView({ padding: 0.15, duration: 300 });
-        return;
-      }
-
-      // 1 — zoom to 100%
-      if (e.key === '1' && !e.metaKey && !e.ctrlKey) {
-        const currentNodes = nodesRef.current;
-        if (currentNodes.length > 0) {
-          const centerNode = currentNodes[Math.floor(currentNodes.length / 2)];
-          setCenter(centerNode.position.x + 160, centerNode.position.y + 136, {
-            zoom: 1,
-            duration: 300,
-          });
-        }
-        return;
-      }
-
-      // + / = — zoom in
-      if (e.key === '+' || e.key === '=') {
-        zoomIn({ duration: 200 });
-        return;
-      }
-
-      // - — zoom out
-      if (e.key === '-') {
-        zoomOut({ duration: 200 });
-        return;
-      }
-
-      // Delete / Backspace — delete selected nodes
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeIds.size > 0) {
-        e.preventDefault();
-        setShowDeleteConfirm(true);
-        return;
-      }
-
-      // Escape — close panels, clear selection
-      if (e.key === 'Escape') {
-        if (contextMenu.visible) {
-          setContextMenu((c) => ({ ...c, visible: false }));
-        } else if (showSearch) {
-          setShowSearch(false);
-          setSearchQuery('');
-          nodeFilter.clearFilter();
-        } else if (selectedNodeIds.size > 0) {
-          handleClearSelection();
-        }
-        return;
-      }
-
-      // ? — toggle shortcuts help
-      if (e.key === '?') {
-        setShowShortcutsHelp((v) => !v);
-        return;
-      }
-
-      // M — toggle minimap
-      if (e.key === 'm') {
-        setShowMiniMap((v) => {
-          if (v) setShowMiniMapSettings(false);
-          return !v;
-        });
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [
-    fitView,
-    zoomIn,
-    zoomOut,
-    setCenter,
-    handleUndo,
-    handleRedo,
-    handleClearSelection,
-    handleSelectAll,
-    handleDuplicateSelected,
-    handleToggleCanon,
-    handleEditScene,
-    selectedNodeIds,
-    showSearch,
-    contextMenu.visible,
-    nodeArcs,
-    nodeFilter,
-  ]);
-
   // Focus search input when opened
   useEffect(() => {
     if (showSearch) {
@@ -1405,6 +1244,167 @@ function UniverseTimelineEditorInner() {
     },
     [nodeArcs, selectedNodeIds]
   );
+
+  // ── Keyboard Shortcuts ────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(
+        (e.target as HTMLElement)?.tagName || ''
+      );
+
+      // Ctrl/Cmd+K — search & filter
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch((v) => !v);
+        return;
+      }
+
+      // Ctrl/Cmd+A — select all scene nodes
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && !isInput) {
+        e.preventDefault();
+        handleSelectAll();
+        return;
+      }
+
+      // Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !isInput) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+
+      // Skip remaining shortcuts if typing in an input
+      if (isInput) return;
+
+      // D — duplicate selected
+      if (e.key === 'd' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
+        e.preventDefault();
+        handleDuplicateSelected();
+        return;
+      }
+
+      // C — toggle canon on selected
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
+        e.preventDefault();
+        handleToggleCanon();
+        return;
+      }
+
+      // E — edit selected node (single selection)
+      if (e.key === 'e' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size === 1) {
+        e.preventDefault();
+        const nodeId = [...selectedNodeIds][0];
+        const node = nodesRef.current.find((n) => n.id === nodeId);
+        if (node?.data.eventId) handleEditScene(node.data.eventId);
+        return;
+      }
+
+      // O — toggle outline panel
+      if (e.key === 'o' && !e.metaKey && !e.ctrlKey) {
+        setShowOutlinePanel((v) => !v);
+        return;
+      }
+
+      // G — assign to arc (opens context for arc assignment)
+      if (e.key === 'g' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
+        if (nodeArcs.arcs.length === 1) {
+          nodeArcs.addNodesToArc(nodeArcs.arcs[0].id, [...selectedNodeIds]);
+        }
+        return;
+      }
+
+      // F — fit view
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
+        fitView({ padding: 0.15, duration: 300 });
+        return;
+      }
+
+      // 1 — zoom to 100%
+      if (e.key === '1' && !e.metaKey && !e.ctrlKey) {
+        const currentNodes = nodesRef.current;
+        if (currentNodes.length > 0) {
+          const centerNode = currentNodes[Math.floor(currentNodes.length / 2)];
+          setCenter(centerNode.position.x + 160, centerNode.position.y + 136, {
+            zoom: 1,
+            duration: 300,
+          });
+        }
+        return;
+      }
+
+      // + / = — zoom in
+      if (e.key === '+' || e.key === '=') {
+        zoomIn({ duration: 200 });
+        return;
+      }
+
+      // - — zoom out
+      if (e.key === '-') {
+        zoomOut({ duration: 200 });
+        return;
+      }
+
+      // Delete / Backspace — delete selected nodes
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeIds.size > 0) {
+        e.preventDefault();
+        setShowDeleteConfirm(true);
+        return;
+      }
+
+      // Escape — close panels, clear selection
+      if (e.key === 'Escape') {
+        if (contextMenu.visible) {
+          setContextMenu((c) => ({ ...c, visible: false }));
+        } else if (showSearch) {
+          setShowSearch(false);
+          setSearchQuery('');
+          nodeFilter.clearFilter();
+        } else if (selectedNodeIds.size > 0) {
+          handleClearSelection();
+        }
+        return;
+      }
+
+      // ? — toggle shortcuts help
+      if (e.key === '?') {
+        setShowShortcutsHelp((v) => !v);
+        return;
+      }
+
+      // M — toggle minimap
+      if (e.key === 'm') {
+        setShowMiniMap((v) => {
+          if (v) setShowMiniMapSettings(false);
+          return !v;
+        });
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [
+    fitView,
+    zoomIn,
+    zoomOut,
+    setCenter,
+    handleUndo,
+    handleRedo,
+    handleClearSelection,
+    handleSelectAll,
+    handleDuplicateSelected,
+    handleToggleCanon,
+    handleEditScene,
+    selectedNodeIds,
+    showSearch,
+    contextMenu.visible,
+    nodeArcs,
+    nodeFilter,
+  ]);
 
   // Handle file selection for edit video
   const handleEditVideoFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2486,11 +2486,18 @@ function UniverseTimelineEditorInner() {
                       <Map className="h-4 w-4" />
                     </button>
                     <button
+                      onClick={() => setShowOutlinePanel((v) => !v)}
+                      className={`p-1.5 hover:bg-zinc-700 transition-colors ${showOutlinePanel ? 'text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                      title="Node outline (O)"
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => {
                         setShowSearch(true);
                       }}
                       className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
-                      title="Search nodes (Ctrl+K)"
+                      title="Search & filter (Ctrl+K)"
                     >
                       <Search className="h-4 w-4" />
                     </button>
@@ -2592,132 +2599,28 @@ function UniverseTimelineEditorInner() {
               </Panel>
 
               {/* Selection Toolbar — appears when nodes are selected */}
-              {selectedNodeIds.size > 0 && (
-                <Panel
-                  position="top-center"
-                  className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 animate-in slide-in-from-top-2 duration-200"
-                >
-                  <div className="flex items-center gap-2 text-sm text-zinc-300 border-r border-zinc-700 pr-3">
-                    <CheckSquare className="h-4 w-4 text-blue-400" />
-                    <span className="font-medium">{selectedNodeIds.size} selected</span>
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                    onClick={handlePlaySelected}
-                    disabled={
-                      nodes.filter(
-                        (n: any) =>
-                          selectedNodeIds.has(n.id) &&
-                          n.data?.videoUrl &&
-                          n.data.nodeType === 'scene'
-                      ).length === 0
-                    }
-                    title="Play selected videos in sequence"
-                  >
-                    <Play className="h-4 w-4" />
-                    Play
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
-                    onClick={handleDuplicateSelected}
-                  >
-                    <Copy className="h-4 w-4" />
-                    Duplicate
-                  </Button>
-
-                  <div className="border-l border-zinc-700 pl-3 flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                      onClick={() => setShowAudioToolbar(true)}
-                      disabled={selectedClips.length === 0}
-                      title="Add background music"
-                    >
-                      <Music className="h-4 w-4" />
-                      Music
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                      onClick={() => setShowAudioToolbar(true)}
-                      disabled={selectedClips.length === 0}
-                      title="Add sound effects"
-                    >
-                      <Waves className="h-4 w-4" />
-                      SFX
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                      onClick={() => setShowAudioToolbar(true)}
-                      disabled={selectedClips.length === 0}
-                      title="Lip sync dialogue"
-                    >
-                      <Megaphone className="h-4 w-4" />
-                      Lip Sync
-                    </Button>
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    onClick={() => setShowDeleteConfirm(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
-
-                  <div className="border-l border-zinc-700 pl-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-zinc-500 hover:text-zinc-300 text-xs px-2"
-                      onClick={handleClearSelection}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </Panel>
-              )}
-
-              {/* Delete Confirmation Dialog */}
-              {showDeleteConfirm && (
-                <Panel
-                  position="top-center"
-                  className="bg-zinc-900/95 backdrop-blur-md border border-red-900/50 rounded-xl shadow-2xl px-5 py-4 flex flex-col items-center gap-3 mt-16 animate-in fade-in duration-150"
-                >
-                  <p className="text-sm text-zinc-300">
-                    Delete <span className="font-bold text-white">{selectedNodeIds.size}</span> node
-                    {selectedNodeIds.size > 1 ? 's' : ''}?
-                  </p>
-                  <p className="text-xs text-zinc-500 max-w-xs text-center">
-                    Blockchain nodes will be hidden from your timeline. Local-only nodes will be
-                    permanently removed.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={handleDeleteSelected}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete {selectedNodeIds.size > 1 ? 'All' : ''}
-                    </Button>
-                  </div>
+              {selectedNodeIds.size > 0 && !showSearch && (
+                <Panel position="top-center">
+                  <BulkOperationsToolbar
+                    selectedNodeIds={selectedNodeIds}
+                    nodes={nodes}
+                    arcs={nodeArcs.arcs}
+                    hasVideoInSelection={nodes.some(
+                      (n: any) =>
+                        selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
+                    )}
+                    selectedClipsCount={selectedClips.length}
+                    onPlaySelected={handlePlaySelected}
+                    onDuplicateSelected={handleDuplicateSelected}
+                    onDeleteSelected={handleDeleteSelected}
+                    onClearSelection={handleClearSelection}
+                    onSelectAll={handleSelectAll}
+                    onInvertSelection={handleInvertSelection}
+                    onToggleCanon={handleToggleCanon}
+                    onAssignToArc={handleAssignSelectedToArc}
+                    onCreateArc={handleCreateArcAndAssign}
+                    onShowAudioToolbar={() => setShowAudioToolbar(true)}
+                  />
                 </Panel>
               )}
 
@@ -2733,8 +2636,46 @@ function UniverseTimelineEditorInner() {
                 </Panel>
               )}
             </ReactFlow>
+
+            {/* Node Context Menu (portal) */}
+            <NodeContextMenu
+              state={contextMenu}
+              node={
+                contextMenu.nodeId
+                  ? ((nodes.find((n) => n.id === contextMenu.nodeId) as
+                      | Node<TimelineNodeData>
+                      | undefined) ?? null)
+                  : null
+              }
+              arcs={nodeArcs.arcs}
+              universeId={id}
+              onClose={() => setContextMenu((c) => ({ ...c, visible: false }))}
+              onEdit={handleEditScene}
+              onDuplicate={handleDuplicateSingle}
+              onBranch={(eventId) => handleAddEvent('branch', eventId)}
+              onToggleCanon={handleToggleCanonSingle}
+              onDelete={handleDeleteNode}
+              onAssignToArc={nodeArcs.addNodesToArc}
+              onCreateArc={(name) => nodeArcs.addArc(name)}
+              onPlay={(nodeId) => {
+                setSelectedNodeIds(new Set([nodeId]));
+                setShowSelectionPlayer(true);
+              }}
+            />
           </div>
         </div>
+
+        {/* Node Outline Panel (left sidebar) */}
+        <NodeOutlinePanel
+          open={showOutlinePanel}
+          onOpenChange={setShowOutlinePanel}
+          nodes={nodes}
+          edges={edges}
+          arcs={nodeArcs.arcs}
+          selectedNodeIds={selectedNodeIds}
+          onNavigateToNode={handleNavigateToNode}
+          onToggleSelect={handleToggleSelect}
+        />
 
         {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
         {(() => {

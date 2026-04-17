@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
 import {ERC20Permit} from "@openzeppelin/token/ERC20/extensions/ERC20Permit.sol";
 import {ERC20Votes} from "@openzeppelin/token/ERC20/extensions/ERC20Votes.sol";
 import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 
+/// @dev DEPRECATED: This standalone GovernanceERC20 is superseded by the version in
+///      GovernanceTokenFactory.sol. The factory version is deployed by UniverseTokenDeployerV3.
+///      This file is kept for reference and existing deployments only.
 /// @title GovernanceERC20
 /// @notice ERC20 token with voting and permit capabilities for universe governance.
 /// @dev Extends OpenZeppelin's ERC20Votes for on-chain vote delegation and ERC20Permit for gasless approvals.
@@ -79,6 +82,12 @@ contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
         uint256 value
     ) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);
+        // GOV-02: Auto-delegate on first token receipt so voting power is active by default.
+        // Without this, ERC20Votes requires explicit delegate(self) call, and empirical
+        // delegation rates of 10-30% make governance quorum effectively unreachable.
+        if (to != address(0) && delegates(to) == address(0) && balanceOf(to) > 0) {
+            _delegate(to, to);
+        }
     }
 
     function nonces(

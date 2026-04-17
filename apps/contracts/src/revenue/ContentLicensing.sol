@@ -8,6 +8,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/Reentr
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {ISplitRouter} from "../interfaces/ISplitRouter.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 
 /// @title ContentLicensing
 /// @notice Manages individual content piece licensing: buy (permanent), rent (time-bound),
@@ -43,6 +44,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     ISplitRouter public splitRouter;
     IPaymentRouter public paymentRouter;
+    IRightsRegistry public rightsRegistry;
     address public platform;
     uint16 public platformFeeBps;
 
@@ -86,6 +88,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error FeeTooHigh();
     error ZeroAddress();
     error ZeroHash();
+    error ContentNotMonetizable();
     error SplitRouterFailed();
     error RefundFailed();
     error MaxDealsReached();
@@ -107,17 +110,19 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         address _platform,
         address _splitRouter,
         address _paymentRouter,
+        address _rightsRegistry,
         uint16 _platformFeeBps
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        if (_platform == address(0) || _splitRouter == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (_platform == address(0) || _splitRouter == address(0) || _paymentRouter == address(0) || _rightsRegistry == address(0)) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         splitRouter = ISplitRouter(_splitRouter);
         paymentRouter = IPaymentRouter(_paymentRouter);
+        rightsRegistry = IRightsRegistry(_rightsRegistry);
         platformFeeBps = _platformFeeBps;
         nextDealId = 1; // Reserve 0 as sentinel for "no deal" in hasAccessFast
     }
@@ -141,6 +146,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         uint16 licenseRoyaltyBps
     ) external whenNotPaused {
         if (contentHash == bytes32(0)) revert ZeroHash();
+        // CONTENT-01: Gate on rights registry (matches all other revenue contracts)
+        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
         if (registrations[contentHash].creator != address(0)) revert AlreadyRegistered();
         if (licenseRoyaltyBps > MAX_FEE_BPS) revert FeeTooHigh();
 
@@ -295,6 +302,10 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice O(1) access check using the buyer's latest deal mapping.
     /// Preferred over hasAccess() for gas efficiency on content with many deals.
+    /// @dev CONTENT-02: This is a view-only optimistic check — it does NOT transition
+    ///      DealStatus.EXPIRED. For state-changing access checks that auto-expire deals,
+    ///      use checkAccess() instead. hasAccessFast may return true for a brief window
+    ///      after endTime if the deal has not been explicitly expired via checkAccess().
     function hasAccessFast(bytes32 contentHash, address user) external view returns (bool) {
         // Check if user is the content owner (permanent BUY)
         if (contentOwner[contentHash] == user) return true;
@@ -305,7 +316,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (deal.buyer != user) return false;
         if (deal.status != DealStatus.ACTIVE) return false;
         if (deal.dealType == DealType.BUY) return true;
-        return deal.endTime == 0 || block.timestamp < deal.endTime;
+        // CONTENT-02: Use <= to include deals valid through their endTime
+        return deal.endTime == 0 || block.timestamp <= deal.endTime;
     }
 
     /// @notice Check if a user has active access (view-only, does not auto-expire)
@@ -317,7 +329,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             if (deal.buyer != user) continue;
             if (deal.status != DealStatus.ACTIVE) continue;
             if (deal.dealType == DealType.BUY) return true;
-            if (deal.endTime == 0 || block.timestamp < deal.endTime) return true;
+            // CONTENT-02: Use <= to include deals valid through their endTime
+            if (deal.endTime == 0 || block.timestamp <= deal.endTime) return true;
         }
         return false;
     }
@@ -417,7 +430,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Internal ────────────────────────────────────────────────────────
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[39] private __gap;
+    uint256[38] private __gap;
 
     /// @dev Only update _buyerLatestDeal if the existing entry is NOT an active permanent BUY.
     ///      Prevents RENT/LICENSE from overwriting a BUY, which would break hasAccessFast().

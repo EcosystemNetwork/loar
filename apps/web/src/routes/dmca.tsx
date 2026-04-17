@@ -71,10 +71,37 @@ function DmcaPage() {
           using the form below.
         </p>
 
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 mb-8 text-sm text-muted-foreground">
-          <strong className="text-foreground">Important:</strong> Content metadata hashes stored on
-          the blockchain cannot be deleted. While infringing content will be removed from the
-          platform interface, on-chain records are immutable.
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 mb-8 text-sm text-muted-foreground space-y-3">
+          <p>
+            <strong className="text-foreground">On-chain permanence:</strong> Content metadata
+            hashes stored on the blockchain cannot be deleted. While infringing content will be
+            removed from the platform interface, on-chain records (content hashes, transaction
+            history, NFT metadata) are immutable and persist on the Base L2 public ledger
+            indefinitely.
+          </p>
+          <p>
+            <strong className="text-foreground">Designated DMCA Agent:</strong> [DMCA Agent Name —
+            TO BE FILED]
+            <br />
+            [Email — TO BE FILED]
+            <br />
+            [Physical Address — TO BE FILED]
+          </p>
+          <p>
+            <strong className="text-foreground">512(c) Safe Harbor:</strong> LOAR maintains a
+            designated agent registration with the U.S. Copyright Office pursuant to 17 U.S.C.
+            Section 512(c). The current filing fee for agent designation is $6, payable to the
+            Copyright Office. Our agent registration status is available at{' '}
+            <a
+              href="https://www.copyright.gov/dmca-directory/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline"
+            >
+              copyright.gov/dmca-directory
+            </a>
+            .
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

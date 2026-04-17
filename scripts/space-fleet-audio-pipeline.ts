@@ -51,7 +51,11 @@ async function ePost(p: string, b: Record<string, unknown>): Promise<Buffer> {
   if (!r.ok) throw new Error(`11L ${r.status}: ${(await r.text()).slice(0, 200)}`);
   return Buffer.from(await r.arrayBuffer());
 }
-async function designVoice(o: {
+/**
+ * Fetch all available voices and find the best match by name keywords.
+ * Falls back to searching by gender/age labels if no name match.
+ */
+async function findBestVoice(o: {
   name: string;
   gender: string;
   age: string;
@@ -60,31 +64,37 @@ async function designVoice(o: {
   text: string;
   desc: string;
 }): Promise<string> {
-  const g = await fetch(`${EBASE}/voice-generation/generate-voice`, {
-    method: 'POST',
-    headers: eH(),
-    body: JSON.stringify({
-      gender: o.gender,
-      age: o.age,
-      accent: o.accent,
-      accent_strength: o.as,
-      text: o.text,
-    }),
-  });
-  if (!g.ok) throw new Error(`VGen ${g.status}`);
-  const gd = await g.json();
-  const s = await fetch(`${EBASE}/voice-generation/create-voice`, {
-    method: 'POST',
-    headers: eH(),
-    body: JSON.stringify({
-      voice_name: o.name,
-      voice_description: o.desc,
-      generated_voice_id: gd.generated_voice_id,
-      labels: {},
-    }),
-  });
-  if (!s.ok) throw new Error(`VSave ${s.status}`);
-  return (await s.json()).voice_id;
+  const res = await fetch(`${EBASE}/voices`, { headers: eH() });
+  if (!res.ok) throw new Error(`Voices list ${res.status}`);
+  const { voices } = (await res.json()) as {
+    voices: Array<{ voice_id: string; name: string; labels?: Record<string, string> }>;
+  };
+
+  // Character → preferred voice mapping (ElevenLabs library voices)
+  const PREFERRED: Record<string, string[]> = {
+    'Eli Vance - SF': ['Charlie', 'Liam', 'Daniel', 'James'], // young male, intense
+    'Mara Chen - SF': ['Sarah', 'Laura', 'Alice', 'Jessica'], // sharp female 30s
+    'Dir Halden - SF': ['George', 'Roger', 'Bill', 'Arnold'], // authoritative older male
+    'The Voice - SF': ['Callum', 'Harry', 'George', 'Brian'], // older calm menacing
+    'Intercom - SF': ['Alice', 'Rachel', 'Matilda', 'Charlotte'], // clean professional female
+    'Archival - SF': ['Roger', 'Bill', 'George', 'Thomas'], // bland official male
+  };
+
+  const prefs = PREFERRED[o.name] || [];
+  for (const pref of prefs) {
+    const match = voices.find((v) => v.name.toLowerCase().includes(pref.toLowerCase()));
+    if (match) return match.voice_id;
+  }
+
+  // Fallback: match by gender label
+  const genderMatch = voices.find(
+    (v) => v.labels?.gender === o.gender || v.name.toLowerCase().includes(o.gender)
+  );
+  if (genderMatch) return genderMatch.voice_id;
+
+  // Last resort: first available voice
+  if (voices.length > 0) return voices[0].voice_id;
+  throw new Error('No voices available');
 }
 const tts = (t: string, vid: string, st: number, sy: number) =>
   ePost(`/text-to-speech/${vid}?output_format=mp3_44100_128`, {
@@ -107,8 +117,10 @@ const sfx = (d: string, sec?: number) => {
 const fInit = () => fal.config({ credentials: FK });
 async function fMusic(p: string, d: number): Promise<string> {
   fInit();
+  // stable-audio max is ~47s, clamp and loop if needed
+  const clamped = Math.min(d, 47);
   const r = await fal.subscribe('fal-ai/stable-audio', {
-    input: { prompt: p, seconds_total: d, steps: 100 },
+    input: { prompt: p, seconds_total: clamped, steps: 100 },
     logs: true,
   });
   const x = (r as any).data || r;
@@ -248,12 +260,12 @@ async function loadV(): Promise<Record<string, VP>> {
   const p: Record<string, VP> = {};
   for (const [k, s] of Object.entries(VSPECS)) {
     try {
-      const id = await designVoice(s);
+      const id = await findBestVoice(s);
       p[k] = { name: s.name, voiceId: id, st: s.st, sy: s.sy };
       L('V', `  ${k} -> ${id}`);
-      await Z(1000);
+      await Z(500);
     } catch (e: any) {
-      L('V', `  FAIL ${k}`);
+      L('V', `  FAIL ${k}: ${e.message?.slice(0, 100)}`);
     }
   }
   fs.writeFileSync(f, JSON.stringify(p, null, 2));
@@ -849,7 +861,9 @@ function mix(v: string, dlg: string | undefined, sx: string, mu: string, out: st
 
 /* ── Chain fetch ─────────────────────────────────────────────────────── */
 async function fetchV(): Promise<Record<string, string>> {
-  const pc = createPublicClient({ chain: sepolia, transport: http(RPC) });
+  // Use public RPC to avoid Alchemy free-tier getLogs block range limit
+  const publicRpc = 'https://ethereum-sepolia-rpc.publicnode.com';
+  const pc = createPublicClient({ chain: sepolia, transport: http(publicRpc) });
   const ev = {
     type: 'event' as const,
     name: 'NodeCreated' as const,
@@ -863,7 +877,12 @@ async function fetchV(): Promise<Record<string, string>> {
       { name: 'plot', type: 'string' as const },
     ],
   };
-  const logs = await pc.getLogs({ address: UADDR, event: ev, fromBlock: 0n, toBlock: 'latest' });
+  // Get current block and scan from a recent range (universe just deployed)
+  const latest = await pc.getBlockNumber();
+  const from = latest > 5000n ? latest - 5000n : 0n;
+  L('CHAIN', `Scanning blocks ${from}..${latest}`);
+  const logs = await pc.getLogs({ address: UADDR, event: ev, fromBlock: from, toBlock: 'latest' });
+  L('CHAIN', `Found ${logs.length} NodeCreated events`);
   const sa = buildSA();
   const m: Record<string, string> = {};
   for (const l of logs) {
@@ -903,13 +922,17 @@ async function main() {
       continue;
     }
     try {
+      L('M', `Generating ${m.id} (${m.d}s)...`);
       const u = await fMusic(m.p, m.d);
       if (u) {
         await dl(u, f);
         mf[m.id] = f;
+        L('M', `  Done: ${m.id}`);
+      } else {
+        L('M', `  No URL returned for ${m.id}`);
       }
-    } catch {
-      L('M', `FAIL ${m.id}`);
+    } catch (err: any) {
+      L('M', `FAIL ${m.id}: ${err?.message?.slice(0, 200) || String(err)}`);
     }
     await Z(1500);
   }

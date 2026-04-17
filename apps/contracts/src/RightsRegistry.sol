@@ -23,14 +23,23 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     /// @notice Addresses authorized to set/freeze rights (platform operators)
     mapping(address => bool) public operators;
 
+    /// @notice RIGHTS-02: Two-step freeze — operator requests, owner confirms
+    mapping(bytes32 => address) public pendingFreeze;
+    /// @notice RIGHTS-02: Reason for the pending freeze request
+    mapping(bytes32 => string) public pendingFreezeReason;
+
     event RightsSet(bytes32 indexed contentHash, RightsType rightsType);
     event ContentFrozen(bytes32 indexed contentHash, string reason);
+    event FreezeRequested(bytes32 indexed contentHash, address indexed requestedBy, string reason);
+    event FreezeCancelled(bytes32 indexed contentHash);
     event OperatorUpdated(address indexed operator, bool authorized);
 
     error NotOperator();
     error NotCreatorOrOwner();
     error AlreadyFrozen();
     error ZeroHash();
+    error NotFrozen();
+    error NoPendingFreeze();
 
     modifier onlyOperator() {
         _checkOperator();
@@ -53,7 +62,8 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Set the rights classification for a content hash
-    /// @dev On first classification (UNSET), any operator can set and becomes recorded creator.
+    /// @dev RIGHTS-01: On first classification (UNSET), any operator can set and becomes recorded creator.
+    ///      This is intentional for platform operation — operators act on behalf of creators during upload.
     ///      Subsequent changes require the caller to be the recorded creator or the owner.
     ///      Cannot change a FROZEN entry — use a new content hash for revised content.
     function setRights(bytes32 contentHash, RightsType rightsType) external onlyOperator {
@@ -74,12 +84,45 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
         emit RightsSet(contentHash, rightsType);
     }
 
-    /// @notice Freeze a content hash — blocks all monetization permanently
-    /// @dev Used for DMCA takedowns, rights disputes, or policy violations
-    function freeze(bytes32 contentHash, string calldata reason) external onlyOperator {
+    /// @notice RIGHTS-02: Request a freeze — operator initiates, owner must confirm.
+    ///         Prevents any single operator from unilaterally killing content monetization.
+    function requestFreeze(bytes32 contentHash, string calldata reason) external onlyOperator {
         if (contentHash == bytes32(0)) revert ZeroHash();
+        if (rights[contentHash] == RightsType.FROZEN) revert AlreadyFrozen();
+        pendingFreeze[contentHash] = msg.sender;
+        pendingFreezeReason[contentHash] = reason;
+        emit FreezeRequested(contentHash, msg.sender, reason);
+    }
+
+    /// @notice RIGHTS-02: Confirm a pending freeze — owner only.
+    function confirmFreeze(bytes32 contentHash) external onlyOwner {
+        if (pendingFreeze[contentHash] == address(0)) revert NoPendingFreeze();
+        string memory reason = pendingFreezeReason[contentHash];
+        rights[contentHash] = RightsType.FROZEN;
+        delete pendingFreeze[contentHash];
+        delete pendingFreezeReason[contentHash];
+        emit ContentFrozen(contentHash, reason);
+    }
+
+    /// @notice RIGHTS-02: Emergency freeze — owner bypasses two-step for genuine DMCA emergencies.
+    function emergencyFreeze(bytes32 contentHash, string calldata reason) external onlyOwner {
+        if (contentHash == bytes32(0)) revert ZeroHash();
+        // Clear any pending freeze for this hash
+        if (pendingFreeze[contentHash] != address(0)) {
+            delete pendingFreeze[contentHash];
+            delete pendingFreezeReason[contentHash];
+        }
         rights[contentHash] = RightsType.FROZEN;
         emit ContentFrozen(contentHash, reason);
+    }
+
+    /// @notice Unfreeze a content hash — restores it to UNSET for re-classification.
+    /// @dev RIGHTS-02: Provides an appeal path (FROZEN → UNSET) rather than permanent freeze.
+    ///      Only owner can unfreeze.
+    function unfreeze(bytes32 contentHash) external onlyOwner {
+        if (rights[contentHash] != RightsType.FROZEN) revert NotFrozen();
+        rights[contentHash] = RightsType.UNSET;
+        emit RightsSet(contentHash, RightsType.UNSET);
     }
 
     /// @notice Returns true if the content hash is allowed to be monetized.
@@ -96,5 +139,5 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     }
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[46] private __gap;
+    uint256[44] private __gap;
 }

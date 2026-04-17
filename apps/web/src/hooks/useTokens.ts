@@ -465,6 +465,8 @@ export function useTokenListData() {
   return {
     data: enrichedTokens,
     isLoading: tokensQuery.isLoading,
+    isError: tokensQuery.isError,
+    refetch: tokensQuery.refetch,
     recentSwaps: swapsQuery.data ?? [],
     totalMarketCap,
   };

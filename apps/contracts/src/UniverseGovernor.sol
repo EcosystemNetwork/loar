@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Compatible with OpenZeppelin Contracts ^5.4.0
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {Governor} from "@openzeppelin/governance/Governor.sol";
 import {GovernorCountingSimple} from "@openzeppelin/governance/extensions/GovernorCountingSimple.sol";
@@ -41,13 +41,14 @@ contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple,
     /// @notice Block at which this governor was deployed.
     uint256 public immutable deployedAtBlock;
 
-    /// @notice Early-life period: ~30 days on Base L2 at 2s blocks (30 * 24 * 3600 / 2).
-    uint256 public constant EARLY_LIFE_BLOCKS = 1_296_000;
+    /// @notice Early-life period in blocks. Default 1_296_000 (~30 days on Base L2 at 2s blocks).
+    ///         Now configurable via constructor to support different chains and testing (GOV-04).
+    uint256 public immutable EARLY_LIFE_BLOCKS;
 
     /// @notice Quorum during early-life period (20% of total supply).
     uint256 public constant EARLY_LIFE_QUORUM_FRACTION = 20;
 
-    constructor(IVotes _token, TimelockController _timelock)
+    constructor(IVotes _token, TimelockController _timelock, uint256 _earlyLifeBlocks)
         Governor("UniverseGovernor")
         GovernorSettings(7200 /* ~1 day on Base L2 @ 2s blocks */, 50400 /* ~7 days */, 1_000_000e18 /* 1M tokens */)
         GovernorVotes(_token)
@@ -55,6 +56,7 @@ contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple,
         GovernorTimelockControl(_timelock)
     {
         deployedAtBlock = block.number;
+        EARLY_LIFE_BLOCKS = _earlyLifeBlocks;
     }
 
     /// @notice Returns the quorum for a given timepoint. During the early-life period

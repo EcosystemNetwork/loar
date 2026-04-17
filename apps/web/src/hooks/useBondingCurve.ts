@@ -19,7 +19,10 @@ const BONDING_CURVE_ABI = [
     name: 'buy',
     type: 'function',
     stateMutability: 'payable',
-    inputs: [{ name: 'minTokensOut', type: 'uint256' }],
+    inputs: [
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+    ],
     outputs: [],
   },
   {
@@ -29,6 +32,7 @@ const BONDING_CURVE_ABI = [
     inputs: [
       { name: 'tokenAmount', type: 'uint256' },
       { name: 'minEthOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
     ],
     outputs: [],
   },
@@ -224,11 +228,13 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         // In production, call getTokensForEth first and apply slippage
         const minTokensOut = 0n;
 
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+
         const hash = await writeContractAsync({
           address: bondingCurveAddress,
           abi: BONDING_CURVE_ABI,
           functionName: 'buy',
-          args: [minTokensOut],
+          args: [minTokensOut, deadline],
           value,
         });
 
@@ -260,11 +266,13 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         setStatus('confirming');
         setError(null);
 
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+
         const hash = await writeContractAsync({
           address: bondingCurveAddress,
           abi: BONDING_CURVE_ABI,
           functionName: 'sell',
-          args: [tokenAmount, minEthOut],
+          args: [tokenAmount, minEthOut, deadline],
         });
 
         setTxHash(hash);

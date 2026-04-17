@@ -1,28 +1,32 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
-import {GovernorVotes} from "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
-import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
-import {GovernorVotesQuorumFraction} from "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
-
-contract UniverseGovernor is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction {
-    constructor(IVotes _token)
-        Governor("UniverseGovernor")
-        GovernorVotes(_token)
-        GovernorVotesQuorumFraction(10) {}
-
-    function votingDelay() public pure override returns (uint256) { return 7200; }
-    function votingPeriod() public pure override returns (uint256) { return 50400; }
-    function proposalThreshold() public pure override returns (uint256) { return 1_000_000e18; }
-}
+import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
+import {UniverseGovernor} from "../UniverseGovernor.sol";
 
 contract GovernorFactory {
+    /// @notice Default early-life period: ~30 days on Base L2 at 2s blocks (GOV-04)
+    uint256 public constant DEFAULT_EARLY_LIFE_BLOCKS = 1_296_000;
+
     event GovernorCreated(address indexed governor, address indexed token);
 
-    function deployGovernor(address token) external returns (address) {
-        UniverseGovernor governor = new UniverseGovernor(IVotes(token));
+    /// @notice Deploy a governor with the default early-life period.
+    function deployGovernor(address token, address timelock) external returns (address) {
+        return _deploy(token, timelock, DEFAULT_EARLY_LIFE_BLOCKS);
+    }
+
+    /// @notice Deploy a governor with a custom early-life period (GOV-04).
+    function deployGovernor(address token, address timelock, uint256 earlyLifeBlocks) external returns (address) {
+        return _deploy(token, timelock, earlyLifeBlocks);
+    }
+
+    function _deploy(address token, address timelock, uint256 earlyLifeBlocks) internal returns (address) {
+        UniverseGovernor governor = new UniverseGovernor(
+            IVotes(token),
+            TimelockController(payable(timelock)),
+            earlyLifeBlocks
+        );
         emit GovernorCreated(address(governor), token);
         return address(governor);
     }

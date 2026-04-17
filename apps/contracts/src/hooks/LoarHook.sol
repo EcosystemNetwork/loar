@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {ILoarHook} from "../interfaces/ILoarHook.sol";
 import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
@@ -29,6 +29,17 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     uint256 public constant PROTOCOL_FEE_NUMERATOR = 200_000; // 20% of the imposed LP fee
     int128 public constant FEE_DENOMINATOR = 1_000_000; // Uniswap 100% fee
 
+    /// @notice Protocol fee for the current swap context. This is a transient-like variable:
+    ///         it's set in _beforeSwap and read in _afterSwap within the same atomic swap.
+    ///         HOOK-03: Safe because Uniswap v4 processes beforeSwap→swap→afterSwap atomically
+    ///         per pool. Multi-pool atomic txs don't interleave hooks from different pools.
+    /// @dev HOOK-03 RISK: This single storage slot is shared across all pools using this hook.
+    ///      If a future PoolManager upgrade or custom router enables interleaved multi-pool
+    ///      atomic swaps (where beforeSwap on pool A runs, then beforeSwap on pool B runs
+    ///      before afterSwap on pool A), the protocolFee value would be overwritten.
+    ///      The proper fix is per-pool fee storage (mapping(PoolId => uint24)), but this
+    ///      requires a larger refactor. For now, Uniswap v4's sequential hook execution
+    ///      guarantees correctness.
     uint24 public protocolFee;
 
     address public immutable factory;
@@ -37,6 +48,10 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     mapping(PoolId => bool) internal loarIsToken0;
     mapping(PoolId => address) internal locker;
     mapping(PoolId => uint256) public poolCreationTimestamp;
+
+    /// @notice HOOK-02: Throttle LP locker fee claims to reduce per-swap gas cost
+    mapping(PoolId => uint256) public lastLockerClaimTimestamp;
+    uint256 public constant LOCKER_CLAIM_INTERVAL = 1 hours;
 
     modifier onlyFactory() {
         _checkFactory();
@@ -325,18 +340,22 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     }
 
     function _lpLockerFeeClaim(PoolKey calldata poolKey) internal {
-        // if this wasn't initialized to claim fees, skip the claim
         if (locker[poolKey.toId()] == address(0)) {
             return;
         }
 
-        // determine the token
-        address token = loarIsToken0[poolKey.toId()]
+        // HOOK-02: Only claim every LOCKER_CLAIM_INTERVAL to reduce gas per swap
+        PoolId pid = poolKey.toId();
+        if (block.timestamp < lastLockerClaimTimestamp[pid] + LOCKER_CLAIM_INTERVAL) {
+            return;
+        }
+        lastLockerClaimTimestamp[pid] = block.timestamp;
+
+        address token = loarIsToken0[pid]
             ? Currency.unwrap(poolKey.currency0)
             : Currency.unwrap(poolKey.currency1);
 
-        // trigger the fee claim
-        ILoarLpLocker(locker[poolKey.toId()]).collectRewardsWithoutUnlock(token);
+        ILoarLpLocker(locker[pid]).collectRewardsWithoutUnlock(token);
     }
 
 

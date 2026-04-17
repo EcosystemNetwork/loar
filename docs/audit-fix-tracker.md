@@ -1,13 +1,14 @@
 # LOAR Contract Audit — Consolidated Fix Tracker
 
-**Sources**: 4 independent reviews (Apr 16–17, 2026)
+**Sources**: 5 independent reviews (Apr 16–17, 2026)
 
 - Audit A: Launch Readiness Audit (Apr 16)
 - Audit B: Contract Security Deep Audit, Parts 1–3 (Apr 16–17)
-- Audit C: Pre-Audit Review — Mainnet Readiness (Apr 17)
+- Audit C: Pre-Audit Review — Mainnet Readiness, Part 1 (Apr 17)
 - Audit D: Extended Review — NFT Architecture, Staking, Governance, Revenue (Apr 17)
+- Audit E: Pre-Audit Review — Part 3: Revenue, Factories, Token, Deployment (Apr 17)
 
-**Verdict (unanimous): NOT mainnet ready.** Audit D recommends a second audit pass after fixes — C-7 alone is a ground-up rewrite of 5 contracts.
+**Verdict (unanimous): NOT mainnet ready.** Audit D recommends a second audit pass after fixes — C-7 alone is a ground-up rewrite of 5 contracts. Audit E reveals factories deploy wrong Governor/Token code — the documented security model is fiction.
 
 ---
 
@@ -117,6 +118,44 @@
 - **Assignee**:
 - **Notes**: This is the largest single fix. Budget for introducing new bugs — second audit pass required after this rewrite.
 
+### GOV-06: GovernorFactory deploys inline Governor with NO timelock — zero anti-rug
+
+- **Sources**: E (C-13)
+- **Contracts**: `GovernorFactory.sol`, `UniverseTokenDeployerV3.sol`
+- **Impact**: Three Governor implementations exist; factory deploys the stripped-down inline one. No timelock, no early-life quorum. Creator holds ~10% supply, is often the only delegated voter (GOV-02), can propose + pass + execute instantly. Zero anti-rug mechanism in deployed governance.
+- **Fix**: Rewrite GovernorFactory.deployGovernor to take TimelockController param, deploy timelock per universe, wire it. Update UniverseTokenDeployerV3 to pass through. Delete inline Governor from factory. Delete unused src/UniverseGovernor.sol and src/UniverseTimelockGovernor.sol — keep exactly one implementation.
+- **Status**: [ ] Not started
+- **Assignee**:
+- **Notes**: This is a "ship wrong code" bug — the documented security model (24h timelock, 20% early-life quorum) is dead code. Combined with GOV-02 (no auto-delegation), governance is a creator dictatorship.
+
+### GOV-07: GovernanceTokenFactory deploys inline token without symbol validation
+
+- **Sources**: E (C-14)
+- **Contracts**: `GovernanceTokenFactory.sol`
+- **Impact**: src/GovernanceERC20.sol has length validation + blocklist. Factory has inline copy with none of it. Deployed token allows any symbol: AAPL, TSLA, 1-char, 40-char. The "H4 fix" is dead code.
+- **Fix**: Delete inline GovernanceERC20 from factory. Import and deploy the real one. Ensure blocklist is wired (GOV-03).
+- **Status**: [ ] Not started
+- **Assignee**:
+- **Notes**: Same "ship wrong code" pattern as GOV-06. Two inline duplicates must be deleted.
+
+### CONTENT-01: ContentLicensing.registerContent skips rights-registry check
+
+- **Sources**: E (C-16)
+- **Contract**: `ContentLicensing.sol`
+- **Impact**: Every other revenue contract gates on `rightsRegistry.isMonetizable(contentHash)`. ContentLicensing does not. Users can register content they don't own or content flagged FUN/FROZEN and collect sale/rent/license payments. Direct DMCA/legal exposure.
+- **Fix**: Add `require(rightsRegistry.isMonetizable(contentHash))` in `registerContent`.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### MARKET-01: SlopMarket ignores ERC2981 royalties
+
+- **Sources**: E (C-17)
+- **Contract**: `SlopMarket.sol`
+- **Impact**: NFT contracts implement ERC2981 with `_setTokenRoyalty(tokenId, creator, N)`. SlopMarket.buy routes through PaymentRouter without querying `royaltyInfo()`. Every sale through the platform's own marketplace strips creator royalties.
+- **Fix**: Query `IERC2981(tokenContract).royaltyInfo(tokenId, totalPrice)` before routing. Split price three ways: creator royalty, seller remainder, platform fee.
+- **Status**: [ ] Not started
+- **Assignee**:
+
 ### STAKE-01: LaunchpadStaking lock-period trivially bypassable via 1-wei seed
 
 - **Sources**: D (C-9)
@@ -131,12 +170,12 @@
 
 ## P1 — Exploitable Within Hours on Mainnet
 
-### TOKEN-02: LoarToken fee-on-transfer breaks Uniswap v4, LP locker, PaymentRouter, CreditManager
+### TOKEN-02: LoarToken fee-on-transfer breaks Uniswap v4, LP locker, PaymentRouter, CreditManager, and ALL protocol contracts
 
-- **Sources**: B (C3), C (H-3)
-- **Contracts**: `LoarToken.sol`, `PaymentRouter.sol`, all consumers
-- **Impact**: Over-committed accounting, failed transfers, fund divergence
-- **Fix**: In PaymentRouter `routeLoar` — measure `balanceOf(address(this))` before and after `transferFrom`, use the delta. OR remove fee-on-transfer from LoarToken entirely.
+- **Sources**: B (C3), C (H-3), E (C-15)
+- **Contracts**: `LoarToken.sol`, `PaymentRouter.sol`, `RemixFees.sol`, `TokenVesting.sol`, `StoryBounties.sol`, `CreditManager.sol`, `LoarBurner.sol`, `LaunchpadStaking.sol`, all consumers
+- **Impact**: Every non-exempt transfer skims transferFeeBps (1–500bp) to LP. ALL protocol contracts assume `safeTransferFrom(user, this, amount)` delivers exactly `amount`. Internal accounting exceeds actual balance → eventual reverts. **Strong recommendation: remove the fee entirely** — code cost, audit cost, and footgun risk outweigh 1bp LP depth benefit.
+- **Fix**: OPTION A (recommended): Remove fee-on-transfer from LoarToken entirely. OPTION B: Add every protocol contract to `feeExempt` at deploy + maintain forever across upgrades + add invariant tests. Also clean up dead `feeExemptPairs` mapping (unused in `_update` logic).
 - **Status**: [ ] Not started
 - **Assignee**:
 
@@ -265,6 +304,52 @@
 - **Fix**: Remove the function entirely (users must call `paymentRouter.claim()`), or make it forward to PaymentRouter.
 - **Status**: [ ] Not started
 - **Assignee**:
+
+### DEED-01: StructuralDeed.mintDeed — no universe-ownership check
+
+- **Sources**: E (H-22)
+- **Contract**: `StructuralDeed.sol`
+- **Impact**: Anyone can mint DOMAINs claiming `universeId = N` even if they don't own universe N. Name-squatting all universe territories.
+- **Fix**: Verify `msg.sender == universeManager.ownerOf(universeId)` or `Universe.getAdmin()`.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### COLLAB-01: CollabManager — proposer/acceptor trusted on blind faith
+
+- **Sources**: E (H-23)
+- **Contract**: `CollabManager.sol`
+- **Impact**: Anyone proposes `proposeCollab(universeA=5, universeB=7, targetAcceptor=Bob)`. When accepted, proposer collects universe A's share despite having no relation to universe 5. `universeManager` stored but never read.
+- **Fix**: Gate `proposeCollab` on `universeManager.ownerOf(universeA) == msg.sender` and `acceptCollab` on `universeManager.ownerOf(universeB) == msg.sender`.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### BOUNTY-01: StoryBounties — poster can rug accepted winner
+
+- **Sources**: E (H-24)
+- **Contract**: `StoryBounties.sol`
+- **Impact**: After deadline, anyone calls `expireBounty()` returning full reward to poster. If winner's submission was accepted verbally, poster runs `expireBounty` before `awardBounty`, keeping both work and money.
+- **Fix**: Add submission lock that prevents `expireBounty` once submissions exist, or require explicit rejection before expiry.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### SPOKE-01: LoarTokenSpoke diverges from hub in safety features
+
+- **Sources**: E (H-26)
+- **Contract**: `LoarTokenSpoke.sol`
+- **Impact**: No Pausable, no FEE_CHANGE_COOLDOWN, default fee 5bp vs 1bp on hub. Cap checked via `totalSupply()` not `totalMinted` — burn-and-remint cycles reset cap each time. Any bridge compromise mints up to cap on every spoke.
+- **Fix**: Port all safety features from hub: Pausable, cooldown, `totalMinted` tracking. Align default fee. Add NTT manager verification.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### SPLIT-02: SplitRouter.setSplits — no lock, owner can redirect before payment
+
+- **Sources**: E (H-27), extends SPLIT-01
+- **Contract**: `SplitRouter.sol`
+- **Impact**: `splitOwner` reconfigures splits instantly, no delay, no co-recipient consent. Before large incoming payment, owner sets `[{owner, 10000}]`, collects, re-spreads.
+- **Fix**: Add commit-delay or frozen mode requiring co-signer consent. Put behind timelock.
+- **Status**: [ ] Not started
+- **Assignee**:
+- **Notes**: More severe than SPLIT-01 (which only covers `setPaymentRouter`). This is the split distribution itself.
 
 ### ESCROW-03: Escrow.resolveDispute is single-EOA dictatorship over all disputed trades
 
@@ -509,6 +594,51 @@
 - **Status**: [ ] Not started
 - **Assignee**:
 
+### DEED-02: StructuralDeed.mintDeed — no overpayment refund
+
+- **Sources**: E (H-21)
+- **Contract**: `StructuralDeed.sol`
+- **Impact**: Lines 158-160 send all `msg.value` (not required price) to treasury. Users overpaying lose difference silently.
+- **Fix**: `require(msg.value == price)` or refund `msg.value - price` to sender.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### TOKEN-04: UniverseTokenDeployerV3 lumps treasury+community allocations
+
+- **Sources**: E (H-20)
+- **Contract**: `UniverseTokenDeployerV3.sol`
+- **Impact**: `safeTransfer(universeManager, treasuryAmount + communityAmount)`. `claimTeamFee` sweeps both. "500 bps to community" is actually platform-owned funds. Users misled.
+- **Fix**: Split into separate recipients with different configurable addresses, or rename `communityBps` honestly.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### IDENTITY-01: IdentityNFT claims soulbound but is freely transferable
+
+- **Sources**: E (H-25)
+- **Contract**: `IdentityNFT.sol`
+- **Impact**: Docstring says "soulbound-style". Nothing overrides `_update`. INFTs representing co-creator identities can be sold on secondary markets.
+- **Fix**: Override `_update` to revert on transfer (except mint), or fix documentation.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### CREDIT-05: CreditManager.purchaseWithLoar fallback bypasses PaymentRouter
+
+- **Sources**: E (M-18)
+- **Contract**: `CreditManager.sol`
+- **Impact**: If `address(paymentRouter) == address(0)`, direct transfer bypasses PaymentRouter accounting. Deployment order creates window where revenue doesn't flow through router.
+- **Fix**: Remove fallback path — require PaymentRouter to be set. Or add deployment ordering check.
+- **Status**: [ ] Not started
+- **Assignee**:
+
+### FACTORY-01: UniverseFactory.createUniverse — no access control
+
+- **Sources**: E (M-22)
+- **Contract**: `UniverseFactory.sol`
+- **Impact**: Anyone creates orphan universes bypassing UniverseManager. No NFT, no LP seed, no fee paid. Creates indexer noise.
+- **Fix**: Add `onlyManager` modifier.
+- **Status**: [ ] Not started
+- **Assignee**:
+
 ### TREASURY-02: Treasury set to `address(this)` breaks accounting
 
 - **Sources**: C (M-4)
@@ -645,6 +775,44 @@
 - **Fix**: Add reasonable cap on `pricePerMonth`.
 - **Status**: [ ] Not started
 
+### BURN-01: LoarBurner misleadingly named — never burns $LOAR
+
+- **Sources**: E (H-28)
+- **Contract**: `LoarBurner.sol`
+- **Impact**: Comment: "NO supply destruction." Users expecting deflationary burns get fee redistribution to LP/treasury. Tokenomics docs claiming "burns create scarcity" are unsupported.
+- **Fix**: Rename to `PremiumActions` or `LoarFeeCollector`. Update tokenomics docs.
+- **Status**: [ ] Not started
+
+### FACTORY-02: Three Governor + two Token implementations — deploy-the-wrong-one risk
+
+- **Sources**: E (H-29, M-25)
+- **Contracts**: `GovernorFactory.sol`, `GovernanceTokenFactory.sol`, `UniverseGovernor.sol`, `UniverseTimelockGovernor.sol`, `GovernanceERC20.sol`
+- **Impact**: Confusion for auditors and team. Wrong ones ARE being deployed (GOV-06, GOV-07).
+- **Fix**: Delete unused. Have exactly one Governor and one token implementation. No inline duplicates in factories.
+- **Status**: [ ] Not started
+
+### ANALYTICS-01: AnalyticsRegistry.setTrending — platform-curated, not algorithmic
+
+- **Sources**: E (M-19)
+- **Contract**: `AnalyticsRegistry.sol`
+- **Fix**: Document that "trending" is platform-curated. Fine if transparent.
+- **Status**: [ ] Not started
+
+### CONTENT-02: ContentLicensing DealStatus.EXPIRED never transitions
+
+- **Sources**: E (M-24)
+- **Contract**: `ContentLicensing.sol`
+- **Impact**: Deals past endTime read as ACTIVE from `hasAccessFast`. Only `checkAccess` transitions to EXPIRED.
+- **Fix**: Check time in `hasAccessFast` or add background transition mechanism.
+- **Status**: [ ] Not started
+
+### IDENTITY-02: IdentityNFT universeName/universeImage stale on rebrand
+
+- **Sources**: E (M-21)
+- **Contract**: `IdentityNFT.sol`
+- **Fix**: Read from Universe contract dynamically or add update mechanism.
+- **Status**: [ ] Not started
+
 ### MISC-01: Dead constant `teamFee = 0`
 
 - **Sources**: C (M-1)
@@ -656,6 +824,8 @@
 
 ## P4 — Informational / Cleanup
 
+- AnalyticsRegistry.requestDataExport emits event but no on-chain follow-through (E M-20)
+- StoryBounties `*Changed` events declared but never emitted in setter functions (E M-23)
 - `require()` strings → custom errors for gas savings (partially done)
 - `BondingCurve.buy` uses `call{value: refund, gas: 50000}` — document or loosen
 - `CreditManager.initialize` sets default generation costs inline — consider config struct
@@ -682,104 +852,123 @@
 All of these handle revenue or user assets and have 0% test coverage.
 Contracts marked _(partial)_ were touched by Audit D but need full coverage.
 
-| Contract                     | LOC (est) | Risk                        | Audit D                              |
-| ---------------------------- | --------- | --------------------------- | ------------------------------------ |
-| AdPlacement.sol              | ~200      | Medium — holds ad payments  | _(partial)_ — AD-01, AD-02           |
-| SubscriptionManager.sol      | ~300      | High — recurring payments   | _(partial)_ — SUB-01, SUB-02         |
-| CollabManager.sol            | ~200      | Medium — splits             |                                      |
-| LicensingRegistry.sol        | ~250      | High — IP licensing         | _(partial)_ — LICENSE-01, LICENSE-02 |
-| ContentLicensing.sol         | ~200      | Medium — licensing fees     |                                      |
-| StoryBounties.sol            | ~300      | High — holds bounty escrow  |                                      |
-| SlopMarket.sol               | ~200      | Medium — marketplace        |                                      |
-| StructuralDeed.sol           | ~150      | Low — metadata              |                                      |
-| RemixFees.sol                | ~150      | Medium — fee routing        | _(partial)_ — named in REVENUE-01    |
-| LaunchpadStaking.sol         | ~300      | High — holds staked tokens  | _(partial)_ — STAKE-01, STAKE-02     |
-| LoarSwapRouter.sol           | ~150      | Medium — swap routing       |                                      |
-| LoarBurner.sol               | ~100      | Low — burn mechanics        |                                      |
-| CharacterNFT.sol             | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01, ROYALTY-01     |
-| EntityNFT.sol                | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01, NFT-02         |
-| EntityEditionNFT.sol         | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01                 |
-| EpisodeNFT.sol               | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01                 |
-| EpisodeEditionCollection.sol | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01                 |
-| CollectiveTokenFactory.sol   | ~150      | Medium — deploys tokens     |                                      |
+| Contract                     | LOC (est) | Risk                        | Coverage                                   |
+| ---------------------------- | --------- | --------------------------- | ------------------------------------------ |
+| AdPlacement.sol              | ~200      | Medium — holds ad payments  | _(partial)_ — AD-01, AD-02                 |
+| SubscriptionManager.sol      | ~300      | High — recurring payments   | _(partial)_ — SUB-01, SUB-02               |
+| CollabManager.sol            | ~200      | Medium — splits             | _(partial)_ — COLLAB-01 (E)                |
+| LicensingRegistry.sol        | ~250      | High — IP licensing         | _(partial)_ — LICENSE-01, LICENSE-02       |
+| ContentLicensing.sol         | ~200      | **High** — licensing fees   | _(partial)_ — CONTENT-01, CONTENT-02 (E)   |
+| StoryBounties.sol            | ~300      | High — holds bounty escrow  | _(partial)_ — BOUNTY-01 (E)                |
+| SlopMarket.sol               | ~200      | **High** — marketplace      | _(partial)_ — MARKET-01 (E)                |
+| StructuralDeed.sol           | ~150      | Medium — metadata+payments  | _(partial)_ — DEED-01, DEED-02 (E)         |
+| RemixFees.sol                | ~150      | Medium — fee routing        | _(partial)_ — named in REVENUE-01          |
+| LaunchpadStaking.sol         | ~300      | High — holds staked tokens  | _(partial)_ — STAKE-01, STAKE-02           |
+| LoarSwapRouter.sol           | ~150      | Medium — swap routing       |                                            |
+| LoarBurner.sol               | ~100      | Low — misleading name       | _(partial)_ — BURN-01 (E)                  |
+| CharacterNFT.sol             | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01, ROYALTY-01           |
+| EntityNFT.sol                | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01, NFT-02               |
+| EntityEditionNFT.sol         | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01                       |
+| EpisodeNFT.sol               | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01                       |
+| EpisodeEditionCollection.sol | ~200      | **Critical** — broken proxy | _(partial)_ — NFT-01                       |
+| CollectiveTokenFactory.sol   | ~150      | Medium — deploys tokens     |                                            |
+| IdentityNFT.sol              | ~150      | Medium — soulbound claims   | _(partial)_ — IDENTITY-01, IDENTITY-02 (E) |
+| LoarTokenSpoke.sol           | ~200      | High — cross-chain token    | _(partial)_ — SPOKE-01 (E)                 |
+| AnalyticsRegistry.sol        | ~200      | Low — analytics             | _(partial)_ — ANALYTICS-01 (E)             |
 
 ---
 
 ## Recommended Execution Order
 
+### Phase 0: Source Cleanup (Day 1) — NEW
+
+> Before anything else: the auditor and your team must be looking at the same code.
+
+1. **FACTORY-02** — Delete unused Governor/Token variants. Keep exactly one of each.
+2. **GOV-06** — Rewrite GovernorFactory to deploy real Governor with TimelockController
+3. **GOV-07** — Rewrite GovernanceTokenFactory to deploy real GovernanceERC20 with symbol validation
+4. **TOKEN-02 decision** — Remove fee-on-transfer from $LOAR (recommended) OR commit to comprehensive feeExempt plan
+
 ### Phase 1: Stop the Bleeding (Week 1)
 
-1. GOV-01 — Deploy Safe + Timelock, transfer all ownership
-2. PAY-01 — 3 one-line tx.from checks
-3. TOKEN-01 — TOKEN_SUPPLY mismatch (visible day 1)
-4. AUTH-02 — Rate limiter fix (one-line)
-5. CANON-01 + CANON-02 — Sockpuppet + reentrancy (combined fix)
-6. STAKE-01 — Staking lock bypass (zero sophistication exploit)
-7. ROYALTY-01 — Remove vestigial claimRoyalties (one function)
+5. GOV-01 — Deploy Safe + Timelock, transfer all ownership
+6. PAY-01 — 3 one-line tx.from checks
+7. TOKEN-01 — TOKEN_SUPPLY mismatch (visible day 1)
+8. AUTH-02 — Rate limiter fix (one-line)
+9. CANON-01 + CANON-02 — Sockpuppet + reentrancy (combined fix)
+10. STAKE-01 — Staking lock bypass (zero sophistication exploit)
+11. ROYALTY-01 — Remove vestigial claimRoyalties (one function)
+12. CONTENT-01 — Add `isMonetizable` check to ContentLicensing (one line)
+13. MARKET-01 — SlopMarket must query ERC2981 royaltyInfo before routing
 
 ### Phase 2: Fund Safety (Week 2)
 
-8. CANON-03 — Flash-loan voting (requires design decision)
-9. CANON-04 — Quorum refund path
-10. CREDIT-01 + CREDIT-02 — Rate limits + platform rotation
-11. TOKEN-02 — Fee-on-transfer protection
-12. TOKEN-03 — Mint cap fix
-13. CURVE-01 — Deadline parameter
-14. REVENUE-01 — Wire all 5 revenue contracts to read from UniverseManager (systemic)
-15. LICENSE-01 — Fix licensor assignment
-16. AD-01 — Bid cancellation/expiry
-17. SUB-01 — Block tier downgrades or prorate
+14. CANON-03 — Flash-loan voting (requires design decision)
+15. CANON-04 — Quorum refund path
+16. CREDIT-01 + CREDIT-02 — Rate limits + platform rotation
+17. TOKEN-02 — Fee-on-transfer protection (if not removed in Phase 0)
+18. TOKEN-03 — Mint cap fix
+19. CURVE-01 — Deadline parameter
+20. REVENUE-01 — Wire all 5 revenue contracts to read from UniverseManager (systemic)
+21. LICENSE-01 — Fix licensor assignment
+22. AD-01 — Bid cancellation/expiry
+23. SUB-01 — Block tier downgrades or prorate
+24. DEED-01 — Universe-ownership check on StructuralDeed mint
+25. COLLAB-01 — Ownership verification in CollabManager
+26. BOUNTY-01 — Prevent poster rugging accepted winner
+27. SPOKE-01 — Port hub safety features to LoarTokenSpoke
+28. SPLIT-02 — Add commit-delay to setSplits
 
 ### Phase 3: NFT Architecture Rewrite (Weeks 3–4)
 
-18. NFT-01 — Rewrite all 5 NFT contracts to Upgradeable bases (**largest single fix**)
-19. GOV-02 — Auto-delegation in GovernanceERC20
-20. GOV-03 — Wire symbol blocklist to deployer
-21. ESCROW-03 — Dispute resolution multisig
-22. RIGHTS-02 — Freeze requires N-of-M consensus
+29. NFT-01 — Rewrite all 5 NFT contracts to Upgradeable bases (**largest single fix**)
+30. GOV-02 — Auto-delegation in GovernanceERC20
+31. GOV-03 — Wire symbol blocklist to deployer
+32. ESCROW-03 — Dispute resolution multisig
+33. RIGHTS-02 — Freeze requires N-of-M consensus
 
 ### Phase 4: Integrity (Week 5)
 
-23. RIGHTS-01 — Creator signature requirement
-24. UNIVERSE-01 through UNIVERSE-04
-25. LOCKER-01 + LOCKER-02
-26. HOOK-01
-27. AUTH-01, AUTH-03, AUTH-04
+34. RIGHTS-01 — Creator signature requirement
+35. UNIVERSE-01 through UNIVERSE-04
+36. LOCKER-01 + LOCKER-02
+37. HOOK-01
+38. AUTH-01, AUTH-03, AUTH-04
 
 ### Phase 5: Hardening (Week 6)
 
-28. All P2 items (GOV-04, VESTING-03, HOOK-02, LICENSE-02, STAKE-02, ESCROW-04, etc.)
-29. BUILD-01 through BUILD-04
-30. Foundry invariant tests
-31. Slither + Mythril in CI
+39. All P2 items (GOV-04, VESTING-03, HOOK-02, LICENSE-02, STAKE-02, ESCROW-04, DEED-02, TOKEN-04, IDENTITY-01, CREDIT-05, FACTORY-01, etc.)
+40. BUILD-01 through BUILD-04
+41. Foundry invariant tests
+42. Slither + Mythril in CI
 
 ### Phase 6: External Audit — TWO PASSES (Weeks 7–16)
 
-32. **Pass 1** (Weeks 7–10): Engage 2 audit firms on pre-fix codebase snapshot
-33. Fix audit findings from Pass 1
-34. **Pass 2** (Weeks 12–14): Re-audit NFT rewrite (C-7 fixes) + systemic revenue routing changes — these are large enough to introduce new bugs
-35. Public contest (Code4rena / Sherlock)
-36. Bug bounty program
+43. **Pass 1** (Weeks 7–10): Engage 2 audit firms on pre-fix codebase snapshot
+44. Fix audit findings from Pass 1
+45. **Pass 2** (Weeks 12–14): Re-audit NFT rewrite (C-7 fixes) + systemic revenue routing changes + factory rewrites — these are large enough to introduce new bugs
+46. Public contest (Code4rena / Sherlock)
+47. Bug bounty program
 
 ### Phase 7: Mainnet (Week 17+)
 
-37. LEGAL-01, LEGAL-02, LEGAL-03
-38. Deploy with low TVL cap + functional pause
-39. On-chain monitoring (Forta, Defender, Tenderly)
-40. Gradual TVL cap increase based on telemetry
+48. LEGAL-01, LEGAL-02, LEGAL-03
+49. Deploy with low TVL cap + functional pause
+50. On-chain monitoring (Forta, Defender, Tenderly)
+51. Gradual TVL cap increase based on telemetry
 
 ---
 
 ## Stats
 
-| Severity             | Count                                | Fixed |
-| -------------------- | ------------------------------------ | ----- |
-| P0 — Critical        | 11                                   | 0     |
-| P1 — High            | 23                                   | 0     |
-| P2 — Significant     | 19                                   | 0     |
-| P3 — Operational     | 19                                   | 0     |
-| P4 — Informational   | 18                                   | 0     |
-| **Total**            | **90**                               | **0** |
-| Unreviewed contracts | 18 (10 partially covered by Audit D) | —     |
+| Severity             | Count                                  | Fixed |
+| -------------------- | -------------------------------------- | ----- |
+| P0 — Critical        | 15                                     | 0     |
+| P1 — High            | 28                                     | 0     |
+| P2 — Significant     | 24                                     | 0     |
+| P3 — Operational     | 24                                     | 0     |
+| P4 — Informational   | 20                                     | 0     |
+| **Total**            | **111**                                | **0** |
+| Unreviewed contracts | 21 (16 partially covered by Audit D+E) | —     |
 
-_Last updated: 2026-04-17 (Audit D integrated)_
+_Last updated: 2026-04-17 (Audit E integrated — Pre-Audit Review Part 3)_

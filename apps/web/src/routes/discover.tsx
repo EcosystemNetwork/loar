@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
+import { QueryState } from '@/components/QueryState';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
@@ -54,6 +55,7 @@ function DiscoverPage() {
     data: profilesData,
     isLoading: profilesLoading,
     isError: profilesError,
+    refetch: profilesRefetch,
   } = useQuery({
     queryKey: ['discover-profiles', search],
     queryFn: () => trpcClient.profiles.discover.query({ search: search || undefined, limit: 30 }),
@@ -64,6 +66,7 @@ function DiscoverPage() {
     data: contentData,
     isLoading: contentLoading,
     isError: contentError,
+    refetch: contentRefetch,
   } = useQuery({
     queryKey: ['discover-content', search, contentFilter, mediaFilter],
     queryFn: () =>
@@ -226,58 +229,60 @@ function DiscoverPage() {
 
           {/* Creators Tab */}
           <TabsContent value="creators">
-            {profilesError ? (
-              <div className="p-8 text-center text-red-400">
-                Failed to load data. Please try again.
-              </div>
-            ) : profilesLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              </div>
-            ) : profiles.length === 0 ? (
-              <div className="text-center py-16">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No creators found</h3>
-                <p className="text-muted-foreground">
-                  {search
-                    ? `No results for "${search}"`
-                    : 'Be the first to create a public profile!'}
-                </p>
-              </div>
-            ) : (
+            <QueryState
+              isLoading={profilesLoading}
+              isError={profilesError}
+              isEmpty={profiles.length === 0}
+              onRetry={() => profilesRefetch()}
+              errorMessage="Failed to load creators. Please try again."
+              skeletonCount={8}
+              skeletonAspect="aspect-[4/5]"
+              emptyState={
+                <div className="text-center py-16">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No creators found</h3>
+                  <p className="text-muted-foreground">
+                    {search
+                      ? `No results for "${search}"`
+                      : 'Be the first to create a public profile!'}
+                  </p>
+                </div>
+              }
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {profiles.map((profile: any) => (
                   <CreatorCard key={profile.id} profile={profile} />
                 ))}
               </div>
-            )}
+            </QueryState>
           </TabsContent>
 
           {/* Content Tab */}
           <TabsContent value="content">
-            {contentError ? (
-              <div className="p-8 text-center text-red-400">
-                Failed to load data. Please try again.
-              </div>
-            ) : contentLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              </div>
-            ) : contentItems.length === 0 ? (
-              <div className="text-center py-16">
-                <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No content found</h3>
-                <p className="text-muted-foreground">
-                  {search ? `No results for "${search}"` : 'No public content yet.'}
-                </p>
-              </div>
-            ) : (
+            <QueryState
+              isLoading={contentLoading}
+              isError={contentError}
+              isEmpty={contentItems.length === 0}
+              onRetry={() => contentRefetch()}
+              errorMessage="Failed to load content. Please try again."
+              skeletonCount={8}
+              skeletonAspect="aspect-video"
+              emptyState={
+                <div className="text-center py-16">
+                  <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No content found</h3>
+                  <p className="text-muted-foreground">
+                    {search ? `No results for "${search}"` : 'No public content yet.'}
+                  </p>
+                </div>
+              }
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {contentItems.map((item: any) => (
                   <ContentFeedCard key={item.id} item={item} />
                 ))}
               </div>
-            )}
+            </QueryState>
           </TabsContent>
 
           {/* Videos Tab */}
@@ -296,7 +301,7 @@ function UniversesTabContent({ search }: { search: string }) {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
   const [accessFilter, setAccessFilter] = useState<string | undefined>();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['discover-universes', search, sortBy, accessFilter],
     queryFn: () =>
       trpcClient.universes.discover.query({
@@ -346,34 +351,34 @@ function UniversesTabContent({ search }: { search: string }) {
         ))}
       </div>
 
-      {isError ? (
-        <div className="p-8 text-center text-red-400">
-          Failed to load universes. Please try again.
-        </div>
-      ) : isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-muted animate-pulse aspect-[4/5]" />
-          ))}
-        </div>
-      ) : universes.length === 0 ? (
-        <div className="text-center py-16">
-          <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No universes found</h3>
-          <p className="text-muted-foreground">
-            {search ? `No results for "${search}"` : 'No universes created yet.'}
-          </p>
-          <Link to="/create">
-            <Button className="mt-4">Create a Universe</Button>
-          </Link>
-        </div>
-      ) : (
+      <QueryState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={universes.length === 0}
+        onRetry={() => refetch()}
+        errorMessage="Failed to load universes. Please try again."
+        skeletonCount={8}
+        skeletonAspect="aspect-[4/5]"
+        skeletonGrid="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"
+        emptyState={
+          <div className="text-center py-16">
+            <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No universes found</h3>
+            <p className="text-muted-foreground">
+              {search ? `No results for "${search}"` : 'No universes created yet.'}
+            </p>
+            <Link to="/create">
+              <Button className="mt-4">Create a Universe</Button>
+            </Link>
+          </div>
+        }
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {universes.map((universe: any) => (
             <UniverseCard key={universe.id} universe={universe} />
           ))}
         </div>
-      )}
+      </QueryState>
     </div>
   );
 }

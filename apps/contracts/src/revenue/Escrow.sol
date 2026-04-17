@@ -53,7 +53,7 @@ contract Escrow is
     uint16 public defaultFeeBps;
     uint256 public disputeWindow;   // seconds — default 7 days
 
-    uint16 public constant MAX_FEE_BPS = 5000;
+    uint16 public constant MAX_FEE_BPS = 1000; // ESCROW-04: capped at 10% (was 50%)
 
     // ── Events ──────────────────────────────────────────────────────────
     event EscrowCreated(uint256 indexed id, address indexed buyer, address indexed seller, uint256 amount, bytes32 contentHash);

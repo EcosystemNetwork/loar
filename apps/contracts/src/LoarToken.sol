@@ -12,33 +12,15 @@ import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 ///         at a discounted rate (25% margin vs 35% for card/crypto).
 ///         Also used for quest rewards, affiliate payouts, and governance staking.
 /// @dev ERC20 with permit (gasless approvals), burn, and owner-controlled minting.
-///      A small transfer fee is skimmed on every transfer and routed to the
-///      liquidity pool address, deepening protocol-owned liquidity over time.
+///      TOKEN-02: Fee-on-transfer removed. All protocol contracts assume exact-amount transfers.
 contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 1e18; // 1 billion $LOAR
-    uint256 public constant MAX_TRANSFER_FEE_BPS = 500; // hard cap: 5%
-    uint256 public constant MAX_FEE_INCREASE_PER_CHANGE = 10; // max +0.1% per change — rate-limits rug
-    uint256 public constant BPS_DENOMINATOR = 10_000;
-    uint256 public constant FEE_CHANGE_COOLDOWN = 1 days;
 
     /// @notice Treasury address that receives platform revenue
     address public treasury;
 
-    /// @notice Liquidity pool address that receives transfer fees
-    address public liquidityPool;
-
-    /// @notice Transfer fee in basis points (default 1 = 0.01%)
-    uint256 public transferFeeBps = 1;
-
-    /// @notice Timestamp of last fee change (enforces cooldown between changes)
-    uint256 public lastFeeChangeAt;
-
-    /// @notice Addresses exempt from the transfer fee (treasury, LP, minters, etc.)
+    /// @notice Addresses exempt from fees or other protocol-level restrictions
     mapping(address => bool) public feeExempt;
-
-    /// @notice Fee-exempt trading pairs (DEX pools). Transfers between two fee-exempt
-    ///         addresses skip fee logic entirely, preventing double-fee on DEX swaps.
-    mapping(address => bool) public feeExemptPairs;
 
     /// @notice Addresses authorized to mint (platform backend, quest rewards, etc.)
     mapping(address => bool) public minters;
@@ -50,17 +32,11 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
 
     event MinterUpdated(address indexed minter, bool authorized);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
-    event LiquidityPoolUpdated(address indexed oldPool, address indexed newPool);
-    event TransferFeeUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event FeeExemptUpdated(address indexed account, bool exempt);
-    event LiquidityFeeCollected(address indexed from, address indexed to, uint256 fee);
 
     error NotMinter();
     error ExceedsMaxSupply();
     error ZeroAddress();
-    error FeeTooHigh();
-    error FeeIncreaseExceedsLimit();
-    error FeeChangeCooldownActive();
 
     modifier onlyMinter() {
         _checkMinter();
@@ -122,33 +98,6 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
         feeExempt[newTreasury] = true;
     }
 
-    /// @notice Set the liquidity pool address that receives transfer fees
-    function setLiquidityPool(address newPool) external onlyOwner {
-        if (newPool == address(0)) revert ZeroAddress();
-        emit LiquidityPoolUpdated(liquidityPool, newPool);
-        // Old pool loses exemption, new pool gains it
-        if (liquidityPool != address(0)) feeExempt[liquidityPool] = false;
-        liquidityPool = newPool;
-        feeExempt[newPool] = true;
-    }
-
-    /// @notice Update the transfer fee (in basis points). Cannot exceed MAX_TRANSFER_FEE_BPS.
-    ///         Increases are rate-limited to MAX_FEE_INCREASE_PER_CHANGE per call.
-    ///         Decreases are unrestricted.
-    function setTransferFeeBps(uint256 newFeeBps) external onlyOwner {
-        // Skip cooldown on first-ever fee change (lastFeeChangeAt == 0 means never changed)
-        if (lastFeeChangeAt != 0 && block.timestamp < lastFeeChangeAt + FEE_CHANGE_COOLDOWN) {
-            revert FeeChangeCooldownActive();
-        }
-        if (newFeeBps > MAX_TRANSFER_FEE_BPS) revert FeeTooHigh();
-        if (newFeeBps > transferFeeBps && newFeeBps - transferFeeBps > MAX_FEE_INCREASE_PER_CHANGE) {
-            revert FeeIncreaseExceedsLimit();
-        }
-        emit TransferFeeUpdated(transferFeeBps, newFeeBps);
-        transferFeeBps = newFeeBps;
-        lastFeeChangeAt = block.timestamp;
-    }
-
     /// @notice Set fee exemption for an address
     function setFeeExempt(address account, bool exempt) external onlyOwner {
         if (account == address(0)) revert ZeroAddress();
@@ -156,24 +105,12 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
         emit FeeExemptUpdated(account, exempt);
     }
 
-    /// @notice Batch-set fee exemptions for DEX routers, pools, hooks, etc.
-    ///         Prevents accidental double-fee on integrations.
+    /// @notice Batch-set fee exemptions for multiple addresses
     function batchSetFeeExempt(address[] calldata accounts, bool exempt) external onlyOwner {
         require(accounts.length <= 200, "Batch too large");
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
             feeExempt[accounts[i]] = exempt;
-            emit FeeExemptUpdated(accounts[i], exempt);
-        }
-    }
-
-    /// @notice Batch-set fee exemptions (C3 alias). Sets both feeExempt and feeExemptPairs.
-    function setFeeExemptBatch(address[] calldata accounts, bool exempt) external onlyOwner {
-        require(accounts.length <= 200, "Batch too large");
-        for (uint256 i = 0; i < accounts.length; i++) {
-            if (accounts[i] == address(0)) revert ZeroAddress();
-            feeExempt[accounts[i]] = exempt;
-            feeExemptPairs[accounts[i]] = exempt;
             emit FeeExemptUpdated(accounts[i], exempt);
         }
     }
@@ -188,35 +125,9 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
         _unpause();
     }
 
-    /// @dev Override ERC20 _update to enforce pause and skim a transfer fee to the liquidity pool.
-    ///      Fee is skipped for mints, burns, exempt addresses, and transfers
-    ///      between two fee-exempt addresses (e.g. DEX router <-> pool).
+    /// @dev Override ERC20 _update to enforce pause on all transfers.
+    ///      TOKEN-02: Fee-on-transfer removed. All protocol contracts assume exact-amount transfers.
     function _update(address from, address to, uint256 amount) internal override whenNotPaused {
-        // C3 fix: skip fee entirely when both sides are fee-exempt (DEX pair optimization)
-        if (feeExempt[from] && feeExempt[to]) {
-            super._update(from, to, amount);
-            return;
-        }
-
-        bool shouldTakeFee = liquidityPool != address(0)
-            && transferFeeBps > 0
-            && from != address(0)       // not a mint
-            && to != address(0)         // not a burn
-            && !feeExempt[from]
-            && !feeExempt[to];
-
-        if (shouldTakeFee) {
-            uint256 fee = (amount * transferFeeBps) / BPS_DENOMINATOR;
-            uint256 amountAfterFee = amount - fee;
-
-            // Route fee to liquidity pool
-            super._update(from, liquidityPool, fee);
-            emit LiquidityFeeCollected(from, to, fee);
-
-            // Send remainder to recipient
-            super._update(from, to, amountAfterFee);
-        } else {
-            super._update(from, to, amount);
-        }
+        super._update(from, to, amount);
     }
 }

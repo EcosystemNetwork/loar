@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 
 /// @title AdPlacement
 /// @notice Manages programmatic product placement and sponsorships inside
@@ -49,6 +50,9 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
 
+    /// @notice On-chain source of truth for universe ownership (ERC-721)
+    address public universeManager;
+
     mapping(uint256 => address) public universeCreators;
 
     /// @notice Pending withdrawals for outbid bidders (pull pattern)
@@ -59,6 +63,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     event SponsorshipActivated(uint256 indexed sponsorshipId, uint256 slotId, address sponsor);
     event ImpressionRecorded(uint256 indexed sponsorshipId, uint256 totalImpressions);
     event RefundWithdrawn(address indexed bidder, uint256 amount);
+    event BidCancelled(uint256 indexed slotId, address bidder, uint256 amount);
 
     error NotPlatform();
     error NotCreator();
@@ -68,6 +73,12 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     error TransferFailed();
     error FeeTooHigh();
     error NoPendingWithdrawal();
+
+    uint256 public constant BID_CANCEL_COOLDOWN = 3 days;
+    uint256 public constant BID_EXPIRY = 30 days;
+
+    /// @notice Timestamp when the current bid was placed, per slot
+    mapping(uint256 => uint256) public bidPlacedAt;
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -104,8 +115,19 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
 
     event UniverseRegistered(uint256 indexed universeId, address creator);
 
+    /// @notice Set the UniverseManager contract address (owner only)
+    function setUniverseManager(address _universeManager) external onlyOwner {
+        if (_universeManager == address(0)) revert ZeroAddress();
+        universeManager = _universeManager;
+    }
+
     /// @notice Register a universe for ad placements
-    function registerUniverse(uint256 universeId, address creator) external onlyPlatform {
+    /// @dev REVENUE-01 FIX: Creator is now looked up on-chain via UniverseManager.ownerOf()
+    ///      instead of trusting platform-supplied address.
+    function registerUniverse(uint256 universeId) external onlyPlatform {
+        require(universeManager != address(0), "Universe manager not set");
+        // REVENUE-01: Read creator from on-chain source of truth
+        address creator = IERC721(universeManager).ownerOf(universeId);
         if (creator == address(0)) revert ZeroAddress();
         universeCreators[universeId] = creator;
         emit UniverseRegistered(universeId, creator);
@@ -157,6 +179,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
 
         slot.currentBid = msg.value;
         slot.currentBidder = msg.sender;
+        bidPlacedAt[slotId] = block.timestamp;
 
         emit BidPlaced(slotId, msg.sender, msg.value);
     }
@@ -172,6 +195,23 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         if (!sent) revert TransferFailed();
 
         emit RefundWithdrawn(msg.sender, amount);
+    }
+
+    /// @notice Cancel a bid after cooldown or expiry (AD-01)
+    function cancelBid(uint256 slotId) external nonReentrant {
+        AdSlot storage slot = adSlots[slotId];
+        require(msg.sender == slot.currentBidder, "Not current bidder");
+        require(
+            block.timestamp >= bidPlacedAt[slotId] + BID_CANCEL_COOLDOWN ||
+            block.timestamp >= bidPlacedAt[slotId] + BID_EXPIRY,
+            "Cooldown not elapsed"
+        );
+        uint256 amount = slot.currentBid;
+        slot.currentBid = 0;
+        slot.currentBidder = address(0);
+        bidPlacedAt[slotId] = 0;
+        pendingWithdrawals[msg.sender] += amount;
+        emit BidCancelled(slotId, msg.sender, amount);
     }
 
     /// @notice Accept winning bid and activate sponsorship

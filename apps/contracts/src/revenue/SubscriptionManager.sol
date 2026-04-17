@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 
 /// @title SubscriptionManager
 /// @notice Manages subscriptions to universes. Subscribers get early episodes,
@@ -42,6 +43,9 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
 
+    /// @notice On-chain source of truth for universe ownership (ERC-721)
+    address public universeManager;
+
     // Universe creator receives revenue
     mapping(uint256 => address) public universeCreators;
 
@@ -61,6 +65,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     error NoRevenue();
     error TransferFailed();
     error FeeTooHigh();
+    error TierDowngradeNotAllowed();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -120,6 +125,8 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     ) external {
         // Must be universe creator or platform
         if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
+        // SUB-02: Price cap to prevent abusive pricing
+        require(pricePerMonth <= 100 ether, "Price too high");
 
         tierConfigs[universeId][tier] = TierConfig({
             pricePerMonth: pricePerMonth,
@@ -136,8 +143,19 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
     event UniverseRegistered(uint256 indexed universeId, address creator);
 
-    /// @notice Register a universe creator
-    function registerUniverse(uint256 universeId, address creator) external onlyPlatform {
+    /// @notice Set the UniverseManager contract address (owner only)
+    function setUniverseManager(address _universeManager) external onlyOwner {
+        if (_universeManager == address(0)) revert ZeroAddress();
+        universeManager = _universeManager;
+    }
+
+    /// @notice Register a universe creator — looks up owner on-chain
+    /// @dev REVENUE-01 FIX: Creator is now looked up on-chain via UniverseManager.ownerOf()
+    ///      instead of trusting platform-supplied address.
+    function registerUniverse(uint256 universeId) external onlyPlatform {
+        require(universeManager != address(0), "Universe manager not set");
+        // REVENUE-01: Read creator from on-chain source of truth
+        address creator = IERC721(universeManager).ownerOf(universeId);
         if (creator == address(0)) revert ZeroAddress();
         universeCreators[universeId] = creator;
         emit UniverseRegistered(universeId, creator);
@@ -156,6 +174,11 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (msg.value < totalPrice) revert InsufficientPayment();
 
         Subscription storage sub = subscriptions[msg.sender][universeId];
+
+        // SUB-01: Block tier downgrades on active subscriptions to prevent loss of paid time
+        if (sub.expiresAt > block.timestamp && uint8(tier) < uint8(sub.tier)) {
+            revert TierDowngradeNotAllowed();
+        }
 
         uint256 startTime = block.timestamp;
         if (sub.expiresAt > block.timestamp) {

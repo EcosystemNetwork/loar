@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
 
 /// @title CollabManager
@@ -106,6 +107,8 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     ) external whenNotPaused returns (uint256 collabId) {
         require(revenueShareBps <= 10000, "Invalid share");
         if (targetAcceptor == address(0)) revert ZeroAddress();
+        // COLLAB-01: Verify proposer owns universe A
+        require(IERC721(address(universeManager)).ownerOf(universeA) == msg.sender, "Not universe A owner");
 
         collabId = nextCollabId++;
 
@@ -134,7 +137,8 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function acceptCollab(uint256 collabId) external whenNotPaused {
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.PROPOSED) revert InvalidStatus();
-        if (msg.sender != c.acceptor) revert NotAcceptor();
+        // COLLAB-01: Verify acceptor owns universe B (on-chain check is authoritative)
+        require(IERC721(address(universeManager)).ownerOf(c.universeB) == msg.sender, "Not universe B owner");
 
         c.status = CollabStatus.ACCEPTED;
 

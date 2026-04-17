@@ -111,8 +111,10 @@ function RootNotFound() {
 }
 
 function AuthErrorWatcher() {
-  const { error } = useWalletAuth();
+  const { error, needsManualSignIn, signIn } = useWalletAuth();
   const prevError = useRef<string | null>(null);
+  const shownManualSignIn = useRef(false);
+
   useEffect(() => {
     if (error && error !== prevError.current) {
       prevError.current = error;
@@ -121,6 +123,24 @@ function AuthErrorWatcher() {
       prevError.current = null;
     }
   }, [error]);
+
+  // Surface when auto-sign-in exhausted — prompt user to sign manually
+  useEffect(() => {
+    if (needsManualSignIn && !shownManualSignIn.current) {
+      shownManualSignIn.current = true;
+      toast.info('Wallet connected but not signed in', {
+        description: 'Click below to complete sign-in.',
+        action: {
+          label: 'Sign In',
+          onClick: () => signIn(),
+        },
+        duration: 15000,
+      });
+    } else if (!needsManualSignIn) {
+      shownManualSignIn.current = false;
+    }
+  }, [needsManualSignIn, signIn]);
+
   return null;
 }
 
@@ -140,41 +160,37 @@ function RootComponent() {
         disableTransitionOnChange
         storageKey="vite-ui-theme"
       >
+        {/* Route transition progress bar — keeps layout stable, no page flash */}
+        {isLoading && <div className="route-progress-bar" aria-hidden="true" />}
         <div className="min-h-svh flex flex-col">
-          {isLoading ? (
-            <Loader />
-          ) : (
-            <>
-              <Header />
-              <AuthErrorWatcher />
-              {/* Testnet warning banner — only visible in testnet mode */}
-              {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
-                <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">
-                  <strong>Testnet</strong> — This is a testnet deployment. Funds and tokens have no
-                  real value.
-                </div>
-              )}
-              <main className="flex-1">
-                <Outlet />
-              </main>
-              <footer className="border-t py-6 px-4">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
-                  <span>&copy; {new Date().getFullYear()} LOAR</span>
-                  <Link to="/terms" className="hover:text-foreground transition-colors">
-                    Terms of Service
-                  </Link>
-                  <Link to="/privacy" className="hover:text-foreground transition-colors">
-                    Privacy Policy
-                  </Link>
-                  <Link to="/dmca" className="hover:text-foreground transition-colors">
-                    DMCA
-                  </Link>
-                </div>
-              </footer>
-            </>
+          <Header />
+          <AuthErrorWatcher />
+          {/* Testnet warning banner — only visible in testnet mode */}
+          {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
+            <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">
+              <strong>Testnet</strong> — This is a testnet deployment. Funds and tokens have no real
+              value.
+            </div>
           )}
+          <main className="flex-1">
+            <Outlet />
+          </main>
+          <footer className="border-t py-6 px-4">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+              <span>&copy; {new Date().getFullYear()} LOAR</span>
+              <Link to="/terms" className="hover:text-foreground transition-colors">
+                Terms of Service
+              </Link>
+              <Link to="/privacy" className="hover:text-foreground transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/dmca" className="hover:text-foreground transition-colors">
+                DMCA
+              </Link>
+            </div>
+          </footer>
         </div>
-        <Toaster richColors />
+        <Toaster richColors position="top-right" toastOptions={{ duration: 5000 }} />
         <AdminToolbar />
       </ThemeProvider>
       {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-left" />}

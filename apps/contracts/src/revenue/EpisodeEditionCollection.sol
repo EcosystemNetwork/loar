@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
-import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
+import {ERC1155Upgradeable} from "@openzeppelin-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
-import {Context} from "@openzeppelin/utils/Context.sol";
-import {ContextUpgradeable} from "@openzeppelin-upgradeable/utils/ContextUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -18,7 +16,7 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Checks RightsRegistry before creating an edition — FUN and FROZEN content
 ///         cannot be monetized. Routes all payments through PaymentRouter.
-contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract EpisodeEditionCollection is Initializable, ERC1155Upgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     struct Edition {
         uint256 nodeId;
         bytes32 contentHash;
@@ -75,7 +73,7 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() ERC1155("") { _disableInitializers(); }
+    constructor() { _disableInitializers(); }
 
     function initialize(
         uint256 _universeId,
@@ -85,6 +83,8 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
         uint16 _platformFeeBps,
         uint16 _royaltyBps
     ) external initializer {
+        __ERC1155_init("");
+        __ERC2981_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -174,23 +174,12 @@ contract EpisodeEditionCollection is Initializable, ERC1155, ERC2981, Reentrancy
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC1155, ERC2981)
+        override(ERC1155Upgradeable, ERC2981Upgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
 
-    // ---- Context diamond override (non-upgradeable + upgradeable) ----
-
-    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
-        return msg.sender;
-    }
-
-    function _msgData() internal pure override(Context, ContextUpgradeable) returns (bytes calldata) {
-        return msg.data;
-    }
-
-    function _contextSuffixLength() internal pure override(Context, ContextUpgradeable) returns (uint256) {
-        return 0;
-    }
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
 }

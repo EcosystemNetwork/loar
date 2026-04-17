@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -121,8 +121,12 @@ contract TokenVesting is Ownable {
         if (vestingDuration == 0) revert ZeroVestingDuration();
         if (cliffDuration > vestingDuration) revert CliffExceedsVesting();
 
-        // Transfer tokens from caller to this contract
+        // VESTING-03: Fee-on-transfer protection — store actual received amount
+        uint256 balBefore = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransferFrom(msg.sender, address(this), totalAmount);
+        uint256 received = IERC20(token).balanceOf(address(this)) - balBefore;
+        // Use received amount (may be less than totalAmount for fee-on-transfer tokens)
+        totalAmount = uint128(received);
 
         vestingId = nextVestingId++;
 

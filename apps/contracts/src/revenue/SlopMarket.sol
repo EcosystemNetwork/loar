@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import {IERC721} from "@openzeppelin/interfaces/IERC721.sol";
 import {IERC1155} from "@openzeppelin/interfaces/IERC1155.sol";
 import {IERC165} from "@openzeppelin/interfaces/IERC165.sol";
+import {IERC2981} from "@openzeppelin/interfaces/IERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -189,8 +190,22 @@ contract SlopMarket is ReentrancyGuard, Ownable {
             IERC1155(l.tokenContract).safeTransferFrom(l.seller, msg.sender, l.tokenId, amount, "");
         }
 
-        // Route payment: platform cut to treasury, rest accrues to seller
-        paymentRouter.route{value: totalPrice}(l.seller, platformFeeBps);
+        // MARKET-01: Honor ERC2981 creator royalties
+        (address royaltyReceiver, uint256 royaltyAmount) = (address(0), 0);
+        try IERC2981(l.tokenContract).royaltyInfo(l.tokenId, totalPrice) returns (address receiver, uint256 amount) {
+            royaltyReceiver = receiver;
+            royaltyAmount = amount;
+        } catch {}
+
+        if (royaltyAmount > 0 && royaltyReceiver != address(0) && royaltyReceiver != l.seller) {
+            // Route royalty to creator, remaining to seller
+            uint256 sellerAmount = totalPrice - royaltyAmount;
+            paymentRouter.route{value: royaltyAmount}(royaltyReceiver, 0);
+            paymentRouter.route{value: sellerAmount}(l.seller, platformFeeBps);
+        } else {
+            // Route payment: platform cut to treasury, rest accrues to seller
+            paymentRouter.route{value: totalPrice}(l.seller, platformFeeBps);
+        }
 
         // Refund overpayment
         uint256 overpaid = msg.value - totalPrice;

@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
-import {ERC721Enumerable} from "@openzeppelin/token/ERC721/extensions/ERC721Enumerable.sol";
-import {ERC721URIStorage} from "@openzeppelin/token/ERC721/extensions/ERC721URIStorage.sol";
-import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
+import {ERC721Upgradeable} from "@openzeppelin-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import {ERC721EnumerableUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import {ERC721URIStorageUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
-import {Context} from "@openzeppelin/utils/Context.sol";
-import {ContextUpgradeable} from "@openzeppelin-upgradeable/utils/ContextUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
 /// @title CharacterNFT
 /// @notice Characters as ownable NFTs. Owners earn when their character appears in episodes.
 ///         Supports appearance tracking and royalty accumulation.
-contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     struct Character {
         uint256 universeId;
         string name;
@@ -73,7 +71,7 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
     mapping(uint256 => uint256) public characterOriginalToken;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() ERC721("LOAR Characters", "CHARACTER") { _disableInitializers(); }
+    constructor() { _disableInitializers(); }
 
     function initialize(
         uint256 _universeId,
@@ -82,6 +80,10 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         address _paymentRouter,
         uint16 _appearanceFeeBps
     ) external initializer {
+        __ERC721_init("LOAR Characters", "CHARACTER");
+        __ERC721Enumerable_init();
+        __ERC721URIStorage_init();
+        __ERC2981_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         if (_appearanceFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
@@ -200,15 +202,9 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
         emit CharacterAppearance(characterId, episodeId, msg.value);
     }
 
-    /// @notice Claim accumulated appearance royalties
-    /// @dev Royalties are routed through PaymentRouter on appearance, so the owner
-    ///      claims from PaymentRouter. This function resets the tracked amount.
-    function claimRoyalties() external nonReentrant {
-        uint256 amount = claimableRoyalties[msg.sender];
-        if (amount == 0) revert NothingToClaim();
-        claimableRoyalties[msg.sender] = 0;
-        emit RoyaltyClaimed(0, msg.sender, amount);
-    }
+    /// @notice REMOVED: claimRoyalties was vestigial — it emitted RoyaltyClaimed but transferred
+    ///         no ETH (ROYALTY-01 / C-8). Royalties are routed through PaymentRouter on appearance.
+    ///         Claim via paymentRouter.claim() instead.
 
     /// @notice Deactivate character (creator only)
     function deactivateCharacter(uint256 characterId) external {
@@ -235,33 +231,23 @@ contract CharacterNFT is Initializable, ERC721Enumerable, ERC721URIStorage, ERC2
 
     // ---- Overrides ----
 
-    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+    function tokenURI(uint256 tokenId) public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721Enumerable, ERC721URIStorage, ERC2981) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721Upgradeable, ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
-    function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
+    function _update(address to, uint256 tokenId, address auth) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
         return super._update(to, tokenId, auth);
     }
 
-    function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
+    function _increaseBalance(address account, uint128 value) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
         super._increaseBalance(account, value);
     }
 
-    // ---- Context diamond override (non-upgradeable + upgradeable) ----
+    // ---- Storage gap ----
 
-    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
-        return msg.sender;
-    }
-
-    function _msgData() internal pure override(Context, ContextUpgradeable) returns (bytes calldata) {
-        return msg.data;
-    }
-
-    function _contextSuffixLength() internal pure override(Context, ContextUpgradeable) returns (uint256) {
-        return 0;
-    }
+    uint256[50] private __gap;
 }

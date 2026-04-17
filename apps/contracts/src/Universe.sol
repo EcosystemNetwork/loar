@@ -402,6 +402,10 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
     // ---- Canon ----
 
+    /// @notice Set the canon tip. The full canon chain is derived via getCanonChain() / getTimeline().
+    /// @dev The `canon` boolean on VideoNode is ONLY meaningful for `currentCanonId` — it marks the
+    ///      current tip, not membership in the canon chain. Use getCanonChain() to get the full chain.
+    ///      This is an O(1) operation — walk-and-update would be O(n) and gas-prohibitive for long chains.
     function setCanon(uint id) public onlyAdmin {
         if (nodes[id].id == 0) {
             revert NodeDoesNotExist();

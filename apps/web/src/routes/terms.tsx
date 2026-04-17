@@ -17,7 +17,7 @@ function TermsPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: April 16, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: April 17, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
           <section>
@@ -242,7 +242,51 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">9. Prohibited Conduct</h2>
+            <h2 className="text-xl font-semibold text-foreground">9. $LOAR Token</h2>
+            <p>
+              The $LOAR token is a utility token used within the Platform for AI generation credits,
+              governance participation, marketplace transactions, and ecosystem incentives. $LOAR is{' '}
+              <strong>not a security, investment contract, or financial instrument</strong>. The
+              Company makes no representations regarding the future value, price appreciation, or
+              return on purchase of $LOAR tokens. Purchasing or holding $LOAR tokens does not
+              entitle you to equity, dividends, profit sharing, or any ownership interest in the
+              Company.
+            </p>
+            <p>You acknowledge and agree to the following token mechanics:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong>Fee-on-Transfer:</strong> $LOAR token transfers may include a protocol fee
+                that is automatically deducted by the smart contract on each transfer. This means
+                the amount received by the recipient may be less than the amount sent by the sender.
+                The fee rate is configurable by governance and is disclosed in the token contract.
+                You are responsible for accounting for this fee when initiating transfers.
+              </li>
+              <li>
+                <strong>Bonding Curve:</strong> $LOAR tokens may be bought and sold through an
+                automated bonding curve smart contract, where the token price increases with supply
+                and decreases with redemptions. Bonding curves carry inherent risk: early
+                participants may receive lower prices while later participants pay higher prices,
+                and large sell orders can significantly impact the price. The Company does not
+                guarantee liquidity, price stability, or the ability to sell tokens at any
+                particular price.
+              </li>
+              <li>
+                <strong>Governance:</strong> $LOAR token holders may participate in Platform
+                governance by voting on proposals. Governance votes are recorded on-chain and are
+                permanent. Governance rights are limited to Platform parameters and do not confer
+                corporate governance rights over the Company.
+              </li>
+            </ul>
+            <p>
+              Regulatory treatment of utility tokens varies by jurisdiction. You are solely
+              responsible for determining whether your purchase, possession, or use of $LOAR tokens
+              complies with applicable laws in your jurisdiction, including securities, tax, and
+              money transmission regulations.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">10. Prohibited Conduct</h2>
             <p>You agree not to use the Platform to:</p>
             <ul className="list-disc pl-6 space-y-1">
               <li>
@@ -294,7 +338,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">10. Content Moderation</h2>
+            <h2 className="text-xl font-semibold text-foreground">11. Content Moderation</h2>
             <p>
               The Company reserves the right to review, flag, hide, or remove any content on the
               Platform that violates these Terms or applicable law. Content may be assigned one of
@@ -312,7 +356,7 @@ function TermsPage() {
 
           <section>
             <h2 className="text-xl font-semibold text-foreground">
-              11. DMCA &amp; Copyright Takedowns
+              12. DMCA &amp; Copyright Takedowns
             </h2>
             <p>
               The Company respects intellectual property rights and complies with the Digital
@@ -349,7 +393,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">12. Disclaimers</h2>
+            <h2 className="text-xl font-semibold text-foreground">13. Disclaimers</h2>
             <p>
               THE PLATFORM IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT
               WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
@@ -369,7 +413,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">13. Limitation of Liability</h2>
+            <h2 className="text-xl font-semibold text-foreground">14. Limitation of Liability</h2>
             <p>
               TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COMPANY, ITS OFFICERS,
               DIRECTORS, EMPLOYEES, AGENTS, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY INDIRECT,
@@ -396,7 +440,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">14. Indemnification</h2>
+            <h2 className="text-xl font-semibold text-foreground">15. Indemnification</h2>
             <p>
               You agree to indemnify, defend, and hold harmless the Company and its officers,
               directors, employees, agents, and affiliates from and against any and all claims,
@@ -410,7 +454,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">15. Termination</h2>
+            <h2 className="text-xl font-semibold text-foreground">16. Termination</h2>
             <p>
               The Company may suspend or terminate your access to the Platform at any time, with or
               without notice, for violation of these Terms, suspected fraudulent activity, legal
@@ -423,13 +467,13 @@ function TermsPage() {
               exist on the blockchain independently of the Platform; (c) off-chain content may be
               retained or deleted at the Company&apos;s discretion; (d) any accrued and unpaid fees
               remain payable; and (e) provisions of these Terms that by their nature should survive
-              termination (including Sections 5, 6, 7, 12, 13, 14, and 16) shall survive.
+              termination (including Sections 5, 6, 7, 9, 13, 14, 15, and 17) shall survive.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground">
-              16. Governing Law &amp; Dispute Resolution
+              17. Governing Law &amp; Dispute Resolution
             </h2>
             <p>
               These Terms shall be governed by and construed in accordance with the laws of the
@@ -453,7 +497,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">17. Changes to These Terms</h2>
+            <h2 className="text-xl font-semibold text-foreground">18. Changes to These Terms</h2>
             <p>
               The Company reserves the right to modify these Terms at any time. Material changes
               will be communicated by updating the &quot;Last updated&quot; date at the top of this
@@ -464,7 +508,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">18. Severability</h2>
+            <h2 className="text-xl font-semibold text-foreground">19. Severability</h2>
             <p>
               If any provision of these Terms is held to be invalid, illegal, or unenforceable, the
               remaining provisions shall continue in full force and effect. The invalid provision
@@ -474,7 +518,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">19. Entire Agreement</h2>
+            <h2 className="text-xl font-semibold text-foreground">20. Entire Agreement</h2>
             <p>
               These Terms, together with the Privacy Policy and any additional terms applicable to
               specific Platform features, constitute the entire agreement between you and the
@@ -484,7 +528,7 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">20. Contact</h2>
+            <h2 className="text-xl font-semibold text-foreground">21. Contact</h2>
             <p>For questions about these Terms, contact us at:</p>
             <p>
               <strong>General inquiries:</strong>{' '}

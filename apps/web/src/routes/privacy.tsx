@@ -17,7 +17,7 @@ function PrivacyPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: April 16, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: April 17, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
           <section>
@@ -444,6 +444,20 @@ function PrivacyPage() {
               <Link to={'/dmca' as any} className="text-primary underline">
                 /dmca
               </Link>
+            </p>
+            <p className="mt-4">
+              <strong>Designated DMCA Agent:</strong>
+              <br />
+              [DMCA Agent Name — TO BE FILED]
+              <br />
+              [Email — TO BE FILED]
+              <br />
+              [Physical Address — TO BE FILED]
+              <br />
+              <span className="text-xs">
+                (Agent designation to be registered with the U.S. Copyright Office pursuant to 17
+                U.S.C. Section 512(c))
+              </span>
             </p>
           </section>
         </div>

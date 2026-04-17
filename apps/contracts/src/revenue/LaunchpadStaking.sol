@@ -159,8 +159,16 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         StakeInfo storage s = stakes[msg.sender];
         Tier oldTier = s.tier;
 
+        // STAKE-01 fix: Update stakedAt on each deposit using weighted average
+        // to prevent lock-period bypass via small seed deposits
+        if (s.stakedAt == 0) {
+            s.stakedAt = block.timestamp;
+        } else {
+            // Weighted average: new stakedAt = (oldAmount * oldStakedAt + newAmount * now) / totalAmount
+            s.stakedAt = (s.amount * s.stakedAt + amount * block.timestamp) / (s.amount + amount);
+        }
+
         s.amount += amount;
-        if (s.stakedAt == 0) s.stakedAt = block.timestamp;
         s.lastClaimAt = block.timestamp;
 
         // Update tier
@@ -243,8 +251,16 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             }
         }
 
+        // STAKE-01 fix: Update stakedAt on each deposit using weighted average
+        // to prevent lock-period bypass via small seed deposits
+        if (us.stakedAt == 0) {
+            us.stakedAt = block.timestamp;
+        } else {
+            // Weighted average: new stakedAt = (oldAmount * oldStakedAt + newAmount * now) / totalAmount
+            us.stakedAt = (us.amount * us.stakedAt + amount * block.timestamp) / (us.amount + amount);
+        }
+
         us.amount += amount;
-        if (us.stakedAt == 0) us.stakedAt = block.timestamp;
         us.rewardDebt = us.amount * pool.accRewardPerShare / 1e18;
 
         pool.totalStaked += amount;

@@ -7,9 +7,20 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { recoverMessageAddress, getAddress } from 'viem';
 import { db, firebaseAvailable } from './firebase';
 
-const getNoncesCol = () => (firebaseAvailable ? db.collection('siweNonces') : null);
+// AUTH-03: In production, Firestore is REQUIRED for nonce storage to ensure
+// multi-instance safety. In-memory fallback is only allowed in local dev.
+const getNoncesCol = () => {
+  if (firebaseAvailable) return db.collection('siweNonces');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Firestore is unavailable but required for nonce storage in production. ' +
+        'In-memory nonce storage is unsafe for multi-instance deployments.'
+    );
+  }
+  return null;
+};
 
-// In-memory nonce store fallback
+// In-memory nonce store fallback (local dev only — see AUTH-03 above)
 const memoryNonces = new Map<string, { createdAt: Date; expiresAt: Date; used: boolean }>();
 setInterval(
   () => {
@@ -43,6 +54,12 @@ setInterval(
   15 * 60 * 1000
 );
 
+// JWT Secret Rotation Procedure (INFRA-02):
+// 1. Set SIWE_JWT_SECRET_PREVIOUS = current SIWE_JWT_SECRET value
+// 2. Set SIWE_JWT_SECRET = new secret value
+// 3. Deploy — new tokens signed with new secret, old tokens still verify
+// 4. After 24h (JWT TTL), remove SIWE_JWT_SECRET_PREVIOUS
+
 const jwtSecretRaw = process.env.SIWE_JWT_SECRET;
 if (!jwtSecretRaw || jwtSecretRaw.length < 32) {
   throw new Error(
@@ -50,6 +67,12 @@ if (!jwtSecretRaw || jwtSecretRaw.length < 32) {
   );
 }
 const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
+
+const jwtSecretPreviousRaw = process.env.SIWE_JWT_SECRET_PREVIOUS;
+const JWT_SECRET_PREVIOUS = jwtSecretPreviousRaw
+  ? new TextEncoder().encode(jwtSecretPreviousRaw)
+  : null;
+
 const JWT_ISSUER = 'loar-server';
 const JWT_AUDIENCE = 'loar-app';
 const JWT_EXPIRY = '24h';
@@ -73,9 +96,11 @@ const ALLOWED_DOMAINS = new Set(
   })()
 );
 
-/** Allowed Chain IDs. Base L2 mainnet + Sepolia testnet + localhost. */
+/** Allowed Chain IDs. Base L2 mainnet (8453) + Base Sepolia (84532) + Sepolia testnet (11155111) + localhost. */
 const ALLOWED_CHAIN_IDS = new Set(
-  (process.env.SIWE_ALLOWED_CHAIN_IDS || '8453,11155111,1,31337').split(',').map((id) => id.trim())
+  (process.env.SIWE_ALLOWED_CHAIN_IDS || '8453,84532,11155111,31337')
+    .split(',')
+    .map((id) => id.trim())
 );
 
 export interface SiweSessionPayload extends JWTPayload {
@@ -111,7 +136,8 @@ export async function consumeNonce(nonce: string): Promise<void> {
     const nonceData = nonceDoc.data()!;
     if (nonceData.used) throw new Error('Invalid or expired nonce');
     if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
-    await col.doc(nonce).update({ used: true });
+    // AUTH-03: Delete nonce from Firestore on consume (one-time use)
+    await col.doc(nonce).delete();
   } else {
     // Atomic nonce consumption: delete IMMEDIATELY to prevent TOCTOU race.
     // If two requests arrive with the same nonce, only the first delete returns
@@ -235,7 +261,8 @@ export async function verifySiweSignature(
       if (nonceData.used) throw new Error('Invalid or expired nonce');
       if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
 
-      transaction.update(nonceRef, { used: true });
+      // AUTH-03: Delete nonce from Firestore (one-time use) instead of marking used
+      transaction.delete(nonceRef);
     });
   } else {
     // Atomic nonce consumption: delete IMMEDIATELY before any async work
@@ -313,13 +340,14 @@ async function isTokenRevoked(jti: string): Promise<boolean> {
   return memoryBlacklist.has(jti);
 }
 
-/** Verify a SIWE session JWT. Returns the payload or null if invalid/expired/revoked. */
+/** Verify a SIWE session JWT. Returns the payload or null if invalid/expired/revoked.
+ *  Supports secret rotation: tries the current secret first, then falls back to
+ *  SIWE_JWT_SECRET_PREVIOUS if set (see INFRA-02 rotation procedure above). */
 export async function verifySessionToken(token: string): Promise<SiweSessionPayload | null> {
+  const verifyOpts = { issuer: JWT_ISSUER, audience: JWT_AUDIENCE };
+
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    });
+    const { payload } = await jwtVerify(token, JWT_SECRET, verifyOpts);
 
     // Check revocation if token has a jti
     if (payload.jti && (await isTokenRevoked(payload.jti))) {
@@ -328,6 +356,25 @@ export async function verifySessionToken(token: string): Promise<SiweSessionPayl
 
     return payload as SiweSessionPayload;
   } catch {
+    // Current secret failed — try the previous secret during rotation
+    if (JWT_SECRET_PREVIOUS) {
+      try {
+        const { payload } = await jwtVerify(token, JWT_SECRET_PREVIOUS, verifyOpts);
+
+        // Check revocation if token has a jti
+        if (payload.jti && (await isTokenRevoked(payload.jti))) {
+          return null;
+        }
+
+        console.warn(
+          '[SIWE] Token verified with previous secret — rotation still in progress. ' +
+            'Remove SIWE_JWT_SECRET_PREVIOUS after 24h.'
+        );
+        return payload as SiweSessionPayload;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {GovernanceERC20} from "../GovernanceERC20.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";

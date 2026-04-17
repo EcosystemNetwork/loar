@@ -29,6 +29,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
+import { GettingStartedBanner } from '@/components/GettingStartedBanner';
 import { useQuery } from '@tanstack/react-query';
 import {
   ponderGql,
@@ -1386,6 +1387,9 @@ function HomeComponent() {
 
       {/* Hero: skeleton during load, real billboard once data arrives */}
       {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
+
+      {/* Getting Started — dismissible onboarding for new users */}
+      <GettingStartedBanner />
 
       {/* Content Rows — only render once we have real data */}
       {!universesLoading && (

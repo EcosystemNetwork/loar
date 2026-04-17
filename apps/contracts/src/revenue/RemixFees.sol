@@ -8,6 +8,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/Reentr
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 
 /// @title RemixFees
 /// @notice When someone branches/remixes content from another creator's work,
@@ -45,6 +46,9 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     uint16 public creatorShareBps;    // % to original content creator
     uint16 public lpShareBps;         // % to LP
     uint16 public treasuryShareBps;   // % to DAO treasury
+
+    /// @notice On-chain source of truth for universe ownership (ERC-721)
+    address public universeManager;
 
     /// @notice Per-universe remix configs
     mapping(uint256 => RemixConfig) public universeConfigs;
@@ -179,9 +183,21 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         emit UniverseRemixFeeSet(universeId, fee);
     }
 
-    /// @notice Register universe creator (platform only)
-    function registerUniverse(uint256 universeId, address creator) external whenNotPaused {
+    /// @notice Set the UniverseManager contract address (owner only)
+    function setUniverseManager(address _universeManager) external onlyOwner {
+        if (_universeManager == address(0)) revert ZeroAddress();
+        universeManager = _universeManager;
+    }
+
+    /// @notice Register universe creator — looks up owner on-chain
+    /// @dev REVENUE-01 FIX: Creator is now looked up on-chain via UniverseManager.ownerOf()
+    ///      instead of trusting platform-supplied address.
+    function registerUniverse(uint256 universeId) external whenNotPaused {
         require(msg.sender == platform || msg.sender == owner(), "Unauthorized");
+        require(universeManager != address(0), "Universe manager not set");
+        // REVENUE-01: Read creator from on-chain source of truth
+        address creator = IERC721(universeManager).ownerOf(universeId);
+        if (creator == address(0)) revert ZeroAddress();
         universeCreators[universeId] = creator;
     }
 

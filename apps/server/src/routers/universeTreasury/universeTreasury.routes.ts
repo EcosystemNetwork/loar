@@ -62,7 +62,8 @@ function getTreasuryChainClient(chainId?: number) {
 async function verifyTreasuryEthPayment(
   txHash: string,
   expectedWei?: string,
-  chainId?: number
+  chainId?: number,
+  expectedSender?: string
 ): Promise<void> {
   if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
     throw new TRPCError({
@@ -105,6 +106,21 @@ async function verifyTreasuryEthPayment(
     });
   }
 
+  // Verify the transaction was sent by the authenticated user
+  if (!expectedSender) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Sender verification is required for treasury payment claims.',
+    });
+  }
+  if (tx.from?.toLowerCase() !== expectedSender.toLowerCase()) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message:
+        'Transaction sender does not match your wallet address. You can only fund pools with your own payments.',
+    });
+  }
+
   if (expectedWei && expectedWei !== '0') {
     const minRequired = BigInt(expectedWei);
     if (tx.value < minRequired) {
@@ -120,7 +136,8 @@ async function verifyTreasuryEthPayment(
 async function verifyTreasuryLoarPayment(
   txHash: string,
   expectedLoarWei: bigint,
-  chainId?: number
+  chainId?: number,
+  expectedSender?: string
 ): Promise<void> {
   if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
     throw new TRPCError({
@@ -169,6 +186,24 @@ async function verifyTreasuryLoarPayment(
       code: 'BAD_REQUEST',
       message: 'Transaction does not contain a $LOAR Transfer to the platform treasury.',
     });
+  }
+
+  // Verify the transfer was sent by the authenticated user
+  if (!expectedSender) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Sender verification is required for treasury payment claims.',
+    });
+  }
+  if (transferLog.topics[1]) {
+    const sender = `0x${transferLog.topics[1].slice(26)}`.toLowerCase();
+    if (sender !== expectedSender.toLowerCase()) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message:
+          'Token transfer sender does not match your wallet address. You can only fund pools with your own payments.',
+      });
+    }
   }
 
   const transferredWei = BigInt(transferLog.data);
@@ -266,7 +301,12 @@ export const universeTreasuryRouter = router({
             message: 'ETH pricing is not configured. Cannot verify payment amount.',
           });
         }
-        await verifyTreasuryEthPayment(input.paymentRef, pkg.ethPriceWei, input.chainId);
+        await verifyTreasuryEthPayment(
+          input.paymentRef,
+          pkg.ethPriceWei,
+          input.chainId,
+          ctx.user.address
+        );
       } else if (input.paymentMethod === 'loar') {
         if (!input.loarAmount)
           throw new TRPCError({
@@ -274,11 +314,16 @@ export const universeTreasuryRouter = router({
             message: 'loarAmount is required for $LOAR payments',
           });
         const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
-        await verifyTreasuryLoarPayment(input.paymentRef, expectedWei, input.chainId);
+        await verifyTreasuryLoarPayment(
+          input.paymentRef,
+          expectedWei,
+          input.chainId,
+          ctx.user.address
+        );
       } else {
         // card: verify Stripe PaymentIntent
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
-        await verifyStripePayment(input.paymentRef, input.packageId, expectedCents);
+        await verifyStripePayment(input.paymentRef, input.packageId, expectedCents, ctx.user.uid);
         // Dedup is enforced atomically inside the transaction below
       }
 
@@ -655,6 +700,14 @@ export const universeTreasuryRouter = router({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Deposit transaction recipient does not match the platform treasury address.',
+        });
+      }
+      // Verify the deposit was sent by the authenticated user
+      if (tx.from?.toLowerCase() !== ctx.user.address.toLowerCase()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message:
+            'Deposit transaction sender does not match your wallet address. You can only deposit your own transactions.',
         });
       }
       // Verify the deposited amount matches the claimed amount (0.1% tolerance for gas rounding)

@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgrad
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
+import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 
 /// @title LicensingRegistry
 /// @notice Manages IP licensing for original universes. When a universe gains traction,
@@ -24,7 +25,11 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         address licensor;          // universe creator
         address licensee;          // external platform/partner
         uint256 upfrontFee;
-        uint16 royaltyBps;         // ongoing royalty percentage
+        /// @dev LICENSE-02: royaltyBps is advisory — enforcement is off-chain via legal agreement.
+        ///      On-chain enforcement would require an oracle for content revenue tracking.
+        ///      This field records the agreed-upon royalty rate for reference and event emission,
+        ///      but payRoyalty() does not auto-enforce minimum payment amounts against it.
+        uint16 royaltyBps;         // agreed royalty percentage (advisory, not auto-enforced)
         uint256 totalRoyalties;
         uint256 startTime;
         uint256 endTime;
@@ -55,6 +60,9 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     // universeId => creator/admin
     mapping(uint256 => address) public universeCreators;
+
+    /// @notice On-chain source of truth for universe ownership (ERC-721)
+    address public universeManager;
 
     address public platform;
     IPaymentRouter public paymentRouter;
@@ -115,8 +123,19 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     event UniverseRegistered(uint256 indexed universeId, address creator);
 
-    /// @notice Register a universe creator (platform only)
-    function registerUniverse(uint256 universeId, address creator) external onlyPlatform {
+    /// @notice Set the UniverseManager contract address (owner only)
+    function setUniverseManager(address _universeManager) external onlyOwner {
+        if (_universeManager == address(0)) revert ZeroAddress();
+        universeManager = _universeManager;
+    }
+
+    /// @notice Register a universe creator — looks up owner on-chain
+    /// @dev REVENUE-01 FIX: Creator is now looked up on-chain via UniverseManager.ownerOf()
+    ///      instead of trusting platform-supplied address.
+    function registerUniverse(uint256 universeId) external onlyPlatform {
+        require(universeManager != address(0), "Universe manager not set");
+        // REVENUE-01: Read creator from on-chain source of truth
+        address creator = IERC721(universeManager).ownerOf(universeId);
         if (creator == address(0)) revert ZeroAddress();
         universeCreators[universeId] = creator;
         emit UniverseRegistered(universeId, creator);
@@ -142,7 +161,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
             universeId: universeId,
             licenseType: licenseType,
             status: LicenseStatus.PROPOSED,
-            licensor: msg.sender,
+            licensor: universeCreators[universeId],
             licensee: licensee,
             upfrontFee: upfrontFee,
             royaltyBps: royaltyBps,
@@ -179,7 +198,11 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     error LicenseExpired();
 
     /// @notice Pay ongoing royalties for an active license (licensee or platform only)
-    /// @dev Reverts if the license has expired — prevents paying royalties to stale deals
+    /// @dev Reverts if the license has expired — prevents paying royalties to stale deals.
+    ///      LICENSE-02: royaltyBps is advisory — enforcement is off-chain via legal agreement.
+    ///      On-chain enforcement would require an oracle for content revenue tracking.
+    ///      The agreed royalty rate is stored in the License struct for transparency and
+    ///      can be read by off-chain systems to verify compliance.
     function payRoyalty(uint256 licenseId) external payable nonReentrant whenNotPaused {
         License storage lic = licenses[licenseId];
         if (lic.status != LicenseStatus.ACTIVE) revert InvalidStatus();

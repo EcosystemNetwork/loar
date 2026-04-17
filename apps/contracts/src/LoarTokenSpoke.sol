@@ -5,30 +5,25 @@ import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
 import {ERC20Permit} from "@openzeppelin/token/ERC20/extensions/ERC20Permit.sol";
 import {ERC20Burnable} from "@openzeppelin/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 
 /// @title LoarTokenSpoke ($LOAR — Spoke Chain)
 /// @notice Deployed on non-hub EVM chains (Ethereum, Arbitrum, Optimism, etc.)
 ///         where Wormhole NTT mints/burns supply via burn-and-mint mode.
 /// @dev Identical to LoarToken.sol except:
-///      - No MAX_SUPPLY cap (NTT manages global supply invariant across chains)
 ///      - NTT Manager is the sole minter (set at deploy, can be updated)
-///      - Same 0.05% auto-liquidity transfer fee
-contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
+///      - Per-chain MAX_SUPPLY as defense-in-depth (NTT manages global invariant)
+///      TOKEN-02: Fee-on-transfer removed. All protocol contracts assume exact-amount transfers.
+contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 1e18; // 1B cap — defense-in-depth even with NTT
-    uint256 public constant MAX_TRANSFER_FEE_BPS = 500; // hard cap: 5%
-    uint256 public constant MAX_FEE_INCREASE_PER_CHANGE = 10; // max +0.1% per change — rate-limits rug
-    uint256 public constant BPS_DENOMINATOR = 10_000;
 
     /// @notice Treasury address that receives platform revenue
     address public treasury;
 
-    /// @notice Liquidity pool address that receives transfer fees
-    address public liquidityPool;
+    /// @notice Cumulative tokens minted (never decreases). Prevents burn-and-remint cap bypass.
+    uint256 public totalMinted;
 
-    /// @notice Transfer fee in basis points (default 5 = 0.05%)
-    uint256 public transferFeeBps = 5;
-
-    /// @notice Addresses exempt from the transfer fee
+    /// @notice Addresses exempt from fees or other protocol-level restrictions
     mapping(address => bool) public feeExempt;
 
     /// @notice Addresses authorized to mint (NTT Manager)
@@ -36,16 +31,11 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
 
     event MinterUpdated(address indexed minter, bool authorized);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
-    event LiquidityPoolUpdated(address indexed oldPool, address indexed newPool);
-    event TransferFeeUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event FeeExemptUpdated(address indexed account, bool exempt);
-    event LiquidityFeeCollected(address indexed from, address indexed to, uint256 fee);
 
     error NotMinter();
     error ExceedsMaxSupply();
     error ZeroAddress();
-    error FeeTooHigh();
-    error FeeIncreaseExceedsLimit();
 
     modifier onlyMinter() {
         _checkMinter();
@@ -74,9 +64,11 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     }
 
     /// @notice Mint tokens (called by NTT Manager when tokens arrive from another chain).
-    /// @dev Per-chain cap as defense-in-depth. NTT enforces the global invariant across chains.
+    /// @dev SPOKE-01: totalMinted tracks cumulative mints (like hub) to prevent burn-and-remint cap bypass.
+    ///      Per-chain cap as defense-in-depth. NTT enforces the global invariant across chains.
     function mint(address to, uint256 amount) external onlyMinter {
-        if (totalSupply() + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
+        if (totalMinted + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
+        totalMinted += amount;
         _mint(to, amount);
     }
 
@@ -96,25 +88,9 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         feeExempt[newTreasury] = true;
     }
 
-    /// @notice Set the liquidity pool address that receives transfer fees
-    function setLiquidityPool(address newPool) external onlyOwner {
-        if (newPool == address(0)) revert ZeroAddress();
-        emit LiquidityPoolUpdated(liquidityPool, newPool);
-        if (liquidityPool != address(0)) feeExempt[liquidityPool] = false;
-        liquidityPool = newPool;
-        feeExempt[newPool] = true;
-    }
-
-    /// @notice Update the transfer fee (in basis points).
-    ///         Increases are rate-limited to MAX_FEE_INCREASE_PER_CHANGE per call.
-    function setTransferFeeBps(uint256 newFeeBps) external onlyOwner {
-        if (newFeeBps > MAX_TRANSFER_FEE_BPS) revert FeeTooHigh();
-        if (newFeeBps > transferFeeBps && newFeeBps - transferFeeBps > MAX_FEE_INCREASE_PER_CHANGE) {
-            revert FeeIncreaseExceedsLimit();
-        }
-        emit TransferFeeUpdated(transferFeeBps, newFeeBps);
-        transferFeeBps = newFeeBps;
-    }
+    /// @notice Emergency pause — halts all transfers. Only callable by owner.
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     /// @notice Set fee exemption for an address
     function setFeeExempt(address account, bool exempt) external onlyOwner {
@@ -123,7 +99,7 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         emit FeeExemptUpdated(account, exempt);
     }
 
-    /// @notice Batch-set fee exemptions for DEX routers, pools, hooks, etc.
+    /// @notice Batch-set fee exemptions for multiple addresses
     function batchSetFeeExempt(address[] calldata accounts, bool exempt) external onlyOwner {
         require(accounts.length <= 200, "Batch too large");
         for (uint256 i = 0; i < accounts.length; i++) {
@@ -133,24 +109,9 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         }
     }
 
-    /// @dev Override ERC20 _update to skim transfer fee to LP.
-    function _update(address from, address to, uint256 amount) internal override {
-        bool shouldTakeFee = liquidityPool != address(0)
-            && transferFeeBps > 0
-            && from != address(0)
-            && to != address(0)
-            && !feeExempt[from]
-            && !feeExempt[to];
-
-        if (shouldTakeFee) {
-            uint256 fee = (amount * transferFeeBps) / BPS_DENOMINATOR;
-            uint256 amountAfterFee = amount - fee;
-
-            super._update(from, liquidityPool, fee);
-            emit LiquidityFeeCollected(from, to, fee);
-            super._update(from, to, amountAfterFee);
-        } else {
-            super._update(from, to, amount);
-        }
+    /// @dev Override ERC20 _update to enforce pause on all transfers.
+    ///      TOKEN-02: Fee-on-transfer removed. All protocol contracts assume exact-amount transfers.
+    function _update(address from, address to, uint256 amount) internal override whenNotPaused {
+        super._update(from, to, amount);
     }
 }

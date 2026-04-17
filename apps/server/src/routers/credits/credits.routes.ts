@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 import { getPlatformConfig } from '../../services/platformConfig';
 import { verifyStripePayment } from './stripe.routes';
+import { reconcileSingleOrder, reconcileOrders } from '../../services/order-reconciliation';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 
@@ -958,5 +959,22 @@ export const creditsRouter = router({
   getEthPrice: publicProcedure.query(async () => {
     const cfg = await getPlatformConfig();
     return { ethPriceUsd: cfg.ethPriceUsd, updatedAt: new Date().toISOString() };
+  }),
+
+  // ── Order Reconciliation (admin-only) — INFRA-01 ──────────────
+
+  reconcile: adminProcedure
+    .input(
+      z.object({
+        txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash'),
+        chainId: z.number(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return reconcileSingleOrder(input.txHash, input.chainId);
+    }),
+
+  reconcileAll: adminProcedure.mutation(async () => {
+    return reconcileOrders();
   }),
 });

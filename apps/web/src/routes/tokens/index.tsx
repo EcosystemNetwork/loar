@@ -43,6 +43,7 @@ import { useChainId } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerAddressUrl } from '@/configs/chains';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
+import { QueryState } from '@/components/QueryState';
 
 export const Route = createFileRoute('/tokens/')({
   component: TokenLaunchpad,
@@ -54,7 +55,14 @@ function TokenLaunchpad() {
   const chainId = useChainId();
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('trending');
-  const { data: tokens, isLoading, recentSwaps, totalMarketCap } = useTokenListData();
+  const {
+    data: tokens,
+    isLoading,
+    isError,
+    refetch,
+    recentSwaps,
+    totalMarketCap,
+  } = useTokenListData();
 
   const filteredTokens = useMemo(() => {
     if (!tokens.length) return [];
@@ -244,39 +252,45 @@ function TokenLaunchpad() {
             </div>
 
             {/* Token Cards */}
-            {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredTokens.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-16">
-                  <Rocket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    {search ? 'No tokens match your search' : 'No tokens launched yet'}
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    {search
-                      ? 'Try a different search term'
-                      : 'Be the first to launch a universe token!'}
-                  </p>
-                  {!search && (
-                    <Link to="/cinematicUniverseCreate">
-                      <Button>
-                        <Rocket className="h-4 w-4 mr-2" />
-                        Launch First Token
-                      </Button>
-                    </Link>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
+            <QueryState
+              isLoading={isLoading}
+              isError={isError}
+              isEmpty={filteredTokens.length === 0}
+              onRetry={() => refetch()}
+              errorMessage="Failed to load tokens. The indexer may be temporarily unavailable."
+              skeletonCount={6}
+              skeletonAspect="aspect-[3/4]"
+              skeletonGrid="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+              emptyState={
+                <Card>
+                  <CardContent className="text-center py-16">
+                    <Rocket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      {search ? 'No tokens match your search' : 'No tokens launched yet'}
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      {search
+                        ? 'Try a different search term'
+                        : 'Be the first to launch a universe token!'}
+                    </p>
+                    {!search && (
+                      <Link to="/cinematicUniverseCreate">
+                        <Button>
+                          <Rocket className="h-4 w-4 mr-2" />
+                          Launch First Token
+                        </Button>
+                      </Link>
+                    )}
+                  </CardContent>
+                </Card>
+              }
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filteredTokens.map((token) => (
                   <TokenCard key={token.id} token={token} chainId={chainId} />
                 ))}
               </div>
-            )}
+            </QueryState>
           </div>
 
           {/* Activity Feed Sidebar */}

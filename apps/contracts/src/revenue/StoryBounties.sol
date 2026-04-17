@@ -68,6 +68,9 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     /// @notice Maximum deadline extension (365 days)
     uint256 public constant MAX_DEADLINE = 365 days;
 
+    /// @notice BOUNTY-01: Grace period after deadline — poster must award or explicitly reject before expiry kicks in
+    uint256 public constant AWARD_GRACE_PERIOD = 7 days;
+
     /// @notice Total $LOAR distributed through bounties (lifetime)
     uint256 public totalDistributed;
 
@@ -221,7 +224,8 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function expireBounty(uint256 bountyId) external nonReentrant whenNotPaused {
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
-        if (block.timestamp <= b.deadline) revert DeadlineNotPassed();
+        // BOUNTY-01: Require grace period to pass so poster has time to award before expiry
+        if (block.timestamp <= b.deadline + AWARD_GRACE_PERIOD) revert DeadlineNotPassed();
 
         b.status = BountyStatus.EXPIRED;
         loarToken.safeTransfer(b.poster, b.reward);

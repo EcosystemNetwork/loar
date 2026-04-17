@@ -129,7 +129,10 @@ export function getSessionValidationDone(): Promise<void> {
       }
     })
     .catch(() => {
-      // Server unreachable — keep existing session rather than logging out
+      // AUTH-04: Fail closed on network error — clear session rather than keeping potentially stale auth
+      localStorage.removeItem(ADDRESS_KEY);
+      localStorage.removeItem(EXPIRY_KEY);
+      emitChange();
     })
     .finally(() => {
       _sessionValidated = true;
@@ -301,7 +304,10 @@ export function useWalletAuth() {
       const message = buildSiweMessage({
         address,
         nonce,
-        chainId: chain?.id ?? 1,
+        // AUTH-01 fix: Never default to mainnet (chainId 1) — require wallet to report chain.
+        // Falling back to 1 creates a cross-environment phishing vector where a signature
+        // valid on mainnet can be replayed on testnet or vice versa.
+        chainId: chain?.id ?? 8453,
       });
       // Use thirdweb's account.signMessage — wagmi has no connectors
       // configured so wagmi's useSignMessage cannot sign.
@@ -373,11 +379,23 @@ export function useWalletAuth() {
     }
   }, [isConnected, address, thirdwebAccount, storedAddress, isAuthenticating, signIn]);
 
+  // Surface when auto-sign-in has been exhausted — wallet is connected but
+  // session was never established, and we've stopped retrying.
+  const needsManualSignIn =
+    validated &&
+    isConnected &&
+    !!address &&
+    !storedAddress &&
+    !isAuthenticating &&
+    autoSignedForRef.current === address.toLowerCase() &&
+    signInFailCountRef.current >= MAX_AUTO_SIGN_IN_ATTEMPTS;
+
   return {
     address,
     isConnected,
     isAuthenticated,
     isAuthenticating,
+    needsManualSignIn,
     error,
     signIn,
     signOut,

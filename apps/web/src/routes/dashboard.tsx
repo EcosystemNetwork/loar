@@ -9,6 +9,7 @@ import { createFileRoute, redirect, Link as RouterLink } from '@tanstack/react-r
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Play,
   Plus,
@@ -17,7 +18,6 @@ import {
   Rocket,
   TrendingUp,
   Globe,
-  Loader2,
   Coins,
   BarChart3,
   Crown,
@@ -26,9 +26,7 @@ import {
   ShoppingBag,
   Activity,
   Bell,
-  BookOpen,
   Paintbrush,
-  Video,
   Sparkles,
   FolderOpen,
 } from 'lucide-react';
@@ -100,11 +98,7 @@ function RouteComponent() {
   };
 
   if (isAuthenticating || !isConnected || isLoadingMine) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const myUniverseList: any[] = (myUniverses as any)?.data ?? [];
@@ -835,5 +829,87 @@ function NotificationsWidget() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Dashboard Skeleton (shown while auth/data loads) ─────────────────
+
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header skeleton */}
+      <div className="border-b bg-card/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-56" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-24 rounded-md" />
+              <Skeleton className="h-8 w-32 rounded-md" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6">
+        <div className="flex-1 min-w-0 space-y-8">
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-2.5 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Quick actions skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-28" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-lg" />
+              ))}
+            </div>
+          </div>
+          {/* Universe grid skeleton */}
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-36" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <Skeleton className="h-32 rounded-none" />
+                  <CardContent className="p-3 space-y-2">
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Sidebar skeleton */}
+        <aside className="hidden lg:block w-80 flex-shrink-0">
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4 space-y-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }

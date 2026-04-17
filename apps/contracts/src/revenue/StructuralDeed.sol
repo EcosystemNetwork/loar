@@ -8,6 +8,9 @@ import {ERC2981} from "@openzeppelin/token/common/ERC2981.sol";
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
+import {IERC721} from "@openzeppelin/interfaces/IERC721.sol";
+import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
+import {IUniverse} from "../interfaces/IUniverse.sol";
 
 /// @title StructuralDeed
 /// @notice ERC-721 "world real estate" for the ontology hierarchy:
@@ -59,6 +62,7 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     address public immutable platform;
     IPaymentRouter public immutable paymentRouter;
     IRightsRegistry public immutable rightsRegistry;
+    IUniverseManager public immutable universeManager;
     uint16 public immutable platformFeeBps;
     uint16 public immutable royaltyBps;
 
@@ -80,6 +84,8 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     error ContentNotMonetizable();
     error InvalidParent();
     error ParentRequired();
+    error NotUniverseAdmin();
+    error RefundFailed();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -87,6 +93,7 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         address _platform,
         address _paymentRouter,
         address _rightsRegistry,
+        address _universeManager,
         uint16 _platformFeeBps,
         uint16 _royaltyBps,
         uint256[6] memory _layerMintPrices,
@@ -96,6 +103,7 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
         rightsRegistry = IRightsRegistry(_rightsRegistry);
+        universeManager = IUniverseManager(_universeManager);
         platformFeeBps = _platformFeeBps;
         royaltyBps = _royaltyBps;
         layerMintPrices = _layerMintPrices;
@@ -118,6 +126,13 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         string calldata metadataURI
     ) external payable nonReentrant returns (uint256 tokenId) {
         if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
+
+        // DEED-01: Verify caller owns or administers this universe
+        require(
+            IERC721(address(universeManager)).ownerOf(universeId) == msg.sender,
+            "Not universe owner or admin"
+        );
+
         uint8 l = uint8(layer);
         if (msg.value < layerMintPrices[l]) revert InsufficientPayment();
         if (layerMaxSupply[l] > 0 && layerMinted[l] >= layerMaxSupply[l]) revert LayerSoldOut();
@@ -154,9 +169,14 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         _setTokenURI(tokenId, metadataURI);
         _setTokenRoyalty(tokenId, msg.sender, royaltyBps);
 
-        // Route mint fee entirely to treasury (not back to minter)
-        if (msg.value > 0) {
-            paymentRouter.routeToTreasury{value: msg.value}();
+        // DEED-02: Route only the required price to treasury, refund excess
+        uint256 price = layerMintPrices[l];
+        if (price > 0) {
+            paymentRouter.routeToTreasury{value: price}();
+        }
+        if (msg.value > price) {
+            (bool ok,) = msg.sender.call{value: msg.value - price}("");
+            if (!ok) revert RefundFailed();
         }
 
         emit DeedMinted(tokenId, universeId, layer, name, msg.sender, parentTokenId);

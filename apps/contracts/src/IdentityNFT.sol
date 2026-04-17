@@ -152,6 +152,13 @@ contract IdentityNFT is ERC721, Ownable {
         ));
     }
 
+    // IDENTITY-01: Soulbound — only mints allowed, no transfers
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        address from = super._update(to, tokenId, auth);
+        require(from == address(0), "Soulbound: transfers disabled");
+        return from;
+    }
+
     /// @notice Total INFTs minted.
     function totalSupply() external view returns (uint256) {
         return _nextTokenId - 1;
