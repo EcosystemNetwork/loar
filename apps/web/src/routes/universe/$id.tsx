@@ -28,7 +28,6 @@ import ReactFlow, {
   ReactFlowProvider,
   Panel,
   MarkerType,
-  SelectionMode,
   addEdge,
   useOnSelectionChange,
   type Node,
@@ -1680,7 +1679,7 @@ function UniverseTimelineEditorInner() {
               nodeTypes={nodeTypes}
               selectionOnDrag
               panOnDrag={[1, 2]}
-              selectionMode={SelectionMode.Partial}
+              selectionMode="partial"
               multiSelectionKeyCode="Shift"
               deleteKeyCode={null}
               fitView

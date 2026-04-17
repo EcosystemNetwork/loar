@@ -17,7 +17,6 @@ import path from 'path';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync, writeFileSync } from 'fs';
-import { GoogleAuth } from 'google-auth-library';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -25,7 +24,6 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 const CREATOR_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 const CREDITS = 5000;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY!;
-const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET!;
 
 const UNIVERSE_NAME = 'E Combonator';
 const TOKEN_SYMBOL = '$ECOMB';
@@ -106,49 +104,11 @@ async function generateCoverImage(): Promise<Buffer> {
 
 // ── Step 2: Upload to Firebase Storage ───────────────────────────────
 
-async function uploadToFirebaseStorage(imageBuffer: Buffer, filename: string): Promise<string> {
-  log('STORAGE', 'Uploading to Firebase Storage via REST API...');
-
-  const saPath = path.resolve(process.cwd(), 'firebase-service-account.json');
-  const auth = new GoogleAuth({
-    keyFile: saPath,
-    scopes: ['https://www.googleapis.com/auth/devstorage.full_control'],
-  });
-  const accessToken = await auth.getAccessToken();
-
-  const key = `universes/${filename}`;
-  const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${STORAGE_BUCKET}/o?uploadType=media&name=${encodeURIComponent(key)}`;
-
-  const res = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'image/png',
-    },
-    body: imageBuffer,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`GCS upload failed: ${res.status} ${text.slice(0, 300)}`);
-  }
-
-  // Make the object publicly readable
-  const aclUrl = `https://storage.googleapis.com/storage/v1/b/${STORAGE_BUCKET}/o/${encodeURIComponent(key)}/acl`;
-  await fetch(aclUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ entity: 'allUsers', role: 'READER' }),
-  });
-
-  const publicUrl = `https://storage.googleapis.com/${STORAGE_BUCKET}/${key}`;
-  log('STORAGE', `Uploaded: ${key} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-  log('STORAGE', `URL: ${publicUrl}`);
-
-  return publicUrl;
+async function saveImageLocally(imageBuffer: Buffer, filename: string): Promise<string> {
+  const outPath = path.resolve(process.cwd(), filename);
+  writeFileSync(outPath, imageBuffer);
+  log('IMAGE', `Saved locally: ${outPath} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
+  return outPath;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────
@@ -158,7 +118,6 @@ async function main() {
 
   // ── Validate env ──────────────────────────────────────────────────
   if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY not set');
-  if (!STORAGE_BUCKET) throw new Error('FIREBASE_STORAGE_BUCKET not set');
 
   // ── Init Firebase ──────────────────────────────────────────────────
   const saPath = path.resolve(process.cwd(), 'firebase-service-account.json');
@@ -171,18 +130,19 @@ async function main() {
   db.settings({ preferRest: true });
   console.log(`  Firebase   : ${serviceAccount.project_id}`);
   console.log(`  Creator    : ${CREATOR_ADDRESS}`);
-  console.log(`  Imagen     : configured`);
-  console.log(`  Storage    : ${STORAGE_BUCKET}\n`);
+  console.log(`  Imagen     : configured\n`);
 
   // ── Step 1: Generate AI cover image ────────────────────────────────
   console.log('Step 1: Generating AI cover image via Google Imagen 4...');
 
   const imageBuffer = await generateCoverImage();
 
-  // ── Step 2: Upload to Firebase Storage ──────────────────────────────
-  console.log('\nStep 2: Uploading cover image to Firebase Storage...');
+  // ── Step 2: Save image locally ──────────────────────────────────────
+  console.log('\nStep 2: Saving cover image locally...');
 
-  const coverImageUrl = await uploadToFirebaseStorage(imageBuffer, 'ecombonator-cover.png');
+  const localPath = await saveImageLocally(imageBuffer, 'ecombonator-cover.png');
+  // Use a placeholder — image can be uploaded via the app UI later
+  const coverImageUrl = `file://${localPath}`;
 
   // ── Step 3: Create the universe in Firestore ──────────────────────
   console.log('\nStep 3: Creating universe in Firestore...');
