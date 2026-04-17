@@ -52,6 +52,7 @@ import {
   type VfxPresetId,
 } from '../../services/scene-controls';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { buildGenerationContext } from '../../services/wiki-context';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -81,6 +82,7 @@ const generateInputSchema = z.object({
   allowFallback: z.boolean().default(true),
   entityId: z.string().optional(),
   universeId: z.string().optional(),
+  useWikiContext: z.boolean().default(true),
 
   // Model-specific optional params
   negativePrompt: z.string().optional(),
@@ -780,6 +782,22 @@ export const generationRouter = router({
             const configNeg = genConfig.negativePrompts.map((s: string) => sanitize(s)).join(', ');
             input.negativePrompt = existingNeg ? `${existingNeg}, ${configNeg}` : configNeg;
           }
+        }
+      }
+
+      // ── Wiki context injection ──────────────────────────────────────
+      if (input.useWikiContext && (input.universeId || input.entityId)) {
+        try {
+          const wikiContext = await buildGenerationContext({
+            universeId: input.universeId,
+            entityId: input.entityId,
+          });
+          if (wikiContext) {
+            input.prompt = `${wikiContext}\n\n${input.prompt}`;
+          }
+        } catch (err) {
+          // Non-fatal — generation continues without wiki context
+          console.warn('[generation] Wiki context fetch failed:', err);
         }
       }
 

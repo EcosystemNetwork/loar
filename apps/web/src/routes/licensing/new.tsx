@@ -7,7 +7,7 @@
  *   3. pricing   — Upfront fee + royalty %
  *   4. confirm   — Review + publish
  */
-import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, useSearch, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -38,6 +38,11 @@ import { getEvmAddresses } from '@/configs/addresses';
 import { licensingRegistryAbi } from '@loar/abis/generated';
 
 export const Route = createFileRoute('/licensing/new')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/licensing/new' } });
+    }
+  },
   component: CreateLicensePage,
   validateSearch: (search: Record<string, unknown>): { universeId?: string } => ({
     ...(search.universeId ? { universeId: search.universeId as string } : {}),

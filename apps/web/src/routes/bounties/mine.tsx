@@ -1,7 +1,7 @@
 /**
  * My Bounties — Dashboard for bounties you posted and submissions you made.
  */
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,11 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 
 export const Route = createFileRoute('/bounties/mine')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/bounties/mine' } });
+    }
+  },
   component: MyBountiesPage,
 });
 

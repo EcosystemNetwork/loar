@@ -54,9 +54,23 @@ const JWT_ISSUER = 'loar-server';
 const JWT_AUDIENCE = 'loar-app';
 const JWT_EXPIRY = '24h';
 
-/** Allowed SIWE domains. Add production domain when deploying. */
+/** Allowed SIWE domains. In production, SIWE_ALLOWED_DOMAINS must be set explicitly. */
 const ALLOWED_DOMAINS = new Set(
-  (process.env.SIWE_ALLOWED_DOMAINS || 'localhost,loar.fun').split(',').map((d) => d.trim())
+  (() => {
+    const raw = process.env.SIWE_ALLOWED_DOMAINS || 'localhost,loar.fun';
+    const domains = raw.split(',').map((d) => d.trim());
+    // Reject localhost in production to prevent domain spoofing
+    if (process.env.NODE_ENV === 'production') {
+      const filtered = domains.filter((d) => d !== 'localhost');
+      if (filtered.length === 0) {
+        throw new Error(
+          'SIWE_ALLOWED_DOMAINS must contain at least one non-localhost domain in production'
+        );
+      }
+      return filtered;
+    }
+    return domains;
+  })()
 );
 
 /** Allowed Chain IDs. Base L2 mainnet + Sepolia testnet + localhost. */

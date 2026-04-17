@@ -287,6 +287,17 @@ function EventPage() {
     [eventSegments, persistSegments]
   );
 
+  // Handle segment trim
+  const handleSegmentTrim = useCallback(
+    (segmentId: string, startTrim: number, endTrim: number) => {
+      const updated = eventSegments.map((s) =>
+        s.id === segmentId ? { ...s, startTrim, endTrim } : s
+      );
+      persistSegments(updated);
+    },
+    [eventSegments, persistSegments]
+  );
+
   // Build connected node chain for "Play Timeline" (walks previous→current→next)
   const timelineChain: VideoSegment[] = [];
   if (graphData.nodeIds.length > 0) {
@@ -456,6 +467,7 @@ function EventPage() {
             <VideoTimeline
               segments={eventSegments}
               onSegmentsReorder={handleSegmentsReorder}
+              onSegmentTrim={handleSegmentTrim}
               onSegmentDelete={handleSegmentDelete}
               onAddSegment={() => setShowAddSegment(true)}
               onPlaySegments={() => setIsPlayingSegments(!isPlayingSegments)}

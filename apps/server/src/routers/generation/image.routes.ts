@@ -50,6 +50,7 @@ import { getStorageManager } from '../../services/storage';
 import { signWithProvenance } from '../../services/provenance';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { buildGenerationContext } from '../../services/wiki-context';
 
 // ── Collections ───────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ const generateSchema = z.object({
   allowFallback: z.boolean().default(true),
   entityId: z.string().optional(),
   universeId: z.string().optional(),
+  useWikiContext: z.boolean().default(true),
 
   qualityTarget: z.enum(['draft', 'standard', 'premium']).optional(),
   costBudget: z.enum(['low', 'medium', 'any']).optional(),
@@ -325,6 +327,22 @@ export const imageRouter = router({
       // Sanitize user-supplied prompts
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
+
+      // ── Wiki context injection ──────────────────────────────────────
+      if (input.useWikiContext && (input.universeId || input.entityId)) {
+        try {
+          const wikiContext = await buildGenerationContext({
+            universeId: input.universeId,
+            entityId: input.entityId,
+          });
+          if (wikiContext) {
+            input.prompt = `${wikiContext}\n\n${input.prompt}`;
+          }
+        } catch (err) {
+          // Non-fatal — generation continues without wiki context
+          console.warn('[image] Wiki context fetch failed:', err);
+        }
+      }
 
       const genId = randomUUID();
       const startTime = Date.now();

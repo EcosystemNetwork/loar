@@ -34,15 +34,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Public entity/wiki data
+    // Entity/wiki data — public unless explicitly marked private
     match /entities/{entityId} {
-      allow read: if true;
+      allow read: if resource == null || resource.data.visibility != 'private'
+                   || (request.auth != null && resource.data.creatorUid == request.auth.uid);
       allow write: if false;
     }
 
-    // Content metadata is public
+    // Content metadata — public unless explicitly marked private
     match /content/{contentId} {
-      allow read: if true;
+      allow read: if resource == null || resource.data.visibility != 'private'
+                   || (request.auth != null && resource.data.creatorUid == request.auth.uid);
       allow write: if false;
     }
 

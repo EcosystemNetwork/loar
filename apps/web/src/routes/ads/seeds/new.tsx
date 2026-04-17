@@ -8,7 +8,7 @@
  *   4. bounty     — Reward per placement, max placements, deadline
  *   5. confirm    — Review + publish
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -34,6 +34,11 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/ads/seeds/new')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/ads/seeds/new' } });
+    }
+  },
   component: CreateAdSeedPage,
 });
 

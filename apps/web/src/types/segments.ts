@@ -205,10 +205,21 @@ export function isMultiSegmentEvent(
 }
 
 /**
- * Helper function to get total duration of all segments
+ * Get the effective duration of a single segment, accounting for trims.
+ * Returns duration in seconds.
+ */
+export function getEffectiveDuration(segment: VideoSegment): number {
+  const fullMs = segment.duration * 1000;
+  const start = segment.startTrim ?? 0;
+  const end = segment.endTrim ?? fullMs;
+  return (end - start) / 1000;
+}
+
+/**
+ * Helper function to get total duration of all segments (accounting for trims)
  */
 export function getTotalDuration(event: MultiSegmentEvent): number {
-  return event.segments.reduce((total, segment) => total + segment.duration, 0);
+  return event.segments.reduce((total, segment) => total + getEffectiveDuration(segment), 0);
 }
 
 /**

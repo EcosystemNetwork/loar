@@ -46,6 +46,8 @@ interface VideoSegment {
   duration: number;
   model: string;
   order: number;
+  startTrim?: number;
+  endTrim?: number;
 }
 
 interface SceneEditorProps {

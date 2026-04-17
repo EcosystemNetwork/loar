@@ -4,7 +4,7 @@
  * Tiers unlock: fee discounts, priority AI queue, curation mining boosts,
  * and priority allocation on new universe token launches.
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/staking')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/staking' } });
+    }
+  },
   component: StakingPage,
 });
 

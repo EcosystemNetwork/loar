@@ -92,6 +92,7 @@ import { pollsRouter } from './polls/polls.routes';
 import { notificationsRouter } from './notifications/notifications.routes';
 import { lipsyncRouter } from './generation/lipsync.routes';
 import { cutdownRouter } from './generation/cutdown.routes';
+import { sceneAudioRouter } from './generation/sceneAudio.routes';
 import { universeStyleRouter } from './universeStyle/universeStyle.routes';
 import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.routes';
 
@@ -181,6 +182,7 @@ export const appRouter = router({
   lora: loraRouter,
   lipsync: lipsyncRouter,
   cutdown: cutdownRouter,
+  sceneAudio: sceneAudioRouter,
 
   // ── Studio OS ────────────────────────────────────────────────────────
   studio: studioRouter,

@@ -1,10 +1,15 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { UploadForm } from '@/components/UploadForm';
 import { Loader2 } from 'lucide-react';
 
 export const Route = createFileRoute('/upload')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/upload' } });
+    }
+  },
   component: UploadPage,
   validateSearch: (search: Record<string, unknown>): { universeId?: string } => ({
     universeId: (search.universeId as string) || undefined,

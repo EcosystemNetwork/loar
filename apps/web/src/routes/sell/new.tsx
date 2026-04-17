@@ -1,7 +1,7 @@
 /**
  * Create Listing — mobile multi-step listing flow
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -35,6 +35,11 @@ import { toast } from 'sonner';
 import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/sell/new')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/sell/new' } });
+    }
+  },
   component: CreateListingPage,
 });
 

@@ -4,7 +4,7 @@
  * Shows all content the authenticated user has uploaded, with grid/list
  * view, classification filter tabs, search, and delete actions.
  */
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
@@ -33,6 +33,11 @@ import { MintContentDialog } from '@/components/MintContentDialog';
 import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/my-works')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/my-works' } });
+    }
+  },
   component: MyWorksPage,
 });
 

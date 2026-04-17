@@ -221,6 +221,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  // Validate Ethereum addresses in input
+  const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+  for (const [key, value] of Object.entries(inputArgs)) {
+    if (
+      (key === 'universeAddress' || key === 'address' || key === 'walletAddress') &&
+      typeof value === 'string' &&
+      !ETH_ADDRESS_RE.test(value)
+    ) {
+      return {
+        content: [
+          { type: 'text' as const, text: `Invalid Ethereum address for "${key}": ${value}` },
+        ],
+        isError: true,
+      };
+    }
+  }
+
   try {
     const result = await tool.handler(client, inputArgs);
 

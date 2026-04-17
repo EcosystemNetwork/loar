@@ -20,10 +20,10 @@ export function errorHandler(err: Error, c: Context) {
     });
   }
 
-  // Only expose error details when LOAR_DEBUG_ERRORS is explicitly set.
-  // Using NODE_ENV alone risks leaking stack traces if dev mode is
-  // accidentally enabled in production.
-  const showDetails = process.env.LOAR_DEBUG_ERRORS === 'true';
+  // Only expose error details in development with explicit opt-in.
+  // Never leak stack traces in production regardless of env vars.
+  const isProduction = process.env.NODE_ENV === 'production';
+  const showDetails = !isProduction && process.env.LOAR_DEBUG_ERRORS === 'true';
 
   return c.json(
     {

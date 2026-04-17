@@ -5,6 +5,7 @@ import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
 import {ERC20Permit} from "@openzeppelin/token/ERC20/extensions/ERC20Permit.sol";
 import {ERC20Burnable} from "@openzeppelin/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 
 /// @title LoarToken ($LOAR)
 /// @notice Platform utility token for LOAR — used to purchase generation credits
@@ -13,7 +14,7 @@ import {Ownable} from "@openzeppelin/access/Ownable.sol";
 /// @dev ERC20 with permit (gasless approvals), burn, and owner-controlled minting.
 ///      A small transfer fee is skimmed on every transfer and routed to the
 ///      liquidity pool address, deepening protocol-owned liquidity over time.
-contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
+contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 1e18; // 1 billion $LOAR
     uint256 public constant MAX_TRANSFER_FEE_BPS = 500; // hard cap: 5%
     uint256 public constant MAX_FEE_INCREASE_PER_CHANGE = 10; // max +0.1% per change — rate-limits rug
@@ -177,10 +178,20 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         }
     }
 
-    /// @dev Override ERC20 _update to skim a transfer fee to the liquidity pool.
+    /// @notice Emergency pause — halts all transfers. Only callable by owner.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpause — resumes all transfers. Only callable by owner.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /// @dev Override ERC20 _update to enforce pause and skim a transfer fee to the liquidity pool.
     ///      Fee is skipped for mints, burns, exempt addresses, and transfers
     ///      between two fee-exempt addresses (e.g. DEX router <-> pool).
-    function _update(address from, address to, uint256 amount) internal override {
+    function _update(address from, address to, uint256 amount) internal override whenNotPaused {
         // C3 fix: skip fee entirely when both sides are fee-exempt (DEX pair optimization)
         if (feeExempt[from] && feeExempt[to]) {
             super._update(from, to, amount);

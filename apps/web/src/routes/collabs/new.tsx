@@ -7,7 +7,7 @@
  *   3. details   — Title + description
  *   4. confirm   — Review + send proposal
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -28,6 +28,11 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/collabs/new')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/collabs/new' } });
+    }
+  },
   component: ProposeCollabPage,
 });
 

@@ -49,7 +49,7 @@ export async function securityHeaders(c: Context, next: Next) {
     [
       "default-src 'self'",
       `script-src 'self' 'nonce-${nonce}'`,
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'nonce-" + nonce + "'",
       `connect-src ${TRUSTED_CONNECT}`,
       `img-src ${TRUSTED_IMG}`,
       "font-src 'self'",

@@ -11,7 +11,12 @@ const envSchema = z.object({
     .transform((v) => parseInt(v, 10)),
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  SIWE_JWT_SECRET: z.string().min(32, 'SIWE_JWT_SECRET must be at least 32 characters'),
+  SIWE_JWT_SECRET: z
+    .string()
+    .min(
+      64,
+      'SIWE_JWT_SECRET must be at least 64 characters (256-bit). Generate with: openssl rand -hex 32'
+    ),
   /** Single URL or comma-separated list (e.g. "https://loar.fun,https://staging.loar.fun") */
   CORS_ORIGIN: z.string().optional(),
 

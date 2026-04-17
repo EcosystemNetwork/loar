@@ -7,7 +7,7 @@
  *   3. pricing    — Min bid (ETH) + episode count
  *   4. confirm    — Review + publish
  */
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -30,6 +30,11 @@ import { toast } from 'sonner';
 import { parseEther } from 'viem';
 
 export const Route = createFileRoute('/ads/new')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/ads/new' } });
+    }
+  },
   component: CreateAdSlotPage,
 });
 

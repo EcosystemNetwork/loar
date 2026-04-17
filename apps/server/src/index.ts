@@ -29,6 +29,7 @@ const { verifyAuth } = await import('./lib/auth');
 const { securityHeaders } = await import('./middleware/security-headers');
 const { rateLimiter, aiRateLimiter } = await import('./middleware/rate-limit');
 const { errorHandler } = await import('./middleware/error-handler');
+const { csrfProtection } = await import('./middleware/csrf');
 const { z } = await import('zod');
 
 const app = new Hono();
@@ -67,12 +68,18 @@ app.use(
   })
 );
 
+// CSRF protection — validate Origin header on mutating requests.
+// Must be AFTER CORS (which sets response headers) but BEFORE route handlers.
+// Stripe webhook is excluded (uses its own signature verification).
+app.use('/*', csrfProtection(allowedOrigins));
+
 // Stripe webhook (must be before body-parsing middleware — needs raw body)
 const { stripeWebhookRoutes } = await import('./routes/stripe-webhook');
 app.route('/api/stripe', stripeWebhookRoutes);
 
-// SIWE authentication routes — stricter rate limit (10 req/min per IP)
-app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 10 }));
+// SIWE authentication routes — stricter rate limit (20 req/min per IP)
+// Each sign-in needs nonce + verify (2 reqs), plus /me checks and /refresh calls
+app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.route('/auth', authRoutes);
 
 // Add image serving routes
@@ -297,10 +304,10 @@ app.post('/api/upload', async (c) => {
   }
 });
 
-// ── Public DMCA takedown REST endpoint (no auth required) ───────────
+// ── Public DMCA takedown REST endpoint ─────────────────────────────
 // External reporters can't use tRPC, so this mirrors moderation.submitTakedown as REST.
-// Strict rate limit: 5 requests per minute per IP to prevent mass-flagging abuse
-app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 5 }));
+// Strict rate limit: 3 requests per minute per IP to prevent mass-flagging abuse
+app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 3 }));
 app.post('/api/takedown', async (c) => {
   const takedownSchema = z.object({
     contentId: z.string().min(1),
@@ -329,6 +336,24 @@ app.post('/api/takedown', async (c) => {
     const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
     if (!fbAvail || !fireDb) {
       return c.json({ code: 'SERVICE_UNAVAILABLE', message: 'Service not available' }, 503);
+    }
+
+    // Rate limit per claimant email: max 5 takedowns per day per email
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const recentByEmail = await fireDb
+      .collection('takedownRequests')
+      .where('claimantEmail', '==', claimantEmail)
+      .where('createdAt', '>=', oneDayAgo)
+      .limit(5)
+      .get();
+    if (recentByEmail.size >= 5) {
+      return c.json(
+        {
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many takedown requests from this email. Try again tomorrow.',
+        },
+        429
+      );
     }
 
     const now = new Date();
@@ -546,15 +571,34 @@ app.get('/api/collaboration/stream/:entityId', async (c) => {
   const { db: fireDb } = await import('./lib/firebase');
   if (!fireDb) return c.json({ error: 'Firebase not configured' }, 503);
 
+  // Verify the user has access to this entity (must be creator or public)
+  const entityDoc = await fireDb.collection('entities').doc(entityId).get();
+  if (!entityDoc.exists) return c.json({ error: 'Entity not found' }, 404);
+  const entityData = entityDoc.data()!;
+  const isOwner = entityData.creatorUid?.toLowerCase() === user.uid.toLowerCase();
+  const isPublic = entityData.visibility !== 'private';
+  if (!isOwner && !isPublic) {
+    return c.json({ error: 'You do not have access to this entity' }, 403);
+  }
+
   // Set up SSE
   c.header('Content-Type', 'text/event-stream');
   c.header('Cache-Control', 'no-cache');
   c.header('Connection', 'keep-alive');
 
+  const ALLOWED_SSE_EVENTS = new Set([
+    'entity_update',
+    'presence',
+    'locks',
+    'connected',
+    'heartbeat',
+  ]);
+
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
       const send = (event: string, data: any) => {
+        if (!ALLOWED_SSE_EVENTS.has(event)) return;
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 

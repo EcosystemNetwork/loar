@@ -7,7 +7,7 @@
  * event, lore, species, vehicle, technology, organization). Unknown kinds
  * redirect back to the create hub.
  */
-import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate, useSearch, redirect } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
@@ -1270,6 +1270,11 @@ const createSearchSchema = z.object({
 });
 
 export const Route = createFileRoute('/create/$kind')({
+  beforeLoad: ({ context, params }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: `/create/${params.kind}` } });
+    }
+  },
   component: EntityCreateForm,
   validateSearch: createSearchSchema,
 });

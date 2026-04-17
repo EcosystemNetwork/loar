@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
+import { getEffectiveDuration } from '@/types/segments';
 
 interface SegmentPlayerProps {
   segments: VideoSegment[];
@@ -50,7 +51,7 @@ export function SegmentPlayer({
   const hasNext = currentIndex < segments.length - 1;
   const hasPrevious = currentIndex > 0;
 
-  // Handle video ended - move to next segment
+  // Handle video ended (fallback — trim-based ending is in handleTimeUpdate)
   const handleEnded = useCallback(() => {
     if (hasNext) {
       setCurrentIndex((prev) => prev + 1);
@@ -106,34 +107,54 @@ export function SegmentPlayer({
     }
   }, []);
 
-  // Update progress
+  // Trim bounds for the current segment (in seconds)
+  const trimStartSec = (currentSegment?.startTrim ?? 0) / 1000;
+  const trimEndSec =
+    currentSegment?.endTrim != null
+      ? currentSegment.endTrim / 1000
+      : (currentSegment?.duration ?? 0);
+  const trimmedDuration = trimEndSec - trimStartSec;
+
+  // Update progress — clamp to trim bounds and auto-advance at trim end
   const handleTimeUpdate = useCallback(() => {
     if (!videoRef.current) return;
 
     const current = videoRef.current.currentTime;
-    const total = videoRef.current.duration;
 
-    setCurrentTime(current);
-    setDuration(total);
-
-    if (total > 0) {
-      setProgress((current / total) * 100);
+    // If we've reached the trim end point, treat as "ended"
+    if (current >= trimEndSec) {
+      videoRef.current.pause();
+      if (hasNext) {
+        setCurrentIndex((prev) => prev + 1);
+      } else {
+        setIsPlaying(false);
+        onPlaybackComplete?.();
+      }
+      return;
     }
-  }, []);
 
-  // Handle seek
+    const elapsed = current - trimStartSec;
+    setCurrentTime(elapsed);
+    setDuration(trimmedDuration);
+
+    if (trimmedDuration > 0) {
+      setProgress((elapsed / trimmedDuration) * 100);
+    }
+  }, [trimStartSec, trimEndSec, trimmedDuration, hasNext, onPlaybackComplete]);
+
+  // Handle seek — maps slider % to trimmed range
   const handleSeek = useCallback(
     (value: number) => {
       if (!videoRef.current) return;
 
-      const newTime = (value / 100) * duration;
+      const newTime = trimStartSec + (value / 100) * trimmedDuration;
       videoRef.current.currentTime = newTime;
       setProgress(value);
     },
-    [duration]
+    [trimStartSec, trimmedDuration]
   );
 
-  // Load new segment
+  // Load new segment — seek to trim start
   useEffect(() => {
     if (!videoRef.current || !currentSegment) return;
 
@@ -141,8 +162,13 @@ export function SegmentPlayer({
     videoRef.current.load();
 
     const video = videoRef.current;
+    const startSec = (currentSegment.startTrim ?? 0) / 1000;
 
     const handleLoadedData = () => {
+      // Seek to trim start
+      if (startSec > 0) {
+        video.currentTime = startSec;
+      }
       setIsLoading(false);
       if (isPlaying) {
         video.play();

@@ -38,12 +38,12 @@ services:
   redis:
     image: redis:7-alpine
     container_name: loar-redis
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save "" --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save "" --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set - generate with openssl rand -hex 32}
     restart: unless-stopped
     networks:
       - loar-network
     healthcheck:
-      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-changeme}', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -60,7 +60,7 @@ services:
       - ./.env
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379
       - TRUST_PROXY=true
       - WORKER_CONCURRENCY=0
     expose:
@@ -106,7 +106,7 @@ services:
       - ./.env
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379
       - WORKER_CONCURRENCY=5
     # Override CMD to run the worker process instead of the server
     command: ['node', 'apps/server/dist/workers/generation.worker.js']

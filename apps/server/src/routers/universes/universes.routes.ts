@@ -96,6 +96,7 @@ export const universesRouter = router({
       onChainUniverseId: input.onChainUniverseId,
       mintTxHash: input.mintTxHash,
       unstoppableDomain: input.unstoppableDomain ?? null,
+      chainId: input.chainId,
     });
   }),
 

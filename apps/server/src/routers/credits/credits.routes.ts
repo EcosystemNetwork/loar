@@ -131,7 +131,10 @@ async function verifyEthPayment(
   }
 
   // C4 fix: Verify the transaction was sent by the authenticated user
-  if (expectedSender && tx.from?.toLowerCase() !== expectedSender.toLowerCase()) {
+  if (!expectedSender) {
+    throw new Error('Sender verification is required for payment claims.');
+  }
+  if (tx.from?.toLowerCase() !== expectedSender.toLowerCase()) {
     throw new Error(
       'Transaction sender does not match your wallet address. You can only claim credits for your own payments.'
     );
@@ -197,7 +200,10 @@ async function verifyLoarPayment(
   }
 
   // C4 fix: Verify the transfer was sent by the authenticated user
-  if (expectedSender && transferLog.topics[1]) {
+  if (!expectedSender) {
+    throw new Error('Sender verification is required for payment claims.');
+  }
+  if (transferLog.topics[1]) {
     const sender = `0x${transferLog.topics[1].slice(26)}`.toLowerCase();
     if (sender !== expectedSender.toLowerCase()) {
       throw new Error(

@@ -52,6 +52,7 @@ import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
+import { VoiceProfileCard } from '@/components/VoiceProfileCard';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 
 const KIND_LABELS: Record<string, string> = {
@@ -671,6 +672,16 @@ function EntityPage() {
               )}
             </>
           )}
+
+          {/* Voice profile — design & preview character voices */}
+          <VoiceProfileCard
+            entityId={id}
+            entityName={entity.name}
+            entityKind={entity.kind}
+            entityDescription={entity.description || ''}
+            universeId={entity.universeAddress || null}
+            isOwner={isOwner}
+          />
 
           {/* Character pipeline status */}
           {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}

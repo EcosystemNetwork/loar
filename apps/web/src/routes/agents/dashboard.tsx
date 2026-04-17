@@ -1,7 +1,7 @@
 /**
  * Agent Dashboard — Manage clients, contracts, and commissions
  */
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
 import {
   useMyAgentProfile,
   useMyContracts,
@@ -24,6 +24,11 @@ import {
 } from 'lucide-react';
 
 export const Route = createFileRoute('/agents/dashboard')({
+  beforeLoad: ({ context }) => {
+    if (!context.hasSession()) {
+      throw redirect({ to: '/login', search: { redirect: '/agents/dashboard' } });
+    }
+  },
   component: AgentDashboardPage,
 });
 

@@ -12,8 +12,10 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, Plus, Trash2, GripVertical, Clock, Maximize2 } from 'lucide-react';
+import { Play, Pause, Plus, Trash2, GripVertical, Clock, Maximize2, Scissors } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
+import { getEffectiveDuration } from '@/types/segments';
+import { VideoTrimmer } from './VideoTrimmer';
 import { cn } from '@/lib/utils';
 
 interface VideoTimelineProps {
@@ -31,6 +33,7 @@ interface VideoTimelineProps {
 export function VideoTimeline({
   segments,
   onSegmentsReorder,
+  onSegmentTrim,
   onSegmentDelete,
   onAddSegment,
   onPlaySegments,
@@ -41,10 +44,11 @@ export function VideoTimeline({
   const [draggedSegment, setDraggedSegment] = useState<string | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
+  const [trimmingSegment, setTrimmingSegment] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Calculate total duration
-  const totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+  // Calculate total duration (accounting for trims)
+  const totalDuration = segments.reduce((sum, seg) => sum + getEffectiveDuration(seg), 0);
 
   // Get current segment
   const currentSegment = segments[currentSegmentIndex] || segments[0];
@@ -89,12 +93,12 @@ export function VideoTimeline({
     setHoveredSegment(null);
   };
 
-  // Calculate segment start time
+  // Calculate segment start time (accounting for trims)
   const getSegmentStartTime = (segmentId: string): number => {
     let startTime = 0;
     for (const seg of segments) {
       if (seg.id === segmentId) break;
-      startTime += seg.duration;
+      startTime += getEffectiveDuration(seg);
     }
     return startTime;
   };
@@ -222,7 +226,7 @@ export function VideoTimeline({
               <div className="flex gap-1 h-12 relative">
                 {segments.map((segment, index) => {
                   const startTime = getSegmentStartTime(segment.id);
-                  const widthPercent = (segment.duration / totalDuration) * 100;
+                  const widthPercent = (getEffectiveDuration(segment) / totalDuration) * 100;
 
                   return (
                     <SegmentBlock
@@ -264,11 +268,16 @@ export function VideoTimeline({
       </Card>
 
       {/* Segment Details (when selected) - Ultra Compact */}
-      {selectedSegment && (
+      {selectedSegment && !trimmingSegment && (
         <Card className="p-1.5 bg-primary/5 border-primary/20">
           {(() => {
             const segment = segments.find((s) => s.id === selectedSegment);
             if (!segment) return null;
+
+            const isTrimmed =
+              (segment.startTrim != null && segment.startTrim > 0) ||
+              (segment.endTrim != null && segment.endTrim < segment.duration * 1000);
+            const effectiveSec = getEffectiveDuration(segment);
 
             return (
               <div className="flex items-center justify-between gap-2">
@@ -282,7 +291,9 @@ export function VideoTimeline({
                   <div className="flex items-center gap-1 text-[9px] text-muted-foreground flex-shrink-0">
                     <span className="flex items-center gap-0.5 px-1 py-0 bg-background rounded">
                       <Clock className="h-2.5 w-2.5" />
-                      {segment.duration}s
+                      {isTrimmed
+                        ? `${effectiveSec.toFixed(1)}s / ${segment.duration}s`
+                        : `${segment.duration}s`}
                     </span>
                     <span className="px-1 py-0 bg-background rounded">
                       {segment.model.replace('fal-', '')}
@@ -290,19 +301,48 @@ export function VideoTimeline({
                     <span className="px-1 py-0 bg-background rounded">{segment.aspectRatio}</span>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSelectedSegment(null)}
-                  className="h-5 w-5 p-0 text-xs"
-                >
-                  ×
-                </Button>
+                <div className="flex items-center gap-1">
+                  {onSegmentTrim && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setTrimmingSegment(segment.id)}
+                      className="h-5 px-1.5 text-[10px] gap-1"
+                      title="Trim video"
+                    >
+                      <Scissors className="h-2.5 w-2.5" />
+                      {isTrimmed ? 'Trimmed' : 'Trim'}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSelectedSegment(null)}
+                    className="h-5 w-5 p-0 text-xs"
+                  >
+                    ×
+                  </Button>
+                </div>
               </div>
             );
           })()}
         </Card>
       )}
+
+      {/* Trim Editor */}
+      {trimmingSegment &&
+        onSegmentTrim &&
+        (() => {
+          const segment = segments.find((s) => s.id === trimmingSegment);
+          if (!segment) return null;
+          return (
+            <VideoTrimmer
+              segment={segment}
+              onTrimChange={onSegmentTrim}
+              onClose={() => setTrimmingSegment(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -411,9 +451,15 @@ function SegmentBlock({
       <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-white font-bold drop-shadow">{index + 1}</span>
-          <span className="text-[9px] text-white/90 font-medium bg-black/40 px-1 py-0.5 rounded">
-            {segment.duration}s
-          </span>
+          <div className="flex items-center gap-0.5">
+            {((segment.startTrim != null && segment.startTrim > 0) ||
+              (segment.endTrim != null && segment.endTrim < segment.duration * 1000)) && (
+              <Scissors className="h-2 w-2 text-white/70" />
+            )}
+            <span className="text-[9px] text-white/90 font-medium bg-black/40 px-1 py-0.5 rounded">
+              {getEffectiveDuration(segment).toFixed(1)}s
+            </span>
+          </div>
         </div>
       </div>
 

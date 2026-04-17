@@ -38,17 +38,33 @@ const ADMIN_ADDRESSES: string[] = (() => {
     ...(process.env.ADMIN_ADDRESSES ?? '').split(','),
     ...(process.env.ADMIN_WALLET ? [process.env.ADMIN_WALLET] : []),
   ]
-    .map((a) => a.trim().toLowerCase())
+    .map((a) => a.trim())
     .filter(Boolean);
-  // Deduplicate
-  const unique = [...new Set(raw)];
-  // Validate each address
+  // Deduplicate (case-insensitive)
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const addr of raw) {
+    const lower = addr.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      unique.push(addr);
+    }
+  }
+  // Validate and checksum each address
+  const valid: string[] = [];
   for (const addr of unique) {
     if (!ETH_ADDRESS_RE.test(addr)) {
       console.warn(`[trpc] Invalid admin address ignored: ${addr}`);
+      continue;
+    }
+    try {
+      // Checksum via getAddress, then lowercase for consistent comparison
+      valid.push(getAddress(addr).toLowerCase());
+    } catch {
+      console.warn(`[trpc] Failed to checksum admin address: ${addr}`);
     }
   }
-  return unique.filter((a) => ETH_ADDRESS_RE.test(a));
+  return valid;
 })();
 
 /**
