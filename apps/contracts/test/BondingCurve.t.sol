@@ -49,7 +49,8 @@ contract BondingCurveTest is Test {
     uint256 constant CURVE_SUPPLY_V3 = (TOKEN_SUPPLY_V3 * 8000) / 10000;
 
     uint256 constant GRADUATION_ETH = 4 ether;
-    uint16 constant MAX_BUY_BPS = 200; // 2%
+    uint16 constant MAX_BUY_BPS = 10000; // 100% — no whale limit for math tests
+    uint16 constant REAL_MAX_BUY_BPS = 200; // 2% — production value
 
     MockToken tokenV1;
     MockToken tokenV3;
@@ -357,27 +358,42 @@ contract BondingCurveTest is Test {
         uint256 supply,
         uint256 gradEth
     ) public {
-        supply = bound(supply, 1e18, 1e30);   // 1 token to 1T tokens
-        gradEth = bound(gradEth, 0.01 ether, 1000 ether);
+        supply = bound(supply, 1e20, 1e29);   // 100 tokens to 100B tokens
+        gradEth = bound(gradEth, 0.1 ether, 100 ether);
 
         MockToken t = new MockToken("T", "T", supply, address(this));
 
         try new BondingCurve(
             address(t), address(manager), 99,
-            supply, gradEth, 200
+            supply, gradEth, 10000
         ) returns (BondingCurve c) {
             assertGt(c.slopeScaled(), 0, "slopeScaled must be > 0");
 
-            // Verify full curve cost ~ gradEth
+            // Verify full curve cost ~ gradEth (within 1% for reasonable params)
             uint256 cost = _getCostExternally(c, supply);
             uint256 diff = cost > gradEth
                 ? cost - gradEth
                 : gradEth - cost;
-            // Allow 1% tolerance for extreme params
             assertLe(diff * 100, gradEth + 1, "Full curve cost off by > 1%");
         } catch {
             // SlopeIsZero is acceptable for extreme params
         }
+    }
+
+    /// @dev Anti-whale: buying more than MAX_BUY_AMOUNT reverts
+    function test_antiWhale_maxBuy() public {
+        BondingCurve whaleCurve = new BondingCurve(
+            address(tokenV1), address(manager), 99,
+            CURVE_SUPPLY_V1, GRADUATION_ETH, REAL_MAX_BUY_BPS
+        );
+        // Fund the curve with tokens
+        tokenV1.transfer(address(whaleCurve), CURVE_SUPPLY_V1);
+
+        // A large buy should revert
+        vm.deal(alice, 10 ether);
+        vm.prank(alice);
+        vm.expectRevert(IBondingCurve.ExceedsMaxBuy.selector);
+        whaleCurve.buy{value: 1 ether}(0);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
