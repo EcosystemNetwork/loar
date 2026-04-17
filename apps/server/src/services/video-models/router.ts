@@ -15,25 +15,63 @@ import type {
 import { getModelsForMode, getModelById } from './registry';
 
 // ── Provider Health (in-memory, upgradeable to Redis/Firestore later) ─
+// Threshold-based: provider is only marked unhealthy after multiple
+// failures within a sliding window, preventing a single transient error
+// from blocking all models for that provider.
 
-const providerHealth: Map<string, { healthy: boolean; lastChecked: Date }> = new Map();
+const FAILURE_THRESHOLD = 3; // failures needed to trip unhealthy
+const FAILURE_WINDOW_MS = 2 * 60 * 1000; // 2-minute sliding window
+const RECOVERY_MS = 5 * 60 * 1000; // auto-recover after 5 minutes
+
+interface ProviderHealthState {
+  failures: number[]; // timestamps of recent failures
+  markedUnhealthyAt: number | null; // when threshold was tripped
+}
+
+const providerHealth: Map<string, ProviderHealthState> = new Map();
+
+function getOrCreateState(provider: string): ProviderHealthState {
+  let state = providerHealth.get(provider);
+  if (!state) {
+    state = { failures: [], markedUnhealthyAt: null };
+    providerHealth.set(provider, state);
+  }
+  return state;
+}
 
 export function markProviderUnhealthy(provider: string): void {
-  providerHealth.set(provider, { healthy: false, lastChecked: new Date() });
+  const state = getOrCreateState(provider);
+  const now = Date.now();
+
+  // Add this failure and prune old ones outside the window
+  state.failures.push(now);
+  state.failures = state.failures.filter((t) => now - t < FAILURE_WINDOW_MS);
+
+  // Only trip unhealthy if threshold reached
+  if (state.failures.length >= FAILURE_THRESHOLD && !state.markedUnhealthyAt) {
+    state.markedUnhealthyAt = now;
+    console.warn(
+      `[ProviderHealth] ${provider} marked unhealthy after ${state.failures.length} failures in ${FAILURE_WINDOW_MS / 1000}s`
+    );
+  }
 }
 
 export function markProviderHealthy(provider: string): void {
-  providerHealth.set(provider, { healthy: true, lastChecked: new Date() });
+  const state = getOrCreateState(provider);
+  state.failures = [];
+  state.markedUnhealthyAt = null;
 }
 
 function isProviderHealthy(provider: string): boolean {
-  const status = providerHealth.get(provider);
-  if (!status) return true; // assume healthy if unknown
-  // Auto-recover after 5 minutes
-  if (!status.healthy && Date.now() - status.lastChecked.getTime() > 5 * 60 * 1000) {
+  const state = providerHealth.get(provider);
+  if (!state || !state.markedUnhealthyAt) return true;
+  // Auto-recover after recovery window
+  if (Date.now() - state.markedUnhealthyAt > RECOVERY_MS) {
+    state.markedUnhealthyAt = null;
+    state.failures = [];
     return true;
   }
-  return status.healthy;
+  return false;
 }
 
 // ── Scoring Helpers ───────────────────────────────────────────────────

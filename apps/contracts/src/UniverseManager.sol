@@ -50,7 +50,6 @@ interface IUniverseTokenDeployer {
 ///         Before governance token deployment, transferring the NFT transfers admin control.
 ///         After governance, the NFT represents creator identity; admin is the governor.
 contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, Pausable {
-    uint public constant teamFee = 0;
     address public teamFeeRecipient;
     address public tokenDeployer;
     uint256 public constant TOKEN_SUPPLY = 1_000_000_000e18; // 1B with 18 decimals
@@ -71,6 +70,9 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     /// @notice External renderer for on-chain tokenURI (Strings+Base64 extracted for EIP-170).
     address public metadataRenderer;
 
+    /// @notice Once locked, metadataRenderer cannot be changed (protects existing tokenURIs).
+    bool public metadataRendererLocked;
+
     /// @notice Per-universe LP seed balance (wei) held until token deployment seeds the pool.
     mapping(uint256 => uint256) public universeLpSeed;
 
@@ -80,6 +82,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) public enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
+    /// @notice Whitelist of tokens that can be claimed via claimTeamFee.
+    mapping(address => bool) public claimableTokens;
     /// @notice Stored deployment config per universe for graduation (pool + locker config).
     mapping(uint256 => DeploymentConfig) public graduationConfigs;
     uint latestId;
@@ -89,6 +93,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     event MintFeeUpdated(uint256 oldFee, uint256 newFee);
     event WethUpdated(address oldWeth, address newWeth);
     event EthClaimed(address indexed recipient, uint256 amount);
+    event AdminSyncFailed(uint256 indexed tokenId, address to);
+    event MetadataRendererLocked(address renderer);
 
     constructor(address _teamFeeRecipient, address _weth) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
@@ -128,8 +134,15 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     }
 
     function setMetadataRenderer(address _renderer) external onlyOwner {
+        require(!metadataRendererLocked, "Metadata renderer is locked");
         require(_renderer != address(0), "Zero address");
         metadataRenderer = _renderer;
+    }
+
+    /// @notice Permanently lock the metadata renderer — one-way, cannot be undone.
+    function lockMetadataRenderer() external onlyOwner {
+        metadataRendererLocked = true;
+        emit MetadataRendererLocked(metadataRenderer);
     }
 
     /// @notice Claim ETH held in the contract, excluding LP seeds reserved for universes.
@@ -431,8 +444,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
             try IGnosisSafe(owner).getOwners() returns (address[] memory owners) {
                 if (owners.length > 0) {
                     // Multi-sig detected — mint to each signer
-                    uint8 total = owners.length > 255 ? 255 : uint8(owners.length);
-                    for (uint8 i = 0; i < total; i++) {
+                    uint16 total = owners.length > 200 ? 200 : uint16(owners.length);
+                    for (uint16 i = 0; i < total; i++) {
                         try inft.mint(
                             owners[i],
                             universeId,
@@ -476,8 +489,13 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         emit SetTeamFeeRecipient(oldTeamFeeRecipient, teamFeeRecipient);
     }
 
+    function setClaimableToken(address token, bool allowed) external onlyOwner {
+        claimableTokens[token] = allowed;
+    }
+
     function claimTeamFee(address token) external onlyOwner {
         if (teamFeeRecipient == address(0)) revert TeamFeeRecipientNotSet();
+        require(claimableTokens[token], "Token not claimable");
 
         uint256 balance = IERC20(token).balanceOf(address(this));
         SafeERC20.safeTransfer(IERC20(token), teamFeeRecipient, balance);
@@ -541,7 +559,9 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         UniverseData storage data = universeDatas[tokenId];
         if (address(data.universe) != address(0) && address(data.universeGovernor) == address(0)) {
             require(to != address(0), "Cannot burn NFT without governor");
-            data.universe.setAdmin(to);
+            try data.universe.setAdmin(to) {} catch {
+                emit AdminSyncFailed(tokenId, to);
+            }
         }
 
         return from;

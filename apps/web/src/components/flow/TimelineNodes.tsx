@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import { LoarIcon } from '@/components/loar-icons';
 import { useState, useEffect } from 'react';
 
 // ── Scene Control Types (mirrors server scene-controls/types.ts) ──────
@@ -126,6 +127,11 @@ export interface TimelineNodeData {
 
   // ── Scene Controls (Node Editor Expansion v1) ──────────────────
   sceneControls?: SceneControls;
+
+  // ── Node Management ───────────────────────────────────────────
+  arcId?: string | null;
+  tags?: string[];
+  dimmed?: boolean; // true when filter is active and this node doesn't match
 }
 
 // Style preset colors for visual indicators
@@ -246,7 +252,10 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
     <>
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
 
-      <div className="relative group">
+      <div
+        className={`relative group ${data.dimmed ? 'opacity-30 pointer-events-none' : ''}`}
+        style={{ transition: 'opacity 0.2s ease' }}
+      >
         {/* Selection indicator ring */}
         {data.isSelected && (
           <div className="absolute -inset-1 rounded-xl border-2 border-blue-500 bg-blue-500/10 pointer-events-none z-10" />
@@ -388,7 +397,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   data.onEditScene?.(data.eventId || '');
                 }}
               >
-                <div className="text-white text-4xl mb-2">🎬</div>
+                <LoarIcon name="clapperboard" size={40} className="text-white mb-2" />
                 <div className="text-white text-sm font-medium">Add Video</div>
                 <div className="text-white/60 text-xs mt-1">Click to upload or paste URL</div>
               </div>

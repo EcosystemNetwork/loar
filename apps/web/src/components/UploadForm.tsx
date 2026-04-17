@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react';
+import { LoarIcon } from '@/components/loar-icons';
 
 const LICENSES = [
   { value: 'all-rights-reserved', label: 'All Rights Reserved', desc: 'Full copyright protection' },
@@ -750,7 +751,7 @@ export function UploadForm({
                       : 'border-muted hover:border-muted-foreground/30'
                   }`}
                 >
-                  <div className="text-lg mb-1">🎬</div>
+                  <LoarIcon name="clapperboard" size={20} className="mb-1" />
                   <p className="text-sm font-semibold">Long-Form</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Episodes · Features · Full cuts

@@ -65,6 +65,17 @@ function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+function isValidAudioFile(filePath: string, minBytes = 1024): boolean {
+  if (!fs.existsSync(filePath)) return false;
+  return fs.statSync(filePath).size >= minBytes;
+}
+
+function progress(current: number, total: number, label: string) {
+  const pct = Math.round((current / total) * 100);
+  const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5));
+  console.log(`  [${bar}] ${pct}% (${current}/${total}) ${label}`);
+}
+
 // ── ElevenLabs API (direct, no server dependency) ───────────────────────
 
 function elevenHeaders(): Record<string, string> {
@@ -1387,11 +1398,11 @@ function compositeAudio(opts: {
     filterParts.push(`[${audioIndex}:a]volume=1.0[dialog]`);
     // Mix all three: dialogue on top, SFX mid, music low
     filterParts.push(
-      `[dialog][sfx][music]amix=inputs=3:duration=first:dropout_transition=2[mixed]`
+      `[dialog][sfx][music]amix=inputs=3:duration=shortest:dropout_transition=2[mixed]`
     );
   } else {
     // Mix SFX + music only
-    filterParts.push(`[sfx][music]amix=inputs=2:duration=first:dropout_transition=2[mixed]`);
+    filterParts.push(`[sfx][music]amix=inputs=2:duration=shortest:dropout_transition=2[mixed]`);
   }
 
   const filter = filterParts.join(';');

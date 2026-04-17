@@ -25,6 +25,7 @@ interface IBondingCurve {
     );
     event TradingHalted(uint256 indexed universeId);
     event TradingResumed(uint256 indexed universeId);
+    event TradingHaltedByManager(uint256 indexed universeId, bool halted);
 
     // ── Errors ─────────────────────────────────────────────────────────
     error CurveGraduated();
@@ -41,18 +42,20 @@ interface IBondingCurve {
 
     /// @notice Buy tokens from the bonding curve with ETH.
     /// @param minTokensOut Minimum tokens to receive (slippage protection).
-    function buy(uint256 minTokensOut) external payable;
+    /// @param deadline Timestamp after which the transaction reverts (MEV protection).
+    function buy(uint256 minTokensOut, uint256 deadline) external payable;
 
     /// @notice Sell tokens back to the bonding curve for ETH.
     /// @param tokenAmount Amount of tokens to sell.
     /// @param minEthOut Minimum ETH to receive (slippage protection).
-    function sell(uint256 tokenAmount, uint256 minEthOut) external;
+    /// @param deadline Timestamp after which the transaction reverts (MEV protection).
+    function sell(uint256 tokenAmount, uint256 minEthOut, uint256 deadline) external;
 
     /// @notice Trigger graduation to Uniswap v4 LP pool.
     /// @dev Can be called by anyone once ethRaised >= graduationEth.
     function graduate() external;
 
-    /// @notice Emergency halt or resume trading. Only callable by universeManager.
+    /// @notice Emergency halt/resume. Should be behind timelock+multisig (GOV-01). Use only for genuine emergencies.
     function setTradingHalted(bool halted) external;
 
     // ── View functions ─────────────────────────────────────────────────

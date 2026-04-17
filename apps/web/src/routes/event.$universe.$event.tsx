@@ -33,6 +33,7 @@ import {
   Plus,
   ListVideo,
 } from 'lucide-react';
+import { LoarIcon } from '@/components/loar-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { trpcClient } from '@/utils/trpc';
@@ -880,7 +881,7 @@ function EventPage() {
                           className="group flex items-start gap-2 p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 border border-transparent hover:border-primary/20"
                         >
                           <span className="text-primary mt-0.5 group-hover:scale-125 transition-transform duration-300">
-                            ✦
+                            <LoarIcon name="sparkle" size={12} />
                           </span>
                           <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
                             {detailText}

@@ -4,7 +4,7 @@
  * Reads from:
  * - LoarLpLockerMultiple: reward recipients, bps splits, admins
  * - LoarFeeLocker: claimable fees per recipient
- * - Provides write helpers for updateRewardRecipient and collectRewards
+ * - Provides write helpers for requestRewardRecipientChange, executeRewardRecipientChange, and collectRewards
  */
 import { useReadContract, useChainId } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
@@ -90,7 +90,7 @@ export function useUpdateRewardRecipient() {
     String(chainId) as keyof typeof LoarLpLockerMultiple
   ] as Address | undefined;
 
-  const updateRecipient = async (
+  const requestRecipientChange = async (
     tokenAddress: Address,
     rewardIndex: number,
     newRecipient: Address
@@ -99,13 +99,24 @@ export function useUpdateRewardRecipient() {
     await writeContractAsync({
       address: lockerAddress,
       abi: loarLpLockerMultipleAbi,
-      functionName: 'updateRewardRecipient',
+      functionName: 'requestRewardRecipientChange',
       args: [tokenAddress, BigInt(rewardIndex), newRecipient],
       chainId,
     });
   };
 
-  return { updateRecipient, isPending, error };
+  const executeRecipientChange = async (tokenAddress: Address, rewardIndex: number) => {
+    if (!lockerAddress) throw new Error('LP Locker not deployed on this chain');
+    await writeContractAsync({
+      address: lockerAddress,
+      abi: loarLpLockerMultipleAbi,
+      functionName: 'executeRewardRecipientChange',
+      args: [tokenAddress, BigInt(rewardIndex)],
+      chainId,
+    });
+  };
+
+  return { requestRecipientChange, executeRecipientChange, isPending, error };
 }
 
 /**

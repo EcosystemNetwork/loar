@@ -164,8 +164,13 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         emit PendingClaimed(msg.sender, amount);
     }
 
+    error CannotSetSelfAsTreasury();
+
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
+        // TREASURY-02 / M-4: prevent setting treasury to this contract, which would
+        // break accounting as platform-cut transfers would circle back into the router.
+        if (newTreasury == address(this)) revert CannotSetSelfAsTreasury();
         emit TreasuryUpdated(treasury, newTreasury);
         treasury = newTreasury;
     }
@@ -197,11 +202,16 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
             bps = 0;
         }
 
-        uint256 platformCut = (amount * bps) / 10_000;
-        uint256 creatorCut = amount - platformCut;
-
-        // Pull $LOAR from caller
+        // Fee-on-transfer protection (TOKEN-02 / H-3): measure actual received
+        // amount rather than trusting the caller's `amount` parameter. If the token
+        // deducts a transfer fee, `received` will be less than `amount`, and all
+        // accounting uses the real balance delta.
+        uint256 balBefore = loarToken.balanceOf(address(this));
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = loarToken.balanceOf(address(this)) - balBefore;
+
+        uint256 platformCut = (received * bps) / 10_000;
+        uint256 creatorCut = received - platformCut;
 
         if (creatorCut > 0) {
             claimableLoar[creator] += creatorCut;
@@ -217,8 +227,11 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     function routeLoarToTreasury(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) return;
         if (address(loarToken) == address(0)) revert ZeroAddress();
+        // Fee-on-transfer protection: measure actual received amount
+        uint256 balBefore = loarToken.balanceOf(address(this));
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
-        loarToken.safeTransfer(treasury, amount);
+        uint256 received = loarToken.balanceOf(address(this)) - balBefore;
+        loarToken.safeTransfer(treasury, received);
     }
 
     /// @notice Creator pulls accumulated $LOAR earnings

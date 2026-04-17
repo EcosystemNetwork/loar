@@ -241,7 +241,7 @@ Try switching to Veo3, Kling 2.5, or Wan 2.5 which have more flexible content po
 
 Current settings: ${videoRatio} aspect ratio, ${selectedVideoDuration || 4}s duration
 
-${videoRatio === '1:1' ? "❌ ISSUE: You selected 1:1 which Sora doesn't support! Change to 16:9 or 9:16.\n\n" : ''}Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
+${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support! Change to 16:9 or 9:16.\n\n" : ''}Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
             action = {
               label: 'Switch to Veo3',
               onClick: () => {

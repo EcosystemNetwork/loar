@@ -23,6 +23,8 @@ interface ILoarLpLockerMultiple is ILoarLpLocker {
     error MismatchedPositionInfos();
     error NoPositions();
     error TooManyPositions();
+    error RewardChangeNotRequested();
+    error RewardChangeDelayNotMet();
 
     event Received(address indexed from, uint256 positionId);
     event RewardRecipientUpdated(
@@ -34,9 +36,25 @@ interface ILoarLpLockerMultiple is ILoarLpLocker {
     event RewardAdminUpdated(
         address indexed token, uint256 indexed rewardIndex, address oldAdmin, address newAdmin
     );
+    event RewardRecipientChangeRequested(
+        address indexed token,
+        uint256 indexed rewardIndex,
+        address newRecipient,
+        uint256 effectiveAt
+    );
+    event RewardAdminChangeRequested(
+        address indexed token,
+        uint256 indexed rewardIndex,
+        address newAdmin,
+        uint256 effectiveAt
+    );
 
-    function updateRewardAdmin(address token, uint256 rewardIndex, address newAdmin) external;
+    function requestRewardAdminChange(address token, uint256 rewardIndex, address newAdmin) external;
 
-    function updateRewardRecipient(address token, uint256 rewardIndex, address newRecipient)
+    function executeRewardAdminChange(address token, uint256 rewardIndex) external;
+
+    function requestRewardRecipientChange(address token, uint256 rewardIndex, address newRecipient)
         external;
+
+    function executeRewardRecipientChange(address token, uint256 rewardIndex) external;
 }

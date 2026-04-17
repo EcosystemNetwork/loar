@@ -66,10 +66,11 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     event RefundPending(address indexed buyer, uint256 amount);
     event RefundClaimed(address indexed buyer, uint256 amount);
 
-    /// @notice Emergency halt/resume callable by UniverseManager (owner-gated there).
+    /// @notice Emergency halt/resume. Should be behind timelock+multisig (GOV-01). Use only for genuine emergencies.
     function setTradingHalted(bool halted) external {
         require(msg.sender == universeManager, "Only universe manager");
         tradingHalted = halted;
+        emit TradingHaltedByManager(universeId, halted);
         if (halted) {
             emit TradingHalted(universeId);
         } else {
@@ -110,7 +111,8 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     // ── Buy ────────────────────────────────────────────────────────────
 
     /// @inheritdoc IBondingCurve
-    function buy(uint256 minTokensOut) external payable nonReentrant whenActive {
+    function buy(uint256 minTokensOut, uint256 deadline) external payable nonReentrant whenActive {
+        require(block.timestamp <= deadline, "Transaction expired");
         if (msg.value == 0) revert ZeroAmount();
 
         uint256 tokensBought = _getTokensForEth(msg.value, tokensSold);
@@ -156,7 +158,8 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     // ── Sell ────────────────────────────────────────────────────────────
 
     /// @inheritdoc IBondingCurve
-    function sell(uint256 tokenAmount, uint256 minEthOut) external nonReentrant whenActive {
+    function sell(uint256 tokenAmount, uint256 minEthOut, uint256 deadline) external nonReentrant whenActive {
+        require(block.timestamp <= deadline, "Transaction expired");
         if (tokenAmount == 0) revert ZeroAmount();
         if (tokenAmount > tokensSold) revert InsufficientTokens();
 

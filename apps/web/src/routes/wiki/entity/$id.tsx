@@ -714,6 +714,11 @@ function EntityPage() {
     }
   }, [pipelineHistory, pipelineId]);
 
+  // Must be called before any conditional returns (Rules of Hooks)
+  const { isAdmin: isUniverseManager } = useIsUniverseAdmin(
+    (entity?.universeAddress as `0x${string}` | undefined) ?? undefined
+  );
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -739,9 +744,6 @@ function EntityPage() {
   const kindLabel = KIND_LABELS[entity.kind] ?? entity.kind;
   const metadataEntries = Object.entries(entity.metadata ?? {}).filter(([, v]) => v);
   const isCreator = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
-  const { isAdmin: isUniverseManager } = useIsUniverseAdmin(
-    entity.universeAddress as `0x${string}` | undefined
-  );
   const isOwner = isCreator || isUniverseManager;
 
   const handleGenerateBio = async () => {

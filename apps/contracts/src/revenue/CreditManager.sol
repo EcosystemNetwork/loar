@@ -57,6 +57,12 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // Generation costs per type (in credits)
     mapping(bytes32 => uint256) public generationCosts;
 
+    // Rate limiting for grantCredits (CREDIT-01)
+    uint256 public dailyGrantLimit = 100_000;
+    uint256 public grantedToday;
+    uint256 public currentGrantDay;
+    uint256 public maxGrantPerUser = 10_000;
+
     // ── Margin constants (informational, actual margins baked into package prices) ──
     uint16 public constant FIAT_MARGIN_BPS = 3500;   // 35%
     uint16 public constant LOAR_MARGIN_BPS = 2500;    // 25%
@@ -69,6 +75,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     event CreditsSpent(address indexed user, uint256 amount, string generationType, uint256 universeId);
     event CreditsGranted(address indexed user, uint256 amount, string reason);
     event GenerationCostUpdated(string genType, uint256 newCost);
+    event PlatformUpdated(address indexed oldPlatform, address indexed newPlatform);
 
     // ── Errors ───────────────────────────────────────────────────
 
@@ -80,6 +87,8 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     error NotPlatform();
     error TransferFailed();
     error ZeroAddress();
+    error DailyGrantLimitExceeded();
+    error MaxGrantPerUserExceeded();
 
     modifier onlyPlatform() {
         _checkPlatform();
@@ -170,7 +179,7 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
             // Wrap in try/catch to prevent DoS via malicious token contracts
             // that revert or consume excessive gas in balanceOf()
             try IERC20(discountToken).balanceOf(msg.sender) returns (uint256 bal) {
-                if (bal > 0) {
+                if (bal >= 1e18) {
                     bonusFromDiscount = (pkg.credits * holderDiscountBps[discountToken]) / 10000;
                 }
             } catch {
@@ -270,12 +279,24 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     // ── Grant Credits (quests, affiliates, promotions) ───────────
 
-    /// @notice Grant free credits
+    /// @notice Grant free credits (rate-limited)
     function grantCredits(
         address user,
         uint256 amount,
         string calldata reason
     ) external onlyPlatform whenNotPaused {
+        // Daily rate limit reset
+        uint256 today = block.timestamp / 1 days;
+        if (today != currentGrantDay) {
+            currentGrantDay = today;
+            grantedToday = 0;
+        }
+        if (grantedToday + amount > dailyGrantLimit) revert DailyGrantLimitExceeded();
+        grantedToday += amount;
+
+        // Per-user cap
+        if (userCredits[user].balance + amount > maxGrantPerUser) revert MaxGrantPerUserExceeded();
+
         userCredits[user].balance += amount;
         userCredits[user].totalPurchased += amount;
 
@@ -290,7 +311,23 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     }
 
     function setHolderDiscount(address token, uint16 discountBps) external onlyPlatform {
+        require(discountBps <= 5000, "Max 50% discount");
         holderDiscountBps[token] = discountBps;
+    }
+
+    function setPlatform(address newPlatform) external onlyOwner {
+        if (newPlatform == address(0)) revert ZeroAddress();
+        address oldPlatform = platform;
+        platform = newPlatform;
+        emit PlatformUpdated(oldPlatform, newPlatform);
+    }
+
+    function setDailyGrantLimit(uint256 _limit) external onlyOwner {
+        dailyGrantLimit = _limit;
+    }
+
+    function setMaxGrantPerUser(uint256 _limit) external onlyOwner {
+        maxGrantPerUser = _limit;
     }
 
     function deactivatePackage(uint256 packageId) external onlyPlatform {

@@ -293,12 +293,12 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                   : 'New Vote',
           emoji:
             type === 'character'
-              ? '👤'
+              ? 'hero'
               : type === 'plotPoint'
-                ? '📝'
+                ? 'memo'
                 : type === 'media'
-                  ? '🎬'
-                  : '🗳️',
+                  ? 'clapperboard'
+                  : 'ballot',
           description: 'Add description here...',
           ...(type === 'character' && { nftId: 'Unassigned' }),
           ...(type === 'plotPoint' && { canonicity: 'Pending' }),
@@ -347,25 +347,25 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
                 onClick={() => addNode('character')}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
-                <span className="mr-1">👤</span> Add Character
+                <LoarIcon name="hero" size={14} className="mr-1" /> Add Character
               </button>
               <button
                 onClick={() => addNode('plotPoint')}
                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
-                <span className="mr-1">📝</span> Add Plot Point
+                <LoarIcon name="memo" size={14} className="mr-1" /> Add Plot Point
               </button>
               <button
                 onClick={() => addNode('media')}
                 className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
-                <span className="mr-1">🎬</span> Add Media
+                <LoarIcon name="clapperboard" size={14} className="mr-1" /> Add Media
               </button>
               <button
                 onClick={() => addNode('voting')}
                 className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
               >
-                <span className="mr-1">🗳️</span> Add Voting
+                <LoarIcon name="ballot" size={14} className="mr-1" /> Add Voting
               </button>
             </div>
           </div>

@@ -62,7 +62,11 @@ export function LPYieldManager({
   } = useClaimableFees(address as Address | undefined, tokenAddress);
   const { collectRewards, isPending: collecting } = useCollectRewards();
   const { claimFees, isPending: claiming } = useClaimFees();
-  const { updateRecipient, isPending: updating } = useUpdateRewardRecipient();
+  const {
+    requestRecipientChange,
+    executeRecipientChange,
+    isPending: updating,
+  } = useUpdateRewardRecipient();
 
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [newRecipient, setNewRecipient] = useState('');
@@ -116,19 +120,29 @@ export function LPYieldManager({
     }
   };
 
-  const handleUpdateRecipient = async (index: number) => {
+  const handleRequestRecipientChange = async (index: number) => {
     if (!newRecipient.match(/^0x[0-9a-fA-F]{40}$/)) {
       toast.error('Invalid address format');
       return;
     }
     try {
-      await updateRecipient(tokenAddress, index, newRecipient as Address);
-      toast.success('Reward recipient updated');
+      await requestRecipientChange(tokenAddress, index, newRecipient as Address);
+      toast.success('Recipient change requested — executable after 2-day delay');
       setEditIndex(null);
       setNewRecipient('');
       refetchConfig();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update recipient');
+      toast.error(err.message || 'Failed to request recipient change');
+    }
+  };
+
+  const handleExecuteRecipientChange = async (index: number) => {
+    try {
+      await executeRecipientChange(tokenAddress, index);
+      toast.success('Reward recipient updated');
+      refetchConfig();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to execute recipient change — delay may not have passed');
     }
   };
 
@@ -218,7 +232,7 @@ export function LPYieldManager({
                         <Button
                           size="sm"
                           className="h-7 px-2"
-                          onClick={() => handleUpdateRecipient(i)}
+                          onClick={() => handleRequestRecipientChange(i)}
                           disabled={updating}
                         >
                           {updating ? (

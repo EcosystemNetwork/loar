@@ -17,6 +17,9 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     /// @notice Content hash => rights classification
     mapping(bytes32 => RightsType) public rights;
 
+    /// @notice Content hash => original creator (set on first classification)
+    mapping(bytes32 => address) public contentCreator;
+
     /// @notice Addresses authorized to set/freeze rights (platform operators)
     mapping(address => bool) public operators;
 
@@ -25,6 +28,7 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     event OperatorUpdated(address indexed operator, bool authorized);
 
     error NotOperator();
+    error NotCreatorOrOwner();
     error AlreadyFrozen();
     error ZeroHash();
 
@@ -49,10 +53,23 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Set the rights classification for a content hash
-    /// @dev Cannot change a FROZEN entry — use a new content hash for revised content
+    /// @dev On first classification (UNSET), any operator can set and becomes recorded creator.
+    ///      Subsequent changes require the caller to be the recorded creator or the owner.
+    ///      Cannot change a FROZEN entry — use a new content hash for revised content.
     function setRights(bytes32 contentHash, RightsType rightsType) external onlyOperator {
         if (contentHash == bytes32(0)) revert ZeroHash();
         if (rights[contentHash] == RightsType.FROZEN) revert AlreadyFrozen();
+
+        if (rights[contentHash] == RightsType.UNSET) {
+            // First classification — record the creator
+            contentCreator[contentHash] = msg.sender;
+        } else {
+            // Subsequent change — only creator or owner
+            if (msg.sender != contentCreator[contentHash] && msg.sender != owner()) {
+                revert NotCreatorOrOwner();
+            }
+        }
+
         rights[contentHash] = rightsType;
         emit RightsSet(contentHash, rightsType);
     }
@@ -79,5 +96,5 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     }
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 }

@@ -19,6 +19,9 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     }
 
     IPaymentRouter public paymentRouter;
+    uint256 public paymentRouterChangeRequestedAt;
+    address public pendingPaymentRouter;
+    uint256 public constant ROUTER_CHANGE_DELAY = 2 days;
 
     /// @notice entityHash => configured splits
     mapping(bytes32 => Split[]) internal _splits;
@@ -33,6 +36,8 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     event SplitsConfigured(bytes32 indexed entityHash, address indexed owner, uint256 recipientCount);
     event SplitPayment(bytes32 indexed entityHash, uint256 totalAmount, uint256 recipientCount, uint16 platformFeeBps);
     event RegistrarUpdated(address indexed registrar, bool authorized);
+    event PaymentRouterChangeRequested(address indexed pendingRouter, uint256 executeAfter);
+    event PaymentRouterChanged(address indexed oldRouter, address indexed newRouter);
 
     error InvalidSplitTotal();
     error TooManyRecipients();
@@ -41,6 +46,8 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     error NoSplitsConfigured();
     error ZeroAddress();
     error FeeTooHigh();
+    error NoChangeRequested();
+    error TimelockNotElapsed();
 
     constructor(address _paymentRouter) Ownable(msg.sender) {
         if (_paymentRouter == address(0)) revert ZeroAddress();
@@ -141,9 +148,24 @@ contract SplitRouter is ReentrancyGuard, Ownable {
         splitOwner[entityHash] = newOwner;
     }
 
-    /// @notice Update PaymentRouter address (owner only)
-    function setPaymentRouter(address _paymentRouter) external onlyOwner {
+    /// @notice Request a PaymentRouter change (timelock step 1)
+    function requestPaymentRouterChange(address _paymentRouter) external onlyOwner {
         if (_paymentRouter == address(0)) revert ZeroAddress();
-        paymentRouter = IPaymentRouter(_paymentRouter);
+        pendingPaymentRouter = _paymentRouter;
+        paymentRouterChangeRequestedAt = block.timestamp;
+        emit PaymentRouterChangeRequested(_paymentRouter, block.timestamp + ROUTER_CHANGE_DELAY);
+    }
+
+    /// @notice Execute a pending PaymentRouter change after timelock delay (step 2)
+    function executePaymentRouterChange() external onlyOwner {
+        if (pendingPaymentRouter == address(0)) revert NoChangeRequested();
+        if (block.timestamp < paymentRouterChangeRequestedAt + ROUTER_CHANGE_DELAY) revert TimelockNotElapsed();
+
+        address oldRouter = address(paymentRouter);
+        paymentRouter = IPaymentRouter(pendingPaymentRouter);
+        emit PaymentRouterChanged(oldRouter, pendingPaymentRouter);
+
+        pendingPaymentRouter = address(0);
+        paymentRouterChangeRequestedAt = 0;
     }
 }

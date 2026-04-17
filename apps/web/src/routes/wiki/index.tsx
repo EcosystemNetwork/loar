@@ -39,6 +39,8 @@ import {
   Video,
   Globe,
   Lock,
+  UserCircle,
+  Rotate3d,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,7 +69,7 @@ type EntityKind =
   | 'realm'
   | 'domain';
 
-type WikiTab = EntityKind | 'gallery' | 'collection';
+type WikiTab = EntityKind | 'gallery' | 'collection' | '3d-models' | 'character-profiles';
 
 const TABS: {
   id: WikiTab;
@@ -101,6 +103,8 @@ const TABS: {
   { id: 'realm', label: 'Realms', kind: 'realm', icon: Castle, section: 'structural' },
   { id: 'domain', label: 'Domains', kind: 'domain', icon: Crown, section: 'structural' },
   // Special tabs
+  { id: 'character-profiles', label: 'Profiles', icon: UserCircle, section: 'other' },
+  { id: '3d-models', label: '3D Models', icon: Rotate3d, section: 'other' },
   { id: 'gallery', label: 'Gallery', icon: ImageIcon, section: 'other' },
   { id: 'collection', label: 'Collection', icon: Users, section: 'other' },
 ];
@@ -487,6 +491,237 @@ function CollectionTab() {
   );
 }
 
+/** Character Profiles tab — shows person entities with rich profiles (generated bios, images, metadata). */
+function CharacterProfilesTab({ universeAddress }: { universeAddress?: string }) {
+  const [search, setSearch] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: universeAddress
+      ? ['entities', 'list', universeAddress, 'person']
+      : ['entities', 'listByKind', 'person'],
+    queryFn: () =>
+      universeAddress
+        ? trpcClient.entities.list.query({ universeAddress, kind: 'person' })
+        : trpcClient.entities.listByKind.query({ kind: 'person' }),
+  });
+
+  const entities: Entity[] = (data?.entities ?? []).filter(
+    (e) => e.description || e.imageUrl || Object.keys(e.metadata ?? {}).length > 0
+  );
+  const filtered = search.trim()
+    ? entities.filter(
+        (e) =>
+          e.name.toLowerCase().includes(search.toLowerCase()) ||
+          e.description?.toLowerCase().includes(search.toLowerCase())
+      )
+    : entities;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search character profiles..."
+            className="pl-9"
+          />
+        </div>
+        <Link
+          to="/create/$kind"
+          params={{ kind: 'person' }}
+          search={universeAddress ? { universe: universeAddress } : undefined}
+        >
+          <Button size="sm" variant="outline">
+            <Plus className="h-4 w-4 mr-1" />
+            New Character
+          </Button>
+        </Link>
+      </div>
+
+      {isLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
+
+      {!isLoading && filtered.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <UserCircle className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+          <p className="mb-2">No character profiles yet.</p>
+          <p className="text-xs mb-4">
+            Create a person entity and generate a bio to build a full character profile.
+          </p>
+          <Link
+            to="/create/$kind"
+            params={{ kind: 'person' }}
+            search={universeAddress ? { universe: universeAddress } : undefined}
+          >
+            <Button variant="outline">Create Character</Button>
+          </Link>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((entity) => (
+          <Link key={entity.id} to="/wiki/entity/$id" params={{ id: entity.id }} className="block">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+              <div className="flex gap-4 p-4">
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex-shrink-0 relative">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <UserCircle className="h-10 w-10 text-muted-foreground/30" />
+                  </div>
+                  {entity.imageUrl && (
+                    <img
+                      src={entity.imageUrl}
+                      alt={entity.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base truncate">{entity.name}</h3>
+                  {(entity.metadata as Record<string, unknown>)?.role ? (
+                    <p className="text-xs text-primary mt-0.5">
+                      {String((entity.metadata as Record<string, unknown>).role)}
+                    </p>
+                  ) : null}
+                  {entity.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                      {entity.description}
+                    </p>
+                  )}
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {Object.entries(entity.metadata ?? {})
+                      .filter(([k]) => ['abilities', 'affiliations', 'homePlace'].includes(k))
+                      .slice(0, 2)
+                      .map(([k, v]) => (
+                        <Badge key={k} variant="secondary" className="text-[10px]">
+                          {String(v).slice(0, 20)}
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 3D Models tab — shows gallery items and entities that have 3D model assets. */
+function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
+  const [search, setSearch] = useState('');
+
+  // Fetch 3D content from gallery
+  const { data: galleryData, isLoading: galleryLoading } = useQuery({
+    queryKey: ['wiki', '3d-gallery', universeAddress],
+    queryFn: () =>
+      trpcClient.gallery.browse.query({
+        universeId: universeAddress,
+        mediaType: '3d',
+        sortBy: 'newest',
+        limit: 50,
+      }),
+  });
+
+  // Also fetch person/species/vehicle/thing entities that have pipeline-generated 3D
+  const { data: pipelineEntities, isLoading: entitiesLoading } = useQuery({
+    queryKey: ['wiki', '3d-entities', universeAddress],
+    queryFn: async () => {
+      const kinds = ['person', 'species', 'vehicle', 'technology', 'thing'] as const;
+      const results = await Promise.all(
+        kinds.map((kind) =>
+          universeAddress
+            ? trpcClient.entities.list.query({ universeAddress, kind })
+            : trpcClient.entities.listByKind.query({ kind })
+        )
+      );
+      // Flatten and filter to entities that likely have 3D assets (via imageUrl as proxy)
+      return results.flatMap((r) => r.entities ?? []);
+    },
+  });
+
+  const galleryItems = galleryData?.items ?? [];
+  const isLoading = galleryLoading || entitiesLoading;
+
+  // Combine: gallery 3D items first, then entities with images (pipeline candidates)
+  const entityIds = new Set((pipelineEntities ?? []).map((e: any) => e.id));
+  const filteredGallery = search.trim()
+    ? galleryItems.filter(
+        (item: any) =>
+          item.title?.toLowerCase().includes(search.toLowerCase()) ||
+          item.description?.toLowerCase().includes(search.toLowerCase())
+      )
+    : galleryItems;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search 3D models..."
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {isLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
+
+      {!isLoading && filteredGallery.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <Rotate3d className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+          <p className="mb-2">No 3D models yet.</p>
+          <p className="text-xs mb-4">
+            Create a character entity and use "Generate 3D Character" to produce 2D art, 3D models,
+            and textured assets.
+          </p>
+          <Link to="/create/$kind" params={{ kind: 'person' }}>
+            <Button variant="outline">Create a Character</Button>
+          </Link>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {filteredGallery.map((item: any) => (
+          <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="aspect-square bg-muted relative">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Rotate3d className="h-6 w-6 text-muted-foreground/30" />
+              </div>
+              {(item.thumbnailUrl || item.mediaUrl) && (
+                <img
+                  src={item.thumbnailUrl || item.mediaUrl}
+                  alt={item.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
+                <Rotate3d className="h-2.5 w-2.5 mr-1" />
+                3D
+              </Badge>
+            </div>
+            <CardContent className="p-3">
+              <p className="text-sm font-medium truncate">{item.title}</p>
+              {item.description && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Global search across all entity kinds. */
 function GlobalSearchResults({
   query,
@@ -683,6 +918,10 @@ function WikiPage() {
         <GlobalSearchResults query={globalSearch.trim()} universeAddress={universeAddress} />
       ) : activeTabDef.kind ? (
         <EntityTab kind={activeTabDef.kind} universeAddress={universeAddress} />
+      ) : activeTab === 'character-profiles' ? (
+        <CharacterProfilesTab universeAddress={universeAddress} />
+      ) : activeTab === '3d-models' ? (
+        <ThreeDModelsTab universeAddress={universeAddress} />
       ) : activeTab === 'gallery' ? (
         <GalleryTab universeAddress={universeAddress} />
       ) : (

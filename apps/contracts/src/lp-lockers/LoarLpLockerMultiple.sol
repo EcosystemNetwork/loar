@@ -38,6 +38,15 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     address public immutable factory;
     mapping(address token => TokenRewardInfo tokenRewardInfo) internal _tokenRewards;
 
+    uint256 public constant REWARD_CHANGE_DELAY = 2 days;
+
+    /// @notice Pending 2-step reward recipient changes: token => rewardIndex => new recipient
+    mapping(address => mapping(uint256 => address)) public pendingRewardRecipient;
+    /// @notice Pending 2-step reward admin changes: token => rewardIndex => new admin
+    mapping(address => mapping(uint256 => address)) public pendingRewardAdmin;
+    /// @notice Timestamp when a reward change was requested: token => rewardIndex => timestamp
+    mapping(address => mapping(uint256 => uint256)) public rewardChangeRequestedAt;
+
     /// @notice Tokens that are part of active LP pools and must not be drained via withdrawERC20.
     mapping(address => bool) public protectedToken;
 
@@ -394,40 +403,104 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         return (balance0After - balance0Before, balance1After - balance1Before);
     }
 
-    // Replace the reward recipient
-    function updateRewardRecipient(address token, uint256 rewardIndex, address newRecipient)
+    // Request a reward recipient change (2-step with delay)
+    function requestRewardRecipientChange(address token, uint256 rewardIndex, address newRecipient)
         external
     {
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
         require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
         require(newRecipient != address(0), "Cannot set zero address recipient");
 
-        // Only admin can replace the reward recipient
+        // Only admin can request a reward recipient change
         if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
             revert Unauthorized();
         }
 
-        // Add the new recipient
+        pendingRewardRecipient[token][rewardIndex] = newRecipient;
+        rewardChangeRequestedAt[token][rewardIndex] = block.timestamp;
+
+        emit RewardRecipientChangeRequested(
+            token, rewardIndex, newRecipient, block.timestamp + REWARD_CHANGE_DELAY
+        );
+    }
+
+    // Execute a pending reward recipient change after delay
+    function executeRewardRecipientChange(address token, uint256 rewardIndex) external {
+        TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
+        require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
+
+        uint256 requestedAt = rewardChangeRequestedAt[token][rewardIndex];
+        address newRecipient = pendingRewardRecipient[token][rewardIndex];
+
+        if (requestedAt == 0 || newRecipient == address(0)) {
+            revert RewardChangeNotRequested();
+        }
+        if (block.timestamp < requestedAt + REWARD_CHANGE_DELAY) {
+            revert RewardChangeDelayNotMet();
+        }
+
+        // Only admin can execute the change
+        if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
+            revert Unauthorized();
+        }
+
         address oldRecipient = tokenRewardInfo.rewardRecipients[rewardIndex];
         tokenRewardInfo.rewardRecipients[rewardIndex] = newRecipient;
+
+        // Clear pending state
+        delete pendingRewardRecipient[token][rewardIndex];
+        delete rewardChangeRequestedAt[token][rewardIndex];
 
         emit RewardRecipientUpdated(token, rewardIndex, oldRecipient, newRecipient);
     }
 
-    // Replace the reward admin
-    function updateRewardAdmin(address token, uint256 rewardIndex, address newAdmin) external {
+    // Request a reward admin change (2-step with delay)
+    function requestRewardAdminChange(address token, uint256 rewardIndex, address newAdmin)
+        external
+    {
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
         require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
         require(newAdmin != address(0), "Cannot set zero address admin");
 
-        // Only admin can replace the reward admin
+        // Only current admin can request an admin change
         if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
             revert Unauthorized();
         }
 
-        // Add the new admin
+        pendingRewardAdmin[token][rewardIndex] = newAdmin;
+        rewardChangeRequestedAt[token][rewardIndex] = block.timestamp;
+
+        emit RewardAdminChangeRequested(
+            token, rewardIndex, newAdmin, block.timestamp + REWARD_CHANGE_DELAY
+        );
+    }
+
+    // Execute a pending reward admin change after delay
+    function executeRewardAdminChange(address token, uint256 rewardIndex) external {
+        TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
+        require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
+
+        uint256 requestedAt = rewardChangeRequestedAt[token][rewardIndex];
+        address newAdmin = pendingRewardAdmin[token][rewardIndex];
+
+        if (requestedAt == 0 || newAdmin == address(0)) {
+            revert RewardChangeNotRequested();
+        }
+        if (block.timestamp < requestedAt + REWARD_CHANGE_DELAY) {
+            revert RewardChangeDelayNotMet();
+        }
+
+        // Only current admin can execute the change
+        if (msg.sender != tokenRewardInfo.rewardAdmins[rewardIndex]) {
+            revert Unauthorized();
+        }
+
         address oldAdmin = tokenRewardInfo.rewardAdmins[rewardIndex];
         tokenRewardInfo.rewardAdmins[rewardIndex] = newAdmin;
+
+        // Clear pending state
+        delete pendingRewardAdmin[token][rewardIndex];
+        delete rewardChangeRequestedAt[token][rewardIndex];
 
         emit RewardAdminUpdated(token, rewardIndex, oldAdmin, newAdmin);
     }

@@ -90,6 +90,16 @@ import { CastManager } from '@/components/flow/CastManager';
 import { MotionBrush } from '@/components/flow/MotionBrush';
 import type { SceneControls } from '@/components/flow/TimelineNodes';
 import { SelectionPlayer, type SelectionVideo } from '@/components/player/SelectionPlayer';
+import { NodeOutlinePanel } from '@/components/flow/NodeOutlinePanel';
+import { NodeFilterBar } from '@/components/flow/NodeFilterBar';
+import { BulkOperationsToolbar } from '@/components/flow/BulkOperationsToolbar';
+import { NodeContextMenu } from '@/components/flow/NodeContextMenu';
+import { ShortcutsHelpDialog } from '@/components/flow/ShortcutsHelpDialog';
+import { NodeArcOverlay } from '@/components/flow/NodeArcOverlay';
+import { useNodeArcs } from '@/hooks/useNodeArcs';
+import { useNodeFilter } from '@/hooks/useNodeFilter';
+import type { ContextMenuState } from '@/components/flow/types';
+import { getSceneNodes } from '@/components/flow/types';
 
 // Register custom node types
 const nodeTypes = {
@@ -210,6 +220,19 @@ function UniverseTimelineEditorInner() {
   // Music/soundtrack state
   const [soundtrackUrl, setSoundtrackUrl] = useState<string>('');
   const [soundtrackName, setSoundtrackName] = useState<string>('');
+
+  // Node Management state
+  const [showOutlinePanel, setShowOutlinePanel] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    nodeId: null,
+  });
+
+  // Node Management hooks
+  const nodeArcs = useNodeArcs(id);
+  const nodeFilter = useNodeFilter(nodes, nodeArcs.arcs);
 
   // Canvas UI state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -941,10 +964,17 @@ function UniverseTimelineEditorInner() {
         (e.target as HTMLElement)?.tagName || ''
       );
 
-      // Ctrl/Cmd+K — search
+      // Ctrl/Cmd+K — search & filter
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setShowSearch((v) => !v);
+        return;
+      }
+
+      // Ctrl/Cmd+A — select all scene nodes
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && !isInput) {
+        e.preventDefault();
+        handleSelectAll();
         return;
       }
 
@@ -961,6 +991,44 @@ function UniverseTimelineEditorInner() {
 
       // Skip remaining shortcuts if typing in an input
       if (isInput) return;
+
+      // D — duplicate selected
+      if (e.key === 'd' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
+        e.preventDefault();
+        handleDuplicateSelected();
+        return;
+      }
+
+      // C — toggle canon on selected
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
+        e.preventDefault();
+        handleToggleCanon();
+        return;
+      }
+
+      // E — edit selected node (single selection)
+      if (e.key === 'e' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size === 1) {
+        e.preventDefault();
+        const nodeId = [...selectedNodeIds][0];
+        const node = nodesRef.current.find((n) => n.id === nodeId);
+        if (node?.data.eventId) handleEditScene(node.data.eventId);
+        return;
+      }
+
+      // O — toggle outline panel
+      if (e.key === 'o' && !e.metaKey && !e.ctrlKey) {
+        setShowOutlinePanel((v) => !v);
+        return;
+      }
+
+      // G — assign to arc (opens context for arc assignment)
+      if (e.key === 'g' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
+        // If only one arc exists, assign directly; otherwise handled by toolbar
+        if (nodeArcs.arcs.length === 1) {
+          nodeArcs.addNodesToArc(nodeArcs.arcs[0].id, [...selectedNodeIds]);
+        }
+        return;
+      }
 
       // F — fit view
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
@@ -1000,11 +1068,14 @@ function UniverseTimelineEditorInner() {
         return;
       }
 
-      // Escape — close search, clear selection
+      // Escape — close panels, clear selection
       if (e.key === 'Escape') {
-        if (showSearch) {
+        if (contextMenu.visible) {
+          setContextMenu((c) => ({ ...c, visible: false }));
+        } else if (showSearch) {
           setShowSearch(false);
           setSearchQuery('');
+          nodeFilter.clearFilter();
         } else if (selectedNodeIds.size > 0) {
           handleClearSelection();
         }
@@ -1037,8 +1108,15 @@ function UniverseTimelineEditorInner() {
     handleUndo,
     handleRedo,
     handleClearSelection,
+    handleSelectAll,
+    handleDuplicateSelected,
+    handleToggleCanon,
+    handleEditScene,
     selectedNodeIds,
     showSearch,
+    contextMenu.visible,
+    nodeArcs,
+    nodeFilter,
   ]);
 
   // Focus search input when opened
@@ -1117,7 +1195,7 @@ function UniverseTimelineEditorInner() {
 
     const newNodes: Node<TimelineNodeData>[] = [];
     const newEdges: Edge[] = [];
-    const idMapping = new Map<string, string>(); // oldId -> newId
+    const idMapping: Record<string, string> = {}; // oldId -> newId
 
     // First pass: create duplicated nodes with new IDs
     for (const nodeFlowId of selectedNodeIds) {
@@ -1130,7 +1208,7 @@ function UniverseTimelineEditorInner() {
       // Generate a new unique ID
       const newEventId = `dup-${eventId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const newFlowId = `local-node-${newEventId}`;
-      idMapping.set(nodeFlowId, newFlowId);
+      idMapping[nodeFlowId] = newFlowId;
 
       // Position offset (below and to the right)
       const offsetX = 60;
@@ -1170,8 +1248,8 @@ function UniverseTimelineEditorInner() {
     // Second pass: recreate edges between duplicated nodes
     const currentEdges = edges;
     for (const edge of currentEdges) {
-      const newSource = idMapping.get(edge.source);
-      const newTarget = idMapping.get(edge.target);
+      const newSource = idMapping[edge.source];
+      const newTarget = idMapping[edge.target];
       if (newSource && newTarget) {
         newEdges.push({
           id: `edge-dup-${newSource}-${newTarget}`,
@@ -1206,6 +1284,127 @@ function UniverseTimelineEditorInner() {
     setNodes,
     setEdges,
   ]);
+
+  // ── Node Management Actions ──────────────────────────────────────────
+
+  // Select all scene nodes
+  const handleSelectAll = useCallback(() => {
+    const sceneIds = new Set(
+      nodes.filter((n: any) => n.data.nodeType === 'scene').map((n: any) => n.id)
+    );
+    setSelectedNodeIds(sceneIds);
+    setNodes((nds: any) =>
+      nds.map((n: any) => (n.data.nodeType === 'scene' ? { ...n, selected: true } : n))
+    );
+  }, [nodes, setNodes]);
+
+  // Invert selection
+  const handleInvertSelection = useCallback(() => {
+    const sceneIds = nodes.filter((n: any) => n.data.nodeType === 'scene').map((n: any) => n.id);
+    const inverted = new Set(sceneIds.filter((nid: string) => !selectedNodeIds.has(nid)));
+    setSelectedNodeIds(inverted);
+  }, [nodes, selectedNodeIds]);
+
+  // Toggle canon on selected nodes (local-only toggle)
+  const handleToggleCanon = useCallback(() => {
+    if (selectedNodeIds.size === 0) return;
+    setNodes((nds: any) =>
+      nds.map((n: any) => {
+        if (!selectedNodeIds.has(n.id)) return n;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            isInCanonChain: !n.data.isInCanonChain,
+            isCanon: !n.data.isCanon,
+          },
+        };
+      })
+    );
+  }, [selectedNodeIds, setNodes]);
+
+  // Toggle canon on a single node
+  const handleToggleCanonSingle = useCallback(
+    (nodeId: string) => {
+      setNodes((nds: any) =>
+        nds.map((n: any) => {
+          if (n.id !== nodeId) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              isInCanonChain: !n.data.isInCanonChain,
+              isCanon: !n.data.isCanon,
+            },
+          };
+        })
+      );
+    },
+    [setNodes]
+  );
+
+  // Duplicate a single node (for context menu)
+  const handleDuplicateSingle = useCallback(
+    (nodeId: string) => {
+      setSelectedNodeIds(new Set([nodeId]));
+      // Slight delay to let selection update then trigger duplicate
+      requestAnimationFrame(() => handleDuplicateSelected());
+    },
+    [handleDuplicateSelected]
+  );
+
+  // Toggle select for outline panel
+  const handleToggleSelect = useCallback((nodeId: string) => {
+    setSelectedNodeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }, []);
+
+  // Navigate to node (for outline panel and search)
+  const handleNavigateToNode = useCallback(
+    (node: Node<TimelineNodeData>) => {
+      setCenter(node.position.x + 160, node.position.y + 136, {
+        zoom: 1,
+        duration: 500,
+      });
+      setSelectedNode(node);
+    },
+    [setCenter]
+  );
+
+  // Context menu handler
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    if (node.data.nodeType !== 'scene') return;
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: node.id,
+    });
+  }, []);
+
+  // Create arc and assign selected nodes
+  const handleCreateArcAndAssign = useCallback(
+    (name: string) => {
+      const arc = nodeArcs.addArc(name);
+      if (selectedNodeIds.size > 0) {
+        nodeArcs.addNodesToArc(arc.id, [...selectedNodeIds]);
+      }
+    },
+    [nodeArcs, selectedNodeIds]
+  );
+
+  // Assign selected nodes to arc
+  const handleAssignSelectedToArc = useCallback(
+    (arcId: string) => {
+      nodeArcs.addNodesToArc(arcId, [...selectedNodeIds]);
+    },
+    [nodeArcs, selectedNodeIds]
+  );
 
   // Handle file selection for edit video
   const handleEditVideoFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1917,18 +2116,25 @@ function UniverseTimelineEditorInner() {
     [setEdges]
   );
 
-  // Sync isSelected flag on node data when selection changes
+  // Sync isSelected + dimmed flags on node data when selection/filter changes
   useEffect(() => {
     setNodes((nds: any) =>
       nds.map((n: any) => {
         const shouldBeSelected = selectedNodeIds.has(n.id);
-        if (n.data.isSelected !== shouldBeSelected) {
-          return { ...n, data: { ...n.data, isSelected: shouldBeSelected } };
+        const shouldBeDimmed =
+          nodeFilter.matchingNodeIds !== null &&
+          !nodeFilter.matchingNodeIds.has(n.id) &&
+          n.data.nodeType === 'scene';
+        if (n.data.isSelected !== shouldBeSelected || n.data.dimmed !== shouldBeDimmed) {
+          return {
+            ...n,
+            data: { ...n.data, isSelected: shouldBeSelected, dimmed: shouldBeDimmed },
+          };
         }
         return n;
       })
     );
-  }, [selectedNodeIds, setNodes]);
+  }, [selectedNodeIds, nodeFilter.matchingNodeIds, setNodes]);
 
   // Handle node selection — shift+click toggles multi-select without navigating
   const onNodeClick = useCallback(
@@ -2063,6 +2269,7 @@ function UniverseTimelineEditorInner() {
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               nodeTypes={nodeTypes}
+              onNodeContextMenu={handleNodeContextMenu}
               selectionOnDrag
               panOnDrag={[1, 2]}
               selectionMode={SelectionMode.Partial}
@@ -2073,6 +2280,9 @@ function UniverseTimelineEditorInner() {
               minZoom={0.1}
               maxZoom={2}
             >
+              {/* Arc group overlays */}
+              <NodeArcOverlay nodes={nodes} arcs={nodeArcs.arcs} />
+
               <Background />
               <Controls showInteractive={false} />
 
@@ -2205,107 +2415,34 @@ function UniverseTimelineEditorInner() {
                 </Panel>
               )}
 
-              {/* Search Overlay */}
+              {/* Search & Filter Overlay */}
               {showSearch && (
                 <Panel position="top-center" className="z-50 mt-2">
-                  <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl w-96 overflow-hidden animate-in slide-in-from-top-2 duration-150">
-                    <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-800">
-                      <Search className="h-4 w-4 text-zinc-400 shrink-0" />
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            setShowSearch(false);
-                            setSearchQuery('');
-                          }
-                          if (e.key === 'Enter' && searchResults.length > 0) {
-                            handleSearchSelect(searchResults[0]);
-                          }
-                        }}
-                        placeholder="Search nodes by title, description, or ID..."
-                        className="flex-1 bg-transparent text-sm text-white placeholder:text-zinc-500 outline-none"
-                      />
-                      <kbd className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
-                        ESC
-                      </kbd>
-                    </div>
-                    {searchQuery.trim() && (
-                      <div className="max-h-64 overflow-y-auto">
-                        {searchResults.length === 0 ? (
-                          <div className="px-3 py-4 text-center text-sm text-zinc-500">
-                            No nodes found
-                          </div>
-                        ) : (
-                          searchResults.slice(0, 8).map((node: any) => (
-                            <button
-                              key={node.id}
-                              onClick={() => handleSearchSelect(node)}
-                              className="w-full text-left px-3 py-2 hover:bg-zinc-800 transition-colors flex items-center gap-3 group"
-                            >
-                              <div
-                                className="w-2 h-2 rounded-full shrink-0"
-                                style={{ backgroundColor: node.data.timelineColor || '#10b981' }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm text-white truncate">
-                                  {node.data.label || node.data.displayName}
-                                </div>
-                                <div className="text-xs text-zinc-500 truncate">
-                                  {node.data.eventId ? `Event ${node.data.eventId}` : ''}
-                                  {node.data.isInCanonChain ? ' · Canon' : ''}
-                                </div>
-                              </div>
-                              <Locate className="h-3.5 w-3.5 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <NodeFilterBar
+                    filter={nodeFilter.filter}
+                    isActive={nodeFilter.isActive}
+                    arcs={nodeArcs.arcs}
+                    matchCount={nodeFilter.matchingNodeIds?.size ?? getSceneNodes(nodes).length}
+                    totalCount={getSceneNodes(nodes).length}
+                    onSearchTextChange={nodeFilter.setSearchText}
+                    onCanonStatusChange={nodeFilter.setCanonStatus}
+                    onArcIdChange={nodeFilter.setArcId}
+                    onHasVideoChange={nodeFilter.setHasVideo}
+                    onClear={() => {
+                      nodeFilter.clearFilter();
+                    }}
+                    onClose={() => {
+                      setShowSearch(false);
+                      nodeFilter.clearFilter();
+                    }}
+                  />
                 </Panel>
               )}
 
               {/* Keyboard Shortcuts Help */}
               {showShortcutsHelp && (
                 <Panel position="bottom-center" className="z-50 mb-2">
-                  <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl p-4 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-white flex items-center gap-2">
-                        <Keyboard className="h-4 w-4" /> Keyboard Shortcuts
-                      </span>
-                      <button
-                        onClick={() => setShowShortcutsHelp(false)}
-                        className="text-zinc-500 hover:text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs">
-                      {[
-                        ['Ctrl+K', 'Search nodes'],
-                        ['Ctrl+Z', 'Undo'],
-                        ['Ctrl+Shift+Z', 'Redo'],
-                        ['F', 'Fit to view'],
-                        ['1', 'Zoom to 100%'],
-                        ['+/-', 'Zoom in/out'],
-                        ['M', 'Toggle minimap'],
-                        ['Del', 'Delete selected'],
-                        ['Shift+Click', 'Multi-select'],
-                        ['Esc', 'Clear selection'],
-                        ['?', 'Toggle shortcuts'],
-                      ].map(([key, desc]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <kbd className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded font-mono min-w-[60px] text-center">
-                            {key}
-                          </kbd>
-                          <span className="text-zinc-400">{desc}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <ShortcutsHelpDialog onClose={() => setShowShortcutsHelp(false)} />
                 </Panel>
               )}
 

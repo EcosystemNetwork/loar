@@ -24,6 +24,7 @@ interface IUniverse {
     event NodeVisibilityOptionUpdated(NodeVisibilityOptions option);
     event NodeCreationOptionUpdated(NodeCreationOptions option);
     event MediaUpdated(uint indexed nodeId, address updater, bytes32 contentHash, string link);
+    event MediaUpdatedAttribution(uint indexed nodeId, address indexed updater, address indexed originalCreator, bytes32 contentHash);
     event NodesSwapped(uint indexed nodeA, uint indexed nodeB, address swapper);
     event WhitelistedUpdated(address indexed user, bool status);
     event VaultWhitelistUpdated(address indexed user, bool status);

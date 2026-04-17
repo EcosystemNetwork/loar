@@ -195,6 +195,7 @@ contract TokenVesting is Ownable {
     function claimAll() external {
         uint256[] storage ids = beneficiaryVestings[msg.sender];
         uint256 len = ids.length;
+        require(len <= 50, "Too many vestings, use claim() individually");
 
         for (uint256 i; i < len; ++i) {
             VestingSchedule storage v = vestings[ids[i]];

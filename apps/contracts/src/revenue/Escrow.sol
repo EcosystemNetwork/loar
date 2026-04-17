@@ -62,6 +62,7 @@ contract Escrow is
     event DisputeResolved(uint256 indexed id, uint256 buyerAmount, uint256 sellerAmount);
     event ExpiredClaimed(uint256 indexed id, address indexed seller);
     event Claimed(address indexed account, uint256 amount);
+    event PlatformUpdated(address indexed oldPlatform, address indexed newPlatform);
 
     // ── Errors ──────────────────────────────────────────────────────────
     error ZeroAddress();
@@ -161,10 +162,16 @@ contract Escrow is
     ) external onlyOwner nonReentrant {
         EscrowData storage e = escrows[escrowId];
         if (e.status != EscrowStatus.DISPUTED) revert InvalidStatus();
-        if (buyerAmount + sellerAmount != e.amount) revert AmountMismatch();
+
+        uint256 fee = (e.amount * e.platformFeeBps) / 10000;
+        uint256 distributable = e.amount - fee;
+        if (buyerAmount + sellerAmount != distributable) revert AmountMismatch();
 
         e.status = EscrowStatus.RESOLVED;
 
+        if (fee > 0) {
+            claimable[platform] += fee;
+        }
         if (buyerAmount > 0) {
             claimable[e.buyer] += buyerAmount;
         }
@@ -205,12 +212,19 @@ contract Escrow is
     // ── Admin ───────────────────────────────────────────────────────────
 
     function setDisputeWindow(uint256 _window) external onlyOwner {
+        require(_window <= 30 days, "Max 30 day dispute window");
         disputeWindow = _window;
     }
 
     function setDefaultFeeBps(uint16 _feeBps) external onlyOwner {
         if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
         defaultFeeBps = _feeBps;
+    }
+
+    function setPlatform(address _platform) external onlyOwner {
+        if (_platform == address(0)) revert ZeroAddress();
+        emit PlatformUpdated(platform, _platform);
+        platform = _platform;
     }
 
     function pause() external onlyOwner { _pause(); }

@@ -51,9 +51,13 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         uint256 submissionFee;       // fee paid by submitter
         uint256 votesFor;
         uint256 votesAgainst;
-        uint256 votingDeadline;
+        uint256 votingDeadline;      // uses block.timestamp (seconds) for calendar-predictable deadlines
         uint256 createdAt;
-        uint256 snapshotBlock;       // block number for vote weight snapshot (flash loan protection)
+        uint256 snapshotBlock;       // uses block.number for vote weight snapshot (flash loan protection)
+                                     // Design note (CANON-05): votingDeadline uses block.timestamp while
+                                     // snapshotBlock uses block.number. This is intentional — timestamps give
+                                     // human-readable deadlines, while block numbers provide deterministic
+                                     // snapshot points for IVotes.getPastVotes(). The two are independent axes.
     }
 
     struct CanonLicense {
@@ -123,9 +127,12 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     uint16 public constant MAX_FEE_BPS = 5000;
 
     /// @notice Minimum snapshot age in blocks to prevent flash loan attacks.
-    /// On Base L2 (2s blocks), 15 blocks ≈ 30 seconds — enough to prevent
-    /// same-block flash loan manipulation while keeping UX responsive.
-    uint256 public constant MIN_SNAPSHOT_AGE = 15;
+    /// On Base L2 (2s blocks), 7200 blocks ≈ 4 hours. The previous value of 15 blocks (~30s)
+    /// was trivially gameable via multi-block MEV or flash-loan-like strategies that acquire
+    /// tokens shortly before submission. 4 hours forces attackers to hold real economic exposure,
+    /// making vote manipulation prohibitively expensive while remaining acceptable UX for
+    /// legitimate submitters who already hold governance tokens.
+    uint256 public constant MIN_SNAPSHOT_AGE = 7200;
 
     error ZeroAddress();
     error TokenMismatch();
@@ -251,18 +258,32 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit VoteCast(submissionId, msg.sender, support, weight);
     }
 
-    /// @notice Finalize a submission after voting ends
+    /// @notice Finalize a submission after voting ends.
+    /// @dev CANON-06: On rejection or expiry, only the creator's held portion is refunded.
+    ///      The platform fee (taken in submit()) is intentionally retained as an anti-spam
+    ///      measure — without this cost, attackers could flood the voting queue for free.
     function finalize(uint256 submissionId) external whenNotPaused {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert InvalidStatus();
         if (block.timestamp < sub.votingDeadline) revert VotingNotEnded();
 
-        // Enforce minimum quorum: total votes must meet threshold of total supply
+        // Enforce minimum quorum: total votes must meet threshold of total supply.
+        // If quorum is not reached, the submission expires and held ETH is refunded
+        // to the creator via the pull-based claimableRefunds pattern (CANON-04 fix).
         if (quorumBps > 0) {
             uint256 totalVotes = sub.votesFor + sub.votesAgainst;
             uint256 totalSupply = IVotes(sub.universeToken).getPastTotalSupply(sub.snapshotBlock);
             uint256 quorumRequired = (totalSupply * quorumBps) / 10_000;
-            if (totalVotes < quorumRequired) revert QuorumNotReached();
+            if (totalVotes < quorumRequired) {
+                sub.status = SubmissionStatus.EXPIRED;
+                uint256 heldExpired = creatorHeldAmount[submissionId];
+                creatorHeldAmount[submissionId] = 0;
+                if (heldExpired > 0) {
+                    claimableRefunds[sub.creator] += heldExpired;
+                }
+                emit SubmissionRejected(submissionId);
+                return;
+            }
         }
 
         uint256 held = creatorHeldAmount[submissionId];

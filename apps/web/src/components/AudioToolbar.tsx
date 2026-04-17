@@ -291,7 +291,7 @@ export function AudioToolbar({
 
   if (selectedClips.length === 0) return null;
 
-  const togglePanel = (panel: 'music' | 'sfx' | 'lipsync') => {
+  const togglePanel = (panel: 'music' | 'sfx' | 'lipsync' | 'mixer') => {
     setActivePanel(activePanel === panel ? null : panel);
     setLastResult(null);
   };

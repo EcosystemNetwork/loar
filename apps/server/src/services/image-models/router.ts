@@ -13,23 +13,56 @@ import type {
 } from './types';
 import { getImageModelsForTask, getImageModelById } from './registry';
 
-// ── Provider Health (in-memory, same pattern as video router) ─────────
+// ── Provider Health (in-memory, threshold-based) ────────────────────
 
-const providerHealth: Map<string, { healthy: boolean; lastChecked: Date }> = new Map();
+const FAILURE_THRESHOLD = 3;
+const FAILURE_WINDOW_MS = 2 * 60 * 1000;
+const RECOVERY_MS = 5 * 60 * 1000;
+
+interface ProviderHealthState {
+  failures: number[];
+  markedUnhealthyAt: number | null;
+}
+
+const providerHealth: Map<string, ProviderHealthState> = new Map();
+
+function getOrCreateState(provider: string): ProviderHealthState {
+  let state = providerHealth.get(provider);
+  if (!state) {
+    state = { failures: [], markedUnhealthyAt: null };
+    providerHealth.set(provider, state);
+  }
+  return state;
+}
 
 export function markImageProviderUnhealthy(provider: string): void {
-  providerHealth.set(provider, { healthy: false, lastChecked: new Date() });
+  const state = getOrCreateState(provider);
+  const now = Date.now();
+  state.failures.push(now);
+  state.failures = state.failures.filter((t) => now - t < FAILURE_WINDOW_MS);
+  if (state.failures.length >= FAILURE_THRESHOLD && !state.markedUnhealthyAt) {
+    state.markedUnhealthyAt = now;
+    console.warn(
+      `[ProviderHealth] image/${provider} marked unhealthy after ${state.failures.length} failures in ${FAILURE_WINDOW_MS / 1000}s`
+    );
+  }
 }
 
 export function markImageProviderHealthy(provider: string): void {
-  providerHealth.set(provider, { healthy: true, lastChecked: new Date() });
+  const state = getOrCreateState(provider);
+  state.failures = [];
+  state.markedUnhealthyAt = null;
 }
 
 function isProviderHealthy(provider: string): boolean {
-  const status = providerHealth.get(provider);
-  if (!status) return true;
-  if (!status.healthy && Date.now() - status.lastChecked.getTime() > 5 * 60 * 1000) return true;
-  return status.healthy;
+  const state = providerHealth.get(provider);
+  if (!state || !state.markedUnhealthyAt) return true;
+  if (Date.now() - state.markedUnhealthyAt > RECOVERY_MS) {
+    state.markedUnhealthyAt = null;
+    state.failures = [];
+    return true;
+  }
+  return false;
 }
 
 // ── Scoring ───────────────────────────────────────────────────────────
@@ -135,7 +168,11 @@ export function routeImageModel(input: ImageRoutingInput): ImageRoutingDecision 
     reasonCode = 'best_quality_eligible';
   }
 
-  return toDecision(chosen, reasonCode, scored.slice(1, 3).map((s) => s.model));
+  return toDecision(
+    chosen,
+    reasonCode,
+    scored.slice(1, 3).map((s) => s.model)
+  );
 }
 
 export function validateImageModelSelection(

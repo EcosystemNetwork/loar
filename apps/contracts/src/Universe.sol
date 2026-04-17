@@ -16,6 +16,7 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         bytes32 plotHash;      // SHA-256 hash of plot text
         uint previous;
         uint[] next;
+        /// @dev Only meaningful for currentCanonId. Use getCanonChain() to determine full canon membership.
         bool canon;
         address creator;
     }
@@ -48,7 +49,7 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
     address public associatedToken;
     IUniverseManager public immutable universeManager;
     address public universeAdmin;
-    uint public currentCanonId;  // tracked canon node (avoids unbounded loop)
+    uint public currentCanonId;  // current canon tip node ID (not "is part of canon chain" — use getCanonChain())
 
     /// @notice Maximum children per node (prevents unbounded array growth)
     uint public constant MAX_CHILDREN_PER_NODE = 100;
@@ -263,10 +264,13 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         return nodes[id].contentHash;
     }
 
+    /// @dev WARNING: This changes content without updating creator attribution. Should be behind timelock.
     function setMedia(uint id, bytes32 _contentHash, string calldata _link) public onlyAdmin {
         require(nodes[id].id != 0, "Node does not exist");
+        address originalCreator = nodes[id].creator;
         nodes[id].contentHash = _contentHash;
         emit MediaUpdated(id, msg.sender, _contentHash, _link);
+        emit MediaUpdatedAttribution(id, msg.sender, originalCreator, _contentHash);
     }
 
     /// @notice Swap the content (media + plot) between two nodes, keeping DAG structure intact.
@@ -279,12 +283,15 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
         bytes32 tempContentHash = nodes[nodeA].contentHash;
         bytes32 tempPlotHash = nodes[nodeA].plotHash;
+        address tempCreator = nodes[nodeA].creator;
 
         nodes[nodeA].contentHash = nodes[nodeB].contentHash;
         nodes[nodeA].plotHash = nodes[nodeB].plotHash;
+        nodes[nodeA].creator = nodes[nodeB].creator;
 
         nodes[nodeB].contentHash = tempContentHash;
         nodes[nodeB].plotHash = tempPlotHash;
+        nodes[nodeB].creator = tempCreator;
 
         emit NodesSwapped(nodeA, nodeB, msg.sender);
     }
@@ -315,6 +322,7 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
             bool[] memory canonFlags
         )
     {
+        require(latestNodeId <= 500, "Use getGraphPage for large graphs");
         uint total = latestNodeId;
 
         ids = new uint[](total);
