@@ -1,48 +1,64 @@
 /**
- * Create the "E Combonator" universe on the LOAR platform.
+ * Deploy "E Combonator" universe + $ECOMB token — full end-to-end.
  *
- * A story about a solo tech founder in the Bay Area who has the most
- * advanced technology, travels the world winning hackathons, but no one
- * takes him seriously — until one day...
+ * Flow:
+ *   1. Generate cover image via Google Imagen 4
+ *   2. Upload image via server /api/upload
+ *   3. Create universe + deploy token on-chain (atomic tx)
+ *   4. Register universe in Firestore via tRPC (SIWE auth)
  *
- * Uses Firebase Admin SDK (REST mode) + Google Imagen 4 + Firebase Storage.
+ * Usage: pnpm tsx scripts/create-ecombonator-universe.ts
  *
- * Usage:
- *   pnpm tsx scripts/create-ecombonator-universe.ts
- *
- * Required env: GOOGLE_API_KEY, FIREBASE_STORAGE_BUCKET
+ * Required env: PRIVATE_KEY, GOOGLE_API_KEY
+ * Optional env: RPC_URL, VITE_SERVER_URL
  */
 import dotenv from 'dotenv';
 import path from 'path';
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  formatEther,
+  decodeEventLog,
+  encodeAbiParameters,
+  getAddress,
+} from 'viem';
+import { sepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-// ── Config ───────────────────────────────────────────────────────────
-const CREATOR_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-const CREDITS = 5000;
+// ── ABI ───────────────────────────────────────────────────────────────────────
+const artifact = JSON.parse(
+  readFileSync(
+    path.resolve(process.cwd(), 'apps/contracts/out/UniverseManager.sol/UniverseManager.json'),
+    'utf-8'
+  )
+);
+const universeManagerAbi = artifact.abi;
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const rawKey = process.env.PRIVATE_KEY ?? '';
+const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
+const RPC_URL = process.env.RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY!;
+const SERVER_URL = process.env.VITE_SERVER_URL ?? 'http://localhost:3000';
 
+// Contract addresses — loaded from deployment manifest
+const deployment = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), 'deployments/sepolia.json'), 'utf-8')
+);
+const UNIVERSE_MANAGER = getAddress(deployment.contracts.UniverseManager) as `0x${string}`;
+const HOOK = getAddress(deployment.contracts.LoarHookStaticFee) as `0x${string}`;
+const LOCKER = getAddress(deployment.contracts.LoarLpLockerMultiple) as `0x${string}`;
+const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9' as const; // Sepolia WETH
+
+// ── Universe config ───────────────────────────────────────────────────────────
 const UNIVERSE_NAME = 'E Combonator';
-const TOKEN_SYMBOL = '$ECOMB';
-
-const DESCRIPTION = [
-  'E Combonator is the story of a solo tech founder operating out of a cramped apartment in the Bay Area,',
-  'building technology so advanced it borders on science fiction.',
-  'Armed with nothing but a laptop, an obsessive work ethic, and code that rewrites the rules,',
-  'he travels the globe entering hackathon after hackathon — and winning every single one.',
-  '\n\nBut nobody takes him seriously.',
-  'The VCs laugh him out of Sand Hill Road. The accelerators ghost his applications.',
-  'Twitter threads calling him a "hackathon tourist" go viral.',
-  'Conference organizers stop inviting him. His demos get more views than his cap table has zeros.',
-  '\n\nHe keeps building anyway. Alone. Relentless. Invisible.',
-  "\n\nUntil one day, the technology he's been quietly assembling in that apartment",
-  'does something that no one — not the big labs, not the megacorps, not the three-letter agencies —',
-  'thought was possible. And suddenly, every door that was closed is trying to open at once.',
-  "\n\nBut by then, he's already walking through a different one.",
-].join(' ');
+const TOKEN_SYMBOL = 'ECOMB';
+const UNIVERSE_DESCRIPTION =
+  'E Combonator is the story of a solo tech founder operating out of a cramped apartment in the Bay Area, building technology so advanced it borders on science fiction. Armed with nothing but a laptop, an obsessive work ethic, and code that rewrites the rules, he travels the globe entering hackathon after hackathon — and winning every single one.\n\nBut nobody takes him seriously. The VCs laugh him out of Sand Hill Road. The accelerators ghost his applications. Twitter threads calling him a "hackathon tourist" go viral. Conference organizers stop inviting him. His demos get more views than his cap table has zeros.\n\nHe keeps building anyway. Alone. Relentless. Invisible.\n\nUntil one day, the technology he\'s been quietly assembling in that apartment does something that no one — not the big labs, not the megacorps, not the three-letter agencies — thought was possible. And suddenly, every door that was closed is trying to open at once.\n\nBut by then, he\'s already walking through a different one.';
 
 const COVER_PROMPT = [
   `Cinematic movie poster for "E Combonator".`,
@@ -57,11 +73,20 @@ const COVER_PROMPT = [
   'Ultra-detailed 8K concept art, dramatic volumetric lighting, no text, no watermarks, no logos.',
 ].join(' ');
 
+// Pool config
+const STARTING_TICK = -230400;
+const TICK_SPACING = 200;
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
+const account = privateKeyToAccount(PRIVATE_KEY);
+const publicClient = createPublicClient({ chain: sepolia, transport: http(RPC_URL) });
+const walletClient = createWalletClient({ account, chain: sepolia, transport: http(RPC_URL) });
+
 function log(step: string, msg: string) {
   console.log(`  [${step}] ${msg}`);
 }
 
-// ── Step 1: Generate cover image via Google Imagen 4 ─────────────────
+// ── Step 1: Generate cover image via Google Imagen 4 ─────────────────────────
 
 async function generateCoverImage(): Promise<Buffer> {
   log('IMAGE', 'Generating cover image via Google Imagen 4...');
@@ -95,157 +120,385 @@ async function generateCoverImage(): Promise<Buffer> {
     throw new Error('No images returned from Imagen 4');
   }
 
-  const imageBase64 = data.predictions[0].bytesBase64Encoded;
-  const buffer = Buffer.from(imageBase64, 'base64');
+  const buffer = Buffer.from(data.predictions[0].bytesBase64Encoded, 'base64');
   log('IMAGE', `Generated: ${(buffer.length / 1024).toFixed(0)} KB`);
-
   return buffer;
 }
 
-// ── Step 2: Upload to Firebase Storage ───────────────────────────────
+// ── Step 2: Upload image via server /api/upload ──────────────────────────────
 
-async function saveImageLocally(imageBuffer: Buffer, filename: string): Promise<string> {
-  const outPath = path.resolve(process.cwd(), filename);
-  writeFileSync(outPath, imageBuffer);
-  log('IMAGE', `Saved locally: ${outPath} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-  return outPath;
+async function uploadImage(imageBuffer: Buffer, jwt: string): Promise<string> {
+  log('UPLOAD', 'Uploading to server via /api/upload...');
+
+  const form = new FormData();
+  form.append('file', new Blob([imageBuffer], { type: 'image/png' }), 'ecomb-cover.png');
+
+  const res = await fetch(`${SERVER_URL}/api/upload`, {
+    method: 'POST',
+    headers: { Cookie: `siwe-session=${jwt}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upload failed: ${res.status} ${text.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as any;
+  const url = data.manifest?.uploads?.[0]?.url || data.url || data.publicUrl;
+  if (!url) throw new Error('No URL in upload response');
+  log('UPLOAD', `URL: ${url}`);
+  return url;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────
+// ── Step 3: Deploy universe + token on-chain ──────────────────────────────────
 
-async function main() {
-  console.log('\n LOAR — Creating E Combonator Universe\n');
+interface DeployResult {
+  txHash: `0x${string}`;
+  universeAddress: string;
+  tokenAddress: string;
+  governorAddress: string;
+  universeId: bigint | null;
+}
 
-  // ── Validate env ──────────────────────────────────────────────────
-  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY not set');
+async function deployOnChain(imageUrl: string): Promise<DeployResult> {
+  log('CHAIN', `Contract: ${UNIVERSE_MANAGER}`);
 
-  // ── Init Firebase ──────────────────────────────────────────────────
-  const saPath = path.resolve(process.cwd(), 'firebase-service-account.json');
-  const serviceAccount = JSON.parse(readFileSync(saPath, 'utf-8'));
-  const app = initializeApp(
-    { credential: cert(serviceAccount) },
-    'create-ecombonator-' + Date.now()
+  const balance = await publicClient.getBalance({ address: account.address });
+  log('CHAIN', `Balance: ${formatEther(balance)} ETH`);
+
+  const mintFee = (await publicClient.readContract({
+    address: UNIVERSE_MANAGER,
+    abi: universeManagerAbi,
+    functionName: 'mintFee',
+  })) as bigint;
+  log('CHAIN', `Mint fee: ${formatEther(mintFee)} ETH`);
+
+  if (balance < mintFee + 5000000000000000n) {
+    throw new Error(`Need at least ${formatEther(mintFee + 5000000000000000n)} ETH`);
+  }
+
+  const poolData = encodeAbiParameters(
+    [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'loarFee', type: 'uint24' },
+          { name: 'pairedFee', type: 'uint24' },
+        ],
+      },
+    ],
+    [{ loarFee: 3000, pairedFee: 3000 }]
   );
-  const db = getFirestore(app);
-  db.settings({ preferRest: true });
-  console.log(`  Firebase   : ${serviceAccount.project_id}`);
-  console.log(`  Creator    : ${CREATOR_ADDRESS}`);
-  console.log(`  Imagen     : configured\n`);
 
-  // ── Step 1: Generate AI cover image ────────────────────────────────
-  console.log('Step 1: Generating AI cover image via Google Imagen 4...');
-
-  const imageBuffer = await generateCoverImage();
-
-  // ── Step 2: Save image locally ──────────────────────────────────────
-  console.log('\nStep 2: Saving cover image locally...');
-
-  const localPath = await saveImageLocally(imageBuffer, 'ecombonator-cover.png');
-  // Use a placeholder — image can be uploaded via the app UI later
-  const coverImageUrl = `file://${localPath}`;
-
-  // ── Step 3: Create the universe in Firestore ──────────────────────
-  console.log('\nStep 3: Creating universe in Firestore...');
-
-  const ts = Date.now();
-  const fakeAddress = `0x${ts.toString(16).padStart(40, '0')}`;
-  const universeId = fakeAddress.toLowerCase();
-
-  const now = new Date();
-
-  // Write universe document
-  await db
-    .collection('cinematicUniverses')
-    .doc(universeId)
-    .set({
-      address: fakeAddress,
-      creator: CREATOR_ADDRESS,
-      tokenAddress: `0x${(ts + 1).toString(16).padStart(40, '0')}`,
-      governanceAddress: `0x${(ts + 2).toString(16).padStart(40, '0')}`,
-      image_url: coverImageUrl,
-      description: DESCRIPTION,
+  const deploymentConfig = {
+    tokenConfig: {
+      tokenAdmin: account.address,
       name: UNIVERSE_NAME,
       symbol: TOKEN_SYMBOL,
-      onChainUniverseId: null,
-      mintTxHash: null,
-      unstoppableDomain: null,
-      hasPrivateSection: true,
-      isMultiSig: false,
-      multiSigAddress: null,
-      accessModel: 'open',
-      created_at: now,
-      updated_at: now,
+      imageURL: imageUrl,
+      metadata: `Governance token for ${UNIVERSE_NAME}`,
+      context: UNIVERSE_DESCRIPTION,
+    },
+    poolConfig: {
+      hook: HOOK,
+      pairedToken: WETH,
+      tickIfToken0IsLoar: STARTING_TICK,
+      tickSpacing: TICK_SPACING,
+      poolData,
+    },
+    lockerConfig: {
+      locker: LOCKER,
+      rewardAdmins: [account.address],
+      rewardRecipients: [account.address],
+      rewardBps: [10000],
+      tickLower: [STARTING_TICK],
+      tickUpper: [0],
+      positionBps: [10000],
+      lockerData: '0x' as `0x${string}`,
+    },
+    allocationConfig: { curveBps: 8000, creatorBps: 1000, treasuryBps: 500, communityBps: 500 },
+  };
+
+  let txHash: `0x${string}`;
+  let universeAddress: string | undefined;
+  let tokenAddress: string | undefined;
+  let governorAddress: string | undefined;
+  let universeId: bigint | null = null;
+
+  try {
+    log('CHAIN', 'Simulating atomic createUniverseWithToken...');
+    await publicClient.simulateContract({
+      account,
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'createUniverseWithToken',
+      args: [
+        UNIVERSE_NAME,
+        imageUrl,
+        UNIVERSE_DESCRIPTION,
+        0,
+        0,
+        account.address,
+        deploymentConfig,
+      ],
+      value: mintFee,
     });
-  log('FIRESTORE', 'Universe document created');
+    log('CHAIN', 'Simulation passed — sending atomic tx...');
 
-  // Seed credit pool
-  await db.collection('universeCredits').doc(universeId).set({
-    universeId,
-    balance: CREDITS,
-    totalPurchased: CREDITS,
-    totalSpent: 0,
-    seedTxHash: null,
-    seedSource: 'genesis',
-    lastFundedAt: now,
-    updatedAt: now,
-    createdAt: now,
+    txHash = await walletClient.writeContract({
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'createUniverseWithToken',
+      args: [
+        UNIVERSE_NAME,
+        imageUrl,
+        UNIVERSE_DESCRIPTION,
+        0,
+        0,
+        account.address,
+        deploymentConfig,
+      ],
+      value: mintFee,
+    });
+  } catch {
+    log('CHAIN', 'Atomic call reverted — using two-step flow');
+
+    log('CHAIN', 'Step 1/2: Creating universe...');
+    const h1 = await walletClient.writeContract({
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'createUniverse',
+      args: [UNIVERSE_NAME, imageUrl, UNIVERSE_DESCRIPTION, 0, 0, account.address],
+      value: mintFee,
+    });
+    const r1 = await publicClient.waitForTransactionReceipt({ hash: h1, timeout: 120_000 });
+    if (r1.status !== 'success') throw new Error('createUniverse reverted');
+
+    for (const logEntry of r1.logs) {
+      try {
+        const d = decodeEventLog({
+          abi: universeManagerAbi,
+          data: logEntry.data,
+          topics: logEntry.topics,
+        });
+        if (d.eventName === 'UniverseCreated') universeAddress = (d.args as any).universe;
+        if (d.eventName === 'UniverseLpSeed') universeId = (d.args as any).universeId;
+      } catch {}
+    }
+    log('CHAIN', `Universe created: ${universeAddress} (ID: ${universeId})`);
+
+    if (universeId === null) {
+      const { parseAbiItem } = await import('viem');
+      const logs = await publicClient.getLogs({
+        address: UNIVERSE_MANAGER,
+        event: parseAbiItem('event UniverseCreated(address universe, address creator)'),
+        fromBlock: BigInt(deployment.startBlock),
+        toBlock: 'latest',
+      });
+      universeId = BigInt(logs.length - 1);
+    }
+
+    log('CHAIN', 'Step 2/2: Deploying token...');
+    await publicClient.simulateContract({
+      account,
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'deployUniverseToken',
+      args: [deploymentConfig, universeId],
+    });
+
+    txHash = await walletClient.writeContract({
+      address: UNIVERSE_MANAGER,
+      abi: universeManagerAbi,
+      functionName: 'deployUniverseToken',
+      args: [deploymentConfig, universeId],
+    });
+  }
+
+  log('CHAIN', `TX: ${txHash}`);
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: txHash,
+    confirmations: 1,
+    timeout: 120_000,
   });
-  log('FIRESTORE', `Seeded ${CREDITS} mint credits`);
+  if (receipt.status !== 'success') throw new Error(`Transaction reverted!`);
+  log('CHAIN', `Confirmed in block ${receipt.blockNumber}`);
 
-  // Seed private section config
-  await db.collection('privateSectionConfig').doc(universeId).set({
-    universeId,
-    vaultEnabled: true,
-    notesEnabled: true,
-    holderMinPercentage: 1,
-    createdAt: now,
-    updatedAt: now,
+  for (const logEntry of receipt.logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: universeManagerAbi,
+        data: logEntry.data,
+        topics: logEntry.topics,
+      });
+      if (decoded.eventName === 'UniverseCreated') universeAddress = (decoded.args as any).universe;
+      if (decoded.eventName === 'UniverseLpSeed') universeId = (decoded.args as any).universeId;
+      if (decoded.eventName === 'TokenCreated') {
+        tokenAddress = (decoded.args as any).tokenAddress;
+        governorAddress = (decoded.args as any).governor;
+      }
+    } catch {}
+  }
+
+  if (!universeAddress || !tokenAddress || !governorAddress) {
+    throw new Error('Missing events — universe or token deployment failed');
+  }
+
+  return { txHash, universeAddress, tokenAddress, governorAddress, universeId };
+}
+
+// ── Step 4: Register in Firestore via SIWE + tRPC ─────────────────────────────
+
+function buildSiweMessage(params: { address: string; nonce: string; chainId: number }): string {
+  const domain = new URL(SERVER_URL).hostname;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 2 * 60 * 1000);
+  return [
+    `${domain} wants you to sign in with your Ethereum account:`,
+    params.address,
+    '',
+    'Sign in to LOAR',
+    '',
+    `URI: ${SERVER_URL}`,
+    `Version: 1`,
+    `Chain ID: ${params.chainId}`,
+    `Nonce: ${params.nonce}`,
+    `Issued At: ${now.toISOString()}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
+  ].join('\n');
+}
+
+async function authenticateSiwe(): Promise<string> {
+  log('AUTH', 'Authenticating via SIWE...');
+
+  const nonceRes = await fetch(`${SERVER_URL}/auth/nonce`);
+  if (!nonceRes.ok) throw new Error(`Nonce fetch failed: ${nonceRes.status}`);
+  const { nonce } = (await nonceRes.json()) as { nonce: string };
+
+  const siweMessage = buildSiweMessage({
+    address: getAddress(account.address),
+    nonce,
+    chainId: sepolia.id,
   });
-  log('FIRESTORE', 'Seeded private section config');
+  const signature = await account.signMessage({ message: siweMessage });
 
-  // Credit transaction log
-  await db.collection('universeCreditTransactions').add({
-    universeId,
-    type: 'fund',
-    fundedByUid: CREATOR_ADDRESS.toLowerCase(),
-    paymentMethod: 'genesis',
-    paymentRef: 'ecombonator-genesis',
-    credits: CREDITS,
-    ethAmountWei: '0',
-    source: 'genesis',
-    note: 'E Combonator universe genesis credits',
-    createdAt: now,
+  const verifyRes = await fetch(`${SERVER_URL}/auth/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: SERVER_URL },
+    body: JSON.stringify({ message: siweMessage, signature }),
   });
-  log('FIRESTORE', 'Credit transaction logged');
 
-  // ── Step 4: Verify ─────────────────────────────────────────────────
-  console.log('\nStep 4: Verifying...');
+  if (!verifyRes.ok) throw new Error(`Auth verify failed: ${await verifyRes.text()}`);
 
-  const doc = await db.collection('cinematicUniverses').doc(universeId).get();
-  if (!doc.exists) throw new Error('Verification failed — universe not found');
-  log('VERIFY', 'Universe verified in Firestore');
+  const setCookie = verifyRes.headers.get('set-cookie') ?? '';
+  const jwtMatch = setCookie.match(/siwe-session=([^;]+)/);
+  if (!jwtMatch) throw new Error('No session token in verify response');
 
-  const allSnap = await db.collection('cinematicUniverses').get();
-  log('VERIFY', `Total universes: ${allSnap.size}`);
+  log('AUTH', `Authenticated as ${account.address}`);
+  return jwtMatch[1];
+}
 
-  // ── Summary ────────────────────────────────────────────────────────
+async function registerInFirestore(
+  deploy: DeployResult,
+  imageUrl: string,
+  jwt: string
+): Promise<void> {
+  // Get universe creation nonce
+  const createNonceRes = await fetch(
+    `${SERVER_URL}/trpc/universes.getNonce?batch=1&input=${encodeURIComponent(JSON.stringify({ '0': null }))}`,
+    { headers: { Authorization: `Bearer ${jwt}` } }
+  );
+  const createNonceData = (await createNonceRes.json()) as any[];
+  const createNonce = createNonceData[0]?.result?.data?.nonce;
+  if (!createNonce) throw new Error('Failed to get creation nonce');
+
+  const ts = Math.floor(Date.now() / 1000);
+  const createMsg = `Create universe as ${account.address} at ${ts} nonce:${createNonce}`;
+  const createSig = await account.signMessage({ message: createMsg });
+
+  log('REGISTER', 'Registering universe in Firestore...');
+  const createRes = await fetch(`${SERVER_URL}/trpc/universes.create?batch=1`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+    body: JSON.stringify({
+      '0': {
+        address: deploy.universeAddress,
+        creator: account.address,
+        name: UNIVERSE_NAME,
+        tokenAddress: deploy.tokenAddress,
+        governanceAddress: deploy.governorAddress,
+        imageUrl,
+        description: UNIVERSE_DESCRIPTION,
+        onChainUniverseId: deploy.universeId?.toString(),
+        mintTxHash: deploy.txHash,
+        signature: createSig,
+        message: createMsg,
+        nonce: createNonce,
+      },
+    }),
+  });
+
+  const createData = (await createRes.json()) as any[];
+  if (createData[0]?.error) {
+    throw new Error(`Firestore registration failed: ${JSON.stringify(createData[0].error)}`);
+  }
+
+  const result = createData[0]?.result?.data;
+  log('REGISTER', `Firestore ID: ${result?.data?.id ?? 'unknown'}`);
+  log('REGISTER', `Credits awarded: ${result?.mintCreditsAwarded ?? 0}`);
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function main() {
   console.log('\n' + '='.repeat(60));
-  console.log('  E COMBONATOR — LIVE ON LOAR');
+  console.log('  LOAR — E Combonator Universe + $ECOMB Token Deployment');
   console.log('='.repeat(60));
-  console.log(`  Universe ID  : ${universeId}`);
-  console.log(`  Name         : ${UNIVERSE_NAME}`);
-  console.log(`  Symbol       : ${TOKEN_SYMBOL}`);
-  console.log(`  Creator      : ${CREATOR_ADDRESS}`);
-  console.log(`  Credits      : ${CREDITS}`);
-  console.log(`  Cover Image  : ${coverImageUrl}`);
-  console.log(`  Access Model : open`);
-  console.log('='.repeat(60));
+  console.log(`  Deployer: ${account.address}`);
+  console.log(`  Chain:    Sepolia (${sepolia.id})`);
+  console.log(`  Server:   ${SERVER_URL}\n`);
 
-  console.log('\nE Combonator is live on LOAR.\n');
-  process.exit(0);
+  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY not set');
+
+  // Step 1: Authenticate
+  const jwt = await authenticateSiwe();
+
+  // Step 2: Generate cover image
+  const imageBuffer = await generateCoverImage();
+
+  // Step 3: Upload via server
+  const imageUrl = await uploadImage(imageBuffer, jwt);
+
+  // Step 4: Deploy on-chain
+  const deploy = await deployOnChain(imageUrl);
+
+  // Step 5: Register in Firestore
+  try {
+    await registerInFirestore(deploy, imageUrl, jwt);
+  } catch (err: any) {
+    log('REGISTER', `WARNING: Firestore registration failed: ${err.message}`);
+    log('REGISTER', 'Universe is live on-chain but may not appear in the app until registered.');
+  }
+
+  console.log('\n' + '='.repeat(60));
+  console.log('  COMPLETE');
+  console.log('='.repeat(60));
+  console.log(`
+  Universe : ${UNIVERSE_NAME}
+  Address  : ${deploy.universeAddress}
+  Token    : $${TOKEN_SYMBOL} @ ${deploy.tokenAddress}
+  Governor : ${deploy.governorAddress}
+  Image    : ${imageUrl}
+  TX       : https://sepolia.etherscan.io/tx/${deploy.txHash}
+
+  Launchpad: /tokens
+  Universe:  /universe/${deploy.universeAddress}
+`);
 }
 
 main().catch((err) => {
-  console.error('\nFailed:', err.message ?? err);
+  console.error('\nFAILED:', err.message ?? err);
+  if (err.cause) console.error('Cause:', (err.cause as any)?.message);
   process.exit(1);
 });

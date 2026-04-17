@@ -211,7 +211,21 @@ export function MonetizationOverview() {
         </div>
       </div>
 
-      {showCreditStore && <CreditStore onClose={() => setShowCreditStore(false)} />}
+      {showCreditStore && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Credit Store"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCreditStore(false);
+          }}
+        >
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6 mx-4">
+            <CreditStore onClose={() => setShowCreditStore(false)} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -51,11 +51,20 @@ export default defineConfig({
     dedupe: ['wagmi', 'viem', 'thirdweb', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
-    // Let Vite/Rollup handle code splitting automatically.
-    // Manual chunks broke module initialization order — @radix-ui calls
-    // React.forwardRef() at load time, but React was in a different chunk
-    // that hadn't initialized yet, causing "Cannot read properties of
-    // undefined (reading 'forwardRef')" white screen crash.
+    // Only isolate thirdweb into its own chunk — it has internal circular
+    // deps that cause TDZ errors ("Cannot access 'Tc' before initialization")
+    // when Rollup concatenates it into the main chunk.
+    // NOTE: Do NOT separate React or @radix-ui — they call React.forwardRef()
+    // at load time and must share a chunk with React.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/thirdweb')) {
+            return 'thirdweb';
+          }
+        },
+      },
+    },
   },
   server: {
     port: 3001,

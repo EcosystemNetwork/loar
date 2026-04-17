@@ -45,10 +45,12 @@ import {
   Castle,
   Crown,
   ImageIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
+import { MintContentDialog } from '@/components/MintContentDialog';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 
@@ -314,6 +316,9 @@ function EntityPage() {
   const [collaborativeMode, setCollaborativeMode] = useState(false);
   const [launchingPipeline, setLaunchingPipeline] = useState(false);
   const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const [showMintDialog, setShowMintDialog] = useState(false);
+  const [mintContentId, setMintContentId] = useState<string | null>(null);
+  const [findingContent, setFindingContent] = useState(false);
 
   const {
     data: entity,
@@ -424,8 +429,64 @@ function EntityPage() {
     }
   };
 
+  const handleMintEntity = async () => {
+    if (!entity) return;
+    setFindingContent(true);
+    try {
+      // Find gallery content linked to this entity via media attachment generationIds
+      const generationIds = mediaAttachments.map((a: any) => a.generationId).filter(Boolean);
+
+      if (generationIds.length > 0) {
+        // Browse gallery for matching content
+        const gallery = await trpcClient.gallery.browse.query({
+          origin: 'generated',
+          limit: 50,
+          sortBy: 'newest',
+        });
+        const items = (gallery as any)?.items || [];
+        // Match by generationId, prefer unminted
+        const match =
+          items.find((c: any) => generationIds.includes(c.generationId) && !c.mintedAsNft) ||
+          items.find((c: any) => generationIds.includes(c.generationId));
+
+        if (match) {
+          if (match.mintedAsNft) {
+            toast.info("This entity's artwork has already been minted as an NFT.");
+            return;
+          }
+          setMintContentId(match.id);
+          setShowMintDialog(true);
+          return;
+        }
+      }
+
+      // Fallback: search by entity name in gallery titles
+      const gallery = await trpcClient.gallery.browse.query({
+        origin: 'generated',
+        limit: 50,
+        sortBy: 'newest',
+      });
+      const items = (gallery as any)?.items || [];
+      const nameMatch = items.find(
+        (c: any) => c.title?.toLowerCase().includes(entity.name.toLowerCase()) && !c.mintedAsNft
+      );
+      if (nameMatch) {
+        setMintContentId(nameMatch.id);
+        setShowMintDialog(true);
+        return;
+      }
+
+      toast.error('No gallery content found for this entity. Generate artwork first, then mint.');
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to find mintable content');
+    } finally {
+      setFindingContent(false);
+    }
+  };
+
   const isPipelineEligible = entity && PIPELINE_ELIGIBLE_KINDS.includes(entity.kind);
   const hasPipeline = !!pipelineId;
+  const canMint = entity?.monetized && entity?.rightsDeclaration && entity?.imageUrl && isOwner;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -492,6 +553,14 @@ function EntityPage() {
                   </span>
                 </div>
               )}
+              {entity.monetized && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Rights</span>
+                  <Badge variant="outline" className="text-amber-500 border-amber-500/30">
+                    {entity.rightsDeclaration === 'original' ? 'Original' : 'Licensed'}
+                  </Badge>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
                 <span>{new Date(entity.createdAt).toLocaleDateString()}</span>
@@ -516,6 +585,22 @@ function EntityPage() {
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <CardTitle className="text-2xl">{entity.name}</CardTitle>
                   <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    {canMint && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleMintEntity}
+                        disabled={findingContent}
+                        className="bg-amber-600 hover:bg-amber-500"
+                      >
+                        {findingContent ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="w-4 h-4 mr-2" />
+                        )}
+                        {findingContent ? 'Preparing...' : 'Mint as NFT'}
+                      </Button>
+                    )}
                     {isOwner && isPipelineEligible && !hasPipeline && (
                       <Button
                         variant="default"
@@ -645,6 +730,23 @@ function EntityPage() {
           )}
         </div>
       </div>
+
+      {/* Mint as NFT dialog */}
+      {showMintDialog && mintContentId && (
+        <MintContentDialog
+          contentId={mintContentId}
+          contentTitle={entity.name}
+          universeId={entity.universeAddress || undefined}
+          onClose={() => {
+            setShowMintDialog(false);
+            setMintContentId(null);
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['entity', id] });
+            queryClient.invalidateQueries({ queryKey: ['media-attachments', 'entity', id] });
+          }}
+        />
+      )}
     </div>
   );
 }

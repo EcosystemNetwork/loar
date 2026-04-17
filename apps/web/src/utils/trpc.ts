@@ -15,7 +15,6 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
-import { hasSession, clearSiweSession } from '../lib/wallet-auth';
 
 /** Shared React Query client. Retries 5xx errors and shows toast on failure. */
 export const queryClient = new QueryClient({
@@ -78,10 +77,16 @@ export const queryClient = new QueryClient({
 
       // Handle expired/invalid JWT — clear session and prompt re-auth.
       // Only toast if the user actually had a session; unauthenticated 401s are expected.
+      // Note: we inline the localStorage logic here instead of importing from wallet-auth
+      // to avoid a circular dependency (wallet-auth imports wagmi/thirdweb which have
+      // internal circular deps that cause TDZ errors when loaded synchronously).
       const httpStatus = error?.data?.httpStatus ?? error?.status;
       if (httpStatus === 401 || error.message?.includes('UNAUTHORIZED')) {
-        const hadSession = hasSession();
-        clearSiweSession();
+        const address = localStorage.getItem('siwe-address');
+        const expiry = localStorage.getItem('siwe-expiry');
+        const hadSession = !!(address && expiry && Date.now() < Number(expiry));
+        localStorage.removeItem('siwe-address');
+        localStorage.removeItem('siwe-expiry');
         if (hadSession) {
           toast.error('Session expired. Please sign in again.', {
             id: 'session-expired', // dedupe — one toast even if multiple queries fail

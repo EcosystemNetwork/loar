@@ -33,17 +33,62 @@ const walletClient = createWalletClient({ account, chain: sepolia, transport: ht
 const UNIVERSE_ADDR = '0x341fFa19c0EC8D2C8eF42A360cf799949844262e' as const;
 const BD_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 
-// ── Character Visual DNA ──────────────────────────────────────────────
-const NOVA =
-  'Nova Reyes: 23-year-old female, brown skin, silver braided undercut, glowing blue circuit tattoo over left eye, black tactical jacket with neon cyan seam lines, fingerless gloves, thin glowing cyan plasma blade.';
-const ORIN =
-  'Orin Vale: 27-year-old tall male, dark skin, shaved head, cybernetic right arm with glowing red light strips, charcoal armor vest, long gray coat, plasma rifle.';
-const ECHO_CHAR =
-  'Echo: appears-16 holographic girl, white bob-cut hair, glowing violet eyes, transparent body filled with moving code fragments, ethereal soft violet glow.';
-const VOSS =
-  'Commander Drake Voss: 50s male, pale angular face, long white coat over black armor, red cybernetic spine visible through transparent back plating, energy staff weapon.';
+// ── Character Visual DNA — pulled from wiki at startup ────────────────
+// These get populated by fetchCharacterDNA() before scene generation starts.
+let NOVA = '';
+let ORIN = '';
+let ECHO_CHAR = '';
+let VOSS = '';
 const WORLD =
   'Year 2149 cyberpunk megacity. Neon rain, holographic ads, patrol drones. Color palette: deep blue, neon cyan, hot red, violet. Cinematic 16:9, dramatic lighting, 720p quality.';
+
+const SERVER_URL = process.env.VITE_SERVER_URL ?? 'http://localhost:3000';
+
+// Entity IDs from wiki setup
+const ENTITY_IDS: Record<string, string> = {
+  'Nova Reyes': 'MWBnOOjOFsf8foFzGIao',
+  'Orin Vale': 'gT9oiI9PfWxOpw4GEFgp',
+  'Echo (AI Construct)': 'tptmvvggTwWjfqXcEknQ',
+  'Commander Drake Voss': 'MPNjSvAidoxIw3ejksnB',
+};
+
+async function fetchCharacterDNA(): Promise<void> {
+  console.log('[WIKI] Fetching character data from wiki entities...');
+  for (const [name, entityId] of Object.entries(ENTITY_IDS)) {
+    try {
+      const url = `${SERVER_URL}/trpc/entities.get?batch=1&input=${encodeURIComponent(JSON.stringify({ '0': { entityId } }))}`;
+      const res = await fetch(url);
+      const json = (await res.json()) as any[];
+      const entity = json[0]?.result?.data;
+      if (entity?.description) {
+        // Extract the visual description (first 2 sentences or up to 300 chars)
+        const desc = entity.description.slice(0, 300).replace(/\n/g, ' ');
+        const visual = `${entity.name}: ${desc}`;
+        if (name.includes('Nova')) NOVA = visual;
+        else if (name.includes('Orin')) ORIN = visual;
+        else if (name.includes('Echo')) ECHO_CHAR = visual;
+        else if (name.includes('Voss')) VOSS = visual;
+        console.log(`[WIKI] ${entity.name}: loaded (${desc.length} chars)`);
+      }
+    } catch (err: any) {
+      console.log(`[WIKI] ${name}: fetch failed (${err.message?.slice(0, 60)}), using fallback`);
+    }
+  }
+
+  // Fallbacks if wiki fetch failed
+  if (!NOVA)
+    NOVA =
+      'Nova Reyes: 23-year-old female, brown skin, silver braided undercut, glowing blue circuit tattoo over left eye, black tactical jacket with neon cyan seam lines, fingerless gloves, thin glowing cyan plasma blade.';
+  if (!ORIN)
+    ORIN =
+      'Orin Vale: 27-year-old tall male, dark skin, shaved head, cybernetic right arm with glowing red light strips, charcoal armor vest, long gray coat, plasma rifle.';
+  if (!ECHO_CHAR)
+    ECHO_CHAR =
+      'Echo: appears-16 holographic girl, white bob-cut hair, glowing violet eyes, transparent body filled with moving code fragments, ethereal soft violet glow.';
+  if (!VOSS)
+    VOSS =
+      'Commander Drake Voss: 50s male, pale angular face, long white coat over black armor, red cybernetic spine visible through transparent back plating, energy staff weapon.';
+}
 
 // ── Batch 2: 42 Additional Scenes ─────────────────────────────────────
 const SCENES = [
@@ -534,6 +579,9 @@ async function main() {
   console.log('  CYBER WAR FILM — Batch 2 (S19-S70)');
   console.log('  52 additional scenes for 10-minute film');
   console.log('═'.repeat(60));
+
+  // Pull character descriptions from wiki entities
+  await fetchCharacterDNA();
 
   const latestId = (await publicClient.readContract({
     address: UNIVERSE_ADDR,
