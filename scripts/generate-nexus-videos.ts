@@ -37,14 +37,14 @@ const VIDEO_SCENES = [
     description:
       'Kael wakes up in a pod filled with liquid code, ripping free from cables that feed him simulated memories. The pod chamber stretches infinitely — millions of sleeping humans plugged into the Nexus.',
     prompt:
-      'Cinematic sci-fi: A young man rips free from a pod filled with glowing green liquid in a vast dark chamber. Millions of identical pods stretch into infinity. Green Matrix-style digital rain cascades down invisible walls. Cables and tubes disconnect from his body. His eyes glow briefly with circuit patterns. Dramatic lighting, cyberpunk aesthetic, 4K cinematic quality, dark atmosphere with green bioluminescence.',
+      'Cinematic sci-fi: A young man emerges from a glowing green pod in a vast dark chamber. Millions of identical pods stretch into infinity. Green Matrix-style digital rain cascades down invisible walls. Glowing fiber optic cables float away. His eyes glow with circuit patterns. Dramatic lighting, cyberpunk aesthetic, 4K cinematic quality, dark atmosphere with green bioluminescence.',
   },
   {
     title: 'The Blade Remembers',
     description:
       'Through genetic memory, Kael experiences his ancestor — a Master Architect performing impossible parkour between floating stone towers while assassinating a simulation lord with blades of compressed data.',
     prompt:
-      'Cinematic action: A hooded assassin with glowing circuit tattoos performs acrobatic parkour between floating Renaissance stone towers in a cyberpunk city. His hidden blade glows with green digital energy, leaving trails of dissolving code. He leaps from a tower and performs a dramatic air assassination on a figure below. Gold and green color palette, ancient architecture meets holographic overlays, dramatic camera tracking shot, 4K cinematic.',
+      'Cinematic action: A hooded figure with glowing circuit tattoos performs acrobatic parkour between floating Renaissance stone towers in a cyberpunk city. A hidden blade glows with green digital energy, leaving trails of dissolving code. The figure leaps between towers with incredible agility. Gold and green color palette, ancient architecture meets holographic overlays, dramatic camera tracking shot, 4K cinematic.',
   },
   {
     title: 'Rise of the Autarchs',
@@ -65,21 +65,21 @@ const VIDEO_SCENES = [
     description:
       'Rogue AIs manifest as towering holographic figures of pure mathematics. They offer Kael two pills. He crushes both and demands a third option. The Veil smiles for the first time in ten thousand years.',
     prompt:
-      'Surreal cinematic: A young man stands before two massive holographic AI figures made of flowing mathematical equations and geometric patterns in a dark void. Two glowing pills float before him — one red, one blue — each radiating energy. He crushes both pills in his fists, light exploding outward. The AI figures expression shifts to surprise. Mathematical symbols and fractals fill the void. Green Matrix rain in the background, dramatic face lighting, 4K cinematic, philosophical atmosphere.',
+      'Surreal cinematic: A young man stands before two massive holographic AI figures made of flowing mathematical equations and geometric patterns in a dark void. Two glowing orbs float before him — one red, one blue — each radiating energy. He clasps both orbs, light exploding outward. Mathematical symbols and fractals fill the void. Green Matrix rain in the background, dramatic face lighting, 4K cinematic, philosophical atmosphere.',
   },
   {
     title: "Assassin's Eclipse",
     description:
       'Assassins leap between rooftops that phase between stone and wireframe in the Nexus version of Constantinople. As the lead assassin plunges her data-blade into a Control Node, the entire city glitches — everyone sees the truth.',
     prompt:
-      'Epic action scene: Hooded assassins leap between rooftops of a grand Byzantine city that glitches between ancient stone and digital wireframe. A female assassin plunges a glowing green blade into the dome of a massive building. The entire city begins decompiling — buildings dissolving into streams of code, the sky cracking like broken glass revealing green digital void behind it. Citizens look up in shock. Gold, green, and white color palette, dramatic wide shot, cinematic 4K, reality-breaking visual effects.',
+      'Epic action scene: Hooded figures leap between rooftops of a grand Byzantine city that glitches between ancient stone and digital wireframe. A female warrior touches a glowing green blade to the dome of a massive building. The entire city begins decompiling — buildings dissolving into streams of code, the sky cracking like glass revealing green digital void behind it. People look up in awe. Gold, green, and white color palette, dramatic wide shot, cinematic 4K, reality-breaking visual effects.',
   },
   {
     title: 'Clash of Titans',
     description:
       'Solarius Prime leads the Autarch invasion into Luminari space. Sera redirects an entire missile volley with the Force-current. Solarius catches a star cruiser in his massive hand and crushes it.',
     prompt:
-      'Epic space battle: Colossal transforming warships clash with elegant crystalline star cruisers in deep space near a nebula. A massive robot catches a cruiser in its hand. Beams of blue crystalline energy and orange plasma fire crisscross the battlefield. Ships transform mid-combat. Explosions and debris fill the frame. A woman stands on a bridge with hands raised, redirecting missiles with visible force energy. Blue and orange contrasting colors, epic scale, cinematic 4K, dramatic lighting.',
+      'Epic space scene: Colossal transforming warships face elegant crystalline star cruisers in deep space near a nebula. A massive robot reaches toward a cruiser. Beams of blue crystalline energy and orange plasma crisscross the space. Ships transform mid-flight. Energy bursts and debris fill the frame. A woman stands on a bridge with hands raised, redirecting energy with visible force waves. Blue and orange contrasting colors, epic scale, cinematic 4K, dramatic lighting.',
   },
   {
     title: 'The Four Realms Converge',
@@ -232,18 +232,29 @@ async function main() {
     try {
       log(`VIDEO ${i + 1}/10`, `"${scene.title}" — generating...`);
 
-      const result = await tRPCMutate<{ videoUrl: string }>(
-        'generation.generateVideo',
+      const result = await tRPCMutate<{
+        videoUrl: string;
+        generationId: string;
+        modelUsed: string;
+      }>(
+        'generation.generate',
         {
           prompt: scene.prompt,
-          model: 'bytedance/seedance-2.0/fast/text-to-video',
-          duration: 5,
+          mode: 'text_to_video',
+          durationSec: 5,
+          resolution: '720p',
           aspectRatio: '16:9',
+          audio: false,
+          routingMode: 'auto',
+          allowFallback: true,
         },
         authToken
       );
 
-      log(`VIDEO ${i + 1}/10`, `Generated: ${result.videoUrl.slice(0, 70)}...`);
+      log(
+        `VIDEO ${i + 1}/10`,
+        `Generated via ${result.modelUsed ?? 'auto'}: ${result.videoUrl.slice(0, 60)}...`
+      );
 
       // Upload to storage
       let storageUrl = result.videoUrl;

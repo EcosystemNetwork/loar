@@ -12,7 +12,7 @@ import {
   type Swap,
   type TokenHolder,
 } from '@/utils/ponder-api';
-import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
+import { useVisibilityAwareInterval, jitteredInterval, POLL_INTERVALS } from './useSmartPolling';
 
 // ─── List all launched tokens ──────────────────────────────────────────
 

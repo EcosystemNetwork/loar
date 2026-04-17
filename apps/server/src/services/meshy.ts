@@ -13,7 +13,7 @@
  * Required env var: MESHY_API_KEY
  */
 
-const BASE_URL = 'https://api.meshy.ai/v2';
+const BASE_URL = 'https://api.meshy.ai/v1';
 
 // ── Types ─────────────────────────────────────────────────────────────
 

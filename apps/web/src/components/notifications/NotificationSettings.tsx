@@ -180,7 +180,7 @@ export function NotificationSettings() {
               />
               {pushEnabled && (
                 <button
-                  onClick={() => testPush.mutate({})}
+                  onClick={() => testPush.mutate()}
                   disabled={testPush.isPending}
                   className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1"
                 >

@@ -135,13 +135,14 @@ export function useCurveState(bondingCurveAddress: Address | undefined) {
 }
 
 export function useCurveProgress(bondingCurveAddress: Address | undefined) {
+  const progressPollInterval = useVisibilityAwareInterval(POLL_INTERVALS.REALTIME);
   const { data, isLoading } = useReadContract({
     address: bondingCurveAddress,
     abi: BONDING_CURVE_ABI,
     functionName: 'getProgress',
     query: {
       enabled: !!bondingCurveAddress,
-      refetchInterval: pollInterval,
+      refetchInterval: progressPollInterval,
     },
   });
 

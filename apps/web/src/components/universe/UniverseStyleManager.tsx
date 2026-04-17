@@ -146,7 +146,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
   }, [fetchedStyle]);
 
   const saveMutation = useMutation(
-    trpc.universeStyle.upsert.mutationOptions({
+    trpc.universeStyle.update.mutationOptions({
       onSuccess: () => {
         toast.success('Style saved');
         queryClient.invalidateQueries({
@@ -162,7 +162,16 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
   const handleSave = () => {
     saveMutation.mutate({
       universeAddress,
-      ...form,
+      visualStyle: form.visualStyle,
+      cinematicStyle: form.cinematicStyle,
+      colorPalette: form.colorPalette,
+      lightingPreset: form.lightingPreset,
+      era: (form as any).eraSetting || (form as any).era,
+      stylePrompt: form.stylePrompt,
+      negativePrompt: form.negativePrompt,
+      referenceImages: form.referenceImages,
+      aspectRatio: (form as any).defaultAspectRatio || (form as any).aspectRatio,
+      locked: form.locked,
     });
   };
 

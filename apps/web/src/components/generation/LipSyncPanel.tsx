@@ -128,7 +128,7 @@ function LipSyncTab({
 }) {
   const [videoUrl, setVideoUrl] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
-  const [model, setModel] = useState<'lipsync' | 'sadtalker'>('lipsync');
+  const [model, setModel] = useState<'fal-ai/lipsync' | 'fal-ai/sadtalker'>('fal-ai/lipsync');
   const [status, setStatus] = useState<LipSyncStatus>('idle');
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
@@ -160,7 +160,6 @@ function LipSyncTab({
       audioUrl: audioUrl.trim(),
       model,
       entityId,
-      universeAddress,
     });
   };
 
@@ -197,15 +196,15 @@ function LipSyncTab({
         <Label className="text-zinc-300">Model</Label>
         <Select
           value={model}
-          onValueChange={(v) => setModel(v as 'lipsync' | 'sadtalker')}
+          onValueChange={(v) => setModel(v as 'fal-ai/lipsync' | 'fal-ai/sadtalker')}
           disabled={isProcessing}
         >
           <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="lipsync">Lip Sync (default)</SelectItem>
-            <SelectItem value="sadtalker">SadTalker</SelectItem>
+            <SelectItem value="fal-ai/lipsync">Lip Sync (default)</SelectItem>
+            <SelectItem value="fal-ai/sadtalker">SadTalker</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -334,8 +333,6 @@ function CaptionsTab({
       videoUrl: videoUrl.trim(),
       language,
       format,
-      entityId,
-      universeAddress,
     });
   };
 
@@ -480,14 +477,11 @@ function HistoryTab({
   entityId?: string;
   universeAddress?: string;
 }) {
-  const { data: history, isLoading } = useQuery({
-    ...trpc.lipsync.getHistory.queryOptions({
-      entityId,
-      universeAddress,
+  const { data: history, isLoading } = useQuery(
+    trpc.lipsync.getHistory.queryOptions({
       limit: 50,
-    }),
-    queryKey: ['lipsync-history', entityId, universeAddress],
-  });
+    })
+  );
 
   if (isLoading) {
     return (

@@ -39,8 +39,8 @@ git fetch origin --quiet
 git reset --hard "$TARGET"
 
 # Rebuild and restart
-docker compose build
-docker compose up -d
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
 
 # Give containers time to start before probing
 echo "Waiting 20s for services to initialise..."

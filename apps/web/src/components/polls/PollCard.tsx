@@ -119,7 +119,6 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
     voteMutation.mutate({
       pollId: poll.id,
       optionIds: selectedOptionIds,
-      universeAddress,
     });
   }
 

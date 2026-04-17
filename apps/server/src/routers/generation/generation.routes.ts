@@ -294,6 +294,59 @@ async function autoAttachVideo(opts: {
   }
 }
 
+// ── Video thumbnail extraction ─────────────────────────────────────
+
+async function extractVideoThumbnail(
+  videoUrl: string,
+  generationId: string
+): Promise<string | null> {
+  try {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const { tmpdir } = await import('os');
+    const { join } = await import('path');
+    const { readFile, unlink } = await import('fs/promises');
+    const execFileAsync = promisify(execFile);
+
+    const outPath = join(tmpdir(), `thumb-${generationId}.jpg`);
+
+    // Extract a frame at 0.5s using ffmpeg
+    await execFileAsync(
+      'ffmpeg',
+      [
+        '-y',
+        '-i',
+        videoUrl,
+        '-ss',
+        '0.5',
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        '-vf',
+        'scale=640:-1',
+        outPath,
+      ],
+      { timeout: 15000 }
+    );
+
+    const thumbBuffer = await readFile(outPath);
+    unlink(outPath).catch(() => {});
+
+    // Upload thumbnail to storage
+    const manager = getStorageManager();
+    const filename = `thumb-${generationId}.jpg`;
+    const manifest = await manager.upload(thumbBuffer, filename, 'image/jpeg', 'system');
+    return manifest.uploads[0]?.url || null;
+  } catch (err) {
+    console.warn(
+      `[thumbnail] Failed to extract thumbnail for ${generationId}:`,
+      (err as Error).message
+    );
+    return null;
+  }
+}
+
 // ── Auto-publish video to gallery ────────────────────────────────────
 
 const contentCol = () => db.collection('content');
@@ -307,12 +360,18 @@ async function autoPublishVideoToGallery(opts: {
   generationId: string;
   thumbnailUrl?: string;
 }) {
+  // If no thumbnail provided, try to extract one from the video
+  let thumbnailUrl = opts.thumbnailUrl || null;
+  if (!thumbnailUrl) {
+    thumbnailUrl = await extractVideoThumbnail(opts.videoUrl, opts.generationId);
+  }
+
   const now = new Date();
   await contentCol().add({
     title: opts.prompt.slice(0, 100) || 'Generated Video',
     description: opts.prompt,
     mediaUrl: opts.videoUrl,
-    thumbnailUrl: opts.thumbnailUrl || null,
+    thumbnailUrl,
     mediaType: 'ai-video',
     classification: 'original',
     tags: [],

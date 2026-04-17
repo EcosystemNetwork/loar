@@ -19,9 +19,9 @@ export interface ImagenGenerateOptions {
   negativePrompt?: string;
   numberOfImages?: number; // 1-4
   aspectRatio?: ImagenAspectRatio;
-  /** Safety filter threshold: block_none, block_only_high, block_medium_and_above, block_low_and_above */
+  /** Safety filter threshold: BLOCK_NONE, BLOCK_ONLY_HIGH, BLOCK_MEDIUM_AND_ABOVE, BLOCK_LOW_AND_ABOVE */
   safetyFilterLevel?: string;
-  /** Person generation: dont_allow, allow_adult, allow_all */
+  /** Person generation: DONT_ALLOW, ALLOW_ADULT, ALLOW_ALL */
   personGeneration?: string;
 }
 
@@ -58,27 +58,28 @@ class GoogleImagenService {
   async generate(options: ImagenGenerateOptions): Promise<ImagenResult> {
     if (!this.apiKey) throw new Error('GOOGLE_API_KEY is not configured');
 
-    const model = 'imagen-3.0-generate-002';
+    const model = 'imagen-4.0-generate-001';
     const url = `${IMAGEN_API_BASE}/models/${model}:predict?key=${this.apiKey}`;
 
-    const body: Record<string, unknown> = {
-      instances: [{ prompt: options.prompt }],
+    const requestBody = {
+      instances: [
+        {
+          prompt: options.prompt,
+          ...(options.negativePrompt ? { negativePrompt: options.negativePrompt } : {}),
+        },
+      ],
       parameters: {
         sampleCount: options.numberOfImages || 1,
         aspectRatio: options.aspectRatio || '1:1',
-        safetyFilterLevel: options.safetyFilterLevel || 'block_only_high',
-        personGeneration: options.personGeneration || 'allow_adult',
+        safetyFilterLevel: options.safetyFilterLevel || 'BLOCK_ONLY_HIGH',
+        personGeneration: options.personGeneration || 'ALLOW_ADULT',
       },
     };
-
-    if (options.negativePrompt) {
-      (body.instances as any[])[0].negativePrompt = options.negativePrompt;
-    }
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -145,7 +146,7 @@ class GoogleImagenService {
         'blurry, low quality, text, watermark, multiple characters, busy background, cropped',
       numberOfImages: 1,
       aspectRatio: '3:4', // portrait orientation for full-body
-      personGeneration: 'allow_adult',
+      personGeneration: 'ALLOW_ADULT',
     });
   }
 }

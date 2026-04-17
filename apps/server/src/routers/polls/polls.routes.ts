@@ -97,7 +97,7 @@ export const pollsRouter = router({
       },
     });
 
-    return { id: pollId, ...poll };
+    return { ...poll, id: pollId };
   }),
 
   /** Cast a vote on a poll */
@@ -237,26 +237,61 @@ export const pollsRouter = router({
     }),
 
   /** Get a single poll with optional user vote */
-  get: publicProcedure.input(z.object({ pollId: z.string() })).query(async ({ ctx, input }) => {
-    const doc = await pollsCol().doc(input.pollId).get();
-    if (!doc.exists) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Poll not found' });
-    }
-
-    const poll = { id: doc.id, ...doc.data() };
-
-    // Check if authenticated user has voted
-    let userVote = null;
-    if (ctx.user) {
-      const voteDocId = `${input.pollId}_${ctx.user.uid}`;
-      const voteSnap = await pollVotesCol().doc(voteDocId).get();
-      if (voteSnap.exists) {
-        userVote = voteSnap.data();
+  get: publicProcedure.input(z.object({ pollId: z.string() })).query(
+    async ({
+      ctx,
+      input,
+    }): Promise<{
+      id: string;
+      title: string;
+      description?: string;
+      type: string;
+      status: string;
+      universeAddress: string;
+      creatorUid: string;
+      totalVotes: number;
+      options: Array<{ id: string; text: string; voteCount: number }>;
+      endsAt: any;
+      createdAt: any;
+      userVote?: Record<string, any> | null;
+      linkedEntityId?: string;
+      linkedContentId?: string;
+    }> => {
+      const doc = await pollsCol().doc(input.pollId).get();
+      if (!doc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Poll not found' });
       }
-    }
 
-    return { ...poll, userVote };
-  }),
+      const data = doc.data()!;
+
+      // Check if authenticated user has voted
+      let userVote = null;
+      if (ctx.user) {
+        const voteDocId = `${input.pollId}_${ctx.user.uid}`;
+        const voteSnap = await pollVotesCol().doc(voteDocId).get();
+        if (voteSnap.exists) {
+          userVote = voteSnap.data() ?? null;
+        }
+      }
+
+      return {
+        id: doc.id,
+        title: data.title,
+        description: data.description,
+        type: data.type,
+        status: data.status,
+        universeAddress: data.universeAddress,
+        creatorUid: data.creatorUid,
+        totalVotes: data.totalVotes || 0,
+        options: data.options || [],
+        endsAt: data.endsAt,
+        createdAt: data.createdAt,
+        userVote,
+        linkedEntityId: data.linkedEntityId,
+        linkedContentId: data.linkedContentId,
+      };
+    }
+  ),
 
   /** Close a poll (creator or admin only) */
   close: protectedProcedure
@@ -350,7 +385,7 @@ export const pollsRouter = router({
         },
       });
 
-      return { id: submissionId, ...canonSubmission };
+      return { ...canonSubmission, id: submissionId };
     }),
 
   /** Get detailed vote breakdown for a poll */

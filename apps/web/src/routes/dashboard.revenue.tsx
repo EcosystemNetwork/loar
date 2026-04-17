@@ -115,13 +115,6 @@ function RevenueDashboardPage() {
     staleTime: 60_000,
   });
 
-  const { data: sources, isLoading: sourcesLoading } = useQuery({
-    queryKey: ['revenue-sources', period],
-    queryFn: () => trpcClient.revenueDashboard.sources.query({ period }),
-    enabled: isAuthenticated,
-    staleTime: 60_000,
-  });
-
   const { data: timeline, isLoading: timelineLoading } = useQuery({
     queryKey: ['revenue-timeline', chartPeriod],
     queryFn: () => trpcClient.revenueDashboard.timeline.query({ period: chartPeriod }),
@@ -129,16 +122,22 @@ function RevenueDashboardPage() {
     staleTime: 60_000,
   });
 
-  const { data: universes, isLoading: universesLoading } = useQuery({
+  const { data: universeData, isLoading: universesLoading } = useQuery({
     queryKey: ['revenue-universes', period],
-    queryFn: () => trpcClient.revenueDashboard.universes.query({ period }),
+    queryFn: () => trpcClient.revenueDashboard.byUniverse.query({}),
     enabled: isAuthenticated,
     staleTime: 60_000,
   });
 
   const exportMutation = useMutation({
     mutationFn: (params: { format: ExportFormat; period: Period }) =>
-      trpcClient.revenueDashboard.export.mutate(params),
+      trpcClient.revenueDashboard.export.mutate({
+        format: params.format,
+        period:
+          params.period === 'all' || params.period === 'day' || params.period === 'week'
+            ? 'month'
+            : (params.period as 'month' | 'quarter' | 'year'),
+      }),
     onSuccess: (data: any) => {
       if (data?.downloadUrl) {
         window.open(data.downloadUrl, '_blank');
@@ -152,7 +151,7 @@ function RevenueDashboardPage() {
 
   // ── Derived data ─────────────────────────────────────────────────
 
-  const summaryData: RevenueSummary = (summary as RevenueSummary) ?? {
+  const summaryData: RevenueSummary = (summary as unknown as RevenueSummary) ?? {
     totalRevenue: 0,
     netCredits: 0,
     creditsEarned: 0,
@@ -160,9 +159,26 @@ function RevenueDashboardPage() {
     topUniverse: null,
   };
 
-  const sourceList: RevenueSource[] = (sources as RevenueSource[]) ?? [];
-  const timelineData: TimelinePoint[] = (timeline as TimelinePoint[]) ?? [];
-  const universeList: UniverseRevenue[] = (universes as UniverseRevenue[]) ?? [];
+  const timelineData: TimelinePoint[] = ((timeline as any)?.dataPoints ??
+    timeline ??
+    []) as TimelinePoint[];
+  const universeList: UniverseRevenue[] = ((universeData as any)?.universes ??
+    []) as UniverseRevenue[];
+
+  // Derive source breakdown from summary data
+  const sourcesLoading = summaryLoading;
+  const sourceList: RevenueSource[] = useMemo(() => {
+    const bySource = (summary as any)?.revenueBySource;
+    if (!bySource) return [];
+    const entries = Object.entries(bySource).map(([source, amount]) => ({
+      source,
+      amount: amount as number,
+    }));
+    const total = entries.reduce((sum, e) => sum + e.amount, 0) || 1;
+    return entries
+      .filter((e) => e.amount > 0)
+      .map((e) => ({ source: e.source, amount: e.amount, percentage: (e.amount / total) * 100 }));
+  }, [summary]);
 
   const maxTimelineValue = useMemo(
     () => Math.max(...timelineData.map((p) => p.amount), 1),

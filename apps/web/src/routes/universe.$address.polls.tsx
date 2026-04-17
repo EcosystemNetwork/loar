@@ -8,7 +8,7 @@
 import { createFileRoute, useParams } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { trpc } from '@/utils/trpc';
+import { trpc, trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { PollCard } from '@/components/polls/PollCard';
 import { PollResults } from '@/components/polls/PollResults';
@@ -38,21 +38,25 @@ function UniversePollsPage() {
   );
 
   // Check if current user is the universe creator (for the Create Poll button).
-  // The polls.list response may include a `isCreator` flag, or we check locally.
-  const { data: universeData } = useQuery(
-    trpc.polls.universeCreator.queryOptions(
-      { universeAddress },
-      { enabled: Boolean(universeAddress) && isAuthenticated }
-    )
+  const { data: universeInfo } = useQuery({
+    queryKey: ['universe', universeAddress],
+    queryFn: () => trpcClient.universes.get.query({ id: universeAddress }),
+    enabled: Boolean(universeAddress) && isAuthenticated,
+  });
+
+  const universeDoc = universeInfo?.data as any;
+  const isUniverseCreator = !!(
+    userAddress &&
+    universeDoc?.creator &&
+    userAddress.toLowerCase() === String(universeDoc.creator).toLowerCase()
   );
 
-  const isUniverseCreator = universeData?.isCreator ?? false;
-
-  const activePolls = (polls ?? []).filter(
-    (p) => p.status === 'active' && new Date(p.endsAt).getTime() > Date.now()
+  const pollsList = (polls as any)?.polls ?? [];
+  const activePolls = pollsList.filter(
+    (p: any) => p.status === 'active' && new Date(p.endsAt).getTime() > Date.now()
   );
-  const endedPolls = (polls ?? []).filter(
-    (p) => p.status === 'ended' || new Date(p.endsAt).getTime() <= Date.now()
+  const endedPolls = pollsList.filter(
+    (p: any) => p.status === 'ended' || new Date(p.endsAt).getTime() <= Date.now()
   );
 
   return (
@@ -96,7 +100,7 @@ function UniversePollsPage() {
         )}
 
         {/* Empty state */}
-        {!isLoading && !error && (polls ?? []).length === 0 && (
+        {!isLoading && !error && pollsList.length === 0 && (
           <div className="text-center py-20 space-y-3">
             <BarChart3 className="w-12 h-12 text-zinc-600 mx-auto" />
             <h2 className="text-lg font-medium text-zinc-400">No polls yet</h2>
@@ -118,7 +122,7 @@ function UniversePollsPage() {
               </Badge>
             </div>
             <div className="grid gap-4">
-              {activePolls.map((poll) => (
+              {activePolls.map((poll: any) => (
                 <div key={poll.id}>
                   <PollCard
                     poll={poll}
@@ -146,7 +150,7 @@ function UniversePollsPage() {
               </Badge>
             </div>
             <div className="grid gap-4">
-              {endedPolls.map((poll) => (
+              {endedPolls.map((poll: any) => (
                 <div key={poll.id}>
                   <button
                     type="button"

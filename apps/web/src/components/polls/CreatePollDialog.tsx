@@ -52,7 +52,9 @@ export function CreatePollDialog({
 }: CreatePollDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState('story_direction');
+  const [type, setType] = useState<
+    'general' | 'story_direction' | 'character_fate' | 'world_event' | 'canon_submission'
+  >('story_direction');
   const [options, setOptions] = useState(['', '']);
   const [duration, setDuration] = useState('3d');
   const [tokenWeighted, setTokenWeighted] = useState(false);
@@ -114,13 +116,23 @@ export function CreatePollDialog({
       return;
     }
 
+    // Convert duration shorthand to ISO datetime
+    const durationMs: Record<string, number> = {
+      '1h': 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+      '3d': 3 * 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+    };
+    const endsAt = new Date(Date.now() + (durationMs[duration] || durationMs['3d'])).toISOString();
+
     createMutation.mutate({
       universeAddress,
       title: trimmedTitle,
       description: description.trim() || undefined,
       type,
       options: trimmedOptions,
-      duration,
+      endsAt,
       tokenWeighted,
       allowMultiple,
     });
@@ -177,7 +189,7 @@ export function CreatePollDialog({
           {/* Type */}
           <div className="space-y-2">
             <Label className="text-zinc-300">Poll Type</Label>
-            <Select value={type} onValueChange={setType}>
+            <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
               <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
                 <SelectValue />
               </SelectTrigger>

@@ -131,7 +131,9 @@ export function PollResults({ pollId }: PollResultsProps) {
             onClick={() =>
               promoteMutation.mutate({
                 pollId: poll.id,
-                optionId: winningOption.id,
+                winningOptionId: winningOption.id,
+                canonSubmissionTitle: `${poll.title} — Winner: ${winningOption.text}`,
+                canonSubmissionDescription: poll.description || '',
               })
             }
             disabled={promoteMutation.isPending}

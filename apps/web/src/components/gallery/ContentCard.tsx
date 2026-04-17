@@ -1,6 +1,7 @@
 /**
  * Content Card — Gallery item display with thumbnail, pricing, and creator info.
  */
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ function formatPrice(wei: string | undefined): string {
 }
 
 export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: ContentCardProps) {
+  const [videoLoaded, setVideoLoaded] = useState(false);
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
   const isAIGenerated = content.mediaType?.startsWith('ai-');
   const thumbnail =
@@ -64,29 +66,37 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
       {/* Thumbnail / Video */}
       <div className="relative aspect-video overflow-hidden bg-muted">
         {isVideo && content.mediaUrl ? (
-          <video
-            src={
-              content.thumbnailUrl || content.imageUrl
-                ? content.mediaUrl
-                : `${content.mediaUrl}#t=0.5`
-            }
-            className="w-full h-full object-cover"
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster={content.thumbnailUrl || content.imageUrl || undefined}
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-          />
+          <>
+            <video
+              src={`${content.mediaUrl}#t=0.5`}
+              className="w-full h-full object-cover"
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster={content.thumbnailUrl || content.imageUrl || undefined}
+              onLoadedData={() => setVideoLoaded(true)}
+              onMouseEnter={(e) => e.currentTarget.play()}
+              onMouseLeave={(e) => {
+                e.currentTarget.pause();
+                e.currentTarget.currentTime = 0;
+              }}
+            />
+            {/* Loading placeholder shown until video frame loads */}
+            {!videoLoaded && !content.thumbnailUrl && !content.imageUrl && (
+              <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center pointer-events-none">
+                <Film className="h-8 w-8 text-muted-foreground/40" />
+              </div>
+            )}
+          </>
         ) : (
           <img
             src={thumbnail}
             alt={content.title || 'Content'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
+            }}
           />
         )}
         {content.mediaType && (

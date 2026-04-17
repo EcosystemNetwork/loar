@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+SERVER_URL="${SERVER_URL:-http://localhost}"
 INDEXER_URL="${INDEXER_URL:-http://localhost:42069}"
 PASS=0
 FAIL=0
@@ -131,6 +131,29 @@ if echo "$RESP" | grep -q '"result"'; then
   pass "tRPC universeTreasury.getPoolBalance → returns result"
 else
   fail "tRPC universeTreasury.getPoolBalance → unexpected response"
+fi
+
+# ── Infrastructure (Redis, Queue, Circuit Breakers) ──────────────────────────
+
+# 10. Health endpoint must report Redis and queue status
+HEALTH=$(curl -sf --max-time 10 "$SERVER_URL/health" 2>/dev/null) || HEALTH=""
+if echo "$HEALTH" | grep -q '"redis":"ok"'; then
+  pass "Redis → connected and healthy"
+elif echo "$HEALTH" | grep -q '"redis":"not_configured"'; then
+  fail "Redis → not configured (REDIS_URL not set — no queue, no distributed rate limiting)"
+elif echo "$HEALTH" | grep -q '"redis":"degraded"'; then
+  fail "Redis → degraded (connection issues)"
+else
+  fail "Redis → status unknown (check /health response)"
+fi
+
+# 11. Queue should be initialized
+if echo "$HEALTH" | grep -q '"queue":"ok"'; then
+  pass "BullMQ queue → healthy"
+elif echo "$HEALTH" | grep -q '"queue"'; then
+  fail "BullMQ queue → degraded or not initialized"
+else
+  pass "BullMQ queue → not reported (may not be initialized yet)"
 fi
 
 # ── Indexer ───────────────────────────────────────────────────────────────────

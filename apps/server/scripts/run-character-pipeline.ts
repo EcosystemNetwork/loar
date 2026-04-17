@@ -153,7 +153,11 @@ async function uploadImage(
   try {
     const pinataJwt = process.env.PINATA_JWT;
     const formData = new FormData();
-    formData.append('file', new Blob([imageBuffer], { type: 'image/png' }), 'portrait.png');
+    formData.append(
+      'file',
+      new Blob([imageBuffer as BlobPart], { type: 'image/png' }),
+      'portrait.png'
+    );
     formData.append('pinataMetadata', JSON.stringify({ name: `${charName} portrait` }));
 
     const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
@@ -424,8 +428,13 @@ async function main() {
 
   // ── Initialize services ──────────────────────────────────────────
   console.log('Initializing services...');
-  const { db } = await import('../src/lib/firebase.js');
-  if (!db) throw new Error('Firebase not available');
+  const firebase = await import('../src/lib/firebase.js');
+  // initFirebase must be called after dotenv has loaded
+  if ('initFirebase' in firebase && typeof firebase.initFirebase === 'function') {
+    firebase.initFirebase();
+  }
+  const db = firebase.db;
+  if (!db) throw new Error('Firebase not available — check FIREBASE_SERVICE_ACCOUNT_PATH');
   console.log('  Firebase connected');
 
   const { googleImagenService } = await import('../src/services/google-imagen.js');

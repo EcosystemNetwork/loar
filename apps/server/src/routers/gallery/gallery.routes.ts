@@ -115,10 +115,28 @@ export const galleryRouter = router({
 
       const snapshot = await query.limit(input.limit).get();
 
-      const items = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
+      const items = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title || 'Untitled',
+          description: data.description || '',
+          mediaUrl: data.mediaUrl || null,
+          thumbnailUrl: data.thumbnailUrl || null,
+          mediaType: data.mediaType || 'image',
+          classification: data.classification || 'fan',
+          tags: data.tags || [],
+          creatorUid: data.creatorUid || null,
+          creatorAddress: data.creatorAddress || null,
+          universeId: data.universeId || null,
+          contentHash: data.contentHash || null,
+          generationId: data.generationId || null,
+          views: data.views || 0,
+          likes: data.likes || 0,
+          visibility: data.visibility || 'public',
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+        };
+      });
 
       // Enrich with licensing data if available
       const contentHashes = items.map((i: any) => i.contentHash).filter(Boolean);
@@ -174,7 +192,22 @@ export const galleryRouter = router({
 
       const snapshot = await query.orderBy('views', 'desc').limit(input.limit).get();
 
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      return snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title || 'Untitled',
+          description: data.description || '',
+          mediaUrl: data.mediaUrl || null,
+          thumbnailUrl: data.thumbnailUrl || null,
+          mediaType: data.mediaType || 'image',
+          creatorUid: data.creatorUid || null,
+          creatorAddress: data.creatorAddress || null,
+          views: data.views || 0,
+          likes: data.likes || 0,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+        };
+      });
     }),
 
   /** Get admin-curated featured content for a universe */
@@ -198,7 +231,23 @@ export const galleryRouter = router({
       contentIds.map((id: string) => contentCol().doc(id).get())
     );
 
-    return contentDocs.filter((d) => d.exists).map((d) => ({ id: d.id, ...d.data() }));
+    return contentDocs
+      .filter((d) => d.exists)
+      .map((d) => {
+        const data = d.data()!;
+        return {
+          id: d.id,
+          title: data.title || 'Untitled',
+          description: data.description || '',
+          mediaUrl: data.mediaUrl || null,
+          thumbnailUrl: data.thumbnailUrl || null,
+          mediaType: data.mediaType || 'image',
+          creatorUid: data.creatorUid || null,
+          views: data.views || 0,
+          likes: data.likes || 0,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+        };
+      });
   }),
 
   /** Set featured content for a universe (admin only) */
@@ -263,7 +312,22 @@ export const galleryRouter = router({
         .limit(input.limit)
         .get();
 
-      const content = contentSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const content = contentSnapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title || 'Untitled',
+          description: data.description || '',
+          mediaUrl: data.mediaUrl || null,
+          thumbnailUrl: data.thumbnailUrl || null,
+          mediaType: data.mediaType || 'image',
+          classification: data.classification || 'fan',
+          tags: data.tags || [],
+          views: data.views || 0,
+          likes: data.likes || 0,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+        };
+      });
 
       // Aggregate stats
       let totalViews = 0;

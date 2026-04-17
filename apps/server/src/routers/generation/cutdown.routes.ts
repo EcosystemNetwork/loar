@@ -191,7 +191,7 @@ async function transcribeVideo(
 ): Promise<Array<{ start: number; end: number; text: string }>> {
   try {
     // Attempt FAL Whisper transcription
-    const { fal } = await import('@fal-ai/client');
+    const { fal } = (await import(/* @vite-ignore */ '@fal-ai/client' as string)) as any;
     const result = await (fal as any).subscribe('fal-ai/whisper', {
       input: { audio_url: videoUrl },
     });
@@ -332,7 +332,7 @@ export const cutdownRouter = router({
         trackQuests(userId, [{ questId: 'create_cutdown' }, { questId: 'create_short_content' }]);
 
         emitActivity({
-          eventType: 'content_in_universe',
+          eventType: 'created_content',
           actorUid: userId,
           targetType: 'cutdown',
           targetId: cutdownId,
