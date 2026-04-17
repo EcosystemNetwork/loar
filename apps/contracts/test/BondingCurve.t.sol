@@ -150,21 +150,16 @@ contract BondingCurveTest is Test {
     }
 
     function test_graduation_V1() public {
-        // Buy enough to fill the curve (no maxBuy limit on curveV1)
+        // Buy with enough ETH to fill the curve and trigger graduation.
+        // No maxBuy limit on curveV1 (MAX_BUY_BPS=10000). Excess ETH is refunded.
         vm.deal(alice, 10 ether);
-        vm.startPrank(alice);
-
-        // Buy in chunks, reducing amount as we approach graduation
-        while (!curveV1.graduated()) {
-            uint256 remaining = GRADUATION_ETH - curveV1.ethRaised();
-            uint256 ethToSend = remaining < 0.5 ether ? remaining + 0.01 ether : 0.5 ether;
-            if (ethToSend > alice.balance) ethToSend = alice.balance;
-            curveV1.buy{value: ethToSend}(0);
-        }
+        vm.prank(alice);
+        curveV1.buy{value: 5 ether}(0);
 
         assertTrue(curveV1.graduated(), "Should have graduated");
         assertTrue(manager.graduated(), "Manager should have received graduation");
-        vm.stopPrank();
+        // Excess ETH refunded
+        assertGt(alice.balance, 4 ether, "Should have received refund");
     }
 
     function test_emergencyHalt_onlyManager() public {
