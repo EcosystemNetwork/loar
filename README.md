@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
 [![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
-[![Sepolia Testnet](https://img.shields.io/badge/Network-Sepolia-blue)](https://sepolia.etherscan.io/)
+[![Sepolia + Base Sepolia](https://img.shields.io/badge/Network-Sepolia%20%2B%20Base%20Sepolia-blue)](https://sepolia.etherscan.io/)
 [![Base L2](https://img.shields.io/badge/Target-Base%20L2-0052FF)](https://basescan.org/)
 
 </div>
@@ -22,7 +22,7 @@ LOAR is a platform where creators deploy cinematic universes as smart contracts,
 
 **One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
 
-**Live testnet demo:** [loar.fun](https://loar.fun) (Sepolia)
+**Live testnet demo:** [loar.fun](https://loar.fun) (Sepolia + Base Sepolia)
 
 ---
 
@@ -58,41 +58,38 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Multi-Sig Support**             | Gnosis Safe addresses as universe owners for shared team governance                                                                                                                                       |
 | **Error Toast Notifications**     | Real-time toast feedback on all mutation successes and failures via Sonner                                                                                                                                |
 
-### PARTIAL (Backend + contracts exist, frontend not fully wired)
+### PARTIAL (Working but with gaps)
 
-These have working smart contracts deployed on Sepolia AND fully implemented backend APIs (tRPC), but the marketplace frontend is informational UI — it shows stats and explains how things work, without interactive buy/sell/bid transaction flows.
+These features have working smart contracts, backend APIs, AND frontend UIs, but some interactive flows need completion.
 
-| Feature                   | What Exists                                                                                                                                                                                                        | What's Missing                                                                                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. UI: product detail + ETH buy button                                                                                                           | No creator mint form. Purchases record in Firestore; on-chain contract not yet deployed                                                                |
-| **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD                                                                                                                                                         | No frontend mint flow. Marketplace tab is explainer text only                                                                                          |
-| **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations. Full submit form + For/Against voting UI                                                                                                              | On-chain finalize/license call not yet wired from frontend                                                                                             |
-| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. On-chain ETH + $LOAR payment verification (Sepolia + Base Sepolia). Stripe PaymentIntent creation + server-side verification | Card payments require `STRIPE_SECRET_KEY` env var. Without it, card tab is disabled. _(ETH/$LOAR on-chain payments now fully live — see LIVE section)_ |
-| **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model                                                                                                                                                        | Tab UI exists but no subscribe/payment flow                                                                                                            |
-| **Collabs**               | API: propose, accept, activate, record episodes, complete                                                                                                                                                          | Tab UI placeholder only                                                                                                                                |
-| **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD                                                                                                                                                              | Tab UI placeholder only                                                                                                                                |
-| **IP Licensing**          | Contract: 6 license types, royalty tracking. API: full CRUD + merch                                                                                                                                                | Tab UI placeholder only                                                                                                                                |
-| **On-Chain Governance**   | Contract: OpenZeppelin Governor + TimelockController. Ponder indexes proposals/votes. Governance page at `/governance/$universeId`                                                                                 | Voting UI partially wired — proposal creation and vote casting need completion                                                                         |
-| **Token Trading**         | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live. LP yield dashboard for fee collection/claiming                                                                                        | No swap UI. Users must use Uniswap directly                                                                                                            |
-| **Analytics**             | API: views, engagement, trending, platform stats                                                                                                                                                                   | Market page queries real stats. No per-universe analytics dashboard                                                                                    |
-| **Dashboard**             | AI generation tools + universe list wired to live tRPC API. LP Yield Manager panel, quests panel, daily check-in, monetization overview, upload form, NFT gallery                                                  | No per-universe analytics breakdown                                                                                                                    |
-| **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus`                                                                                                      | Frontend still uses old `fun`/`monetized` labels. UI badges not yet migrated                                                                           |
-| **Worldbuilding Studio**  | `/create` hub + per-kind forms. Wiki at `/wiki` with tabbed entity browsing + detail pages (`/wiki/entity/$id`)                                                                                                    | No `/wiki/$kind` filter routes                                                                                                                         |
-| **Content Moderation**    | Flag system, admin review queue, DMCA intake (`/dmca`), immutable audit log. `contentStatus` gates commercial transactions                                                                                         | Admin UI at `/admin/moderation`. No auto-flag threshold, no counter-notice workflow (manual review only)                                               |
-| **Mobile App**            | Expo 52 / React Native (iOS + Android). Portfolio, tokens, earnings, collections, profile tabs. Wallet auth                                                                                                        | Beta — not yet published to App Store / Play Store                                                                                                     |
+| Feature                   | What Works                                                                                                                                                                                                            | What's Missing                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording. MintContentDialog: pin to IPFS + on-chain mint. BuyNFTDialog: purchase with revenue splits                                                       | Creator mint form for batch listing                                                           |
+| **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD. MintContentDialog supports character minting                                                                                                              | Dedicated character NFT gallery page                                                          |
+| **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations. Full submit form + For/Against voting UI                                                                                                                 | On-chain finalize/license call not yet wired from frontend                                    |
+| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. On-chain ETH + $LOAR payment verification (Sepolia + Base Sepolia). Stripe PaymentIntent creation + server-side verification    | Card payments require `STRIPE_SECRET_KEY` env var. Without it, card tab is disabled           |
+| **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model. SubscribeDialog: tier selection + on-chain ETH payment. `/subscriptions` management page with cancel                                                     | No renewal reminders or tier downgrade UI                                                     |
+| **Collabs**               | API: propose, accept, activate, record episodes, complete. `/collabs` hub with Active/Proposals/History tabs. `/collabs/new` creation form                                                                            | No episode-level collab tracking in universe editor                                           |
+| **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD. `/ads` hub with Browse & Campaigns tabs. `/ads/new` creation. `/ads/$slotId` detail + bidding                                                                  | No ad impression rendering during episode playback                                            |
+| **IP Licensing**          | Contract: 6 license types, royalty tracking. API: full CRUD + merch. `/licensing` hub with Licenses + Merch tabs. `/licensing/new` creation                                                                           | No merch fulfillment dashboard                                                                |
+| **On-Chain Governance**   | Contract: OpenZeppelin Governor + TimelockController. Ponder indexes proposals/votes. Governance page at `/governance/$universeId`                                                                                    | Voting UI partially wired — proposal creation and vote casting need completion                |
+| **Token Trading**         | Uniswap v4 pool created at universe deployment. Fee hooks + LP locking live. LP yield dashboard. TokenSwapWidget with bonding curve + LP pool support, quick buy amounts                                              | No swap transaction history                                                                   |
+| **Social Features**       | Follow/unfollow, activity feed (Following + Global tabs), notification center (`/notifications`), NotificationBell dropdown, like system, token comments with threads, general comments on episodes/universes/content | —                                                                                             |
+| **Analytics**             | API: views, engagement, trending, platform stats, per-episode metrics, export. Creator analytics dashboard at `/analytics/$universeId`. Market page queries real stats                                                | No subscriber funnels or cohort analysis                                                      |
+| **Dashboard**             | AI generation tools + universe list wired to live tRPC API. LP Yield Manager panel, quests panel, daily check-in, monetization overview, upload form, NFT gallery                                                     | No per-universe analytics breakdown                                                           |
+| **Rights Classification** | Backend enum updated: `fan` / `original` / `licensed`. Licensed content has `licensingProof` + `reviewStatus`                                                                                                         | Frontend still uses old `fun`/`monetized` labels in some places. UI badges not fully migrated |
+| **Worldbuilding Studio**  | `/create` hub + per-kind forms. Wiki at `/wiki` with tabbed entity browsing + detail pages (`/wiki/entity/$id`). Kind filter at `/wiki/$kind` (person, place, thing, etc.)                                            | —                                                                                             |
+| **Content Moderation**    | Flag system, admin review queue, DMCA intake (`/dmca`), immutable audit log. `contentStatus` gates commercial transactions. Admin UI at `/admin/moderation`                                                           | No auto-flag threshold, no counter-notice workflow (manual review only)                       |
+| **Mobile App**            | Expo 52 / React Native (iOS + Android). Portfolio, tokens, earnings, collections, profile tabs. Wallet auth                                                                                                           | Beta — not yet published to App Store / Play Store                                            |
 
 ### PLANNED (Not implemented)
 
-| Feature                | Notes                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| **Mainnet Deployment** | Contracts on Sepolia + Base Sepolia. Multi-chain infra ready. Needs audit before Base Mainnet |
-| **Solana Deployment**  | 8 Anchor programs code-complete (`apps/contracts-sol`). Not yet deployed to devnet            |
-| **Sui Deployment**     | 8 Move modules code-complete (`apps/contracts-sui`). Not yet deployed to testnet              |
-| **Wormhole Bridge**    | NTT v3 config ready for Base↔Solana↔Sui token bridging. Testnet only                          |
-| **Fiat On-Ramp**       | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp             |
-| **Social Features**    | No follows, comments, activity feed, or notifications                                         |
-| **Merch Fulfillment**  | Backend shell exists. No fulfillment partner, no real orders                                  |
-| **Creator Analytics**  | No per-universe P&L, subscriber funnels, or retention data                                    |
+| Feature                | Notes                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Mainnet Deployment** | Contracts on Sepolia + Base Sepolia. Needs audit before Base Mainnet                                               |
+| **Fiat On-Ramp**       | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp                                  |
+| **Creator Analytics**  | Dashboard at `/analytics/$universeId` shows views/mints/subs/revenue. No subscriber funnels or cohort analysis yet |
+| **Merch Fulfillment**  | Backend CRUD exists. No fulfillment partner integration, no order management dashboard                             |
 
 ---
 
@@ -124,18 +121,15 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
               └──────────────────┘
 ```
 
-| App                  | Stack                                                  | Description                                            |
-| -------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| `apps/web`           | React 18, Vite, TanStack Router/Query, wagmi, thirdweb | Frontend SPA (62 routes)                               |
-| `apps/server`        | Hono, tRPC, Firebase Admin (Firestore)                 | API server (44 routers, 400+ procedures)               |
-| `apps/indexer`       | Ponder v0.15, GraphQL                                  | Blockchain event indexer (29 tables)                   |
-| `apps/contracts`     | Foundry, Solidity ^0.8.30                              | EVM smart contracts (Sepolia/Base, 48 contracts)       |
-| `apps/contracts-sol` | Anchor, Solana SPL                                     | Solana smart contracts (8 programs, not yet deployed)  |
-| `apps/contracts-sui` | Move 2024.beta                                         | Sui Move smart contracts (8 modules, not yet deployed) |
-| `apps/bridge`        | Wormhole NTT v3                                        | Cross-chain bridge config (planned: Base↔Solana↔Sui)   |
-| `apps/mcp`           | MCP Server                                             | AI agent gateway (24 tools for MCP-compatible agents)  |
-| `apps/mobile`        | Expo 52, React Native, NativeWind                      | iOS + Android app                                      |
-| `packages/abis`      | Auto-generated wagmi hooks                             | Shared contract bindings                               |
+| App              | Stack                                                  | Description                                              |
+| ---------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, thirdweb | Frontend SPA (62 routes)                                 |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                 | API server (44 routers, 400+ procedures)                 |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                  | Blockchain event indexer (29 tables)                     |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                              | EVM smart contracts (Sepolia/Base Sepolia, 48 contracts) |
+| `apps/mcp`       | MCP Server                                             | AI agent gateway (25 tools for MCP-compatible agents)    |
+| `apps/mobile`    | Expo 52, React Native, NativeWind                      | iOS + Android app                                        |
+| `packages/abis`  | Auto-generated wagmi hooks                             | Shared contract bindings                                 |
 
 ### Key Flows
 
@@ -155,7 +149,7 @@ These have working smart contracts deployed on Sepolia AND fully implemented bac
 
 48 EVM contracts are deployed on **Sepolia testnet** (chain ID 11155111) with multi-chain support for **Base Sepolia** (84532) and **Base Mainnet** (8453). Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
 
-**Multi-chain roadmap:** Solana (8 Anchor programs) and Sui (8 Move modules) contract ports are code-complete but not yet deployed. Cross-chain token bridging via **Wormhole NTT v3** is configured for testnet.
+**Target chain:** Base L2 (chain 8453). Contracts are currently deployed on Sepolia testnet and Base Sepolia for testing.
 
 ### Core Protocol
 
@@ -420,21 +414,23 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 
 ### Tokens & DeFi
 
-| Route                      | Description                                    |
-| -------------------------- | ---------------------------------------------- |
-| `/tokens/`                 | Token dashboard                                |
-| `/tokens/$address`         | Token details                                  |
-| `/tokens/creator.$address` | Creator token info                             |
-| `/tokens/portfolio`        | Token portfolio                                |
-| `/staking`                 | $LOAR staking interface                        |
-| `/governance/$universeId`  | Governance voting (proposals, votes, timelock) |
-| `/treasury/$universeId`    | Treasury management                            |
+| Route                      | Description                                               |
+| -------------------------- | --------------------------------------------------------- |
+| `/tokens/`                 | Token dashboard                                           |
+| `/tokens/$address`         | Token details                                             |
+| `/tokens/creator.$address` | Creator token info                                        |
+| `/tokens/portfolio`        | Token portfolio                                           |
+| `/staking`                 | $LOAR staking interface                                   |
+| `/governance/$universeId`  | Governance voting (proposals, votes, timelock)            |
+| `/treasury/$universeId`    | Treasury management                                       |
+| `/analytics/$universeId`   | Creator analytics dashboard (views, mints, subs, revenue) |
 
 ### Content & Wiki
 
 | Route                 | Description                                        |
 | --------------------- | -------------------------------------------------- |
 | `/wiki`               | Worldbuilding encyclopedia (tabbed by entity kind) |
+| `/wiki/$kind`         | Entity list filtered by kind (person, place, etc.) |
 | `/wiki/entity/$id`    | Entity detail page                                 |
 | `/wiki/character/$id` | Character detail page                              |
 | `/my-works`           | View created content                               |
@@ -450,6 +446,8 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 | `/profile/$username`  | User profiles        |
 | `/profile/edit`       | Edit profile         |
 | `/activity`           | Activity feed        |
+| `/notifications`      | Notification center  |
+| `/subscriptions`      | Manage subscriptions |
 | `/agents/`            | AI agent marketplace |
 | `/agents/$uid`        | Agent detail         |
 | `/agents/register`    | Register new agent   |
@@ -491,10 +489,7 @@ loar/
 │   ├── server/          # Hono + tRPC API (44 routers, 400+ procedures)
 │   ├── indexer/         # Ponder v0.15 blockchain indexer (29 tables)
 │   ├── contracts/       # Foundry/Solidity EVM (48 contracts, upgradeable, Sepolia/Base)
-│   ├── contracts-sol/   # Solana Anchor smart contracts (8 programs, planned)
-│   ├── contracts-sui/   # Sui Move smart contracts (8 modules, planned)
-│   ├── bridge/          # Wormhole NTT v3 cross-chain bridge config (planned)
-│   ├── mcp/             # MCP server — AI agent gateway (24 tools)
+│   ├── mcp/             # MCP server — AI agent gateway (25 tools)
 │   └── mobile/          # Expo 52 / React Native (iOS + Android)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs + addresses

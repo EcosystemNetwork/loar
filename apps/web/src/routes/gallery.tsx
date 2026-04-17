@@ -17,9 +17,11 @@ export const Route = createFileRoute('/gallery')({
 function GalleryPage() {
   const [mediaType, setMediaType] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [originFilter, setOriginFilter] = useState('all');
 
   const { data: browseData, isLoading } = useGalleryBrowse({
     mediaType: mediaType as any,
+    origin: originFilter as any,
     sortBy: sortBy as any,
     limit: 40,
   });
@@ -32,9 +34,7 @@ function GalleryPage() {
       <div className="flex items-center gap-3">
         <Sparkles className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold">Gallery</h1>
-        <span className="text-muted-foreground text-sm">
-          Discover AI-generated content across all universes
-        </span>
+        <span className="text-muted-foreground text-sm">Discover content across all universes</span>
       </div>
 
       {/* Trending Section */}
@@ -59,7 +59,11 @@ function GalleryPage() {
                   >
                     {isVideo && item.mediaUrl ? (
                       <video
-                        src={item.mediaUrl}
+                        src={
+                          item.thumbnailUrl || item.imageUrl
+                            ? item.mediaUrl
+                            : `${item.mediaUrl}#t=0.5`
+                        }
                         className="w-full h-full object-cover"
                         muted
                         loop
@@ -97,6 +101,8 @@ function GalleryPage() {
         onMediaTypeChange={setMediaType}
         sortBy={sortBy}
         onSortByChange={setSortBy}
+        originFilter={originFilter}
+        onOriginFilterChange={setOriginFilter}
       />
 
       {/* Grid */}

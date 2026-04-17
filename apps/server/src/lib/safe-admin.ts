@@ -88,7 +88,15 @@ export async function isUniverseAdmin(
 
       return owners.some((o) => o.toLowerCase() === caller);
     } catch (err) {
-      console.error(`[isUniverseAdmin] Safe getOwners() failed for ${id}:`, err);
+      // Log the RPC failure explicitly so it's distinguishable from a genuine
+      // authorization denial. Returning false here could lock admins out if
+      // the RPC is temporarily down.
+      console.error(
+        `[isUniverseAdmin] Safe getOwners() RPC failed for universe ${id} ` +
+          `(safe: ${data.multiSigAddress}, caller: ${callerAddress}). ` +
+          `Admin access DENIED due to RPC error — this may be a transient issue:`,
+        err instanceof Error ? err.message : err
+      );
       return false;
     }
   }

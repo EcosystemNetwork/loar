@@ -9,7 +9,16 @@
 
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { Home } from 'lucide-react';
+import { Home, Upload, Link2, Video, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import ReactFlow, {
   Background,
   Controls,
@@ -119,6 +128,15 @@ function UniverseTimelineEditor() {
   // File upload state
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Edit video dialog state
+  const [editVideoDialogOpen, setEditVideoDialogOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [editVideoFile, setEditVideoFile] = useState<File | null>(null);
+  const [editVideoPreview, setEditVideoPreview] = useState<string | null>(null);
+  const [isUploadingEditVideo, setIsUploadingEditVideo] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Contract integration state
   const [isSavingToContract, setIsSavingToContract] = useState(false);
@@ -264,14 +282,14 @@ function UniverseTimelineEditor() {
     }
   }, [universe, id, isBlockchainUniverse]);
 
-  // Fetch available characters
+  // Fetch available characters for this universe
   const {
     data: charactersData,
     isLoading: isLoadingCharacters,
     refetch: refetchCharacters,
   } = useQuery({
     queryKey: ['characters', id],
-    queryFn: () => trpcClient.wiki.characters.query(),
+    queryFn: () => trpcClient.wiki.characters.query({ universeId: id }),
   });
 
   // Analyze character image with Gemini
@@ -297,7 +315,8 @@ function UniverseTimelineEditor() {
     }) => {
       const result = await trpcClient.image.generateCharacter.mutate({
         ...input,
-        saveToDatabase: input.saveToDatabase ?? false, // Use input value or default to false
+        saveToDatabase: input.saveToDatabase ?? false,
+        universeId: id,
       });
       return result;
     },
@@ -327,7 +346,10 @@ function UniverseTimelineEditor() {
       style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk';
       detailedVisualDescription?: string;
     }) => {
-      const result = await trpcClient.image.saveCharacter.mutate(input);
+      const result = await trpcClient.image.saveCharacter.mutate({
+        ...input,
+        universeId: id,
+      });
       return result;
     },
     onSuccess: async (data) => {
@@ -484,6 +506,140 @@ function UniverseTimelineEditor() {
     // - selectedImageCharacters (kept)
     setShowVideoDialog(true);
   }, []);
+
+  // Handle editing video on an existing node
+  const handleEditScene = useCallback(
+    (eventId: string) => {
+      if (!eventId) return;
+
+      // Load current video URL from localStorage or from the node
+      const storageKey = `universe_events_${id}`;
+      const storedEvents = localStorage.getItem(storageKey);
+      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventData = eventsData[eventId];
+
+      // Also check the current node in the flow for its videoUrl
+      const node = nodes.find(
+        (n) => n.data.eventId === eventId || n.data.blockchainNodeId?.toString() === eventId
+      );
+      const currentUrl = eventData?.videoUrl || node?.data.videoUrl || '';
+
+      setEditingEventId(eventId);
+      setEditVideoUrl(currentUrl);
+      setEditVideoFile(null);
+      setEditVideoPreview(currentUrl || null);
+      setEditVideoDialogOpen(true);
+    },
+    [id, nodes]
+  );
+
+  // Handle file selection for edit video
+  const handleEditVideoFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      alert('Please select a video file');
+      return;
+    }
+    if (file.size > 200 * 1024 * 1024) {
+      alert('File too large (max 200MB)');
+      return;
+    }
+    setEditVideoFile(file);
+    setEditVideoPreview(URL.createObjectURL(file));
+    setEditVideoUrl(''); // Clear URL input when file is selected
+  }, []);
+
+  // Save edited video — upload file if needed, then update localStorage + node
+  const handleSaveEditVideo = useCallback(async () => {
+    if (!editingEventId) return;
+
+    let finalUrl = editVideoUrl.trim();
+
+    // If a file was selected, upload it first
+    if (editVideoFile) {
+      setIsUploadingEditVideo(true);
+      try {
+        const serverUrl = import.meta.env.VITE_SERVER_URL || '';
+
+        // Verify session
+        const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
+        if (!meRes.ok || !(await meRes.json()).authenticated) {
+          alert('Session expired. Please sign in again.');
+          setIsUploadingEditVideo(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', editVideoFile);
+
+        const response = await fetch(`${serverUrl}/api/upload`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+
+        const { manifest } = await response.json();
+        const url = manifest?.uploads?.[0]?.url;
+        if (!url) throw new Error('No URL returned from upload');
+        finalUrl = url;
+      } catch (error) {
+        alert(
+          'Failed to upload video: ' + (error instanceof Error ? error.message : 'Unknown error')
+        );
+        setIsUploadingEditVideo(false);
+        return;
+      }
+      setIsUploadingEditVideo(false);
+    }
+
+    if (!finalUrl) {
+      alert('Please provide a video URL or upload a file');
+      return;
+    }
+
+    // Update localStorage
+    const storageKey = `universe_events_${id}`;
+    const storedEvents = localStorage.getItem(storageKey);
+    const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+    if (eventsData[editingEventId]) {
+      eventsData[editingEventId].videoUrl = finalUrl;
+    } else {
+      eventsData[editingEventId] = {
+        eventId: editingEventId,
+        videoUrl: finalUrl,
+        timestamp: Date.now(),
+      };
+    }
+    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+    // Update the node in the flow
+    setNodes((nds: any) =>
+      nds.map((node: any) => {
+        const nodeEventId = node.data.eventId;
+        const nodeBlockchainId = node.data.blockchainNodeId?.toString();
+        if (nodeEventId === editingEventId || nodeBlockchainId === editingEventId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              videoUrl: finalUrl,
+            },
+          };
+        }
+        return node;
+      })
+    );
+
+    // Close dialog
+    setEditVideoDialogOpen(false);
+    setEditingEventId(null);
+    setEditVideoUrl('');
+    setEditVideoFile(null);
+    setEditVideoPreview(null);
+  }, [editingEventId, editVideoUrl, editVideoFile, id, setNodes]);
 
   // Handle selecting a generation from the panel — pre-fills dialog with video ready to save
   const handleSelectGeneration = useCallback(
@@ -665,6 +821,7 @@ function UniverseTimelineEditor() {
         timelineId: `timeline-${id}`,
         universeId: id,
         onAddScene: handleAddEvent,
+        onEditScene: handleEditScene,
       },
     };
 
@@ -793,6 +950,7 @@ function UniverseTimelineEditor() {
     additionType,
     sourceNodeId,
     handleAddEvent,
+    handleEditScene,
     generatedVideoUrl,
     generatedImageUrl,
   ]);
@@ -906,6 +1064,7 @@ function UniverseTimelineEditor() {
           segmentCount: segmentCount > 1 ? segmentCount : undefined,
           childCount: childCount > 1 ? childCount : undefined,
           onAddScene: handleAddEvent,
+          onEditScene: handleEditScene,
         },
       });
     });
@@ -962,7 +1121,7 @@ function UniverseTimelineEditor() {
     setNodes(blockchainNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
-  }, [graphData, finalUniverse?.id, id, handleAddEvent]);
+  }, [graphData, finalUniverse?.id, id, handleAddEvent, handleEditScene]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -1124,6 +1283,29 @@ function UniverseTimelineEditor() {
                         />
                       </svg>
                       Creator's Room
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="hover:bg-green-500/10 hover:text-green-400 transition-all duration-300"
+                    >
+                      <Link to="/upload" search={{ universeId: id }}>
+                        <svg
+                          className="h-4 w-4 mr-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 4.5v15m7.5-7.5h-15"
+                          />
+                        </svg>
+                        Add Content
+                      </Link>
                     </Button>
                     <Button
                       variant="outline"
@@ -1300,6 +1482,126 @@ function UniverseTimelineEditor() {
           </div>
         )}
       </TokenGateGuard>
+
+      {/* Edit Video Dialog */}
+      <Dialog open={editVideoDialogOpen} onOpenChange={setEditVideoDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Change Video — Event {editingEventId}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Current / Preview Video */}
+            {editVideoPreview && (
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                <video
+                  key={editVideoPreview}
+                  src={editVideoPreview}
+                  className="w-full h-full object-contain"
+                  controls
+                  muted
+                />
+                <button
+                  onClick={() => {
+                    setEditVideoPreview(null);
+                    setEditVideoFile(null);
+                    setEditVideoUrl('');
+                  }}
+                  className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Upload File */}
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">Upload Video File</Label>
+              <input
+                ref={editFileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleEditVideoFileChange}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => editFileInputRef.current?.click()}
+                disabled={isUploadingEditVideo}
+              >
+                <Upload className="h-4 w-4" />
+                {editVideoFile ? editVideoFile.name : 'Choose video file...'}
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1">MP4, WebM, MOV — max 200MB</p>
+            </div>
+
+            {/* Or divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">or</span>
+              </div>
+            </div>
+
+            {/* Paste URL */}
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">Paste Video URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://..."
+                  value={editVideoUrl}
+                  onChange={(e) => {
+                    setEditVideoUrl(e.target.value);
+                    setEditVideoFile(null);
+                    if (e.target.value.trim()) {
+                      setEditVideoPreview(e.target.value.trim());
+                    }
+                  }}
+                  disabled={isUploadingEditVideo}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (editVideoUrl.trim()) {
+                      setEditVideoPreview(editVideoUrl.trim());
+                    }
+                  }}
+                  title="Preview URL"
+                >
+                  <Video className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setEditVideoDialogOpen(false)}
+              disabled={isUploadingEditVideo}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEditVideo}
+              disabled={isUploadingEditVideo || (!editVideoUrl.trim() && !editVideoFile)}
+            >
+              {isUploadingEditVideo ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                  Uploading...
+                </>
+              ) : (
+                'Save Video'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

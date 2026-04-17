@@ -109,7 +109,7 @@ apps/web/src/
 apps/server/src/
 ├── lib/            # Firebase admin, auth, tRPC config, context
 ├── routers/        # tRPC routers (cinematicUniverses/, fal/)
-├── services/       # Business logic (fal, gemini, minio, synapse, wikia)
+├── services/       # Business logic (fal, gemini, storage/, wikia) — minio.ts uses Firebase Storage (legacy name)
 └── routes/         # REST routes (images)
 
 apps/indexer/

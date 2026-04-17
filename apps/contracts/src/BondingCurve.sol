@@ -44,7 +44,12 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     // We store slope scaled by PRECISION to avoid precision loss.
     // slope_scaled = (2 * GRADUATION_ETH * PRECISION) / TOTAL_CURVE_SUPPLY²
     // Cost from a→b = slope_scaled * (b² - a²) / (2 * PRECISION)
-    uint256 internal constant PRECISION = 1e18;
+    //
+    // IMPORTANT: With 1B tokens (1e27 decimals) and 4 ETH graduation, the raw
+    // ratio is ~1.25e-17 which rounds to 0 with PRECISION=1e18.
+    // PRECISION=1e44 supports both 1B supply (slopeScaled≈1.25e9) and
+    // 100B supply (slopeScaled≈125000) with good integral precision.
+    uint256 internal constant PRECISION = 1e44;
 
     /// @notice Pre-computed slope (scaled by PRECISION).
     uint256 public immutable slopeScaled;
@@ -54,6 +59,17 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     uint256 public ethRaised;
     bool public graduated;
     bool public tradingHalted;
+
+    /// @notice Emergency halt/resume callable by UniverseManager (owner-gated there).
+    function setTradingHalted(bool halted) external {
+        require(msg.sender == universeManager, "Only universe manager");
+        tradingHalted = halted;
+        if (halted) {
+            emit TradingHalted(universeId);
+        } else {
+            emit TradingResumed(universeId);
+        }
+    }
 
     constructor(
         address _token,
@@ -71,13 +87,10 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         MAX_BUY_AMOUNT = (_totalCurveSupply * _maxBuyBps) / BPS;
 
         // slope_scaled = (2 * graduationEth * PRECISION) / totalCurveSupply²
-        // Split the computation to avoid overflow:
-        // numerator = 2 * graduationEth * PRECISION
-        // denominator = totalCurveSupply * totalCurveSupply
-        // With 1B tokens (1e27 with decimals), totalCurveSupply² = 1e54, fits in uint256
-        uint256 numerator = 2 * _graduationEth * PRECISION;
-        uint256 denominator = _totalCurveSupply.mulDiv(_totalCurveSupply, 1);
-        slopeScaled = numerator / denominator;
+        // Uses mulDiv for 512-bit intermediate to avoid overflow/precision loss.
+        uint256 denominator = _totalCurveSupply * _totalCurveSupply;
+        slopeScaled = FixedPointMathLib.mulDiv(2 * _graduationEth, PRECISION, denominator);
+        if (slopeScaled == 0) revert SlopeIsZero();
     }
 
     // ── Modifiers ──────────────────────────────────────────────────────
@@ -203,6 +216,13 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     }
 
     /// @inheritdoc IBondingCurve
+    function getCurrentPricePerToken() external view returns (uint256) {
+        if (tokensSold == 0) return 0;
+        // Cost to buy 1 whole token (1e18 units) at current position
+        return _getCostForTokens(1e18, tokensSold);
+    }
+
+    /// @inheritdoc IBondingCurve
     function getTokensForEth(uint256 ethAmount) external view returns (uint256) {
         return _getTokensForEth(ethAmount, tokensSold);
     }
@@ -259,7 +279,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     function _getTokensForEth(uint256 ethAmount, uint256 currentSold) internal view returns (uint256) {
         // inner = currentSold² + (2 * ethAmount * PRECISION) / slopeScaled
         uint256 currentSoldSq = currentSold * currentSold;
-        uint256 addend = (2 * ethAmount * PRECISION) / slopeScaled;
+        uint256 addend = FixedPointMathLib.mulDiv(2 * ethAmount, PRECISION, slopeScaled);
         uint256 inner = currentSoldSq + addend;
         uint256 sqrtInner = FixedPointMathLib.sqrt(inner);
         if (sqrtInner <= currentSold) return 0;

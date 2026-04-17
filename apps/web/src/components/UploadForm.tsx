@@ -1,5 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,6 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useState, useRef, useCallback } from 'react';
-import { MediaAttachPanel } from '@/components/MediaAttachPanel';
 // Session cookie sent automatically via xhr.withCredentials
 import {
   Upload as UploadIcon,
@@ -50,9 +50,16 @@ type ContentLane = 'fan' | 'original' | 'licensed';
 interface UploadFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  defaultUniverseId?: string;
+  defaultEntityId?: string;
 }
 
-export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
+export function UploadForm({
+  onSuccess,
+  onCancel,
+  defaultUniverseId,
+  defaultEntityId,
+}: UploadFormProps) {
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState('');
@@ -96,12 +103,61 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
   const [royaltySplit, setRoyaltySplit] = useState(80);
   const [documentUrl, setDocumentUrl] = useState('');
 
+  // Universe + Entity linking
+  const { address } = useAccount();
+  const [universeId, setUniverseId] = useState(defaultUniverseId ?? '');
+  const [entityId, setEntityId] = useState(defaultEntityId ?? '');
+  const [entityName, setEntityName] = useState('');
+
+  const { data: myUniverses = [] } = useQuery({
+    queryKey: ['universes-by-creator', address],
+    queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
+    enabled: !!address,
+  });
+
+  const { data: entitiesResult } = useQuery({
+    queryKey: ['entities-by-universe', universeId],
+    queryFn: () => trpcClient.entities.list.query({ universeAddress: universeId }),
+    enabled: !!universeId,
+  });
+  const universeEntities =
+    (entitiesResult as any)?.entities ?? (Array.isArray(entitiesResult) ? entitiesResult : []);
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => trpcClient.content.create.mutate(data),
+    mutationFn: async (data: any) => {
+      await trpcClient.content.create.mutate(data);
+      // After gallery publish, attach to entity if selected
+      if (entityId && uploadedManifest) {
+        const selectedEntity = (universeEntities as any[]).find((e: any) => e.id === entityId);
+        const mimeType = uploadedManifest.mimeType;
+        const category = mimeType.startsWith('video/')
+          ? 'video'
+          : mimeType.startsWith('image/')
+            ? 'image'
+            : mimeType.startsWith('audio/')
+              ? 'sound'
+              : 'other';
+        await trpcClient.media.attach.mutate({
+          contentHash: uploadedManifest.contentHash,
+          originalFilename: uploadedManifest.originalFilename,
+          mimeType: uploadedManifest.mimeType,
+          size: uploadedManifest.size,
+          url: uploadedManifest.url,
+          targetType: 'entity',
+          targetId: entityId,
+          targetName: selectedEntity?.name ?? entityName ?? entityId,
+          category,
+          label: title || uploadedManifest.originalFilename,
+        });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-content'] });
       queryClient.invalidateQueries({ queryKey: ['my-content-dashboard'] });
-      toast.success('Content published!');
+      if (entityId) {
+        queryClient.invalidateQueries({ queryKey: ['mediaAttachments', 'entity', entityId] });
+      }
+      toast.success(entityId ? 'Content published & attached to entity!' : 'Content published!');
       onSuccess?.();
     },
     onError: (err: any) => {
@@ -287,6 +343,7 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
       classification,
       visibility,
       tags,
+      universeId: universeId || undefined,
       ipDeclaration: {
         isOriginal,
         usesCopyrightedMaterial: usesCopyrighted,
@@ -546,14 +603,63 @@ export function UploadForm({ onSuccess, onCancel }: UploadFormProps) {
             </div>
           </div>
 
-          {/* Attach to world — shown after upload completes */}
-          {uploadedManifest && (
-            <MediaAttachPanel
-              {...uploadedManifest}
-              onAttached={() => setUploadedManifest(null)}
-              onSkip={() => setUploadedManifest(null)}
-            />
-          )}
+          {/* Universe + Entity linking */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Universe (optional)</Label>
+              <Select
+                value={universeId}
+                onValueChange={(v) => {
+                  setUniverseId(v === '__none__' ? '' : v);
+                  setEntityId('');
+                  setEntityName('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No universe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {(myUniverses as any[]).map((u: any) => (
+                    <SelectItem key={u.address} value={u.address}>
+                      {u.description || u.name || u.address?.slice(0, 12) + '...'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {universeId && (
+              <div className="space-y-2">
+                <Label>Entity (optional)</Label>
+                <Select
+                  value={entityId}
+                  onValueChange={(v) => {
+                    if (v === '__none__') {
+                      setEntityId('');
+                      setEntityName('');
+                      return;
+                    }
+                    setEntityId(v);
+                    const ent = (universeEntities as any[]).find((e: any) => e.id === v);
+                    setEntityName(ent?.name ?? v);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No entity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {(universeEntities as any[]).map((e: any) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.name}{' '}
+                        <span className="text-muted-foreground ml-1 text-xs">({e.kind})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

@@ -51,9 +51,10 @@ app.use(
   '/*',
   cors({
     origin: (origin) => {
-      // Non-browser requests (curl, server-to-server) have no Origin header.
-      // Allow them through CORS — auth middleware handles access control.
-      if (!origin) return allowedOrigins[0];
+      // No Origin header = non-browser request (curl, server-to-server).
+      // Return null to omit CORS headers entirely — auth middleware
+      // enforces access control independently of CORS.
+      if (!origin) return null;
       // Reject unknown origins instead of falling back to a default
       return allowedOrigins.includes(origin) ? origin : null;
     },
@@ -74,6 +75,58 @@ app.route('/auth', authRoutes);
 // Add image serving routes
 app.route('/images', imageRouter);
 
+/** Detect MIME type from file magic bytes. Returns null if unrecognised. */
+function detectMimeFromMagic(header: Buffer): string | null {
+  if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return 'image/jpeg';
+  if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47)
+    return 'image/png';
+  if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46) return 'image/gif';
+  if (
+    header[0] === 0x52 &&
+    header[1] === 0x49 &&
+    header[2] === 0x46 &&
+    header[3] === 0x46 &&
+    header[8] === 0x57 &&
+    header[9] === 0x45 &&
+    header[10] === 0x42 &&
+    header[11] === 0x50
+  )
+    return 'image/webp';
+  if (header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46)
+    return 'application/pdf';
+  // MP4/QuickTime (ftyp box)
+  if (header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70)
+    return 'video/mp4';
+  // WebM/MKV (EBML header)
+  if (header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3)
+    return 'video/webm';
+  // MP3 (ID3 tag or sync word)
+  if (
+    (header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33) ||
+    (header[0] === 0xff && (header[1] & 0xe0) === 0xe0)
+  )
+    return 'audio/mpeg';
+  // OGG
+  if (header[0] === 0x4f && header[1] === 0x67 && header[2] === 0x67 && header[3] === 0x53)
+    return 'audio/ogg';
+  // FLAC
+  if (header[0] === 0x66 && header[1] === 0x4c && header[2] === 0x61 && header[3] === 0x43)
+    return 'audio/flac';
+  // WAV (RIFF + WAVE)
+  if (
+    header[0] === 0x52 &&
+    header[1] === 0x49 &&
+    header[2] === 0x46 &&
+    header[3] === 0x46 &&
+    header[8] === 0x57 &&
+    header[9] === 0x41 &&
+    header[10] === 0x56 &&
+    header[11] === 0x45
+  )
+    return 'audio/wav';
+  return null;
+}
+
 // Direct file upload endpoint (multipart form, bypasses tRPC for large files)
 // Stricter rate limit: 10 uploads per minute per IP
 app.use('/api/upload', rateLimiter({ windowMs: 60_000, max: 10 }));
@@ -92,6 +145,11 @@ app.post('/api/upload', async (c) => {
     if (!(file instanceof File)) {
       return c.json({ code: 'BAD_REQUEST', message: 'No file provided' }, 400);
     }
+
+    // Server-side magic byte validation — don't trust client-supplied MIME types
+    const headerBytes = Buffer.from(await file.slice(0, 12).arrayBuffer());
+    const detectedMime = detectMimeFromMagic(headerBytes);
+    const clientMime = detectedMime ?? file.type;
 
     const allowedMimeTypes = new Set([
       // Video
@@ -164,13 +222,13 @@ app.post('/api/upload', async (c) => {
       'dds',
     ]);
     const fileExt = file.name.split('.').pop()?.toLowerCase() ?? '';
-    const isOctetStream = file.type === 'application/octet-stream' || file.type === '';
+    const isOctetStream = clientMime === 'application/octet-stream' || clientMime === '';
     if (
-      !allowedMimeTypes.has(file.type) &&
+      !allowedMimeTypes.has(clientMime) &&
       !(isOctetStream && allowedBinaryExtensions.has(fileExt))
     ) {
       return c.json(
-        { code: 'BAD_REQUEST', message: `Unsupported file type: ${file.type || fileExt}` },
+        { code: 'BAD_REQUEST', message: `Unsupported file type: ${clientMime || fileExt}` },
         400
       );
     }

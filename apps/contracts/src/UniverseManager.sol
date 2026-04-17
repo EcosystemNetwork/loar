@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Universe} from "./Universe.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
+import {IUniverseFactory} from "./interfaces/IUniverseFactory.sol";
+import {IUniverseMetadataRenderer} from "./interfaces/IUniverseMetadataRenderer.sol";
+import {IBondingCurve} from "./interfaces/IBondingCurve.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
@@ -17,8 +19,6 @@ import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 import {UniverseData} from "./types/UniverseData.sol";
-import {Strings} from "@openzeppelin/utils/Strings.sol";
-import {Base64} from "@openzeppelin/utils/Base64.sol";
 import {IdentityNFT} from "./IdentityNFT.sol";
 
 interface IWETH {
@@ -49,8 +49,6 @@ interface IUniverseTokenDeployer {
 ///         Before governance token deployment, transferring the NFT transfers admin control.
 ///         After governance, the NFT represents creator identity; admin is the governor.
 contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
-    using Strings for uint256;
-    using Strings for address;
     uint public constant teamFee = 0;
     address public teamFeeRecipient;
     address public tokenDeployer;
@@ -65,6 +63,12 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
     /// @notice Identity NFT contract for co-creator / multi-sig signer INFTs.
     address public identityNft;
+
+    /// @notice Factory contract that deploys Universe instances (bytecode extracted for EIP-170).
+    address public universeFactory;
+
+    /// @notice External renderer for on-chain tokenURI (Strings+Base64 extracted for EIP-170).
+    address public metadataRenderer;
 
     /// @notice Per-universe LP seed balance (wei) held until token deployment seeds the pool.
     mapping(uint256 => uint256) public universeLpSeed;
@@ -83,6 +87,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     event SetTokenDeployer(address oldTokenDeployer, address newTokenDeployer);
     event MintFeeUpdated(uint256 oldFee, uint256 newFee);
     event WethUpdated(address oldWeth, address newWeth);
+    event EthClaimed(address indexed recipient, uint256 amount);
 
     constructor(address _teamFeeRecipient, address _weth) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
@@ -98,6 +103,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
 
     function setWeth(address _weth) external onlyOwner {
         require(_weth != address(0), "Zero address");
+        require(latestId == 0, "Cannot change WETH after universe creation");
         address old = weth;
         weth = _weth;
         emit WethUpdated(old, _weth);
@@ -115,6 +121,16 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         emit SetIdentityNft(old, _identityNft);
     }
 
+    function setUniverseFactory(address _factory) external onlyOwner {
+        require(_factory != address(0), "Zero address");
+        universeFactory = _factory;
+    }
+
+    function setMetadataRenderer(address _renderer) external onlyOwner {
+        require(_renderer != address(0), "Zero address");
+        metadataRenderer = _renderer;
+    }
+
     /// @notice Claim ETH held in the contract, excluding LP seeds reserved for universes.
     function claimEth(address recipient) external onlyOwner {
         require(recipient != address(0), "Zero address");
@@ -123,6 +139,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         uint256 claimable = balance - totalLpSeedsHeld;
         (bool sent,) = recipient.call{value: claimable}("");
         require(sent, "ETH claim failed");
+        emit EthClaimed(recipient, claimable);
     }
 
     receive() external payable {}
@@ -201,9 +218,11 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
             description: description,
             universeManager: address(this)
         });
-        Universe universe = new Universe(config);
+        require(universeFactory != address(0), "Universe factory not set");
+        address universeAddr = IUniverseFactory(universeFactory).createUniverse(config);
+        IUniverse universe = IUniverse(universeAddr);
         UniverseData memory data = UniverseData({
-            universe: IUniverse(universe),
+            universe: universe,
             token: IERC20(address(0)),
             universeGovernor: IGovernor(address(0)),
             hook: IHooks(address(0)),
@@ -333,6 +352,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         UniverseData storage data = universeDatas[universeId];
         require(msg.sender == data.bondingCurve, "Only bonding curve can graduate");
         require(address(data.token) == _token, "Token mismatch");
+        require(msg.value == ethAmount, "ETH amount mismatch");
 
         // Pull unsold tokens from bonding curve (already approved)
         if (tokenAmount > 0) {
@@ -457,6 +477,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
         emit ClaimTeamFees(token, teamFeeRecipient, balance);
     }
 
+    /// @notice Emergency halt or resume trading on a universe's bonding curve.
+    ///         Only callable by contract owner (should be a timelocked multisig).
+    function setBondingCurveHalted(uint256 universeId, bool halted) external onlyOwner {
+        address curve = universeDatas[universeId].bondingCurve;
+        require(curve != address(0), "No active bonding curve");
+        IBondingCurve(curve).setTradingHalted(halted);
+    }
+
     function setDeprecated(bool deprecated_) external onlyOwner {
         deprecated = deprecated_;
         emit SetDeprecated(deprecated_);
@@ -498,48 +526,27 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable {
     // ── ERC-721 Identity NFT ───────────────────────────────────────
 
     /// @dev On transfer, sync the universe admin if governance hasn't been deployed yet.
+    ///      Blocks transfer to address(0) (burn) when no governor, as that would
+    ///      permanently brick universe admin with no recovery path.
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = super._update(to, tokenId, auth);
 
         UniverseData storage data = universeDatas[tokenId];
         if (address(data.universe) != address(0) && address(data.universeGovernor) == address(0)) {
+            require(to != address(0), "Cannot burn NFT without governor");
             data.universe.setAdmin(to);
         }
 
         return from;
     }
 
-    /// @notice Fully on-chain tokenURI with universe metadata.
+    /// @notice Fully on-chain tokenURI — delegates to external renderer (EIP-170 extraction).
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
-
+        require(metadataRenderer != address(0), "Metadata renderer not set");
         UniverseData storage data = universeDatas[tokenId];
-        IUniverse universe = data.universe;
-
-        string memory universeName = universe.universeName();
-        string memory universeDesc = universe.universeDescription();
-        string memory universeImage = universe.universeImageUrl();
-        address universeAddr = address(universe);
-        bool hasToken = address(data.token) != address(0);
-
-        string memory json = string(abi.encodePacked(
-            '{"name":"', universeName,
-            '","description":"', universeDesc,
-            '","image":"', universeImage,
-            '","external_url":"https://loar.fun/universe/', universeAddr.toHexString(),
-            '","attributes":[',
-                '{"trait_type":"Universe Contract","value":"', universeAddr.toHexString(), '"}',
-                ',{"trait_type":"Universe ID","value":"', tokenId.toString(), '"}',
-                ',{"trait_type":"Has Token","value":"', hasToken ? 'true' : 'false', '"}',
-                hasToken ? string(abi.encodePacked(
-                    ',{"trait_type":"Token","value":"', address(data.token).toHexString(), '"}'
-                )) : '',
-            ']}'
-        ));
-
-        return string(abi.encodePacked(
-            "data:application/json;base64,",
-            Base64.encode(bytes(json))
-        ));
+        return IUniverseMetadataRenderer(metadataRenderer).tokenURI(
+            tokenId, address(data.universe), address(data.token)
+        );
     }
 }

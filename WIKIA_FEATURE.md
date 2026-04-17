@@ -64,7 +64,7 @@ The wikia feature is integrated into the event detail page with:
 
 Add your OpenAI API key to the server environment:
 
-**`apps/server/.env`**:
+**`.env`** (at the repository root):
 
 ```bash
 OPENAI_API_KEY=your-openai-api-key-here
@@ -84,11 +84,11 @@ The OpenAI package is already included in the server dependencies:
 
 ```bash
 # From the monorepo root
-bun dev
+pnpm dev
 
 # Or start services individually
-bun dev:server  # Start backend
-bun dev:web     # Start frontend
+pnpm dev:server  # Start backend
+pnpm dev:web     # Start frontend
 ```
 
 ## Usage
@@ -230,7 +230,7 @@ If wikia generation is slow:
 - Backend Service: [apps/server/src/services/wikia.ts](apps/server/src/services/wikia.ts)
 - API Route: [apps/server/src/routers/index.ts](apps/server/src/routers/index.ts)
 - Frontend Component: [apps/web/src/routes/event/$universeId.$eventId.tsx](apps/web/src/routes/event/$universeId.$eventId.tsx)
-- Environment Config: [apps/server/.env](apps/server/.env)
+- Environment Config: [.env](.env) (repository root)
 
 ## License
 

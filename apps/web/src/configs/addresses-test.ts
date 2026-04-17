@@ -4,7 +4,7 @@
 import type { SupportedChainId } from './chains';
 
 export const TIMELINE_ADDRESSES: Partial<Record<SupportedChainId, `0x${string}`>> = {
-  11155111: '0x20a882279ea84755cf0264e77590176247503643',
+  11155111: '0xeC927f51FE3B4a27784Cb2cAEB60240287385274',
 };
 
 export const UNIVERSEGOVERNANCE_ADDRESSES: Partial<Record<SupportedChainId, `0x${string}`>> = {

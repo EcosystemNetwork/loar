@@ -14111,6 +14111,16 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [
+      { name: 'nodeA', internalType: 'uint256', type: 'uint256' },
+      { name: 'nodeB', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'swapNodes',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
       {
         name: '_option',
         internalType: 'enum NodeCreationOptions',
@@ -14241,6 +14251,21 @@ export const universeAbi = [
       { name: 'link', internalType: 'string', type: 'string', indexed: false },
     ],
     name: 'MediaUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'nodeA', internalType: 'uint256', type: 'uint256', indexed: true },
+      { name: 'nodeB', internalType: 'uint256', type: 'uint256', indexed: true },
+      {
+        name: 'swapper',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'NodesSwapped',
   },
   {
     type: 'event',

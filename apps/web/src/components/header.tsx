@@ -45,6 +45,8 @@ const moreLinks = [
   { to: '/staking', label: 'Staking' },
   { to: '/agents', label: 'Agents' },
   { to: '/activity', label: 'Activity' },
+  { to: '/notifications', label: 'Notifications' },
+  { to: '/subscriptions', label: 'Subscriptions' },
   { to: '/my-works', label: 'My Works' },
   { to: '/sell', label: 'Sell' },
   { to: '/licensing', label: 'Licensing' },

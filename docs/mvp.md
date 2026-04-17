@@ -14,17 +14,17 @@ Connect Wallet → Create Universe → Generate AI Content → Publish On-Chain 
 
 ### Status of Each Step
 
-| Step | Feature              | Status | Gap                                                                |
-| ---- | -------------------- | ------ | ------------------------------------------------------------------ |
-| 1    | **Wallet Login**     | LIVE   | None. SIWE auth works end-to-end                                   |
-| 2    | **Create Universe**  | LIVE   | Contract + token + Uniswap pool deploys correctly                  |
-| 3    | **Generate Content** | LIVE   | 4 video models, 4 image models, wiki generation all functional     |
-| 4    | **Build Timeline**   | LIVE   | ReactFlow editor, branching, on-chain node storage                 |
-| 5    | **Publish**          | LIVE   | Decentralized storage with dedup, content hash on-chain            |
-| 6    | **Get Discovered**   | LIVE   | Content feed + creator gallery with search/filters                 |
-| 7    | **Earn Revenue**     | BROKEN | Marketplace UI is informational. No purchase/mint flow on frontend |
+| Step | Feature              | Status  | Gap                                                                                     |
+| ---- | -------------------- | ------- | --------------------------------------------------------------------------------------- |
+| 1    | **Wallet Login**     | LIVE    | None. SIWE auth works end-to-end                                                        |
+| 2    | **Create Universe**  | LIVE    | Contract + token + Uniswap pool deploys correctly                                       |
+| 3    | **Generate Content** | LIVE    | 44 video models, 21 image models, wiki generation all functional                        |
+| 4    | **Build Timeline**   | LIVE    | ReactFlow editor, branching, on-chain node storage                                      |
+| 5    | **Publish**          | LIVE    | Decentralized storage with dedup, content hash on-chain                                 |
+| 6    | **Get Discovered**   | LIVE    | Content feed + creator gallery with search/filters                                      |
+| 7    | **Earn Revenue**     | PARTIAL | On-chain credit purchases (ETH/$LOAR) work. NFT minting and subscriptions not yet wired |
 
-**The MVP loop breaks at Step 7.** The backend APIs and smart contracts for monetization exist, but no frontend transaction flow lets a user actually pay for anything.
+**The MVP loop is partially closed at Step 7.** On-chain credit purchases (ETH and $LOAR) work end-to-end on Sepolia + Base Sepolia. NFT minting, subscriptions, and other marketplace transactions still need frontend wiring.
 
 ---
 
@@ -34,14 +34,20 @@ Connect Wallet → Create Universe → Generate AI Content → Publish On-Chain 
 
 - Wallet authentication (SIWE → JWT)
 - Universe + token deployment (smart contract)
-- AI content generation (video + image + wiki)
+- AI content generation (44 video + 21 image models, wiki generation)
 - Narrative timeline editor (ReactFlow + on-chain)
-- Decentralized multi-provider storage
-- Content upload with IP classification
+- Decentralized multi-provider storage (Pinata, Lighthouse, Firebase)
+- Content upload with IP classification (fan/original/licensed)
 - Creator profiles with customization
 - Content and creator discovery
 - Character wiki browsing
-- Blockchain event indexing (Ponder, 37+ tables)
+- Blockchain event indexing (Ponder, 29 tables)
+- On-chain credit purchases (ETH + $LOAR, Sepolia + Base Sepolia)
+- LP yield management (fee collection, multi-recipient distribution, claim UI)
+- TimelockController governance (24h execution delay, Ponder indexes proposals/votes)
+- Identity NFTs (per-universe creator identity proof)
+- Content moderation (flag system, admin review queue, DMCA intake, audit log)
+- Quest & affiliate system ($LOAR rewards for engagement actions)
 
 ### Backend-Complete, Frontend-Incomplete
 
@@ -49,21 +55,20 @@ These have fully implemented tRPC routes AND deployed Solidity contracts, but th
 
 - Episode NFT minting (contract + API ready, no mint button)
 - Character NFT minting (contract + API ready, no mint button)
-- Credit purchasing (API ready, no payment flow)
 - Subscription management (API ready, no subscribe button)
-- Canon voting (contract + API ready, no voting form)
+- Canon voting (submit form + for/against voting UI exists, on-chain finalize/license not wired)
 - Cross-universe collabs (API ready, no proposal form)
 - Ad bidding (contract + API ready, no bid form)
 - IP licensing (contract + API ready, no license form)
-- Analytics (API ready, no dashboard visualization)
-- Governance voting (contract indexed, voting UI incomplete)
+- Analytics (API ready, no per-universe dashboard visualization)
+- Governance voting (proposals/votes indexed, voting UI partially wired)
+- Rights classification (backend uses fan/original/licensed, frontend labels not fully migrated)
 
 ### Not Built
 
-- Fiat payments (no Stripe, no credit card)
+- Fiat payments (Stripe integration exists but requires `STRIPE_SECRET_KEY`; no other fiat on-ramp)
 - Social features (no follows, comments, notifications)
-- Content moderation (no flagging, no review queue)
-- Creator analytics dashboard
+- Creator analytics dashboard (per-universe P&L)
 - Mobile-responsive layouts (partial at best)
 - Merch fulfillment (backend shell, no logistics)
 
@@ -115,10 +120,10 @@ To close the loop, the MVP needs these additions:
 
 These features are built but their parameters may change:
 
-- **AI model selection** — FAL models may be swapped based on cost/quality data
-- **Credit pricing** — Generation costs (image=1, video=5) are estimates, not validated
-- **Storage provider priority** — Walrus-first ordering may shift based on reliability
-- **Governance parameters** — 300-block voting period, 10% quorum are defaults, not tuned
+- **AI model selection** — 65 models (44 video + 21 image) via FAL AI + ModelArk. Smart auto-routing selects by quality/speed/cost
+- **Credit pricing** — Dual-margin pricing (35% card/ETH, 25% LOAR). Generation costs are estimates, not validated
+- **Storage provider priority** — Pinata > Lighthouse > Firebase ordering may shift based on reliability
+- **Governance parameters** — Voting delay 7200 blocks, voting period 50400 blocks, 10% quorum are defaults, not tuned
 - **Token supply** — 100B per universe is arbitrary, may need economic modeling
 
 ---
@@ -131,6 +136,4 @@ These features are built but their parameters may change:
 | Fiat on-ramp       | Requires payment processor (Stripe/MoonPay) integration    |
 | Mobile app         | Web-first; mobile is a growth play, not a validation play  |
 | Social features    | Follows/comments don't validate the core monetization loop |
-| Content moderation | Required before mainnet but not for testnet validation     |
-| Multi-chain        | Adds complexity without validating the product             |
 | Merch fulfillment  | Physical logistics is a separate business problem          |

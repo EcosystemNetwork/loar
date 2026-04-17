@@ -286,7 +286,7 @@ function EntityPage() {
                 <CardTitle className="text-base flex items-center justify-between">
                   Media &amp; Assets
                   {isOwner && (
-                    <Link to="/upload">
+                    <Link to="/upload" search={{}}>
                       <button className="text-xs font-normal text-primary hover:underline">
                         + Upload &amp; attach
                       </button>
@@ -299,7 +299,7 @@ function EntityPage() {
                 {mediaAttachments.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No media attached yet.{' '}
-                    <Link to="/upload" className="text-primary hover:underline">
+                    <Link to="/upload" search={{}} className="text-primary hover:underline">
                       Upload a file
                     </Link>{' '}
                     to attach artwork, 3D models, textures, animations, rigs, video, music, sound

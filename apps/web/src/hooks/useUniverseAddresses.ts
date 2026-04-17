@@ -16,6 +16,7 @@ interface UniverseAddresses {
   governorAddress: `0x${string}` | undefined;
   hookAddress: `0x${string}` | undefined;
   lockerAddress: `0x${string}` | undefined;
+  bondingCurveAddress: `0x${string}` | undefined;
 }
 
 /**
@@ -81,12 +82,14 @@ export function useUniverseAddresses(
       governorAddress: (ponder.data.governorAddress as `0x${string}`) || undefined,
       hookAddress: undefined,
       lockerAddress: undefined,
+      bondingCurveAddress: undefined,
       isLoading: false,
     };
   }
 
   if (onChain.data) {
-    const [addr, token, governor, hook, locker] = onChain.data as readonly [
+    const [addr, token, governor, hook, locker, bondingCurve] = onChain.data as readonly [
+      `0x${string}`,
       `0x${string}`,
       `0x${string}`,
       `0x${string}`,
@@ -100,6 +103,7 @@ export function useUniverseAddresses(
       governorAddress: governor !== ZERO ? governor : undefined,
       hookAddress: hook !== ZERO ? hook : undefined,
       lockerAddress: locker !== ZERO ? locker : undefined,
+      bondingCurveAddress: bondingCurve !== ZERO ? bondingCurve : undefined,
       isLoading: false,
     };
   }
@@ -110,6 +114,7 @@ export function useUniverseAddresses(
     governorAddress: undefined,
     hookAddress: undefined,
     lockerAddress: undefined,
+    bondingCurveAddress: undefined,
     isLoading: ponder.isLoading || onChain.isLoading,
   };
 }

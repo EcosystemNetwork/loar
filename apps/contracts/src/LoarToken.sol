@@ -18,6 +18,7 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     uint256 public constant MAX_TRANSFER_FEE_BPS = 500; // hard cap: 5%
     uint256 public constant MAX_FEE_INCREASE_PER_CHANGE = 10; // max +0.1% per change — rate-limits rug
     uint256 public constant BPS_DENOMINATOR = 10_000;
+    uint256 public constant FEE_CHANGE_COOLDOWN = 1 days;
 
     /// @notice Treasury address that receives platform revenue
     address public treasury;
@@ -28,11 +29,19 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     /// @notice Transfer fee in basis points (default 1 = 0.01%)
     uint256 public transferFeeBps = 1;
 
+    /// @notice Timestamp of last fee change (enforces cooldown between changes)
+    uint256 public lastFeeChangeAt;
+
     /// @notice Addresses exempt from the transfer fee (treasury, LP, minters, etc.)
     mapping(address => bool) public feeExempt;
 
     /// @notice Addresses authorized to mint (platform backend, quest rewards, etc.)
     mapping(address => bool) public minters;
+
+    /// @notice Cumulative tokens ever minted (never decreases, even after burns).
+    ///         Used instead of totalSupply() for the MAX_SUPPLY cap so that burns
+    ///         cannot reopen minting headroom.
+    uint256 public totalMinted;
 
     event MinterUpdated(address indexed minter, bool authorized);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
@@ -46,6 +55,7 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     error ZeroAddress();
     error FeeTooHigh();
     error FeeIncreaseExceedsLimit();
+    error FeeChangeCooldownActive();
 
     modifier onlyMinter() {
         _checkMinter();
@@ -82,12 +92,16 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
         _mint(_initialHolder, holderAmount);
         _mint(_treasury, communityAmount); // community pool managed by treasury
         _mint(_treasury, reserveAmount);   // reserve managed by treasury
+
+        // Track initial distribution against the permanent cap
+        totalMinted = MAX_SUPPLY;
     }
 
     /// @notice Mint new tokens (for quest rewards, affiliate payouts, etc.)
     /// @dev Only callable by authorized minters or owner. Cannot exceed MAX_SUPPLY.
     function mint(address to, uint256 amount) external onlyMinter {
-        if (totalSupply() + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
+        if (totalMinted + amount > MAX_SUPPLY) revert ExceedsMaxSupply();
+        totalMinted += amount;
         _mint(to, amount);
     }
 
@@ -121,12 +135,14 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable {
     ///         Increases are rate-limited to MAX_FEE_INCREASE_PER_CHANGE per call.
     ///         Decreases are unrestricted.
     function setTransferFeeBps(uint256 newFeeBps) external onlyOwner {
+        if (block.timestamp < lastFeeChangeAt + FEE_CHANGE_COOLDOWN) revert FeeChangeCooldownActive();
         if (newFeeBps > MAX_TRANSFER_FEE_BPS) revert FeeTooHigh();
         if (newFeeBps > transferFeeBps && newFeeBps - transferFeeBps > MAX_FEE_INCREASE_PER_CHANGE) {
             revert FeeIncreaseExceedsLimit();
         }
         emit TransferFeeUpdated(transferFeeBps, newFeeBps);
         transferFeeBps = newFeeBps;
+        lastFeeChangeAt = block.timestamp;
     }
 
     /// @notice Set fee exemption for an address

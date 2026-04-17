@@ -191,3 +191,23 @@ export function useSetMedia() {
 
   return { writeAsync };
 }
+
+/**
+ * Returns a function to swap the content (media + plot) between two nodes on-chain.
+ * The DAG structure stays intact — only contentHash and plotHash are exchanged.
+ * @returns Object with `writeAsync(nodeA, nodeB)` that submits the swapNodes transaction
+ */
+export function useSwapNodes() {
+  const chainId = useChainId();
+  const contract = useWriteContract();
+
+  const writeAsync = (nodeA: number, nodeB: number) =>
+    contract.writeContractAsync({
+      abi: universeAbi,
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
+      functionName: 'swapNodes',
+      args: [BigInt(nodeA), BigInt(nodeB)],
+    });
+
+  return { writeAsync };
+}

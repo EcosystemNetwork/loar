@@ -13,6 +13,9 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@loar/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",

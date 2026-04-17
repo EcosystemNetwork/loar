@@ -8,13 +8,16 @@ import type { Context } from 'hono';
 export function errorHandler(err: Error, c: Context) {
   console.error('Unhandled error:', err);
 
-  const isDev = process.env.NODE_ENV === 'development';
+  // Only expose error details when LOAR_DEBUG_ERRORS is explicitly set.
+  // Using NODE_ENV alone risks leaking stack traces if dev mode is
+  // accidentally enabled in production.
+  const showDetails = process.env.LOAR_DEBUG_ERRORS === 'true';
 
   return c.json(
     {
       code: 'INTERNAL_SERVER_ERROR',
-      message: isDev ? err.message : 'Something went wrong',
-      ...(isDev && err.stack ? { details: { stack: err.stack } } : {}),
+      message: showDetails ? err.message : 'Something went wrong',
+      ...(showDetails && err.stack ? { details: { stack: err.stack } } : {}),
     },
     500
   );

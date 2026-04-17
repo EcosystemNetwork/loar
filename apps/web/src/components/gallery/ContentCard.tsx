@@ -4,7 +4,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Clock, FileCheck, Eye, Heart, Film } from 'lucide-react';
+import { ShoppingCart, Clock, FileCheck, Eye, Heart, Film, Sparkles, Upload } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { formatEther } from 'viem';
 
@@ -47,6 +47,7 @@ function formatPrice(wei: string | undefined): string {
 
 export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: ContentCardProps) {
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
+  const isAIGenerated = content.mediaType?.startsWith('ai-');
   const thumbnail =
     content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
   const hasLicensing =
@@ -64,7 +65,11 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
       <div className="relative aspect-video overflow-hidden bg-muted">
         {isVideo && content.mediaUrl ? (
           <video
-            src={content.mediaUrl}
+            src={
+              content.thumbnailUrl || content.imageUrl
+                ? content.mediaUrl
+                : `${content.mediaUrl}#t=0.5`
+            }
             className="w-full h-full object-cover"
             muted
             loop
@@ -85,8 +90,12 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           />
         )}
         {content.mediaType && (
-          <Badge variant="secondary" className="absolute top-2 left-2 text-xs capitalize">
-            {content.mediaType}
+          <Badge
+            variant="secondary"
+            className={`absolute top-2 left-2 text-xs gap-1 ${isAIGenerated ? 'bg-violet-500/80 text-white border-violet-400/50' : ''}`}
+          >
+            {isAIGenerated ? <Sparkles className="h-3 w-3" /> : <Upload className="h-3 w-3" />}
+            {isVideo ? 'Video' : 'Image'}
           </Badge>
         )}
         {isVideo && (

@@ -245,6 +245,23 @@ export function useRemoveNodeFromEntity(universeAddress?: string) {
   });
 }
 
+/** Swap node IDs between two entities (off-chain counterpart to Universe.swapNodes). */
+export function useSwapNodesBetweenEntities() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      entityIdA: string;
+      nodeIdA: number;
+      entityIdB: string;
+      nodeIdB: number;
+    }) => trpcClient.entities.swapNodes.mutate(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [['entities']] });
+    },
+  });
+}
+
 /**
  * Build a tree structure from a flat list of entities.
  * Returns root entities (parentId === null) with nested children.

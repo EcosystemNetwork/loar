@@ -59,6 +59,11 @@ const ALLOWED_DOMAINS = new Set(
   (process.env.SIWE_ALLOWED_DOMAINS || 'localhost,loar.fun').split(',').map((d) => d.trim())
 );
 
+/** Allowed Chain IDs. Base L2 mainnet + Sepolia testnet + localhost. */
+const ALLOWED_CHAIN_IDS = new Set(
+  (process.env.SIWE_ALLOWED_CHAIN_IDS || '8453,11155111,1,31337').split(',').map((id) => id.trim())
+);
+
 export interface SiweSessionPayload extends JWTPayload {
   sub: string; // checksummed wallet address
   iat: number;
@@ -168,6 +173,31 @@ export async function verifySiweSignature(
     throw new Error('SIWE message has expired. Please sign in again.');
   }
 
+  // Validate Chain ID (REQUIRED per EIP-4361)
+  const chainIdMatch = message.match(/Chain ID: (\d+)/);
+  if (!chainIdMatch) {
+    throw new Error('SIWE message must include a Chain ID');
+  }
+  if (!ALLOWED_CHAIN_IDS.has(chainIdMatch[1])) {
+    throw new Error(`SIWE Chain ID "${chainIdMatch[1]}" is not allowed`);
+  }
+
+  // Validate URI field (REQUIRED per EIP-4361)
+  const uriMatch = message.match(/URI: (.+)/);
+  if (!uriMatch) {
+    throw new Error('SIWE message must include a URI');
+  }
+  try {
+    const uri = new URL(uriMatch[1].trim());
+    const uriHostname = uri.hostname;
+    if (!ALLOWED_DOMAINS.has(uriHostname) && uriHostname !== 'localhost') {
+      throw new Error(`SIWE URI hostname "${uriHostname}" is not in the allowed domains`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('SIWE URI hostname')) throw e;
+    throw new Error('SIWE message contains an invalid URI');
+  }
+
   // Extract and validate nonce
   const nonceMatch = message.match(/Nonce: ([a-f0-9]+)/);
   if (!nonceMatch) {
@@ -224,6 +254,8 @@ export async function issueSessionToken(address: string): Promise<string> {
 
 // ── Token blacklist (in-memory, or Firestore if available) ──────────────
 // Used to revoke tokens before they expire naturally.
+// Bounded to MAX_BLACKLIST_SIZE entries to prevent memory exhaustion.
+const MAX_BLACKLIST_SIZE = 10_000;
 const memoryBlacklist = new Map<string, number>();
 
 // Clean up in-memory blacklist every 30 minutes. Evict entries older than
@@ -244,6 +276,14 @@ export async function revokeToken(jti: string): Promise<void> {
   if (col) {
     await col.doc(jti).set({ revokedAt: new Date() });
   } else {
+    // Evict oldest entries if at capacity (LRU-style eviction)
+    if (memoryBlacklist.size >= MAX_BLACKLIST_SIZE) {
+      const keysToRemove = [...memoryBlacklist.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, Math.floor(MAX_BLACKLIST_SIZE * 0.1))
+        .map(([k]) => k);
+      for (const k of keysToRemove) memoryBlacklist.delete(k);
+    }
     memoryBlacklist.set(jti, Date.now());
   }
 }

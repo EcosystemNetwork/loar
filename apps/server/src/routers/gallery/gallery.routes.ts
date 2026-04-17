@@ -47,6 +47,7 @@ export const galleryRouter = router({
         universeId: z.string().optional(),
         creatorUid: z.string().optional(),
         mediaType: mediaTypeEnum,
+        origin: z.enum(['all', 'generated', 'uploaded']).default('all'),
         sortBy: sortByEnum,
         limit: z.number().int().min(1).max(50).default(20),
         cursor: z.string().optional(),
@@ -61,15 +62,37 @@ export const galleryRouter = router({
       if (input.creatorUid) {
         query = query.where('creatorUid', '==', input.creatorUid);
       }
-      if (input.mediaType !== 'all') {
-        // Match both raw types (video/image) and AI-generated variants (ai-video/ai-image)
-        const typeVariants =
-          input.mediaType === 'video'
-            ? ['video', 'ai-video']
-            : input.mediaType === 'image'
-              ? ['image', 'ai-image']
-              : [input.mediaType];
-        query = query.where('mediaType', 'in', typeVariants);
+
+      // Compute final mediaType filter by intersecting mediaType + origin filters.
+      // Both affect the same Firestore field, so we combine them into one `in` clause.
+      const allTypes = ['video', 'ai-video', 'image', 'ai-image', 'audio', '3d'];
+      let allowedByMedia: string[];
+      if (input.mediaType === 'all') {
+        allowedByMedia = allTypes;
+      } else if (input.mediaType === 'video') {
+        allowedByMedia = ['video', 'ai-video'];
+      } else if (input.mediaType === 'image') {
+        allowedByMedia = ['image', 'ai-image'];
+      } else {
+        allowedByMedia = [input.mediaType];
+      }
+
+      let allowedByOrigin: string[];
+      if (input.origin === 'generated') {
+        allowedByOrigin = ['ai-video', 'ai-image'];
+      } else if (input.origin === 'uploaded') {
+        allowedByOrigin = ['video', 'image', 'audio', '3d'];
+      } else {
+        allowedByOrigin = allTypes;
+      }
+
+      const finalTypes = allowedByMedia.filter((t) => allowedByOrigin.includes(t));
+      if (finalTypes.length === 0) {
+        return { items: [], nextCursor: null };
+      }
+      // Only apply filter if not matching all types (avoids unnecessary in clause)
+      if (finalTypes.length < allTypes.length) {
+        query = query.where('mediaType', 'in', finalTypes);
       }
 
       // Sorting

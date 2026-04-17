@@ -57,13 +57,14 @@ The timeline editor is your creative workspace:
 
 1. **Create a node** — Click "Create Event" in the sidebar
 2. **Write your prompt** — Describe the scene, select characters
-3. **Generate image** — AI creates a scene image (4 models available)
+3. **Generate image** — AI creates a scene image (21 models available including FLUX, Recraft, Ideogram, Seedream, GPT Image)
 4. **Generate video** — AI creates a 1-60s video from the image
-   - Choose provider: Veo3, Kling, Wan2.5, or Sora
+   - 44 video models: Veo 3.1, Kling 3.0, Wan 2.7, Sora 2, Seedance 2.0, LTX, HunYuan, CogVideoX, PixVerse V6, Runway Gen-3, and more
+   - Smart auto-routing selects best model by quality/speed/cost, or choose manually
    - Set duration and aspect ratio
 5. **Preview and confirm** — Watch the video, edit if needed
 6. **Save to blockchain** — Content hash stored in Universe contract
-7. **Storage** — Video/image automatically uploaded to Walrus/IPFS/Filecoin
+7. **Storage** — Video/image automatically uploaded to Pinata (IPFS), Lighthouse (Filecoin), or Firebase with priority-based fallback
 
 ### Branching Narratives
 
@@ -107,11 +108,12 @@ Your public profile at `/profile/$username` is your portfolio for fans and colla
 For content outside the timeline editor (standalone videos, images, promotional material):
 
 1. **Classify your content:**
-   - **Fun** — Non-commercial. Can include fan works, copyrighted references. Cannot be monetized.
-   - **Monetized** — Commercial. Must be original, no copyrighted material. Eligible for all revenue streams.
+   - **Fan** — Non-commercial. Can include fan works, copyrighted references. Cannot be monetized.
+   - **Original** — Creator-owned. Must be original, no copyrighted material. Eligible for all revenue streams.
+   - **Licensed** — Rights-cleared. Third-party content with licensing proof. Requires admin review.
 
 2. **Declare IP status:**
-   - Is it original? (required for monetized)
+   - Is it original? (required for original/licensed)
    - Does it use copyrighted material? (blocks monetization if yes)
    - Add copyright notes if needed
    - Select a license (All Rights Reserved, CC-BY, CC-BY-SA, CC-BY-NC, CC0)
@@ -130,49 +132,53 @@ For content outside the timeline editor (standalone videos, images, promotional 
 
 The marketplace has 10 tabs for revenue streams. Here's the honest status:
 
-### What You Can See Today
+### What Works Today
 
-- Your credit balance and generation costs
+- Buy credits with ETH or $LOAR on-chain (Sepolia + Base Sepolia)
+- CreditStore UI with package selection and dual-margin pricing
+- Credit balance tracking and generation cost deduction
 - Platform stats (universes, views, mints, revenue)
-- Descriptions of how each revenue stream works
-- Your NFT collection (episodes + characters)
+- LP yield collection and claiming via dashboard
+- Quest rewards and daily check-in for $LOAR
+- Canon submission form + For/Against voting UI
+- Stripe card payments (when `STRIPE_SECRET_KEY` is set)
 
-### What You CANNOT Do Yet (Frontend Not Wired)
+### What You CANNOT Do Yet (Frontend Not Fully Wired)
 
 | Action                          | Backend Ready | Frontend Ready |
 | ------------------------------- | :-----------: | :------------: |
 | List an episode as NFT          |      Yes      |       No       |
 | Set NFT price and royalties     |      Yes      |       No       |
-| Buy credits with ETH            |      Yes      |       No       |
 | Configure subscription tiers    |      Yes      |       No       |
-| Submit content for canon vote   |      Yes      |       No       |
-| Vote on canon submissions       |      Yes      |       No       |
+| Finalize/license canon entries  |      Yes      |       No       |
 | Propose a cross-universe collab |      Yes      |       No       |
 | Create an ad slot               |      Yes      |       No       |
 | License your IP                 |      Yes      |       No       |
 
-**What this means:** The marketplace page explains the revenue model but doesn't yet let you transact. This is the #1 priority to fix (see [roadmap](roadmap.md)).
+**What this means:** Credit purchases and LP yield work. NFT minting and other marketplace transactions still need frontend wiring. See [roadmap](roadmap.md).
 
 ---
 
 ## Step 7: Govern Your Universe (PARTIALLY WORKING)
 
-**From the universe editor's governance sidebar:**
+**Route:** `/governance/$universeId`
 
 ### What Works Today
 
 - View governance token info (name, symbol, supply)
-- See contract addresses
-- View universe metadata
+- See contract addresses and universe metadata
+- UniverseTimelockGovernor with 24-hour execution delay
+- Per-universe Governor with configurable voting delay/period/quorum
+- Ponder indexes proposals, votes, executions, and cancellations
+- Governance page at `/governance/$universeId`
 
-### What Doesn't Work Yet
+### What Needs Completion
 
-- Creating governance proposals
-- Voting on proposals
-- Executing passed proposals
-- Delegating voting power
+- Proposal creation UI needs finishing
+- Vote casting UI partially wired
+- Delegating voting power not yet in UI
 
-The smart contracts and backend indexing for governance are fully functional — the frontend UI needs to be connected.
+The smart contracts, backend indexing, and governance page exist — the interactive transaction flows need completion.
 
 ---
 
@@ -204,22 +210,25 @@ WORKING:
 Connect Wallet → Create Universe → Generate AI Content → Build Timeline
     → Store Decentralized → Set Up Profile → Upload Content → Get Discovered
 
+PARTIALLY WORKING:
+    → Buy Credits (ETH/$LOAR on-chain) → Generate AI Content → Earn LP Yield
+    → Token Governance → Community Decisions (UI partially wired)
+
 NOT YET WORKING:
     → List NFTs → Fans Mint → Earn Revenue
     → Set Subscriptions → Fans Subscribe → Recurring Revenue
-    → Token Governance → Community Decisions → Universe Evolution
 ```
 
 **Time to first universe:** ~5 minutes
 **Time to first AI content:** ~10 minutes
-**Time to first revenue:** Not yet possible (marketplace transactions not wired)
+**Time to first credit purchase:** ~2 minutes (ETH or $LOAR on-chain)
 
 ---
 
 ## What Creators Should Know
 
 1. **You own your universe.** The smart contract is deployed from your wallet. You are the admin.
-2. **Content is decentralized.** Your videos/images are stored across Walrus, IPFS, and Filecoin — not just one server.
-3. **This is testnet.** Everything runs on Sepolia. No real money is at stake. When we launch on mainnet, you'll need to redeploy.
-4. **IP matters.** If you want to monetize, your content must be original. Fan works are welcome in the "Fun" category but can't generate revenue.
-5. **AI costs are currently free.** Credit spending isn't enforced yet. This will change.
+2. **Content is decentralized.** Your videos/images are stored across Pinata (IPFS), Lighthouse (Filecoin), and Firebase — not just one server.
+3. **This is testnet.** Everything runs on Sepolia + Base Sepolia. No real money is at stake. When we launch on Base mainnet, you'll need to redeploy.
+4. **IP matters.** If you want to monetize, your content must be original. Fan works are welcome in the "Fan" category but can't generate revenue.
+5. **Credits are tracked.** AI generation costs are deducted from your credit balance. Purchase credits with ETH or $LOAR on-chain.

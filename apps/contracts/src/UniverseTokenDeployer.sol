@@ -125,10 +125,9 @@ contract UniverseTokenDeployer is ReentrancyGuard {
 
         // Creator gets tokens for governance voting power from day 1
         address creator = deploymentConfig.tokenConfig.tokenAdmin;
-        if (creator != address(0)) {
+        require(creator != address(0) || creatorAmount == 0, "Creator address required when creatorBps > 0");
+        if (creatorAmount > 0) {
             IERC20(tokenAddress).safeTransfer(creator, creatorAmount);
-        } else {
-            IERC20(tokenAddress).safeTransfer(address(universeManager), creatorAmount);
         }
 
         // Treasury + community go to team fee recipient on UniverseManager

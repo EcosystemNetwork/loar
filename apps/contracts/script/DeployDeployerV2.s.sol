@@ -28,9 +28,11 @@ contract DeployDeployerV2 is Script {
         vm.startBroadcast();
 
         // Deploy new token deployer with vesting support
+        // NOTE: bondingCurveFactory must be set after deployment via setBondingCurveFactory()
         UniverseTokenDeployerV2 deployerV2 = new UniverseTokenDeployerV2(
             universeManager,
-            vestingContract
+            vestingContract,
+            address(0)  // bondingCurveFactory — set post-deploy
         );
         console.log("UniverseTokenDeployerV2 deployed at:", address(deployerV2));
 
