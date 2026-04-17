@@ -121,26 +121,31 @@ function getStore(): RateLimitStore {
 /**
  * Extract the client IP from trusted headers.
  *
- * Priority:
+ * Priority (when behind a trusted reverse proxy):
  *   1. x-forwarded-for — last entry (closest trusted proxy hop)
  *   2. x-real-ip — set by nginx / similar
- *   3. Connection remote address
+ *   3. Connection remote address (always available)
  *
- * IMPORTANT: Configure your reverse proxy to strip/overwrite these headers
- * from the original client request. If the proxy passes client-supplied
- * headers through, clients can spoof their IP to bypass rate limits.
+ * IMPORTANT: TRUST_PROXY must be set to 'true' for header-based extraction.
+ * Without it, only the socket remote address is used — preventing IP spoofing
+ * when no reverse proxy is configured. Your reverse proxy MUST strip/overwrite
+ * x-forwarded-for and x-real-ip headers from the original client request.
  */
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/;
+const TRUST_PROXY = process.env.TRUST_PROXY === 'true';
 
 function getClientKey(c: Context): string {
-  const xff = c.req.header('x-forwarded-for');
-  if (xff) {
-    // Take the LAST entry — that's the IP your trusted proxy appended.
-    const lastIp = xff.split(',').pop()?.trim();
-    if (lastIp && IP_RE.test(lastIp)) return lastIp;
+  // Only trust forwarding headers when explicitly behind a reverse proxy
+  if (TRUST_PROXY) {
+    const xff = c.req.header('x-forwarded-for');
+    if (xff) {
+      // Take the LAST entry — that's the IP your trusted proxy appended.
+      const lastIp = xff.split(',').pop()?.trim();
+      if (lastIp && IP_RE.test(lastIp)) return lastIp;
+    }
+    const realIp = c.req.header('x-real-ip');
+    if (realIp && IP_RE.test(realIp)) return realIp;
   }
-  const realIp = c.req.header('x-real-ip');
-  if (realIp && IP_RE.test(realIp)) return realIp;
   // Fallback to connection-level IP — never share a single bucket for all unknowns
   return (c.req.raw as any)?.socket?.remoteAddress || 'unknown-' + Date.now();
 }

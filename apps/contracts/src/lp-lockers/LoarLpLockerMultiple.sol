@@ -38,6 +38,9 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     address public immutable factory;
     mapping(address token => TokenRewardInfo tokenRewardInfo) internal _tokenRewards;
 
+    /// @notice Tokens that are part of active LP pools and must not be drained via withdrawERC20.
+    mapping(address => bool) public protectedToken;
+
     constructor(
         address owner_,
         address factory_, // Address of the loar factory
@@ -144,6 +147,10 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         // store the reward info
         tokenRewardInfo.positionId = positionId;
         _tokenRewards[token] = tokenRewardInfo;
+
+        // Mark both pool currencies as protected from owner withdrawal
+        protectedToken[Currency.unwrap(poolKey.currency0)] = true;
+        protectedToken[Currency.unwrap(poolKey.currency1)] = true;
 
         emit TokenRewardAdded({
             token: tokenRewardInfo.token,
@@ -446,8 +453,9 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         require(success, "ETH transfer failed");
     }
 
-    // Withdraw ERC20 tokens from the contract
+    // Withdraw ERC20 tokens from the contract (only non-pool tokens)
     function withdrawERC20(address token, address recipient) public onlyOwner nonReentrant {
+        require(!protectedToken[token], "Cannot withdraw pool currency");
         IERC20 token_ = IERC20(token);
         SafeERC20.safeTransfer(token_, recipient, token_.balanceOf(address(this)));
     }

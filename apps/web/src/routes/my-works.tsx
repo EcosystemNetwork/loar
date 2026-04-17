@@ -126,7 +126,7 @@ function MyWorksPage() {
             </p>
           </div>
           <Button asChild className="gap-2">
-            <Link to="/upload">
+            <Link to="/upload" search={{}}>
               <Upload className="h-4 w-4" />
               Upload New
             </Link>
@@ -202,7 +202,7 @@ function MyWorksPage() {
             </p>
             {allItems.length === 0 && (
               <Button asChild className="gap-2">
-                <Link to="/upload">
+                <Link to="/upload" search={{}}>
                   <Upload className="h-4 w-4" />
                   Upload Content
                 </Link>

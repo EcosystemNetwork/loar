@@ -6,9 +6,13 @@ import { Loader2 } from 'lucide-react';
 
 export const Route = createFileRoute('/upload')({
   component: UploadPage,
+  validateSearch: (search: Record<string, unknown>): { universeId?: string } => ({
+    universeId: (search.universeId as string) || undefined,
+  }),
 });
 
 function UploadPage() {
+  const { universeId } = Route.useSearch();
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = useNavigate();
 
@@ -36,6 +40,7 @@ function UploadPage() {
         <h1 className="text-2xl font-bold mb-2">Upload Content</h1>
         <p className="text-muted-foreground mb-8">Share your work with the community</p>
         <UploadForm
+          defaultUniverseId={universeId}
           onSuccess={() => navigate({ to: '/dashboard' })}
           onCancel={() => navigate({ to: '/dashboard' })}
         />

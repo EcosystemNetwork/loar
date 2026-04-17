@@ -43,7 +43,7 @@ contract CanonMarketplaceTest is Test {
         vm.startPrank(deployer);
 
         rights = new MockRightsRegistry();
-        router = new MockPaymentRouter();
+        router = new MockPaymentRouter(platform);
         votesToken = new MockVotesToken();
 
         CanonMarketplace impl = new CanonMarketplace();

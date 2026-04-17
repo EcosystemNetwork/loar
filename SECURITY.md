@@ -85,7 +85,8 @@ We will not pursue legal action against researchers who:
 Our protocol uses:
 
 - OpenZeppelin 5.0.2 upgradeable contracts (UUPS pattern)
-- Gnosis Safe multisig + TimelockController (48h delay) for governance
+- Single EOA ownership (testnet) — Gnosis Safe multisig + TimelockController planned before mainnet
+- Per-universe TimelockController governance (24h delay) for universe-level proposals
 - Pull-payment pattern in PaymentRouter
 - Beacon proxies for NFT contracts
 

@@ -99,6 +99,10 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             poolData
         );
 
+        // Store locker so _lpLockerFeeClaim can trigger fee collection on swaps
+        if (_locker != address(0)) {
+            locker[poolKey.toId()] = _locker;
+        }
 
         emit PoolCreatedFactory({
             pairedToken: pairedToken,

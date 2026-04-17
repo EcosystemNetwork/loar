@@ -3,6 +3,7 @@
  * Exports public (unauthenticated) and protected (auth-required) procedures.
  */
 import { initTRPC, TRPCError } from '@trpc/server';
+import { getAddress } from 'viem';
 import type { Context } from './context';
 
 export const t = initTRPC.context<Context>().create();
@@ -72,8 +73,8 @@ export function requirePermission(permission: string) {
 
 /** Protected procedure that also requires admin role */
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  const address = ctx.user.address?.toLowerCase();
-  if (!address) {
+  const rawAddress = ctx.user.address;
+  if (!rawAddress) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access requires a wallet address' });
   }
   if (ADMIN_ADDRESSES.length === 0) {
@@ -82,6 +83,8 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
       message: 'Admin access not configured. Set ADMIN_ADDRESSES or ADMIN_WALLET env var.',
     });
   }
+  // Normalize via getAddress() for checksummed comparison consistency
+  const address = getAddress(rawAddress).toLowerCase();
   if (!ADMIN_ADDRESSES.includes(address)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
   }

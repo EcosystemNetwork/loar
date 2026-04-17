@@ -12,7 +12,7 @@ import { CommissionDialog } from '@/components/gallery/CommissionDialog';
 import { useGalleryBrowse, useGalleryFeatured, useGalleryTrending } from '@/hooks/useGallery';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Star, TrendingUp, Film } from 'lucide-react';
+import { ArrowLeft, Star, TrendingUp, Film, Plus } from 'lucide-react';
 
 export const Route = createFileRoute('/universe/$id/gallery')({
   component: UniverseGalleryPage,
@@ -22,11 +22,13 @@ function UniverseGalleryPage() {
   const { id } = useParams({ from: '/universe/$id/gallery' });
   const [mediaType, setMediaType] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [originFilter, setOriginFilter] = useState('all');
   const [commissionTarget, setCommissionTarget] = useState<any>(null);
 
   const { data: browseData, isLoading } = useGalleryBrowse({
     universeId: id,
     mediaType: mediaType as any,
+    origin: originFilter as any,
     sortBy: sortBy as any,
     limit: 40,
   });
@@ -45,6 +47,13 @@ function UniverseGalleryPage() {
         </Link>
         <Film className="h-5 w-5 text-pink-500" />
         <h1 className="text-xl font-bold">Universe Gallery</h1>
+        <div className="ml-auto">
+          <Link to="/upload" search={{ universeId: id }}>
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" /> Add Content
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Featured Section */}
@@ -64,7 +73,7 @@ function UniverseGalleryPage() {
                   className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
                 >
                   <img
-                    src={item.thumbnailUrl || item.imageUrl || '/placeholder.jpg'}
+                    src={item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg'}
                     alt={item.title || 'Featured'}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -100,6 +109,8 @@ function UniverseGalleryPage() {
         onMediaTypeChange={setMediaType}
         sortBy={sortBy}
         onSortByChange={setSortBy}
+        originFilter={originFilter}
+        onOriginFilterChange={setOriginFilter}
       />
 
       {/* All Content */}

@@ -54,7 +54,7 @@ LOAR supports two agent systems with programmatic access:
 | **Talent Agents**      | Human      | Represent creators, broker deals, earn commissions    |
 | **AI Agent Pipelines** | Autonomous | Multi-step content creation and universe management   |
 | **API Keys**           | Auth       | Programmatic access via `X-API-Key` header            |
-| **MCP Server**         | Gateway    | Exposes LOAR as 20 tools for MCP-compatible AI agents |
+| **MCP Server**         | Gateway    | Exposes LOAR as 25 tools for MCP-compatible AI agents |
 
 See [docs/agents.md](agents.md) for full documentation.
 

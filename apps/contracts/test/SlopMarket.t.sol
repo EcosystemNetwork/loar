@@ -8,6 +8,7 @@ import {ERC1155} from "@openzeppelin/token/ERC1155/ERC1155.sol";
 import {SlopMarket} from "../src/revenue/SlopMarket.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
 import {MockRightsRegistry} from "./mocks/MockRightsRegistry.sol";
+import {IRightsRegistry} from "../src/interfaces/IRightsRegistry.sol";
 
 // ── Minimal mock tokens ───────────────────────────────────────
 
@@ -85,7 +86,7 @@ contract SlopMarketTest is Test {
         market = new SlopMarket(platformAddr, address(router), address(registry), FEE_BPS);
 
         // Set content hash as monetizable (default is true in mock, but be explicit)
-        registry.setRights(CONTENT_HASH, MockRightsRegistry.RightsType.ORIGINAL);
+        registry.setRights(CONTENT_HASH, IRightsRegistry.RightsType.ORIGINAL);
     }
 
     // ── Helpers ──
@@ -221,7 +222,7 @@ contract SlopMarketTest is Test {
     function test_list721_revert_contentNotMonetizable() public {
         uint256 tokenId = _mintAndApprove721(seller);
         bytes32 badHash = keccak256("non-monetizable");
-        registry.setRights(badHash, MockRightsRegistry.RightsType.FROZEN);
+        registry.setRights(badHash, IRightsRegistry.RightsType.FROZEN);
 
         vm.prank(seller);
         vm.expectRevert(SlopMarket.ContentNotMonetizable.selector);
@@ -306,7 +307,7 @@ contract SlopMarketTest is Test {
         assertEq(market.activeERC721Listing(address(nft721), tokenId), 0);
 
         // Payment routed: 5% fee to treasury, 95% claimable by seller
-        uint256 expectedFee = (2 ether * FEE_BPS) / 10000;
+        uint256 expectedFee = (2 ether * uint256(FEE_BPS)) / 10000;
         uint256 expectedSeller = 2 ether - expectedFee;
         assertEq(treasury.balance - treasuryBefore, expectedFee);
         assertEq(router.claimable(seller), expectedSeller);
@@ -422,7 +423,7 @@ contract SlopMarketTest is Test {
         vm.prank(buyer);
         market.buy{value: 5 ether}(listingId, 10); // 10 * 0.5 = 5 ETH
 
-        uint256 expectedFee = (5 ether * FEE_BPS) / 10000;
+        uint256 expectedFee = (5 ether * uint256(FEE_BPS)) / 10000;
         uint256 expectedSeller = 5 ether - expectedFee;
         assertEq(treasury.balance - treasuryBefore, expectedFee);
         assertEq(router.claimable(seller), expectedSeller);

@@ -40,7 +40,7 @@ Add to `~/.claude/claude_desktop_config.json`:
 }
 ```
 
-## Available Tools (20)
+## Available Tools (25)
 
 ### Entities
 
@@ -79,6 +79,19 @@ Add to `~/.claude/claude_desktop_config.json`:
 - `loar_get_profile` — Get user profile
 - `loar_discover_profiles` — Search creator profiles
 - `loar_discover_talent_agents` — Browse talent agents
+
+### Media Generation (Extended)
+
+- `loar_generate_voice` — AI voice generation (TTS/cloning)
+- `loar_generate_3d` — AI 3D model generation
+- `loar_generate_sound_effect` — AI sound effect generation
+
+### Content & Commerce
+
+- `loar_create_content` — Create content entry
+- `loar_mint_content_nft` — Mint content as NFT
+- `loar_create_listing` — Create a marketplace listing
+- `loar_record_collab_episode` — Record a collaboration episode
 
 ### Credits
 

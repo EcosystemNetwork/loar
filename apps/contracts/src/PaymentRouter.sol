@@ -36,6 +36,12 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @notice Fee discount for $LOAR payments (default 500 = 5% discount)
     uint16 public loarFeeDiscountBps;
 
+    /// @notice Whether the $LOAR token address has been permanently locked.
+    ///         Once locked, setLoarToken() cannot be called again, preventing
+    ///         the owner from swapping to a different token while users have
+    ///         claimableLoar balances accrued against the original token.
+    bool public loarTokenLocked;
+
     event PaymentRouted(
         address indexed creator,
         uint256 creatorAmount,
@@ -200,10 +206,19 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
 
     // ── $LOAR Admin ─────────────────────────────────────────────
 
+    error LoarTokenIsLocked();
+
     function setLoarToken(address _loarToken) external onlyOwner {
         if (_loarToken == address(0)) revert ZeroAddress();
+        if (loarTokenLocked) revert LoarTokenIsLocked();
         loarToken = IERC20(_loarToken);
         emit LoarTokenUpdated(_loarToken);
+    }
+
+    /// @notice Permanently lock the $LOAR token address. Cannot be undone.
+    function lockLoarToken() external onlyOwner {
+        require(address(loarToken) != address(0), "Set loar token first");
+        loarTokenLocked = true;
     }
 
     error DiscountTooHigh();

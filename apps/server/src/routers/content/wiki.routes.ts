@@ -21,50 +21,54 @@ const eventWikisCol = () => {
 };
 
 export const wikiRouter = router({
-  /** List all characters from the wiki database. Falls back to JSON file. */
-  characters: publicProcedure.query(async () => {
-    try {
-      const snapshot = await charactersCol().get();
-      const result = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      return {
-        metadata: {
-          version: '5.0',
-          created_at: new Date().toISOString(),
-          total_characters: result.length,
-          last_updated: new Date().toISOString(),
-        },
-        characters: result.map((char: any) => ({
-          id: char.id,
-          character_name: char.character_name,
-          collection: char.collection,
-          token_id: char.token_id,
-          traits: char.traits as Record<string, string>,
-          rarity_rank: char.rarity_rank,
-          rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
-          image_url: char.image_url,
-          description: char.description,
-          created_at: char.created_at?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-        })),
-      };
-    } catch (error) {
-      console.error('Failed to load characters from database:', error);
+  /** List characters from the wiki database, optionally filtered by universe. */
+  characters: publicProcedure
+    .input(z.object({ universeId: z.string().optional() }).optional())
+    .query(async ({ input }) => {
       try {
-        const wikiPath = join(process.cwd(), '../character-wiki/simple_character_wiki.json');
-        const wikiData = readFileSync(wikiPath, 'utf-8');
+        const col = charactersCol();
+        const query = input?.universeId ? col.where('universe_id', '==', input.universeId) : col;
+        const snapshot = await query.get();
+        const result = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        return {
+          metadata: {
+            version: '5.0',
+            created_at: new Date().toISOString(),
+            total_characters: result.length,
+            last_updated: new Date().toISOString(),
+          },
+          characters: result.map((char: any) => ({
+            id: char.id,
+            character_name: char.character_name,
+            collection: char.collection,
+            token_id: char.token_id,
+            traits: char.traits as Record<string, string>,
+            rarity_rank: char.rarity_rank,
+            rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
+            image_url: char.image_url,
+            description: char.description,
+            created_at: char.created_at?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+          })),
+        };
+      } catch (error) {
+        console.error('Failed to load characters from database:', error);
         try {
-          return JSON.parse(wikiData);
-        } catch (parseErr) {
-          throw new Error('Character wiki fallback file contains invalid JSON');
+          const wikiPath = join(process.cwd(), '../character-wiki/simple_character_wiki.json');
+          const wikiData = readFileSync(wikiPath, 'utf-8');
+          try {
+            return JSON.parse(wikiData);
+          } catch (parseErr) {
+            throw new Error('Character wiki fallback file contains invalid JSON');
+          }
+        } catch (fileError) {
+          console.error('Failed to load character wiki file:', fileError);
+          throw wrapError(fileError, 'Could not load character data');
         }
-      } catch (fileError) {
-        console.error('Failed to load character wiki file:', fileError);
-        throw wrapError(fileError, 'Could not load character data');
       }
-    }
-  }),
+    }),
 
   /** Get a single character by ID. */
   character: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {

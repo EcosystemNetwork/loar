@@ -17,7 +17,7 @@
 import { useState, useCallback } from 'react';
 import { useChainId } from 'wagmi';
 import { useActiveAccount } from 'thirdweb/react';
-import { defineChain, prepareTransaction, sendTransaction } from 'thirdweb';
+import { defineChain, prepareTransaction, sendTransaction, estimateGas } from 'thirdweb';
 import { thirdwebClient } from '@/lib/thirdweb';
 import { encodeFunctionData, type Abi } from 'viem';
 
@@ -62,6 +62,14 @@ export function useWriteContract() {
           data: calldata,
           value: params.value,
         });
+
+        // Pre-flight gas estimation — catches reverts before broadcasting
+        try {
+          await estimateGas({ transaction: tx, account: thirdwebAccount });
+        } catch (gasErr) {
+          const reason = gasErr instanceof Error ? gasErr.message : String(gasErr);
+          throw new Error(`Transaction would fail: ${reason}`);
+        }
 
         const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
         const txHash = result.transactionHash;
@@ -132,6 +140,14 @@ export function useSendTransaction() {
           value: params.value,
           data: params.data as `0x${string}` | undefined,
         });
+
+        // Pre-flight gas estimation — catches reverts before broadcasting
+        try {
+          await estimateGas({ transaction: tx, account: thirdwebAccount });
+        } catch (gasErr) {
+          const reason = gasErr instanceof Error ? gasErr.message : String(gasErr);
+          throw new Error(`Transaction would fail: ${reason}`);
+        }
 
         const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
         const txHash = result.transactionHash;

@@ -5,6 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, SlidersHorizontal } from 'lucide-react';
 
+const ORIGIN_TYPES = [
+  { value: 'all', label: 'All Origins' },
+  { value: 'generated', label: 'AI Generated' },
+  { value: 'uploaded', label: 'Uploaded' },
+];
+
 interface GalleryFiltersProps {
   mediaType: string;
   onMediaTypeChange: (type: string) => void;
@@ -12,6 +18,8 @@ interface GalleryFiltersProps {
   onSortByChange: (sort: string) => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  originFilter?: string;
+  onOriginFilterChange?: (origin: string) => void;
 }
 
 const MEDIA_TYPES = [
@@ -36,6 +44,8 @@ export function GalleryFilters({
   onSortByChange,
   searchQuery,
   onSearchChange,
+  originFilter,
+  onOriginFilterChange,
 }: GalleryFiltersProps) {
   return (
     <div className="space-y-3">
@@ -84,6 +94,23 @@ export function GalleryFilters({
           ))}
         </div>
       </div>
+
+      {/* Origin filter */}
+      {onOriginFilterChange && (
+        <div className="flex items-center gap-1">
+          {ORIGIN_TYPES.map((type) => (
+            <Button
+              key={type.value}
+              variant={(originFilter ?? 'all') === type.value ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 text-xs whitespace-nowrap"
+              onClick={() => onOriginFilterChange(type.value)}
+            >
+              {type.label}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
  * Single source of truth for RPC clients across all server routers.
  * Replaces duplicated client creation in credits, staking, treasury, etc.
  */
-import { createPublicClient, http, type PublicClient } from 'viem';
+import { createPublicClient, http } from 'viem';
 import { sepolia, baseSepolia, base } from 'viem/chains';
 
 const SUPPORTED_CHAINS = {
@@ -27,14 +27,16 @@ const SUPPORTED_CHAINS = {
 
 export const ALLOWED_CHAIN_IDS = new Set(Object.keys(SUPPORTED_CHAINS).map(Number));
 
-const clientCache = new Map<number, PublicClient>();
+type ChainClient = ReturnType<typeof createPublicClient>;
+
+const clientCache = new Map<number, ChainClient>();
 
 /**
  * Get a public client for the specified chain.
  * Defaults to Sepolia if chainId is not provided.
  * Throws if chain is not supported.
  */
-export function getChainClient(chainId?: number): PublicClient {
+export function getChainClient(chainId?: number): ChainClient {
   const id = chainId ?? sepolia.id;
 
   if (!ALLOWED_CHAIN_IDS.has(id)) {
@@ -43,15 +45,17 @@ export function getChainClient(chainId?: number): PublicClient {
     );
   }
 
-  let client = clientCache.get(id);
-  if (!client) {
-    const config = SUPPORTED_CHAINS[id as keyof typeof SUPPORTED_CHAINS];
-    client = createPublicClient({
-      chain: config.chain,
-      transport: http(config.rpcUrl),
-    });
-    clientCache.set(id, client);
-  }
+  const cached = clientCache.get(id);
+  if (cached) return cached;
+
+  const config = SUPPORTED_CHAINS[id as keyof typeof SUPPORTED_CHAINS];
+  // Cast needed: pnpm hoists multiple viem copies with different peer-dep
+  // combinations, causing structurally-identical types to be considered unrelated.
+  const client = createPublicClient({
+    chain: config.chain,
+    transport: http(config.rpcUrl),
+  }) as ChainClient;
+  clientCache.set(id, client);
 
   return client;
 }

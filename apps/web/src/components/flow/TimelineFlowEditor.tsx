@@ -25,7 +25,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Film, Plus, Settings, Clock } from 'lucide-react';
+import { Film, Plus, Settings, Clock, ArrowLeftRight } from 'lucide-react';
+import { useSwapNodes } from '@/hooks/useTimeline';
 
 // Register custom node types
 const nodeTypes = {
@@ -54,6 +55,12 @@ export function TimelineFlowEditor({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node<TimelineNodeData> | null>(null);
   const [eventCounter, setEventCounter] = useState(1);
+
+  // Swap mode state
+  const [swapMode, setSwapMode] = useState(false);
+  const [swapNodeA, setSwapNodeA] = useState<Node<TimelineNodeData> | null>(null);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const { writeAsync: swapNodesOnChain } = useSwapNodes();
 
   // Timeline parameters
   const [timelineTitle, setTimelineTitle] = useState('My Timeline');
@@ -178,6 +185,54 @@ export function TimelineFlowEditor({
     [setEdges]
   );
 
+  // Handle swap execution
+  const executeSwap = useCallback(
+    async (nodeA: Node<TimelineNodeData>, nodeB: Node<TimelineNodeData>) => {
+      const idA = parseInt(nodeA.data.eventId || '0');
+      const idB = parseInt(nodeB.data.eventId || '0');
+      if (!idA || !idB || idA === idB) return;
+
+      setIsSwapping(true);
+      try {
+        await swapNodesOnChain(idA, idB);
+
+        // Swap the data in the local ReactFlow state for immediate feedback
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === nodeA.id) {
+              return {
+                ...n,
+                data: {
+                  ...nodeB.data,
+                  eventId: nodeA.data.eventId,
+                  blockchainNodeId: nodeA.data.blockchainNodeId,
+                },
+              };
+            }
+            if (n.id === nodeB.id) {
+              return {
+                ...n,
+                data: {
+                  ...nodeA.data,
+                  eventId: nodeB.data.eventId,
+                  blockchainNodeId: nodeB.data.blockchainNodeId,
+                },
+              };
+            }
+            return n;
+          })
+        );
+      } catch (err) {
+        console.error('Swap failed:', err);
+      } finally {
+        setIsSwapping(false);
+        setSwapMode(false);
+        setSwapNodeA(null);
+      }
+    },
+    [swapNodesOnChain, setNodes]
+  );
+
   // Handle node selection
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: any) => {
@@ -186,22 +241,36 @@ export function TimelineFlowEditor({
         if (node.data.eventId && node.data.universeId) {
           window.location.href = `/timeline?universe=${node.data.universeId}&event=${node.data.eventId}`;
         }
-      } else {
-        // In edit mode, select the node for editing
-        setSelectedNode(node);
-        if (node.data.nodeType === 'scene') {
-          setSelectedEventTitle(node.data.label);
-          // Extract description string from object if needed
-          const rawDesc = node.data.description;
-          const description =
-            rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-              ? String((rawDesc as any).description)
-              : String(rawDesc || '');
-          setSelectedEventDescription(description);
+        return;
+      }
+
+      // Swap mode: select two nodes then execute
+      if (swapMode && node.data.nodeType !== 'add') {
+        if (!swapNodeA) {
+          setSwapNodeA(node);
+          return;
         }
+        if (node.id === swapNodeA.id) {
+          setSwapNodeA(null);
+          return;
+        }
+        executeSwap(swapNodeA, node);
+        return;
+      }
+
+      // Normal edit mode
+      setSelectedNode(node);
+      if (node.data.nodeType === 'scene') {
+        setSelectedEventTitle(node.data.label);
+        const rawDesc = node.data.description;
+        const description =
+          rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+            ? String((rawDesc as any).description)
+            : String(rawDesc || '');
+        setSelectedEventDescription(description);
       }
     },
-    [readOnly]
+    [readOnly, swapMode, swapNodeA, executeSwap]
   );
 
   // Initialize with start event
@@ -322,6 +391,60 @@ export function TimelineFlowEditor({
               </CardContent>
             </Card>
 
+            {/* Swap Nodes */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Swap Nodes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!swapMode ? (
+                  <Button
+                    onClick={() => {
+                      setSwapMode(true);
+                      setSwapNodeA(null);
+                      setSelectedNode(null);
+                    }}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <ArrowLeftRight className="h-4 w-4 mr-2" />
+                    Enter Swap Mode
+                  </Button>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      {isSwapping
+                        ? 'Swapping on-chain...'
+                        : !swapNodeA
+                          ? 'Click the first node to swap'
+                          : `Selected: Event ${swapNodeA.data.eventId}. Click the second node.`}
+                    </p>
+                    {swapNodeA && (
+                      <div className="flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20">
+                        <div className="w-2 h-2 rounded-full bg-primary" />
+                        <span className="text-sm font-medium">Node {swapNodeA.data.eventId}</span>
+                      </div>
+                    )}
+                    <Button
+                      onClick={() => {
+                        setSwapMode(false);
+                        setSwapNodeA(null);
+                      }}
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      disabled={isSwapping}
+                    >
+                      Cancel Swap
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Selected Event */}
             {selectedNode && selectedNode.data.nodeType === 'scene' && (
               <Card>
@@ -389,7 +512,11 @@ export function TimelineFlowEditor({
         <ReactFlowProvider>
           <div ref={reactFlowWrapper} className="h-full w-full">
             <ReactFlow
-              nodes={nodes}
+              nodes={nodes.map((n) =>
+                swapMode && swapNodeA?.id === n.id
+                  ? { ...n, className: 'ring-4 ring-primary rounded-lg' }
+                  : n
+              )}
               edges={edges}
               onNodesChange={readOnly ? undefined : onNodesChange}
               onEdgesChange={readOnly ? undefined : onEdgesChange}
@@ -418,8 +545,23 @@ export function TimelineFlowEditor({
                 position="top-center"
                 className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border"
               >
-                <h2 className="text-lg font-semibold">{timelineTitle}</h2>
-                <p className="text-sm text-muted-foreground">{timelineDescription}</p>
+                {swapMode ? (
+                  <div className="flex items-center gap-2 text-primary">
+                    <ArrowLeftRight className="h-4 w-4" />
+                    <span className="font-semibold">
+                      {isSwapping
+                        ? 'Swapping...'
+                        : !swapNodeA
+                          ? 'Select first node to swap'
+                          : `Node ${swapNodeA.data.eventId} selected — click second node`}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-lg font-semibold">{timelineTitle}</h2>
+                    <p className="text-sm text-muted-foreground">{timelineDescription}</p>
+                  </>
+                )}
               </Panel>
             </ReactFlow>
           </div>

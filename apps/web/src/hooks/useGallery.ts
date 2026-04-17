@@ -12,6 +12,7 @@ export function useGalleryBrowse(options: {
   universeId?: string;
   creatorUid?: string;
   mediaType?: 'video' | 'image' | 'audio' | '3d' | 'all';
+  origin?: 'all' | 'generated' | 'uploaded';
   sortBy?: 'newest' | 'trending' | 'price_asc' | 'price_desc';
   limit?: number;
   cursor?: string;

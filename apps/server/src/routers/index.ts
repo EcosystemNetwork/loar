@@ -32,6 +32,7 @@ import { db, firebaseAvailable } from '../lib/firebase';
 import { universesRouter } from './universes/universes.routes';
 import { contentRouter } from './content/content.routes';
 import { wikiRouter } from './content/wiki.routes';
+import { commentsRouter } from './content/comments.routes';
 import { generationRouter } from './generation/generation.routes';
 import { imageRouter } from './generation/image.routes';
 import { marketplaceRouter } from './marketplace/marketplace.routes';
@@ -153,6 +154,7 @@ export const appRouter = router({
   // ── Content domain ──────────────────────────────────────────────────
   content: contentRouter,
   wiki: wikiRouter,
+  comments: commentsRouter,
   entities: entitiesRouter,
   media: mediaRouter,
 

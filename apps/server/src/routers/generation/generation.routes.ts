@@ -217,13 +217,14 @@ async function autoPublishVideoToGallery(opts: {
   model: string;
   universeId?: string;
   generationId: string;
+  thumbnailUrl?: string;
 }) {
   const now = new Date();
   await contentCol().add({
     title: opts.prompt.slice(0, 100) || 'Generated Video',
     description: opts.prompt,
     mediaUrl: opts.videoUrl,
-    thumbnailUrl: null,
+    thumbnailUrl: opts.thumbnailUrl || null,
     mediaType: 'ai-video',
     classification: 'original',
     tags: [],
@@ -761,6 +762,7 @@ export const generationRouter = router({
                 prompt: originalPrompt,
                 model: fallbackResult.fallbackModelId,
                 universeId: input.universeId,
+                thumbnailUrl: input.imageUrl,
                 generationId,
               }).catch((err: Error) =>
                 console.error('[video] gallery publish failed:', err.message)
@@ -839,6 +841,7 @@ export const generationRouter = router({
           model: finalModelId,
           universeId: input.universeId,
           generationId,
+          thumbnailUrl: input.imageUrl,
         }).catch((err) => console.error('[video] gallery publish failed:', err.message));
 
         return {
@@ -1210,6 +1213,7 @@ export const generationRouter = router({
           prompt: input.prompt,
           model: input.model || 'fal-ai/ltx-video',
           generationId: legacyGenId,
+          thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy video] gallery publish failed:', err.message)
         );
@@ -1272,6 +1276,7 @@ export const generationRouter = router({
           prompt: input.prompt,
           model: 'fal-ai/veo3.1/fast/image-to-video',
           generationId: veo3GenId,
+          thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy veo3] gallery publish failed:', err.message)
         );
@@ -1336,6 +1341,7 @@ export const generationRouter = router({
           prompt: input.prompt,
           model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
           generationId: klingGenId,
+          thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy kling] gallery publish failed:', err.message)
         );
@@ -1400,6 +1406,7 @@ export const generationRouter = router({
           prompt: input.prompt,
           model: 'fal-ai/wan-25-preview/image-to-video',
           generationId: wan25GenId,
+          thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy wan25] gallery publish failed:', err.message)
         );
@@ -1463,6 +1470,7 @@ export const generationRouter = router({
           prompt: input.prompt,
           model: 'fal-ai/sora-2/image-to-video',
           generationId: soraGenId,
+          thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy sora] gallery publish failed:', err.message)
         );

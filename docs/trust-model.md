@@ -8,33 +8,37 @@ The `UniverseManager` contract inherits OpenZeppelin `Ownable`. The **deployer w
 
 ### Owner Powers
 
-| Function                                | What it does                                                                          | Risk                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `setTokenDeployer(address)`             | Changes which contract is used to deploy universe tokens + governance                 | Owner can swap to a malicious deployer                     |
-| `setLpRecipient(address)`               | Changes where the LP half of mint fees (0.025 ETH) is sent                            | Owner can redirect LP fees                                 |
-| `setTeamFeeRecipient(address)`          | Changes where team fees are sent                                                      | Owner can redirect team fees                               |
-| `claimTeamFee(token)`                   | Transfers full ERC-20 balance of any token held by the contract to `teamFeeRecipient` | Owner can claim any ERC-20 the contract holds              |
-| `claimEth(recipient)`                   | Sends all non-reserved ETH in the contract to any address                             | Owner can claim surplus ETH (but NOT credit-fund ETH)      |
-| `consumeCreditFund(universeId, amount)` | Marks credit-fund ETH as consumed                                                     | Owner signals off-chain credit conversion completed        |
-| `setHook(address, bool)`                | Enables/disables Uniswap v4 hook contracts                                            | Owner controls which hooks are allowed                     |
-| `setLocker(address, hook, bool)`        | Enables/disables LP locker contracts per hook                                         | Owner controls which lockers are allowed                   |
-| `setDeprecated(bool)`                   | Disables new universe creation                                                        | Owner can freeze new mints (existing universes still work) |
+| Function                                  | What it does                                                                          | Risk                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `setTokenDeployer(address)`               | Changes which contract is used to deploy universe tokens + governance                 | Owner can swap to a malicious deployer                     |
+| `setTeamFeeRecipient(address)`            | Changes where team fees are sent                                                      | Owner can redirect team fees                               |
+| `claimTeamFee(token)`                     | Transfers full ERC-20 balance of any token held by the contract to `teamFeeRecipient` | Owner can claim any ERC-20 the contract holds              |
+| `claimEth(recipient)`                     | Sends all non-reserved ETH in the contract to any address                             | Owner can claim surplus ETH (but NOT LP-seed ETH)          |
+| `setHook(address, bool)`                  | Enables/disables Uniswap v4 hook contracts                                            | Owner controls which hooks are allowed                     |
+| `setLocker(address, hook, bool)`          | Enables/disables LP locker contracts per hook                                         | Owner controls which lockers are allowed                   |
+| `setMintFee(uint256)`                     | Changes the ETH fee required to create a universe                                     | Owner can change the cost barrier to entry                 |
+| `setWeth(address)`                        | Changes the WETH address (locked after first universe creation)                       | One-time; cannot be changed after any universe exists      |
+| `setBondingCurveHalted(universeId, bool)` | Emergency halt/resume trading on a universe's bonding curve                           | Owner can freeze trading on any pre-graduation universe    |
+| `setDeprecated(bool)`                     | Disables new universe creation                                                        | Owner can freeze new mints (existing universes still work) |
 
 ### What the owner CANNOT do
 
-- **Drain credit-fund ETH.** `claimEth` explicitly subtracts `totalCreditFundsHeld` before computing the claimable balance. Universe credit funds are protected.
+- **Drain LP-seed ETH.** `claimEth` explicitly subtracts `totalLpSeedsHeld` before computing the claimable balance. LP seeds reserved for universe token graduation are protected.
 - **Modify existing universes.** Once a `Universe` contract is deployed, its admin is the creator (or the governor after token deployment). The manager cannot change universe state.
-- **Mint universe tokens.** Token deployment requires the universe admin to call `deployUniverseToken`. The manager owner cannot deploy tokens on behalf of a universe.
-- **Move LP-locked tokens.** Once liquidity is placed via the locker, neither the manager owner nor the universe admin can withdraw it (locked by the locker contract).
+- **Mint universe tokens.** Token deployment requires the universe NFT owner to call `deployUniverseToken`. The manager owner cannot deploy tokens on behalf of a universe.
+- **Move LP-locked tokens.** Once liquidity is placed via the locker at graduation, neither the manager owner nor the universe admin can withdraw it (locked by the locker contract).
+- **Change WETH after first universe.** `setWeth` reverts once `latestId > 0`.
 
-### Credit Fund Flow
+### LP Seed Flow
 
-On universe creation, the 0.05 ETH mint fee is split:
+On universe creation, 100% of the mint fee (default 0.05 ETH) is held in the contract as an LP seed:
 
-- 50% (0.025 ETH) → `lpRecipient` (immediate transfer)
-- 50% (0.025 ETH) → `universeCreditFund[id]` (held in contract)
+- `universeLpSeed[id]` tracks the per-universe seed balance
+- `totalLpSeedsHeld` tracks the aggregate (prevents `claimEth` from draining seeds)
 
-Credit funds are reserved on-chain and tracked by `totalCreditFundsHeld`. The platform converts these to off-chain generation credits via `consumeCreditFund`, which the owner calls after crediting the universe's pool in Firestore. This is a trusted off-chain bridge — the owner could consume funds without actually issuing credits (or issue credits without consuming funds).
+When the universe creator calls `deployUniverseToken`, the LP seed is forwarded to the bonding curve as initial reserve ETH. When the bonding curve graduates (hits its target), the raised ETH + unsold tokens are wrapped to WETH and permanently locked in a Uniswap v4 LP position via the locker contract.
+
+There is no credit-fund mechanism in the current contract. Off-chain generation credits are managed entirely in Firestore via the server's CreditManager tRPC router.
 
 ## Server-Side Admin
 
@@ -91,8 +95,10 @@ All credit purchase paths verify payment before issuing credits:
 
 ## Planned Improvements for Mainnet
 
-- [ ] Transfer `UniverseManager` ownership to a multisig (Gnosis Safe)
-- [ ] Add a timelock contract between the multisig and the manager
+- [ ] Transfer `UniverseManager` ownership to a multisig (Gnosis Safe, 3-of-5 minimum)
+- [ ] Add a `TimelockController` (48–72h delay) between the multisig and all owned contracts
 - [ ] Publish all admin transactions via an on-chain audit log
-- [ ] Move credit-fund conversion to a trustless bridge (e.g., oracle-verified)
+- [ ] Add `Pausable` to BondingCurve and other value-holding contracts (controlled by timelock)
 - [ ] Add on-chain role-based access control to replace single `Ownable`
+- [ ] Professional security audit (Trail of Bits / Spearbit / Cantina) before any mainnet deployment
+- [ ] Public bug bounty (Immunefi) live before mainnet

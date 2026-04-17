@@ -10,6 +10,8 @@ import {LoarToken} from "../src/LoarToken.sol";
 import {LoarFaucet} from "../src/LoarFaucet.sol";
 import {UniverseManager} from "../src/UniverseManager.sol";
 import {UniverseTokenDeployer} from "../src/UniverseTokenDeployer.sol";
+import {UniverseFactory} from "../src/factories/UniverseFactory.sol";
+import {UniverseMetadataRenderer} from "../src/UniverseMetadataRenderer.sol";
 import {LoarFeeLocker} from "../src/LoarFeeLocker.sol";
 
 // Revenue infrastructure
@@ -93,8 +95,18 @@ contract DeployAllScript is Script {
         }
 
         // ── Phase 2: Core Protocol ──────────────────────────────────
+        UniverseFactory uf = new UniverseFactory();
+        console.log("[2] UniverseFactory:", address(uf));
+
+        UniverseMetadataRenderer umr = new UniverseMetadataRenderer();
+        console.log("[2] MetadataRenderer:", address(umr));
+
         UniverseManager um = new UniverseManager(treasury, wethAddr);
         console.log("[2] UniverseManager:", address(um));
+
+        um.setUniverseFactory(address(uf));
+        um.setMetadataRenderer(address(umr));
+        console.log("[2] Factory + Renderer wired");
 
         UniverseTokenDeployer utd = new UniverseTokenDeployer(address(um));
         console.log("[2] UniverseTokenDeployer:", address(utd));

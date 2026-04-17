@@ -235,7 +235,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   data.onEditScene?.(data.eventId || '');
                 }}
                 className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Edit scene segments"
+                title="Change video"
               >
                 <Film className="h-4 w-4" />
               </Button>

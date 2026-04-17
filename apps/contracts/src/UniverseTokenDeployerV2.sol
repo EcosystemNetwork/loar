@@ -75,6 +75,17 @@ interface IUniverseGovernorFactory {
     function deployGovernor(address token) external returns (address);
 }
 
+interface IBondingCurveFactory {
+    function deployBondingCurve(
+        address token,
+        address universeManager,
+        uint256 universeId,
+        uint256 totalCurveSupply,
+        uint256 graduationEth,
+        uint16 maxBuyBps
+    ) external returns (address);
+}
+
 /**
  * @title UniverseTokenDeployerV2
  * @notice Token deployer with optional creator vesting via TokenVesting contract.
@@ -99,11 +110,16 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
     uint16 public constant MIN_TREASURY_BPS = 200;
     uint16 public constant MAX_CREATOR_BPS = 4000;
 
+    // Bonding curve defaults
+    uint256 public constant DEFAULT_GRADUATION_ETH = 4 ether;
+    uint16 public constant DEFAULT_MAX_BUY_BPS = 200; // 2% of curve supply per tx
+
     // ─── Vesting configuration ─────────────────────────────────────────
     ITokenVesting public vestingContract;
     uint64 public vestingCliff = 30 days;      // 30-day cliff
     uint64 public vestingDuration = 180 days;  // 6-month linear vest
 
+    IBondingCurveFactory public bondingCurveFactory;
     address public owner;
 
     error HookNotEnabled();
@@ -112,6 +128,7 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
     error AllocationSupplyMismatch();
     error OnlyUniverseManager();
     error OnlyOwner();
+    error BondingCurveFactoryNotSet();
 
     event TokenDeployed(uint256 indexed universeId, address indexed tokenAddress, address indexed hook, address locker);
     event TokenAllocation(uint256 indexed universeId, uint256 lpAmount, uint256 creatorAmount, uint256 treasuryAmount, uint256 communityAmount);
@@ -123,9 +140,10 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
         _;
     }
 
-    constructor(address _universeManager, address _vestingContract) {
+    constructor(address _universeManager, address _vestingContract, address _bondingCurveFactory) {
         universeManager = _universeManager;
         vestingContract = ITokenVesting(_vestingContract);
+        bondingCurveFactory = IBondingCurveFactory(_bondingCurveFactory);
         owner = msg.sender;
     }
 
@@ -151,6 +169,10 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
         emit VestingConfigUpdated(_vestingContract, _cliff, _duration);
     }
 
+    function setBondingCurveFactory(address _factory) external onlyOwner {
+        bondingCurveFactory = IBondingCurveFactory(_factory);
+    }
+
     function transferOwnership(address newOwner) external onlyOwner {
         owner = newOwner;
     }
@@ -160,8 +182,9 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
     function deployTokenAndGovernance(
         IUniverseManager.DeploymentConfig memory deploymentConfig,
         uint256 universeId
-    ) external nonReentrant returns (address tokenAddress, address governor) {
+    ) external nonReentrant returns (address tokenAddress, address governor, address bondingCurveAddress) {
         if (msg.sender != universeManager) revert OnlyUniverseManager();
+        if (address(bondingCurveFactory) == address(0)) revert BondingCurveFactoryNotSet();
 
         // Deploy the ERC20 token (uses LoarDeployer library via delegatecall pattern)
         tokenAddress = _deployToken(deploymentConfig.tokenConfig);
@@ -191,11 +214,22 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
         uint256 communityAmount = TOKEN_SUPPLY - lpAmount - creatorAmount - treasuryAmount;
         if (lpAmount + creatorAmount + treasuryAmount + communityAmount != TOKEN_SUPPLY) revert AllocationSupplyMismatch();
 
-        // LP → UniverseManager for pool locking
-        IERC20(tokenAddress).safeTransfer(universeManager, lpAmount);
+        // Deploy bonding curve via factory
+        bondingCurveAddress = bondingCurveFactory.deployBondingCurve(
+            tokenAddress,
+            universeManager,
+            universeId,
+            lpAmount,
+            DEFAULT_GRADUATION_ETH,
+            DEFAULT_MAX_BUY_BPS
+        );
+
+        // LP (curve) tokens → BondingCurve contract for sale
+        IERC20(tokenAddress).safeTransfer(bondingCurveAddress, lpAmount);
 
         // Creator allocation → vesting contract (if configured) or direct
         address creator = deploymentConfig.tokenConfig.tokenAdmin;
+        require(creator != address(0) || creatorAmount == 0, "Creator address required when creatorBps > 0");
         if (creator != address(0) && creatorAmount > 0) {
             if (address(vestingContract) != address(0)) {
                 // Route through vesting: approve + create schedule
@@ -212,8 +246,6 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
                 // No vesting — direct transfer (V1 behavior)
                 IERC20(tokenAddress).safeTransfer(creator, creatorAmount);
             }
-        } else {
-            IERC20(tokenAddress).safeTransfer(universeManager, creatorAmount);
         }
 
         // Treasury + community → UniverseManager

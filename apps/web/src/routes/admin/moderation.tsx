@@ -71,8 +71,11 @@ function ModerationDashboard() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: (data: { contentId: string; newStatus: string; reason?: string }) =>
-      trpcClient.moderation.updateContentStatus.mutate(data as any),
+    mutationFn: (data: {
+      contentId: string;
+      newStatus: 'active' | 'flagged' | 'under_review' | 'hidden' | 'removed' | 'reinstated';
+      reason?: string;
+    }) => trpcClient.moderation.updateContentStatus.mutate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mod-flags'] });
       toast.success('Content status updated');
@@ -115,9 +118,9 @@ function ModerationDashboard() {
   }
 
   const statusActions = [
-    { status: 'active', label: 'Restore', icon: RotateCcw, color: 'text-green-500' },
-    { status: 'hidden', label: 'Hide', icon: EyeOff, color: 'text-yellow-500' },
-    { status: 'removed', label: 'Remove', icon: Trash2, color: 'text-red-500' },
+    { status: 'active' as const, label: 'Restore', icon: RotateCcw, color: 'text-green-500' },
+    { status: 'hidden' as const, label: 'Hide', icon: EyeOff, color: 'text-yellow-500' },
+    { status: 'removed' as const, label: 'Remove', icon: Trash2, color: 'text-red-500' },
   ];
 
   return (

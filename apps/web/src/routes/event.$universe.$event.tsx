@@ -160,10 +160,10 @@ function EventPage() {
 
   // Fetch characters to get images for character elements
   const { data: charactersData } = useQuery({
-    queryKey: ['characters'],
+    queryKey: ['characters', universeId],
     queryFn: async () => {
       try {
-        const result = await trpcClient.wiki.characters.query();
+        const result = await trpcClient.wiki.characters.query({ universeId });
         return result;
       } catch (error) {
         return null;

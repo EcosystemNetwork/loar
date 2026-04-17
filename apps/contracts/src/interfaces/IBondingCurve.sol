@@ -24,6 +24,7 @@ interface IBondingCurve {
         uint256 lpTokens
     );
     event TradingHalted(uint256 indexed universeId);
+    event TradingResumed(uint256 indexed universeId);
 
     // ── Errors ─────────────────────────────────────────────────────────
     error CurveGraduated();
@@ -34,6 +35,7 @@ interface IBondingCurve {
     error ZeroAmount();
     error TransferFailed();
     error NotGraduationReady();
+    error SlopeIsZero();
 
     // ── Write functions ────────────────────────────────────────────────
 
@@ -50,10 +52,19 @@ interface IBondingCurve {
     /// @dev Can be called by anyone once ethRaised >= graduationEth.
     function graduate() external;
 
+    /// @notice Emergency halt or resume trading. Only callable by universeManager.
+    function setTradingHalted(bool halted) external;
+
     // ── View functions ─────────────────────────────────────────────────
 
-    /// @notice Current price per token (slope * tokensSold).
+    /// @notice Current marginal price per token-unit (slope * tokensSold).
+    ///         Returns 0 for most of the curve due to sub-wei precision.
+    ///         Use getCurrentPricePerToken() for frontend display.
     function getCurrentPrice() external view returns (uint256);
+
+    /// @notice Cost in wei to buy 1 whole token (1e18 units) at the current position.
+    ///         Suitable for frontend price display.
+    function getCurrentPricePerToken() external view returns (uint256);
 
     /// @notice Preview how many tokens an ETH amount would buy.
     function getTokensForEth(uint256 ethAmount) external view returns (uint256);

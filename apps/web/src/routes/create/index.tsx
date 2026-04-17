@@ -229,6 +229,7 @@ function CreateHub() {
         {/* Upload Media — separate card */}
         <Link
           to="/upload"
+          search={{}}
           className="group relative flex flex-col gap-3 p-6 rounded-xl border bg-gradient-to-br from-pink-500/20 to-rose-500/20 border-pink-500/30 hover:scale-[1.02] transition-all duration-200 hover:shadow-lg"
         >
           <div className="flex items-center gap-3">

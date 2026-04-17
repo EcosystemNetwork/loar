@@ -1070,6 +1070,7 @@ export const imageRouter = router({
         style: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']).optional(),
         saveToDatabase: z.boolean().optional().default(true),
         detailedVisualDescription: z.string().optional(),
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -1116,6 +1117,7 @@ export const imageRouter = router({
             image_url: imageResult.imageUrl,
             description: input.description,
             detailed_visual_description: input.detailedVisualDescription || null,
+            universe_id: input.universeId || null,
             created_at: new Date(),
             updated_at: new Date(),
           });
@@ -1164,6 +1166,7 @@ export const imageRouter = router({
         imageUrl: z.string().min(1, 'Image URL is required'),
         style: z.enum(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk']),
         detailedVisualDescription: z.string().optional(),
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -1180,6 +1183,7 @@ export const imageRouter = router({
           image_url: input.imageUrl,
           description: input.description,
           detailed_visual_description: input.detailedVisualDescription || null,
+          universe_id: input.universeId || null,
           created_at: new Date(),
           updated_at: new Date(),
         });
