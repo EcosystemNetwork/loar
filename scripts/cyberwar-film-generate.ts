@@ -706,26 +706,9 @@ async function main() {
   let previousId = latestId;
   let completed = 0;
 
-  // Skip already-completed scenes from previous runs
-  const DONE_IDS = new Set([
-    'S01',
-    'S02',
-    'S03',
-    'S04',
-    'S05',
-    'S06',
-    'S07',
-    'S08',
-    'S09',
-    'S10',
-    'S11',
-    'S12',
-    'S13',
-    'S14',
-    'S15',
-    'S16',
-    'S17',
-  ]);
+  // Cleanup pass — only run the 7 missing scenes
+  const TODO_IDS = new Set(['S48', 'S49', 'S59', 'S60', 'S61', 'S62', 'S63']);
+  const DONE_IDS = new Set(SCENES.map((s) => s.id).filter((id) => !TODO_IDS.has(id)));
 
   for (let i = 0; i < SCENES.length; i++) {
     if (DONE_IDS.has(SCENES[i].id)) {
