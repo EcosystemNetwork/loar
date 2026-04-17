@@ -71,6 +71,7 @@ import { Route as AgentsUidRouteImport } from './routes/agents/$uid'
 import { Route as AdsNewRouteImport } from './routes/ads/new'
 import { Route as AdsSlotIdRouteImport } from './routes/ads/$slotId'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
+import { Route as AdsSeedsIndexRouteImport } from './routes/ads/seeds/index'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
@@ -79,6 +80,8 @@ import { Route as UniverseIdDeployTokenRouteImport } from './routes/universe/$id
 import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$address.polls'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
+import { Route as AdsSeedsNewRouteImport } from './routes/ads/seeds/new'
+import { Route as AdsSeedsSeedIdRouteImport } from './routes/ads/seeds/$seedId'
 
 const VideosRoute = VideosRouteImport.update({
   id: '/videos',
@@ -390,6 +393,11 @@ const AdminModerationRoute = AdminModerationRouteImport.update({
   path: '/admin/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdsSeedsIndexRoute = AdsSeedsIndexRouteImport.update({
+  id: '/ads/seeds/',
+  path: '/ads/seeds/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WikiEntityIdRoute = WikiEntityIdRouteImport.update({
   id: '/wiki/entity/$id',
   path: '/wiki/entity/$id',
@@ -428,6 +436,16 @@ const TokensCreatorAddressRoute = TokensCreatorAddressRouteImport.update({
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   id: '/event/$universe/$event',
   path: '/event/$universe/$event',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsSeedsNewRoute = AdsSeedsNewRouteImport.update({
+  id: '/ads/seeds/new',
+  path: '/ads/seeds/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsSeedsSeedIdRoute = AdsSeedsSeedIdRouteImport.update({
+  id: '/ads/seeds/$seedId',
+  path: '/ads/seeds/$seedId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -494,6 +512,8 @@ export interface FileRoutesByFullPath {
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
+  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
+  '/ads/seeds/new': typeof AdsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
@@ -502,6 +522,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/ads/seeds/': typeof AdsSeedsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -566,6 +587,8 @@ export interface FileRoutesByTo {
   '/sell': typeof SellIndexRoute
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
+  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
+  '/ads/seeds/new': typeof AdsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
@@ -574,6 +597,7 @@ export interface FileRoutesByTo {
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/ads/seeds': typeof AdsSeedsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -639,6 +663,8 @@ export interface FileRoutesById {
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
+  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
+  '/ads/seeds/new': typeof AdsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
@@ -647,6 +673,7 @@ export interface FileRoutesById {
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/ads/seeds/': typeof AdsSeedsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -713,6 +740,8 @@ export interface FileRouteTypes {
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
+    | '/ads/seeds/$seedId'
+    | '/ads/seeds/new'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
     | '/universe/$address/polls'
@@ -721,6 +750,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/ads/seeds/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -785,6 +815,8 @@ export interface FileRouteTypes {
     | '/sell'
     | '/tokens'
     | '/wiki'
+    | '/ads/seeds/$seedId'
+    | '/ads/seeds/new'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
     | '/universe/$address/polls'
@@ -793,6 +825,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/ads/seeds'
   id:
     | '__root__'
     | '/'
@@ -857,6 +890,8 @@ export interface FileRouteTypes {
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
+    | '/ads/seeds/$seedId'
+    | '/ads/seeds/new'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
     | '/universe/$address/polls'
@@ -865,6 +900,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gen-config'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/ads/seeds/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -929,11 +965,14 @@ export interface RootRouteChildren {
   SellIndexRoute: typeof SellIndexRoute
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
+  AdsSeedsSeedIdRoute: typeof AdsSeedsSeedIdRoute
+  AdsSeedsNewRoute: typeof AdsSeedsNewRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
   UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
   WikiEntityIdRoute: typeof WikiEntityIdRoute
+  AdsSeedsIndexRoute: typeof AdsSeedsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1372,6 +1411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminModerationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ads/seeds/': {
+      id: '/ads/seeds/'
+      path: '/ads/seeds'
+      fullPath: '/ads/seeds/'
+      preLoaderRoute: typeof AdsSeedsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/wiki/entity/$id': {
       id: '/wiki/entity/$id'
       path: '/wiki/entity/$id'
@@ -1426,6 +1472,20 @@ declare module '@tanstack/react-router' {
       path: '/event/$universe/$event'
       fullPath: '/event/$universe/$event'
       preLoaderRoute: typeof EventUniverseEventRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/seeds/new': {
+      id: '/ads/seeds/new'
+      path: '/ads/seeds/new'
+      fullPath: '/ads/seeds/new'
+      preLoaderRoute: typeof AdsSeedsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/seeds/$seedId': {
+      id: '/ads/seeds/$seedId'
+      path: '/ads/seeds/$seedId'
+      fullPath: '/ads/seeds/$seedId'
+      preLoaderRoute: typeof AdsSeedsSeedIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -1521,11 +1581,14 @@ const rootRouteChildren: RootRouteChildren = {
   SellIndexRoute: SellIndexRoute,
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
+  AdsSeedsSeedIdRoute: AdsSeedsSeedIdRoute,
+  AdsSeedsNewRoute: AdsSeedsNewRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
   UniverseAddressPollsRoute: UniverseAddressPollsRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
   WikiEntityIdRoute: WikiEntityIdRoute,
+  AdsSeedsIndexRoute: AdsSeedsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

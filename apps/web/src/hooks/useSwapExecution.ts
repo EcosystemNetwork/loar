@@ -131,6 +131,7 @@ export function useSwapExecution() {
               '0x', // hookData
             ],
             value: amountIn,
+            chainId,
           });
 
           setTxHash(hash);

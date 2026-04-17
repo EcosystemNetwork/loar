@@ -14,7 +14,7 @@ contract CollectiveTokenFactoryTest is Test {
     uint256 constant UNIVERSE_ID = 1;
 
     function setUp() public {
-        factory = new CollectiveTokenFactory();
+        factory = new CollectiveTokenFactory(address(this));
     }
 
     // ---- deployCollective (FACTION) ----

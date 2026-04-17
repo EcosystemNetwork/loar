@@ -674,7 +674,7 @@ export function GovernanceSidebar({
                         </div>
                       )}
 
-                      {votingPower && votingPower === 0n && !needsDelegation && (
+                      {votingPower !== undefined && votingPower === 0n && !needsDelegation && (
                         <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                           <div className="text-xs text-amber-700 dark:text-amber-300">
@@ -1021,7 +1021,9 @@ export function GovernanceSidebar({
             </Card>
 
             {/* Governance Info */}
-            {(votingDelay || votingPeriod || proposalThreshold) && (
+            {(votingDelay !== undefined ||
+              votingPeriod !== undefined ||
+              proposalThreshold !== undefined) && (
               <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/50 dark:to-slate-800/50 border-slate-200 dark:border-slate-700">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm text-slate-700 dark:text-slate-300">
@@ -1029,7 +1031,7 @@ export function GovernanceSidebar({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {votingDelay && (
+                  {votingDelay !== undefined && (
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-600 dark:text-slate-400">Voting Delay:</span>
                       <span className="text-slate-800 dark:text-slate-200">
@@ -1037,7 +1039,7 @@ export function GovernanceSidebar({
                       </span>
                     </div>
                   )}
-                  {votingPeriod && (
+                  {votingPeriod !== undefined && (
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-600 dark:text-slate-400">Voting Period:</span>
                       <span className="text-slate-800 dark:text-slate-200">
@@ -1045,7 +1047,7 @@ export function GovernanceSidebar({
                       </span>
                     </div>
                   )}
-                  {proposalThreshold && (
+                  {proposalThreshold !== undefined && (
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-600 dark:text-slate-400">
                         Proposal Threshold:

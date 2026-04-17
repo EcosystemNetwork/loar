@@ -120,11 +120,12 @@ The server uses [Hono](https://hono.dev/) as the HTTP framework with middleware:
 ### tRPC Router Tree
 
 ```
-appRouter (44 routers, 400+ procedures)
+appRouter (61+ routers, 400+ procedures)
 ├── healthCheck              (query, public)
 ├── privateData              (query, protected)
 ├── admin                    (sub-router) — platform configuration
 ├── ads                      (sub-router) — ad slots and sponsorships
+├── adSeeds                  (sub-router) — Seed Dance (ad bounties for filmmakers)
 ├── aiAgents                 (sub-router) — AI agent management
 ├── aiPipelines              (sub-router) — AI agent pipeline execution
 ├── analytics                (sub-router) — views, engagement, trending
@@ -166,7 +167,24 @@ appRouter (44 routers, 400+ procedures)
 ├── universeGenConfig        (sub-router) — per-universe AI generation config
 ├── universes                (sub-router) — CRUD, team, treasury
 ├── universeTeam             (sub-router) — universe team management
-└── universeTreasury         (sub-router) — treasury operations
+├── universeTreasury         (sub-router) — treasury operations
+├── universeStyle            (sub-router) — universe style customization
+├── cast                     (sub-router) — cast/actor management
+├── sceneControls            (sub-router) — scene editor controls
+├── voice                    (sub-router) — TTS, voice cloning, sound effects
+├── audio                    (sub-router) — music generation
+├── threed                   (sub-router) — 3D asset generation (Meshy)
+├── characterPipeline        (sub-router) — character generation pipeline
+├── lora                     (sub-router) — LoRA fine-tuning
+├── lipsync                  (sub-router) — lip-sync video generation
+├── cutdown                  (sub-router) — video editing pipeline
+├── image                    (sub-router) — AI image generation (21 models)
+├── wiki                     (sub-router) — wiki generation + character analysis
+├── comments                 (sub-router) — threaded comments
+├── notifications            (sub-router) — push/email notifications
+├── revenueDashboard         (sub-router) — creator revenue analytics
+├── collaboration            (sub-router) — multi-creator collaboration
+└── stripe                   (sub-router) — Stripe payment integration
 ```
 
 ### Services
@@ -187,15 +205,17 @@ _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved
 
 **Entry point:** `apps/web/src/main.tsx`
 
-| Layer         | Technology               | Purpose                                 |
-| ------------- | ------------------------ | --------------------------------------- |
-| Bundler       | Vite                     | Dev server (port 3001), build           |
-| Routing       | TanStack Router          | File-based routing (`src/routes/`)      |
-| Data Fetching | TanStack Query + tRPC    | Server state management                 |
-| Web3          | wagmi + thirdweb         | Wallet connection, contract interaction |
-| Auth          | thirdweb + SIWE          | Wallet-based authentication             |
-| UI            | Tailwind CSS + shadcn/ui | Component library                       |
-| Flow Editor   | ReactFlow                | Narrative node visualization            |
+| Layer          | Technology               | Purpose                                                                                                                |
+| -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Bundler        | Vite                     | Dev server (port 3001), build                                                                                          |
+| Routing        | TanStack Router          | File-based routing (`src/routes/`)                                                                                     |
+| Data Fetching  | TanStack Query + tRPC    | Server state management                                                                                                |
+| Web3           | wagmi + thirdweb         | Wallet connection, contract interaction                                                                                |
+| Auth           | thirdweb + SIWE          | Wallet-based authentication                                                                                            |
+| UI             | Tailwind CSS + shadcn/ui | Component library                                                                                                      |
+| Flow Editor    | ReactFlow                | Narrative node visualization with MiniMap, search, undo/redo, auto-layout, keyboard shortcuts, fullscreen, edge labels |
+| Scene Controls | Custom panels            | Camera, style, VFX presets, cast assignment, motion brush, keyframe handoff                                            |
+| Audio/3D       | ElevenLabs + Meshy       | Voice, music, sound effects, 3D assets                                                                                 |
 
 ### Route Map
 
@@ -227,6 +247,9 @@ _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved
 | `/licensing/`                | IP licensing hub                                     |
 | `/collabs/`                  | Collaboration hub                                    |
 | `/ads/`                      | Ad management                                        |
+| `/ads/seeds/`                | Seed Dance hub (ad bounties for filmmakers)          |
+| `/ads/seeds/new`             | Plant a new ad seed (brand creative + bounty)        |
+| `/ads/seeds/$seedId`         | Seed detail + placement submissions                  |
 | `/canon/$universeId`         | Canon marketplace                                    |
 | `/bounties/`                 | Bounty hub                                           |
 | `/agents/`                   | AI agent marketplace                                 |

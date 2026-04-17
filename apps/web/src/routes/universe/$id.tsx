@@ -53,6 +53,7 @@ import ReactFlow, {
   addEdge,
   useOnSelectionChange,
   useReactFlow,
+  SelectionMode,
   type Node,
   type Edge,
   type Connection,
@@ -359,12 +360,16 @@ function UniverseTimelineEditorInner() {
   const { data: castMembersData } = useQuery({
     queryKey: ['cast', id],
     queryFn: () => trpcClient.cast.list.query({ universeId: id }),
+    retry: false,
+    meta: { skipGlobalErrorHandler: true },
   });
 
   // Fetch scene controls for all nodes in this universe
   const { data: nodeControlsMap } = useQuery({
     queryKey: ['nodeSceneControls', id],
     queryFn: () => trpcClient.sceneControls.getUniverseNodeControls.query({ universeId: id }),
+    retry: false,
+    meta: { skipGlobalErrorHandler: true },
   });
 
   // Save scene controls for the selected node
@@ -2024,7 +2029,7 @@ function UniverseTimelineEditorInner() {
               nodeTypes={nodeTypes}
               selectionOnDrag
               panOnDrag={[1, 2]}
-              selectionMode="partial"
+              selectionMode={SelectionMode.Partial}
               multiSelectionKeyCode="Shift"
               deleteKeyCode={null}
               fitView

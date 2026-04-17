@@ -155,13 +155,13 @@ export function TimelineActions() {
                       {Array.isArray(nodeData) && nodeData.length >= 3 ? (
                         <>
                           <div>
-                            <strong>Link:</strong> {nodeData[0] || 'N/A'}
+                            <strong>Link:</strong> {String(nodeData[0] ?? 'N/A')}
                           </div>
                           <div>
                             <strong>Plot:</strong> {nodeData[1] || 'N/A'}
                           </div>
                           <div>
-                            <strong>Previous:</strong> {nodeData[2]?.toString() || 'N/A'}
+                            <strong>Previous:</strong> {String(nodeData[2] ?? 'N/A')}
                           </div>
                         </>
                       ) : (

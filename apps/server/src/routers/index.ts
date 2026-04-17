@@ -42,6 +42,7 @@ import { creditsRouter } from './credits/credits.routes';
 import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
 import { adsRouter } from './ads/ads.routes';
+import { adSeedsRouter } from './ads/adSeeds.routes';
 import { licensingRouter } from './licensing/licensing.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
@@ -193,6 +194,7 @@ export const appRouter = router({
   credits: creditsRouter,
   subscriptions: subscriptionsRouter,
   ads: adsRouter,
+  adSeeds: adSeedsRouter,
   licensing: licensingRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────

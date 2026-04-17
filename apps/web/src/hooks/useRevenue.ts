@@ -356,6 +356,110 @@ export function useMySponsorships() {
   });
 }
 
+// ---- Ad Seeds (Seed Dance) ----
+
+export function useAdSeeds(status?: string, seedType?: string) {
+  return useQuery({
+    queryKey: ['ad-seeds', status, seedType],
+    queryFn: () =>
+      trpcClient.adSeeds.list.query({
+        status: status as any,
+        seedType: seedType as any,
+      }),
+  });
+}
+
+export function useAdSeed(seedId: string) {
+  return useQuery({
+    queryKey: ['ad-seed', seedId],
+    queryFn: () => trpcClient.adSeeds.get.query({ seedId }),
+    enabled: !!seedId,
+  });
+}
+
+export function useAdSeedPlacements(seedId: string) {
+  return useQuery({
+    queryKey: ['ad-seed-placements', seedId],
+    queryFn: () => trpcClient.adSeeds.placements.query({ seedId }),
+    enabled: !!seedId,
+  });
+}
+
+export function useAdSeedStats() {
+  return useQuery({
+    queryKey: ['ad-seed-stats'],
+    queryFn: () => trpcClient.adSeeds.stats.query(),
+  });
+}
+
+export function useMyAdSeeds() {
+  const { isAuthenticated } = useWalletAuth();
+  return useQuery({
+    queryKey: ['my-ad-seeds'],
+    queryFn: () => trpcClient.adSeeds.mySeeds.query(),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useMyAdSeedPlacements() {
+  const { isAuthenticated } = useWalletAuth();
+  return useQuery({
+    queryKey: ['my-ad-seed-placements'],
+    queryFn: () => trpcClient.adSeeds.myPlacements.query(),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateAdSeed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.create.mutate>[0]) =>
+      trpcClient.adSeeds.create.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-seeds'] });
+      qc.invalidateQueries({ queryKey: ['my-ad-seeds'] });
+    },
+  });
+}
+
+export function useSubmitAdSeedPlacement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.submitPlacement.mutate>[0]) =>
+      trpcClient.adSeeds.submitPlacement.mutate(input),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['ad-seed-placements', vars.seedId] });
+      qc.invalidateQueries({ queryKey: ['ad-seed', vars.seedId] });
+      qc.invalidateQueries({ queryKey: ['my-ad-seed-placements'] });
+    },
+  });
+}
+
+export function useApproveAdSeedPlacement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.approvePlacement.mutate>[0]) =>
+      trpcClient.adSeeds.approvePlacement.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-seed-placements'] });
+      qc.invalidateQueries({ queryKey: ['ad-seeds'] });
+      qc.invalidateQueries({ queryKey: ['my-ad-seeds'] });
+    },
+  });
+}
+
+export function useRejectAdSeedPlacement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.rejectPlacement.mutate>[0]) =>
+      trpcClient.adSeeds.rejectPlacement.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-seed-placements'] });
+      qc.invalidateQueries({ queryKey: ['ad-seeds'] });
+    },
+  });
+}
+
 // ---- Licensing ----
 
 export function useUniverseLicenses(universeId: string) {

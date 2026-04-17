@@ -324,7 +324,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice Check if a user has active access to rented/licensed content
     /// @dev Auto-expires deals past their endTime (state-changing)
-    function checkAccess(bytes32 contentHash, address user) external returns (bool hasAccess) {
+    function checkAccess(bytes32 contentHash, address user) external returns (bool result) {
         uint256[] storage dealIds = _contentDeals[contentHash];
         for (uint256 i = dealIds.length; i > 0; i--) {
             Deal storage deal = deals[dealIds[i - 1]];

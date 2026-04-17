@@ -21,12 +21,15 @@ import { type Address } from 'viem';
  */
 export function useGetNode(id: number) {
   const chainId = useChainId();
+  const address = TIMELINE_ADDRESSES[chainId as SupportedChainId];
 
   return useReadContract({
     abi: universeAbi,
-    address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+    address: address as Address,
     functionName: 'getNode',
     args: [BigInt(id)],
+    chainId,
+    query: { enabled: !!address },
   });
 }
 
@@ -37,12 +40,15 @@ export function useGetNode(id: number) {
  */
 export function useGetTimeline(id: number) {
   const chainId = useChainId();
+  const address = TIMELINE_ADDRESSES[chainId as SupportedChainId];
 
   return useReadContract({
     abi: universeAbi,
-    address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
+    address: address as Address,
     functionName: 'getTimeline',
     args: [BigInt(id)],
+    chainId,
+    query: { enabled: !!address },
   });
 }
 
@@ -52,11 +58,14 @@ export function useGetTimeline(id: number) {
  */
 export function useGetLeaves() {
   const chainId = useChainId();
+  const address = TIMELINE_ADDRESSES[chainId as SupportedChainId];
 
   return useReadContract({
     abi: universeAbi,
-    address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
+    address: address as Address,
     functionName: 'getLeaves',
+    chainId,
+    query: { enabled: !!address },
   });
 }
 
@@ -67,12 +76,15 @@ export function useGetLeaves() {
  */
 export function useGetMedia(id: number) {
   const chainId = useChainId();
+  const address = TIMELINE_ADDRESSES[chainId as SupportedChainId];
 
   return useReadContract({
     abi: universeAbi,
-    address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
+    address: address as Address,
     functionName: 'getMedia',
     args: [BigInt(id)],
+    chainId,
+    query: { enabled: !!address },
   });
 }
 
@@ -90,6 +102,8 @@ export function useGetCanonChain() {
     abi: universeAbi,
     address,
     functionName: 'currentCanonId',
+    chainId,
+    query: { enabled: !!address },
   });
 
   const hasCanon = currentCanonId != null && BigInt(currentCanonId as any) !== 0n;
@@ -98,8 +112,9 @@ export function useGetCanonChain() {
     abi: universeAbi,
     address,
     functionName: 'getCanonChain',
+    chainId,
     query: {
-      enabled: hasCanon,
+      enabled: !!address && hasCanon,
     },
   });
 }
@@ -119,6 +134,7 @@ export function useGetFullGraph(timelineAddress?: string) {
     abi: universeAbi,
     address: address as Address,
     functionName: 'getFullGraph',
+    chainId,
     query: {
       enabled: !!address,
     },
@@ -141,6 +157,7 @@ export function useSetCanon() {
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
       functionName: 'setCanon',
       args: [BigInt(id)],
+      chainId,
     });
 
   return { writeAsync };
@@ -187,6 +204,7 @@ export function useSetMedia() {
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
       functionName: 'setMedia',
       args: [BigInt(id), contentHash, link],
+      chainId,
     });
 
   return { writeAsync };
@@ -207,6 +225,7 @@ export function useSwapNodes() {
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
       functionName: 'swapNodes',
       args: [BigInt(nodeA), BigInt(nodeB)],
+      chainId,
     });
 
   return { writeAsync };

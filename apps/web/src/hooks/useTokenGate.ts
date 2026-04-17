@@ -8,7 +8,7 @@
  * Fetches all gate rules for the universe once, then checks the relevant
  * rule against on-chain balance / totalSupply.
  */
-import { useAccount, useReadContract } from 'wagmi';
+import { useAccount, useReadContract, useChainId } from 'wagmi';
 import { useActiveAccount } from 'thirdweb/react';
 import { useQuery } from '@tanstack/react-query';
 import { governanceErc20Abi } from '@loar/abis/generated';
@@ -76,6 +76,7 @@ export function useTokenGate(
   const { address: wagmiAddress } = useAccount();
   const thirdwebAccount = useActiveAccount();
   const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
+  const chainId = useChainId();
   const { tokenAddress: fallbackToken } = useUniverseAddresses(universeId);
   const { rules, isLoading: rulesLoading } = useTokenGateRules(universeId);
 
@@ -89,6 +90,7 @@ export function useTokenGate(
     abi: governanceErc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    chainId,
     query: { enabled: !!address && !!gateTokenAddress && !!rule },
   });
 
@@ -97,6 +99,7 @@ export function useTokenGate(
     address: gateTokenAddress,
     abi: governanceErc20Abi,
     functionName: 'totalSupply',
+    chainId,
     query: { enabled: !!gateTokenAddress && !!rule },
   });
 

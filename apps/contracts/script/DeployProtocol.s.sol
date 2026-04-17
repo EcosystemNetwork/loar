@@ -4,6 +4,9 @@ pragma solidity ^0.8.30;
 import {Script, console} from "forge-std/Script.sol";
 import {UniverseManager} from "../src/UniverseManager.sol";
 import {UniverseTokenDeployer} from "../src/UniverseTokenDeployer.sol";
+import {UniverseFactory} from "../src/factories/UniverseFactory.sol";
+import {UniverseMetadataRenderer} from "../src/UniverseMetadataRenderer.sol";
+import {IdentityNFT} from "../src/IdentityNFT.sol";
 import {LoarFeeLocker} from "../src/LoarFeeLocker.sol";
 import {LoarLpLockerMultiple} from "../src/lp-lockers/LoarLpLockerMultiple.sol";
 import {LoarHookStaticFee} from "../src/hooks/LoarHookStaticFee.sol";
@@ -25,7 +28,10 @@ import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
  */
 contract DeployProtocolScript is Script {
     UniverseManager public universeManager;
+    UniverseFactory public universeFactory;
+    UniverseMetadataRenderer public metadataRenderer;
     UniverseTokenDeployer public tokenDeployer;
+    IdentityNFT public identityNft;
     LoarFeeLocker public feeLocker;
     LoarLpLockerMultiple public lpLocker;
     LoarHookStaticFee public hook;
@@ -94,28 +100,48 @@ contract DeployProtocolScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy UniverseManager
-        console.log("1/6 Deploying UniverseManager...");
+        // 1. Deploy UniverseFactory (holds Universe creation bytecode, EIP-170 extraction)
+        console.log("1/9 Deploying UniverseFactory...");
+        universeFactory = new UniverseFactory();
+        console.log("   UniverseFactory deployed at:", address(universeFactory));
+
+        // 2. Deploy UniverseMetadataRenderer (holds Strings + Base64, EIP-170 extraction)
+        console.log("2/9 Deploying UniverseMetadataRenderer...");
+        metadataRenderer = new UniverseMetadataRenderer();
+        console.log("   UniverseMetadataRenderer deployed at:", address(metadataRenderer));
+
+        // 3. Deploy UniverseManager
+        console.log("3/9 Deploying UniverseManager...");
         universeManager = new UniverseManager(teamFeeRecipient, weth);
         console.log("   UniverseManager deployed at:", address(universeManager));
 
-        // 2. Deploy UniverseTokenDeployer
-        console.log("2/6 Deploying UniverseTokenDeployer...");
+        // Wire factory + renderer
+        universeManager.setUniverseFactory(address(universeFactory));
+        universeManager.setMetadataRenderer(address(metadataRenderer));
+        console.log("   Factory + Renderer wired");
+
+        // 4. Deploy UniverseTokenDeployer
+        console.log("4/9 Deploying UniverseTokenDeployer...");
         tokenDeployer = new UniverseTokenDeployer(address(universeManager));
         console.log("   UniverseTokenDeployer deployed at:", address(tokenDeployer));
 
-        // 3. Set TokenDeployer on UniverseManager
-        console.log("3/6 Setting TokenDeployer on UniverseManager...");
+        // Set TokenDeployer on UniverseManager
         universeManager.setTokenDeployer(address(tokenDeployer));
         console.log("   TokenDeployer set successfully");
 
-        // 4. Deploy FeeLocker
-        console.log("4/6 Deploying LoarFeeLocker...");
+        // 5. Deploy IdentityNFT (minter = UniverseManager)
+        console.log("5/9 Deploying IdentityNFT...");
+        identityNft = new IdentityNFT(address(universeManager));
+        universeManager.setIdentityNft(address(identityNft));
+        console.log("   IdentityNFT deployed at:", address(identityNft));
+
+        // 6. Deploy FeeLocker
+        console.log("6/9 Deploying LoarFeeLocker...");
         feeLocker = new LoarFeeLocker(deployerAddress);
         console.log("   LoarFeeLocker deployed at:", address(feeLocker));
 
-        // 5. Deploy LpLocker
-        console.log("5/6 Deploying LoarLpLockerMultiple...");
+        // 7. Deploy LpLocker
+        console.log("7/9 Deploying LoarLpLockerMultiple...");
         lpLocker = new LoarLpLockerMultiple(
             deployerAddress, // owner
             address(universeManager), // factory
@@ -125,8 +151,8 @@ contract DeployProtocolScript is Script {
         );
         console.log("   LoarLpLockerMultiple deployed at:", address(lpLocker));
 
-        // 6. Deploy Hook with deterministic address using CREATE2
-        console.log("6/6 Deploying LoarHookStaticFee...");
+        // 8. Deploy Hook with deterministic address using CREATE2
+        console.log("8/9 Deploying LoarHookStaticFee...");
 
         // Calculate the required hook address flags
         uint160 flags = uint160(
@@ -163,8 +189,8 @@ contract DeployProtocolScript is Script {
         require(address(hook) == hookAddress, "Hook address mismatch");
         console.log("   LoarHookStaticFee deployed at:", address(hook));
 
-        // 5. Configure protocol relationships
-        console.log("\n=== Configuring Protocol ===\n");
+        // 9. Configure protocol relationships
+        console.log("9/9 Configuring Protocol...");
 
         console.log("Adding lpLocker as depositor in feeLocker...");
         feeLocker.addDepositor(address(lpLocker));
@@ -178,15 +204,17 @@ contract DeployProtocolScript is Script {
         vm.stopBroadcast();
 
         console.log("\n=== Deployment Complete ===\n");
+        console.log("UniverseFactory:", address(universeFactory));
+        console.log("UniverseMetadataRenderer:", address(metadataRenderer));
         console.log("UniverseManager:", address(universeManager));
         console.log("UniverseTokenDeployer:", address(tokenDeployer));
+        console.log("IdentityNFT:", address(identityNft));
         console.log("LoarFeeLocker:", address(feeLocker));
         console.log("LoarLpLockerMultiple:", address(lpLocker));
         console.log("LoarHookStaticFee:", address(hook));
-        console.log("\n=== Next Steps ===");
-        console.log("1. Verify contracts on Etherscan");
-        console.log("2. Transfer ownership if needed");
-        console.log("3. Deploy additional hooks/lockers if needed");
-        console.log("4. Test universe creation");
+        console.log("\n=== Update addresses.ts ===");
+        console.log("1. Update all addresses in packages/abis/src/addresses.ts");
+        console.log("2. Run: npx wagmi generate");
+        console.log("3. Test universe creation");
     }
 }

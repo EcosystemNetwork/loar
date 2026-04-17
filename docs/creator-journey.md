@@ -55,8 +55,8 @@ Step-by-step from zero to a monetizable cinematic universe. Each step notes what
 
 The timeline editor is your creative workspace:
 
-1. **Create a node** — Click "Create Event" in the sidebar
-2. **Write your prompt** — Describe the scene, select characters
+1. **Create a node** — Click "Create Event" in the sidebar or use the "+" button on the canvas
+2. **Write your prompt** — Describe the scene, select characters from your cast
 3. **Generate image** — AI creates a scene image (21 models available including FLUX, Recraft, Ideogram, Seedream, GPT Image)
 4. **Generate video** — AI creates a 1-60s video from the image
    - 44 video models: Veo 3.1, Kling 3.0, Wan 2.7, Sora 2, Seedance 2.0, LTX, HunYuan, CogVideoX, PixVerse V6, Runway Gen-3, and more
@@ -66,17 +66,39 @@ The timeline editor is your creative workspace:
 6. **Save to blockchain** — Content hash stored in Universe contract
 7. **Storage** — Video/image automatically uploaded to Pinata (IPFS), Lighthouse (Filecoin), or Firebase with priority-based fallback
 
+### Timeline Editor Features
+
+- **MiniMap** — Bird's eye view of your full timeline, pannable and zoomable. Toggle with `M` key
+- **Node Search** — `Ctrl+K` opens a command palette to find nodes by title, description, or ID
+- **Undo / Redo** — `Ctrl+Z` / `Ctrl+Shift+Z` for all canvas operations (up to 50 states)
+- **Auto-Layout** — One-click tree layout algorithm positions nodes by depth and subtree size
+- **Keyboard Shortcuts** — `F` (fit view), `1` (zoom 100%), `+/-` (zoom), `Del` (delete selected), `?` (show all shortcuts)
+- **Fullscreen Mode** — Expand canvas to fill the viewport, hiding sidebars
+- **Edge Labels** — Canon edges show gold "Canon" label, branch edges show gray "Branch" label
+- **Multi-Select** — Shift+click or drag to select multiple nodes for batch delete or duplicate
+- **Drag-and-Drop** — Drag generations from the Generations Panel onto the canvas
+
+### Scene Controls (Per-Node)
+
+- **Camera Presets** — 16 options: locked, handheld, dolly, pan, tilt, orbit, crane, whip pan
+- **Style Presets** — 12 options: noir, watercolor, VHS 80s, anime, cyberpunk, fantasy, horror, documentary, comic book, cinematic, surreal, steampunk
+- **VFX Overlays** — 14 options: color grades, film grain, lens flare, light leak, slow motion, speed ramp, rain, dust, glitch, vignette
+- **Cast Assignment** — Assign cast members to nodes for character consistency
+- **Motion Brush** — Paint motion masks directly on frames
+- **Keyframe Handoff** — Link start/end frames between adjacent nodes for continuity
+
 ### Branching Narratives
 
 - Each node can have multiple children (branching paths)
 - Mark one path as "canon" (official storyline)
-- Community can explore alternate timelines
+- Community can explore alternate timelines via the interactive Narrative Player (`/play/$universeId`)
 
-### Characters
+### Characters & Cast
 
 - AI-generate characters with visual descriptions
 - Characters are reusable across episodes
 - Gemini analyzes character images for traits/descriptions
+- **Cast Manager** — Register characters as cast members with reference images for consistency across scenes
 
 **Time per episode:** ~5-10 minutes
 

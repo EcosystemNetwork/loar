@@ -36,6 +36,7 @@ export function CastManager({ universeId, isOpen, onClose }: CastManagerProps) {
     queryKey: ['cast', universeId],
     queryFn: () => trpcClient.cast.list.query({ universeId }),
     enabled: isOpen,
+    retry: false,
   });
 
   // Create cast member mutation

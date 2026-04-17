@@ -122,16 +122,21 @@ export default defineConfig({
     dedupe: ['wagmi', 'viem', 'thirdweb', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
-    // Only isolate thirdweb into its own chunk — it has internal circular
-    // deps that cause TDZ errors ("Cannot access 'Tc' before initialization")
-    // when Rollup concatenates it into the main chunk.
-    // NOTE: Do NOT separate React or @radix-ui — they call React.forwardRef()
-    // at load time and must share a chunk with React.
     rollupOptions: {
       output: {
+        // Split large non-React deps into their own chunks to reduce initial
+        // bundle size. IMPORTANT: thirdweb, @radix-ui, and anything that calls
+        // React hooks at load time must stay in the default chunk with React
+        // to avoid dual-React-instance crashes (React error #310).
         manualChunks(id) {
-          if (id.includes('node_modules/thirdweb')) {
-            return 'thirdweb';
+          if (id.includes('node_modules')) {
+            // Heavy crypto/wallet libs that don't import React directly
+            if (id.includes('@metamask') || id.includes('@walletconnect')) {
+              return 'wallet-adapters';
+            }
+            if (id.includes('viem') || id.includes('@noble') || id.includes('abitype')) {
+              return 'viem';
+            }
           }
         },
       },
