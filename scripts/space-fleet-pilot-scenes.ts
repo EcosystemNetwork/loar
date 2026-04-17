@@ -85,28 +85,74 @@ async function getAuthToken(): Promise<string> {
   return match[1];
 }
 
-// ── Pull character DNA from wiki ────────────────────────────────────────
+// ── Pull full entity data from wiki for visual consistency ──────────────
 async function fetchCharacterDNA(token: string): Promise<Record<string, string>> {
-  log('WIKI', 'Fetching character data from wiki entities...');
+  log('WIKI', 'Fetching ALL entity data from wiki for visual consistency...');
   const res = await fetch(
-    `${SERVER_URL}/trpc/entities.listByUniverse?batch=1&input=${encodeURIComponent(
-      JSON.stringify({ '0': { universeAddress: UNIVERSE_ADDR } })
+    `${SERVER_URL}/trpc/entities.list?batch=1&input=${encodeURIComponent(
+      JSON.stringify({ '0': { universeAddress: UNIVERSE_ADDR.toLowerCase() } })
     )}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   const json = (await res.json()) as any[];
-  const entities = json[0]?.result?.data || [];
+  const result = json[0]?.result?.data;
+  const entities = result?.entities || result || [];
 
   const dna: Record<string, string> = {};
   for (const e of entities) {
     const name = e.name || e.data?.name;
-    const desc = e.description || e.data?.description;
-    if (name && desc) {
-      const short = desc.split('.').slice(0, 3).join('.') + '.';
-      dna[name.toUpperCase().replace(/[^A-Z0-9]/g, '_')] = `${name}: ${short}`;
-      log('WIKI', `  Loaded: ${name}`);
+    const desc = e.description || e.data?.description || '';
+    const meta = e.metadata || e.data?.metadata || {};
+    const kind = e.kind || e.data?.kind || '';
+    if (!name) continue;
+
+    const key = name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+
+    // Build rich visual DNA based on entity kind
+    if (kind === 'person') {
+      // For characters: use appearance metadata (most detailed visual info)
+      const appearance = meta.appearance || '';
+      const role = meta.role || '';
+      const affiliations = meta.affiliations || '';
+      dna[key] = [
+        `${name}:`,
+        appearance,
+        role ? `Role: ${role}.` : '',
+        affiliations ? `Affiliation: ${affiliations}.` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    } else if (kind === 'place') {
+      // For places: atmosphere + type for scene consistency
+      const placeType = meta.placeType || '';
+      const atmosphere = meta.atmosphere || '';
+      dna[key] = [
+        `${name}:`,
+        placeType ? `${placeType}.` : '',
+        atmosphere || desc.split('.').slice(0, 2).join('.') + '.',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    } else if (kind === 'technology' || kind === 'vehicle') {
+      // For tech/vehicles: howItWorks + capabilities for visual accuracy
+      const techType = meta.techType || meta.vehicleType || '';
+      const howItWorks = meta.howItWorks || meta.capabilities || '';
+      dna[key] = [
+        `${name}:`,
+        techType ? `${techType}.` : '',
+        howItWorks || desc.split('.').slice(0, 2).join('.') + '.',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    } else {
+      // Fallback: first 3 sentences of description
+      dna[key] = `${name}: ${desc.split('.').slice(0, 3).join('.')}.`;
     }
+
+    log('WIKI', `  [${kind}] ${name}`);
   }
+
+  log('WIKI', `Loaded ${Object.keys(dna).length} entities for visual consistency`);
   return dna;
 }
 
@@ -268,17 +314,51 @@ async function createNode(
 
 // ── Scene definitions ───────────────────────────────────────────────────
 function buildScenes(dna: Record<string, string>) {
+  // ── Character Visual DNA (from wiki metadata.appearance) ──
   const ELI =
     dna['ELI_VANCE'] ||
-    'Eli Vance: 24-year-old male analyst, wiry build, intense dark eyes, cheap government suit and tie, deliberately ordinary appearance. Government badge, notebook with sketches of triangular craft.';
+    'Eli Vance: 24-year-old male, wiry build, intense dark eyes, cheap government suit and thin tie, deliberately ordinary and forgettable. Government ID badge clipped to jacket. Notebook with hand-drawn triangular craft sketches. Expression of controlled determination.';
   const MARA =
     dna['MARA_CHEN'] ||
-    'Mara Chen: 30s female, sharp professional look, cheerful demeanor masking deep awareness. Government attire above ground, black Orpheus uniform below.';
+    'Mara Chen: 30s female, sharp professional, smart blazer, practical clothes. Cheerful demeanor masking deep awareness. Wears government attire above ground, black Orpheus uniform in sublevel.';
   const HALDEN =
     dna['DIRECTOR_HALDEN'] ||
-    'Director Halden: 50s male, immaculate dark suit, steel-gray hair, completely unreadable face. Military bearing under bureaucratic calm.';
-  const WORLD =
-    'Near-future Earth. Paranoid government thriller tone. Color palette: sterile government gray, cold fluorescent white, deep space navy blue, occasional warm amber. Cinematic 16:9, dramatic lighting, photorealistic, grounded sci-fi.';
+    'Director Halden: 50s male, clean-shaven, immaculate dark suit, polished shoes, steel-gray hair. Military bearing hidden under bureaucratic calm. Completely unreadable face.';
+
+  // ── Location Visual DNA (from wiki metadata.atmosphere) ──
+  const DAC =
+    dna['DEFENSE_ANALYSIS_CENTER'] ||
+    'Defense Analysis Center: Brutalist gray windowless government facility. Sterile fluorescent lighting, badge scanners, frosted glass, surveillance cameras. Mundane exterior concealing extraordinary sublevel.';
+  const TRIAGE =
+    dna['TRIAGE_OFFICE'] ||
+    'Triage Office: Dim intelligence review station lit entirely by rows of glowing screens. Blue monitor glow, claustrophobic, analysts sorting truth from fiction then burying the truth.';
+  const HANGAR =
+    dna['UNDERGROUND_HANGAR'] ||
+    'Underground Hangar: Cavernous space carved from rock, cathedral-scale. Matte-black warship suspended in glowing magnetic cradle. Blue-white energy, service crews on platforms. Impossibly advanced.';
+  const LAUNCH =
+    dna['LAUNCH_SPINE_TWO'] ||
+    'Launch Spine Two: Towering vertical launch chamber inside a mountain. Massive blast doors overhead revealing shaft through rock to stars. Ships rise soundlessly. Sunlight pours down like revelation.';
+  const APARTMENT =
+    dna['ELI_S_APARTMENT'] ||
+    "Eli's Apartment: Small sparse apartment, cheap furniture. One wall covered in investigation board — satellite photos, redacted memos, red string connections. Warm desk lamp vs cold surveillance blue.";
+
+  // ── Tech/Vehicle DNA (from wiki metadata) ──
+  const SHIP =
+    dna['ORPHEUS_CLASS_WARSHIP'] ||
+    'Orpheus-Class Warship: Matte-black angular craft, destroyer-sized, sharp stealth surfaces. No visible engines or propulsion. Suspended in magnetic cradle with blue-white energy. Human-made yet impossibly advanced.';
+
+  // ── AAA Cinematic World Prompt ──
+  const WORLD = [
+    'Shot on ARRI Alexa 65 with Cooke S7/i anamorphic lenses.',
+    'Near-future Earth. Paranoid government thriller.',
+    'Color graded: desaturated institutional gray with cold fluorescent white above ground,',
+    'polished obsidian black with blue-white energy below ground,',
+    'deep navy sky with impossible white light in desert exteriors.',
+    'Shallow depth of field, anamorphic bokeh, subtle film grain.',
+    'Lighting: motivated practicals, volumetric atmosphere, chiaroscuro contrast.',
+    'Composition: Fincher-precise symmetry, Deakins natural light, Villeneuve scale.',
+    'Cinematic 2.39:1 widescreen, photorealistic, no text, no watermarks.',
+  ].join(' ');
 
   return [
     // ═══════════════════════════════════════════════════════════════════

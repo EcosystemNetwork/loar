@@ -6,9 +6,25 @@ import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import {AdPlacement} from "../src/revenue/AdPlacement.sol";
 import {MockPaymentRouter} from "./mocks/MockPaymentRouter.sol";
 
+/// @dev Minimal ERC721 mock that returns a configurable owner for ownerOf()
+contract MockERC721Owner {
+    mapping(uint256 => address) public owners;
+
+    function setOwner(uint256 tokenId, address owner) external {
+        owners[tokenId] = owner;
+    }
+
+    function ownerOf(uint256 tokenId) external view returns (address) {
+        address o = owners[tokenId];
+        require(o != address(0), "ERC721: invalid token ID");
+        return o;
+    }
+}
+
 contract AdPlacementTest is Test {
     AdPlacement public ad;
     MockPaymentRouter public router;
+    MockERC721Owner public mockUniverse;
 
     address platform = makeAddr("platform");
     address treasury = makeAddr("treasury");
@@ -29,6 +45,7 @@ contract AdPlacementTest is Test {
         vm.deal(bidder3, 100 ether);
 
         router = new MockPaymentRouter(treasury);
+        mockUniverse = new MockERC721Owner();
 
         AdPlacement impl = new AdPlacement();
         ad = AdPlacement(
@@ -40,8 +57,12 @@ contract AdPlacementTest is Test {
             )
         );
 
+        // Set up mock universe ownership and register
+        ad.setUniverseManager(address(mockUniverse));
+        mockUniverse.setOwner(UNIVERSE_ID, creator);
+
         vm.prank(platform);
-        ad.registerUniverse(UNIVERSE_ID, creator);
+        ad.registerUniverse(UNIVERSE_ID);
     }
 
     // =========================================================================
@@ -100,21 +121,24 @@ contract AdPlacementTest is Test {
     // =========================================================================
 
     function test_registerUniverse() public {
+        mockUniverse.setOwner(99, creator);
         vm.prank(platform);
-        ad.registerUniverse(99, creator);
+        ad.registerUniverse(99);
         assertEq(ad.universeCreators(99), creator);
     }
 
     function test_registerUniverse_revert_notPlatform() public {
+        mockUniverse.setOwner(99, creator);
         vm.prank(stranger);
         vm.expectRevert(AdPlacement.NotPlatform.selector);
-        ad.registerUniverse(99, creator);
+        ad.registerUniverse(99);
     }
 
-    function test_registerUniverse_revert_zeroCreator() public {
+    function test_registerUniverse_revert_unknownUniverse() public {
+        // Universe 99 has no owner set in mock, so ownerOf reverts
         vm.prank(platform);
-        vm.expectRevert(AdPlacement.ZeroAddress.selector);
-        ad.registerUniverse(99, address(0));
+        vm.expectRevert();
+        ad.registerUniverse(99);
     }
 
     // =========================================================================
@@ -776,10 +800,11 @@ contract AdPlacementTest is Test {
     }
 
     function test_event_UniverseRegistered() public {
+        mockUniverse.setOwner(77, creator);
         vm.prank(platform);
         vm.expectEmit(true, false, false, true);
         emit AdPlacement.UniverseRegistered(77, creator);
-        ad.registerUniverse(77, creator);
+        ad.registerUniverse(77);
     }
 
     function test_event_ImpressionRecorded() public {
@@ -802,8 +827,9 @@ contract AdPlacementTest is Test {
     // =========================================================================
 
     function test_multipleSlotsPerUniverse() public {
+        mockUniverse.setOwner(2, creator);
         vm.prank(platform);
-        ad.registerUniverse(2, creator);
+        ad.registerUniverse(2);
 
         vm.startPrank(creator);
         ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 10, "");

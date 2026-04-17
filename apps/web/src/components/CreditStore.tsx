@@ -7,6 +7,7 @@ import { useChainId, useReadContract, usePublicClient } from 'wagmi';
 import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, parseUnits, formatUnits, type Address } from 'viem';
+import { sepolia } from 'viem/chains';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { trpcClient } from '@/utils/trpc';
@@ -392,6 +393,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     abi: FAUCET_ABI,
     functionName: 'canClaim',
     args: address ? [address] : undefined,
+    chainId: sepolia.id,
     query: { enabled: hasFaucet && !!address },
   });
 
@@ -399,6 +401,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     address: LOAR_FAUCET_ADDRESS,
     abi: FAUCET_ABI,
     functionName: 'claimAmount',
+    chainId: sepolia.id,
     query: { enabled: hasFaucet },
   });
 
@@ -416,6 +419,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
         address: LOAR_FAUCET_ADDRESS,
         abi: FAUCET_ABI,
         functionName: 'claim',
+        chainId: sepolia.id,
       });
       toast.success(`Claimed ${faucetAmount.toLocaleString()} $LOAR!`);
       refetchCanClaim();

@@ -15,7 +15,10 @@ contract MockRightsRegistry is IRightsRegistry {
         _rights[contentHash] = rightsType;
     }
 
-    function freeze(bytes32, string calldata) external {}
+    function requestFreeze(bytes32, string calldata) external {}
+    function confirmFreeze(bytes32) external {}
+    function emergencyFreeze(bytes32, string calldata) external {}
+    function unfreeze(bytes32) external {}
 
     function isMonetizable(bytes32 contentHash) external view returns (bool) {
         RightsType r = _rights[contentHash];

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
+import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
+import {TimelockController} from "@openzeppelin/governance/TimelockController.sol";
 import {UniverseGovernor} from "../UniverseGovernor.sol";
 
 contract GovernorFactory {

@@ -44,8 +44,10 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     mapping(address => mapping(uint256 => address)) public pendingRewardRecipient;
     /// @notice Pending 2-step reward admin changes: token => rewardIndex => new admin
     mapping(address => mapping(uint256 => address)) public pendingRewardAdmin;
-    /// @notice Timestamp when a reward change was requested: token => rewardIndex => timestamp
-    mapping(address => mapping(uint256 => uint256)) public rewardChangeRequestedAt;
+    /// @notice Timestamp when a recipient change was requested: token => rewardIndex => timestamp
+    mapping(address => mapping(uint256 => uint256)) public recipientChangeRequestedAt;
+    /// @notice Timestamp when an admin change was requested: token => rewardIndex => timestamp
+    mapping(address => mapping(uint256 => uint256)) public adminChangeRequestedAt;
 
     /// @notice Tokens that are part of active LP pools and must not be drained via withdrawERC20.
     mapping(address => bool) public protectedToken;
@@ -417,7 +419,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         }
 
         pendingRewardRecipient[token][rewardIndex] = newRecipient;
-        rewardChangeRequestedAt[token][rewardIndex] = block.timestamp;
+        recipientChangeRequestedAt[token][rewardIndex] = block.timestamp;
 
         emit RewardRecipientChangeRequested(
             token, rewardIndex, newRecipient, block.timestamp + REWARD_CHANGE_DELAY
@@ -429,7 +431,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
         require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
 
-        uint256 requestedAt = rewardChangeRequestedAt[token][rewardIndex];
+        uint256 requestedAt = recipientChangeRequestedAt[token][rewardIndex];
         address newRecipient = pendingRewardRecipient[token][rewardIndex];
 
         if (requestedAt == 0 || newRecipient == address(0)) {
@@ -449,7 +451,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
         // Clear pending state
         delete pendingRewardRecipient[token][rewardIndex];
-        delete rewardChangeRequestedAt[token][rewardIndex];
+        delete recipientChangeRequestedAt[token][rewardIndex];
 
         emit RewardRecipientUpdated(token, rewardIndex, oldRecipient, newRecipient);
     }
@@ -468,7 +470,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         }
 
         pendingRewardAdmin[token][rewardIndex] = newAdmin;
-        rewardChangeRequestedAt[token][rewardIndex] = block.timestamp;
+        adminChangeRequestedAt[token][rewardIndex] = block.timestamp;
 
         emit RewardAdminChangeRequested(
             token, rewardIndex, newAdmin, block.timestamp + REWARD_CHANGE_DELAY
@@ -480,7 +482,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         TokenRewardInfo storage tokenRewardInfo = _tokenRewards[token];
         require(rewardIndex < tokenRewardInfo.rewardAdmins.length, "Index out of bounds");
 
-        uint256 requestedAt = rewardChangeRequestedAt[token][rewardIndex];
+        uint256 requestedAt = adminChangeRequestedAt[token][rewardIndex];
         address newAdmin = pendingRewardAdmin[token][rewardIndex];
 
         if (requestedAt == 0 || newAdmin == address(0)) {
@@ -500,7 +502,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
         // Clear pending state
         delete pendingRewardAdmin[token][rewardIndex];
-        delete rewardChangeRequestedAt[token][rewardIndex];
+        delete adminChangeRequestedAt[token][rewardIndex];
 
         emit RewardAdminUpdated(token, rewardIndex, oldAdmin, newAdmin);
     }

@@ -946,6 +946,179 @@ export class FalService {
     }
   }
 
+  // ── Video Editing Operations ──────────────────────────────────────────
+
+  /** Upscale an image using Real-ESRGAN, Clarity, or Creative upscaler */
+  async upscaleImage(options: {
+    imageUrl: string;
+    model?: string;
+    prompt?: string;
+    scale?: number;
+  }): Promise<{ id: string; status: string; imageUrl?: string; error?: string }> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/real-esrgan';
+      const input: any = { image_url: options.imageUrl };
+
+      if (model === 'fal-ai/creative-upscaler' && options.prompt) {
+        input.prompt = options.prompt;
+      }
+      if (options.scale) {
+        input.scale = options.scale;
+      }
+
+      const result = await fal.subscribe(model, { input, logs: true });
+      const data = (result as any).data || result;
+      const imageUrl = data.image?.url || data.images?.[0]?.url || data.url;
+
+      if (!imageUrl)
+        throw new Error(`No image URL in response. Keys: ${Object.keys(data).join(', ')}`);
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        imageUrl,
+      };
+    } catch (error: any) {
+      console.error('Upscale failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Upscale failed' };
+    }
+  }
+
+  /** Interpolate frames for slow-motion effect */
+  async interpolateFrames(options: {
+    videoUrl: string;
+    model?: string;
+    multiplier?: number;
+  }): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/frame-interpolation';
+      const input: any = {
+        video_url: options.videoUrl,
+        multiplier: options.multiplier || 2,
+      };
+
+      const result = await fal.subscribe(model, { input, logs: true });
+      const data = (result as any).data || result;
+      const videoUrl = data.video?.url || data.video_url || data.url;
+
+      if (!videoUrl)
+        throw new Error(`No video URL in response. Keys: ${Object.keys(data).join(', ')}`);
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        videoUrl,
+      };
+    } catch (error: any) {
+      console.error('Frame interpolation failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Interpolation failed' };
+    }
+  }
+
+  /** Video-to-video restyle: apply a new prompt while preserving motion */
+  async restyleVideo(options: {
+    videoUrl: string;
+    prompt: string;
+    model?: string;
+    strength?: number;
+    negativePrompt?: string;
+  }): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/wan/v2.1/video-to-video';
+      const input: any = {
+        video_url: options.videoUrl,
+        prompt: options.prompt,
+      };
+
+      if (options.strength !== undefined) input.strength = options.strength;
+      if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+
+      const result = await fal.subscribe(model, { input, logs: true });
+      const data = (result as any).data || result;
+      const videoUrl = data.video?.url || data.video_url || data.url;
+
+      if (!videoUrl)
+        throw new Error(`No video URL in response. Keys: ${Object.keys(data).join(', ')}`);
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        videoUrl,
+      };
+    } catch (error: any) {
+      console.error('Video restyle failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Restyle failed' };
+    }
+  }
+
+  /** Inpaint a region of an image using a mask */
+  async inpaintImage(options: {
+    imageUrl: string;
+    maskUrl: string;
+    prompt: string;
+    model?: string;
+    negativePrompt?: string;
+  }): Promise<{ id: string; status: string; imageUrl?: string; error?: string }> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/flux/dev/inpainting';
+      const input: any = {
+        image_url: options.imageUrl,
+        mask_url: options.maskUrl,
+        prompt: options.prompt,
+      };
+
+      if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+
+      const result = await fal.subscribe(model, { input, logs: true });
+      const data = (result as any).data || result;
+      const imageUrl = data.images?.[0]?.url || data.image?.url || data.url;
+
+      if (!imageUrl)
+        throw new Error(`No image URL in response. Keys: ${Object.keys(data).join(', ')}`);
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        imageUrl,
+      };
+    } catch (error: any) {
+      console.error('Inpaint failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Inpaint failed' };
+    }
+  }
+
+  /** Remove background from an image */
+  async removeBackground(options: {
+    imageUrl: string;
+    model?: string;
+  }): Promise<{ id: string; status: string; imageUrl?: string; error?: string }> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/birefnet';
+      const input: any = { image_url: options.imageUrl };
+
+      const result = await fal.subscribe(model, { input, logs: true });
+      const data = (result as any).data || result;
+      const imageUrl = data.image?.url || data.images?.[0]?.url || data.url;
+
+      if (!imageUrl)
+        throw new Error(`No image URL in response. Keys: ${Object.keys(data).join(', ')}`);
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        imageUrl,
+      };
+    } catch (error: any) {
+      console.error('Background removal failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Background removal failed' };
+    }
+  }
+
   private mapStatus(falStatus: string): FalVideoGenerationResult['status'] {
     switch (falStatus) {
       case 'COMPLETED':

@@ -7,6 +7,7 @@ import { useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { formatUnits, type Address } from 'viem';
+import { sepolia } from 'viem/chains';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,11 +63,12 @@ function FaucetPage() {
 
   const hasFaucet = !!LOAR_FAUCET_ADDRESS && LOAR_FAUCET_ADDRESS !== '0x';
 
-  // Faucet reads
+  // Faucet reads — pinned to Sepolia where the contracts are deployed
   const { data: claimAmountData } = useReadContract({
     address: LOAR_FAUCET_ADDRESS,
     abi: FAUCET_ABI,
     functionName: 'claimAmount',
+    chainId: sepolia.id,
     query: { enabled: hasFaucet },
   });
 
@@ -74,6 +76,7 @@ function FaucetPage() {
     address: LOAR_FAUCET_ADDRESS,
     abi: FAUCET_ABI,
     functionName: 'faucetBalance',
+    chainId: sepolia.id,
     query: { enabled: hasFaucet },
   });
 
@@ -83,6 +86,7 @@ function FaucetPage() {
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    chainId: sepolia.id,
     query: {
       enabled:
         !!address &&
@@ -110,6 +114,7 @@ function FaucetPage() {
         address: LOAR_FAUCET_ADDRESS,
         abi: FAUCET_ABI,
         functionName: 'claim',
+        chainId: sepolia.id,
       });
       toast.success(`Claimed ${faucetAmount.toLocaleString()} $LOAR!`);
       setJustClaimed(true);

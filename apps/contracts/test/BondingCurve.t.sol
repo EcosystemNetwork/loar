@@ -115,7 +115,7 @@ contract BondingCurveTest is Test {
 
     function test_buy_basic_V1() public {
         vm.prank(alice);
-        curveV1.buy{value: 0.1 ether}(0);
+        curveV1.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
 
         assertGt(curveV1.tokensSold(), 0, "Should have sold tokens");
         assertGt(curveV1.ethRaised(), 0, "Should have raised ETH");
@@ -124,7 +124,7 @@ contract BondingCurveTest is Test {
 
     function test_buy_basic_V3() public {
         vm.prank(alice);
-        curveV3.buy{value: 0.1 ether}(0);
+        curveV3.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
 
         assertGt(curveV3.tokensSold(), 0, "Should have sold tokens");
         assertGt(curveV3.ethRaised(), 0, "Should have raised ETH");
@@ -133,7 +133,7 @@ contract BondingCurveTest is Test {
 
     function test_buy_then_sell_V1() public {
         vm.startPrank(alice);
-        curveV1.buy{value: 0.5 ether}(0);
+        curveV1.buy{value: 0.5 ether}(0, block.timestamp + 1 hours);
 
         uint256 bought = tokenV1.balanceOf(alice);
         assertGt(bought, 0);
@@ -142,7 +142,7 @@ contract BondingCurveTest is Test {
         uint256 sellAmount = bought / 2;
         tokenV1.approve(address(curveV1), sellAmount);
         uint256 ethBefore = alice.balance;
-        curveV1.sell(sellAmount, 0);
+        curveV1.sell(sellAmount, 0, block.timestamp + 1 hours);
 
         assertGt(alice.balance, ethBefore, "Should have received ETH");
         assertEq(tokenV1.balanceOf(alice), bought - sellAmount);
@@ -154,7 +154,7 @@ contract BondingCurveTest is Test {
         // No maxBuy limit on curveV1 (MAX_BUY_BPS=10000). Excess ETH is refunded.
         vm.deal(alice, 10 ether);
         vm.prank(alice);
-        curveV1.buy{value: 5 ether}(0);
+        curveV1.buy{value: 5 ether}(0, block.timestamp + 1 hours);
 
         assertTrue(curveV1.graduated(), "Should have graduated");
         assertTrue(manager.graduated(), "Manager should have received graduation");
@@ -174,7 +174,7 @@ contract BondingCurveTest is Test {
         // Can't buy when halted
         vm.prank(alice);
         vm.expectRevert(IBondingCurve.TradingIsHalted.selector);
-        curveV1.buy{value: 0.1 ether}(0);
+        curveV1.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
 
         // Resume
         vm.prank(address(manager));
@@ -183,12 +183,12 @@ contract BondingCurveTest is Test {
 
         // Can buy again
         vm.prank(alice);
-        curveV1.buy{value: 0.1 ether}(0);
+        curveV1.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
     }
 
     function test_getCurrentPricePerToken() public {
         vm.prank(alice);
-        curveV1.buy{value: 0.5 ether}(0);
+        curveV1.buy{value: 0.5 ether}(0, block.timestamp + 1 hours);
 
         uint256 pricePerToken = curveV1.getCurrentPricePerToken();
         assertGt(pricePerToken, 0, "Price per token should be non-zero after buys");
@@ -204,7 +204,7 @@ contract BondingCurveTest is Test {
         vm.deal(alice, ethAmount);
         vm.prank(alice);
 
-        try curveV1.buy{value: ethAmount}(0) {} catch {}
+        try curveV1.buy{value: ethAmount}(0, block.timestamp + 1 hours) {} catch {}
 
         assertLe(curveV1.tokensSold(), CURVE_SUPPLY_V1, "tokensSold > supply");
     }
@@ -216,7 +216,7 @@ contract BondingCurveTest is Test {
         vm.deal(alice, ethAmount);
         vm.prank(alice);
 
-        try curveV1.buy{value: ethAmount}(0) {} catch {}
+        try curveV1.buy{value: ethAmount}(0, block.timestamp + 1 hours) {} catch {}
 
         if (!curveV1.graduated()) {
             assertGe(
@@ -233,7 +233,7 @@ contract BondingCurveTest is Test {
         vm.deal(alice, ethAmount);
 
         vm.startPrank(alice);
-        curveV1.buy{value: ethAmount}(0);
+        curveV1.buy{value: ethAmount}(0, block.timestamp + 1 hours);
 
         uint256 tokensBought = tokenV1.balanceOf(alice);
         if (tokensBought == 0) return;
@@ -241,7 +241,7 @@ contract BondingCurveTest is Test {
         tokenV1.approve(address(curveV1), tokensBought);
 
         uint256 ethBefore = alice.balance;
-        curveV1.sell(tokensBought, 0);
+        curveV1.sell(tokensBought, 0, block.timestamp + 1 hours);
         uint256 ethReceived = alice.balance - ethBefore;
         vm.stopPrank();
 
@@ -256,7 +256,7 @@ contract BondingCurveTest is Test {
 
         vm.deal(alice, eth1);
         vm.prank(alice);
-        try curveV1.buy{value: eth1}(0) {} catch { return; }
+        try curveV1.buy{value: eth1}(0, block.timestamp + 1 hours) {} catch { return; }
 
         uint256 tokens1 = tokenV1.balanceOf(alice);
         if (tokens1 == 0) return;
@@ -265,7 +265,7 @@ contract BondingCurveTest is Test {
 
         vm.deal(bob, eth2);
         vm.prank(bob);
-        try curveV1.buy{value: eth2}(0) {} catch { return; }
+        try curveV1.buy{value: eth2}(0, block.timestamp + 1 hours) {} catch { return; }
 
         uint256 tokens2 = tokenV1.balanceOf(bob);
         if (tokens2 == 0) return;
@@ -336,7 +336,7 @@ contract BondingCurveTest is Test {
 
         vm.deal(alice, ethAmount);
         vm.startPrank(alice);
-        curveV1.buy{value: ethAmount}(0);
+        curveV1.buy{value: ethAmount}(0, block.timestamp + 1 hours);
 
         uint256 bought = tokenV1.balanceOf(alice);
         if (bought == 0) return;
@@ -345,7 +345,7 @@ contract BondingCurveTest is Test {
         tokenV1.approve(address(curveV1), tryToSell);
 
         vm.expectRevert(IBondingCurve.InsufficientTokens.selector);
-        curveV1.sell(tryToSell, 0);
+        curveV1.sell(tryToSell, 0, block.timestamp + 1 hours);
         vm.stopPrank();
     }
 
@@ -389,7 +389,7 @@ contract BondingCurveTest is Test {
         vm.deal(alice, 10 ether);
         vm.prank(alice);
         vm.expectRevert(IBondingCurve.ExceedsMaxBuy.selector);
-        whaleCurve.buy{value: 1 ether}(0);
+        whaleCurve.buy{value: 1 ether}(0, block.timestamp + 1 hours);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

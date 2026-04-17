@@ -12,7 +12,17 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, Plus, Trash2, GripVertical, Clock, Maximize2, Scissors } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  Plus,
+  Trash2,
+  GripVertical,
+  Clock,
+  Maximize2,
+  Scissors,
+  Wand2,
+} from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
 import { getEffectiveDuration } from '@/types/segments';
 import { VideoTrimmer } from './VideoTrimmer';
@@ -302,6 +312,16 @@ export function VideoTimeline({
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {segment.videoUrl && (
+                    <a
+                      href={`/editor?video=${encodeURIComponent(segment.videoUrl)}`}
+                      className="inline-flex items-center gap-1 h-5 px-1.5 text-[10px] rounded hover:bg-accent"
+                      title="Open in Video Editor"
+                    >
+                      <Wand2 className="h-2.5 w-2.5" />
+                      Edit
+                    </a>
+                  )}
                   {onSegmentTrim && (
                     <Button
                       size="sm"

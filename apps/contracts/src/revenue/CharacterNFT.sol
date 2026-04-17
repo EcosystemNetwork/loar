@@ -235,7 +235,7 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721Upgradeable, ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 

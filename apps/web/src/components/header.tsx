@@ -16,7 +16,9 @@ import { Button } from './ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
@@ -136,11 +138,11 @@ export default function Header() {
                     const visibleLinks = group.links.filter((l) => !HIDDEN_ROUTES.has(l.to));
                     if (!visibleLinks.length) return null;
                     return (
-                      <div key={group.label}>
+                      <DropdownMenuGroup key={group.label}>
                         {gi > 0 && <DropdownMenuSeparator />}
-                        <p className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                           {group.label}
-                        </p>
+                        </DropdownMenuLabel>
                         {visibleLinks.map((link) => (
                           <DropdownMenuItem key={link.to} asChild>
                             <Link
@@ -153,14 +155,14 @@ export default function Header() {
                             >
                               {link.label}
                               {'beta' in link && link.beta && (
-                                <span className="text-[9px] font-semibold bg-primary/15 text-primary px-1.5 py-0.5 rounded-full">
+                                <span className="text-[9px] font-semibold bg-primary/15 text-primary px-1.5 py-0.5 rounded-full leading-none">
                                   BETA
                                 </span>
                               )}
                             </Link>
                           </DropdownMenuItem>
                         ))}
-                      </div>
+                      </DropdownMenuGroup>
                     );
                   })}
                 </DropdownMenuContent>

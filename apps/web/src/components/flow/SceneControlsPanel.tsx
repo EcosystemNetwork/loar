@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// Card wrapper removed — panel is already inside a bordered container in universe/$id.tsx
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -103,12 +103,10 @@ interface SceneControlsPanelProps {
   universeId: string;
   controls: SceneControls;
   onChange: (controls: SceneControls) => void;
-  onSave: () => void;
   castMembers?: CastMember[];
   onOpenCastManager?: () => void;
   onOpenMotionBrush?: () => void;
   siblingNodes?: Array<{ id: string; label: string; videoUrl?: string }>;
-  isSaving?: boolean;
 }
 
 type Tab = 'camera' | 'cast' | 'motion' | 'keyframe' | 'vfx' | 'style';
@@ -118,12 +116,10 @@ export function SceneControlsPanel({
   universeId,
   controls,
   onChange,
-  onSave,
   castMembers = [],
   onOpenCastManager,
   onOpenMotionBrush,
   siblingNodes = [],
-  isSaving = false,
 }: SceneControlsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('camera');
 
@@ -174,41 +170,26 @@ export function SceneControlsPanel({
   ];
 
   return (
-    <Card className="border-primary/20">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center justify-between">
-          <span>Scene Controls</span>
-          <Button
-            size="sm"
-            variant="default"
-            onClick={onSave}
-            disabled={isSaving}
-            className="h-7 text-xs"
+    <div className="space-y-3">
+      {/* Tab bar */}
+      <div className="flex gap-1 flex-wrap">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+              activeTab === tab.id
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+            } ${tab.hasValue ? 'ring-1 ring-primary/40' : ''}`}
           >
-            {isSaving ? 'Saving...' : 'Save'}
-          </Button>
-        </CardTitle>
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Tab bar */}
-        <div className="flex gap-1 flex-wrap mt-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-              } ${tab.hasValue ? 'ring-1 ring-primary/40' : ''}`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-2 space-y-3">
+      <div className="space-y-3">
         {/* ── Camera Tab ─────────────────────────────────────────── */}
         {activeTab === 'camera' && (
           <div className="space-y-3">
@@ -572,7 +553,7 @@ export function SceneControlsPanel({
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

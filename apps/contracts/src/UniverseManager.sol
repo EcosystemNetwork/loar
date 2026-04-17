@@ -449,8 +449,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
                         try inft.mint(
                             owners[i],
                             universeId,
-                            i + 1,        // 1-based index
-                            total,
+                            uint8(i + 1),        // 1-based index
+                            uint8(total),
                             owner,        // safe address
                             universeContract,
                             universeName,

@@ -95,14 +95,14 @@ contract DeployAllScript is Script {
         }
 
         // ── Phase 2: Core Protocol ──────────────────────────────────
-        UniverseFactory uf = new UniverseFactory();
-        console.log("[2] UniverseFactory:", address(uf));
-
         UniverseMetadataRenderer umr = new UniverseMetadataRenderer();
         console.log("[2] MetadataRenderer:", address(umr));
 
         UniverseManager um = new UniverseManager(treasury, wethAddr);
         console.log("[2] UniverseManager:", address(um));
+
+        UniverseFactory uf = new UniverseFactory(address(um));
+        console.log("[2] UniverseFactory:", address(uf));
 
         um.setUniverseFactory(address(uf));
         um.setMetadataRenderer(address(umr));

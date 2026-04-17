@@ -5,39 +5,45 @@ import { z } from 'zod';
  * All vars in this schema are browser-safe (public) by design.
  * Never add secrets here — VITE_ vars are baked into the JS bundle.
  */
+
+/** Coerces empty strings to undefined so `.optional()` correctly skips unset Vite env vars */
+const optionalString = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
+
+const optionalAddress = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid Ethereum address')
+    .optional()
+);
+
 const envSchema = z.object({
   // ── Server URL (falls back to relative path if unset) ─────────────────────
-  VITE_SERVER_URL: z.string().optional(),
+  VITE_SERVER_URL: optionalString,
 
   // ── Optional endpoints ────────────────────────────────────────────────────
-  VITE_PONDER_URL: z.string().optional(),
+  VITE_PONDER_URL: optionalString,
 
   // ── Blockchain (public addresses) ─────────────────────────────────────────
-  VITE_LOAR_TOKEN_ADDRESS: z
-    .string()
-    .regex(/^0x[0-9a-fA-F]{40}$/, 'VITE_LOAR_TOKEN_ADDRESS must be a valid Ethereum address')
-    .optional(),
-  VITE_TREASURY_ADDRESS: z
-    .string()
-    .regex(/^0x[0-9a-fA-F]{40}$/, 'VITE_TREASURY_ADDRESS must be a valid Ethereum address')
-    .optional(),
+  VITE_LOAR_TOKEN_ADDRESS: optionalAddress,
+  VITE_TREASURY_ADDRESS: optionalAddress,
 
   // ── Admin (comma-separated public addresses) ───────────────────────────────
-  VITE_ADMIN_ADDRESSES: z.string().optional(),
+  VITE_ADMIN_ADDRESSES: optionalString,
 
   // ── Thirdweb (client ID — public, not secret) ──────────────────────────────
-  VITE_THIRDWEB_CLIENT_ID: z.string().optional(),
+  VITE_THIRDWEB_CLIENT_ID: optionalString,
 
   // ── WalletConnect (project ID — public) ───────────────────────────────────
-  VITE_WALLETCONNECT_PROJECT_ID: z.string().optional(),
+  VITE_WALLETCONNECT_PROJECT_ID: optionalString,
 
   // ── Firebase web client config (public — not admin credentials) ────────────
-  VITE_FIREBASE_PROJECT_ID: z.string().optional(),
-  VITE_FIREBASE_API_KEY: z.string().optional(),
-  VITE_FIREBASE_AUTH_DOMAIN: z.string().optional(),
-  VITE_FIREBASE_STORAGE_BUCKET: z.string().optional(),
-  VITE_FIREBASE_MESSAGING_SENDER_ID: z.string().optional(),
-  VITE_FIREBASE_APP_ID: z.string().optional(),
+  VITE_FIREBASE_PROJECT_ID: optionalString,
+  VITE_FIREBASE_API_KEY: optionalString,
+  VITE_FIREBASE_AUTH_DOMAIN: optionalString,
+  VITE_FIREBASE_STORAGE_BUCKET: optionalString,
+  VITE_FIREBASE_MESSAGING_SENDER_ID: optionalString,
+  VITE_FIREBASE_APP_ID: optionalString,
 });
 
 export type WebEnv = z.infer<typeof envSchema>;

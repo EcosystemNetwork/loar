@@ -49,8 +49,12 @@ import type { UniverseData } from '@/types/universe';
 /** Max characters for on-chain proposal descriptions to limit gas usage */
 const MAX_PROPOSAL_DESCRIPTION = 500;
 
-/** Number of blocks to look back when fetching proposals. ~500k blocks on Base L2 ≈ ~11.5 days */
-const PROPOSAL_LOOKBACK_BLOCKS = 500_000n;
+/**
+ * Block lookback ranges for fetching proposals.
+ * Many RPC providers cap eth_getLogs to ~10k blocks, so we try progressively
+ * smaller windows on failure rather than one giant 500k-block query.
+ */
+const PROPOSAL_LOOKBACK_RANGES = [100_000n, 50_000n, 10_000n, 2_000n] as const;
 
 interface GovernanceSidebarProps {
   isOpen: boolean;
@@ -298,18 +302,46 @@ export function GovernanceSidebar({
 
     setIsLoadingProposals(true);
     try {
+      // Verify the governance contract actually exists on-chain
+      const code = await publicClient.getCode({ address: governanceAddress });
+      if (!code || code === '0x') {
+        // No contract deployed at this address — not an error, just nothing to show
+        setProposals([]);
+        return;
+      }
+
       const latestBlock = await publicClient.getBlockNumber();
       setCurrentBlock(latestBlock);
-      const fromBlock =
-        latestBlock > PROPOSAL_LOOKBACK_BLOCKS ? latestBlock - PROPOSAL_LOOKBACK_BLOCKS : 0n;
 
-      const events = await publicClient.getContractEvents({
-        address: governanceAddress,
-        abi: universeGovernorAbi,
-        eventName: 'ProposalCreated',
-        fromBlock,
-        toBlock: 'latest',
-      });
+      // Try progressively smaller block ranges — RPC providers often cap eth_getLogs
+      let events: Awaited<ReturnType<typeof publicClient.getContractEvents>> = [];
+      let fetched = false;
+
+      for (const range of PROPOSAL_LOOKBACK_RANGES) {
+        const fromBlock = latestBlock > range ? latestBlock - range : 0n;
+        try {
+          events = await publicClient.getContractEvents({
+            address: governanceAddress,
+            abi: universeGovernorAbi,
+            eventName: 'ProposalCreated',
+            fromBlock,
+            toBlock: 'latest',
+          });
+          fetched = true;
+          break;
+        } catch {
+          // Range too large for this RPC, try a smaller one
+        }
+      }
+
+      if (!fetched) {
+        // All ranges failed — show a specific message
+        toast.error(
+          'RPC does not support log queries for this range. Try switching RPC providers.'
+        );
+        setProposals([]);
+        return;
+      }
 
       const fetchedProposals: Proposal[] = await Promise.all(
         events.map(async (event) => {
@@ -376,8 +408,9 @@ export function GovernanceSidebar({
       );
 
       setProposals(fetchedProposals.reverse());
-    } catch {
-      toast.error('Failed to load proposals');
+    } catch (err) {
+      console.error('[GovernanceSidebar] Failed to load proposals:', err);
+      toast.error(err instanceof Error ? `Proposals: ${err.message}` : 'Failed to load proposals');
     } finally {
       setIsLoadingProposals(false);
     }

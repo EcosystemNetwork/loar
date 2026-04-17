@@ -192,9 +192,9 @@ contract SlopMarket is ReentrancyGuard, Ownable {
 
         // MARKET-01: Honor ERC2981 creator royalties
         (address royaltyReceiver, uint256 royaltyAmount) = (address(0), 0);
-        try IERC2981(l.tokenContract).royaltyInfo(l.tokenId, totalPrice) returns (address receiver, uint256 amount) {
+        try IERC2981(l.tokenContract).royaltyInfo(l.tokenId, totalPrice) returns (address receiver, uint256 royaltyAmt) {
             royaltyReceiver = receiver;
-            royaltyAmount = amount;
+            royaltyAmount = royaltyAmt;
         } catch {}
 
         if (royaltyAmount > 0 && royaltyReceiver != address(0) && royaltyReceiver != l.seller) {

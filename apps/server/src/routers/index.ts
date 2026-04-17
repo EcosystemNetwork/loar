@@ -60,6 +60,7 @@ import { mediaRouter } from './media/media.routes';
 import { voiceRouter } from './generation/voice.routes';
 import { threedRouter } from './generation/threed.routes';
 import { audioRouter } from './generation/audio.routes';
+import { editingRouter } from './generation/editing.routes';
 import { characterPipelineRouter } from './generation/character-pipeline.routes';
 import { collaborationRouter } from './collaboration/collaboration.routes';
 import { studioRouter } from './studio/studio.routes';
@@ -179,6 +180,7 @@ export const appRouter = router({
   audio: audioRouter,
   threed: threedRouter,
   characterPipeline: characterPipelineRouter,
+  editing: editingRouter,
   lora: loraRouter,
   lipsync: lipsyncRouter,
   cutdown: cutdownRouter,

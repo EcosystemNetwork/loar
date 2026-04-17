@@ -198,7 +198,7 @@ contract CharacterNFTTest is Test {
 
     function test_createCharacter_revert_frozenContent() public {
         vm.prank(platform);
-        registry.freeze(visualHash, "dispute");
+        registry.emergencyFreeze(visualHash, "dispute");
 
         vm.prank(creator);
         vm.expectRevert(CharacterNFT.ContentNotMonetizable.selector);
@@ -493,25 +493,16 @@ contract CharacterNFTTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Claim Royalties
+    //  Royalties (ROYALTY-01: claimRoyalties removed — royalties routed via PaymentRouter)
     // ═══════════════════════════════════════════════════════════════════
 
-    function test_claimRoyalties() public {
+    function test_recordAppearance_routesViaPaymentRouter() public {
         vm.prank(creator);
         nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
 
         vm.prank(platform);
         nft.recordAppearance{value: 0.5 ether}(1, 1);
-
-        vm.prank(creator);
-        nft.claimRoyalties();
-        assertEq(nft.claimableRoyalties(creator), 0);
-    }
-
-    function test_claimRoyalties_revert_nothingToClaim() public {
-        vm.prank(creator);
-        vm.expectRevert(CharacterNFT.NothingToClaim.selector);
-        nft.claimRoyalties();
+        // Royalties now routed through PaymentRouter — creator claims via paymentRouter.claim()
     }
 
     // ═══════════════════════════════════════════════════════════════════

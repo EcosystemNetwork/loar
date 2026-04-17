@@ -2838,17 +2838,28 @@ function UniverseTimelineEditorInner() {
           !showCastManager && (
             <div className="w-[320px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
               <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-                <span className="text-sm text-zinc-400">
-                  Node {selectedNode.data.displayName || selectedNode.data.eventId}
+                <span className="text-sm text-zinc-400 truncate">
+                  {selectedNode.data.displayName || selectedNode.data.eventId}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedNode(null)}
-                  className="text-zinc-500 hover:text-white h-6 w-6 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={handleSaveSceneControls}
+                    disabled={isSavingControls}
+                    className="h-6 text-xs px-2"
+                  >
+                    {isSavingControls ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedNode(null)}
+                    className="text-zinc-500 hover:text-white h-6 w-6 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3">
                 {/* Motion Brush overlay */}
@@ -2864,8 +2875,6 @@ function UniverseTimelineEditorInner() {
                     universeId={id}
                     controls={selectedNodeControls}
                     onChange={setSelectedNodeControls}
-                    onSave={handleSaveSceneControls}
-                    isSaving={isSavingControls}
                     castMembers={
                       castMembersData?.map((m: any) => ({
                         id: m.id,

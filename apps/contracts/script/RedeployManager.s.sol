@@ -33,17 +33,17 @@ contract RedeployManagerScript is Script {
 
         vm.startBroadcast(pk);
 
-        // 1. Deploy UniverseFactory (holds Universe creation bytecode)
-        UniverseFactory factory = new UniverseFactory();
-        console.log("[1] UniverseFactory:", address(factory));
-
-        // 2. Deploy MetadataRenderer (holds Strings + Base64)
+        // 1. Deploy MetadataRenderer (holds Strings + Base64)
         UniverseMetadataRenderer renderer = new UniverseMetadataRenderer();
-        console.log("[2] MetadataRenderer:", address(renderer));
+        console.log("[1] MetadataRenderer:", address(renderer));
 
-        // 3. Deploy UniverseManager (now under EIP-170 limit)
+        // 2. Deploy UniverseManager (now under EIP-170 limit)
         UniverseManager um = new UniverseManager(deployer, weth);
-        console.log("[3] UniverseManager:", address(um));
+        console.log("[2] UniverseManager:", address(um));
+
+        // 3. Deploy UniverseFactory (needs manager for access control)
+        UniverseFactory factory = new UniverseFactory(address(um));
+        console.log("[3] UniverseFactory:", address(factory));
 
         // 4. Wire up factory + renderer
         um.setUniverseFactory(address(factory));

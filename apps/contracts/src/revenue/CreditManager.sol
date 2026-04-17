@@ -58,10 +58,11 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     mapping(bytes32 => uint256) public generationCosts;
 
     // Rate limiting for grantCredits (CREDIT-01)
-    uint256 public dailyGrantLimit = 100_000;
+    // NOTE: Defaults set in initialize(), not here — inline initializers don't execute in proxy context
+    uint256 public dailyGrantLimit;
     uint256 public grantedToday;
     uint256 public currentGrantDay;
-    uint256 public maxGrantPerUser = 10_000;
+    uint256 public maxGrantPerUser;
 
     // ── Margin constants (informational, actual margins baked into package prices) ──
     uint16 public constant FIAT_MARGIN_BPS = 3500;   // 35%
@@ -129,6 +130,10 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         generationCosts[keccak256("scene")] = 15;
         generationCosts[keccak256("voiceover")] = 10;
         generationCosts[keccak256("caption")] = 2;
+
+        // CREDIT-01: Set rate limits in initialize (inline initializers don't run in proxy)
+        dailyGrantLimit = 100_000;
+        maxGrantPerUser = 10_000;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

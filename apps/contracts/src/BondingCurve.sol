@@ -63,6 +63,9 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     /// @notice Pending refunds for buyers whose refund transfer failed (pull pattern, H1 fix)
     mapping(address => uint256) public pendingRefunds;
 
+    /// @notice Total ETH held as pending refunds — excluded from graduation LP to protect refund claimants
+    uint256 public totalPendingRefunds;
+
     event RefundPending(address indexed buyer, uint256 amount);
     event RefundClaimed(address indexed buyer, uint256 amount);
 
@@ -142,6 +145,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
             if (!sent) {
                 // Store for later withdrawal instead of reverting
                 pendingRefunds[msg.sender] += refund;
+                totalPendingRefunds += refund;
                 emit RefundPending(msg.sender, refund);
             }
         }
@@ -201,7 +205,8 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         emit TradingHalted(universeId);
 
         uint256 unsoldTokens = TOTAL_CURVE_SUPPLY - tokensSold;
-        uint256 ethForLp = address(this).balance; // includes sell fees as bonus liquidity
+        // Exclude pending refunds from LP ETH — those belong to refund claimants, not LP
+        uint256 ethForLp = address(this).balance - totalPendingRefunds;
 
         // Approve unsold tokens for UniverseManager
         if (unsoldTokens > 0) {
@@ -228,6 +233,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         uint256 amount = pendingRefunds[msg.sender];
         require(amount > 0, "No pending refund");
         pendingRefunds[msg.sender] = 0;
+        totalPendingRefunds -= amount;
         (bool sent,) = msg.sender.call{value: amount}("");
         if (!sent) revert TransferFailed();
         emit RefundClaimed(msg.sender, amount);

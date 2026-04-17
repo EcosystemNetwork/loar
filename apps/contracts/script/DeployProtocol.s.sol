@@ -100,20 +100,20 @@ contract DeployProtocolScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy UniverseFactory (holds Universe creation bytecode, EIP-170 extraction)
-        console.log("1/9 Deploying UniverseFactory...");
-        universeFactory = new UniverseFactory();
-        console.log("   UniverseFactory deployed at:", address(universeFactory));
-
-        // 2. Deploy UniverseMetadataRenderer (holds Strings + Base64, EIP-170 extraction)
-        console.log("2/9 Deploying UniverseMetadataRenderer...");
+        // 1. Deploy UniverseMetadataRenderer (holds Strings + Base64, EIP-170 extraction)
+        console.log("1/9 Deploying UniverseMetadataRenderer...");
         metadataRenderer = new UniverseMetadataRenderer();
         console.log("   UniverseMetadataRenderer deployed at:", address(metadataRenderer));
 
-        // 3. Deploy UniverseManager
-        console.log("3/9 Deploying UniverseManager...");
+        // 2. Deploy UniverseManager
+        console.log("2/9 Deploying UniverseManager...");
         universeManager = new UniverseManager(teamFeeRecipient, weth);
         console.log("   UniverseManager deployed at:", address(universeManager));
+
+        // 3. Deploy UniverseFactory (needs manager address for access control)
+        console.log("3/9 Deploying UniverseFactory...");
+        universeFactory = new UniverseFactory(address(universeManager));
+        console.log("   UniverseFactory deployed at:", address(universeFactory));
 
         // Wire factory + renderer
         universeManager.setUniverseFactory(address(universeFactory));
