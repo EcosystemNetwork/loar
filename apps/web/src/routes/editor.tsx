@@ -35,6 +35,10 @@ import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 
 export const Route = createFileRoute('/editor')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    video: (search.video as string) || undefined,
+    image: (search.image as string) || undefined,
+  }),
   beforeLoad: ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/editor' } });
@@ -44,8 +48,9 @@ export const Route = createFileRoute('/editor')({
 });
 
 function EditorPage() {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const { video: initialVideo, image: initialImage } = Route.useSearch();
+  const [videoUrl, setVideoUrl] = useState<string | null>(initialVideo || null);
+  const [imageUrl, setImageUrl] = useState<string | null>(initialImage || null);
   const [inputMode, setInputMode] = useState<'url' | 'upload'>('url');
   const [urlInput, setUrlInput] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
