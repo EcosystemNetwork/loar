@@ -301,4 +301,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     function getUniverseCounts(uint256 universeId) external view returns (uint256 licenseCount, uint256 merchCount) {
         return (universeLicenses[universeId].length, universeMerch[universeId].length);
     }
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

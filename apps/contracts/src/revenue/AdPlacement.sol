@@ -251,4 +251,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     function getSlotCount(uint256 universeId) external view returns (uint256) {
         return universeSlots[universeId].length;
     }
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

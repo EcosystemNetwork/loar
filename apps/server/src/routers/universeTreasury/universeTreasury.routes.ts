@@ -19,7 +19,7 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { base, sepolia, baseSepolia } from 'viem/chains';
 import { DEFAULT_PACKAGES, buildPackagesFromConfig } from '../credits/credits.routes';
 import { verifyStripePayment } from '../credits/stripe.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
@@ -31,13 +31,19 @@ const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
 /** Allowed chain IDs for treasury payment verification. */
-const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id, base.id]);
 
 function getTreasuryChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `Chain ID ${chainId} is not supported for treasury operations.`,
+    });
+  }
+  if (chainId === base.id) {
+    return createPublicClient({
+      chain: base,
+      transport: http(process.env.RPC_URL_BASE ?? ''),
     });
   }
   if (chainId === baseSepolia.id) {
@@ -651,9 +657,9 @@ export const universeTreasuryRouter = router({
           message: 'Deposit transaction recipient does not match the platform treasury address.',
         });
       }
-      // Verify the deposited amount matches the claimed amount (1% tolerance)
+      // Verify the deposited amount matches the claimed amount (0.1% tolerance for gas rounding)
       const claimedWei = parseUnits(input.amountEth, 18);
-      const minRequired = (claimedWei * 99n) / 100n;
+      const minRequired = (claimedWei * 999n) / 1000n;
       if (tx.value < minRequired) {
         throw new TRPCError({
           code: 'BAD_REQUEST',

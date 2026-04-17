@@ -354,19 +354,12 @@ async function main() {
       // 1. Generate video
       const videoUrl = await generateVideo(scene.prompt, label);
 
-      // 2. Pin to IPFS
-      const slug = scene.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const { url: ipfsUrl, hash: ipfsHash } = await pinToIPFS(
-        videoUrl,
-        `cyberwar-${scene.id}-${slug}.mp4`,
-        label
-      );
-
-      // 3. On-chain node
-      const nodeId = await createNode(ipfsHash, scene.plot, previousId, ipfsUrl, label);
+      // 2. On-chain node (skip Pinata download — use ByteDance URL directly)
+      const contentHash = `cw-${scene.id}-${Date.now()}`;
+      const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
       previousId = nodeId;
 
-      results.push({ id: scene.id, title: scene.title, nodeId, ipfs: ipfsHash });
+      results.push({ id: scene.id, title: scene.title, nodeId, ipfs: contentHash });
       log(label, `DONE — Node #${nodeId}`);
     } catch (err: any) {
       log(label, `FAILED: ${err.message?.slice(0, 200)}`);

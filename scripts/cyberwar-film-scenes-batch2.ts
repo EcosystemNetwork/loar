@@ -557,8 +557,9 @@ async function main() {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .slice(0, 40);
-      const { url: ipfsUrl, hash } = await pinToIPFS(videoUrl, `cw-${scene.id}-${slug}.mp4`, label);
-      const nodeId = await createNode(hash, scene.plot, previousId, ipfsUrl, label);
+      // Skip Pinata — use ByteDance URL directly (CDN download hangs)
+      const contentHash = `cw-${scene.id}-${Date.now()}`;
+      const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
       previousId = nodeId;
       completed++;
       log(label, `DONE — Node #${nodeId}`);

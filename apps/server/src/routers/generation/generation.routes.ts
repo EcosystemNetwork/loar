@@ -537,6 +537,31 @@ function saveLegacyVideoRecord(record: Record<string, any>) {
   }
 }
 
+// ── Per-user generation throttle (in-memory, complements IP rate limiter) ──
+
+const lastGenerationByUser = new Map<string, number>();
+
+/** Enforce a minimum interval between generations per user address. */
+function checkUserThrottle(userId: string, minIntervalMs = 2_000): void {
+  const now = Date.now();
+  const last = lastGenerationByUser.get(userId);
+  if (last && now - last < minIntervalMs) {
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: `Please wait ${Math.ceil((minIntervalMs - (now - last)) / 1000)}s before generating again.`,
+    });
+  }
+  lastGenerationByUser.set(userId, now);
+}
+
+// Evict stale entries every 5 minutes to prevent unbounded growth
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [key, ts] of lastGenerationByUser) {
+    if (ts < cutoff) lastGenerationByUser.delete(key);
+  }
+}, 5 * 60_000);
+
 // ── Router ────────────────────────────────────────────────────────────
 
 export const generationRouter = router({
@@ -683,6 +708,9 @@ export const generationRouter = router({
     .use(requirePermission('generation.video'))
     .input(generateInputSchema)
     .mutation(async ({ input, ctx }) => {
+      // Per-user throttle: minimum 2s between generation requests
+      checkUserThrottle(ctx.user.uid);
+
       // Sanitize user-supplied prompt before any processing
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);

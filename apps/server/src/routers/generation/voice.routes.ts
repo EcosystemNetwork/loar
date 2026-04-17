@@ -33,6 +33,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { validateUploadUrl } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
 
 // ── Pricing — loaded from platform config (admin-configurable) ────────
 
@@ -214,6 +215,7 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.text = sanitizePrompt(input.text);
       const genId = randomUUID();
       const startTime = Date.now();
 
@@ -319,6 +321,7 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.text = sanitizePrompt(input.text);
       const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
       const credits = toCredits(SOUND_EFFECT_COST_USD, fiatMargin);

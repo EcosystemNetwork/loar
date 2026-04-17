@@ -236,4 +236,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
             sub.autoRenew
         );
     }
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

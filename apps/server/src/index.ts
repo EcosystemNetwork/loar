@@ -152,7 +152,46 @@ app.post('/api/upload', async (c) => {
     // Server-side magic byte validation — don't trust client-supplied MIME types
     const headerBytes = Buffer.from(await file.slice(0, 12).arrayBuffer());
     const detectedMime = detectMimeFromMagic(headerBytes);
-    const clientMime = detectedMime ?? file.type;
+
+    // When magic byte detection succeeds, use the detected MIME. When it fails,
+    // cross-check the client-supplied MIME against the file extension to prevent
+    // MIME spoofing (e.g. uploading an executable with a fake image/png type).
+    let clientMime: string;
+    if (detectedMime) {
+      clientMime = detectedMime;
+    } else {
+      // Magic detection failed — validate that client MIME is consistent with extension
+      const extMimeMap: Record<string, string[]> = {
+        jpg: ['image/jpeg'],
+        jpeg: ['image/jpeg'],
+        png: ['image/png'],
+        gif: ['image/gif'],
+        webp: ['image/webp'],
+        mp4: ['video/mp4', 'video/quicktime'],
+        mov: ['video/quicktime', 'video/mp4'],
+        webm: ['video/webm'],
+        avi: ['video/x-msvideo'],
+        mkv: ['video/x-matroska'],
+        mp3: ['audio/mpeg'],
+        wav: ['audio/wav', 'audio/x-wav'],
+        ogg: ['audio/ogg'],
+        flac: ['audio/flac'],
+        pdf: ['application/pdf'],
+        svg: ['image/svg+xml'],
+      };
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+      const expectedMimes = extMimeMap[ext];
+      if (expectedMimes && file.type && !expectedMimes.includes(file.type)) {
+        return c.json(
+          {
+            code: 'BAD_REQUEST',
+            message: `MIME type "${file.type}" does not match file extension ".${ext}"`,
+          },
+          400
+        );
+      }
+      clientMime = file.type || 'application/octet-stream';
+    }
 
     const allowedMimeTypes = new Set([
       // Video
@@ -243,7 +282,7 @@ app.post('/api/upload', async (c) => {
     const { getStorageManager } = await import('./services/storage');
     const manager = getStorageManager();
     const buffer = Buffer.from(await file.arrayBuffer());
-    const manifest = await manager.upload(buffer, file.name, file.type);
+    const manifest = await manager.upload(buffer, file.name, clientMime);
 
     return c.json({ manifest });
   } catch (error) {

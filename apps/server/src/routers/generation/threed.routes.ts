@@ -32,6 +32,7 @@ import type { MeshyTaskOutput } from '../../services/meshy';
 // ── Pricing — loaded from platform config (admin-configurable) ────────
 
 import { getPlatformConfig } from '../../services/platformConfig';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
 
 const LOAR_TO_USD = 0.01;
 
@@ -264,6 +265,8 @@ export const threedRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
       const cost = COSTS.text_preview;

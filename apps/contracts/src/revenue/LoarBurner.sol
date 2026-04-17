@@ -218,4 +218,7 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
         emit PlatformUpdated(platform, newPlatform);
         platform = newPlatform;
     }
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

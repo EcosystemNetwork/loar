@@ -232,4 +232,7 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function getCollabCount(uint256 universeId) external view returns (uint256) {
         return universeCollabs[universeId].length;
     }
+
+    /// @dev Reserved storage gap for future upgrades (M4)
+    uint256[50] private __gap;
 }

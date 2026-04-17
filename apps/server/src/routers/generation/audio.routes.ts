@@ -36,6 +36,7 @@ import {
 } from '../../services/audio-models';
 import type { AudioGenerationMode, RoutingMode } from '../../services/audio-models';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
 
 // ── Pricing helpers ──────────────────────────────────────────────────
 
@@ -246,6 +247,7 @@ export const audioRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
       const genId = randomUUID();
       const startTime = Date.now();
       const { fiatMargin, loarMargin } = await getMargins();

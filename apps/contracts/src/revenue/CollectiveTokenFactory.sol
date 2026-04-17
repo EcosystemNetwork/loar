@@ -33,16 +33,16 @@ contract CollectiveERC20 is ERC20, ERC20Permit, Ownable {
     }
 }
 
-/// @title CollectiveTokenFactory
-/// @notice Deploys ERC-20 tokens for factions and organizations.
-///         Each collective gets 1 billion tokens (same pattern as GovernanceERC20)
-///         minted entirely to the creator for self-managed distribution.
-///         These tokens represent membership/ownership shares in a narrative collective.
 /// @dev Minimal interface to look up universe owner for access control (L2 fix)
 interface IUniverseManagerOwner {
     function ownerOf(uint256 tokenId) external view returns (address);
 }
 
+/// @title CollectiveTokenFactory
+/// @notice Deploys ERC-20 tokens for factions and organizations.
+///         Each collective gets 1 billion tokens (same pattern as GovernanceERC20)
+///         minted entirely to the creator for self-managed distribution.
+///         These tokens represent membership/ownership shares in a narrative collective.
 contract CollectiveTokenFactory {
     enum CollectiveKind { FACTION, ORGANIZATION }
 

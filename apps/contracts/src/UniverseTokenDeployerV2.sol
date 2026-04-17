@@ -283,7 +283,28 @@ contract UniverseTokenDeployerV2 is ReentrancyGuard {
     }
 
     function _deployGovernance(address tokenAddress) internal returns (address) {
-        UniverseGovernorMinimal governor = new UniverseGovernorMinimal(IVotes(tokenAddress));
+        // Deploy a TimelockController with a 24h delay — prevents instant execution
+        // of hostile proposals, giving community time to exit.
+        address[] memory proposers = new address[](0);
+        address[] memory executors = new address[](0);
+        TimelockController timelock = new TimelockController(
+            24 hours,  // minDelay
+            proposers, // filled by governor later
+            executors, // open executor
+            address(this) // admin (renounced below)
+        );
+
+        UniverseGovernorMinimal governor = new UniverseGovernorMinimal(
+            IVotes(tokenAddress),
+            timelock
+        );
+
+        // Grant governor roles on the timelock, then renounce admin
+        timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
+        timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0)); // anyone can execute after delay
+        timelock.grantRole(timelock.CANCELLER_ROLE(), address(governor));
+        timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), address(this));
+
         return address(governor);
     }
 }
@@ -328,20 +349,80 @@ contract GovernanceERC20Minimal is ERC20, ERC20Permit, ERC20Votes {
     }
 }
 
-// ─── Minimal governor ─────────────────────────────────────────────────
+// ─── Minimal governor (with TimelockController for safe execution delay) ──
 
 import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
 import {GovernorVotes} from "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import {GovernorVotesQuorumFraction} from "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
+import {GovernorTimelockControl} from "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
+import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
-contract UniverseGovernorMinimal is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction {
-    constructor(IVotes _token)
+contract UniverseGovernorMinimal is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
+
+    /// @notice Block at which this governor was deployed.
+    uint256 public immutable deployedAtBlock;
+
+    /// @notice Early-life period: ~30 days on Base L2 at 2s blocks.
+    uint256 public constant EARLY_LIFE_BLOCKS = 1_296_000;
+
+    /// @notice Quorum during early-life period (20% of total supply).
+    uint256 public constant EARLY_LIFE_QUORUM_FRACTION = 20;
+
+    constructor(IVotes _token, TimelockController _timelock)
         Governor("UniverseGovernor")
         GovernorVotes(_token)
-        GovernorVotesQuorumFraction(10) {}
+        GovernorVotesQuorumFraction(10) // steady-state = 10%
+        GovernorTimelockControl(_timelock)
+    {
+        deployedAtBlock = block.number;
+    }
 
-    function votingDelay() public pure override returns (uint256) { return 7200; }
-    function votingPeriod() public pure override returns (uint256) { return 50400; }
-    function proposalThreshold() public pure override returns (uint256) { return 1_000_000e18; }
+    function votingDelay() public pure override(Governor) returns (uint256) { return 7200; }
+    function votingPeriod() public pure override(Governor) returns (uint256) { return 50400; }
+    function proposalThreshold() public pure override(Governor) returns (uint256) { return 1_000_000e18; }
+
+    /// @notice Early-life quorum boost: 20% for first ~30 days, then 10%.
+    function quorum(uint256 timepoint)
+        public
+        view
+        override(Governor, GovernorVotesQuorumFraction)
+        returns (uint256)
+    {
+        if (block.number < deployedAtBlock + EARLY_LIFE_BLOCKS) {
+            return (token().getPastTotalSupply(timepoint) * EARLY_LIFE_QUORUM_FRACTION) / 100;
+        }
+        return super.quorum(timepoint);
+    }
+
+    // ── Required overrides for GovernorTimelockControl ──
+
+    function state(uint256 proposalId)
+        public view override(Governor, GovernorTimelockControl)
+        returns (ProposalState)
+    { return super.state(proposalId); }
+
+    function proposalNeedsQueuing(uint256 proposalId)
+        public view override(Governor, GovernorTimelockControl)
+        returns (bool)
+    { return super.proposalNeedsQueuing(proposalId); }
+
+    function _queueOperations(uint256 proposalId, address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
+        internal override(Governor, GovernorTimelockControl)
+        returns (uint48)
+    { return super._queueOperations(proposalId, targets, values, calldatas, descriptionHash); }
+
+    function _executeOperations(uint256 proposalId, address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
+        internal override(Governor, GovernorTimelockControl)
+    { super._executeOperations(proposalId, targets, values, calldatas, descriptionHash); }
+
+    function _cancel(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
+        internal override(Governor, GovernorTimelockControl)
+        returns (uint256)
+    { return super._cancel(targets, values, calldatas, descriptionHash); }
+
+    function _executor()
+        internal view override(Governor, GovernorTimelockControl)
+        returns (address)
+    { return super._executor(); }
 }
