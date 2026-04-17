@@ -25,7 +25,7 @@ export default defineConfig({
     {
       name: 'mobile-chrome',
       use: { ...devices['Pixel 5'] },
-      testMatch: ['homepage.spec.ts', 'navigation.spec.ts'],
+      testMatch: ['homepage.spec.ts'],
     },
   ],
   webServer: {

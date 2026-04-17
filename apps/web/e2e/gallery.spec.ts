@@ -89,13 +89,9 @@ test.describe('Gallery Filters', () => {
 test.describe('Gallery Trending Section', () => {
   test('trending section renders', async ({ page }) => {
     await page.goto('/gallery');
-    // Trending section with icon or text
-    await expect(
-      page
-        .getByText(/trending/i)
-        .first()
-        .or(page.locator('body'))
-    ).toBeVisible();
+    // Page should contain gallery content — trending only shows if data exists
+    const body = await page.locator('body').textContent();
+    expect(body?.toLowerCase()).toMatch(/gallery|trending|discover content/i);
   });
 });
 
@@ -114,13 +110,14 @@ test.describe('Gallery Content Display', () => {
 
   test('search input is present', async ({ page }) => {
     await page.goto('/gallery');
-    const searchInput = page.getByPlaceholder(/search/i).first();
+    // Gallery uses GalleryFilters which has a search input with placeholder "Search content..."
+    const searchInput = page.getByPlaceholder(/search content/i).first();
     await expect(searchInput).toBeVisible();
   });
 
   test('search input accepts text', async ({ page }) => {
     await page.goto('/gallery');
-    const searchInput = page.getByPlaceholder(/search/i).first();
+    const searchInput = page.getByPlaceholder(/search content/i).first();
     await searchInput.fill('test query');
     await expect(searchInput).toHaveValue('test query');
   });

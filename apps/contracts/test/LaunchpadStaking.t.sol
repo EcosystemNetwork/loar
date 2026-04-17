@@ -208,7 +208,8 @@ contract LaunchpadStakingTest is Test {
         vm.prank(staker);
         staking.stake(1_000e18);
 
-        uint256 firstStakeTime = block.timestamp;
+        // Read the recorded stakedAt from the contract (avoids block.timestamp compiler quirks)
+        (, uint256 firstStakeTime,,) = staking.stakes(staker);
 
         // Warp forward, add more
         vm.warp(block.timestamp + 3 days);

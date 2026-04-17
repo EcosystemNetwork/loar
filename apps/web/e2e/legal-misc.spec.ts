@@ -95,18 +95,15 @@ test.describe('Coming Soon Page', () => {
 
   test('has back link to Discover', async ({ page }) => {
     await page.goto('/coming-soon');
-    const backLink = page
-      .getByRole('link', { name: /back to discover/i })
-      .or(page.locator('a[href*="/discover"]').first());
-    await expect(backLink).toBeVisible();
+    // The coming-soon page has a Link to="/discover" — use the button inside it
+    const backBtn = page.getByRole('button', { name: /back to discover/i });
+    await expect(backBtn).toBeVisible();
   });
 
   test('back link navigates to /discover', async ({ page }) => {
     await page.goto('/coming-soon');
-    const backLink = page
-      .getByRole('link', { name: /back to discover/i })
-      .or(page.locator('a[href*="/discover"]').first());
-    await backLink.click();
+    const backBtn = page.getByRole('button', { name: /back to discover/i });
+    await backBtn.click();
     await expect(page).toHaveURL(/\/discover/);
   });
 });

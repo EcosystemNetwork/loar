@@ -367,7 +367,7 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         Deal storage deal = deals[dealId];
         if (deal.status != DealStatus.ACTIVE) return false;
         if (deal.dealType == DealType.BUY) return true; // permanent
-        return block.timestamp <= deal.endTime;
+        return block.timestamp < deal.endTime;
     }
 
     function getContentDeals(bytes32 contentHash) external view returns (uint256[] memory) {

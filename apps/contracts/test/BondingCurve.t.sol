@@ -150,23 +150,16 @@ contract BondingCurveTest is Test {
     }
 
     function test_graduation_V1() public {
-        // Buy enough to fill the curve
-        vm.deal(alice, 100 ether);
-        vm.startPrank(alice);
-
-        // Buy in chunks to avoid maxBuy
-        uint256 maxBuy = curveV1.MAX_BUY_AMOUNT();
-        while (curveV1.ethRaised() < GRADUATION_ETH && !curveV1.graduated()) {
-            uint256 ethToSend = 0.1 ether;
-            if (curveV1.ethRaised() + ethToSend > GRADUATION_ETH + 1 ether) {
-                ethToSend = 0.05 ether;
-            }
-            curveV1.buy{value: ethToSend}(0);
-        }
+        // Buy with enough ETH to fill the curve and trigger graduation.
+        // No maxBuy limit on curveV1 (MAX_BUY_BPS=10000). Excess ETH is refunded.
+        vm.deal(alice, 10 ether);
+        vm.prank(alice);
+        curveV1.buy{value: 5 ether}(0);
 
         assertTrue(curveV1.graduated(), "Should have graduated");
         assertTrue(manager.graduated(), "Manager should have received graduation");
-        vm.stopPrank();
+        // Excess ETH refunded
+        assertGt(alice.balance, 4 ether, "Should have received refund");
     }
 
     function test_emergencyHalt_onlyManager() public {
@@ -217,18 +210,21 @@ contract BondingCurveTest is Test {
     }
 
     /// @dev Invariant: contract balance >= ethRaised (sell fees add extra)
+    ///      Only valid before graduation — after graduation ETH moves to manager.
     function testFuzz_balance_geq_ethRaised(uint256 ethAmount) public {
-        ethAmount = bound(ethAmount, 0.001 ether, 5 ether);
+        ethAmount = bound(ethAmount, 0.001 ether, 3.5 ether); // below graduation
         vm.deal(alice, ethAmount);
         vm.prank(alice);
 
         try curveV1.buy{value: ethAmount}(0) {} catch {}
 
-        assertGe(
-            address(curveV1).balance,
-            curveV1.ethRaised(),
-            "balance < ethRaised"
-        );
+        if (!curveV1.graduated()) {
+            assertGe(
+                address(curveV1).balance,
+                curveV1.ethRaised(),
+                "balance < ethRaised"
+            );
+        }
     }
 
     /// @dev Invariant: buy then sell full amount yields less ETH than paid (sell fee)
@@ -382,12 +378,12 @@ contract BondingCurveTest is Test {
 
     /// @dev Anti-whale: buying more than MAX_BUY_AMOUNT reverts
     function test_antiWhale_maxBuy() public {
+        MockToken whaleToken = new MockToken("WT", "WT", TOKEN_SUPPLY_V1, address(this));
         BondingCurve whaleCurve = new BondingCurve(
-            address(tokenV1), address(manager), 99,
+            address(whaleToken), address(manager), 99,
             CURVE_SUPPLY_V1, GRADUATION_ETH, REAL_MAX_BUY_BPS
         );
-        // Fund the curve with tokens
-        tokenV1.transfer(address(whaleCurve), CURVE_SUPPLY_V1);
+        whaleToken.transfer(address(whaleCurve), CURVE_SUPPLY_V1);
 
         // A large buy should revert
         vm.deal(alice, 10 ether);

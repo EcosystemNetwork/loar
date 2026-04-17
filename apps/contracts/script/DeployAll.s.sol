@@ -301,6 +301,8 @@ contract DeployAllScript is Script {
         _logEnv("LOAR_FAUCET_ADDRESS", address(faucet));
         _logEnv("TREASURY_ADDRESS", treasury);
         _logEnv("UNIVERSE_MANAGER", address(um));
+        _logEnv("UNIVERSE_FACTORY", address(uf));
+        _logEnv("METADATA_RENDERER", address(umr));
         _logEnv("UNIVERSE_TOKEN_DEPLOYER", address(utd));
         _logEnv("FEE_LOCKER_ADDRESS", address(feeLocker));
         _logEnv("IDENTITY_NFT_ADDRESS", address(identityNft));
