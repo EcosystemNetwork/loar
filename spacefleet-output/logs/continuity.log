@@ -1,0 +1,41 @@
+[dotenv@17.3.1] injecting env (58) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+
+════════════════════════════════════════════════════════════
+  SPACE FLEET — Pilot: "Return"
+  40 Scenes × 10s = ~7 min core footage
+  Seedance 2.0 → On-chain | Mode: CONTINUITY
+════════════════════════════════════════════════════════════
+[AUTH] Authenticating...
+[AUTH] Authenticated as 0x116C28e6DCABCa363f83217C712d79DCE168d90e
+[WIKI] Fetching ALL entity data from wiki for visual consistency...
+[WIKI] Loaded 0 entities for visual consistency
+[SETUP] Balance: 0.9820 ETH
+[SETUP] Latest node: #150
+[MODE] CONTINUITY — sequential i2v chaining (slower, visually cohesive)
+
+═══════════════════════════════════════════════════════
+  S01: Highway — Jeff's Truck
+═══════════════════════════════════════════════════════
+[S01 (1/40)] Generating video (t2v)...
+[S01 (1/40)] Task: cgt-20260418141335-9zxps
+[S01 (1/40)] Generating... (0s)
+[S01 (1/40)] Generating... (30s)
+[S01 (1/40)] Generating... (60s)
+[S01 (1/40)] Generating... (90s)
+[S01 (1/40)] Generating... (120s)
+[S01 (1/40)] Generating... (150s)
+[S01 (1/40)] Video done
+[S01 (1/40)] Node #151 confirmed
+[S01 (1/40)] DONE — Node #151
+[S01 FRAME] Extracted last frame (42KB)
+[S01 FRAME] Frame uploaded: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmUysk17CDibwrguxtaN6dNLmy1hxjsPe6r32eCs86QFid
+
+═══════════════════════════════════════════════════════
+  S02: Parking Lot — Arrival
+═══════════════════════════════════════════════════════
+[S02 (2/40)] Generating video (i2v continuity)...
+[S02 (2/40)] Task: cgt-20260418141734-gnpqn
+[S02 (2/40)] Generating... (0s)
+[S02 (2/40)] Generating... (30s)
+[S02 (2/40)] Generating... (60s)
+[S02 (2/40)] Generating... (90s)

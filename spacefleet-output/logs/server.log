@@ -1,0 +1,72 @@
+
+> loar-fullstack@ dev:server /home/god/Desktop/LOAR/loar
+> turbo -F server dev
+
+• turbo 2.8.20
+
+   • Packages in scope: server
+   • Running dev in 1 packages
+   • Remote caching disabled
+
+server:dev: cache bypass, force executing a0e13d7703f60281
+server:dev: 
+server:dev: > server@0.1.0 dev /home/god/Desktop/LOAR/loar/apps/server
+server:dev: > tsx watch src/index.ts
+server:dev: 
+server:dev: [dotenv@17.3.1] injecting env (58) from ../../.env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+server:dev: [sentry] SENTRY_DSN not set — error reporting disabled
+server:dev: Firebase Admin SDK initialized successfully
+server:dev: Starting server on port 3000
+server:dev: CORS origin: http://localhost:3001
+server:dev: Environment: development
+server:dev: Server listening on http://localhost:3000
+server:dev: [pricing] Heartbeat complete: 45 models checked, 0 price changes detected
+server:dev: [pricing] Heartbeat started — checking every 12 hours
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 194ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 135ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 159ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m403[0m 0ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 150ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m403[0m 0ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 170ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 142ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m403[0m 1ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m403[0m 1ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 130ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [32m200[0m 346ms
+server:dev: <-- GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D
+server:dev: --> GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D [31m500[0m 439ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 143ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m401[0m 1ms
+server:dev: <-- GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D
+server:dev: --> GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D [31m500[0m 120ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 233ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [32m200[0m 344ms
+server:dev: <-- GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D
+server:dev: --> GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D [31m500[0m 301ms
+server:dev: <-- GET /trpc/entities.get?batch=1&input=%7B%220%22%3A%7B%22entityId%22%3A%22TbZvgFLV00ZsDIX8qkmK%22%7D%7D
+server:dev: --> GET /trpc/entities.get?batch=1&input=%7B%220%22%3A%7B%22entityId%22%3A%22TbZvgFLV00ZsDIX8qkmK%22%7D%7D [32m200[0m 132ms
+server:dev: <-- GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220X228295466C531C1D55B9DFDD5CF15AD0B88782FA%22%7D%7D
+server:dev: --> GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220X228295466C531C1D55B9DFDD5CF15AD0B88782FA%22%7D%7D [33m400[0m 8ms
+server:dev: <-- GET /trpc/entities.listByCreator?batch=1&input=%7B%220%22%3A%7B%22creator%22%3A%220x116c28e6dcabca363f83217c712d79dce168d90e%22%7D%7D
+server:dev: --> GET /trpc/entities.listByCreator?batch=1&input=%7B%220%22%3A%7B%22creator%22%3A%220x116c28e6dcabca363f83217c712d79dce168d90e%22%7D%7D [31m500[0m 110ms
+server:dev: <-- GET /trpc/entities.get?batch=1&input=%7B%220%22%3A%7B%22entityId%22%3A%22TbZvgFLV00ZsDIX8qkmK%22%7D%7D
+server:dev: --> GET /trpc/entities.get?batch=1&input=%7B%220%22%3A%7B%22entityId%22%3A%22TbZvgFLV00ZsDIX8qkmK%22%7D%7D [32m200[0m 133ms
+server:dev: <-- GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D
+server:dev: --> GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D [31m500[0m 165ms

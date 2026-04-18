@@ -82,7 +82,7 @@ async function getAuthToken(): Promise<string> {
     '',
     'Sign in to LOAR',
     '',
-    `URI: http://localhost:5173`,
+    `URI: http://localhost:3001`,
     `Version: 1`,
     `Chain ID: ${sepolia.id}`,
     `Nonce: ${nonce}`,
@@ -92,7 +92,7 @@ async function getAuthToken(): Promise<string> {
   const signature = await account.signMessage({ message });
   const verifyRes = await fetch(`${SERVER_URL}/auth/verify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:5173' },
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3001' },
     body: JSON.stringify({ message, signature }),
   });
   const setCookie = verifyRes.headers.get('set-cookie') ?? '';
