@@ -29,8 +29,14 @@ export default function UniverseDetailScreen() {
     trpc.subscriptions.getUniverseStats.queryOptions({ universeId: id })
   );
 
-  const universe = universeQuery.data;
-  const subStats = subStatsQuery.data;
+  const universeRaw = universeQuery.data as
+    | { success?: boolean; data?: any }
+    | Record<string, any>
+    | null
+    | undefined;
+  const universe: any =
+    universeRaw && 'success' in universeRaw && universeRaw.data ? universeRaw.data : universeRaw;
+  const subStats = subStatsQuery.data as any;
 
   const handleShare = async () => {
     await Share.share({

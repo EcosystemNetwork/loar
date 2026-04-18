@@ -73,12 +73,30 @@ const profileSchema = z.object({
   layout: profileLayoutSchema.optional(),
 });
 
+type ProfileData = {
+  displayName: string;
+  username: string;
+  bio?: string;
+  avatarUrl?: string;
+  visibility?: 'public' | 'private';
+  tags?: string[];
+  socialLinks?: Record<string, string | undefined>;
+  customLinks?: { label: string; url: string }[];
+  layout?: Record<string, unknown>;
+  uid?: string;
+  contentCount?: number;
+  followerCount?: number;
+  followingCount?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+};
+
 export const profilesRouter = router({
   /** Get the current user's profile */
   me: protectedProcedure.query(async ({ ctx }) => {
     const doc = await profilesCol().doc(ctx.user.uid).get();
     if (!doc.exists) return null;
-    return { id: doc.id, ...doc.data() };
+    return { id: doc.id, ...(doc.data() as ProfileData) };
   }),
 
   /** Get a profile by username (public) */
@@ -93,7 +111,7 @@ export const profilesRouter = router({
       if (snapshot.empty) return null;
 
       const doc = snapshot.docs[0];
-      const data = doc.data()!;
+      const data = doc.data() as ProfileData;
 
       // If private, only return minimal info
       if (data.visibility === 'private') {
@@ -114,7 +132,7 @@ export const profilesRouter = router({
     const doc = await profilesCol().doc(input.uid).get();
     if (!doc.exists) return null;
 
-    const data = doc.data()!;
+    const data = doc.data() as ProfileData;
     if (data.visibility === 'private') {
       return {
         id: doc.id,

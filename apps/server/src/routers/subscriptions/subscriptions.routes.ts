@@ -177,11 +177,19 @@ export const subscriptionsRouter = router({
     const snapshot = await subscriptionsCol().where('uid', '==', ctx.user.uid).get();
 
     return snapshot.docs.map((doc) => {
-      const data = doc.data();
+      const data = doc.data() as {
+        uid: string;
+        universeId: string;
+        tier: string;
+        price?: number;
+        autoRenew: boolean;
+        expiresAt?: { toDate?: () => Date };
+        startedAt?: { toDate?: () => Date };
+      };
       return {
         id: doc.id,
         ...data,
-        active: data.expiresAt?.toDate?.() > new Date(),
+        active: (data.expiresAt?.toDate?.() ?? new Date(0)) > new Date(),
         expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() || null,
         startedAt: data.startedAt?.toDate?.()?.toISOString?.() || null,
       };

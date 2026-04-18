@@ -26,8 +26,21 @@ export default function ProfileScreen() {
     )
   );
 
-  const profile = profileQuery.data;
-  const universes = universesQuery.data ?? [];
+  const profile = profileQuery.data as
+    | {
+        username?: string;
+        displayName?: string;
+        avatarUrl?: string;
+        bio?: string;
+        contentCount?: number;
+        followerCount?: number;
+      }
+    | null
+    | undefined;
+  const universes =
+    universesQuery.data && !Array.isArray(universesQuery.data)
+      ? universesQuery.data.data
+      : ((universesQuery.data ?? []) as any[]);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to disconnect your wallet?', [

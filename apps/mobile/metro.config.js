@@ -1,15 +1,51 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
+const {
+  withSerializerPlugins,
+} = require('@expo/metro-config/build/serializer/withExpoSerializers');
 const path = require('path');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
-const config = getDefaultConfig(projectRoot);
+let config = getDefaultConfig(projectRoot);
 
-// Rewrite `import.meta` (unsupported by Hermes) to ES6-compatible form.
-// Applies to all files including node_modules — see metro-transformer.js.
-config.transformer.babelTransformerPath = require.resolve('./metro-transformer.js');
+// Rewrite `import.meta` (unsupported by Hermes) in module output.
+// thirdweb (redux-devtools-extension) and brotli_wasm ship published ESM
+// that reads `import.meta.env` / `import.meta.url`. Hermes refuses to compile
+// those expressions. This serializer processor walks the module graph after
+// transform and replaces MetaProperty with safe fallbacks before serialization.
+//   import.meta.<any>  →  (undefined)
+//   import.meta        →  ({})
+const stripImportMetaProcessor = (entryPoint, preModules, graph, options) => {
+  const rewrite = (code) => {
+    if (!code || !code.includes('import.meta')) return code;
+    return code
+      .replace(/\bimport\.meta\.(\w+)/g, '(undefined)')
+      .replace(/\bimport\.meta\b/g, '({})');
+  };
+  for (const preMod of preModules) {
+    if (preMod.output) {
+      for (const out of preMod.output) {
+        if (out.data && typeof out.data.code === 'string') {
+          out.data.code = rewrite(out.data.code);
+        }
+      }
+    }
+  }
+  for (const mod of graph.dependencies.values()) {
+    if (mod.output) {
+      for (const out of mod.output) {
+        if (out.data && typeof out.data.code === 'string') {
+          out.data.code = rewrite(out.data.code);
+        }
+      }
+    }
+  }
+  return [entryPoint, preModules, graph, options];
+};
+
+config = withSerializerPlugins(config, [stripImportMetaProcessor]);
 
 // Watch the monorepo root so packages in the workspace are tracked for HMR.
 config.watchFolders = [workspaceRoot];

@@ -32,7 +32,10 @@ export default function TokensScreen() {
   );
 
   const isLoading = universesQuery.isLoading;
-  const universes = universesQuery.data ?? [];
+  const universes =
+    universesQuery.data && !Array.isArray(universesQuery.data)
+      ? universesQuery.data.data
+      : ((universesQuery.data ?? []) as any[]);
 
   // $LOAR platform token (tracked separately — currently placeholder)
   const loarBalance = '0'; // TODO: query LoarToken contract via indexer

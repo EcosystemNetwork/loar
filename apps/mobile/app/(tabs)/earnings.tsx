@@ -38,7 +38,10 @@ export default function EarningsScreen() {
     )
   );
 
-  const universes = universesQuery.data ?? [];
+  const universes =
+    universesQuery.data && !Array.isArray(universesQuery.data)
+      ? universesQuery.data.data
+      : ((universesQuery.data ?? []) as any[]);
 
   // Aggregate subscription stats per universe
   const subStatsQueries = universes

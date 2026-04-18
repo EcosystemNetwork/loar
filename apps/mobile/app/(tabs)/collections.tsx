@@ -35,7 +35,16 @@ export default function CollectionsScreen() {
   const nftMintsQuery = useQuery(trpc.nft.getMyNFTs.queryOptions());
 
   const isLoading = nftMintsQuery.isLoading;
-  const allNfts: NFT[] = (nftMintsQuery.data ?? []).map((m: any) => ({
+  const nftsData =
+    nftMintsQuery.data && !Array.isArray(nftMintsQuery.data)
+      ? nftMintsQuery.data
+      : { createdEpisodes: [], createdCharacters: [], mintedEpisodes: [] };
+  const flattened: any[] = [
+    ...nftsData.createdEpisodes,
+    ...nftsData.createdCharacters,
+    ...nftsData.mintedEpisodes,
+  ];
+  const allNfts: NFT[] = flattened.map((m: any) => ({
     id: m.id ?? m.nftListingId ?? m.contentId,
     tokenId: m.tokenId ?? '0',
     contractAddress: m.contractAddress ?? '',
