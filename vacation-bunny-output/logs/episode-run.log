@@ -617,3 +617,359 @@
 [S41 (41/56)] Generating... (30s)
 [S42 (42/56)] Generating... (30s)
 [S40 (40/56)] Generating... (30s)
+[S41 (41/56)] Generating... (60s)
+[S42 (42/56)] Generating... (60s)
+[S40 (40/56)] Generating... (60s)
+[S41 (41/56)] Generating... (90s)
+[S42 (42/56)] Generating... (90s)
+[S40 (40/56)] Generating... (90s)
+[S40 (40/56)] Video done
+[S41 (41/56)] Generating... (120s)
+[S42 (42/56)] Generating... (120s)
+[S42 (42/56)] Video done
+[S41 (41/56)] Retry 1/2 (sanitized)...
+[S41 (41/56)] Task: cgt-20260418171017-bnccs
+[S41 (41/56)] Generating... (0s)
+[S41 (41/56)] Generating... (30s)
+[S41 (41/56)] Generating... (60s)
+[S41 (41/56)] Generating... (90s)
+[S41 (41/56)] Generating... (120s)
+[S41 (41/56)] Retry 2/2 (sanitized)...
+[S41 (41/56)] Task: cgt-20260418171317-kx9zl
+[S41 (41/56)] Generating... (0s)
+[S41 (41/56)] Generating... (30s)
+[S41 (41/56)] Generating... (60s)
+[S41 (41/56)] Generating... (90s)
+[S41 (41/56)] Generating... (120s)
+[S41 (41/56)] Generating... (150s)
+[S41 (41/56)] Video done
+[S40 (40/56)] Rehosting to Pinata...
+[S40 (40/56)] Pinned: QmaSmuwiwoj5koSdR1yWawRazdCzYXEDe3iorZFM7zF5sP (2.7MB)
+[S40 (40/56)] Node #40
+[S40 (40/56)] DONE — Node #40
+[S41 (41/56)] Rehosting to Pinata...
+[S41 (41/56)] Pinned: QmShuUQ8Coewy2zSe4ZkP4aEoBd6oxi3WiBinQrmDUyJjR (2.9MB)
+[S41 (41/56)] Node #41
+[S41 (41/56)] DONE — Node #41
+[S42 (42/56)] Rehosting to Pinata...
+[S42 (42/56)] Pinned: QmayQoBQNh2QGo6huAY9G1Y2nubZcEDQ1K1SyUiPxbFuqd (2.7MB)
+[S42 (42/56)] Node #42
+[S42 (42/56)] DONE — Node #42
+[S42 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776503846119.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S40–S42
+
+═══════════════════════════════════════════════════════
+  BATCH: S43–S45 (3 parallel)
+═══════════════════════════════════════════════════════
+[S43 (43/56)] Generating (t2v)...
+[S44 (44/56)] Generating (t2v)...
+[S45 (45/56)] Generating (t2v)...
+[S43 (43/56)] Task: cgt-20260418171730-zd2j2
+[S45 (45/56)] Task: cgt-20260418171730-pcbqk
+[S44 (44/56)] Task: cgt-20260418171730-grb8b
+[S43 (43/56)] Generating... (0s)
+[S44 (44/56)] Generating... (0s)
+[S45 (45/56)] Generating... (0s)
+[S45 (45/56)] Generating... (30s)
+[S43 (43/56)] Generating... (30s)
+[S44 (44/56)] Generating... (30s)
+[S45 (45/56)] Generating... (60s)
+[S43 (43/56)] Generating... (60s)
+[S44 (44/56)] Generating... (60s)
+[S45 (45/56)] Generating... (90s)
+[S43 (43/56)] Generating... (90s)
+[S44 (44/56)] Generating... (90s)
+[S45 (45/56)] Generating... (120s)
+[S44 (44/56)] Generating... (120s)
+[S43 (43/56)] Retry 1/2 (sanitized)...
+[S43 (43/56)] Task: cgt-20260418171947-srgcq
+[S43 (43/56)] Generating... (0s)
+[S44 (44/56)] Video done
+[S45 (45/56)] Retry 1/2 (sanitized)...
+[S45 (45/56)] Task: cgt-20260418172017-6gjm9
+[S45 (45/56)] Generating... (0s)
+[S43 (43/56)] Generating... (30s)
+[S45 (45/56)] Generating... (30s)
+[S43 (43/56)] Generating... (60s)
+[S45 (45/56)] Generating... (60s)
+[S43 (43/56)] Generating... (90s)
+[S45 (45/56)] Generating... (90s)
+[S43 (43/56)] Generating... (120s)
+[S45 (45/56)] Generating... (120s)
+[S43 (43/56)] Generating... (150s)
+[S45 (45/56)] Video done
+[S43 (43/56)] Generating... (180s)
+[S43 (43/56)] Video done
+[S43 (43/56)] Rehosting to Pinata...
+[S43 (43/56)] Pinned: QmVHRtrntYNGxXC6zxVKZuLxHbMordbEkaLLJYaqSwkfen (3.2MB)
+[S43 (43/56)] Node #43
+[S43 (43/56)] DONE — Node #43
+[S44 (44/56)] Rehosting to Pinata...
+[S44 (44/56)] Pinned: QmNWKYPHFW9WUg2TEiUXsFJULiWpE5WFv9M2qE8HGN4RyP (3.6MB)
+[S44 (44/56)] Node #44
+[S44 (44/56)] DONE — Node #44
+[S45 (45/56)] Rehosting to Pinata...
+[S45 (45/56)] Pinned: QmeS7EVkfPwiCJXwDzXr8qSqSzhJ3AgFwchc1cpaVxfEfz (3.4MB)
+[S45 (45/56)] Node #45
+[S45 (45/56)] DONE — Node #45
+[S45 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776504436435.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S43–S45
+
+═══════════════════════════════════════════════════════
+  BATCH: S46–S48 (3 parallel)
+═══════════════════════════════════════════════════════
+[S46 (46/56)] Generating (t2v)...
+[S47 (47/56)] Generating (t2v)...
+[S48 (48/56)] Generating (t2v)...
+[S48 (48/56)] Task: cgt-20260418172720-rhj4q
+[S46 (46/56)] Task: cgt-20260418172720-9k4hl
+[S47 (47/56)] Task: cgt-20260418172720-8rxhv
+[S48 (48/56)] Generating... (0s)
+[S46 (46/56)] Generating... (0s)
+[S47 (47/56)] Generating... (0s)
+[S48 (48/56)] Generating... (30s)
+[S46 (46/56)] Generating... (30s)
+[S47 (47/56)] Generating... (30s)
+[S47 (47/56)] Generating... (60s)
+[S46 (46/56)] Generating... (60s)
+[S48 (48/56)] Generating... (60s)
+[S47 (47/56)] Generating... (90s)
+[S48 (48/56)] Generating... (90s)
+[S46 (46/56)] Generating... (90s)
+[S47 (47/56)] Generating... (120s)
+[S48 (48/56)] Generating... (120s)
+[S46 (46/56)] Generating... (120s)
+[S46 (46/56)] Video done
+[S48 (48/56)] Retry 1/2 (sanitized)...
+[S48 (48/56)] Task: cgt-20260418173011-79x7d
+[S47 (47/56)] Generating... (150s)
+[S48 (48/56)] Generating... (0s)
+[S47 (47/56)] Retry 1/2 (sanitized)...
+[S47 (47/56)] Task: cgt-20260418173022-4pg9h
+[S47 (47/56)] Generating... (0s)
+[S48 (48/56)] Generating... (30s)
+[S47 (47/56)] Generating... (30s)
+[S48 (48/56)] Generating... (60s)
+[S47 (47/56)] Generating... (60s)
+[S48 (48/56)] Generating... (90s)
+[S47 (47/56)] Generating... (90s)
+[S48 (48/56)] Generating... (120s)
+[S47 (47/56)] Generating... (120s)
+[S48 (48/56)] Generating... (150s)
+[S47 (47/56)] Generating... (150s)
+[S48 (48/56)] Retry 2/2 (sanitized)...
+[S48 (48/56)] Task: cgt-20260418173322-pl7cz
+[S48 (48/56)] Generating... (0s)
+[S47 (47/56)] Generating... (180s)
+[S47 (47/56)] Video done
+[S48 (48/56)] Generating... (30s)
+[S48 (48/56)] Generating... (60s)
+[S48 (48/56)] Generating... (90s)
+[S48 (48/56)] Generating... (120s)
+[S46 (46/56)] Rehosting to Pinata...
+[S46 (46/56)] Pinned: QmSYrWw2HryM92b162ZGAnYorGjo3jhu35A3QHne1URd22 (3.1MB)
+[S46 (46/56)] Node #46
+[S46 (46/56)] DONE — Node #46
+[S47 (47/56)] Rehosting to Pinata...
+[S47 (47/56)] Pinned: QmNgq4XAR5oqMjnehcPGJvVhEqsXyAqCP4x4UxLAbfWFZ5 (2.3MB)
+[S47 (47/56)] Node #47
+[S47 (47/56)] DONE — Node #47
+[S48 (48/56)] VIDEO FAILED: All retries exhausted
+[S48 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776505072308.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S46–S48
+
+═══════════════════════════════════════════════════════
+  BATCH: S49–S51 (3 parallel)
+═══════════════════════════════════════════════════════
+[S49 (49/56)] Generating (t2v)...
+[S50 (50/56)] Generating (t2v)...
+[S51 (51/56)] Generating (t2v)...
+[S49 (49/56)] Task: cgt-20260418173756-pqwkt
+[S50 (50/56)] Task: cgt-20260418173756-kv97b
+[S51 (51/56)] Task: cgt-20260418173756-brh6d
+[S49 (49/56)] Generating... (0s)
+[S50 (50/56)] Generating... (0s)
+[S51 (51/56)] Generating... (0s)
+[S51 (51/56)] Generating... (30s)
+[S49 (49/56)] Generating... (30s)
+[S50 (50/56)] Generating... (30s)
+[S51 (51/56)] Generating... (60s)
+[S49 (49/56)] Generating... (60s)
+[S50 (50/56)] Generating... (60s)
+[S51 (51/56)] Generating... (90s)
+[S49 (49/56)] Generating... (90s)
+[S50 (50/56)] Generating... (90s)
+[S51 (51/56)] Generating... (120s)
+[S49 (49/56)] Generating... (120s)
+[S50 (50/56)] Generating... (120s)
+[S50 (50/56)] Video done
+[S51 (51/56)] Video done
+[S49 (49/56)] Video done
+[S49 (49/56)] Rehosting to Pinata...
+[S49 (49/56)] Pinned: QmUFb36MTBP5xpmKZ5dsZwXvbr4YNfL2mVTP1WLHrYMp3p (1.9MB)
+[S49 (49/56)] Node #48
+[S49 (49/56)] DONE — Node #48
+[S50 (50/56)] Rehosting to Pinata...
+[S50 (50/56)] Pinned: Qmdhppb2tdWqEhcsfQdCd76Sb6Ejp7Axe6AFQbQbNcZfJL (2.3MB)
+[S50 (50/56)] Node #49
+[S50 (50/56)] DONE — Node #49
+[S51 (51/56)] Rehosting to Pinata...
+[S51 (51/56)] Pinned: QmbJquVfqdiXDYu9pCrBGWDRwekcUo2qTgYLd2FWNshRfB (2.8MB)
+[S51 (51/56)] Node #50
+[S51 (51/56)] DONE — Node #50
+[S51 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776505346907.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S49–S51
+
+═══════════════════════════════════════════════════════
+  BATCH: S52–S54 (3 parallel)
+═══════════════════════════════════════════════════════
+[S52 (52/56)] Generating (t2v)...
+[S53 (53/56)] Generating (t2v)...
+[S54 (54/56)] Generating (t2v)...
+[S52 (52/56)] Task: cgt-20260418174231-xdxkk
+[S54 (54/56)] Task: cgt-20260418174231-7k2cc
+[S53 (53/56)] Task: cgt-20260418174231-lcq8x
+[S54 (54/56)] Generating... (0s)
+[S52 (52/56)] Generating... (0s)
+[S53 (53/56)] Generating... (0s)
+[S52 (52/56)] Generating... (30s)
+[S54 (54/56)] Generating... (30s)
+[S53 (53/56)] Generating... (30s)
+[S54 (54/56)] Generating... (60s)
+[S52 (52/56)] Generating... (60s)
+[S53 (53/56)] Generating... (60s)
+[S54 (54/56)] Generating... (90s)
+[S53 (53/56)] Generating... (90s)
+[S52 (52/56)] Generating... (90s)
+[S52 (52/56)] Video done
+[S53 (53/56)] Generating... (120s)
+[S54 (54/56)] Retry 1/2 (sanitized)...
+[S54 (54/56)] Task: cgt-20260418174454-hgc7r
+[S54 (54/56)] Generating... (0s)
+[S53 (53/56)] Retry 1/2 (sanitized)...
+[S53 (53/56)] Task: cgt-20260418174505-5g86p
+[S53 (53/56)] Generating... (0s)
+[S54 (54/56)] Generating... (30s)
+[S53 (53/56)] Generating... (30s)
+[S54 (54/56)] Generating... (60s)
+[S53 (53/56)] Generating... (60s)
+[S54 (54/56)] Generating... (90s)
+[S53 (53/56)] Generating... (90s)
+[S54 (54/56)] Generating... (120s)
+[S53 (53/56)] Generating... (120s)
+[S53 (53/56)] Retry 2/2 (sanitized)...
+[S53 (53/56)] Task: cgt-20260418174729-mssdt
+[S54 (54/56)] Video done
+[S53 (53/56)] Generating... (0s)
+[S53 (53/56)] Generating... (30s)
+[S53 (53/56)] Generating... (60s)
+[S53 (53/56)] Generating... (90s)
+[S53 (53/56)] Generating... (120s)
+[S52 (52/56)] Rehosting to Pinata...
+[S52 (52/56)] Pinned: QmapenJCggUfT93QymGxDrY8aPDgyrpSevKF3Dndu91my8 (2.5MB)
+[S52 (52/56)] Node #51
+[S52 (52/56)] DONE — Node #51
+[S53 (53/56)] VIDEO FAILED: All retries exhausted
+[S54 (54/56)] Rehosting to Pinata...
+[S54 (54/56)] Pinned: QmZz1RghGDPTeU6i9NYSZWVUxJt9zRAFnTAnFSgRVmMjL5 (2.4MB)
+[S54 (54/56)] Node #52
+[S54 (54/56)] DONE — Node #52
+[S54 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776505850626.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S52–S54
+
+═══════════════════════════════════════════════════════
+  BATCH: S55–S56 (2 parallel)
+═══════════════════════════════════════════════════════
+[S55 (55/56)] Generating (t2v)...
+[S56 (56/56)] Generating (t2v)...
+[S55 (55/56)] Task: cgt-20260418175055-thjq4
+[S56 (56/56)] Task: cgt-20260418175055-pkwzh
+[S55 (55/56)] Generating... (0s)
+[S56 (56/56)] Generating... (0s)
+[S56 (56/56)] Generating... (30s)
+[S55 (55/56)] Generating... (30s)
+[S56 (56/56)] Generating... (60s)
+[S55 (55/56)] Generating... (60s)
+[S56 (56/56)] Generating... (90s)
+[S55 (55/56)] Generating... (90s)
+[S56 (56/56)] Generating... (120s)
+[S55 (55/56)] Generating... (120s)
+[S56 (56/56)] Video done
+[S55 (55/56)] Retry 1/2 (sanitized)...
+[S55 (55/56)] Task: cgt-20260418175334-9wsq2
+[S55 (55/56)] Generating... (0s)
+[S55 (55/56)] Generating... (30s)
+[S55 (55/56)] Generating... (60s)
+[S55 (55/56)] Generating... (90s)
+[S55 (55/56)] Retry 2/2 (sanitized)...
+[S55 (55/56)] Task: cgt-20260418175540-xs6sj
+[S55 (55/56)] Generating... (0s)
+[S55 (55/56)] Generating... (30s)
+[S55 (55/56)] Generating... (60s)
+[S55 (55/56)] VIDEO FAILED: All retries exhausted
+[S56 (56/56)] Rehosting to Pinata...
+[S56 (56/56)] Pinned: QmdNrjtrgm6dvREHGifwWSCRUQd7eWRU3qTf3aWMy8q5R8 (4.0MB)
+[S56 (56/56)] Node #53
+[S56 (56/56)] DONE — Node #53
+[S56 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776506319603.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S55–S56
+
+════════════════════════════════════════════════════════════
+  VACATION BUNNY — Pilot Generation Complete
+════════════════════════════════════════════════════════════
+  Scenes completed: 48/53
+  Total footage: ~480s (~8 min)
+  Node chain: #5 → #6 → #7 → #8 → #9 → #10 → #11 → #12 → #13 → #14 → #15 → #16 → #17 → #18 → #19 → #20 → #21 → #22 → #23 → #24 → #25 → #26 → #27 → #28 → #29 → #30 → #31 → #32 → #33 → #34 → #35 → #36 → #37 → #38 → #40 → #41 → #42 → #43 → #44 → #45 → #46 → #47 → #48 → #49 → #50 → #51 → #52 → #53
+
+  S04 | They Wake Up — Shared Smile              | Node #5
+  S05 | Outfit Montage — Yellow Tutu & Navy Silky Dress | Node #6
+  S06 | Mirror Moment — Color Contrast           | Node #7
+  S07 | Sparkle Makeup — Judy Applies to Herself | Node #8
+  S08 | Baby Bunny Gets Sparkle Too              | Node #9
+  S09 | Mirror Selfie Playtime — Peace Sign & Spin | Node #10
+  S10 | Shared Smile Beat                        | Node #11
+  S11 | Cannes Morning Street                    | Node #12
+  S12 | Bakery Interior — Latte & Milk           | Node #13
+  S13 | Pastry Wonder — Baby Bunny Reacts        | Node #14
+  S14 | Croissant Shared                         | Node #15
+  S15 | Milk Moustache — Watching                | Node #16
+  S16 | Pendants Catch Morning Light             | Node #17
+  S17 | Beach Restaurant — Yellow Parasols       | Node #18
+  S18 | Table Setup — Ocean View                 | Node #19
+  S19 | The Clink — Crystal Glasses              | Node #20
+  S21 | Baby Bunny Shocked                       | Node #21
+  S22 | Baby Bunny Rises Bravely                 | Node #22
+  S23 | The Chase                                | Node #23
+  S24 | Resolution — Judy Laughs Silently        | Node #24
+  S26 | Walking Up Hand-in-Hand                  | Node #25
+  S27 | Baby Bunny Amazed                        | Node #26
+  S28 | Spiral Staircase Climb                   | Node #27
+  S29 | Small Steps Climbing                     | Node #28
+  S30 | Princess Spin — Tutu Expands             | Node #29
+  S31 | 360° Top of Tower                        | Node #30
+  S32 | Judy's Emotional Moment                  | Node #31
+  S33 | Pendants Side-by-Side — Soft Glow        | Node #32
+  S34 | Night Carousel Glow                      | Node #33
+  S35 | Baby Bunny Runs to Carousel              | Node #34
+  S36 | She Points — the Black Horse             | Node #35
+  S37 | The Ride — Circular Camera               | Node #36
+  S38 | Judy Joins — Mother Rides Too            | Node #37
+  S39 | Slow-Mo Bubbles and Glowing Dress        | Node #38
+  S40 | Gelato Case — Matcha & Chocolate         | Node #40
+  S41 | Choosing Flavors                         | Node #41
+  S42 | Messy Chocolate — Judy Cleans            | Node #42
+  S43 | Sitting by the Ocean — Pendants Tap      | Node #43
+  S44 | Quiet Apartment at Night                 | Node #44
+  S45 | Baby Bunny Asleep in Pajamas             | Node #45
+  S46 | Judy Watching — No Pendant               | Node #46
+  S47 | Memory Montage — Mirror, Bakery, Beach   | Node #47
+  S49 | Final Shot — Two Pendants on Bedside     | Node #48
+  S50 | Title Card — Butterfly Days in Cannes    | Node #49
+  S51 | After-Credits — Older Baby Bunny at the Mirror | Node #50
+  S52 | She Applies Her Own Sparkle Makeup       | Node #51
+  S54 | Final Callback Pose                      | Node #52
+  S56 | Pendants Sway and Touch — Butterfly Glow | Node #53
+
+  Universe: 0x8e5cDdb763534Fe426766e4eB035449fB9e73913
+  Next: audio pipeline for music + SFX + final stitch
+

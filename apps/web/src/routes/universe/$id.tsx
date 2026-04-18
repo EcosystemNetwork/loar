@@ -234,6 +234,20 @@ const nodeTypes = {
   timelineEvent: TimelineEventNode,
 };
 
+// Browsers can't load ipfs:// URIs in <video>/<img> src — rewrite to a gateway.
+const IPFS_GATEWAY = (
+  import.meta.env.VITE_PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud'
+).replace(/\/$/, '');
+
+function resolveMediaUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('ipfs://')) {
+    const path = url.slice('ipfs://'.length).replace(/^ipfs\//, '');
+    return `${IPFS_GATEWAY}/ipfs/${path}`;
+  }
+  return url;
+}
+
 function UniverseTimelineEditorInner() {
   const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
@@ -3597,7 +3611,7 @@ function UniverseTimelineEditorInner() {
               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                 <video
                   key={editVideoPreview}
-                  src={editVideoPreview}
+                  src={resolveMediaUrl(editVideoPreview)}
                   className="w-full h-full object-contain"
                   controls
                   muted
@@ -3696,7 +3710,7 @@ function UniverseTimelineEditorInner() {
                               >
                                 <div className="aspect-video bg-zinc-800 relative">
                                   <video
-                                    src={v.videoUrl}
+                                    src={resolveMediaUrl(v.videoUrl)}
                                     className="w-full h-full object-cover"
                                     muted
                                     preload="metadata"
@@ -3725,7 +3739,9 @@ function UniverseTimelineEditorInner() {
                           >
                             <div className="aspect-video bg-zinc-800 relative">
                               <video
-                                src={eventData.latestVideoUrl || eventData.videoUrl}
+                                src={resolveMediaUrl(
+                                  eventData.latestVideoUrl || eventData.videoUrl
+                                )}
                                 className="w-full h-full object-cover"
                                 muted
                                 preload="metadata"

@@ -1,0 +1,11 @@
+[dotenv@17.3.1] injecting env (59) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+
+═══ Regenerating S53: Sitting by the Ocean — Pendants Tap ═══
+
+[S53] Generating video via Seedance 2.0...
+[S53] Task: cgt-20260418232054-np748
+[S53] Generating... (0s)
+[S53] Generating... (30s)
+[S53] Generating... (60s)
+[S53] Generating... (90s)
+FAILED: The request failed because the output video may be related to copyright restrictions. Request id: 02177652565475500000000000000000000ffffc0a86476f03dc9

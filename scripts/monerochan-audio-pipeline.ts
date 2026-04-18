@@ -33,7 +33,9 @@ const PINATA_JWT = process.env.PINATA_JWT!;
 const GATEWAY = process.env.PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud';
 const UNIVERSE_ID = '0x0000000000000000000000000000019d9e1c8a49';
 const CREATOR = '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266';
-const ODIR = process.env.MC_OUTPUT_DIR || './monerochan-audio-output';
+/** Episode tag — identifies which variant of the episode to process (photoreal vs animated) */
+const EPISODE_TAG = process.env.EPISODE_TAG || 'episode-1';
+const ODIR = process.env.MC_OUTPUT_DIR || `./monerochan-audio-output-${EPISODE_TAG}`;
 const SKIP_LIP = process.env.MC_SKIP_LIPSYNC === 'true';
 const SFILT = process.env.MC_SCENES
   ? new Set(process.env.MC_SCENES.split(',').map((s) => s.trim()))
@@ -603,7 +605,7 @@ async function fetchSceneVideos(db: FirebaseFirestore.Firestore): Promise<Record
   const snap = await db
     .collection('content')
     .where('universeId', '==', UNIVERSE_ID)
-    .where('tags', 'array-contains', 'monerochan')
+    .where('tags', 'array-contains', EPISODE_TAG)
     .get();
   const out: Record<string, string> = {};
   for (const doc of snap.docs) {
@@ -721,7 +723,7 @@ async function main() {
   const contentSnap = await db
     .collection('content')
     .where('universeId', '==', UNIVERSE_ID)
-    .where('tags', 'array-contains', 'monerochan')
+    .where('tags', 'array-contains', EPISODE_TAG)
     .get();
   const contentIdBySceneTag: Record<string, string> = {};
   for (const doc of contentSnap.docs) {

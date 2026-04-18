@@ -631,3 +631,166 @@
 [S32 (32/40)] Generating... (120s)
 [S32 (32/40)] Video done
 [S32 (32/40)] Rehosting to Pinata...
+[S32 (32/40)] Pinned: QmZnowMrNHzmUFwKyLm3cWbfsptsogVA2imJKdKixaDwFe (4.6MB)
+[S32 (32/40)] Node #206 confirmed
+[S32 (32/40)] DONE — Node #206
+[S32 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776503343552.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S33: Back at NOS — Searching
+═══════════════════════════════════════════════════════
+[S33 (33/40)] Generating video (t2v)...
+[S33 (33/40)] Task: cgt-20260418170908-qctqv
+[S33 (33/40)] Generating... (0s)
+[S33 (33/40)] Generating... (30s)
+[S33 (33/40)] Generating... (60s)
+[S33 (33/40)] Generating... (90s)
+[S33 (33/40)] Generating... (120s)
+[S33 (33/40)] Video done
+[S33 (33/40)] Rehosting to Pinata...
+[S33 (33/40)] Pinned: QmaStJNETqkEiUtvymG9suDQmaUwpWZ9xcXCGBYmq5dSbz (5.0MB)
+[S33 (33/40)] Node #207 confirmed
+[S33 (33/40)] DONE — Node #207
+[S33 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776503533114.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S34: Jeff Spots Him
+═══════════════════════════════════════════════════════
+[S34 (34/40)] Generating video (t2v)...
+[S34 (34/40)] Task: cgt-20260418171217-rm4pn
+[S34 (34/40)] Generating... (0s)
+[S34 (34/40)] Generating... (30s)
+[S34 (34/40)] Generating... (60s)
+[S34 (34/40)] Generating... (90s)
+[S34 (34/40)] Generating... (120s)
+[S34 (34/40)] Video done
+[S34 (34/40)] Rehosting to Pinata...
+[S34 (34/40)] Pinned: QmdXeq7hzjLKD7mQ4nHyJ49FrE4bxuRDv6mCVghgdPk9sk (5.2MB)
+[S34 (34/40)] Node #208 confirmed
+[S34 (34/40)] DONE — Node #208
+
+═══════════════════════════════════════════════════════
+  S35: The Reunion Hug
+═══════════════════════════════════════════════════════
+[S35 (35/40)] Generating video (t2v)...
+[S35 (35/40)] Task: cgt-20260418171710-4qqd2
+[S35 (35/40)] Generating... (0s)
+[S35 (35/40)] Generating... (30s)
+[S35 (35/40)] Generating... (60s)
+[S35 (35/40)] Generating... (90s)
+[S35 (35/40)] Generating... (120s)
+[S35 (35/40)] Video done
+[S35 (35/40)] Rehosting to Pinata...
+[S35 (35/40)] Pinned: QmYN9eNF9GtEJF6WL4WksrGWkFng2Za5Vy2BMzfKXiTsoi (4.8MB)
+[S35 (35/40)] Node #209 confirmed
+[S35 (35/40)] DONE — Node #209
+[S35 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776504037732.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S36: Mikel Appears
+═══════════════════════════════════════════════════════
+[S36 (36/40)] Generating video (t2v)...
+[S36 (36/40)] Task: cgt-20260418172042-jctp9
+[S36 (36/40)] Generating... (0s)
+[S36 (36/40)] Generating... (30s)
+[S36 (36/40)] Generating... (60s)
+[S36 (36/40)] Generating... (90s)
+[S36 (36/40)] Generating... (120s)
+[S36 (36/40)] Generating... (150s)
+[S36 (36/40)] Generating... (180s)
+[S36 (36/40)] Video done
+[S36 (36/40)] Rehosting to Pinata...
+[S36 (36/40)] Pinned: QmU6JEPMqbeuCoXEPmUcScFj3hgKNggDYxgAoo5XEuRu5k (4.6MB)
+[S36 (36/40)] Node #210 confirmed
+[S36 (36/40)] DONE — Node #210
+[S36 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776504315967.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S37: Walking to the Truck
+═══════════════════════════════════════════════════════
+[S37 (37/40)] Generating video (t2v)...
+[S37 (37/40)] Task: cgt-20260418172520-nsp9f
+[S37 (37/40)] Generating... (0s)
+[S37 (37/40)] Generating... (30s)
+[S37 (37/40)] Generating... (60s)
+[S37 (37/40)] Generating... (90s)
+[S37 (37/40)] Generating... (120s)
+[S37 (37/40)] Video done
+[S37 (37/40)] Rehosting to Pinata...
+[S37 (37/40)] Pinned: QmS8ZrFHLSXvAXC4sCsoLeRHvKoZvBsjX5nacvPPN3eig9 (4.1MB)
+[S37 (37/40)] Node #211 confirmed
+[S37 (37/40)] DONE — Node #211
+[S37 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776504506330.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S38: In the Truck — Silence
+═══════════════════════════════════════════════════════
+[S38 (38/40)] Generating video (t2v)...
+[S38 (38/40)] Task: cgt-20260418172830-mqb7n
+[S38 (38/40)] Generating... (0s)
+[S38 (38/40)] Generating... (30s)
+[S38 (38/40)] Generating... (60s)
+[S38 (38/40)] Generating... (90s)
+[S38 (38/40)] Video done
+[S38 (38/40)] Rehosting to Pinata...
+[S38 (38/40)] Pinned: QmZgThfB2ikAymbaqhxz3vEvrqtqnRpWGhSQqshxaBNudv (3.8MB)
+[S38 (38/40)] Node #212 confirmed
+[S38 (38/40)] DONE — Node #212
+[S38 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776504733410.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S39: Eric Feels the Bass Through the Truck
+═══════════════════════════════════════════════════════
+[S39 (39/40)] Generating video (t2v)...
+[S39 (39/40)] Task: cgt-20260418173218-9rthm
+[S39 (39/40)] Generating... (0s)
+[S39 (39/40)] Generating... (30s)
+[S39 (39/40)] Generating... (60s)
+[S39 (39/40)] Generating... (90s)
+[S39 (39/40)] Generating... (120s)
+[S39 (39/40)] Generating... (150s)
+[S39 (39/40)] Video done
+[S39 (39/40)] Rehosting to Pinata...
+[S39 (39/40)] Pinned: QmVTnCyTBt9pTX52mcnAn19f3Y5RrcH9uGN1xY8NwGQ1EW (3.4MB)
+[S39 (39/40)] Node #213 confirmed
+[S39 (39/40)] DONE — Node #213
+[S39 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776504961400.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+═══════════════════════════════════════════════════════
+  S40: End — Eyes Open
+═══════════════════════════════════════════════════════
+[S40 (40/40)] Generating video (t2v)...
+[S40 (40/40)] Task: cgt-20260418173605-dlqfk
+[S40 (40/40)] Generating... (0s)
+[S40 (40/40)] Generating... (30s)
+[S40 (40/40)] Generating... (60s)
+[S40 (40/40)] Generating... (90s)
+[S40 (40/40)] Generating... (120s)
+[S40 (40/40)] Video done
+[S40 (40/40)] Rehosting to Pinata...
+[S40 (40/40)] Pinned: QmQH9u39hBRUQeKWgsG85HhyPqqPH7K94b7qjAgh4kKVmP (4.7MB)
+[S40 (40/40)] Node #214 confirmed
+[S40 (40/40)] DONE — Node #214
+[S40 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/sf-vid-1776505240623.mp4" -frames:v 1 -q:v 2 "/tmp/sf
+
+════════════════════════════════════════════════════════════
+  SPACE FLEET — Pilot Episode Generation Complete
+════════════════════════════════════════════════════════════
+  Scenes completed: 10/10
+  Total footage: ~100s
+  Node chain: #205 → #206 → #207 → #208 → #209 → #210 → #211 → #212 → #213 → #214
+
+  S31 | Eric Leaves — The Poker Face             | Node #205
+  S32 | Hotel Corridor — Alone Again             | Node #206
+  S33 | Back at NOS — Searching                  | Node #207
+  S34 | Jeff Spots Him                           | Node #208
+  S35 | The Reunion Hug                          | Node #209
+  S36 | Mikel Appears                            | Node #210
+  S37 | Walking to the Truck                     | Node #211
+  S38 | In the Truck — Silence                   | Node #212
+  S39 | Eric Feels the Bass Through the Truck    | Node #213
+  S40 | End — Eyes Open                          | Node #214
+
+  Universe: 0x228295466C531C1d55b9dfDd5cF15ad0b88782Fa
+  Next: Run space-fleet-audio-pipeline.ts for voice, SFX & music
+
