@@ -40,6 +40,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import { tmpdir } from 'os';
+import { rehostVideoToPinata } from './lib/rehost-video';
 
 const rawKey = process.env.PRIVATE_KEY ?? '';
 const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
