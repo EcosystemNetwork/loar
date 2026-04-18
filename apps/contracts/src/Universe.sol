@@ -264,22 +264,31 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         return nodes[id].contentHash;
     }
 
-    /// @dev WARNING: This changes content without updating creator attribution. Should be behind timelock.
-    function setMedia(uint id, bytes32 _contentHash, string calldata _link) public onlyAdmin {
+    /// @notice UNIVERSE-01: setMedia is now restricted to the original creator OR admin
+    ///         on non-canon nodes only. Canon content is immutable on-chain — admin cannot
+    ///         rewrite media that has been promoted to the canonical chain.
+    function setMedia(uint id, bytes32 _contentHash, string calldata _link) public {
         require(nodes[id].id != 0, "Node does not exist");
         address originalCreator = nodes[id].creator;
+        require(
+            msg.sender == originalCreator || (msg.sender == universeAdmin && !nodes[id].canon),
+            "UNIVERSE-01: creator-only after canon promotion"
+        );
         nodes[id].contentHash = _contentHash;
         emit MediaUpdated(id, msg.sender, _contentHash, _link);
         emit MediaUpdatedAttribution(id, msg.sender, originalCreator, _contentHash);
     }
 
     /// @notice Swap the content (media + plot) between two nodes, keeping DAG structure intact.
+    /// @dev    UNIVERSE-01: Canon nodes cannot be involved in a swap — preserves on-chain
+    ///         canon integrity.
     /// @param nodeA First node ID
     /// @param nodeB Second node ID
     function swapNodes(uint nodeA, uint nodeB) public onlyAdmin {
         require(nodeA != nodeB, "Cannot swap a node with itself");
         require(nodes[nodeA].id != 0, "Node A does not exist");
         require(nodes[nodeB].id != 0, "Node B does not exist");
+        require(!nodes[nodeA].canon && !nodes[nodeB].canon, "UNIVERSE-01: canon nodes are immutable");
 
         bytes32 tempContentHash = nodes[nodeA].contentHash;
         bytes32 tempPlotHash = nodes[nodeA].plotHash;

@@ -4,6 +4,8 @@ pragma solidity ^0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ECDSA} from "@openzeppelin/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/utils/cryptography/MessageHashUtils.sol";
 import {IRightsRegistry} from "./interfaces/IRightsRegistry.sol";
 
 /// @title RightsRegistry
@@ -28,6 +30,9 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     /// @notice RIGHTS-02: Reason for the pending freeze request
     mapping(bytes32 => string) public pendingFreezeReason;
 
+    /// @notice RIGHTS-01: Per-creator nonce to prevent signature replay.
+    mapping(address => uint256) public creatorNonce;
+
     event RightsSet(bytes32 indexed contentHash, RightsType rightsType);
     event ContentFrozen(bytes32 indexed contentHash, string reason);
     event FreezeRequested(bytes32 indexed contentHash, address indexed requestedBy, string reason);
@@ -40,6 +45,8 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     error ZeroHash();
     error NotFrozen();
     error NoPendingFreeze();
+    error InvalidSignature();
+    error SignatureExpired();
 
     modifier onlyOperator() {
         _checkOperator();
@@ -138,6 +145,54 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
         emit OperatorUpdated(operator, authorized);
     }
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[44] private __gap;
+    /// @notice RIGHTS-01: Operator-initiated classification transition that requires
+    ///         the actual content creator's signature. Prevents a compromised operator
+    ///         from flipping classifications without creator consent (e.g. ORIGINAL→FUN
+    ///         to block monetization, or FUN→ORIGINAL to wash a classification).
+    /// @param contentHash    The content hash being classified.
+    /// @param rightsType     The new classification.
+    /// @param creator        The true content creator signing this transition.
+    /// @param deadline       Signature expiry (unix seconds).
+    /// @param signature      Creator's ECDSA signature over the digest below.
+    ///
+    /// Digest format (EIP-191 personal_sign):
+    ///   keccak256(abi.encodePacked(
+    ///     "LOAR-RIGHTS-V1", address(this), block.chainid,
+    ///     contentHash, uint8(rightsType), creatorNonce[creator], deadline
+    ///   ))
+    function setRightsWithCreatorSig(
+        bytes32 contentHash,
+        RightsType rightsType,
+        address creator,
+        uint256 deadline,
+        bytes calldata signature
+    ) external onlyOperator {
+        if (contentHash == bytes32(0)) revert ZeroHash();
+        if (rights[contentHash] == RightsType.FROZEN) revert AlreadyFrozen();
+        if (block.timestamp > deadline) revert SignatureExpired();
+
+        bytes32 raw = keccak256(abi.encodePacked(
+            "LOAR-RIGHTS-V1",
+            address(this),
+            block.chainid,
+            contentHash,
+            uint8(rightsType),
+            creatorNonce[creator],
+            deadline
+        ));
+        bytes32 digest = MessageHashUtils.toEthSignedMessageHash(raw);
+        address recovered = ECDSA.recover(digest, signature);
+        if (recovered != creator || recovered == address(0)) revert InvalidSignature();
+
+        // Consume the nonce so this signature cannot be replayed.
+        unchecked { creatorNonce[creator]++; }
+
+        // Creator signature binds the content to this creator even on first classification.
+        contentCreator[contentHash] = creator;
+        rights[contentHash] = rightsType;
+        emit RightsSet(contentHash, rightsType);
+    }
+
+    /// @dev Reserved storage gap — reduced by 1 slot for `creatorNonce` mapping.
+    uint256[43] private __gap;
 }

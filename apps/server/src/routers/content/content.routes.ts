@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
+import { triggerContentThumbnailAsync } from '../../services/content-cover-image';
 
 const contentCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -113,6 +114,15 @@ export const contentRouter = router({
     const profileDoc = await profileRef.get();
     if (profileDoc.exists) {
       await profileRef.update({ contentCount: FieldValue.increment(1) });
+    }
+
+    if (!input.thumbnailUrl) {
+      triggerContentThumbnailAsync({
+        id: ref.id,
+        mediaUrl: input.mediaUrl,
+        mediaType: input.mediaType,
+        creatorUid: ctx.user.uid,
+      });
     }
 
     return { id: ref.id, ...contentData };

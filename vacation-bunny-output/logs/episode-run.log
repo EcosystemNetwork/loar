@@ -380,3 +380,22 @@
 [S27 (27/56)] Generating... (90s)
 [S25 (25/56)] Generating... (90s)
 [S25 (25/56)] Video done
+[S27 (27/56)] Video done
+[S26 (26/56)] Generating... (120s)
+[S26 (26/56)] Generating... (150s)
+[S26 (26/56)] Retry 1/2 (sanitized)...
+[S26 (26/56)] Task: cgt-20260418163226-xtwwl
+[S26 (26/56)] Generating... (0s)
+[S26 (26/56)] Generating... (30s)
+[S26 (26/56)] Generating... (60s)
+[S26 (26/56)] Generating... (90s)
+[S26 (26/56)] Generating... (120s)
+[S26 (26/56)] Video done
+[S25 (25/56)] Rehosting to Pinata...
+[S25 (25/56)] CHAIN FAILED: This operation was aborted
+[S26 (26/56)] Rehosting to Pinata...
+[S26 (26/56)] Pinned: QmYbBKL3S2WnsARBQqUzkgxTzbhxHWanrVxgThjmtMnCVh (4.5MB)
+[S26 (26/56)] Node #25
+[S26 (26/56)] DONE — Node #25
+[S27 (27/56)] Rehosting to Pinata...
+[S27 (27/56)] Pinned: QmcADjwz1fNikZH6n9T16rMhwf9icyAjD8h3t1EFLgr1iq (4.6MB)

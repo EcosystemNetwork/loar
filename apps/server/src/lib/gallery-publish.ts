@@ -1,4 +1,5 @@
 import { db } from './firebase';
+import { triggerContentThumbnailAsync } from '../services/content-cover-image';
 
 export type GalleryMediaType = 'image' | 'ai-image' | 'video' | 'ai-video' | 'audio' | '3d';
 
@@ -49,7 +50,16 @@ export function publishToGallery(input: PublishGalleryInput): Promise<void> {
   return db
     .collection('content')
     .add(buildGalleryDoc(input))
-    .then(() => undefined)
+    .then((ref) => {
+      if (!input.thumbnailUrl) {
+        triggerContentThumbnailAsync({
+          id: ref.id,
+          mediaUrl: input.mediaUrl,
+          mediaType: input.mediaType,
+          creatorUid: input.creatorUid,
+        });
+      }
+    })
     .catch((err: unknown) => {
       console.error(`[gallery] publish failed (${input.generationId}):`, err);
     });

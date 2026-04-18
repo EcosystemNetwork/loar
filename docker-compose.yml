@@ -1,4 +1,26 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: loar-redis
+    command:
+      - redis-server
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - 'yes'
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - loar-network
+
   server:
     build:
       context: .
@@ -9,6 +31,10 @@ services:
       - ./.env
     environment:
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - '3000:3000'
     restart: unless-stopped
@@ -64,3 +90,7 @@ networks:
   loar-network:
     name: loar-network
     driver: bridge
+
+volumes:
+  redis-data:
+    name: loar-redis-data

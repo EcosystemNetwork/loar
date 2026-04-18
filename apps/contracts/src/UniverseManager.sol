@@ -95,6 +95,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     event EthClaimed(address indexed recipient, uint256 amount);
     event AdminSyncFailed(uint256 indexed tokenId, address to);
     event MetadataRendererLocked(address renderer);
+    /// @notice Emitted when multi-sig owner count exceeds 200 and signer minting is truncated (UNIVERSE-06).
+    event SignersTruncated(uint256 indexed universeId, uint256 actualCount, uint16 mintedCount);
 
     constructor(address _teamFeeRecipient, address _weth) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
@@ -445,6 +447,9 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
                 if (owners.length > 0) {
                     // Multi-sig detected — mint to each signer
                     uint16 total = owners.length > 200 ? 200 : uint16(owners.length);
+                    if (owners.length > 200) {
+                        emit SignersTruncated(universeId, owners.length, total);
+                    }
                     for (uint16 i = 0; i < total; i++) {
                         try inft.mint(
                             owners[i],

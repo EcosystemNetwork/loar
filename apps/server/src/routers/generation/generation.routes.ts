@@ -20,6 +20,7 @@ import { falService } from '../../services/fal';
 import { bytedanceService } from '../../services/bytedance';
 import type { ByteDanceVideoOptions } from '../../services/bytedance';
 import { getStorageManager } from '../../services/storage';
+import { extractVideoThumbnail } from '../../services/video-thumbnail';
 import { signWithProvenance } from '../../services/provenance';
 import {
   routeModel,
@@ -295,59 +296,6 @@ async function autoAttachVideo(opts: {
     });
   } catch (err) {
     console.error('Failed to auto-attach video:', err);
-  }
-}
-
-// ── Video thumbnail extraction ─────────────────────────────────────
-
-async function extractVideoThumbnail(
-  videoUrl: string,
-  generationId: string
-): Promise<string | null> {
-  try {
-    const { execFile } = await import('child_process');
-    const { promisify } = await import('util');
-    const { tmpdir } = await import('os');
-    const { join } = await import('path');
-    const { readFile, unlink } = await import('fs/promises');
-    const execFileAsync = promisify(execFile);
-
-    const outPath = join(tmpdir(), `thumb-${generationId}.jpg`);
-
-    // Extract a frame at 0.5s using ffmpeg
-    await execFileAsync(
-      'ffmpeg',
-      [
-        '-y',
-        '-i',
-        videoUrl,
-        '-ss',
-        '0.5',
-        '-frames:v',
-        '1',
-        '-q:v',
-        '2',
-        '-vf',
-        'scale=640:-1',
-        outPath,
-      ],
-      { timeout: 15000 }
-    );
-
-    const thumbBuffer = await readFile(outPath);
-    unlink(outPath).catch(() => {});
-
-    // Upload thumbnail to storage
-    const manager = getStorageManager();
-    const filename = `thumb-${generationId}.jpg`;
-    const manifest = await manager.upload(thumbBuffer, filename, 'image/jpeg', 'system');
-    return manifest.uploads[0]?.url || null;
-  } catch (err) {
-    console.warn(
-      `[thumbnail] Failed to extract thumbnail for ${generationId}:`,
-      (err as Error).message
-    );
-    return null;
   }
 }
 

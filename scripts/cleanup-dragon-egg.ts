@@ -29,7 +29,8 @@ const db = getFirestore(app);
 db.settings({ preferRest: true });
 
 const APPLY = process.argv.includes('--apply');
-const CANONICAL = '0x0000000000000000000000000000019d9e5d6003';
+// The real on-chain universe address (Base Sepolia) is the canonical one now.
+const CANONICAL = '0x38f1e8b9c2d31f163fbfcbb9638de959fedcb964';
 
 async function main() {
   console.log(`\n${'='.repeat(60)}\n  DRAGON EGG — Universe Audit\n${'='.repeat(60)}`);

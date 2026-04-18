@@ -413,3 +413,13 @@
 [S27 (27/35)] DONE — Node #27
 [S27 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/void-vid-1776501073688.mp4" -frames:v 1 -q:v 2 "/tmp/
 [BATCH] Completed S25–S27
+
+═══════════════════════════════════════════════════════
+  BATCH: S28–S30 (3 scenes parallel)
+═══════════════════════════════════════════════════════
+[S28 (28/35)] Generating video (t2v)...
+[S29 (29/35)] Generating video (t2v)...
+[S30 (30/35)] Generating video (t2v)...
+[S28 (28/35)] Task: cgt-20260418163118-bjfjt
+[S30 (30/35)] Task: cgt-20260418163118-47b7p
+[S29 (29/35)] Task: cgt-20260418163118-lxndv

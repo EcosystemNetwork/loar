@@ -120,6 +120,12 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     address public owner;
     address public timelock;
 
+    /// @notice TOKEN-04: Distinct recipient for community allocations.
+    ///         When unset, community share falls back to UniverseManager (legacy behavior).
+    ///         Set to a dedicated community treasury / DAO / merkle distributor to prevent
+    ///         `claimTeamFee` from sweeping community funds.
+    address public communityRecipient;
+
     // ─── Vesting configuration (mirrors V2) ───────────────────────────
     address public vestingContract;
     uint64 public vestingCliff = 30 days;
@@ -168,6 +174,13 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
 
     function setTimelock(address _timelock) external onlyOwner {
         timelock = _timelock;
+    }
+
+    /// @notice TOKEN-04: Set a distinct recipient for the community portion of every
+    ///         deployed universe token. Set to address(0) to revert to legacy behavior
+    ///         (community merged with treasury in UniverseManager).
+    function setCommunityRecipient(address _communityRecipient) external onlyOwner {
+        communityRecipient = _communityRecipient;
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -267,8 +280,19 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
             }
         }
 
-        // Treasury + community → UniverseManager
-        IERC20(tokenAddress).safeTransfer(universeManager, treasuryAmount + communityAmount);
+        // TOKEN-04: Route treasury to UniverseManager, community to dedicated recipient when set.
+        //           Legacy behavior (communityRecipient == address(0)) merges both in UniverseManager
+        //           and remains compatible with existing claimTeamFee flow.
+        if (communityRecipient != address(0)) {
+            if (treasuryAmount > 0) {
+                IERC20(tokenAddress).safeTransfer(universeManager, treasuryAmount);
+            }
+            if (communityAmount > 0) {
+                IERC20(tokenAddress).safeTransfer(communityRecipient, communityAmount);
+            }
+        } else {
+            IERC20(tokenAddress).safeTransfer(universeManager, treasuryAmount + communityAmount);
+        }
 
         // Deploy governor via factory
         require(timelock != address(0), "Timelock not set");

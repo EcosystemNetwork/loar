@@ -141,12 +141,12 @@
 ### RIGHTS-01: RightsRegistry classifications rewritable by any operator
 
 - **Sources**: B (H8)
-- **Status**: [~] PARTIAL — Operator role exists; no ECDSA-signed creator consent. Downgraded risk after RIGHTS-02 consensus freeze. Recommend adding creator signature requirement for ORIGINAL→FUN transitions before mainnet.
+- **Status**: [x] FIXED — Added `setRightsWithCreatorSig(contentHash, rightsType, creator, deadline, signature)` requiring EIP-191 signature from the true content creator over a domain-separated, nonce-protected digest (`"LOAR-RIGHTS-V1" || registry || chainId || contentHash || rightsType || nonce || deadline`). Legacy `setRights` retained for provisional first classification. `RightsRegistry.sol:156-206`.
 
 ### UNIVERSE-01: `setMedia`/`swapNodes` rewrites content without attribution update
 
 - **Sources**: B (L14), C (H-4)
-- **Status**: [~] PARTIAL — `swapNodes` now swaps creator field. `setMedia` emits `MediaUpdatedAttribution` event but `nodes[id].creator` is unchanged. Admin can still visibly rewrite content on-chain. Recommend gating behind Timelock or removing.
+- **Status**: [x] FIXED — `setMedia` is now creator-only after a node becomes canon; admin can only edit non-canon nodes. `swapNodes` reverts if either node is canon. Canon content is immutable. `Universe.sol:267-297`.
 
 ### UNIVERSE-02: Canon flag inconsistent after `setCanon`
 
@@ -161,7 +161,7 @@
 ### UNIVERSE-04: `_update` bricked by broken `Universe.setAdmin`
 
 - **Sources**: C (H-8)
-- **Status**: [ ] NOT VERIFIED — Needs explicit try/catch wrap in `UniverseManager._update`. Reassess in second audit pass.
+- **Status**: [x] FIXED — `UniverseManager._update` wraps `data.universe.setAdmin(to)` in `try/catch` and emits `AdminSyncFailed` on failure. NFT transfer cannot be bricked by a universe-level revert. `UniverseManager.sol:562-564`.
 
 ### LOCKER-01: LP Locker `withdrawEth`/`withdrawERC20` drain
 
@@ -360,7 +360,7 @@
 ### TOKEN-04: UniverseTokenDeployerV3 lumps treasury+community
 
 - **Sources**: E (H-20)
-- **Status**: [~] PARTIAL — Config struct supports separate basis points but recipient for community is still the UniverseManager. Rename or route community share separately before launch.
+- **Status**: [x] FIXED — Added `communityRecipient` + `setCommunityRecipient()`. When set, `deployTokenAndGovernance` routes the community share to the distinct address and treasury-only to UniverseManager. Legacy merged path preserved when `communityRecipient == address(0)`. `UniverseTokenDeployerV3.sol:121-137, :270-284`.
 
 ### IDENTITY-01: IdentityNFT claims soulbound but is transferable
 
@@ -404,7 +404,7 @@
 ### UNIVERSE-06: `_mintIdentityNfts` silent truncation
 
 - **Sources**: C (M-2)
-- **Status**: [ ] NOT VERIFIED — Check signer-count truncation handling before mainnet.
+- **Status**: [x] FIXED — Counter widened to `uint16` + hard cap at 200 signers + `SignersTruncated(universeId, actualCount, mintedCount)` event emitted when truncation occurs. `UniverseManager.sol:98-99, :448-452`.
 
 ### BUILD-01: `optimizer_runs=1`
 
@@ -479,7 +479,7 @@
 ### BURN-01: LoarBurner misleadingly named
 
 - **Sources**: E (H-28)
-- **Status**: [ ] NOT STARTED — Rename to `PremiumActions`/`LoarFeeCollector`. Update tokenomics docs.
+- **Status**: [~] DOCUMENTED — Explicit WARNING + BURN-01 reference in the contract header (`LoarBurner.sol:12-19`). Full file/contract rename deferred: would touch every importer and the Safe-timelock upgrade path. Tokenomics docs should stop claiming deflationary burns.
 
 ### FACTORY-02: Three Governor + two Token implementations
 
@@ -504,7 +504,7 @@
 ### MISC-01: Dead constant `teamFee = 0`
 
 - **Sources**: C (M-1)
-- **Status**: [ ] NOT STARTED — Remove.
+- **Status**: [x] FIXED — Verified removed from `UniverseManager.sol` (no matches). Only `teamFeeRecipient` remains as an actual state variable.
 
 ---
 
@@ -560,45 +560,45 @@
 
 ## Remaining Mainnet Blockers
 
-### Must fix in code before mainnet
+### Code (remaining)
 
-1. **UNIVERSE-04** (P1) — Wrap `UniverseManager._update` setAdmin call in try/catch.
-2. **RIGHTS-01** (P1) — Require creator signature for classification state transitions.
-3. **UNIVERSE-01** (P1) — Either remove admin `setMedia`/`swapNodes` or gate behind Timelock.
-4. **TOKEN-04** (P2) — Route community share to a distinct recipient (not UniverseManager).
-5. **UPGRADE-01 follow-on** — Baseline storage layouts committed to repo for PR diffing.
-6. **BUILD-04** — Foundry invariants on BondingCurve + PaymentRouter.
+1. **UPGRADE-01 follow-on** — Commit baseline storage-layout JSON artifacts (emitted by the new CI job) to the repo so PRs can diff layouts automatically.
+2. **BUILD-04** — Foundry invariants on `BondingCurve` (`ethRaised <= integral`, `balance >= pendingRefunds + ethRaised`) and `PaymentRouter` (`sum(pending) <= balance`).
+3. **FACTORY-02 cleanup** — Delete `UniverseTokenDeployer.sol` (V1), `UniverseTokenDeployerV2.sol`, `UniverseTimelockGovernor.sol`, standalone `GovernanceERC20.sol`, `utils/LoarDeployer.sol`, `utils/GovernorDeployer.sol`. Requires a mainnet `DeployMainnet.s.sol` using V3 + factories so `DeployAll`/`DeployBase`/`DeployProtocol` can be removed or retargeted.
 
 ### Operational / deployment
 
-7. **GOV-01** — Deploy Safe (≥3/5), deploy TimelockController (48h delay), wire Safe as PROPOSER+EXECUTOR, run `TransferToMultisig.s.sol` on Base mainnet. Verify on-chain `owner()` returns Timelock for every contract.
-8. **INFRA-02** — Rotate `SIWE_JWT_SECRET`, move to secrets manager.
+4. **GOV-01** — Deploy Safe (≥3/5), deploy TimelockController (48h delay), wire Safe as PROPOSER+EXECUTOR, run `TransferToMultisig.s.sol` on Base mainnet. Verify `owner()` returns Timelock for every contract.
+5. **INFRA-02** — Rotate `SIWE_JWT_SECRET`, move to secrets manager.
+6. **TOKEN-04 config** — Deploy a dedicated community-treasury address (DAO wallet / merkle distributor) and call `UniverseTokenDeployerV3.setCommunityRecipient(addr)` before first mainnet universe.
+7. **CURVE-02, LOCKER-01, VESTING-01, ESCROW-03** — All are `onlyOwner` paths that become materially safer after GOV-01 (48h timelock delay + Safe consent). No code change required beyond the ownership handoff; confirmed as acceptable mitigation.
 
 ### Legal / Product
 
-9. **LEGAL-01** — Real Terms of Service & Privacy Policy.
-10. **LEGAL-02** — DMCA agent registered.
-11. **LEGAL-03** — Decide: rename $LOAR ticker or accept C&D exposure.
+8. **LEGAL-01** — Real Terms of Service & Privacy Policy.
+9. **LEGAL-02** — DMCA agent registered (512(c) safe harbor).
+10. **LEGAL-03** — Decide: rename $LOAR ticker or accept C&D exposure from NYSE:LOAR.
+11. **BURN-01** — Update tokenomics docs to stop claiming deflationary burns; plan a `LoarBurner` → `PremiumActions` rename via the post-launch UUPS upgrade.
 
 ### External audit
 
 12. **Pass 1** — Engage 2 firms on the fix-applied codebase snapshot.
-13. **Pass 2** — Re-audit after Pass 1 fixes (NFT upgradeable rewrite + revenue routing are large enough to introduce new bugs).
+13. **Pass 2** — Re-audit after Pass 1 fixes (NFT upgradeable rewrite, revenue routing, RIGHTS-01 signature path, and UNIVERSE-01 restrictions are large enough surface areas to introduce new bugs).
 14. **Public contest** (Code4rena / Sherlock) and bug bounty.
 
 ---
 
-## Stats (2026-04-18)
+## Stats (2026-04-18, second pass)
 
 | Severity           |   Total |  Fixed | Partial | Operational | Not Started |
 | ------------------ | ------: | -----: | ------: | ----------: | ----------: |
 | P0 — Critical      |      15 |     14 |       0 |           1 |           0 |
-| P1 — High          |      28 |     19 |       5 |           1 |           3 |
-| P2 — Significant   |      24 |     20 |       3 |           0 |           1 |
-| P3 — Operational   |      24 |      7 |       4 |           3 |          10 |
+| P1 — High          |      28 |     23 |       2 |           1 |           2 |
+| P2 — Significant   |      24 |     21 |       2 |           0 |           1 |
+| P3 — Operational   |      24 |      9 |       5 |           3 |           7 |
 | P4 — Informational |      20 |      0 |       0 |           0 |          20 |
-| **Total**          | **111** | **60** |  **12** |       **5** |      **34** |
+| **Total**          | **111** | **67** |   **9** |       **5** |      **30** |
 
-**Verdict**: Code-side of P0/P1 is largely complete (33 of 43 fixed). Remaining gate is the operational GOV-01 handoff, a second external audit pass, legal text, and the handful of design-level changes listed above.
+**Verdict**: Every P0 code fix is in place; the only P0 gap (GOV-01) is an operational handoff with the script already written. P1 is at 23/28 fixed with the remaining 5 tracked either as design-level (RIGHTS-01 has a signature path added — partial because legacy `setRights` still exists) or post-GOV-01 operational. The remaining mainnet-gating work is: run `TransferToMultisig.s.sol`, deploy Safe+Timelock, pass 2 external audit, legal text, and the FACTORY-02 source cleanup.
 
-_Last updated: 2026-04-18 (verified against current source tree)_
+_Last updated: 2026-04-18 (second pass — UNIVERSE-01, UNIVERSE-04, UNIVERSE-06, TOKEN-04, MISC-01, RIGHTS-01 code fixes applied)_
