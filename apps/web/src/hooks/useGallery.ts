@@ -7,6 +7,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '../utils/trpc';
 
+/** Avoid refetching gallery data on every tab focus / remount */
+const GALLERY_STALE_TIME = 5 * 60 * 1000; // 5 minutes
+
 /** Browse content with filters */
 export function useGalleryBrowse(options: {
   universeId?: string;
@@ -20,6 +23,7 @@ export function useGalleryBrowse(options: {
   return useQuery({
     queryKey: ['gallery', 'browse', options],
     queryFn: () => trpcClient.gallery.browse.query(options),
+    staleTime: GALLERY_STALE_TIME,
   });
 }
 
@@ -28,6 +32,7 @@ export function useGalleryTrending(universeId?: string, limit?: number) {
   return useQuery({
     queryKey: ['gallery', 'trending', universeId, limit],
     queryFn: () => trpcClient.gallery.trending.query({ universeId, limit }),
+    staleTime: GALLERY_STALE_TIME,
   });
 }
 
@@ -37,6 +42,7 @@ export function useGalleryFeatured(universeId: string | undefined) {
     queryKey: ['gallery', 'featured', universeId],
     queryFn: () => (universeId ? trpcClient.gallery.featured.query({ universeId }) : []),
     enabled: !!universeId,
+    staleTime: GALLERY_STALE_TIME,
   });
 }
 

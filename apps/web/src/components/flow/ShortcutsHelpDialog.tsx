@@ -12,6 +12,9 @@ interface ShortcutsHelpDialogProps {
 }
 
 const SHORTCUTS = [
+  // Tools
+  ['H', 'Hand tool (pan)'],
+  ['V', 'Select tool (drag-select)'],
   // Navigation & View
   ['Ctrl+K', 'Search & filter nodes'],
   ['F', 'Fit to view'],

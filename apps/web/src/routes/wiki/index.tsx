@@ -8,7 +8,7 @@
  * The "Gallery" tab shows promoted content (from sandbox or direct uploads).
  * The "Collection" tab retains the legacy character NFT gallery.
  */
-import { createFileRoute, Link, useSearch } from '@tanstack/react-router';
+import { createFileRoute, Link, useSearch, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -41,6 +41,8 @@ import {
   Lock,
   UserCircle,
   Rotate3d,
+  Filter,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -769,6 +771,7 @@ function GlobalSearchResults({
 
 function WikiPage() {
   const { universe: universeAddress } = useSearch({ from: '/wiki/' });
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<WikiTab>('person');
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -803,7 +806,7 @@ function WikiPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">World Encyclopedia</h1>
           <p className="text-muted-foreground mt-1">
@@ -813,7 +816,6 @@ function WikiPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Global search */}
           <div className="relative w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -823,38 +825,74 @@ function WikiPage() {
               className="pl-9 h-9 text-xs"
             />
           </div>
-
-          {/* Universe filter */}
-          <Select
-            value={universeAddress ?? '__all__'}
-            onValueChange={(v) => {
-              const url = v === '__all__' ? '/wiki' : `/wiki?universe=${v}`;
-              window.history.replaceState(null, '', url);
-              window.location.reload();
-            }}
-          >
-            <SelectTrigger className="h-9 text-xs w-48">
-              <Globe className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-              <SelectValue placeholder="All Universes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__" className="text-xs">
-                All Public Universes
-              </SelectItem>
-              {publicUniverses.map((u: any) => (
-                <SelectItem key={u.id} value={u.id} className="text-xs">
-                  {u.name || u.id.slice(0, 12)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Link to="/create" search={universeAddress ? { universe: universeAddress } : undefined}>
             <Button size="sm">
               <Plus className="h-4 w-4 mr-1" />
               Create
             </Button>
           </Link>
+        </div>
+      </div>
+
+      {/* Universe filter bar */}
+      <div className="mb-6 rounded-lg border bg-muted/30 p-3">
+        <div className="flex items-center gap-2 mb-2.5">
+          <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-sm font-medium">Filter by Universe</span>
+          {universeAddress && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs ml-auto text-muted-foreground hover:text-foreground"
+              onClick={() => navigate({ to: '/wiki', search: {} })}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear filter
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => navigate({ to: '/wiki', search: {} })}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+              !universeAddress
+                ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
+                : 'border-border bg-background hover:bg-muted hover:border-foreground/20 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Globe className="h-4 w-4" />
+            All Universes
+          </button>
+          {publicUniverses.map((u: any) => (
+            <button
+              key={u.id}
+              onClick={() => navigate({ to: '/wiki', search: { universe: u.id } })}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                universeAddress === u.id
+                  ? 'border-violet-500 bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20'
+                  : 'border-border bg-background hover:bg-muted hover:border-foreground/20 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {u.image_url ? (
+                <img
+                  src={u.image_url}
+                  alt=""
+                  className="h-5 w-5 rounded object-cover flex-shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="h-5 w-5 rounded bg-gradient-to-br from-violet-500/30 to-purple-500/30 flex items-center justify-center flex-shrink-0">
+                  <Globe className="h-3 w-3" />
+                </div>
+              )}
+              {u.name || u.id.slice(0, 10) + '...'}
+            </button>
+          ))}
+          {publicUniverses.length === 0 && (
+            <p className="text-xs text-muted-foreground py-1.5 px-2">No universes found.</p>
+          )}
         </div>
       </div>
 

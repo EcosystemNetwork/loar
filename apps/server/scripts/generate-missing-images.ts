@@ -294,11 +294,11 @@ async function main() {
     process.exit(1);
   }
   const { googleImagenService } = await import('../src/services/google-imagen.js');
-
   if (!googleImagenService.isConfigured()) {
-    console.error('ERROR: GOOGLE_API_KEY is not set. Cannot generate images.');
+    console.error('ERROR: GOOGLE_API_KEY is not set.');
     process.exit(1);
   }
+  console.log(`  Model: nano-banana-pro-preview (Google direct)`);
 
   // ── Query all entities ──────────────────────────────────────────
   console.log('Fetching all entities from Firestore...');
@@ -351,38 +351,17 @@ async function main() {
     process.exit(0);
   }
 
-  // ── Upload helper ───────────────────────────────────────────────
-  async function uploadImage(
-    base64: string,
-    entityId: string,
-    entityName: string,
-    creator: string
-  ): Promise<string> {
-    // Try storage manager first
-    try {
-      const { getStorageManager } = await import('../src/services/storage/index.js');
-      const manager = getStorageManager();
-      const buffer = Buffer.from(base64, 'base64');
-      const manifest = await manager.upload(
-        buffer,
-        `wiki/${entityId}/cover.png`,
-        'image/png',
-        creator
-      );
-      const url = manifest.uploads[0]?.url || '';
-      if (url) return url;
-    } catch {
-      // fall through to Pinata
-    }
-
-    // Fallback to Pinata direct
+  // ── Upload helper (downloads from FAL temp URL → pins to Pinata IPFS) ──
+  async function uploadToPinata(imageUrl: string, entityName: string): Promise<string> {
     const pinataJwt = process.env.PINATA_JWT;
-    if (!pinataJwt)
-      throw new Error('No storage provider available (StorageManager failed, no PINATA_JWT)');
+    if (!pinataJwt) return imageUrl; // fallback: use FAL temp URL directly
 
-    const buffer = Buffer.from(base64, 'base64');
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) throw new Error(`Failed to download image: ${imgRes.status}`);
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+
     const formData = new FormData();
-    formData.append('file', new Blob([buffer as BlobPart], { type: 'image/png' }), 'cover.png');
+    formData.append('file', new Blob([buffer], { type: 'image/png' }), 'cover.png');
     formData.append('pinataMetadata', JSON.stringify({ name: `${entityName} wiki image` }));
 
     const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
@@ -421,12 +400,13 @@ async function main() {
 
       let prompt = config.buildPrompt(entity.name, entity.description || '', entity.metadata || {});
 
-      // Generate image — retry with softened prompt if safety-filtered
+      // Generate image via Google nano-banana-2
       console.log(`  Generating image...`);
       let result;
       try {
         result = await googleImagenService.generate({
           prompt,
+          model: 'nano-banana-2',
           negativePrompt: config.negativePrompt,
           numberOfImages: 1,
           aspectRatio: config.aspectRatio,
@@ -444,6 +424,7 @@ async function main() {
           prompt = config.buildPrompt(entity.name, safeDesc, safeMeta);
           result = await googleImagenService.generate({
             prompt,
+            model: 'nano-banana-2',
             negativePrompt: config.negativePrompt,
             numberOfImages: 1,
             aspectRatio: config.aspectRatio,
@@ -455,19 +436,29 @@ async function main() {
       }
 
       if (!result.images.length) {
-        console.log(`  SKIP — Imagen returned no images (safety filter?)`);
+        console.log(`  SKIP — returned no images (safety filter?)`);
         failed++;
         continue;
       }
 
-      // Upload
-      console.log(`  Uploading...`);
-      const imageUrl = await uploadImage(
-        result.images[0].base64,
-        entity.id,
-        entity.name,
-        entity.creator
-      );
+      // Upload to Pinata IPFS
+      console.log(`  Uploading to IPFS...`);
+      const buffer = Buffer.from(result.images[0].base64, 'base64');
+      const formData = new FormData();
+      formData.append('file', new Blob([buffer as BlobPart], { type: 'image/png' }), 'cover.png');
+      formData.append('pinataMetadata', JSON.stringify({ name: `${entity.name} wiki image` }));
+
+      const pinataJwt = process.env.PINATA_JWT;
+      if (!pinataJwt) throw new Error('PINATA_JWT not set');
+      const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${pinataJwt}` },
+        body: formData,
+      });
+      if (!pinataRes.ok) throw new Error(`Pinata upload failed: ${pinataRes.status}`);
+      const pinataData = (await pinataRes.json()) as { IpfsHash: string };
+      const gateway = process.env.PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud';
+      const imageUrl = `${gateway}/ipfs/${pinataData.IpfsHash}`;
 
       // Update entity
       await db.collection('entities').doc(entity.id).update({
@@ -483,7 +474,20 @@ async function main() {
         await new Promise((r) => setTimeout(r, 1500));
       }
     } catch (err) {
-      console.error(`  FAILED: ${(err as Error).message}\n`);
+      const msg = (err as Error).message;
+      console.error(`  FAILED: ${msg}\n`);
+
+      // Stop immediately on quota exhaustion — no point burning through remaining entities
+      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+        console.log(
+          '\n  QUOTA EXHAUSTED — stopping early. Re-run tomorrow when the daily limit resets.\n'
+        );
+        const remaining = needsImage.length - i - 1;
+        console.log(`  ${remaining} entities still need images.\n`);
+        failed += remaining + 1;
+        break;
+      }
+
       failed++;
     }
   }

@@ -134,7 +134,7 @@ export default function Header() {
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuContent align="start" className="w-48 max-h-[calc(100vh-80px)]">
                   {moreGroups.map((group, gi) => {
                     const visibleLinks = group.links.filter((l) => !HIDDEN_ROUTES.has(l.to));
                     if (!visibleLinks.length) return null;

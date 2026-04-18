@@ -1,16 +1,26 @@
 /**
- * Google Imagen Service — 2D Image Generation
+ * Google Image Generation Service
  *
- * Uses Google's Imagen 3 model via the Generative AI SDK to generate
- * high-quality 2D character art, concept art, and illustrations.
- *
- * Pricing (approximate):
- *   imagen-3.0-generate-002  ~$0.04/image (standard), ~$0.08/image (high quality)
+ * Default model: nano-banana-pro-preview (Gemini-based image generation via generateContent)
+ * Fallback model: imagen-4.0-generate-001 (Imagen 4 via predict endpoint)
  *
  * Required env var: GOOGLE_API_KEY
  */
 
-const IMAGEN_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+/** Models using the predict endpoint (Imagen-style) */
+const PREDICT_MODELS = new Set([
+  'imagen-4.0-generate-001',
+  'imagen-4.0-ultra-generate-001',
+  'imagen-4.0-fast-generate-001',
+]);
+
+export type GoogleImageModel =
+  | 'nano-banana-pro-preview'
+  | 'imagen-4.0-generate-001'
+  | 'imagen-4.0-ultra-generate-001'
+  | 'imagen-4.0-fast-generate-001';
 
 export type ImagenAspectRatio = '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
 
@@ -19,6 +29,8 @@ export interface ImagenGenerateOptions {
   negativePrompt?: string;
   numberOfImages?: number; // 1-4
   aspectRatio?: ImagenAspectRatio;
+  /** Model to use. Defaults to nano-banana-pro-preview */
+  model?: GoogleImageModel;
   /** Safety filter threshold: BLOCK_NONE, BLOCK_ONLY_HIGH, BLOCK_MEDIUM_AND_ABOVE, BLOCK_LOW_AND_ABOVE */
   safetyFilterLevel?: string;
   /** Person generation: DONT_ALLOW, ALLOW_ADULT, ALLOW_ALL */
@@ -52,14 +64,95 @@ class GoogleImagenService {
   }
 
   /**
-   * Generate images using Google Imagen 3.
-   * Returns base64-encoded images that can be uploaded to storage.
+   * Generate images via Google API.
+   * Routes to the correct endpoint based on model type:
+   *   - nano-banana-pro-preview → generateContent (Gemini-style)
+   *   - imagen-* → predict (Imagen-style)
    */
   async generate(options: ImagenGenerateOptions): Promise<ImagenResult> {
     if (!this.apiKey) throw new Error('GOOGLE_API_KEY is not configured');
 
-    const model = 'imagen-4.0-generate-001';
-    const url = `${IMAGEN_API_BASE}/models/${model}:predict?key=${this.apiKey}`;
+    const model = options.model || 'nano-banana-pro-preview';
+
+    if (PREDICT_MODELS.has(model)) {
+      return this.generateViaPredictEndpoint(model, options);
+    }
+    return this.generateViaGeminiEndpoint(model, options);
+  }
+
+  /**
+   * Gemini-style generateContent endpoint (nano-banana-pro-preview, gemini-*-image).
+   * These models accept a text prompt and return inline image data.
+   */
+  private async generateViaGeminiEndpoint(
+    model: string,
+    options: ImagenGenerateOptions
+  ): Promise<ImagenResult> {
+    const url = `${API_BASE}/models/${model}:generateContent?key=${this.apiKey}`;
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [{ text: options.prompt }],
+        },
+      ],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      throw new Error(`Google API error ${response.status}: ${text}`);
+    }
+
+    const data = (await response.json()) as {
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            text?: string;
+            inlineData?: { mimeType: string; data: string };
+          }>;
+        };
+      }>;
+    };
+
+    const images: ImagenImage[] = [];
+    for (const candidate of data.candidates || []) {
+      for (const part of candidate.content?.parts || []) {
+        if (part.inlineData) {
+          images.push({
+            base64: part.inlineData.data,
+            mimeType: part.inlineData.mimeType || 'image/png',
+          });
+        }
+      }
+    }
+
+    if (images.length === 0) {
+      throw new Error(
+        'Google API returned no images — prompt may have been blocked by safety filters'
+      );
+    }
+
+    return { images, imageUrls: [] };
+  }
+
+  /**
+   * Imagen-style predict endpoint (imagen-4.0-*).
+   * Returns base64-encoded images via the predictions array.
+   */
+  private async generateViaPredictEndpoint(
+    model: string,
+    options: ImagenGenerateOptions
+  ): Promise<ImagenResult> {
+    const url = `${API_BASE}/models/${model}:predict?key=${this.apiKey}`;
 
     const requestBody = {
       instances: [

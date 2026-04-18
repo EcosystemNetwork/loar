@@ -1,19 +1,31 @@
 /**
- * SPACE FLEET — Pilot Episode: "Nothing to See Here"
+ * SPACE FLEET — Pilot Episode: "Return"
  *
- * 45 scenes via Seedance 2.0 → on-chain nodes.
+ * 40 scenes via Seedance 2.0 → on-chain nodes.
  * Pulls character DNA from wiki entities for visual consistency.
  *
- * ~12 min episode (65 × 10s = 10.8 min core footage + audio padding)
+ * ~7 min episode (40 × 10s = 6.7 min core footage + audio padding)
  *
  * Prerequisites:
  *   - Space Fleet universe deployed (create-space-fleet.ts)
  *   - Wiki populated (space-fleet-wiki.ts)
  *   - Server running (pnpm dev:server)
  *
- * Usage: pnpm tsx scripts/space-fleet-pilot-scenes.ts
+ * Generation Modes:
+ *   GEN_MODE=continuity  — Sequential i2v: each scene starts from the last
+ *                          frame of the previous scene. Slower (~2.5 min/scene)
+ *                          but maintains visual continuity (same characters,
+ *                          environments, and motion between scenes).
+ *   GEN_MODE=fast         — Parallel t2v: scenes generated in batches of
+ *                          BATCH_SIZE (default 5). Much faster but each scene
+ *                          is visually independent — characters may look
+ *                          different between scenes.
  *
- * Resume: Set START_SCENE=S15 env to skip completed scenes.
+ * Usage:
+ *   GEN_MODE=continuity pnpm tsx scripts/space-fleet-pilot-scenes.ts
+ *   GEN_MODE=fast BATCH_SIZE=3 pnpm tsx scripts/space-fleet-pilot-scenes.ts
+ *
+ * Resume: Set START_SCENE=S14 env to skip completed scenes.
  */
 import dotenv from 'dotenv';
 import path from 'path';
@@ -45,6 +57,10 @@ const UNIVERSE_ADDR = (process.env.SPACE_FLEET_ADDR ??
   '0x0000000000000000000000000000000000000000') as `0x${string}`;
 const BD_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const START_SCENE = process.env.START_SCENE ?? 'S01';
+const GEN_MODE = (process.env.GEN_MODE ?? 'continuity') as 'continuity' | 'fast';
+const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '5', 10);
+// When resuming continuity mode, pass the last frame URL to maintain the chain
+const RESUME_FRAME = process.env.RESUME_FRAME ?? '';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 function log(step: string, msg: string) {
@@ -198,49 +214,133 @@ function sanitizePrompt(prompt: string, attempt: number): string {
   if (attempt === 0) return prompt;
   // Strip character names and replace with generic descriptions
   let p = prompt
-    .replace(/Eli Vance/g, 'a young male analyst')
-    .replace(/Eli/g, 'the young man')
-    .replace(/Mara Chen/g, 'a sharp professional woman')
-    .replace(/Mara/g, 'the woman')
-    .replace(/Director Halden/g, 'the senior director')
-    .replace(/Halden/g, 'the director')
-    .replace(/Nova Reyes/g, 'the female protagonist')
-    .replace(/Commander/g, 'the leader');
+    .replace(/\bEric\b/g, 'the young man')
+    .replace(/\bMikel\b/g, 'a lean pale figure')
+    .replace(/\bJeff\b/g, 'a big muscular guy')
+    .replace(/\bDante\b/g, 'a charismatic stranger')
+    .replace(/\bMarcus\b/g, 'a watchful figure')
+    .replace(/NOS Event Center/gi, 'a massive rave venue')
+    .replace(/San Bernardino/gi, 'the desert city');
   if (attempt >= 2) {
-    // Further strip any remaining proper nouns and brand-like terms
     p = p
-      .replace(/SPACE FLEET/gi, 'the hidden program')
-      .replace(/ORPHEUS/gi, 'the classified project')
-      .replace(/(?:Blade Runner|Interstellar|Hans Zimmer|Zero Dark Thirty)/gi, 'cinematic')
-      .replace(/4K quality/gi, 'high quality')
-      .replace(/photorealistic/gi, 'realistic');
+      .replace(/SPACE FLEET/gi, 'the series')
+      .replace(/The Frequency/gi, 'an ancient presence')
+      .replace(/(?:Gaspar Noé|Villeneuve|A24|Fincher|Deakins)/gi, 'cinematic')
+      .replace(/ARRI Alexa 65/gi, 'professional cinema camera')
+      .replace(/Cooke anamorphic/gi, 'anamorphic')
+      .replace(/photorealistic/gi, 'realistic')
+      .replace(/psilocybin/gi, 'psychedelic experience');
   }
   return p;
 }
 
+// ── Frame extraction for scene continuity ───────────────────────────────
+import { execSync } from 'child_process';
+import fs from 'fs';
+import { tmpdir } from 'os';
+
+async function extractLastFrame(videoUrl: string, label: string): Promise<string | null> {
+  try {
+    const tmpFile = `${tmpdir()}/sf-frame-${Date.now()}.jpg`;
+    const tmpVid = `${tmpdir()}/sf-vid-${Date.now()}.mp4`;
+    const dlRes = await fetch(videoUrl);
+    if (!dlRes.ok) return null;
+    fs.writeFileSync(tmpVid, Buffer.from(await dlRes.arrayBuffer()));
+    execSync(`ffmpeg -y -sseof -0.1 -i "${tmpVid}" -frames:v 1 -q:v 2 "${tmpFile}" 2>/dev/null`, {
+      timeout: 15_000,
+    });
+    fs.unlinkSync(tmpVid);
+    if (!fs.existsSync(tmpFile)) return null;
+    const frameBuffer = fs.readFileSync(tmpFile);
+    fs.unlinkSync(tmpFile);
+    log(label, `Extracted last frame (${(frameBuffer.length / 1024).toFixed(0)}KB)`);
+
+    // Upload frame to Pinata so ByteDance can access it via URL
+    // (ByteDance rejects base64 data URIs — needs a real HTTP URL)
+    const pinataJwt = process.env.PINATA_JWT;
+    if (!pinataJwt) {
+      log(label, 'No PINATA_JWT — falling back to data URI (may fail with ByteDance)');
+      return `data:image/jpeg;base64,${frameBuffer.toString('base64')}`;
+    }
+    const formData = new FormData();
+    formData.append(
+      'file',
+      new Blob([frameBuffer], { type: 'image/jpeg' }),
+      `frame-${Date.now()}.jpg`
+    );
+    formData.append('pinataMetadata', JSON.stringify({ name: `continuity-frame-${label}` }));
+    const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pinataJwt}` },
+      body: formData,
+    });
+    if (!pinataRes.ok) {
+      log(label, `Pinata upload failed (${pinataRes.status}) — no continuity frame`);
+      return null;
+    }
+    const { IpfsHash } = (await pinataRes.json()) as { IpfsHash: string };
+    const gateway = process.env.PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud';
+    const frameUrl = `${gateway}/ipfs/${IpfsHash}`;
+    log(label, `Frame uploaded: ${frameUrl}`);
+    return frameUrl;
+  } catch (err: any) {
+    log(label, `Frame extraction failed: ${err.message?.slice(0, 100)}`);
+    return null;
+  }
+}
+
 // ── Video generation via ByteDance Seedance 2.0 ─────────────────────────
-async function generateVideo(prompt: string, label: string): Promise<string> {
+// Supports optional startImage for scene-to-scene continuity (i2v mode)
+async function generateVideo(
+  prompt: string,
+  label: string,
+  startImage?: string | null
+): Promise<string> {
   const MAX_RETRIES = 3;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const sanitized = sanitizePrompt(prompt, attempt);
     if (attempt > 0) log(label, `Retry ${attempt}/${MAX_RETRIES - 1} (sanitized prompt)...`);
-    else log(label, 'Generating video via Seedance 2.0...');
+    else
+      log(label, startImage ? 'Generating video (i2v continuity)...' : 'Generating video (t2v)...');
+
+    // Build content array — text only or image + text for i2v
+    // startImage may be cleared mid-loop if ByteDance rejects the frame
+    const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+    if (startImage) {
+      content.push({ type: 'image_url', image_url: { url: startImage } });
+    }
+    content.push({ type: 'text', text: sanitized });
 
     const taskRes = await fetch(`${BD_BASE}/contents/generations/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
       body: JSON.stringify({
         model: 'dreamina-seedance-2-0-260128',
-        content: [{ type: 'text', text: sanitized }],
+        content,
         duration: 10,
         aspect_ratio: '16:9',
         resolution: '720p',
         generate_audio: false,
       }),
     });
-    if (!taskRes.ok)
-      throw new Error(`ByteDance ${taskRes.status}: ${(await taskRes.text()).slice(0, 200)}`);
+    if (!taskRes.ok) {
+      const errText = await taskRes.text().catch(() => '');
+      // If i2v was rejected because the frame contains a "real person",
+      // drop the image and retry as pure t2v — don't let one bad frame
+      // poison the entire rest of the episode
+      if (
+        startImage &&
+        (errText.includes('PrivacyInformation') ||
+          errText.includes('real person') ||
+          errText.includes('SensitiveContent'))
+      ) {
+        log(label, 'Frame rejected (person detected) — falling back to t2v');
+        startImage = null; // clear so next attempt skips the image
+        continue; // retry loop will rebuild content without image
+      }
+      throw new Error(`ByteDance ${taskRes.status}: ${errText.slice(0, 200)}`);
+    }
     const { id: taskId } = (await taskRes.json()) as any;
     if (!taskId) throw new Error('No task ID');
     log(label, `Task: ${taskId}`);
@@ -273,7 +373,6 @@ async function generateVideo(prompt: string, label: string): Promise<string> {
     }
 
     if (!copyrightBlock) throw new Error('Timeout');
-    // Wait before retry with sanitized prompt
     await sleep(2000);
   }
   throw new Error('Copyright filter blocked all retries');
@@ -314,461 +413,310 @@ async function createNode(
 
 // ── Scene definitions ───────────────────────────────────────────────────
 function buildScenes(dna: Record<string, string>) {
-  // ── Character Visual DNA (from wiki metadata.appearance) ──
-  const ELI =
-    dna['ELI_VANCE'] ||
-    'Eli Vance: 24-year-old male, wiry build, intense dark eyes, cheap government suit and thin tie, deliberately ordinary and forgettable. Government ID badge clipped to jacket. Notebook with hand-drawn triangular craft sketches. Expression of controlled determination.';
-  const MARA =
-    dna['MARA_CHEN'] ||
-    'Mara Chen: 30s female, sharp professional, smart blazer, practical clothes. Cheerful demeanor masking deep awareness. Wears government attire above ground, black Orpheus uniform in sublevel.';
-  const HALDEN =
-    dna['DIRECTOR_HALDEN'] ||
-    'Director Halden: 50s male, clean-shaven, immaculate dark suit, polished shoes, steel-gray hair. Military bearing hidden under bureaucratic calm. Completely unreadable face.';
+  // ── Character Visual DNA (pulled from wiki entities) ──
+  const ERIC =
+    dna['ERIC'] ||
+    'Eric: Early 20s male, half-Asian mixed heritage, messy black hair falling over eyes, slim build, black hoodie, dark jeans, beat-up Vans. Dilated pupils. Sweat on temples. Cheap festival wristband. Shifts from lost and overwhelmed to transcendent focus.';
+  const MIKEL =
+    dna['MIKEL'] ||
+    'Mikel: Mid-20s male, lean angular build, sharp cheekbones, pale skin, dark eyes that reflect light unnaturally. All-black techwear — fitted tactical jacket, slim cargo pants, matte-black boots. Moves through crowds with inhuman grace. Small silver ring.';
+  const JEFF =
+    dna['JEFF'] ||
+    'Jeff: Early 20s male, big muscular 6\'2", square jaw, short brown hair. SHIRTLESS, tanned athletic build glistening with sweat. Cargo shorts, high-top sneakers, stacked festival wristbands. Huge grin. Water bottle.';
+  const DANTE =
+    dna['DANTE'] ||
+    "Dante: Late 20s male, Mediterranean features, dark curly hair, stubble. Loose white linen shirt over dark pants. Silver chain pendant. Geometric forearm tattoo. Charismatic smile that doesn't reach his eyes.";
+  const MARCUS =
+    dna['MARCUS'] ||
+    'Marcus: Late 20s male, dark skin, shaved head, muscular security build. All black — plain tee, jeans, boots. Ring with symbol. Sits in corners. Watches everything. Positioned near exits.';
 
-  // ── Location Visual DNA (from wiki metadata.atmosphere) ──
-  const DAC =
-    dna['DEFENSE_ANALYSIS_CENTER'] ||
-    'Defense Analysis Center: Brutalist gray windowless government facility. Sterile fluorescent lighting, badge scanners, frosted glass, surveillance cameras. Mundane exterior concealing extraordinary sublevel.';
-  const TRIAGE =
-    dna['TRIAGE_OFFICE'] ||
-    'Triage Office: Dim intelligence review station lit entirely by rows of glowing screens. Blue monitor glow, claustrophobic, analysts sorting truth from fiction then burying the truth.';
-  const HANGAR =
-    dna['UNDERGROUND_HANGAR'] ||
-    'Underground Hangar: Cavernous space carved from rock, cathedral-scale. Matte-black warship suspended in glowing magnetic cradle. Blue-white energy, service crews on platforms. Impossibly advanced.';
-  const LAUNCH =
-    dna['LAUNCH_SPINE_TWO'] ||
-    'Launch Spine Two: Towering vertical launch chamber inside a mountain. Massive blast doors overhead revealing shaft through rock to stars. Ships rise soundlessly. Sunlight pours down like revelation.';
-  const APARTMENT =
-    dna['ELI_S_APARTMENT'] ||
-    "Eli's Apartment: Small sparse apartment, cheap furniture. One wall covered in investigation board — satellite photos, redacted memos, red string connections. Warm desk lamp vs cold surveillance blue.";
-
-  // ── Tech/Vehicle DNA (from wiki metadata) ──
-  const SHIP =
-    dna['ORPHEUS_CLASS_WARSHIP'] ||
-    'Orpheus-Class Warship: Matte-black angular craft, destroyer-sized, sharp stealth surfaces. No visible engines or propulsion. Suspended in magnetic cradle with blue-white energy. Human-made yet impossibly advanced.';
+  // ── Location DNA (pulled from wiki) ──
+  const NOS =
+    dna['NOS_EVENT_CENTER'] ||
+    'NOS Event Center San Bernardino: Massive indoor/outdoor rave venue. Industrial building with lasers, outdoor stages with LED towers. Tens of thousands of people. Fog machines, desert dust, bass you feel in your organs.';
+  const CATHEDRAL =
+    dna['MAIN_STAGE___THE_CATHEDRAL'] ||
+    'Main Stage "The Cathedral": Indoor main stage. 40-foot speaker wall, LED fractal panels, laser grid through thick fog. 10,000+ packed dense. The bass is physical. A cathedral of sound.';
+  const HOTEL =
+    dna['THE_HOTEL_ROOM'] ||
+    'Hotel Room: Cheap hotel near NOS. Two queen beds, thin curtains, bedside lamp. Bluetooth speaker, water bottles, vape pens. Afterparty decompression that turns sinister.';
+  const TRUCK =
+    dna['JEFF_S_TRUCK'] ||
+    "Jeff's Truck: Lifted white Toyota Tacoma. Gym bag in back, aux cord. Safety. The ride home. Dashboard glow the only light.";
 
   // ── AAA Cinematic World Prompt ──
   const WORLD = [
-    'Shot on ARRI Alexa 65 with Cooke S7/i anamorphic lenses.',
-    'Near-future Earth. Paranoid government thriller.',
-    'Color graded: desaturated institutional gray with cold fluorescent white above ground,',
-    'polished obsidian black with blue-white energy below ground,',
-    'deep navy sky with impossible white light in desert exteriors.',
-    'Shallow depth of field, anamorphic bokeh, subtle film grain.',
-    'Lighting: motivated practicals, volumetric atmosphere, chiaroscuro contrast.',
-    'Composition: Fincher-precise symmetry, Deakins natural light, Villeneuve scale.',
-    'Cinematic 2.39:1 widescreen, photorealistic, no text, no watermarks.',
+    'Shot on ARRI Alexa 65 with Cooke anamorphic lenses.',
+    'Present-day Southern California. Psychedelic sci-fi thriller meets rave culture.',
+    'Color graded: neon magenta, ultraviolet, cyan laser light against deep black.',
+    'Indoor rave: fog-diffused lasers, LED fractal walls, silhouette crowds, bass as visual vibration.',
+    'Outdoor: desert night air, competing stage lights, concrete lots, purple-black sky.',
+    'Hotel: warm yellow lamp vs cold parking lot light through thin curtains.',
+    'Psychedelic distortion: colors breathing, geometry warping, time stretching under psilocybin.',
+    'Shallow depth of field, anamorphic bokeh, subtle film grain, motivated practical lighting.',
+    'Gaspar Noé immersion, Villeneuve scale, A24 intimacy. Cinematic 2.39:1 widescreen.',
+    'Photorealistic. No text, no watermarks.',
   ].join(' ');
 
   return [
     // ═══════════════════════════════════════════════════════════════════
-    // COLD OPEN — Desert Highway (S01-S08)
+    // ACT 1 — THE ARRIVAL (S01–S12)
+    // Getting to the rave, entering NOS, the energy, the crew
     // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S01',
-      title: 'Black Screen — Archival Audio',
-      plot: 'BLACK SCREEN. A low mechanical hum. Archival-style audio: "There is no evidence of unauthorized orbital infrastructure. Reports of off-book aerospace platforms are speculative and false." A metallic CLANG. A deep bass RUMBLE.',
-      prompt: `${WORLD} Pure black screen with subtle horizontal scan lines. Faint government seal watermark barely visible. A single line of white text fades in at center: classified document redaction bars. Institutional, sterile, oppressive. The visual equivalent of a government lie. Minimal, tense, cold.`,
+      title: "Highway — Jeff's Truck",
+      plot: 'EXT. HIGHWAY 215 — NIGHT. A lifted white Tacoma blasts down the freeway toward San Bernardino. Inside: Jeff driving shirtless and hyped, Mikel in the back seat silent and still, Eric in the passenger seat watching the desert pass. Bass from the truck stereo vibrates the mirrors.',
+      prompt: `${WORLD} ${TRUCK} A lifted white Toyota Tacoma racing down a desert freeway at night. Through the windshield, the glow of San Bernardino in the distance. Inside: a big shirtless muscular guy driving and grinning, a slim figure in black hoodie in passenger seat looking out the window pensively, a lean pale figure in all-black in the back seat perfectly still. The truck stereo bass makes the side mirrors vibrate. Desert highway, night sky, anticipation energy. Tracking shot alongside the truck.`,
     },
     {
       id: 'S02',
-      title: 'Desert Highway — Wide',
-      plot: 'EXT. DESERT HIGHWAY — NIGHT. A lonely two-lane road cutting through black desert. A sky crowded with stars. A beat-up sedan races alone under infinite sky.',
-      prompt: `${WORLD} Epic wide aerial shot of a lonely two-lane desert highway at night cutting through pitch-black terrain. An impossibly star-filled sky above — the Milky Way blazing. A single beat-up sedan drives alone, headlights carving through darkness. The road stretches to the horizon in both directions. Total isolation. Camera slowly descending toward the car. Cinematic, vast, lonely.`,
+      title: 'Parking Lot — Arrival',
+      plot: 'EXT. NOS EVENT CENTER PARKING LOT — NIGHT. The truck pulls into a sea of cars. Bass from inside the venue hits them before they even open the doors. Colored light spills into the sky. Jeff is already losing his shirt. Eric looks up at the venue — nervous, excited.',
+      prompt: `${WORLD} ${NOS} A massive parking lot outside the NOS Event Center at night. Hundreds of cars, people walking toward the glowing entrance. The industrial building radiates colored light — magenta, cyan, ultraviolet — through open bay doors. Laser beams shoot into the purple-black sky. A lifted white Tacoma parks among the cars. Three guys climb out — one big and shirtless already pumped, one slim in a black hoodie looking up nervously at the venue, one in all-black scanning the crowd like a predator. Festival energy building.`,
     },
     {
       id: 'S03',
-      title: 'Eli in the Car — Interior',
-      plot: 'INT. SEDAN — NIGHT. Eli drives, alert and tense. He keeps glancing in the rearview mirror. On the passenger seat: a government badge, a cheap burner phone, and a notebook filled with sketches of strange triangular craft.',
-      prompt: `${WORLD} ${ELI} Interior of a beat-up sedan at night. Close-up of Eli Vance driving, face tense and alert, eyes flicking to the rearview mirror. Dashboard glow illuminates his sharp features. On the passenger seat beside him: a government ID badge, a cheap flip phone, and an open notebook showing hand-drawn sketches of triangular aircraft. The intimacy of a man carrying his secrets in a car. Tight framing, warm dashboard amber vs cold starlight through windshield.`,
+      title: 'The Entrance — Sensory Wall',
+      plot: "INT. NOS EVENT CENTER ENTRANCE — NIGHT. They push through the entrance and the sound hits them like a physical wall. Bass so loud Eric's vision pulses. Fog machines, laser grids, the smell of sweat and smoke. Jeff whoops. Mikel is already moving through the crowd like water. Eric follows, overwhelmed.",
+      prompt: `${WORLD} ${NOS} POV pushing through the entrance of a massive indoor rave venue. The sensory assault: bass so powerful the camera vibrates, fog machines creating thick atmosphere, laser beams — green, magenta, white — cutting geometric patterns overhead. Silhouettes of thousands of bodies moving. The back of a slim young man in a black hoodie as he enters, flanked by a huge shirtless figure on one side and a lean all-black figure already dissolving into the crowd on the other. The moment normalcy ends. Immersive, overwhelming, entering another world.`,
     },
     {
       id: 'S04',
-      title: 'Passenger Seat Detail',
-      plot: 'INT. SEDAN — NIGHT. Close-up of the passenger seat: the badge, the phone, the notebook open to a page of triangular craft sketches with handwritten notes and calculations. These are the tools of a secret investigator.',
-      prompt: `${WORLD} Extreme close-up of a car passenger seat at night. A government ID badge face-down, a cheap burner flip phone, and an open notebook covered in hand-drawn sketches of triangular aircraft with handwritten annotations: altitudes, speeds, coordinates, question marks. Red string connects some sketches. The warm amber dashboard glow illuminates these objects like evidence in a crime scene. Macro detail shot, shallow depth of field.`,
+      title: 'The Crew Moving Through',
+      plot: 'INT. NOS — NIGHT. The three friends push through the crowd toward the main stage. Jeff parts the crowd like a human snowplow. Mikel appears and disappears, always a step ahead. Eric is jostled, catching glimpses of faces, lights, smoke.',
+      prompt: `${WORLD} ${ERIC} ${JEFF} ${MIKEL} Three friends moving through a packed rave crowd. The big shirtless guy physically parts the crowd, grinning and high-fiving strangers. The lean figure in black techwear weaves between bodies without touching anyone — inhuman fluidity. The slim guy in the black hoodie is caught in the flow, bumped by shoulders, catching strobe-lit glimpses of faces and fog. Tracking shot following them through the sea of bodies. Chaotic energy, friendship in motion.`,
     },
     {
       id: 'S05',
-      title: 'The First Launch — Sky',
-      plot: 'EXT. DESERT — NIGHT. Eli slows. Above the mountains, a streak of white light rises silently — too fast, too vertical, too controlled. The air around it shimmers.',
-      prompt: `${WORLD} Dramatic sky shot over desert mountains at night. A single brilliant streak of white light rises vertically from behind the mountain range — impossibly fast, impossibly controlled, impossibly silent. The air around the streak shimmers and distorts, bending the star field behind it like heat waves. The light trail is pure white against deep navy sky. No sound, no exhaust — just pure anomalous motion. Wide angle looking up from the desert floor. First sighting.`,
+      title: 'The Cathedral — Approach',
+      plot: 'INT. MAIN STAGE — NIGHT. They reach the main stage. The speaker wall is 40 feet wide, 20 feet tall. LED fractals pulse behind the DJ booth. The crowd is a single breathing organism. Even Mikel pauses to take it in. Eric feels the bass in his teeth.',
+      prompt: `${WORLD} ${CATHEDRAL} Wide shot approaching the indoor main stage. A MASSIVE wall of speakers — 40 feet wide, 20 feet tall — dominates the far end. Behind it, LED panels display fractal patterns synced to the beat. Laser grids cut through fog so thick the crowd becomes silhouettes with raised arms. The scale is cathedral-like — the vaulted industrial ceiling disappears into fog and light. Three figures arrive at the edge of the crowd and stop, taking in the enormity. The bass is visible as vibration in the fog. Awe. Scale. Power.`,
     },
     {
       id: 'S06',
-      title: 'Three Launches — Sequence',
-      plot: 'EXT. DESERT — NIGHT. A second streak rises. Then a third. The stars behind all three distort like heat over asphalt. Something is very wrong with the sky.',
-      prompt: `${WORLD} Three brilliant streaks of white light now rise in parallel from behind desert mountains. The star field behind them warps and bends in waves — gravitational lensing, atmospheric distortion, something bending light itself. The three trails are evenly spaced, precisely timed — not random, not natural. The sky itself seems to ripple. Wide panoramic shot, the scale of the anomaly becoming undeniable. Sci-fi thriller, awe and dread.`,
+      title: 'Jeff in the Pit',
+      plot: "INT. MAIN STAGE — NIGHT. Jeff charges into the dense crowd, pulling Eric by the wrist. Mikel follows. They're deep in the mosh pit now — shoulder to shoulder with strangers, the bass obliterating thought. Jeff is in heaven. Mikel watches the crowd. Eric starts to feel the mushrooms kicking in — edges softening, colors deepening.",
+      prompt: `${WORLD} ${JEFF} ${ERIC} Deep inside the rave mosh pit. A big shirtless guy pulls a smaller friend by the wrist into the densest part of the crowd, both grinning. Bodies packed tight, arms raised, everyone moving to the drop. The smaller guy's expression starts to shift — his pupils dilating, the colors around him becoming more vivid, more liquid. The mushrooms beginning. Laser light reflected in dilating eyes. Close immersive shot from within the pit, sweat and light and bodies.`,
     },
     {
       id: 'S07',
-      title: 'Eli Watches — Something Massive',
-      plot: 'EXT. DESERT — NIGHT. Eli stands outside the car staring up. High above, something MASSIVE moves — not seen directly, only implied by its effect on the sky. Stars bend around an invisible shape. His breath catches.',
-      prompt: `${WORLD} ${ELI} Eli stands beside his stopped sedan on the desert road, head tilted back, staring at the sky in shock. Above him, the star field subtly warps and bends in an enormous oval pattern — as if something impossibly large and invisible is passing overhead, distorting light around it like gravitational lensing. Eli is tiny against the vast desert and warped sky. His expression: awe and terror. Low angle shot from behind Eli looking up at the distorted heavens.`,
+      title: "Mushrooms Hit — Eric's Vision Shifts",
+      plot: "INT. MAIN STAGE — NIGHT. The psilocybin peaks. Eric's perception transforms. The fog becomes architecture. The bass has geometry — he can see sound waves rippling through the air. Colors breathe and pulse with the beat. The crowd's faces become beautiful and alien. He's not at a rave anymore. He's inside the music.",
+      prompt: `${WORLD} ${ERIC} Psychedelic POV shift — the rave transforms. Fog becomes translucent architecture, sound waves become visible geometric ripples in the air, colors breathe and pulse with the beat — magenta bleeding into cyan, ultraviolet halos around every light source. The crowd's faces are beautiful and strange, lit from impossible angles. The speaker wall is no longer a wall — it's a living organism of light and frequency. The world through psilocybin-enhanced eyes. Gaspar Noé-style POV, reality dissolving into synesthetic wonder. Psychedelic realism, not trippy cartoon — grounded but transcendent.`,
     },
     {
       id: 'S08',
-      title: 'The Phone Call — Title Card',
-      plot: 'EXT. DESERT — NIGHT. Eli\'s burner buzzes. A calm voice: "You weren\'t supposed to stop. If you want the truth, Mr. Vance... stop looking up in places where civilians can see you." Line dead. Distant thunder — sky clear. Nothing. Just stars. CUT TO TITLE: SPACE FLEET.',
-      prompt: `${WORLD} ${ELI} Close-up of Eli holding a cheap flip phone to his ear on the desert highway, face frozen in shock. The phone screen casts cold light on his face. Behind him, the desert stretches into darkness. The sky above is now perfectly clear — just stars, as if nothing happened. His expression shifts from fear to determination. Camera slowly pulls back to reveal him alone on the vast empty road. Then SMASH CUT to bold white text on black: SPACE FLEET. Paranoid thriller, dramatic lighting.`,
+      title: 'Mikel Notices Eric',
+      plot: "INT. MAIN STAGE — NIGHT. Mikel turns to look at Eric and freezes. He can sense something changing in Eric — not the mushrooms, something underneath. A frequency shift. Mikel's dark eyes narrow. He's lived centuries and he recognizes when something ancient moves through a human. Something is waking up inside Eric.",
+      prompt: `${WORLD} ${MIKEL} Close-up of Mikel in the rave crowd. His pale sharp face is lit by alternating magenta and cyan laser light. His dark eyes lock onto something off-camera (Eric) and his expression changes — the easy confidence drops, replaced by ancient recognition and a flash of fear. His pupils contract when everyone else's would dilate. He senses something he hasn't sensed in centuries. The crowd moves around him but he is perfectly still. Predator becomes prey for one heartbeat. Tight portrait shot, alternating colored light, the vampire sensing the impossible.`,
     },
 
     // ═══════════════════════════════════════════════════════════════════
-    // ACT ONE — Defense Analysis Center (S09-S22)
+    // ACT 2 — THE SEPARATION & THE AWAKENING (S09–S25)
+    // Lost in the crowd, alone, the power activates, The Frequency speaks
     // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S09',
-      title: 'DAC Exterior — Morning',
-      plot: 'EXT. DEFENSE ANALYSIS CENTER — MORNING. A gray, windowless government facility. Badge scanners. Frosted glass. Surveillance cameras. Sterile. Quiet. The architecture of secrets.',
-      prompt: `${WORLD} Establishing shot of a brutalist gray government building in morning light. No windows. Security fencing, badge-access checkpoints, concrete barriers. Frosted glass entrance doors reflect cold sky. A few government vehicles in the parking lot. American flag on a pole barely moves. Surveillance cameras visible at every corner. The building radiates institutional control. Wide establishing shot, overcast morning light.`,
+      title: 'The Drop — Crowd Surge',
+      plot: "INT. MAIN STAGE — NIGHT. A MASSIVE bass drop hits. The crowd surges like a tidal wave. Eric's phone falls from his pocket. Stomped instantly. The crowd pushes — Eric reaches for Mikel — their fingers miss by inches.",
+      prompt: `${WORLD} The moment of the bass drop — the crowd SURGES like a tidal wave. Bodies crash into each other. A phone screen cracks under stomping feet. Two hands reaching across the chaos — slim fingers in a black hoodie sleeve and pale sharp fingers in a black tactical jacket — inches apart, missing. The crowd flows between them like a river separating two banks. Strobe lights freeze the moment. The separation. Dramatic slow-motion feeling, strobe-frozen chaos, the phone cracking, fingers missing. Emotional action.`,
     },
     {
       id: 'S10',
-      title: 'Eli Enters — News Screens',
-      plot: 'INT. DEFENSE ANALYSIS CENTER — MORNING. Eli walks in wearing a cheap tie. Wall screens show news anchors laughing about "viral UFO hysteria." Chyron: MYSTERY LIGHTS OVER NEVADA DEBUNKED AS ATMOSPHERIC DISTORTION. The cover story is already running.',
-      prompt: `${WORLD} ${ELI} Interior of a sterile government facility lobby. Eli walks through badge scanners wearing a cheap suit and thin tie, carrying a laptop bag. On wall-mounted screens behind him, news anchors smile dismissively. A news chyron scrolls: "MYSTERY LIGHTS DEBUNKED AS ATMOSPHERIC DISTORTION." The irony is invisible to everyone but Eli — he SAW those lights last night. Fluorescent lighting, frosted glass, government gray. Medium tracking shot following Eli through security.`,
+      title: 'Separated — Eric Alone',
+      plot: "INT. MAIN STAGE — NIGHT. Eric is suddenly alone. Jeff's voice is swallowed by bass. Mikel has vanished. 10,000 strangers surround him. Phone dead under someone's foot. Mushrooms intensifying. He's trapped in a sea of bodies with no anchor.",
+      prompt: `${WORLD} ${ERIC} A young man in a black hoodie stands still in a surging rave crowd — the only unmoving figure in a sea of motion. His face shows the moment of realization: he is alone. His hand reaches instinctively for his pocket — no phone. He looks left, right — strangers' faces strobing in laser light. No friends. No phone. Mushrooms intensifying. Dilated pupils reflecting fractured light. The isolation of one person in ten thousand. Wide shot of Eric motionless in the swirling crowd, lit from above by lasers.`,
     },
     {
       id: 'S11',
-      title: 'Mara Catches Up — Hallway',
-      plot: 'INT. HALLWAY — MORNING. Mara Chen catches up to Eli. "You look terrible." She jokes about the cover stories: "weather balloons, ion reflections, swamp gas, whatever lie we\'re using this quarter."',
-      prompt: `${WORLD} ${ELI} ${MARA} A government hallway with fluorescent lights. Mara Chen walks alongside Eli, carrying a coffee, her expression cheerful and teasing. Eli looks tired but alert, studying her with subtle intensity. They walk past frosted glass offices. The hallway is sterile but Mara brings warmth to it. Two-shot, walking and talking, government corridor. Surface friendliness hiding mutual assessment.`,
+      title: 'Jeff Searching',
+      plot: "INT/EXT. NOS — NIGHT. Jeff climbs on top of a concrete barrier, cupping his hands, bellowing ERIC over the bass. It's useless and endearing. Mikel appears beside him, says something in his ear. Mikel looks concerned in a way Jeff has never seen.",
+      prompt: `${WORLD} ${JEFF} ${MIKEL} A big shirtless muscular guy stands on top of a concrete barrier inside the venue, cupping his hands around his mouth, yelling. The bass drowns him out completely. Below, the lean figure in all-black appears beside the barrier, looking up at him with an expression of genuine concern — unusual, almost frightened. The crowd flows around the barrier like water around a rock. Multiple colored stage lights create overlapping shadows. The search for a lost friend.`,
     },
     {
       id: 'S12',
-      title: 'Eli Studies Mara',
-      plot: 'INT. HALLWAY. Eli: "You ever say stuff like that out loud just to see who flinches?" Mara smirks: "Every day." She peels off toward another section. Eli clocks that. Interesting.',
-      prompt: `${WORLD} ${ELI} ${MARA} Close two-shot in the hallway. Eli watches Mara with new intensity — she just revealed she tests people too. Mara smirks knowingly and breaks off, walking away down a branching corridor. Eli watches her go, recalculating. The moment of mutual recognition between two people who both see through the institution. Mara's figure receding. Eli's evaluating expression. Government hallway, fluorescent light.`,
+      title: 'Eric Drifts Deeper',
+      plot: "INT. MAIN STAGE — NIGHT. Eric gives up trying to find the exit and drifts deeper into the crowd toward the speaker wall. The mushrooms are at full peak now. Every bass hit is a color. Every laser is a sound. He's moving toward the music because it's the only thing that makes sense.",
+      prompt: `${WORLD} ${ERIC} ${CATHEDRAL} Eric moving through the dense crowd toward the massive speaker wall, pulled by the music. His face is transformed — eyes wide, pupils massive, lips slightly parted. Under psilocybin, the world has become synesthetic: bass pulses are visible as concentric waves of deep red emanating from the speakers, lasers hum with audible resonance, the fog has texture and geometry. He reaches toward the speaker wall like it's magnetic. The crowd parts slightly around him without knowing why. Walking toward sound as destiny. POV following him through psychedelic space.`,
     },
     {
       id: 'S13',
-      title: 'Briefing Room — Halden Enters',
-      plot: 'INT. BRIEFING ROOM. A digital map of near-Earth orbit rotates on the wall. Director Halden stands at the front, immaculate and unreadable. Junior analysts with tablets.',
-      prompt: `${WORLD} ${HALDEN} A government briefing room. A large digital map of near-Earth orbit rotates on the front wall — satellite trajectories and orbital plots. Director Halden stands at the front, immaculate suit, commanding the room. Junior analysts sit with tablets, attentive. The room is clinical and controlled. Halden is lit dramatically, face half in shadow. The orbital map glows behind him. Medium-wide shot of the briefing, institutional authority.`,
+      title: 'The First Sync — Heartbeat and Bass',
+      plot: "INT. MAIN STAGE — NIGHT. Standing near the front, drenched in bass, Eric notices something. The bass is hitting in time with his heartbeat. Not approximately — exactly. When his pulse quickens, the BPM rises. He thinks he's imagining it.",
+      prompt: `${WORLD} ${ERIC} Extreme close-up of Eric's face near the front of the crowd, bathed in speaker vibration. His chest pounds — and the bass hits at exactly the same moment. A visual effect: visible heartbeat pulse rippling outward from his chest in sync with the bass wave from the speakers. His eyes widen with confusion. Is the music following him? Close-up of his face, then his chest, then the speakers — all pulsing in perfect sync. The first clue. Intimate macro shots intercut with the massive speaker wall. The connection forming.`,
     },
     {
       id: 'S14',
-      title: 'Signal Integrity Speech',
-      plot: 'INT. BRIEFING ROOM. Halden: "Today you\'ll be scrubbing public-source chatter surrounding false claims of unauthorized launch activity. Your job is not to prove fantasies. Your job is to maintain signal integrity." He taps the screen. Points of light vanish.',
-      prompt: `${WORLD} ${HALDEN} Close-up of Halden at the briefing screen. He taps the digital orbital map and points of light — representing real anomalies — vanish one by one. Each tap erases evidence. The gesture is casual, practiced. Behind his composed delivery is the machinery of suppression. The orbital display reflects in his glasses. Medium close-up of Halden performing the most mundane act of cosmic cover-up. Cold authority.`,
+      title: 'Fear Makes the Bass Drop',
+      plot: "INT. MAIN STAGE — NIGHT. A spike of anxiety hits Eric — lost, alone, tripping. The moment his fear surges, the bass DROPS. Hard. The whole crowd reacts — thousands of arms thrown up. The DJ didn't trigger that. Eric did.",
+      prompt: `${WORLD} ${ERIC} ${CATHEDRAL} The moment of the drop — but it comes from Eric, not the DJ. Eric's face contorts with a wave of anxiety and at that exact moment the bass DROPS — the speaker wall unleashes a shockwave visible in the fog, the crowd explodes with thousands of arms thrown upward, the laser grid flares white. Eric stumbles backward from the force of what he just caused. The crowd is ecstatic. The DJ behind the LED wall looks confused — that wasn't in the set. The accidental god of the drop. Wide shot of the crowd erupting with Eric at the epicenter, shockwave visible in fog.`,
     },
     {
       id: 'S15',
-      title: 'Halden Promotes Eli',
-      plot: 'INT. BRIEFING ROOM. Halden: "Mr. Vance. Since you scored unusually high on anomaly pattern recognition, you\'ll assist in the disinformation triage queue." Heads turn. That\'s a promotion. Eli: "Happy to help, sir."',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Close two-shot in the briefing room. Halden addresses Eli directly, eyes locking on him. Other analysts turn to look. Eli maintains perfect composure — helpful, eager, unthreatening. The tension between them is invisible to everyone else. Halden's eyes rest on Eli a second too long. Dramatic close-up cutting between both faces. Cold fluorescent lighting, tense undertones.`,
+      title: 'Wonder — The Melody Lifts',
+      plot: "INT. MAIN STAGE — NIGHT. Eric feels a moment of pure wonder — this is real, this is him — and the melody responds. It LIFTS. Beautiful, soaring, ethereal. The crowd sways. Someone near Eric starts crying from the beauty of it. Eric realizes he's composing the music with his feelings.",
+      prompt: `${WORLD} ${ERIC} A transcendent moment. Eric's face shifts from fear to wonder, and the music responds — the melody becomes achingly beautiful, soaring above the bass. The laser grid shifts from aggressive cuts to flowing aurora-like waves of color — soft gold, warm pink, ethereal blue. The crowd sways in unison, arms raised gently instead of violently. A girl near Eric has tears streaming down her face from the beauty. Eric's expression: awe at his own power. He is the composer. His feelings are the instrument. Ethereal, transcendent, overwhelming beauty. The crowd as orchestra.`,
     },
     {
       id: 'S16',
-      title: "Halden's Warning",
-      plot: 'INT. BRIEFING ROOM. Halden: "You will encounter fabricated imagery. Some of it is persuasive. Do not mistake emotional reaction for analysis." His eyes bore into Eli. "Wouldn\'t dream of it."',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Extreme close-up exchange. Halden's face: perfectly controlled, eyes boring into Eli with the weight of a test. Eli's face: composed, respectful, a perfect mask of compliance — but his eyes reveal defiance locked behind obedience. The briefing room blurs behind them. A silent duel disguised as bureaucratic small talk. Intense, intimate, theatrical tension.`,
+      title: 'Full Control — Eric Conducts',
+      plot: 'INT. MAIN STAGE — NIGHT. Eric raises his hand and the crowd raises theirs. He breathes out and the fog machines pulse. He closes his eyes and the music builds — layer by layer, emotion by emotion. For sixty seconds, ten thousand people are extensions of his nervous system.',
+      prompt: `${WORLD} ${ERIC} Eric stands in the crowd with his hand raised, and ten thousand hands rise with his. He is the conductor. Visible concentric sound waves emanate from his body, colored by emotion — gold for wonder, deep red for power. The fog machines pulse with his breathing. The laser grid moves with his gaze. The LED panels behind the DJ display patterns that mirror his heartbeat. His face shows transcendent focus — eyes closed, head tilted slightly back, total surrender to the connection. The crowd is his instrument, the venue is his body, the music is his voice. The most powerful 10 seconds of footage in the episode. Psychedelic transcendence.`,
     },
     {
       id: 'S17',
-      title: 'Triage Office — Establishing',
-      plot: 'INT. TRIAGE OFFICE — LATER. Dim light. Rows of screens. Eli sits at a terminal marked LEVEL 3 — PUBLIC MISATTRIBUTION REVIEW. The room hums with screen glow.',
-      prompt: `${WORLD} ${ELI} A dimly lit intelligence office. Rows of glowing screens fill the space like a grid of blue light. Eli sits alone at a terminal, face illuminated by screen glow. The sign on his station: "LEVEL 3 — PUBLIC MISATTRIBUTION REVIEW." Other empty terminals stretch into shadow behind him. The room feels like a confession booth for classified lies. Wide establishing shot of the triage office, blue monitor light, institutional loneliness.`,
+      title: 'The DJ Notices',
+      plot: "INT. MAIN STAGE — BEHIND DJ BOOTH. The DJ stares at their equipment. The levels are moving on their own. The set is playing itself. They lift their hands off the controls and the music doesn't stop. Someone — or something — else is driving.",
+      prompt: `${WORLD} Behind the DJ booth. A DJ stands at their equipment looking confused and alarmed. The mixing board's faders move by themselves. The waveform display shows patterns that aren't in any loaded track. The DJ lifts both hands away from the controls — the music continues without them, building and building. LED panels behind them display fractal patterns no one programmed. Through the booth's window, the crowd is in perfect unison. The DJ is no longer in control. Tech-focused shot of autonomous equipment, confused DJ, the music playing itself.`,
     },
     {
       id: 'S18',
-      title: 'Evidence Montage',
-      plot: 'INT. TRIAGE OFFICE. Eli scrolls through footage: a farmer filming a glowing object over Kansas. A cargo pilot whispering "That thing just went straight up." A child\'s science fair poster of a ring-shaped station. Each tagged: sensor bloom, viral fabrication, artifact.',
-      prompt: `${WORLD} Montage of screens in the triage office. Screen 1: shaky farmer footage of a luminous oval over Kansas wheat fields, tagged "SENSOR BLOOM." Screen 2: cockpit camera of a pilot staring at something off-screen, tagged "MISIDENTIFIED TEST AIRCRAFT." Screen 3: a child's colorful poster showing a ring-shaped station orbiting the Moon, tagged "ASTROPHOTOGRAPHY ARTIFACT." Each piece of real evidence being buried under institutional labels. Close-ups cycling between screens.`,
+      title: 'The Void Opens',
+      plot: 'INT. MAIN STAGE — NIGHT. Something changes. The LED panels behind the speakers go dark — not off, DARK. A void. A blackness deeper than black that seems to pull light into it. The fog near the speakers stops moving, frozen. The crowd closest to the front freezes for one impossible frame.',
+      prompt: `${WORLD} ${CATHEDRAL} Something wrong happens. The LED panels behind the massive speaker wall go DARK — not powered off but actively void, a blackness that absorbs light. The fog near the speakers freezes mid-swirl, suspended in air. The front rows of the crowd freeze in a single impossible frame — arms raised, mouths open, time stopped for just them. The rest of the crowd behind doesn't notice. The void behind the speakers is not empty — it contains awareness. Something vast and patient is forming behind the wall of sound. Cosmic horror meets rave. The void in the speakers.`,
     },
     {
       id: 'S19',
-      title: 'The Restricted File — Discovery',
-      plot: 'INT. TRIAGE OFFICE. Eli finds something different — a black-and-white tracking video timestamped six hours ago. A cluster of objects leaves Earth orbit... then abruptly vanishes. No propulsion bloom. No normal trajectory.',
-      prompt: `${WORLD} ${ELI} Close-up of Eli's terminal screen. A black-and-white orbital tracking video — grainy, official, timestamped six hours ago. A cluster of small bright objects moves along a curved trajectory (Earth orbit) then simultaneously vanishes. No fade, no bloom — just there, then gone. Eli leans forward, recognizing this is different from everything else. His face in profile, lit by the anomalous footage. The moment of discovery. Tense, intimate.`,
+      title: 'The Frequency Speaks',
+      plot: 'INT. MAIN STAGE — NIGHT. From inside the sound — not through his ears but through his chest, through his bones — a voice. Deep. Ancient. Patient. Not words in the air but words in the bass itself: "I have been waiting for you to return." The music doesn\'t stop. It restructures around the voice like the universe making room.',
+      prompt: `${WORLD} ${ERIC} The most important shot. Eric stands in the frozen-front-row crowd, face lit by the void behind the speakers. His expression transforms from transcendence to primal terror. His chest vibrates — not from the bass but from something speaking THROUGH the bass. The air around him distorts — sound waves become visible dark ripples. The void behind the speakers seems to lean toward him. The music hasn't stopped — it has restructured around a presence, frequencies parting like curtains. Eric is hearing something no human has heard in millennia. Cosmic contact through sub-bass. The moment everything changes. Terror, awe, ancient recognition.`,
     },
     {
       id: 'S20',
-      title: 'ACCESS DENIED — ORPHEUS',
-      plot: 'INT. TRIAGE OFFICE. Eli clicks deeper. ACCESS RESTRICTED. Tries again. ACCESS DENIED — REFER TO SECTION ORPHEUS. His face changes. He writes the word in his notebook: ORPHEUS.',
-      prompt: `${WORLD} ${ELI} Eli clicks urgently. The screen flashes RED: "ACCESS RESTRICTED." He tries again. "ACCESS DENIED — REFER TO SECTION ORPHEUS." The red text fills the screen, reflecting in his wide eyes. Cut to his hands opening his notebook beneath the desk — discreet, hidden from cameras — and writing a single word in careful block letters. Screen glow shifting from blue to red on his face. The discovery moment. Tense, paranoid.`,
+      title: "Eric's Face — Terror",
+      plot: "INT. MAIN STAGE — NIGHT. Close-up on Eric's face as he hears the voice. His transcendent expression shatters into raw animal fear. His mouth opens. His dilated pupils contract for the first time all night. He understands nothing except that he needs to RUN.",
+      prompt: `${WORLD} ${ERIC} Extreme close-up of Eric's face. The progression: transcendent wonder → confusion → recognition of something ancient → pure animal terror. His dilated pupils CONTRACT — the only time all night they've done that. His mouth opens. Sweat runs down his temple. The rave lights on his face shift from warm gold to cold ultraviolet. Behind him, blurred, the void in the speakers pulses. This is the face of a man who just heard God — or something worse. Macro portrait, the full emotional journey in one face, the terror of contact.`,
     },
     {
       id: 'S21',
-      title: 'Halden Behind Him',
-      plot: 'INT. TRIAGE OFFICE. Footsteps. Eli quickly minimizes. Halden stands behind him. "Finding your footing?" "Mostly nonsense. Some very committed nonsense." Halden glances at the notebook.',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Triage office. Eli sits at his terminal — hastily minimized to a blank screen. Director Halden stands directly behind him, looking down. His reflection is visible in the dark monitor. Halden's posture is casual but his presence is a threat. Eli's notebook sits partially visible on the desk edge. The power dynamic is physical: Halden standing, Eli seated, trapped. Low angle shot emphasizing Halden's looming authority.`,
+      title: 'Eric Runs — Music Distorts',
+      plot: 'INT. MAIN STAGE — NIGHT. Eric shoves through the crowd, fighting the current. The music DISTORTS behind him — his panic feeding back into the system. Bass becomes grinding. Melody collapses into dissonance. People around him feel it as a bad trip wave spreading outward.',
+      prompt: `${WORLD} ${ERIC} Eric shoving through the crowd, desperate, fighting against the flow of bodies. Behind him, the music is distorting — visible dark waves of dissonance rippling outward from where he was standing. The crowd he passes through flinches, their expressions souring — his panic is contagious through the sound. The laser grid overhead glitches and flickers. The LED panels display corrupted patterns. His fear is breaking the music. He is the source and he can't control it. Chaotic escape through crowd, distortion waves, panicked motion, music breaking.`,
     },
     {
       id: 'S22',
-      title: 'Curiosity vs Ambition',
-      plot: 'INT. TRIAGE OFFICE. Halden: "Ambition is useful here. Curiosity is not the same thing." "Understood." "Is it?" Beat. "Yes, sir." The faintest smile. Halden walks away. Eli exhales.',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Two-shot in profile. Halden delivers his veiled threat, face perfectly controlled. A beat of silence — the room holds its breath. Then Halden's faintest smile — not warmth but assessment. He turns and walks away down the dim row of terminals, his figure receding into shadow. Cut to Eli exhaling, closing his eyes for one moment of relief. The vulnerability of a man who almost got caught. Dramatic side lighting, long shadows.`,
+      title: 'The Dark Corridor — Running',
+      plot: 'INT. DARK CORRIDOR — NIGHT. Eric finds the corridor between indoor and outdoor areas. Sprints through it. Red emergency lights stretch into infinity under psilocybin. The walls vibrate with distorted bass from the stage. His footsteps echo wrong. He bursts through the exit doors.',
+      prompt: `${WORLD} A young man in a black hoodie sprinting through a long concrete corridor lit only by red emergency exit signs. Under psilocybin the corridor STRETCHES impossibly long — the red signs repeat into infinity. The concrete walls vibrate with distorted bass from the other side. His footsteps echo in wrong rhythms. His shadow multiplies in the red light. He runs toward exit doors that glow with cool outdoor light at the end. Running from something with no body. Psychedelic horror, stretched perspective, red infinity, vibrating walls, pure flight.`,
+    },
+    {
+      id: 'S23',
+      title: 'Outside — Desert Air',
+      plot: "EXT. NOS OUTDOOR AREA — NIGHT. Eric bursts through the doors into the outdoor area. The cool desert air hits him like cold water. Stars above. Multiple stages in the distance. He's shaking, drenched in sweat, alone. His phone is dead. He doesn't know where his friends are.",
+      prompt: `${WORLD} ${ERIC} Eric bursts through exit doors into the outdoor festival area. The cool desert night air visible as his hot breath condensing. He doubles over, hands on knees, gasping. Stars barely visible through light pollution above. Multiple stages glow in the distance with competing colored lights. He is soaked in sweat, shaking, alone. Behind him through the closing doors, the distorted bass is still audible. The relief and terror of escape. Wide shot of a single shaken figure in the open space between stages, tiny against the festival scale.`,
     },
 
     // ═══════════════════════════════════════════════════════════════════
-    // ACT TWO — Mara's Warning + Eli's Apartment (S23-S35)
+    // ACT 3 — THE HOTEL & THE OVERHEARD (S24–S32)
+    // Dante and Marcus, the afterparty, the demon symbols
     // ═══════════════════════════════════════════════════════════════════
     {
-      id: 'S23',
-      title: 'Cafeteria — Establishing',
-      plot: 'INT. CAFETERIA — AFTERNOON. Quiet government lunchroom. Fluorescent buzz. Too clean. Eli sits alone, scrolling a blank spreadsheet while really staring at reflections in the window.',
-      prompt: `${WORLD} ${ELI} A sterile government cafeteria — fluorescent lights buzzing, plastic chairs, surfaces too clean. Nearly empty. Eli sits alone at a table, laptop open to a meaningless spreadsheet, but he stares past it at reflections in the window glass. His coffee is untouched. The loneliness of a secret keeper in a room designed for nothing. Wide shot, flat institutional lighting, isolation.`,
-    },
-    {
       id: 'S24',
-      title: 'Mara Drops In',
-      plot: 'INT. CAFETERIA. Mara drops into the seat across from Eli. "You got Halden\'s attention. Congratulations or condolences, not sure which."',
-      prompt: `${WORLD} ${ELI} ${MARA} Mara slides into the cafeteria seat across from Eli, tray in hand, casual but deliberate. Her expression mixes amusement and genuine concern. Eli looks up, caught between relief at company and wariness about what she might know. The fluorescent light catches them both in its flat, unflattering honesty. Two-shot across the cafeteria table. Mundane setting, charged undercurrent.`,
+      title: 'Dante Approaches',
+      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. Eric is sitting on a curb, head in hands, shaking. A voice: "Hey man, you good?" It\'s Dante — charismatic, late 20s, linen shirt, silver pendant. He\'s friendly, warm, non-threatening. Exactly what Eric needs right now.',
+      prompt: `${WORLD} ${ERIC} ${DANTE} Eric sitting on a concrete curb outside the venue, head in his hands, clearly shaken. A man approaches — late 20s, dark curly hair, white linen shirt, silver chain necklace, easy smile. He crouches beside Eric, offering a water bottle. The gesture is warm, genuine-seeming. Festival lights glow behind them. The contrast between Eric's distress and Dante's calm composure. Two-shot at ground level on the curb, warm human moment against the cold festival night.`,
     },
     {
       id: 'S25',
-      title: '"What\'s Orpheus?"',
-      plot: 'INT. CAFETERIA. Eli: "What\'s Orpheus?" Mara stops chewing. A frozen micro-expression. "That was fast."',
-      prompt: `${WORLD} ${ELI} ${MARA} Tight two-shot across the cafeteria table. Eli leans forward slightly, testing with three syllables. Mara has frozen mid-bite — a micro-expression of surprise she can't quite conceal. Her eyes widen for a fraction of a second before the mask returns. The moment crackles between them. He asked the forbidden question. She reacted. Close-up of Mara's frozen face. Fluorescent light, the intimacy of a dangerous exchange.`,
+      title: 'Marcus in the Background',
+      plot: "EXT. NOS OUTDOOR AREA — NIGHT. Behind Dante, a second figure watches from the shadows. Marcus — shaved head, all black, built like security. He stands near an exit. Watching. Eric doesn't notice him yet.",
+      prompt: `${WORLD} ${MARCUS} In the background of the curb scene, a figure stands in shadow near a venue exit. Muscular, shaved head, all black clothing, arms crossed. He watches Dante and Eric with still, assessing eyes. The festival lights don't quite reach him — he exists in the dark between two light sources. His ring catches a glint of distant laser light. The watcher. Background figure shot — sharp focus on Marcus while the foreground curb scene is slightly soft. The threat you don't notice.`,
     },
     {
       id: 'S26',
-      title: '"So it\'s real"',
-      plot: 'INT. CAFETERIA. "So it\'s real." "I didn\'t say that." "You reacted." "And you asked a question that gets people moved into smaller offices with no clocks."',
-      prompt: `${WORLD} ${ELI} ${MARA} Close-up alternating between faces. Eli's controlled intensity — he caught her and they both know it. Mara's recovery — sharp, defensive, but with a flicker of respect. She leans forward, voice dropped to barely audible. The cafeteria hum covers their words. Two people fencing with information in a room full of enemies. Intimate close-ups, shallow depth of field, fluorescent sterility around a dangerous conversation.`,
+      title: 'The Invitation',
+      plot: 'EXT. NOS PARKING LOT — NIGHT. Dante walks Eric toward the parking lot, talking easily about the music, the night, asking nothing invasive. "We got a room at the hotel across the street. Chill afterparty. You\'re welcome to decompress." Eric, alone and scared, says yes.',
+      prompt: `${WORLD} ${ERIC} ${DANTE} Dante and Eric walking through the festival parking lot at night. Dante is animated and easy, gesturing toward a hotel visible across the street — a cheap two-story motel with exterior corridor lights. Eric walks beside him, hugging himself in his hoodie, still shaken but grateful for human contact. Marcus follows ten paces behind. The NOS Event Center glows behind them, bass still audible. The walk from one world to another — festival to afterparty, public to private, safe to dangerous. Walking two-shot toward the motel.`,
     },
     {
       id: 'S27',
-      title: 'Seven Acceptable Lies',
-      plot: 'INT. CAFETERIA. Mara: "The truth is never hidden. It\'s buried under seven acceptable lies, and your career depends on repeating the right one at the right time."',
-      prompt: `${WORLD} ${MARA} Close-up of Mara speaking low across the table. Her face is serious now — the cheerful mask dropped for the first time. She is revealing the operating manual of the institution they both serve. The fluorescent light catches the intelligence in her eyes. Behind her, blurred cafeteria walls. This is the most dangerous thing she's ever said at work. Intimate close-up, the weight of institutional truth delivered in whisper.`,
+      title: 'Hotel Room — Arriving',
+      plot: 'INT. HOTEL ROOM — NIGHT. A cheap room. Two queen beds, thin curtains, warm lamp light. A bluetooth speaker plays ambient music. Dante is the perfect host — water, chill vibes. Marcus sits in the corner near the door. Eric sits on the bed edge, coming down, trying to process what happened at the stage.',
+      prompt: `${WORLD} ${HOTEL} ${ERIC} ${DANTE} ${MARCUS} Interior of a cheap hotel room. Warm bedside lamp is the main light. Two queen beds with generic bedspreads. A bluetooth speaker on the nightstand plays soft ambient music. Dante moves around the room comfortably, handing out water bottles, being the host. Eric sits on the edge of a bed, hoodie pulled around him, staring at the floor — clearly processing something heavy. Marcus sits in a chair in the corner near the door, back to the wall, watching. The room feels safe on the surface. Intimate afterparty establishing shot.`,
     },
     {
       id: 'S28',
-      title: '"Play Dumb Better"',
-      plot: 'INT. CAFETERIA. "And if I don\'t?" "Then you\'ll never get close enough to learn anything worth knowing." Mara stands. "Play dumb better." She walks off. Eli watches her go.',
-      prompt: `${WORLD} ${MARA} ${ELI} Mara standing up from the cafeteria table, looking down at Eli with an expression of equal parts warning and instruction. She is leaving — body language says "conversation over" but eyes say "listen carefully." Low angle from Eli's perspective looking up at Mara. She turns and walks away through the empty cafeteria, her figure receding under fluorescent tubes. Eli remains seated, processing. The power of someone who knows more walking away.`,
+      title: 'Eric Zoning Out',
+      plot: 'INT. HOTEL ROOM — NIGHT. Eric is staring at the carpet, mushrooms fading, replaying the voice in his head. "I have been waiting for you to return." The hotel room feels too small. The ambient music from the speaker feels different now — he can sense its structure, its bones. The power hasn\'t fully turned off.',
+      prompt: `${WORLD} ${ERIC} Close-up of Eric sitting on the hotel bed edge, staring at the carpet. His eyes are unfocused — he's somewhere else mentally. The ambient music from the bluetooth speaker is visualized as faint geometric patterns only he can see — residual psychedelic perception. His hands grip the bedspread. Sweat has dried on his temples. The warm lamp light makes the room feel close and confining. A man replaying the most terrifying moment of his life on loop. Intimate portrait of internal crisis, warm light, confined space.`,
     },
     {
       id: 'S29',
-      title: 'Apartment — Investigation Wall',
-      plot: "INT. ELI'S APARTMENT — NIGHT. Small apartment. Cheap furniture. One wall covered in printed launch windows, defense budgets, redacted memos, amateur astronomy images. Pinned center: IF THEY'RE LYING ABOUT THE TECHNOLOGY, WHAT ELSE ARE THEY LYING ABOUT?",
-      prompt: `${WORLD} Interior of a small, sparse apartment at night. Cheap furniture, bare walls — except one wall COMPLETELY covered in an investigation board. Printed satellite photos, launch window calendars, redacted government memos with black censorship bars, amateur telescope images, newspaper clippings, red string connecting pieces. A handwritten note pinned in the center. A small desk with a laptop. Single lamp creating dramatic shadows across the conspiracy wall. Paranoid thriller aesthetic.`,
+      title: 'Dante and Marcus — The Conversation',
+      plot: 'INT. HOTEL ROOM — NIGHT. Eric is zoned out on the bed. Near the bathroom, Dante leans against the doorframe talking to Marcus in low voices. They think Eric is too gone to hear. Dante: "Did you see the new ones near the south stage? They\'re not even trying to hide it anymore."',
+      prompt: `${WORLD} ${DANTE} ${MARCUS} Near the bathroom doorframe of the hotel room, two men talk in low voices. Dante leans casually against the frame, one hand gesturing. Marcus stands close, arms crossed, speaking quietly. Their body language is conspiratorial but comfortable — professionals discussing work. In the background, out of focus, Eric sits on the bed — apparently zoned out. The warm lamp creates a split: the two men in shadow near the bathroom, Eric in warm light on the bed. The conversation Eric isn't supposed to hear. Split-focus composition, conspiratorial intimacy.`,
     },
     {
       id: 'S30',
-      title: 'Video Log — The Real Eli',
-      plot: 'INT. APARTMENT — NIGHT. Eli records a video log: "Day one in Level 3. Orpheus exists. Halden knows I\'m looking. Mara knows more than she should."',
-      prompt: `${WORLD} ${ELI} Close-up of Eli sitting at his desk, face illuminated by laptop webcam recording light. He speaks quietly, intensely, directly into camera. His tie is loosened, sleeves rolled up — the government mask coming off. The green recording indicator glows. The investigation wall is visible over his shoulder. This is the real Eli: driven, obsessive, dangerous. Intimate first-person confessional framing, warm lamplight.`,
+      title: 'The Demon Symbols — Overheard',
+      plot: 'INT. HOTEL ROOM — NIGHT. Marcus: "Demon summoning sigils. In the LED panel art. In the stage geometry. In the venue floor plan. It\'s getting obvious. Someone is going to notice." Dante shrugs: "Nobody notices. Nobody ever does." Eric, face blank, is listening to every word.',
+      prompt: `${WORLD} ${ERIC} Tight shot of Eric on the bed. His face is CAREFULLY blank — the face of someone pretending not to hear while memorizing every word. His eyes are aimed down at the carpet but his focus is clearly behind him, toward the two men talking. The ambient light on his face shows micro-tension — jaw slightly clenched, breathing controlled. In the blurred background, Dante and Marcus continue their conversation. The skill of being the quiet kid — invisible, underestimated, hearing everything. The eavesdrop. Close portrait of a face performing blankness while the mind races.`,
     },
     {
       id: 'S31',
-      title: 'Video Log — Industrial Scale',
-      plot: 'INT. APARTMENT — NIGHT. Eli continues: "They\'re not hiding prototypes. Prototypes don\'t get this much narrative management. This is operational. Industrial scale. Orbital or beyond." He pauses, searching for words. "They want the public to think we\'re still struggling with rockets while something else is already running above our heads."',
-      prompt: `${WORLD} ${ELI} Medium shot of Eli at his desk, laptop recording. He gestures toward the investigation wall behind him as he speaks — the evidence of his obsession visible in frame. His face shows the strain of someone who has figured out something enormous and can tell no one. The investigation wall, the laptop, the single lamp — the tools of a lone truth-seeker against an empire of lies. Camera slowly pushes in on his face as the magnitude of his words lands.`,
+      title: 'Eric Leaves — The Poker Face',
+      plot: 'INT. HOTEL ROOM — NIGHT. Eric acts groggy. "Thanks for the hangout man. I need some air." He stands slowly, deliberately. Walks past Marcus at the door. Doesn\'t rush. Doesn\'t look back. Marcus watches him go. The door clicks shut behind him.',
+      prompt: `${WORLD} ${ERIC} ${MARCUS} Eric standing up from the bed slowly, performing exhaustion. He mumbles thanks, moves toward the door. Marcus sits in the corner chair — Eric must pass him to exit. A moment of tension: Eric walks past Marcus, not making eye contact, casual, groggy. Marcus watches him pass — his eyes sharp, assessing. Did Eric hear? The door handle turns. Eric steps into the exterior corridor. The door clicks shut. Shot from Marcus's perspective watching Eric leave — the question hanging: does he know? Tension, poker face, the exit.`,
     },
     {
       id: 'S32',
-      title: 'The Black SUV',
-      plot: 'INT. APARTMENT — NIGHT. A light flashes outside. Eli turns. Across the street, a black SUV idles. No plates. He freezes.',
-      prompt: `${WORLD} ${ELI} Eli at his apartment window, frozen, looking down at the street below. Through the glass, a black SUV with no license plates idles under a street lamp. Tinted windows reflect nothing. Eli's reflection overlays the scene — his face ghosted over the surveillance vehicle below. The SUV's brake lights glow red in the darkness. The moment of realization: they know where he lives. Split focus between Eli's alarmed face and the SUV below. Paranoid thriller.`,
+      title: 'Hotel Corridor — Alone Again',
+      plot: 'EXT. HOTEL EXTERIOR CORRIDOR — NIGHT. Eric walks down the exterior hotel corridor, lit by fluorescent tubes. As soon as he rounds the corner out of sight, his composure breaks. He leans against the wall, breathing hard. Then he starts walking — fast — back toward NOS.',
+      prompt: `${WORLD} ${ERIC} An exterior hotel corridor at night — cheap motel with fluorescent tube lighting. Eric walks along it, composed, normal pace. The moment he turns the corner and is out of sight of the room, his mask BREAKS. He leans against the stucco wall, eyes wide, breathing hard, one hand over his mouth. Then he pushes off the wall and walks fast — nearly jogging — toward the NOS Event Center lights visible in the distance. The composure shattering. The relief of escaping. The second thing tonight that terrified him. Fluorescent corridor, mask dropping, the walk becoming a run.`,
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ACT 4 — THE REUNION & RIDE HOME (S33–S40)
+    // Finding Jeff and Mikel, the silent ride, the bass doesn't stop
+    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S33',
-      title: 'SUV Departs',
-      plot: 'INT. APARTMENT — NIGHT. The SUV drives away silently into the night. Eli watches it go. His laptop screen flickers behind him.',
-      prompt: `${WORLD} Through the apartment window, the black SUV pulls away from the curb silently, taillights tracing red lines down the dark street until it disappears. Eli stands at the window, hand on the glass, watching it go. Behind him, reflected in the window, his laptop screen flickers and distorts. The surveillance leaves but the intrusion remains. Wide shot, Eli silhouetted at window, the empty street, the flickering reflection. Aftermath of menace.`,
+      title: 'Back at NOS — Searching',
+      plot: "EXT. NOS OUTDOOR AREA — NIGHT. Eric walks through the outdoor area, scanning for Jeff or Mikel. The rave is still going — bass from multiple stages, people laughing, LED art installations. He's sober enough now to function but still feeling residual... connection. The music from the nearest stage responds slightly to his mood.",
+      prompt: `${WORLD} ${ERIC} ${NOS} Eric walking through the outdoor festival area, scanning faces. Multiple stages glow in the background with competing colored lights. LED art installations throw patterns on the concrete. Ravers walk between stages. Eric moves with purpose now — still shaken but functional. A subtle visual hint: the nearest stage's lights shift slightly warmer as he passes, responding to his presence. He doesn't notice but we do. The power is still there, just quieter. Walking search, outdoor festival energy, subtle supernatural undertone.`,
     },
     {
       id: 'S34',
-      title: 'The Message',
-      plot: 'INT. APARTMENT — NIGHT. Eli\'s laptop screen flickers. A message appears that he did not type: "YOU WANT TO EXPOSE THE SECRET. FIRST SURVIVE IT." Then the screen goes black.',
-      prompt: `${WORLD} Close-up of a laptop screen in a dark room. The screen flickers, distorts — then white text appears on black, letter by letter, as if typed by an invisible hand. The message fills the screen. The text glows against Eli's horrified face reflected in the monitor. Then the screen cuts to pure black. The cursor blinks once. Then nothing. Extreme close-up, the text is the only light source. Horror meets thriller. The machine knows who he is.`,
+      title: 'Jeff Spots Him',
+      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. From the top of a concrete barrier, Jeff\'s voice: "BRO! ERIC! OVER HERE!" The most beautiful sound Eric has ever heard. Jeff is standing on the barrier, arms waving, huge grin, still shirtless.',
+      prompt: `${WORLD} ${JEFF} A big shirtless muscular guy standing on top of a concrete barrier, arms waving wildly, mouth open in a yell, face split with the biggest grin. Festival lights behind him create a silhouette halo. Below, walking toward him through the crowd, a slim figure in a black hoodie looks up — and the relief on his face is overwhelming, nearly tearful. The most mundane miracle: your friend found you. Wide shot with Jeff elevated on the barrier, Eric approaching below, the scale of the festival behind them, the warmth of reunion.`,
     },
     {
       id: 'S35',
-      title: 'Eli Trapped Between Walls',
-      plot: 'INT. APARTMENT — NIGHT. Eli stares at the dead screen. Behind him, the investigation wall. In front, digital silence. He is being watched from both sides — his own obsession and their surveillance. He is trapped.',
-      prompt: `${WORLD} ${ELI} Wide symmetrical shot of Eli sitting at his desk, framed perfectly between two threats. Behind: the conspiracy investigation wall covered in documents and red string. In front: the dead black laptop screen that just delivered an impossible message. Eli sits between them, still, processing. The composition frames him as trapped between his own obsession and their surveillance. Single lamp, dramatic shadows. Paranoid thriller, symmetrical framing.`,
+      title: 'The Reunion Hug',
+      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. Jeff jumps off the barrier and bear-hugs Eric, lifting him off the ground. "WHERE WERE YOU BRO?" Eric can\'t speak. He just holds on.',
+      prompt: `${WORLD} ${JEFF} ${ERIC} A huge shirtless guy bear-hugging a smaller friend in a black hoodie, lifting him completely off the ground. The smaller guy's face is buried in his friend's shoulder — hiding the emotion, the relief, everything he can't say. Festival lights wash over them. Other ravers walk past, some smiling at the reunion. It's simple and perfect and human after everything supernatural that just happened. The hug as salvation. Medium shot, warm festival lighting, the contrast of Jeff's massive frame and Eric's slim build, pure friendship.`,
     },
-
-    // ═══════════════════════════════════════════════════════════════════
-    // ACT THREE — The Revelation (S36-S55)
-    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S36',
-      title: 'Next Morning — New Badge',
-      plot: 'INT. DEFENSE ANALYSIS CENTER — NEXT MORNING. Eli arrives trying not to show fear. At security, he is handed a new badge: ACCESS ELEVATED: TEMPORARY ASSIGNMENT. He masks his surprise.',
-      prompt: `${WORLD} ${ELI} Security checkpoint at the Defense Analysis Center. Eli stands at the desk receiving a new badge. Close-up of the badge: a different color from yesterday's, stamped with "ACCESS ELEVATED: TEMPORARY ASSIGNMENT." Eli's face masks his surprise with practiced neutrality. The security guard hands it over routinely. Medium shot, institutional lighting, the weight of the moment hidden behind bureaucratic routine.`,
+      title: 'Mikel Appears',
+      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. Mikel appears from the shadows. As always. His eyes lock onto Eric and something changes in his face — he can sense that Eric is different. Something happened. Something fundamental shifted. Mikel says nothing. He just watches.',
+      prompt: `${WORLD} ${MIKEL} A lean figure in all-black techwear emerges from shadow at the edge of the reunion scene. His pale face is lit by distant stage lights — magenta on one side, blue on the other. His dark eyes lock onto Eric with an intensity that goes beyond friendship. He senses it — the change, the opening, the thing that activated. His expression is complex: relief that Eric is alive, fear of what he's become. He doesn't join the hug. He stands apart. Watching. Knowing. The vampire recognizing what woke up in his friend. Mikel in shadows, dual-lit, the outsider who sees everything.`,
     },
     {
       id: 'S37',
-      title: 'Elevator — Floors Disappear',
-      plot: 'INT. SUBLEVEL ELEVATOR. Eli rides down alone. The numbers descend below the listed floors. B4. B5. Then no numbers at all.',
-      prompt: `${WORLD} ${ELI} Interior of a government elevator. Eli stands alone watching the floor indicator. Numbers pass normally at first: B1, B2, B3, B4, B5 — then the digital display goes blank. No numbers. Just a faint hum. The fluorescent light shifts from warm to cold blue. Eli watches the empty display. His reflection in the polished metal doors stares back. Tight framing, claustrophobic, descent into the classified unknown.`,
+      title: 'Walking to the Truck',
+      plot: 'EXT. NOS PARKING LOT — NIGHT. The three friends walk to Jeff\'s truck. Jeff talks enough for all of them — recounting his search, his barrier-climbing strategy, how he "almost fought a security guard." Eric is silent. Mikel is silent. The venue bass fades behind them.',
+      prompt: `${WORLD} ${JEFF} ${ERIC} ${MIKEL} Three friends walking through a dark parking lot toward a lifted white Tacoma. The big shirtless one talks animatedly, gesturing, reliving the night. The slim one in the hoodie walks with his arms wrapped around himself, staring straight ahead, silent. The lean one in black walks slightly behind, watching the back of Eric's head. The NOS Event Center glows behind them, growing smaller. Bass fading with distance. Three friends, three different versions of the same night. Walking group shot, the venue receding, the aftermath beginning.`,
     },
     {
       id: 'S38',
-      title: 'Elevator — The Hum Deepens',
-      plot: 'INT. ELEVATOR. The hum deepens. The descent continues into unmarked territory. Eli braces himself. The doors begin to open.',
-      prompt: `${WORLD} ${ELI} Close-up of Eli in the elevator. His jaw tightens. His hand grips the rail. The elevator hum has become a low, bass vibration that he can feel in his chest. The light is now fully cold blue. A crack of light appears as the doors begin to part — but what's beyond is shadow, not the fluorescent hallway he expected. The transition from the known world to the hidden one. Intimate close-up, anticipation, the threshold moment.`,
+      title: 'In the Truck — Silence',
+      plot: "INT. JEFF'S TRUCK — NIGHT. Jeff drives. Eric stares at the dashboard. Mikel watches Eric from the back seat. Nobody talks. The only sound is the road and the faint vibration of distant bass still audible through the truck frame. Eric can feel it. He can feel ALL of it now. The music from the venue, miles away. The hum of the engine. The frequency of Mikel's attention behind him.",
+      prompt: `${WORLD} ${TRUCK} Interior of the lifted Tacoma. Jeff drives, one hand on the wheel, finally quiet, eyes on the road. Eric in the passenger seat stares at the glowing dashboard instruments — his reflection ghosted in the windshield. In the back seat, Mikel watches Eric's reflection in the side mirror, sharp eyes unblinking. The silence is heavy. The only light is dashboard amber. Through the closed windows, impossibly, the NOS Event Center bass is still faintly audible — or is Eric feeling it from miles away? The ride home where nobody talks about what happened. Three-shot interior, dashboard glow, weighted silence.`,
     },
     {
       id: 'S39',
-      title: 'Black Corridor — The Sign',
-      plot: 'INT. SUBLEVEL. Doors open to a polished black corridor. Minimalist. Quiet. Expensive. A sign on the wall: AEROSPACE LOGISTICS COMMAND — AUTHORIZED PERSONNEL ONLY. A lie so obvious it feels insulting.',
-      prompt: `${WORLD} The elevator doors open to reveal a polished black corridor stretching ahead. Minimalist, expensive, silent. Walls, floor, and ceiling are all dark reflective surfaces. Subtle recessed lighting creates a path forward. On the wall, a plain government sign: "AEROSPACE LOGISTICS COMMAND — AUTHORIZED PERSONNEL ONLY." The sign is deliberately boring against the clearly extraordinary corridor. The contrast between mundane name and sleek architecture. Wide shot, dramatic perspective.`,
+      title: 'Eric Feels the Bass Through the Truck',
+      plot: "INT. JEFF'S TRUCK — NIGHT. Close-up of Eric's hand on the armrest. The truck frame vibrates faintly. Eric closes his eyes. He can feel the bass from the rave through the metal of the truck — miles away now. He can feel the crowd still moving. The power isn't stopping. It wasn't the mushrooms. The door opened. And it isn't closing.",
+      prompt: `${WORLD} ${ERIC} Extreme close-up of Eric's hand resting on the truck's center console. The metal vibrates faintly — impossibly, they're miles from the venue. Eric's eyes are closed. His expression is not peace — it's realization. The bass from the NOS Event Center, miles behind them, is still reaching him through the truck frame, through the road, through the earth itself. Subtle visual: faint geometric patterns of sound visible only to Eric, flowing through the metal under his fingers. The power isn't going away. The mushrooms are gone but the door stays open. Macro close-up, vibrating metal, closed eyes, the terrifying permanence.`,
     },
     {
       id: 'S40',
-      title: 'Halden Waits — Walk With Me',
-      plot: 'INT. CORRIDOR. Halden waits at the far end. Dark figure in a dark space. "Walk with me." They move through the corridor together.',
-      prompt: `${WORLD} ${HALDEN} Long polished black corridor. At the far end, Director Halden stands waiting — a dark figure perfectly composed against the dark space. Eli approaches from the camera's perspective. Halden's figure grows as the distance closes. The corridor gleams with their reflections. The power dynamic is architectural: Halden owns this space. Long shot with dramatic one-point perspective, the two figures meeting in darkness.`,
-    },
-    {
-      id: 'S41',
-      title: 'Behind the Glass — Command Center',
-      plot: 'INT. CORRIDOR. They walk past reinforced glass. Behind it: technicians monitoring live telemetry — orbital plots, lunar transfer arcs, fleet readiness dashboards. Not planes. Not satellites.',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Two figures walk along the black corridor. Behind reinforced glass panels, a command center is visible: technicians at holographic displays showing orbital trajectories, lunar transfer arcs, fleet formation diagrams, readiness boards. The displays clearly show SHIPS — organized fleet groups, not individual satellites. Eli glances through the glass, absorbing. Halden walks calmly. Walking two-shot with classified command center revealed.`,
-    },
-    {
-      id: 'S42',
-      title: 'Fleet Telemetry Close-Up',
-      plot: 'INT. CORRIDOR. Through the glass: close-up of the fleet readiness dashboards. Ship designations, deployment vectors, readiness status indicators. The scale is staggering — this is a military fleet, not a space program.',
-      prompt: `${WORLD} Close-up through reinforced glass of fleet telemetry displays. Holographic screens show ship silhouettes with designation codes, deployment vectors with trajectory arcs, readiness indicators in green/amber/red, fleet group designations: "DEEP RANGE GROUP ALPHA," "OUTER PERIMETER PATROL." The displays pulse with real-time data. The scale implies hundreds of vessels. This is not research — this is an operational military fleet. Macro detail through glass, blue holographic glow.`,
-    },
-    {
-      id: 'S43',
-      title: 'The Observation Window',
-      plot: 'INT. CORRIDOR. They stop at a wide observation window. Beyond it: a cavernous underground hangar. The scale shift hits like a physical force.',
-      prompt: `${WORLD} ${HALDEN} ${ELI} The two men stop at a massive observation window. Through the reinforced glass, a vast underground space opens up — cavernous, dramatically lit, the scale suddenly enormous after the tight corridor. Both figures silhouetted against the bright hangar beyond. Eli's body language shifts — an involuntary step backward at the sheer scale. The moment before revelation. Wide shot, dramatic scale contrast, the infinite opening from the confined.`,
-    },
-    {
-      id: 'S44',
-      title: 'The Ship — First Sight',
-      plot: 'INT. HANGAR. In the center: a matte-black craft the size of a destroyer section, suspended in a magnetic cradle. Angular but elegant. Human-made, yet impossibly advanced. Service crews move beneath it like ants.',
-      prompt: `${WORLD} A vast underground hangar carved from rock. At the center, a MATTE-BLACK ANGULAR WARSHIP the size of a naval destroyer floats suspended in a glowing magnetic cradle. Blue-white energy courses through massive cradle arms. The ship is angular, faceted, stealth-designed — no visible engines, no familiar aerospace shapes. Human engineering pushed beyond known limits. Tiny service crews work on platforms beneath it. The scale is staggering. Epic wide shot, the ship dominating the frame.`,
-    },
-    {
-      id: 'S45',
-      title: "Eli's Breath Catches",
-      plot: 'INT. OBSERVATION WINDOW. Close-up of Eli seeing the ship. His breath catches. His eyes widen despite himself. Years of searching — and now the proof floats in front of him, impossible and undeniable.',
-      prompt: `${WORLD} ${ELI} Extreme close-up of Eli's face at the observation window. The warship is reflected in his wide eyes — matte black geometry floating in blue-white energy. His breath catches visibly. His pupils dilate. Years of investigation, conspiracy boards, midnight drives, and dangerous questions — and now the answer floats in front of him, impossibly real. The emotional impact of vindication and terror hitting simultaneously. The ship reflected in his eyes. Intimate, devastating close-up.`,
-    },
-    {
-      id: 'S46',
-      title: '"Nonsense Protects the Truth"',
-      plot: 'INT. OBSERVATION WINDOW. Halden: "You wanted to know whether the stories were real. The stories are pathetic fragments of reality. People see pieces, shadows. We permit that because nonsense protects the truth."',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Two-shot at the observation window. The warship floats behind them through the glass. Halden speaks with quiet authority, one hand gesturing toward the ship. His tone is philosophical, almost gentle — a man explaining why he lies to the world. The glass reflects both their faces overlaid on the floating warship. Halden is in his element. Profile shot with the impossible ship as backdrop, dramatic hangar lighting.`,
-    },
-    {
-      id: 'S47',
-      title: '"Continuity of Civilization"',
-      plot: 'INT. OBSERVATION WINDOW. Eli: "What is this?" Halden: "Continuity of civilization." The weight of two words. Eli turns to him.',
-      prompt: `${WORLD} ${HALDEN} Close-up exchange. Eli asks the question, raw and direct. Halden answers with two words that reframe everything. His face is calm, carrying the weight of decades of justification. Eli turns to face him fully — the warship behind them both now, the truth between them. Two-shot, both faces visible, the enormous ship reflected in the glass behind. The gravity of nomenclature — three syllables that contain an empire.`,
-    },
-    {
-      id: 'S48',
-      title: 'The Disclosure Argument',
-      plot: 'INT. OBSERVATION WINDOW. Halden: "Markets collapse. Alliances fracture. Religions split. Every population asks: if you hid this, what else did you hide?" Eli: "Maybe they should ask." Halden: "Maybe. But they won\'t ask from a position of calm."',
-      prompt: `${WORLD} ${HALDEN} ${ELI} Halden and Eli face each other at the observation window. Halden makes his case — the philosophy of necessary deception. His conviction is total. Eli pushes back: "Maybe they should ask." A beat. Halden concedes the point but reframes it. Two men debating the fate of civilization while an impossible warship floats behind them. Medium two-shot, the ship as backdrop to a philosophical duel. Dramatic lighting from the hangar.`,
-    },
-    {
-      id: 'S49',
-      title: 'The Choice',
-      plot: 'INT. OBSERVATION WINDOW. Halden gestures to the ship. "You can spend your life shouting from outside the wall... or you can come inside and see why the wall exists." A long beat. Eli knows this is the moment.',
-      prompt: `${WORLD} ${HALDEN} Halden gestures toward the warship with a measured hand. The ship floats behind him, vast and silent. His face shows something rare — a moment of genuine offer, not manipulation but recruitment. He is giving Eli the choice he once received himself. The hangar light catches his steel-gray hair. The warship looms. The weight of the choice fills the silence. Close-up of Halden extending the offer, the ship as destiny behind him.`,
-    },
-    {
-      id: 'S50',
-      title: 'Eli Accepts — The Lie',
-      plot: 'INT. OBSERVATION WINDOW. Eli lowers his eyes just enough. "What do you need from me?" "Loyalty. Competence. Silence." "You\'ll have all three, sir." A lie. But a convincing one.',
-      prompt: `${WORLD} ${ELI} Close-up of Eli's face making his choice. He lowers his eyes — the perfect gesture of submission. But in that downward glance, for one frame, his eyes burn with defiance before the mask settles. He looks back up: compliant, eager, loyal. The perfect lie. The camera is close enough to see micro-expressions — truth hiding behind performance. Then cut to Halden's subtle nod of satisfaction. The deal is struck. Intimate close-up, dramatic lighting.`,
-    },
-    {
-      id: 'S51',
-      title: 'The Tablet',
-      plot: 'INT. OBSERVATION WINDOW. Halden hands Eli a slim tablet. On screen: PROJECT ORPHEUS — STRATEGIC FLEET READINESS / CIVILIAN DISCLOSURE RISK MATRIX.',
-      prompt: `${WORLD} Close-up of hands. Halden's manicured hand extends a slim government tablet. On the screen: bold classified text "PROJECT ORPHEUS — STRATEGIC FLEET READINESS / CIVILIAN DISCLOSURE RISK MATRIX" with TOP SECRET stamps and classification markings. Eli takes it. His fingers grip the edges tightly. The tablet glows between them — the physical object containing the truth he's hunted for years. Macro detail shot, the tablet as sacred object, dramatic lighting.`,
-    },
-    {
-      id: 'S52',
-      title: 'Locker Room — New Uniform',
-      plot: 'INT. SECURE LOCKER ROOM. Eli changes into a dark uniform with no insignia. He opens the tablet. Pages of impossible truth scroll by.',
-      prompt: `${WORLD} ${ELI} A sterile locker room. Eli now wears a dark uniform with no insignia — transformed from analyst to insider. The cheap suit is gone, replaced by black operational wear. He reads the tablet intensely, scrolling. The screen shows diagrams of orbital shipyards, fleet deployments, lunar operations. His face is lit by tablet glow. The uniform marks his transformation from outsider to embedded operative. Medium shot, classified light on stunned face.`,
-    },
-    {
-      id: 'S53',
-      title: 'Briefing Pages — Scope',
-      plot: 'INT. LOCKER ROOM. The tablet shows: orbital shipyards, lunar extraction corridors, civilian observation suppression protocol, encounter management, deep-range fleet groups. Each page more impossible than the last.',
-      prompt: `${WORLD} Close-up montage of the tablet screen as Eli scrolls. Page 1: Orbital Shipyard diagrams — massive ring structures in orbit. Page 2: Lunar extraction corridors — mining operations on the far side. Page 3: Fleet deployment maps — ship formations across the solar system. Page 4: Encounter management protocols — with redacted entity classifications. Each page escalates the impossible. Macro close-up of screen content, the scope expanding with each swipe.`,
-    },
-    {
-      id: 'S54',
-      title: 'NON-HUMAN SIGNAL',
-      plot: 'INT. LOCKER ROOM. One line stops Eli cold: NON-HUMAN SIGNAL EVENT / OUTER PERIMETER / ACTIVE. His eyes widen. This is bigger than corruption. Bigger than secrecy. There is something else out there.',
-      prompt: `${WORLD} ${ELI} Extreme close-up alternating between the tablet screen and Eli's face. On the screen, highlighted in red among the classified text: "NON-HUMAN SIGNAL EVENT / OUTER PERIMETER / ACTIVE." Eli's eyes widen. His breathing changes. The implications cascade across his face — this isn't just a government covering up technology. There is something else. The red text reflects in his eyes. The single most important line in the briefing. Macro close-up, red glow on shocked face.`,
-    },
-    {
-      id: 'S55',
-      title: 'Mara in the Doorway',
-      plot: 'INT. LOCKER ROOM. A sound behind him. Mara stands in the doorway, also in black uniform. The cheerful mask is gone. She looks like a different person.',
-      prompt: `${WORLD} ${MARA} Mara stands in the locker room doorway, now wearing the same dark Orpheus uniform. She looks fundamentally different — harder, more real, the cheerful cafeteria persona completely gone. Her posture is military-straight. Her eyes are clear and direct. The doorway frames her dramatically, amber corridor light behind. This is who Mara really is. Character reveal through costume and posture. Medium shot, the doorway as frame within frame.`,
-    },
-    {
-      id: 'S56',
-      title: '"Everyone Worth Promoting"',
-      plot: 'INT. LOCKER ROOM. Eli: "You\'re part of this." Mara: "Everyone worth promoting is." Eli: "Why didn\'t you tell me?" Mara: "Because you were still deciding whether you wanted truth... or vindication."',
-      prompt: `${WORLD} ${ELI} ${MARA} Two-shot in the locker room. Both in identical black uniforms, facing each other. Eli looks betrayed — she knew all along. Mara is unapologetic, direct. The dialogue strips away pretense. Two people in identical uniforms seeing each other clearly for the first time. The institutional gray locker room background. Intimate two-shot, both faces visible, the honesty of a reckoning between allies who weren't sure they were allies.`,
-    },
-    {
-      id: 'S57',
-      title: '"Proof, Not a Story"',
-      plot: 'INT. LOCKER ROOM. Alarm pulses softly. Intercom: "Orpheus transfer team to Launch Spine Two." Mara: "If you ever do leak it... make sure the world gets proof, not a story. They\'ve trained people to laugh at stories." She leaves.',
-      prompt: `${WORLD} ${MARA} Close-up of Mara delivering her final warning. A soft amber alarm light pulses in the background. Her expression is the most honest she's been: fierce, direct, deadly serious. She is giving Eli the key — not to the conspiracy, but to how to defeat it. Proof, not stories. Then she turns toward the amber-lit corridor as the intercom calls. Her silhouette recedes. The warning hangs in the air. Close-up to silhouette, amber alarm light.`,
-    },
-    {
-      id: 'S58',
-      title: 'The Data Wafer',
-      plot: 'INT. LOCKER ROOM. Eli looks at the tablet. Then at his reflection in the metal locker. He slips a tiny data wafer from his sleeve and palms it. Game on.',
-      prompt: `${WORLD} ${ELI} Close-up of Eli's hands. One holds the classified tablet. The other subtly pulls a tiny metallic data wafer from his sleeve — hair-thin, barely visible. He palms it with practiced sleight of hand. Cut to his face in the metal locker reflection: determination, rage, purpose. He has made his choice. The wafer is his weapon. Macro close-up of hands with the hidden device, then his reflected face. The birth of a double agent.`,
-    },
-
-    // ═══════════════════════════════════════════════════════════════════
-    // FINAL SEQUENCE — Launch Spine Two (S59-S65)
-    // ═══════════════════════════════════════════════════════════════════
-    {
-      id: 'S59',
-      title: 'Launch Spine — Approach',
-      plot: 'INT. CORRIDOR TO LAUNCH SPINE TWO. Eli walks with a group of silent personnel in black uniforms. They move through a massive blast-door entrance. The air vibrates with energy.',
-      prompt: `${WORLD} ${ELI} A group of uniformed personnel walking through a massive blast-door entrance into Launch Spine Two. Eli among them, face neutral but eyes absorbing everything. The blast doors are enormous — industrial, military, designed for things much larger than people. The air seems to shimmer with energy beyond the threshold. The group moves in disciplined silence. Tracking shot from behind the group, the blast doors framing the entrance to the impossible.`,
-    },
-    {
-      id: 'S60',
-      title: 'Launch Chamber — Scale',
-      plot: 'INT. LAUNCH SPINE TWO. A towering vertical chamber humming with impossible energy. The matte-black ship sits sealed, fueled, alive at the base. The shaft rises into darkness above.',
-      prompt: `${WORLD} A TOWERING VERTICAL LAUNCH CHAMBER. The matte-black warship sits at the base, sealed and fueled, surfaces alive with subtle energy patterns. The chamber rises impossibly high above — a vertical shaft carved through solid mountain rock, disappearing into darkness. Energy conduits in the walls pulse with blue-white light. The chamber is cathedral-like in grandeur. Tiny personnel stand in formation at the base. Ultra-wide vertical shot emphasizing the impossible scale.`,
-    },
-    {
-      id: 'S61',
-      title: 'Eli Among the Faithful',
-      plot: 'INT. LAUNCH SPINE. Eli stands with silent personnel, dwarfed by the ship and the shaft. Everyone watches with reverent silence. He watches with something else: rage, awe, purpose.',
-      prompt: `${WORLD} ${ELI} Medium shot of Eli standing in a line of uniformed personnel inside the launch chamber. Everyone gazes upward at the ship with solemn reverence — this is their cathedral, their purpose. But Eli's expression is different. Behind his compliance, his eyes hold rage, awe, and calculation. His fist is subtly clenched at his side — the data wafer pressed into his palm. One man with a different agenda hidden among the faithful. Medium shot, faces upturned, dramatic vertical light.`,
-    },
-    {
-      id: 'S62',
-      title: 'Blast Doors Open — Revelation',
-      plot: 'INT. LAUNCH SPINE. Massive blast doors part overhead, revealing not open sky — but a hidden shaft leading up through mountain rock to the stars. Sunlight pours down like divine revelation.',
-      prompt: `${WORLD} Looking up inside the launch chamber. MASSIVE blast doors part overhead with hydraulic precision, revealing a shaft carved through raw mountain rock — and at the very top, a circle of brilliant blue sky and blazing sunlight. The light pours down the shaft like a column of divine illumination, catching dust and energy particles. The moment of opening is transcendent — darkness giving way to impossible light from above. Personnel faces are illuminated from above. The most awe-inspiring shot in the episode. Dramatic vertical composition.`,
-    },
-    {
-      id: 'S63',
-      title: 'The Ship Rises',
-      plot: 'INT. LAUNCH SPINE. The ship rises soundlessly. As it ascends, sunlight pours down the shaft. Everyone watches in reverent silence. The ship climbs toward the stars.',
-      prompt: `${WORLD} The matte-black warship rises silently from its cradle, ascending through the vertical shaft. Sunlight from above catches its angular surfaces, creating sharp shadows and gleaming edges. The ship moves with impossible grace — no engine noise, no vibration, just pure silent ascent. Below, upturned faces are bathed in reflected light. Energy trails wisps behind the rising ship. The ascent of the hidden. Vertical tracking shot following the ship upward through the shaft.`,
-    },
-    {
-      id: 'S64',
-      title: 'Fleet Status / Cover Story',
-      plot: 'INT. LAUNCH SPINE. Wall screen: FLEET MOVEMENT CONFIRMED — DESTINATION: OUTER PERIMETER COMMAND. Below: PUBLIC NARRATIVE PACKAGE PREPARED — COVER STORY: METEOROLOGICAL TEST FAILURE. Eli almost laughs. No one else finds it funny.',
-      prompt: `${WORLD} ${ELI} A large wall display in the launch chamber. Bold text: "FLEET MOVEMENT CONFIRMED — DESTINATION: OUTER PERIMETER COMMAND." Below it: "PUBLIC NARRATIVE PACKAGE PREPARED — COVER STORY: METEOROLOGICAL TEST FAILURE." Eli stands among solemn personnel, the faintest bitter smile on his face. Everyone else watches with professionalism. Only Eli sees the absurdity — the gap between the cosmic truth above and the mundane lie being prepared below. Medium shot, status board and Eli's dark amusement.`,
-    },
-    {
-      id: 'S65',
-      title: 'The Ship Vanishes — Welcome to Space Fleet',
-      plot: 'INT. LAUNCH SPINE. The ship vanishes upward in a column of white light. ELI (V.O.): "They were never hiding scraps. They were hiding a civilization. And now I\'m inside it." CUT TO BLACK. Beat. INTERCOM: "Welcome to Space Fleet."',
-      prompt: `${WORLD} ${ELI} The climactic shot. Looking up through the vertical shaft, the matte-black warship reaches the opening and vanishes in a brilliant column of white light that floods down the shaft. Personnel stand in silhouette below, bathed in blinding white from above. Eli is center frame, fist clenched around the hidden data wafer, face upturned into the light — rage, awe, and purpose burning on his face. The light overwhelms the frame. Then SMASH CUT to black. White text: "Welcome to Space Fleet." Epic vertical composition, transcendent light, series declaration.`,
+      title: 'End — Eyes Open',
+      plot: "INT. JEFF'S TRUCK — NIGHT. Eric opens his eyes. In the darkness of the truck, for one frame, his irises reflect something that isn't the dashboard light. Something deeper. Older. A frequency. CUT TO BLACK. Title: SPACE FLEET.",
+      prompt: `${WORLD} ${ERIC} The final shot. Eric opens his eyes in the dark truck. Close-up of his face, lit only by dashboard amber. For one frame — one heartbeat — his irises reflect something impossible: not the dashboard, not the road, but a deep resonance pattern, a frequency made visible, something ancient and alien looking back through his eyes. Then it's gone. Just a scared kid in a truck. But we saw it. And so did Mikel, reflected in the rearview mirror, his face showing ancient recognition and deep, deep fear. Then BLACK. White text: SPACE FLEET. The final frame, the hook, the promise of everything to come.`,
     },
   ];
 }
@@ -776,9 +724,9 @@ function buildScenes(dna: Record<string, string>) {
 // ── Main ────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n' + '═'.repeat(60));
-  console.log('  SPACE FLEET — Pilot Episode: "Nothing to See Here"');
-  console.log('  65 Scenes × 10s = 10.8 min core footage');
-  console.log('  Seedance 2.0 → On-chain');
+  console.log('  SPACE FLEET — Pilot: "Return"');
+  console.log('  40 Scenes × 10s = ~7 min core footage');
+  console.log(`  Seedance 2.0 → On-chain | Mode: ${GEN_MODE.toUpperCase()}`);
   console.log('═'.repeat(60));
 
   if (UNIVERSE_ADDR === '0x0000000000000000000000000000000000000000') {
@@ -820,36 +768,111 @@ async function main() {
 
   let previousId = latestId;
   const results: Array<{ id: string; title: string; nodeId: bigint }> = [];
+  let lastFrameUrl: string | null = RESUME_FRAME || null;
 
-  for (let i = startIdx; i < SCENES.length; i++) {
-    const scene = SCENES[i];
-    const label = `${scene.id} (${i + 1}/${SCENES.length})`;
+  if (lastFrameUrl) log('RESUME', `Using frame from previous run: ${lastFrameUrl}`);
+  log(
+    'MODE',
+    GEN_MODE === 'continuity'
+      ? 'CONTINUITY — sequential i2v chaining (slower, visually cohesive)'
+      : `FAST — parallel t2v batches of ${BATCH_SIZE} (faster, less cohesive)`
+  );
 
-    console.log(`\n${'═'.repeat(55)}`);
-    console.log(`  ${scene.id}: ${scene.title}`);
-    console.log(`${'═'.repeat(55)}`);
+  if (GEN_MODE === 'continuity') {
+    // ── CONTINUITY MODE ─────────────────────────────────────────────
+    // Sequential: each scene extracts the last frame from the previous
+    // scene and uses it as the starting image for i2v. Characters,
+    // environments, and motion stay consistent across cuts.
+    for (let i = startIdx; i < SCENES.length; i++) {
+      const scene = SCENES[i];
+      const label = `${scene.id} (${i + 1}/${SCENES.length})`;
 
-    try {
-      // 1. Generate video
-      const videoUrl = await generateVideo(scene.prompt, label);
+      console.log(`\n${'═'.repeat(55)}`);
+      console.log(`  ${scene.id}: ${scene.title}`);
+      console.log(`${'═'.repeat(55)}`);
 
-      // 2. Create on-chain node
-      const contentHash = `sf-${scene.id}-${Date.now()}`;
-      const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
-      previousId = nodeId;
+      try {
+        const videoUrl = await generateVideo(scene.prompt, label, lastFrameUrl);
 
-      results.push({ id: scene.id, title: scene.title, nodeId });
-      log(label, `DONE — Node #${nodeId}`);
-    } catch (err: any) {
-      log(label, `FAILED: ${err.message?.slice(0, 200)}`);
-      log(label, 'Skipping — continuing with next scene');
-      log(
-        label,
-        `To resume from here: START_SCENE=${scene.id} pnpm tsx scripts/space-fleet-pilot-scenes.ts`
-      );
+        const contentHash = `sf-${scene.id}-${Date.now()}`;
+        const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
+        previousId = nodeId;
+        results.push({ id: scene.id, title: scene.title, nodeId });
+        log(label, `DONE — Node #${nodeId}`);
+
+        // Extract last frame for the next scene's i2v input
+        lastFrameUrl = await extractLastFrame(videoUrl, `${scene.id} FRAME`);
+      } catch (err: any) {
+        log(label, `FAILED: ${err.message?.slice(0, 200)}`);
+        // Keep previous lastFrameUrl so next scene still has some reference
+      }
+
+      if (i < SCENES.length - 1) await sleep(2000);
     }
+  } else {
+    // ── FAST MODE ───────────────────────────────────────────────────
+    // Parallel batches: generate BATCH_SIZE scenes at once as t2v.
+    // First scene per batch uses i2v from previous batch's last frame
+    // for partial continuity. Much faster but characters may vary.
+    for (let batchStart = startIdx; batchStart < SCENES.length; batchStart += BATCH_SIZE) {
+      const batch = SCENES.slice(batchStart, Math.min(batchStart + BATCH_SIZE, SCENES.length));
 
-    if (i < SCENES.length - 1) await sleep(2000);
+      console.log(`\n${'═'.repeat(55)}`);
+      console.log(
+        `  BATCH: ${batch[0].id}–${batch[batch.length - 1].id} (${batch.length} scenes parallel)`
+      );
+      console.log(`${'═'.repeat(55)}`);
+
+      // Generate videos in parallel — first scene uses last frame for partial continuity
+      const videoResults = await Promise.allSettled(
+        batch.map((scene, idx) => {
+          const label = `${scene.id} (${batchStart + idx + 1}/${SCENES.length})`;
+          const startImg = idx === 0 ? lastFrameUrl : null;
+          return generateVideo(scene.prompt, label, startImg).then((url) => ({
+            scene,
+            url,
+            label,
+          }));
+        })
+      );
+
+      // Chain on-chain nodes sequentially
+      let lastVideoUrl: string | null = null;
+      for (let j = 0; j < videoResults.length; j++) {
+        const result = videoResults[j];
+        const scene = batch[j];
+        const label = `${scene.id} (${batchStart + j + 1}/${SCENES.length})`;
+
+        if (result.status === 'fulfilled') {
+          try {
+            const contentHash = `sf-${scene.id}-${Date.now()}`;
+            const nodeId = await createNode(
+              contentHash,
+              scene.plot,
+              previousId,
+              result.value.url,
+              label
+            );
+            previousId = nodeId;
+            results.push({ id: scene.id, title: scene.title, nodeId });
+            lastVideoUrl = result.value.url;
+            log(label, `DONE — Node #${nodeId}`);
+          } catch (err: any) {
+            log(label, `CHAIN FAILED: ${err.message?.slice(0, 200)}`);
+          }
+        } else {
+          log(label, `VIDEO FAILED: ${(result.reason as Error)?.message?.slice(0, 200)}`);
+        }
+      }
+
+      // Extract last frame from final scene in batch for next batch
+      if (lastVideoUrl) {
+        lastFrameUrl = await extractLastFrame(lastVideoUrl, `${batch[batch.length - 1].id} FRAME`);
+      }
+
+      log('BATCH', `Completed ${batch[0].id}–${batch[batch.length - 1].id}`);
+      if (batchStart + BATCH_SIZE < SCENES.length) await sleep(2000);
+    }
   }
 
   // Summary

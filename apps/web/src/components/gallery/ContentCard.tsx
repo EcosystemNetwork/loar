@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ShoppingCart, Clock, FileCheck, Eye, Heart, Film, Sparkles, Upload } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { formatEther } from 'viem';
+import { useVideoLoad } from '@/hooks/useVideoLoad';
 
 interface ContentCardProps {
   content: {
@@ -50,6 +51,11 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
   const [videoLoaded, setVideoLoaded] = useState(false);
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
   const isAIGenerated = content.mediaType?.startsWith('ai-');
+  const {
+    videoRef,
+    ready: videoReady,
+    onLoaded: onVideoSlotDone,
+  } = useVideoLoad(isVideo ? content.mediaUrl : undefined);
   const thumbnail =
     content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
   const hasLicensing =
@@ -68,14 +74,19 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
         {isVideo && content.mediaUrl ? (
           <>
             <video
-              src={`${content.mediaUrl}#t=0.5`}
+              ref={videoRef}
+              src={videoReady ? `${content.mediaUrl}#t=0.5` : undefined}
               className="w-full h-full object-cover"
               muted
               loop
               playsInline
-              preload="metadata"
+              preload="none"
               poster={content.thumbnailUrl || content.imageUrl || undefined}
-              onLoadedData={() => setVideoLoaded(true)}
+              onLoadedData={() => {
+                setVideoLoaded(true);
+                onVideoSlotDone();
+              }}
+              onError={() => onVideoSlotDone()}
               onMouseEnter={(e) => e.currentTarget.play()}
               onMouseLeave={(e) => {
                 e.currentTarget.pause();
@@ -94,6 +105,7 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
             src={thumbnail}
             alt={content.title || 'Content'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
             }}

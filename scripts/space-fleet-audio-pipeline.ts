@@ -1,10 +1,11 @@
 /**
  * SPACE FLEET — Audio Pipeline
- * Pilot: "Nothing to See Here" — 65 scenes
+ * Pilot: "Return" — 40 scenes
  *
  * Voice + SFX + Music + Lip-Sync → FFmpeg composite
  *
- * Mirrors ecombonator-audio-pipeline.ts pattern with Space Fleet cast.
+ * Cast: Eric, Mikel, Jeff, Dante, Marcus
+ * Setting: NOS Event Center rave, hotel afterparty, ride home
  *
  * Usage: pnpm tsx scripts/space-fleet-audio-pipeline.ts
  * Env: ELEVENLABS_API_KEY, FAL_KEY, PRIVATE_KEY, RPC_URL
@@ -72,12 +73,13 @@ async function findBestVoice(o: {
 
   // Character → preferred voice mapping (ElevenLabs library voices)
   const PREFERRED: Record<string, string[]> = {
-    'Eli Vance - SF': ['Charlie', 'Liam', 'Daniel', 'James'], // young male, intense
-    'Mara Chen - SF': ['Sarah', 'Laura', 'Alice', 'Jessica'], // sharp female 30s
-    'Dir Halden - SF': ['George', 'Roger', 'Bill', 'Arnold'], // authoritative older male
-    'The Voice - SF': ['Callum', 'Harry', 'George', 'Brian'], // older calm menacing
-    'Intercom - SF': ['Alice', 'Rachel', 'Matilda', 'Charlotte'], // clean professional female
-    'Archival - SF': ['Roger', 'Bill', 'George', 'Thomas'], // bland official male
+    'Eric - SF': ['Charlie', 'Liam', 'Daniel', 'James'], // young male, anxious, overwhelmed
+    'Jeff - SF': ['Josh', 'Adam', 'Clyde', 'Dave'], // big bro energy, loud, warm
+    'Mikel - SF': ['Callum', 'Harry', 'Fin', 'Patrick'], // ancient, calm, controlled menace
+    'Dante - SF': ['Antoni', 'Arnold', 'Thomas', 'Ethan'], // charismatic, Mediterranean warmth
+    'Marcus - SF': ['Michael', 'Bill', 'George', 'Sam'], // deep, curt, security build
+    'The Frequency - SF': ['Callum', 'Brian', 'Roger', 'George'], // cosmic, sub-bass, ancient
+    'DJ - SF': ['Adam', 'Josh', 'Dave', 'Clyde'], // casual, confused
   };
 
   const prefs = PREFERRED[o.name] || [];
@@ -180,83 +182,89 @@ const VSPECS: Record<
     sy: number;
   }
 > = {
-  ELI: {
-    name: 'Eli Vance - SF',
+  ERIC: {
+    name: 'Eric - SF',
     gender: 'male',
     age: 'young',
     accent: 'american',
     as: 0.9,
-    text: "They're not hiding prototypes. This is operational. Industrial scale.",
-    desc: 'Young male 24. Controlled intensity. Quietly precise.',
-    st: 0.55,
-    sy: 0.3,
+    text: "What's happening to me?",
+    desc: 'Young male early 20s. Anxious, overwhelmed, whispered intensity. Half-Asian.',
+    st: 0.45,
+    sy: 0.35,
   },
-  MARA: {
-    name: 'Mara Chen - SF',
-    gender: 'female',
+  JEFF: {
+    name: 'Jeff - SF',
+    gender: 'male',
+    age: 'young',
+    accent: 'american',
+    as: 0.8,
+    text: 'BRO! ERIC! OVER HERE!',
+    desc: 'Young male early 20s. Loud, warm, bro energy. Big muscular guy voice.',
+    st: 0.4,
+    sy: 0.6,
+  },
+  MIKEL: {
+    name: 'Mikel - SF',
+    gender: 'male',
+    age: 'young',
+    accent: 'british',
+    as: 0.7,
+    text: 'Something has changed in you.',
+    desc: 'Mid-20s but sounds ancient. Calm, controlled, unsettling precision. Vampire undertone.',
+    st: 0.7,
+    sy: 0.2,
+  },
+  DANTE: {
+    name: 'Dante - SF',
+    gender: 'male',
     age: 'young',
     accent: 'american',
     as: 0.7,
-    text: 'The truth is buried under seven acceptable lies.',
-    desc: 'Woman 30s. Sharp warm surface, steel underneath.',
-    st: 0.6,
-    sy: 0.35,
+    text: 'Hey man, you good? We got a room at the hotel. Chill afterparty.',
+    desc: 'Late 20s Mediterranean. Charismatic, warm, disarming. Smooth talker.',
+    st: 0.55,
+    sy: 0.45,
   },
-  HALDEN: {
-    name: 'Dir Halden - SF',
+  MARCUS: {
+    name: 'Marcus - SF',
     gender: 'male',
     age: 'middle_aged',
     accent: 'american',
     as: 0.8,
-    text: 'Come inside and see why the wall exists.',
-    desc: 'Male 50s. Calm measured. Institutional power.',
+    text: 'Someone is going to notice.',
+    desc: 'Late 20s. Deep voice, curt, security build. Says little, means everything.',
     st: 0.75,
-    sy: 0.4,
+    sy: 0.15,
   },
-  VOICE: {
-    name: 'The Voice - SF',
+  FREQUENCY: {
+    name: 'The Frequency - SF',
     gender: 'male',
     age: 'old',
-    accent: 'american',
+    accent: 'british',
     as: 0.6,
-    text: 'Stop looking up where civilians can see you.',
-    desc: 'Older male. Calm surveillance voice.',
-    st: 0.7,
-    sy: 0.25,
-  },
-  INTERCOM: {
-    name: 'Intercom - SF',
-    gender: 'female',
-    age: 'young',
-    accent: 'american',
-    as: 1.0,
-    text: 'Orpheus transfer team to Launch Spine Two.',
-    desc: 'Clean PA voice. Military.',
-    st: 0.85,
-    sy: 0.1,
-  },
-  ARCHIVAL: {
-    name: 'Archival - SF',
-    gender: 'male',
-    age: 'middle_aged',
-    accent: 'american',
-    as: 1.0,
-    text: 'No evidence of unauthorized orbital infrastructure.',
-    desc: 'Government spokesman. Polished bland denial.',
+    text: 'I have been waiting for you to return.',
+    desc: 'Ancient cosmic entity speaking through sub-bass. Not human. Calm, patient, vast.',
     st: 0.8,
-    sy: 0.15,
+    sy: 0.1,
   },
 };
 
 async function loadV(): Promise<Record<string, VP>> {
   mkdir(ODIR);
   const f = path.join(ODIR, 'voice-profiles.json');
+  // Force regeneration since cast changed
   if (fs.existsSync(f)) {
-    const s = JSON.parse(fs.readFileSync(f, 'utf-8'));
-    L('V', `Loaded ${Object.keys(s).length}`);
-    return s;
+    const existing = JSON.parse(fs.readFileSync(f, 'utf-8'));
+    // Check if profiles match new cast
+    if (existing.ERIC && existing.JEFF && existing.MIKEL && existing.DANTE) {
+      L('V', `Loaded ${Object.keys(existing).length} voices (new cast)`);
+      return existing;
+    }
+    // Old cast profiles — regenerate
+    L('V', 'Old cast profiles detected — regenerating for new cast...');
   }
-  L('V', 'Designing...');
+  L('V', 'Designing voices for new cast...');
   const p: Record<string, VP> = {};
   for (const [k, s] of Object.entries(VSPECS)) {
     try {
@@ -283,484 +291,386 @@ interface SA {
   ln: Ln[];
   sx: string;
   m: string;
-  fc: boolean;
+  fc: boolean; // has face for lip-sync
 }
 
 function buildSA(): SA[] {
   return [
-    // COLD OPEN
+    // ═══════════════════════════════════════════════════════════════
+    // ACT 1 — THE ARRIVAL (S01–S08)
+    // ═══════════════════════════════════════════════════════════════
     {
       id: 'S01',
-      t: 'Archival',
+      t: 'Highway',
       ln: [
         {
-          sp: 'ARCHIVAL',
-          tx: 'There is no evidence of unauthorized orbital infrastructure. Reports of off-book aerospace platforms are speculative and false.',
+          sp: 'JEFF',
+          tx: "Bro. BRO. Can you feel that? We're not even inside yet and the bass is shaking my mirrors.",
         },
+        { sp: 'ERIC', tx: 'I can feel it.' },
+        { sp: 'JEFF', tx: 'TONIGHT IS THE NIGHT!' },
       ],
-      sx: 'Low mechanical hum, metallic clang, deep bass rumble. Ominous.',
-      m: 'co',
-      fc: false,
+      sx: 'Truck engine rumble, highway asphalt hum, distant bass thump growing louder, wind buffeting, stereo bass vibrating metal.',
+      m: 'arrival',
+      fc: true,
     },
     {
       id: 'S02',
-      t: 'Desert',
+      t: 'Parking',
       ln: [],
-      sx: 'Desert wind, highway hum, car engine. Night crickets.',
-      m: 'co',
+      sx: 'Car doors slamming, distant massive bass from venue, crowd chatter, footsteps on asphalt, laser hum overhead.',
+      m: 'arrival',
       fc: false,
     },
     {
       id: 'S03',
-      t: 'Eli Drives',
-      ln: [],
-      sx: 'Car interior engine hum, road noise, wheel creak.',
-      m: 'co',
+      t: 'Entrance',
+      ln: [{ sp: 'JEFF', tx: "WOOOO! Let's GO!" }],
+      sx: 'MASSIVE bass wall hit, fog machine hiss, crowd roar, laser crackling overhead, sensory overload sound design.',
+      m: 'arrival',
       fc: true,
     },
-    { id: 'S04', t: 'Seat', ln: [], sx: 'Paper rustle, leather seat objects.', m: 'co', fc: false },
+    {
+      id: 'S04',
+      t: 'Moving Through',
+      ln: [],
+      sx: 'Dense crowd noise, bodies bumping, bass pulsing, strobe clicks, distant DJ mixing.',
+      m: 'arrival',
+      fc: false,
+    },
     {
       id: 'S05',
-      t: '1st Launch',
+      t: 'Cathedral',
       ln: [],
-      sx: 'Deep thrum. Subsonic vibration cutting atmosphere.',
-      m: 'co',
+      sx: 'Cathedral-scale reverb, massive speaker wall hum, sub-bass that vibrates the chest, fog machine ambient, ten thousand voices as one organism.',
+      m: 'arrival',
       fc: false,
     },
     {
       id: 'S06',
-      t: '3 Launches',
-      ln: [],
-      sx: 'Triple pulse. Atmospheric distortion crackling.',
-      m: 'co',
-      fc: false,
+      t: 'Jeff Pit',
+      ln: [{ sp: 'JEFF', tx: 'COME ON! Get in here!' }],
+      sx: 'Mosh pit chaos, bodies colliding, crowd surge, ecstatic screams, bass drop impact.',
+      m: 'arrival',
+      fc: true,
     },
     {
       id: 'S07',
-      t: 'Massive',
+      t: 'Mushrooms',
       ln: [],
-      sx: 'Silence then impossibly low vibration. Clear sky thunder.',
-      m: 'co',
-      fc: true,
+      sx: 'Sound design: reality warping. Bass becomes liquid. Frequencies separate and breathe. Synesthetic audio — colors as tones. Swelling, breathing, organic electronic.',
+      m: 'arrival',
+      fc: false,
     },
     {
       id: 'S08',
-      t: 'Phone',
-      ln: [
-        { sp: 'ELI', tx: 'Hello?' },
-        { sp: 'VOICE', tx: "You weren't supposed to stop." },
-        { sp: 'ELI', tx: 'Who is this?' },
-        {
-          sp: 'VOICE',
-          tx: 'If you want the truth, Mr. Vance... stop looking up in places where civilians can see you.',
-        },
-      ],
-      sx: 'Phone buzz, static, dead air. Thunder on clear sky.',
-      m: 'co',
+      t: 'Mikel Notices',
+      ln: [{ sp: 'MIKEL', tx: 'Eric.' }],
+      sx: 'Crowd falls to background. Sharp focus sound. Heartbeat. A presence shifting — something ancient recognizing something familiar.',
+      m: 'arrival',
       fc: true,
     },
-    // ACT ONE
-    { id: 'S09', t: 'DAC', ln: [], sx: 'Badge beeps. Doors. AC hum.', m: 'a1', fc: false },
+
+    // ═══════════════════════════════════════════════════════════════
+    // ACT 2 — THE SEPARATION & AWAKENING (S09–S23)
+    // ═══════════════════════════════════════════════════════════════
+    {
+      id: 'S09',
+      t: 'Drop Surge',
+      ln: [],
+      sx: 'MASSIVE bass drop. Crowd surge like ocean. Phone screen cracking underfoot. Bodies colliding. Hands reaching and missing.',
+      m: 'awaken',
+      fc: false,
+    },
     {
       id: 'S10',
-      t: 'Enter',
-      ln: [],
-      sx: 'Badge beep, turnstile, TV faint. Fluorescent.',
-      m: 'a1',
+      t: 'Alone',
+      ln: [{ sp: 'ERIC', tx: 'Jeff? ... Mikel? ... shit.' }],
+      sx: 'Isolation sound design — crowd becomes muffled, heartbeat prominent, breathing close and panicked, tinnitus ring.',
+      m: 'awaken',
       fc: true,
     },
     {
       id: 'S11',
-      t: 'Mara Hall',
+      t: 'Jeff Search',
       ln: [
-        { sp: 'MARA', tx: 'You look terrible.' },
-        { sp: 'ELI', tx: "Didn't sleep much." },
-        {
-          sp: 'MARA',
-          tx: "Weather balloons, ion reflections, swamp gas, whatever lie we're using this quarter.",
-        },
+        { sp: 'JEFF', tx: 'ERIC! ERICCC!' },
+        { sp: 'MIKEL', tx: "He's not here. Something happened." },
       ],
-      sx: 'Hallway hum, coffee, footsteps.',
-      m: 'a1',
+      sx: 'Crowd noise drowning out shouting, concrete barrier, distant bass, wind.',
+      m: 'awaken',
       fc: true,
     },
     {
       id: 'S12',
-      t: 'Flinch',
-      ln: [
-        { sp: 'ELI', tx: 'You ever say that out loud just to see who flinches?' },
-        { sp: 'MARA', tx: 'Every day.' },
-      ],
-      sx: 'Footsteps diverge.',
-      m: 'a1',
-      fc: true,
+      t: 'Deeper',
+      ln: [],
+      sx: 'Synesthetic audio — bass becomes magnetic pull, frequency layers separating, each sound gaining color and texture. Walking through liquid music.',
+      m: 'awaken',
+      fc: false,
     },
     {
       id: 'S13',
-      t: 'Briefing',
+      t: 'First Sync',
       ln: [],
-      sx: 'Holographic hum. Tablets. Silence.',
-      m: 'a1',
+      sx: 'Heartbeat and bass perfectly synchronized. Two rhythms becoming one. Sub-bass locked to pulse. The sound of a human body becoming a speaker.',
+      m: 'awaken',
       fc: true,
     },
     {
       id: 'S14',
-      t: 'Signal',
-      ln: [
-        {
-          sp: 'HALDEN',
-          tx: 'Your job is not to prove fantasies. Your job is to maintain signal integrity.',
-        },
-      ],
-      sx: 'Digital chimes as data erased.',
-      m: 'a1',
+      t: 'Fear Drop',
+      ln: [],
+      sx: 'MASSIVE unplanned bass drop. Crowd eruption. Shockwave through fog. Speaker distortion. Something that was NOT in the DJ set.',
+      m: 'awaken',
       fc: true,
     },
     {
       id: 'S15',
-      t: 'Promote',
-      ln: [
-        {
-          sp: 'HALDEN',
-          tx: 'Mr. Vance. Anomaly pattern recognition. Disinformation triage queue.',
-        },
-        { sp: 'ELI', tx: 'Happy to help, sir.' },
-      ],
-      sx: 'Chair swivels. Pin-drop.',
-      m: 'a1',
-      fc: true,
+      t: 'Wonder',
+      ln: [],
+      sx: 'Music lifts — beautiful soaring melody emerging from bass. Crowd unified sway. Someone gasping through tears. Ethereal synth pad. Transcendent beauty.',
+      m: 'awaken',
+      fc: false,
     },
     {
       id: 'S16',
-      t: 'Warning',
-      ln: [
-        { sp: 'HALDEN', tx: 'Do not mistake emotional reaction for analysis.' },
-        { sp: 'ELI', tx: "Wouldn't dream of it." },
-      ],
-      sx: 'Silence. Breathing only.',
-      m: 'a1',
+      t: 'Eric Conducts',
+      ln: [],
+      sx: 'Full control soundscape — every element responding: fog machines breathing with him, lasers tracking, crowd as instrument. Concentric sound waves. Orchestra of ten thousand. Peak transcendence.',
+      m: 'awaken',
       fc: true,
     },
     {
       id: 'S17',
-      t: 'Triage',
+      t: 'DJ Notices',
       ln: [],
-      sx: 'Screen hum. Server fans. Blue silence.',
-      m: 'a1t',
-      fc: true,
+      sx: 'Equipment autonomous. Faders moving alone. Waveform displays showing impossible patterns. The hum of technology being controlled by something else.',
+      m: 'void',
+      fc: false,
     },
     {
       id: 'S18',
-      t: 'Evidence',
+      t: 'Void Opens',
       ln: [],
-      sx: 'Audio cuts: farmer, pilot whisper. Stamp beeps.',
-      m: 'a1t',
+      sx: 'Sound drains — active void sucking audio into silence. Fog freezes. Time stops for the front rows. Deep cosmic horror drone. Sub-bass so low it becomes absence.',
+      m: 'void',
       fc: false,
     },
     {
       id: 'S19',
-      t: 'Restricted',
-      ln: [],
-      sx: 'Analog static. Pings. Sudden silence.',
-      m: 'a1t',
-      fc: true,
+      t: 'Frequency Speaks',
+      ln: [{ sp: 'FREQUENCY', tx: 'I have been waiting for you to return.' }],
+      sx: 'The Voice of The Frequency — not through ears but through bass, through chest, through bone. Music restructuring around a presence. Frequencies parting like curtains. Ancient sub-bass communication.',
+      m: 'void',
+      fc: false,
     },
     {
       id: 'S20',
-      t: 'ORPHEUS',
+      t: 'Terror',
       ln: [],
-      sx: 'Error buzzer. Red flash. Pen on paper.',
-      m: 'a1t',
+      sx: 'Heartbeat accelerating. Breathing becoming ragged. Pupils contracting (sharp audio focus snap). The sound of primal fear. Rave audio becoming threatening.',
+      m: 'void',
       fc: true,
     },
     {
       id: 'S21',
-      t: 'Behind',
-      ln: [
-        { sp: 'HALDEN', tx: 'Finding your footing?' },
-        { sp: 'ELI', tx: 'Mostly nonsense. Some very committed nonsense.' },
-      ],
-      sx: 'Footsteps. Quick click.',
-      m: 'a1t',
-      fc: true,
+      t: 'Eric Runs',
+      ln: [],
+      sx: 'Running through crowd — bass distorting behind him. Music becoming dissonant. Crowd flinching. Panic spreading through sound. His fear feeding back into the system.',
+      m: 'void',
+      fc: false,
     },
     {
       id: 'S22',
-      t: 'Is It',
-      ln: [
-        { sp: 'HALDEN', tx: 'Ambition is useful. Curiosity is not the same thing.' },
-        { sp: 'ELI', tx: 'Understood.' },
-        { sp: 'HALDEN', tx: 'Is it?' },
-        { sp: 'ELI', tx: 'Yes, sir.' },
-      ],
-      sx: 'Steps receding. Breath released.',
-      m: 'a1t',
-      fc: true,
+      t: 'Corridor',
+      ln: [],
+      sx: 'Sprinting footsteps echoing wrong in concrete corridor. Red emergency light buzz. Distorted bass through walls. Breathing hard. Exit door crash open.',
+      m: 'void',
+      fc: false,
     },
-    // ACT TWO
     {
       id: 'S23',
-      t: 'Cafe',
-      ln: [],
-      sx: 'Fluorescent buzz. Utensils. Vending.',
-      m: 'a2c',
+      t: 'Outside',
+      ln: [{ sp: 'ERIC', tx: 'Oh god. Oh god. What was that.' }],
+      sx: 'Desert night air rush. Cool wind. Stars. Distant bass from venue. Gasping, doubled over. Sweat dripping. The silence of outdoors after indoor hell.',
+      m: 'void',
       fc: true,
     },
+
+    // ═══════════════════════════════════════════════════════════════
+    // ACT 3 — THE HOTEL & THE OVERHEARD (S24–S32)
+    // ═══════════════════════════════════════════════════════════════
     {
       id: 'S24',
-      t: 'Mara Sits',
-      ln: [{ sp: 'MARA', tx: "Halden's attention. Congratulations or condolences." }],
-      sx: 'Tray down. Chair.',
-      m: 'a2c',
+      t: 'Dante',
+      ln: [
+        { sp: 'DANTE', tx: "Hey man, you good? You look like you've seen something." },
+        { sp: 'ERIC', tx: 'Yeah... yeah I just... got separated from my friends.' },
+        { sp: 'DANTE', tx: 'Been there. Here — water.' },
+      ],
+      sx: 'Outdoor ambient, distant bass, concrete curb, water bottle opening, warm human sounds.',
+      m: 'hotel',
       fc: true,
     },
     {
       id: 'S25',
-      t: 'Orpheus?',
-      ln: [
-        { sp: 'ELI', tx: "What's Orpheus?" },
-        { sp: 'MARA', tx: 'That was fast.' },
-      ],
-      sx: 'Chewing stops.',
-      m: 'a2c',
-      fc: true,
+      t: 'Marcus Watch',
+      ln: [],
+      sx: 'Shadow ambient. Distant festival. A ring turning on a finger. Breathing measured and controlled. The sound of surveillance.',
+      m: 'hotel',
+      fc: false,
     },
     {
       id: 'S26',
-      t: 'Real',
+      t: 'Invitation',
       ln: [
-        { sp: 'ELI', tx: "So it's real." },
-        { sp: 'MARA', tx: "I didn't say that." },
-        { sp: 'ELI', tx: 'You reacted.' },
         {
-          sp: 'MARA',
-          tx: 'You asked a question that gets people moved into offices with no clocks.',
+          sp: 'DANTE',
+          tx: "We got a room at the hotel across the street. Chill afterparty. You're welcome to come decompress.",
         },
+        { sp: 'ERIC', tx: 'Yeah... yeah okay. Thanks.' },
       ],
-      sx: 'Whispered under noise.',
-      m: 'a2c',
+      sx: 'Walking on asphalt, festival receding, motel neon, distant highway, three sets of footsteps — one trailing.',
+      m: 'hotel',
       fc: true,
     },
     {
       id: 'S27',
-      t: '7 Lies',
-      ln: [
-        {
-          sp: 'MARA',
-          tx: "The truth is never hidden. It's buried under seven acceptable lies, and your career depends on repeating the right one.",
-        },
-      ],
-      sx: 'Near silence.',
-      m: 'a2c',
-      fc: true,
+      t: 'Hotel Room',
+      ln: [{ sp: 'DANTE', tx: 'Make yourself at home. Got water, got vibes.' }],
+      sx: 'Hotel room ambience — bluetooth speaker playing soft ambient, lamp click, water bottles, bed creak. Cheap AC unit.',
+      m: 'hotel',
+      fc: false,
     },
     {
       id: 'S28',
-      t: 'Dumb',
-      ln: [
-        { sp: 'ELI', tx: "And if I don't?" },
-        { sp: 'MARA', tx: "You'll never get close enough." },
-        { sp: 'MARA', tx: 'Play dumb better.' },
-      ],
-      sx: 'Chair scrape. Steps.',
-      m: 'a2c',
+      t: 'Eric Zoning',
+      ln: [],
+      sx: 'Internal processing soundscape — ambient music from speaker becoming geometric, residual psychedelic perception, heartbeat, fabric gripping. The sound of replaying terror.',
+      m: 'hotel',
       fc: true,
     },
     {
       id: 'S29',
-      t: 'Wall',
-      ln: [],
-      sx: 'Apartment traffic, creaks, lamp, paper.',
-      m: 'a2a',
-      fc: false,
+      t: 'Whispers',
+      ln: [
+        {
+          sp: 'DANTE',
+          tx: "Did you see the new ones near the south stage? They're not even trying to hide it anymore.",
+        },
+        { sp: 'MARCUS', tx: 'Getting obvious. Someone will notice.' },
+      ],
+      sx: 'Low conspiratorial whisper ambience. Bathroom doorframe. Hotel room distant. Two men talking shop they think nobody hears.',
+      m: 'hotel',
+      fc: true,
     },
     {
       id: 'S30',
-      t: 'Log1',
-      ln: [{ sp: 'ELI', tx: "Day one in Level 3. Orpheus exists. Halden knows I'm looking." }],
-      sx: 'Laptop fan. Recording beep.',
-      m: 'a2a',
+      t: 'Symbols',
+      ln: [
+        {
+          sp: 'MARCUS',
+          tx: 'Summoning sigils. In the LED panel art. In the stage geometry. In the venue floor plan.',
+        },
+        { sp: 'DANTE', tx: 'Nobody notices. Nobody ever does.' },
+      ],
+      sx: 'Near silence. Eric listening — controlled breathing. Two voices in background. The sound of a mind memorizing everything.',
+      m: 'hotel',
       fc: true,
     },
     {
       id: 'S31',
-      t: 'Log2',
+      t: 'Eric Leaves',
       ln: [
-        { sp: 'ELI', tx: "They're not hiding prototypes. This is operational. Industrial scale." },
-        { sp: 'ELI', tx: "They want the public to think we're still struggling with rockets." },
+        { sp: 'ERIC', tx: 'Thanks for the hangout man. I need some air.' },
+        { sp: 'DANTE', tx: 'Take care of yourself.' },
       ],
-      sx: 'Laptop fan. Clock.',
-      m: 'a2a',
+      sx: 'Bed creak standing. Footsteps past chair. Door handle turning. Door click shut. Tension.',
+      m: 'hotel',
       fc: true,
     },
-    { id: 'S32', t: 'SUV', ln: [], sx: 'Flash. Deep idle. Silence.', m: 'a2a', fc: true },
-    { id: 'S33', t: 'Gone', ln: [], sx: 'Tires receding. Electronic glitch.', m: 'a2a', fc: false },
-    { id: 'S34', t: 'Msg', ln: [], sx: 'Static. Ghost keys. Hard silence.', m: 'a2a', fc: false },
-    { id: 'S35', t: 'Trapped', ln: [], sx: 'Silence. Breathing. Creaks.', m: 'a2a', fc: true },
-    // ACT THREE
-    { id: 'S36', t: 'Badge', ln: [], sx: 'New badge tone.', m: 'a3d', fc: true },
-    { id: 'S37', t: 'Floors', ln: [], sx: 'Beeps descending then silence.', m: 'a3d', fc: true },
-    { id: 'S38', t: 'Hum', ln: [], sx: 'Bass vibration. Hydraulic hiss.', m: 'a3d', fc: true },
-    { id: 'S39', t: 'Corridor', ln: [], sx: 'Chime. New acoustic.', m: 'a3d', fc: false },
     {
-      id: 'S40',
-      t: 'Walk',
-      ln: [{ sp: 'HALDEN', tx: 'Walk with me.' }],
-      sx: 'Two footstep sets. Polished floor.',
-      m: 'a3d',
-      fc: true,
-    },
-    { id: 'S41', t: 'Command', ln: [], sx: 'Muffled holo hum, keys, radio.', m: 'a3r', fc: false },
-    { id: 'S42', t: 'Telem', ln: [], sx: 'Digital readout. Status pings.', m: 'a3r', fc: false },
-    {
-      id: 'S43',
-      t: 'Window',
+      id: 'S32',
+      t: 'Corridor',
       ln: [],
-      sx: 'Steps stop. Breath. Cavernous hum.',
-      m: 'a3r',
-      fc: true,
-    },
-    { id: 'S44', t: 'Ship', ln: [], sx: 'Magnetic throb. Cathedral echo.', m: 'a3r', fc: false },
-    { id: 'S45', t: 'Breath', ln: [], sx: 'Breath catching. Heartbeat.', m: 'a3r', fc: true },
-    {
-      id: 'S46',
-      t: 'Nonsense',
-      ln: [
-        { sp: 'ELI', tx: 'What is this?' },
-        {
-          sp: 'HALDEN',
-          tx: 'The stories are pathetic fragments. We permit that. Nonsense protects the truth.',
-        },
-      ],
-      sx: 'Hangar ambience.',
-      m: 'a3r',
-      fc: true,
-    },
-    {
-      id: 'S47',
-      t: 'Civilization',
-      ln: [
-        { sp: 'ELI', tx: 'What is this?' },
-        { sp: 'HALDEN', tx: 'Continuity of civilization.' },
-      ],
-      sx: 'Words like stone.',
-      m: 'a3r',
-      fc: true,
-    },
-    {
-      id: 'S48',
-      t: 'Collapse',
-      ln: [
-        {
-          sp: 'HALDEN',
-          tx: 'Markets collapse. Alliances fracture. If you hid this, what else did you hide?',
-        },
-        { sp: 'ELI', tx: 'Maybe they should ask.' },
-        { sp: 'HALDEN', tx: "They won't ask from calm." },
-      ],
-      sx: 'Silence between. Hangar.',
-      m: 'a3r',
-      fc: true,
-    },
-    {
-      id: 'S49',
-      t: 'Choice',
-      ln: [
-        {
-          sp: 'HALDEN',
-          tx: 'Shouting from outside the wall... or come inside and see why it exists.',
-        },
-      ],
-      sx: 'Ship hums. Pause.',
-      m: 'a3r',
-      fc: true,
-    },
-    {
-      id: 'S50',
-      t: 'Lie',
-      ln: [
-        { sp: 'ELI', tx: 'What do you need?' },
-        { sp: 'HALDEN', tx: 'Loyalty. Competence. Silence.' },
-        { sp: 'ELI', tx: 'All three, sir.' },
-      ],
-      sx: 'Controlled performance.',
-      m: 'a3r',
-      fc: true,
-    },
-    { id: 'S51', t: 'Tablet', ln: [], sx: 'Tablet activate. Grip.', m: 'a3r', fc: false },
-    { id: 'S52', t: 'Uniform', ln: [], sx: 'Locker metal. Fabric. Swipe.', m: 'a3b', fc: true },
-    { id: 'S53', t: 'Pages', ln: [], sx: 'Swipes escalating.', m: 'a3b', fc: false },
-    { id: 'S54', t: 'SIGNAL', ln: [], sx: 'All drops. High tone. Heartbeat.', m: 'a3b', fc: true },
-    {
-      id: 'S55',
-      t: 'Mara',
-      ln: [
-        { sp: 'ELI', tx: "You're part of this." },
-        { sp: 'MARA', tx: 'Everyone worth promoting is.' },
-      ],
-      sx: 'Footstep. Alarm hum.',
-      m: 'a3b',
-      fc: true,
-    },
-    {
-      id: 'S56',
-      t: 'Truth',
-      ln: [
-        { sp: 'ELI', tx: "Why didn't you tell me?" },
-        { sp: 'MARA', tx: 'You were deciding between truth and vindication.' },
-      ],
-      sx: 'First honesty.',
-      m: 'a3b',
-      fc: true,
-    },
-    {
-      id: 'S57',
-      t: 'Proof',
-      ln: [
-        { sp: 'INTERCOM', tx: 'Orpheus transfer team to Launch Spine Two.' },
-        {
-          sp: 'MARA',
-          tx: "Make sure the world gets proof, not a story. They've trained people to laugh at stories.",
-        },
-      ],
-      sx: 'Amber pulse. Intercom. Steps.',
-      m: 'a3b',
-      fc: true,
-    },
-    { id: 'S58', t: 'Wafer', ln: [], sx: 'Metallic click. Palm.', m: 'a3b', fc: true },
-    // FINALE
-    {
-      id: 'S59',
-      t: 'Approach',
-      ln: [],
-      sx: 'Massive doors. Boots. Air vibrates.',
-      m: 'fin',
-      fc: true,
-    },
-    {
-      id: 'S60',
-      t: 'Chamber',
-      ln: [],
-      sx: 'Cavernous. Ship throb. Chest hum.',
-      m: 'fin',
+      sx: 'Exterior motel corridor — fluorescent buzz. Composed footsteps. Corner turn. Then: composure breaking. Gasping. Leaning on stucco. Then fast walking becoming near-running.',
+      m: 'hotel',
       fc: false,
     },
-    { id: 'S61', t: 'Faithful', ln: [], sx: 'Held breath. Rising energy.', m: 'fin', fc: true },
-    { id: 'S62', t: 'Open', ln: [], sx: 'MASSIVE doors. Rock. Light. Wind.', m: 'fin', fc: false },
-    { id: 'S63', t: 'Rises', ln: [], sx: 'Near silence. Air displacement.', m: 'fin', fc: false },
-    { id: 'S64', t: 'Cover', ln: [], sx: 'Status chimes. Keyboard.', m: 'fin', fc: true },
+
+    // ═══════════════════════════════════════════════════════════════
+    // ACT 4 — THE REUNION & RIDE HOME (S33–S40)
+    // ═══════════════════════════════════════════════════════════════
     {
-      id: 'S65',
-      t: 'Welcome',
+      id: 'S33',
+      t: 'Searching',
+      ln: [],
+      sx: 'Outdoor festival ambient. Multiple competing stages. Crowd chatter. Walking with purpose. Subtle — nearest stage lights shift warmer. The power still there, quieter.',
+      m: 'home',
+      fc: false,
+    },
+    {
+      id: 'S34',
+      t: 'Jeff Spots',
+      ln: [{ sp: 'JEFF', tx: "BRO! ERIC! OVER HERE! I'VE BEEN LOOKING EVERYWHERE!" }],
+      sx: "Jeff yelling from concrete barrier. Festival background. The most beautiful sound — a friend's voice cutting through chaos.",
+      m: 'home',
+      fc: true,
+    },
+    {
+      id: 'S35',
+      t: 'Bear Hug',
+      ln: [
+        { sp: 'JEFF', tx: 'WHERE WERE YOU BRO? I was about to fight a security guard for you.' },
+      ],
+      sx: "Bear hug impact — body slam, fabric, Jeff's big exhale. Eric can't speak. Warm human contact after cosmic horror.",
+      m: 'home',
+      fc: true,
+    },
+    {
+      id: 'S36',
+      t: 'Mikel Appears',
+      ln: [],
+      sx: 'Shadow. Footstep from darkness. Dual-colored light — magenta and blue. Ancient recognition. The vampire seeing what woke up.',
+      m: 'home',
+      fc: false,
+    },
+    {
+      id: 'S37',
+      t: 'Walk Truck',
       ln: [
         {
-          sp: 'ELI',
-          tx: "They were never hiding scraps. They were hiding a civilization. And now I'm inside it.",
+          sp: 'JEFF',
+          tx: "So I climbed the barrier right, and this security dude comes up, and I'm like bro I'm LOOKING for my friend—",
         },
-        { sp: 'INTERCOM', tx: 'Welcome to Space Fleet.' },
       ],
-      sx: 'Energy surge. White peak. Silence. Calm intercom.',
-      m: 'fin',
+      sx: 'Parking lot footsteps. Jeff animated monologue. Bass fading behind them. Three friends, three versions of the same night.',
+      m: 'home',
+      fc: true,
+    },
+    {
+      id: 'S38',
+      t: 'Silence',
+      ln: [],
+      sx: 'Truck interior — engine hum, road noise, dashboard rattle. No music. No talking. Weighted silence. Impossibly, distant bass still faintly audible through truck frame.',
+      m: 'home',
+      fc: false,
+    },
+    {
+      id: 'S39',
+      t: 'Bass Through',
+      ln: [],
+      sx: 'Extreme close sound design — metal vibrating under fingers. Faint bass from miles away through the truck frame, through the road, through the earth. The power that does not turn off. Geometric sound patterns flowing through metal.',
+      m: 'home',
+      fc: false,
+    },
+    {
+      id: 'S40',
+      t: 'Eyes Open',
+      ln: [],
+      sx: 'Eyes opening — a single resonant tone. Dashboard ambient. Then for one heartbeat: an ancient frequency, deep and vast, reflected in irises. Cut to silence. Title card.',
+      m: 'home',
       fc: true,
     },
   ];
@@ -771,60 +681,36 @@ const MUS = [
   {
     id: 'M01',
     sc: ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08'],
-    p: 'Paranoid sci-fi cold open. Subsonic drone. Desert isolation. Vast invisible overhead. Delayed piano. Building dread. Strings tremolo. Nolan Sicario. No vocals.',
-    d: 80,
+    p: 'EDM rave build. Driving to the rave, entering the venue, the energy climbs. Desert highway bass into indoor club crescendo. Pulsing synth, 4-on-floor kick building, hi-hats, anticipation energy. No vocals. Electronic dance music meets cinematic tension.',
+    d: 47,
   },
   {
     id: 'M02',
     sc: ['S09', 'S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16'],
-    p: 'Government thriller. Cold sterile pulses. Fluorescent hum as music. Zero Dark Thirty. Clarinet electronic. No vocals.',
-    d: 80,
+    p: 'Psychedelic awakening. Separation anxiety into transcendence. Bass becomes liquid, frequencies breathe and separate. Synesthetic soundscape — psilocybin perception as music. Build from isolation to godlike power. Gaspar Noe meets Aphex Twin. Ethereal synth climax. No vocals.',
+    d: 47,
   },
   {
     id: 'M03',
-    sc: ['S17', 'S18', 'S19', 'S20', 'S21', 'S22'],
-    p: 'Discovery danger. Screen glow. Quickening. ORPHEUS chord. Halden tension. No vocals.',
-    d: 60,
+    sc: ['S17', 'S18', 'S19', 'S20', 'S21', 'S22', 'S23'],
+    p: 'Cosmic horror. The void opens behind the speakers. Ancient frequency speaking through sub-bass. Dread. Sound draining into silence then erupting. Terror run — distorted bass chasing. Exit into desert night. Lovecraft meets rave. Deep drone, reverse reverb, terrifying absence of sound. No vocals.',
+    d: 47,
   },
   {
     id: 'M04',
-    sc: ['S23', 'S24', 'S25', 'S26', 'S27', 'S28'],
-    p: 'Cafeteria tension. Piano long decay. Electronic pad. Near-silence. Spy intimacy. No vocals.',
-    d: 60,
+    sc: ['S24', 'S25', 'S26', 'S27', 'S28', 'S29', 'S30', 'S31', 'S32'],
+    p: 'Afterparty suspense. Cheap hotel room. False safety. Warm ambient surface hiding conspiratorial undercurrent. Overhearing things not meant for you. Thriller tension building under lounge beats. The poker face exit. Dark ambient with heartbeat. No vocals.',
+    d: 47,
   },
   {
     id: 'M05',
-    sc: ['S29', 'S30', 'S31', 'S32', 'S33', 'S34', 'S35'],
-    p: 'Paranoid night. Conspiracy wall. Video confession. SUV surveillance. Obsession to fear. Electronic interference. Creeping horror. No vocals.',
-    d: 70,
-  },
-  {
-    id: 'M06',
-    sc: ['S36', 'S37', 'S38', 'S39', 'S40'],
-    p: 'Classified descent. Semitone lower each floor. Black corridors. Low brass. No vocals.',
-    d: 50,
-  },
-  {
-    id: 'M07',
-    sc: ['S41', 'S42', 'S43', 'S44', 'S45', 'S46', 'S47', 'S48', 'S49', 'S50', 'S51'],
-    p: 'Revelation. Cathedral silence. Brass build. Full swell. Drop for dialogue. Interstellar meets Condor. No vocals.',
-    d: 110,
-  },
-  {
-    id: 'M08',
-    sc: ['S52', 'S53', 'S54', 'S55', 'S56', 'S57', 'S58'],
-    p: 'Classified briefing. NON-HUMAN SIGNAL chord. Mara urgent. Data wafer resolute. No vocals.',
-    d: 70,
-  },
-  {
-    id: 'M09',
-    sc: ['S59', 'S60', 'S61', 'S62', 'S63', 'S64', 'S65'],
-    p: 'Launch Spine finale. Cathedral awe. Ship through mountain. Sunlight revelation. Orchestra electronic peak. Silence. Welcome. Choral for launch only.',
-    d: 70,
+    sc: ['S33', 'S34', 'S35', 'S36', 'S37', 'S38', 'S39', 'S40'],
+    p: 'Reunion and aftermath. Relief of finding friends. Then the silent drive home. The bass that does not stop — miles away but still reaching through the truck, through the road, through the earth. Bittersweet, haunting, the door that opened will not close. Warm piano dissolving into sub-bass drone. Final chord: ancient frequency. No vocals.',
+    d: 47,
   },
 ];
 
-/* ���─ FFmpeg ───────────────────────────────────────────────────────────── */
+/* ── FFmpeg ───────────────────────────────────────────────────────────── */
 function mix(v: string, dlg: string | undefined, sx: string, mu: string, out: string) {
   const i = ['-i', v, '-i', sx, '-i', mu];
   const f = ['[1:a]volume=0.6[s]', '[2:a]volume=0.25[m]'];
@@ -895,7 +781,7 @@ async function fetchV(): Promise<Record<string, string>> {
 
 /* ── Main ────────────────────────────────────────────────────────────── */
 async function main() {
-  console.log('\n=== SPACE FLEET Audio Pipeline (65 scenes) ===\n');
+  console.log('\n=== SPACE FLEET Audio Pipeline — "Return" (40 scenes) ===\n');
   if (!EL_KEY) throw new Error('ELEVENLABS_API_KEY');
   if (!FK) throw new Error('FAL_KEY');
   try {
@@ -939,7 +825,7 @@ async function main() {
   const sm: Record<string, string> = {};
   for (const m of MUS) if (mf[m.id]) for (const s of m.sc) sm[s] = mf[m.id];
 
-  // Videos
+  // Videos — from local dir or chain
   let vids: Record<string, string> = {};
   if (VDIR && fs.existsSync(VDIR)) {
     for (const f of fs.readdirSync(VDIR).filter((f) => f.endsWith('.mp4'))) {
@@ -949,7 +835,7 @@ async function main() {
   } else {
     vids = await fetchV();
   }
-  L('S', `${Object.keys(vids).length} videos`);
+  L('S', `${Object.keys(vids).length} videos found`);
 
   let ok = 0;
   let fail = 0;
@@ -958,6 +844,7 @@ async function main() {
     console.log(`\n--- ${s.id}: ${s.t} ---`);
     const vs = vids[s.id];
     if (!vs) {
+      L(s.id, 'No video — skipping');
       skip++;
       continue;
     }
@@ -968,6 +855,7 @@ async function main() {
         else fs.copyFileSync(vs, vf);
       }
 
+      // Dialogue TTS
       let df: string | undefined;
       if (s.ln.length) {
         df = path.join(ODIR, 'dialogue', `${s.id}.mp3`);
@@ -975,51 +863,64 @@ async function main() {
           const bs: Buffer[] = [];
           for (const ln of s.ln) {
             const v = voices[ln.sp];
-            if (!v) continue;
+            if (!v) {
+              L(s.id, `  No voice for ${ln.sp} — skipping line`);
+              continue;
+            }
             bs.push(await tts(ln.tx, v.voiceId, v.st, v.sy));
-            bs.push(Buffer.alloc(8820));
+            bs.push(Buffer.alloc(8820)); // ~100ms silence between lines
             await Z(500);
           }
           if (bs.length) fs.writeFileSync(df, Buffer.concat(bs));
         }
       }
 
+      // SFX
       const sf = path.join(ODIR, 'sfx', `${s.id}.mp3`);
       if (!fs.existsSync(sf)) {
         try {
           fs.writeFileSync(sf, await sfx(s.sx, 10));
         } catch {
-          fs.writeFileSync(sf, Buffer.alloc(44100 * 2));
+          fs.writeFileSync(sf, Buffer.alloc(44100 * 2)); // silent fallback
         }
         await Z(500);
       }
 
+      // Music track for this scene
       const mu = sm[s.id];
       if (!mu) {
+        L(s.id, 'No music track — skipping');
         skip++;
         continue;
       }
 
+      // Lip-sync (if scene has dialogue and face)
       let fv = vf;
       if (!SKIP_LIP && df && s.fc && fs.existsSync(df)) {
         const lf = path.join(ODIR, 'lipsync', `${s.id}.mp4`);
         if (!fs.existsSync(lf)) {
           try {
+            L(s.id, 'Lip-syncing...');
             const lu = await fLip(await fUpV(vf), await fUpA(fs.readFileSync(df), `${s.id}.mp3`));
             if (lu) {
               await dl(lu, lf);
               fv = lf;
             }
           } catch {
-            /* use original */
+            /* use original video */
           }
         } else {
           fv = lf;
         }
       }
 
+      // FFmpeg composite: video + dialogue + sfx + music → final
       const out = path.join(ODIR, 'final', `${s.id}.mp4`);
-      if (!fs.existsSync(out)) mix(fv, df, sf, mu, out);
+      if (!fs.existsSync(out)) {
+        L(s.id, 'Mixing audio...');
+        mix(fv, df, sf, mu, out);
+      }
+      L(s.id, 'DONE');
       ok++;
     } catch (e: any) {
       L(s.id, `FAIL: ${e.message?.slice(0, 200)}`);

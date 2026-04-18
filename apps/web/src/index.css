@@ -251,3 +251,33 @@
   background: linear-gradient(90deg, transparent, var(--primary), transparent);
   animation: progress-indeterminate 1.2s ease-in-out infinite;
 }
+
+/* ── MiniMap enhancements ──────────────────────────────────────────── */
+
+/* Viewport indicator — glowing amber rectangle */
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.5);
+  stroke: #eab308;
+  stroke-width: 2px;
+  rx: 3;
+  ry: 3;
+  filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.4));
+}
+
+/* Node shapes — branch nodes get diamond via transform, root nodes get circle */
+.react-flow__minimap svg .react-flow__minimap-node {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.react-flow__minimap svg .react-flow__minimap-node:hover {
+  opacity: 0.8;
+  filter: brightness(1.3);
+}
+
+/* Edge lines in minimap — visible by default, toggleable */
+.minimap-edges-visible .react-flow__minimap .react-flow__edge {
+  display: block;
+}
+.minimap-edges-hidden .react-flow__minimap .react-flow__edge {
+  display: none;
+}

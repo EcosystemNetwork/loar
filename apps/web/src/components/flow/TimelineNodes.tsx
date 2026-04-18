@@ -24,6 +24,9 @@ import {
   Trash2,
   Copy,
   Check,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
 import { useState, useEffect } from 'react';
@@ -121,8 +124,18 @@ export interface TimelineNodeData {
   childCount?: number; // Number of child/branching nodes
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
   onEditScene?: (eventId: string) => void;
+  onRegenerateScene?: (eventId: string) => void;
+  onSwitchVersion?: (eventId: string, versionIndex: number) => void;
   onDeleteNode?: (eventId: string) => void;
   isSelected?: boolean;
+  isRegenerating?: boolean;
+  videoVersions?: Array<{
+    videoUrl: string;
+    versionNumber: number;
+    generatedAt: number;
+    model?: string;
+  }>;
+  currentVersionIndex?: number; // -1 or undefined = latest (current), 0+ = historical version
   wiki?: { title?: string; summary?: string; plot?: string };
 
   // ── Scene Controls (Node Editor Expansion v1) ──────────────────
@@ -295,7 +308,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   <source src={displayVideoUrl} />
                 </video>
 
-                {/* Change video overlay — appears on hover */}
+                {/* Hover overlay — edit + regenerate actions */}
                 <div
                   className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center cursor-pointer"
                   onClick={(e) => {
@@ -303,15 +316,92 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                     data.onEditScene?.(data.eventId || '');
                   }}
                 >
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center gap-1">
-                    <div className="bg-white/90 rounded-full p-2">
-                      <Pencil className="h-5 w-5 text-gray-800" />
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-3">
+                    {/* Edit button */}
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="bg-white/90 rounded-full p-2">
+                        <Pencil className="h-5 w-5 text-gray-800" />
+                      </div>
+                      <span className="text-white text-xs font-medium drop-shadow-lg">Edit</span>
                     </div>
-                    <span className="text-white text-xs font-medium drop-shadow-lg">
-                      Change Video
-                    </span>
+                    {/* Regenerate button */}
+                    {data.onRegenerateScene && (
+                      <div
+                        className="flex flex-col items-center gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          data.onRegenerateScene?.(data.eventId || '');
+                        }}
+                      >
+                        <div
+                          className={`bg-white/90 rounded-full p-2 ${data.isRegenerating ? 'animate-spin' : 'hover:bg-primary/20'} transition-colors`}
+                        >
+                          <RefreshCw className="h-5 w-5 text-gray-800" />
+                        </div>
+                        <span className="text-white text-xs font-medium drop-shadow-lg">
+                          {data.isRegenerating ? 'Generating...' : 'Regenerate'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Version picker — shows when multiple versions exist */}
+                {data.videoVersions && data.videoVersions.length > 0 && (
+                  <div
+                    className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/75 rounded-full px-2 py-1 z-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      className="text-white/70 hover:text-white p-0.5 disabled:opacity-30"
+                      disabled={
+                        (data.currentVersionIndex ?? -1) <= 0 &&
+                        data.currentVersionIndex !== -1 &&
+                        data.currentVersionIndex !== undefined
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const current = data.currentVersionIndex ?? -1;
+                        // -1 means "latest". Going left means going to older versions.
+                        // versions array: [v1(oldest), v2, ...] current video is "latest" beyond array
+                        const totalVersions = data.videoVersions!.length + 1; // +1 for current
+                        const currentIdx = current === -1 ? totalVersions - 1 : current;
+                        if (currentIdx > 0) {
+                          data.onSwitchVersion?.(data.eventId || '', currentIdx - 1);
+                        }
+                      }}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="text-white text-xs font-medium min-w-[28px] text-center">
+                      v
+                      {(data.currentVersionIndex ?? -1) === -1
+                        ? data.videoVersions.length + 1
+                        : (data.currentVersionIndex ?? 0) + 1}
+                    </span>
+                    <span className="text-white/50 text-xs">/ {data.videoVersions.length + 1}</span>
+                    <button
+                      className="text-white/70 hover:text-white p-0.5 disabled:opacity-30"
+                      disabled={(data.currentVersionIndex ?? -1) === -1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const current = data.currentVersionIndex ?? -1;
+                        const totalVersions = data.videoVersions!.length + 1;
+                        const currentIdx = current === -1 ? totalVersions - 1 : current;
+                        if (currentIdx < totalVersions - 1) {
+                          const nextIdx = currentIdx + 1;
+                          // If next is the latest, use -1
+                          data.onSwitchVersion?.(
+                            data.eventId || '',
+                            nextIdx >= totalVersions - 1 ? -1 : nextIdx
+                          );
+                        }
+                      }}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Event ID overlay - with displayName support */}
                 <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded pointer-events-none">

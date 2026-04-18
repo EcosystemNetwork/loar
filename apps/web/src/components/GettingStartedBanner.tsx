@@ -1,9 +1,9 @@
 /**
  * Getting Started Popup
  *
- * One-time modal shown after first login. Walks users through
+ * One-time modal shown to first-time visitors. Walks users through
  * connect wallet -> create universe -> explore.
- * Dismissed permanently via localStorage.
+ * Dismissed permanently via localStorage — never shown again after close.
  */
 
 import { Link } from '@tanstack/react-router';

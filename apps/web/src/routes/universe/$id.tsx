@@ -33,9 +33,15 @@ import {
   Waves,
   Megaphone,
   Settings,
+  Eye,
   EyeOff,
   Map,
   List,
+  Layers,
+  RefreshCw,
+  History,
+  Hand,
+  MousePointer2,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -60,12 +66,14 @@ import ReactFlow, {
   addEdge,
   useOnSelectionChange,
   useReactFlow,
+  useStore,
   SelectionMode,
   type Node,
   type Edge,
   type Connection,
   type OnSelectionChangeParams,
 } from 'reactflow';
+import type { MiniMapNodeProps } from '@reactflow/minimap';
 import 'reactflow/dist/style.css';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
@@ -102,6 +110,108 @@ import { useNodeArcs } from '@/hooks/useNodeArcs';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
+
+// Custom MiniMap node — shape varies by node type
+function MiniMapNode({
+  id,
+  x,
+  y,
+  width,
+  height,
+  color,
+  strokeColor,
+  strokeWidth,
+  selected,
+  style,
+  onClick,
+}: MiniMapNodeProps) {
+  const nodeData = useStore((s) => {
+    const node = s.nodeInternals.get(id);
+    return node?.data as TimelineNodeData | undefined;
+  });
+
+  const handleClick = (e: React.MouseEvent) => {
+    onClick?.(e, id);
+  };
+
+  // Root nodes → circle
+  if (nodeData?.isRoot) {
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const r = Math.min(width, height) / 2;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={color}
+        stroke={strokeColor}
+        strokeWidth={strokeWidth}
+        style={{ ...style, cursor: 'pointer' }}
+        onClick={handleClick}
+        className={selected ? 'react-flow__minimap-node selected' : 'react-flow__minimap-node'}
+      />
+    );
+  }
+
+  // Branch nodes → diamond (rotated rect)
+  if (nodeData?.nodeType === 'branch') {
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const size = Math.min(width, height) * 0.7;
+    return (
+      <rect
+        x={cx - size / 2}
+        y={cy - size / 2}
+        width={size}
+        height={size}
+        rx={1}
+        fill={color}
+        stroke={strokeColor}
+        strokeWidth={strokeWidth}
+        transform={`rotate(45, ${cx}, ${cy})`}
+        style={{ ...style, cursor: 'pointer' }}
+        onClick={handleClick}
+        className={selected ? 'react-flow__minimap-node selected' : 'react-flow__minimap-node'}
+      />
+    );
+  }
+
+  // Add nodes → small circle (dot)
+  if (nodeData?.nodeType === 'add') {
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={Math.min(width, height) * 0.3}
+        fill={color}
+        stroke="none"
+        style={{ ...style, cursor: 'pointer', opacity: 0.5 }}
+        onClick={handleClick}
+        className="react-flow__minimap-node"
+      />
+    );
+  }
+
+  // Default scene nodes → rounded rectangle
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      rx={3}
+      fill={color}
+      stroke={strokeColor}
+      strokeWidth={strokeWidth}
+      style={{ ...style, cursor: 'pointer' }}
+      onClick={handleClick}
+      className={selected ? 'react-flow__minimap-node selected' : 'react-flow__minimap-node'}
+    />
+  );
+}
 
 // Register custom node types
 const nodeTypes = {
@@ -192,6 +302,9 @@ function UniverseTimelineEditorInner() {
   const [isUploadingEditVideo, setIsUploadingEditVideo] = useState(false);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Regeneration state
+  const [regeneratingEventId, setRegeneratingEventId] = useState<string | null>(null);
+
   // Contract integration state
   const [isSavingToContract, setIsSavingToContract] = useState(false);
   const [contractSaved, setContractSaved] = useState(false);
@@ -207,6 +320,9 @@ function UniverseTimelineEditorInner() {
   const [showMotionBrush, setShowMotionBrush] = useState(false);
   const [selectedNodeControls, setSelectedNodeControls] = useState<SceneControls>({});
   const [isSavingControls, setIsSavingControls] = useState(false);
+
+  // Canvas tool mode: 'hand' = pan on drag, 'select' = drag-to-select rectangle
+  const [canvasTool, setCanvasTool] = useState<'hand' | 'select'>('hand');
 
   // Multi-select state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
@@ -249,6 +365,11 @@ function UniverseTimelineEditorInner() {
   const [miniMapZoomStep, setMiniMapZoomStep] = useState(10); // 1-20, default 10
   const [miniMapSize, setMiniMapSize] = useState<number>(150); // 100-300
   const [showMiniMapSettings, setShowMiniMapSettings] = useState(false);
+  const [miniMapOpacity, setMiniMapOpacity] = useState(85); // 20-100
+  const [miniMapAutoCollapse, setMiniMapAutoCollapse] = useState(false);
+  const [miniMapShowLegend, setMiniMapShowLegend] = useState(true);
+  const [miniMapShowEdges, setMiniMapShowEdges] = useState(true);
+  const [isMiniMapHovered, setIsMiniMapHovered] = useState(false);
 
   // Undo/redo state
   const undoStack = useRef<{ nodes: Node<TimelineNodeData>[]; edges: Edge[] }[]>([]);
@@ -1026,6 +1147,215 @@ function UniverseTimelineEditorInner() {
     [id]
   );
 
+  // Regenerate a scene's video using the same generation context
+  const handleRegenerateScene = useCallback(
+    async (eventId: string) => {
+      if (!eventId || regeneratingEventId) return;
+
+      // Load the event's generation context from localStorage
+      const storageKey = `universe_events_${id}`;
+      const storedEvents = localStorage.getItem(storageKey);
+      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventData = eventsData[eventId];
+
+      if (!eventData) {
+        alert('No generation context found for this event. Use Edit to change the video instead.');
+        return;
+      }
+
+      const currentVideoUrl = eventData.videoUrl;
+      if (!currentVideoUrl) {
+        alert('No existing video to regenerate. Use Edit to add a video first.');
+        return;
+      }
+
+      // Get the generation parameters from the stored event
+      const prompt = eventData.videoPrompt || eventData.imagePrompt || eventData.description || '';
+      const model = eventData.videoModel || 'seedance';
+      const duration = eventData.videoDuration || 8;
+      const ratio = eventData.videoRatio || '16:9';
+      const negPrompt = eventData.negativePrompt || '';
+      const imageUrl = eventData.imageUrl || null;
+
+      if (!prompt) {
+        alert('No prompt found for this event. Use Edit to change the video instead.');
+        return;
+      }
+
+      setRegeneratingEventId(eventId);
+
+      // Update node to show regenerating state
+      setNodes((nds: any) =>
+        nds.map((node: any) => {
+          if (node.data.eventId === eventId || node.data.blockchainNodeId?.toString() === eventId) {
+            return { ...node, data: { ...node.data, isRegenerating: true } };
+          }
+          return node;
+        })
+      );
+
+      try {
+        // Build model-specific call — same logic as useVideoGeneration
+        const modelMap: Record<string, string> = {
+          'fal-veo3': imageUrl ? 'fal-ai/veo3.1/fast/image-to-video' : 'fal-ai/veo3.1/fast',
+          'fal-kling': imageUrl
+            ? 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
+            : 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+          'fal-wan25': imageUrl
+            ? 'fal-ai/wan-25-preview/image-to-video'
+            : 'fal-ai/wan-25-preview/text-to-video',
+          'fal-sora': imageUrl ? 'fal-ai/sora-2/image-to-video' : 'fal-ai/sora-2/text-to-video',
+          seedance: imageUrl
+            ? 'bytedance/seedance-2.0/image-to-video'
+            : 'bytedance/seedance-2.0/text-to-video',
+          'seedance-fast': imageUrl
+            ? 'bytedance/seedance-2.0/fast/image-to-video'
+            : 'bytedance/seedance-2.0/fast/text-to-video',
+        };
+
+        const falModel = modelMap[model] || modelMap['seedance'];
+
+        const result = await trpcClient.generation.generateVideo.mutate({
+          prompt,
+          ...(imageUrl ? { imageUrl } : {}),
+          model: falModel as any,
+          duration,
+          aspectRatio: ratio,
+          negativePrompt: negPrompt || undefined,
+          generateAudio: model === 'seedance' || model === 'seedance-fast' ? true : undefined,
+        });
+
+        if (result.videoUrl) {
+          // Save the old video as a version
+          const versions = eventData.videoVersions || [];
+          versions.push({
+            videoUrl: currentVideoUrl,
+            generatedAt: eventData.timestamp || Date.now(),
+            model: eventData.videoModel || 'unknown',
+            prompt: prompt,
+            duration: duration,
+            aspectRatio: ratio,
+            negativePrompt: negPrompt,
+            imageUrl: imageUrl,
+            versionNumber: versions.length + 1,
+          });
+
+          // Update localStorage with new video and version history
+          eventsData[eventId] = {
+            ...eventData,
+            videoUrl: result.videoUrl,
+            videoVersions: versions,
+            currentVersionIndex: -1, // -1 = latest
+            timestamp: Date.now(),
+          };
+          localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+          // Update the node in the flow
+          setNodes((nds: any) =>
+            nds.map((node: any) => {
+              if (
+                node.data.eventId === eventId ||
+                node.data.blockchainNodeId?.toString() === eventId
+              ) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    videoUrl: result.videoUrl,
+                    isRegenerating: false,
+                    videoVersions: versions.map((v: any) => ({
+                      videoUrl: v.videoUrl,
+                      versionNumber: v.versionNumber,
+                      generatedAt: v.generatedAt,
+                      model: v.model,
+                    })),
+                    currentVersionIndex: -1,
+                  },
+                };
+              }
+              return node;
+            })
+          );
+        }
+      } catch (error) {
+        alert('Regeneration failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        // Clear regenerating state
+        setNodes((nds: any) =>
+          nds.map((node: any) => {
+            if (
+              node.data.eventId === eventId ||
+              node.data.blockchainNodeId?.toString() === eventId
+            ) {
+              return { ...node, data: { ...node.data, isRegenerating: false } };
+            }
+            return node;
+          })
+        );
+      } finally {
+        setRegeneratingEventId(null);
+      }
+    },
+    [id, setNodes, regeneratingEventId]
+  );
+
+  // Switch to a different version of a video on a node
+  const handleSwitchVersion = useCallback(
+    (eventId: string, versionIndex: number) => {
+      if (!eventId) return;
+
+      const storageKey = `universe_events_${id}`;
+      const storedEvents = localStorage.getItem(storageKey);
+      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventData = eventsData[eventId];
+
+      if (!eventData || !eventData.videoVersions) return;
+
+      const versions = eventData.videoVersions as any[];
+      let newVideoUrl: string;
+
+      if (versionIndex === -1) {
+        // Switch to latest (the current main video stored in videoUrl)
+        // The "latest" is always stored as the main videoUrl
+        // If we were on a historical version, the latest is still in videoUrl
+        // because we only swap display, not the actual stored latest
+        newVideoUrl = eventData.latestVideoUrl || eventData.videoUrl;
+      } else if (versionIndex >= 0 && versionIndex < versions.length) {
+        // Switch to a historical version
+        newVideoUrl = versions[versionIndex].videoUrl;
+      } else {
+        return;
+      }
+
+      // Save the latest video URL if we haven't already (first time switching away from latest)
+      if (!eventData.latestVideoUrl) {
+        eventsData[eventId].latestVideoUrl = eventData.videoUrl;
+      }
+
+      // Update the display video URL and current index
+      eventsData[eventId].videoUrl = newVideoUrl;
+      eventsData[eventId].currentVersionIndex = versionIndex;
+      localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+      // Update the node
+      setNodes((nds: any) =>
+        nds.map((node: any) => {
+          if (node.data.eventId === eventId || node.data.blockchainNodeId?.toString() === eventId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                videoUrl: newVideoUrl,
+                currentVersionIndex: versionIndex,
+              },
+            };
+          }
+          return node;
+        })
+      );
+    },
+    [id, setNodes]
+  );
+
   // Duplicate selected nodes
   const handleDuplicateSelected = useCallback(() => {
     if (selectedNodeIds.size === 0) return;
@@ -1081,6 +1411,8 @@ function UniverseTimelineEditorInner() {
           isSelected: false,
           onAddScene: handleAddEvent,
           onEditScene: handleEditScene,
+          onRegenerateScene: handleRegenerateScene,
+          onSwitchVersion: handleSwitchVersion,
           onDeleteNode: handleDeleteNode,
         },
       });
@@ -1121,6 +1453,8 @@ function UniverseTimelineEditorInner() {
     edges,
     handleAddEvent,
     handleEditScene,
+    handleRegenerateScene,
+    handleSwitchVersion,
     handleDeleteNode,
     setNodes,
     setEdges,
@@ -1377,6 +1711,18 @@ function UniverseTimelineEditorInner() {
         return;
       }
 
+      // H — hand (pan) tool
+      if (e.key === 'h') {
+        setCanvasTool('hand');
+        return;
+      }
+
+      // V — select tool
+      if (e.key === 'v') {
+        setCanvasTool('select');
+        return;
+      }
+
       // M — toggle minimap
       if (e.key === 'm') {
         setShowMiniMap((v) => {
@@ -1475,20 +1821,53 @@ function UniverseTimelineEditorInner() {
       return;
     }
 
-    // Update localStorage
+    // Update localStorage — save old video as a version if it exists
     const storageKey = `universe_events_${id}`;
     const storedEvents = localStorage.getItem(storageKey);
     const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
-    if (eventsData[editingEventId]) {
-      eventsData[editingEventId].videoUrl = finalUrl;
+    const existingEvent = eventsData[editingEventId];
+
+    if (existingEvent) {
+      // If there's an existing video URL and it's different, save as version
+      const oldVideoUrl = existingEvent.latestVideoUrl || existingEvent.videoUrl;
+      if (oldVideoUrl && oldVideoUrl !== finalUrl) {
+        const versions = existingEvent.videoVersions || [];
+        versions.push({
+          videoUrl: oldVideoUrl,
+          generatedAt: existingEvent.timestamp || Date.now(),
+          model: existingEvent.videoModel || 'manual',
+          prompt: existingEvent.videoPrompt || existingEvent.description || '',
+          duration: existingEvent.videoDuration || 0,
+          aspectRatio: existingEvent.videoRatio || '16:9',
+          negativePrompt: existingEvent.negativePrompt || '',
+          imageUrl: existingEvent.imageUrl || null,
+          versionNumber: versions.length + 1,
+        });
+        existingEvent.videoVersions = versions;
+      }
+      existingEvent.videoUrl = finalUrl;
+      existingEvent.latestVideoUrl = finalUrl;
+      existingEvent.currentVersionIndex = -1;
+      eventsData[editingEventId] = existingEvent;
     } else {
       eventsData[editingEventId] = {
         eventId: editingEventId,
         videoUrl: finalUrl,
+        latestVideoUrl: finalUrl,
+        currentVersionIndex: -1,
         timestamp: Date.now(),
       };
     }
     localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+    // Build version data for the node
+    const versions = eventsData[editingEventId]?.videoVersions || [];
+    const versionData = versions.map((v: any) => ({
+      videoUrl: v.videoUrl,
+      versionNumber: v.versionNumber,
+      generatedAt: v.generatedAt,
+      model: v.model,
+    }));
 
     // Update the node in the flow
     setNodes((nds: any) =>
@@ -1501,6 +1880,8 @@ function UniverseTimelineEditorInner() {
             data: {
               ...node.data,
               videoUrl: finalUrl,
+              videoVersions: versionData.length > 0 ? versionData : undefined,
+              currentVersionIndex: -1,
             },
           };
         }
@@ -1754,6 +2135,8 @@ function UniverseTimelineEditorInner() {
         universeId: id,
         onAddScene: handleAddEvent,
         onEditScene: handleEditScene,
+        onRegenerateScene: handleRegenerateScene,
+        onSwitchVersion: handleSwitchVersion,
         onDeleteNode: handleDeleteNode,
         isSelected: false,
       },
@@ -1885,6 +2268,8 @@ function UniverseTimelineEditorInner() {
     sourceNodeId,
     handleAddEvent,
     handleEditScene,
+    handleRegenerateScene,
+    handleSwitchVersion,
     handleDeleteNode,
     generatedVideoUrl,
     generatedImageUrl,
@@ -1985,6 +2370,19 @@ function UniverseTimelineEditorInner() {
         /* ignore */
       }
 
+      // Load version history from localStorage
+      let videoVersions: any[] | undefined;
+      let currentVersionIndex: number | undefined;
+      if (localEvent?.videoVersions && localEvent.videoVersions.length > 0) {
+        videoVersions = localEvent.videoVersions.map((v: any) => ({
+          videoUrl: v.videoUrl,
+          versionNumber: v.versionNumber,
+          generatedAt: v.generatedAt,
+          model: v.model,
+        }));
+        currentVersionIndex = localEvent.currentVersionIndex ?? -1;
+      }
+
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
         type: 'timelineEvent',
@@ -2006,8 +2404,12 @@ function UniverseTimelineEditorInner() {
           childCount: childCount > 1 ? childCount : undefined,
           onAddScene: handleAddEvent,
           onEditScene: handleEditScene,
+          onRegenerateScene: handleRegenerateScene,
+          onSwitchVersion: handleSwitchVersion,
           onDeleteNode: handleDeleteNode,
           isSelected: false,
+          videoVersions,
+          currentVersionIndex,
         },
       });
     });
@@ -2092,6 +2494,8 @@ function UniverseTimelineEditorInner() {
     id,
     handleAddEvent,
     handleEditScene,
+    handleRegenerateScene,
+    handleSwitchVersion,
     handleDeleteNode,
     getArchivedNodeIds,
     fitView,
@@ -2272,9 +2676,9 @@ function UniverseTimelineEditorInner() {
               onDragOver={handleDragOver}
               nodeTypes={nodeTypes}
               onNodeContextMenu={handleNodeContextMenu}
-              panOnDrag
+              panOnDrag={canvasTool === 'hand'}
               panOnScroll
-              selectionOnDrag={false}
+              selectionOnDrag={canvasTool === 'select'}
               selectionMode={SelectionMode.Partial}
               multiSelectionKeyCode="Shift"
               deleteKeyCode={null}
@@ -2289,134 +2693,322 @@ function UniverseTimelineEditorInner() {
               <Background />
               <Controls showInteractive={false} />
 
-              {/* MiniMap — togglable with settings */}
-              {showMiniMap && (
-                <Panel position={miniMapPosition} className="!m-2">
-                  <div className="relative group">
-                    <MiniMap
-                      nodeColor={(n: any) => {
-                        if (n.data?.isInCanonChain) return '#eab308';
-                        if (n.data?.nodeType === 'add') return '#64748b';
-                        return n.data?.timelineColor || '#10b981';
-                      }}
-                      maskColor="rgba(0, 0, 0, 0.6)"
-                      style={{
-                        background: '#0a0a0a',
-                        border: '1px solid #27272a',
-                        borderRadius: 8,
-                        width: miniMapSize,
-                        height: miniMapSize * 0.75,
-                        position: 'relative',
-                      }}
-                      pannable
-                      zoomable
-                      zoomStep={miniMapZoomStep}
-                    />
-                    {/* Settings gear — visible on hover */}
-                    <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setShowMiniMapSettings((v) => !v)}
-                        className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
-                        title="Minimap settings"
-                      >
-                        <Settings className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={() => setShowMiniMap(false)}
-                        className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
-                        title="Hide minimap (M)"
-                      >
-                        <EyeOff className="h-3 w-3" />
-                      </button>
-                    </div>
-                    {/* Settings panel */}
-                    {showMiniMapSettings && (
+              {/* MiniMap — togglable with settings, auto-collapse, legend, stats */}
+              {showMiniMap &&
+                (() => {
+                  const sceneNodes = nodes.filter((n) => n.data?.nodeType !== 'add');
+                  const canonCount = sceneNodes.filter((n) => n.data?.isInCanonChain).length;
+                  const branchCount = sceneNodes.filter(
+                    (n) => n.data?.nodeType === 'branch'
+                  ).length;
+                  const totalScenes = sceneNodes.length;
+                  const effectiveSize =
+                    miniMapAutoCollapse && !isMiniMapHovered
+                      ? Math.max(80, miniMapSize * 0.5)
+                      : miniMapSize;
+
+                  return (
+                    <Panel position={miniMapPosition} className="!m-2">
                       <div
-                        className="absolute z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-lg shadow-2xl p-3 w-56 space-y-3"
+                        className="relative group"
+                        onMouseEnter={() => setIsMiniMapHovered(true)}
+                        onMouseLeave={() => setIsMiniMapHovered(false)}
                         style={{
-                          [miniMapPosition.includes('bottom') ? 'bottom' : 'top']: '100%',
-                          [miniMapPosition.includes('right') ? 'right' : 'left']: 0,
-                          marginBottom: miniMapPosition.includes('bottom') ? 4 : undefined,
-                          marginTop: miniMapPosition.includes('top') ? 4 : undefined,
+                          opacity: miniMapOpacity / 100,
+                          transition: 'opacity 0.2s ease, width 0.3s ease, height 0.3s ease',
                         }}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-zinc-300">
-                            Minimap Settings
-                          </span>
+                        <MiniMap
+                          nodeColor={(n: any) => {
+                            if (n.data?.isInCanonChain) return '#eab308';
+                            if (n.data?.nodeType === 'branch') return '#f97316';
+                            if (n.data?.nodeType === 'add') return '#64748b';
+                            return n.data?.timelineColor || '#10b981';
+                          }}
+                          nodeStrokeColor={(n: any) => {
+                            if (n.data?.isRoot) return '#f472b6';
+                            if (n.data?.isInCanonChain) return '#ca8a04';
+                            return 'transparent';
+                          }}
+                          nodeStrokeWidth={2}
+                          maskColor="rgba(0, 0, 0, 0.5)"
+                          maskStrokeColor="#eab308"
+                          maskStrokeWidth={2}
+                          style={{
+                            background: '#0a0a0a',
+                            border: '1px solid #27272a',
+                            borderRadius: 8,
+                            width: effectiveSize,
+                            height: effectiveSize * 0.75,
+                            position: 'relative',
+                            transition: 'width 0.3s ease, height 0.3s ease',
+                            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+                          }}
+                          nodeComponent={MiniMapNode}
+                          pannable
+                          zoomable
+                          zoomStep={miniMapZoomStep}
+                          onClick={(_event, position) => {
+                            setCenter(position.x, position.y, { zoom: getZoom(), duration: 400 });
+                          }}
+                          onNodeClick={(_event, node) => {
+                            setCenter(node.position.x + 160, node.position.y + 136, {
+                              zoom: 1,
+                              duration: 400,
+                            });
+                          }}
+                        />
+
+                        {/* Stats badge — top-left corner */}
+                        <div className="absolute top-1 left-1 flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="flex items-center gap-0.5 bg-zinc-900/90 backdrop-blur-sm rounded px-1 py-0.5 border border-zinc-700/50">
+                            <Layers className="h-2.5 w-2.5 text-zinc-400" />
+                            <span className="text-[9px] font-mono text-zinc-300">
+                              {totalScenes}
+                            </span>
+                            {canonCount > 0 && (
+                              <>
+                                <span className="text-[9px] text-zinc-600">·</span>
+                                <span className="text-[9px] font-mono text-amber-400">
+                                  {canonCount}
+                                </span>
+                              </>
+                            )}
+                            {branchCount > 0 && (
+                              <>
+                                <span className="text-[9px] text-zinc-600">·</span>
+                                <span className="text-[9px] font-mono text-orange-400">
+                                  {branchCount}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Controls — visible on hover */}
+                        <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => setShowMiniMapSettings(false)}
-                            className="p-0.5 hover:bg-zinc-700 rounded text-zinc-500 hover:text-white"
+                            onClick={() => setMiniMapShowLegend((v) => !v)}
+                            className={`p-1 rounded transition-colors ${miniMapShowLegend ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                            title="Toggle legend"
                           >
-                            <X className="h-3 w-3" />
+                            <Eye className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => setShowMiniMapSettings((v) => !v)}
+                            className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                            title="Minimap settings"
+                          >
+                            <Settings className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => setShowMiniMap(false)}
+                            className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                            title="Hide minimap (M)"
+                          >
+                            <EyeOff className="h-3 w-3" />
                           </button>
                         </div>
 
-                        {/* Sensitivity */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] text-zinc-400">Zoom Sensitivity</label>
-                          <Slider
-                            value={[miniMapZoomStep]}
-                            onValueChange={([v]) => setMiniMapZoomStep(v)}
-                            min={1}
-                            max={20}
-                            step={1}
-                            className="w-full"
-                          />
-                          <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span>Low</span>
-                            <span>High</span>
+                        {/* Legend overlay — below minimap */}
+                        {miniMapShowLegend && (!miniMapAutoCollapse || isMiniMapHovered) && (
+                          <div className="mt-1 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700/50 rounded-md px-2 py-1.5 space-y-0.5">
+                            {/* Canon — rounded rect */}
+                            <div className="flex items-center gap-1.5">
+                              <svg width="10" height="10" className="flex-shrink-0">
+                                <rect x="1" y="2" width="8" height="6" rx="1.5" fill="#eab308" />
+                              </svg>
+                              <span className="text-[9px] text-zinc-400">Canon chain</span>
+                            </div>
+                            {/* Branch — diamond */}
+                            <div className="flex items-center gap-1.5">
+                              <svg width="10" height="10" className="flex-shrink-0">
+                                <rect
+                                  x="2"
+                                  y="2"
+                                  width="6"
+                                  height="6"
+                                  rx="0.5"
+                                  fill="#f97316"
+                                  transform="rotate(45,5,5)"
+                                />
+                              </svg>
+                              <span className="text-[9px] text-zinc-400">Branch</span>
+                            </div>
+                            {/* Scene — rect */}
+                            <div className="flex items-center gap-1.5">
+                              <svg width="10" height="10" className="flex-shrink-0">
+                                <rect x="1" y="2" width="8" height="6" rx="1.5" fill="#10b981" />
+                              </svg>
+                              <span className="text-[9px] text-zinc-400">Scene</span>
+                            </div>
+                            {/* Root — circle with stroke */}
+                            <div className="flex items-center gap-1.5">
+                              <svg width="10" height="10" className="flex-shrink-0">
+                                <circle
+                                  cx="5"
+                                  cy="5"
+                                  r="4"
+                                  fill="#10b981"
+                                  stroke="#f472b6"
+                                  strokeWidth="1.5"
+                                />
+                              </svg>
+                              <span className="text-[9px] text-zinc-400">Root (origin)</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Size */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] text-zinc-400">Size</label>
-                          <Slider
-                            value={[miniMapSize]}
-                            onValueChange={([v]) => setMiniMapSize(v)}
-                            min={100}
-                            max={300}
-                            step={10}
-                            className="w-full"
-                          />
-                          <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span>Small</span>
-                            <span>Large</span>
-                          </div>
-                        </div>
-
-                        {/* Position */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] text-zinc-400">Position</label>
-                          <div className="grid grid-cols-2 gap-1">
-                            {(
-                              [
-                                ['top-left', 'Top Left'],
-                                ['top-right', 'Top Right'],
-                                ['bottom-left', 'Bottom Left'],
-                                ['bottom-right', 'Bottom Right'],
-                              ] as const
-                            ).map(([pos, label]) => (
+                        {/* Settings panel */}
+                        {showMiniMapSettings && (
+                          <div
+                            className="absolute z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-lg shadow-2xl p-3 w-60 space-y-3"
+                            style={{
+                              [miniMapPosition.includes('bottom') ? 'bottom' : 'top']: '100%',
+                              [miniMapPosition.includes('right') ? 'right' : 'left']: 0,
+                              marginBottom: miniMapPosition.includes('bottom') ? 4 : undefined,
+                              marginTop: miniMapPosition.includes('top') ? 4 : undefined,
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-zinc-300">
+                                Minimap Settings
+                              </span>
                               <button
-                                key={pos}
-                                onClick={() => setMiniMapPosition(pos)}
-                                className={`text-[11px] px-2 py-1 rounded transition-colors ${
-                                  miniMapPosition === pos
-                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white border border-zinc-700'
-                                }`}
+                                onClick={() => setShowMiniMapSettings(false)}
+                                className="p-0.5 hover:bg-zinc-700 rounded text-zinc-500 hover:text-white"
                               >
-                                {label}
+                                <X className="h-3 w-3" />
                               </button>
-                            ))}
+                            </div>
+
+                            {/* Size */}
+                            <div className="space-y-1">
+                              <label className="text-[11px] text-zinc-400">
+                                Size — {miniMapSize}px
+                              </label>
+                              <Slider
+                                value={[miniMapSize]}
+                                onValueChange={([v]) => setMiniMapSize(v)}
+                                min={100}
+                                max={300}
+                                step={10}
+                                className="w-full"
+                              />
+                              <div className="flex justify-between text-[10px] text-zinc-500">
+                                <span>Small</span>
+                                <span>Large</span>
+                              </div>
+                            </div>
+
+                            {/* Opacity */}
+                            <div className="space-y-1">
+                              <label className="text-[11px] text-zinc-400">
+                                Opacity — {miniMapOpacity}%
+                              </label>
+                              <Slider
+                                value={[miniMapOpacity]}
+                                onValueChange={([v]) => setMiniMapOpacity(v)}
+                                min={20}
+                                max={100}
+                                step={5}
+                                className="w-full"
+                              />
+                              <div className="flex justify-between text-[10px] text-zinc-500">
+                                <span>Faint</span>
+                                <span>Solid</span>
+                              </div>
+                            </div>
+
+                            {/* Zoom Sensitivity */}
+                            <div className="space-y-1">
+                              <label className="text-[11px] text-zinc-400">
+                                Zoom Sensitivity — {miniMapZoomStep}
+                              </label>
+                              <Slider
+                                value={[miniMapZoomStep]}
+                                onValueChange={([v]) => setMiniMapZoomStep(v)}
+                                min={1}
+                                max={10}
+                                step={1}
+                                className="w-full"
+                              />
+                              <div className="flex justify-between text-[10px] text-zinc-500">
+                                <span>Fine</span>
+                                <span>Coarse</span>
+                              </div>
+                            </div>
+
+                            {/* Toggles */}
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] text-zinc-400">Options</label>
+                              <div className="space-y-1">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={miniMapAutoCollapse}
+                                    onChange={(e) => setMiniMapAutoCollapse(e.target.checked)}
+                                    className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 accent-amber-500"
+                                  />
+                                  <span className="text-[11px] text-zinc-300">
+                                    Auto-collapse when idle
+                                  </span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={miniMapShowLegend}
+                                    onChange={(e) => setMiniMapShowLegend(e.target.checked)}
+                                    className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 accent-amber-500"
+                                  />
+                                  <span className="text-[11px] text-zinc-300">Show legend</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={miniMapShowEdges}
+                                    onChange={(e) => setMiniMapShowEdges(e.target.checked)}
+                                    className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 accent-amber-500"
+                                  />
+                                  <span className="text-[11px] text-zinc-300">
+                                    Show connections
+                                  </span>
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Position */}
+                            <div className="space-y-1">
+                              <label className="text-[11px] text-zinc-400">Position</label>
+                              <div className="grid grid-cols-2 gap-1">
+                                {(
+                                  [
+                                    ['top-left', 'Top Left'],
+                                    ['top-right', 'Top Right'],
+                                    ['bottom-left', 'Bottom Left'],
+                                    ['bottom-right', 'Bottom Right'],
+                                  ] as const
+                                ).map(([pos, label]) => (
+                                  <button
+                                    key={pos}
+                                    onClick={() => setMiniMapPosition(pos)}
+                                    className={`text-[11px] px-2 py-1 rounded transition-colors ${
+                                      miniMapPosition === pos
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                                    }`}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </Panel>
-              )}
+                    </Panel>
+                  );
+                })()}
 
               {/* Search & Filter Overlay */}
               {showSearch && (
@@ -2451,6 +3043,24 @@ function UniverseTimelineEditorInner() {
 
               <Panel position="top-right">
                 <div className="flex gap-2">
+                  {/* Canvas Tool Mode */}
+                  <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setCanvasTool('hand')}
+                      className={`p-1.5 transition-colors ${canvasTool === 'hand' ? 'bg-amber-500/20 text-amber-400' : 'text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}
+                      title="Hand tool — drag to pan (H)"
+                    >
+                      <Hand className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setCanvasTool('select')}
+                      className={`p-1.5 transition-colors ${canvasTool === 'select' ? 'bg-amber-500/20 text-amber-400' : 'text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}
+                      title="Select tool — drag to select multiple (V)"
+                    >
+                      <MousePointer2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
                   {/* Zoom & Layout Controls */}
                   <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">
                     <button
@@ -2971,6 +3581,133 @@ function UniverseTimelineEditorInner() {
                 </button>
               </div>
             )}
+
+            {/* Regenerate with same context */}
+            {editingEventId &&
+              (() => {
+                const storageKey = `universe_events_${id}`;
+                const storedEvents = localStorage.getItem(storageKey);
+                const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+                const eventData = eventsData[editingEventId];
+                const hasContext =
+                  eventData?.videoPrompt || eventData?.imagePrompt || eventData?.description;
+                const versions = eventData?.videoVersions || [];
+
+                return hasContext ? (
+                  <div className="space-y-3">
+                    {/* Regenerate button */}
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-primary/40 hover:bg-primary/10"
+                      onClick={() => {
+                        setEditVideoDialogOpen(false);
+                        handleRegenerateScene(editingEventId);
+                      }}
+                      disabled={!!regeneratingEventId}
+                    >
+                      <RefreshCw
+                        className={`h-4 w-4 ${regeneratingEventId === editingEventId ? 'animate-spin' : ''}`}
+                      />
+                      {regeneratingEventId === editingEventId
+                        ? 'Regenerating...'
+                        : 'Regenerate with Same Context'}
+                    </Button>
+                    {eventData?.videoPrompt && (
+                      <p
+                        className="text-xs text-muted-foreground truncate"
+                        title={eventData.videoPrompt}
+                      >
+                        Prompt: "{eventData.videoPrompt}"
+                      </p>
+                    )}
+
+                    {/* Version history */}
+                    {versions.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <History className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Label className="text-sm font-medium">Version History</Label>
+                          <span className="text-xs text-muted-foreground">
+                            ({versions.length + 1} versions)
+                          </span>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {/* Historical versions */}
+                          {versions.map((v: any, idx: number) => {
+                            const isCurrent = eventData.currentVersionIndex === idx;
+                            return (
+                              <button
+                                key={idx}
+                                className={`flex-shrink-0 w-24 rounded-md overflow-hidden border-2 transition-all ${
+                                  isCurrent
+                                    ? 'border-primary ring-1 ring-primary/50'
+                                    : 'border-transparent hover:border-zinc-500'
+                                }`}
+                                onClick={() => {
+                                  handleSwitchVersion(editingEventId, idx);
+                                  setEditVideoPreview(v.videoUrl);
+                                }}
+                                title={`v${v.versionNumber} — ${v.model || 'unknown'} — ${new Date(v.generatedAt).toLocaleDateString()}`}
+                              >
+                                <div className="aspect-video bg-zinc-800 relative">
+                                  <video
+                                    src={v.videoUrl}
+                                    className="w-full h-full object-cover"
+                                    muted
+                                    preload="metadata"
+                                  />
+                                  <div className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] text-center py-0.5">
+                                    v{v.versionNumber}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                          {/* Current / latest version */}
+                          <button
+                            className={`flex-shrink-0 w-24 rounded-md overflow-hidden border-2 transition-all ${
+                              eventData.currentVersionIndex === -1 ||
+                              eventData.currentVersionIndex === undefined
+                                ? 'border-primary ring-1 ring-primary/50'
+                                : 'border-transparent hover:border-zinc-500'
+                            }`}
+                            onClick={() => {
+                              handleSwitchVersion(editingEventId, -1);
+                              const latestUrl = eventData.latestVideoUrl || eventData.videoUrl;
+                              setEditVideoPreview(latestUrl);
+                            }}
+                            title="Latest version"
+                          >
+                            <div className="aspect-video bg-zinc-800 relative">
+                              <video
+                                src={eventData.latestVideoUrl || eventData.videoUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                                preload="metadata"
+                              />
+                              <div className="absolute bottom-0 inset-x-0 bg-primary/90 text-white text-[10px] text-center py-0.5">
+                                v{versions.length + 1} (latest)
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Divider */}
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          or replace manually
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
 
             {/* Upload File */}
             <div>

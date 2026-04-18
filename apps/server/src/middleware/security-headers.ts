@@ -20,6 +20,7 @@ const TRUSTED_CONNECT = [
   'https://*.googleapis.com',
   'https://rpc.sepolia.org',
   'https://sepolia.base.org',
+  'https://*.meshy.ai',
 ].join(' ');
 
 /** Trusted domains for img-src. */

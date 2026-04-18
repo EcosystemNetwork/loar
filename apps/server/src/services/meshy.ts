@@ -236,22 +236,26 @@ class MeshyService {
    * Pass a GLB model URL and a text description of the desired texture.
    */
   async textToTexture(options: TextToTextureOptions): Promise<{ taskId: string }> {
-    const data = await this.post<{ result: string }>('/text-to-texture', {
-      model_url: options.modelUrl,
-      object_prompt: options.prompt,
-      negative_prompt: options.negativePrompt || '',
-      style_prompt: options.artStyle || 'realistic',
-      resolution: options.resolution || 2048,
-      enable_original_uv: options.enableOriginalUV ?? true,
-      enable_pbr: options.enablePbr ?? true,
-      art_style: options.artStyle || 'realistic',
-      painting_style: options.paintingStyle || 'texture',
-    });
+    const data = await this.post<{ result: string }>(
+      '/text-to-texture',
+      {
+        model_url: options.modelUrl,
+        object_prompt: options.prompt,
+        negative_prompt: options.negativePrompt || '',
+        style_prompt: options.artStyle || 'realistic',
+        resolution: options.resolution || 2048,
+        enable_original_uv: options.enableOriginalUV ?? true,
+        enable_pbr: options.enablePbr ?? true,
+        art_style: options.artStyle || 'realistic',
+        painting_style: options.paintingStyle || 'texture',
+      },
+      TEXT_TO_3D_BASE
+    );
     return { taskId: data.result };
   }
 
   async getTextToTextureTask(taskId: string): Promise<MeshyTextureTask> {
-    const task = await this.get<MeshyTextureTask>(`/text-to-texture/${taskId}`);
+    const task = await this.get<MeshyTextureTask>(`/text-to-texture/${taskId}`, TEXT_TO_3D_BASE);
     return this.normalizeTask(task) as MeshyTextureTask;
   }
 

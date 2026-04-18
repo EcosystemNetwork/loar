@@ -150,6 +150,42 @@ export interface CreateSegmentInput {
 }
 
 /**
+ * A previous version of a video for an event.
+ * When a video is regenerated, the old one is stored here.
+ */
+export interface VideoVersion {
+  /** The video URL for this version */
+  videoUrl: string;
+
+  /** When this version was generated */
+  generatedAt: number;
+
+  /** The AI model used */
+  model: VideoModel;
+
+  /** The prompt used to generate this version */
+  prompt: string;
+
+  /** Duration in seconds */
+  duration: number;
+
+  /** Aspect ratio */
+  aspectRatio: AspectRatio;
+
+  /** Generation mode */
+  generationMode: GenerationMode;
+
+  /** Source image if image-to-video */
+  imageUrl?: string;
+
+  /** Negative prompt used */
+  negativePrompt?: string;
+
+  /** Version label (v1, v2, ...) */
+  versionNumber: number;
+}
+
+/**
  * Segment update input
  */
 export interface UpdateSegmentInput {
