@@ -83,8 +83,16 @@ interface Entity {
 
 function WikiKindPage() {
   const { kind } = Route.useParams();
+  const validKind = isValidKind(kind);
 
-  if (!isValidKind(kind)) {
+  // Hooks must run unconditionally — query is enabled only when kind is valid
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['entities', 'listByKind', kind],
+    queryFn: () => trpcClient.entities.listByKind.query({ kind: kind as any }),
+    enabled: validKind,
+  });
+
+  if (!validKind) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <Link to="/wiki">
@@ -104,11 +112,6 @@ function WikiKindPage() {
   }
 
   const displayName = KIND_DISPLAY_NAMES[kind];
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['entities', 'listByKind', kind],
-    queryFn: () => trpcClient.entities.listByKind.query({ kind }),
-  });
 
   const entities: Entity[] = data?.entities ?? [];
 

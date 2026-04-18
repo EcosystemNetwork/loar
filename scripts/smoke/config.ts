@@ -38,7 +38,14 @@ export function loadConfig(): SmokeConfig {
       'http://localhost:42069'
     ).replace(/\/$/, ''),
     chainId: Number(process.env.SMOKE_CHAIN_ID ?? 84532),
-    rpcUrl: process.env.SMOKE_RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? 'https://sepolia.base.org',
+    // Pick the RPC that matches the chain. Base Sepolia (84532) → BASE_SEPOLIA;
+    // Ethereum Sepolia (11155111) → PONDER_RPC_URL_2. Mismatch causes ERC721
+    // reverts because the same address on a different chain holds different code.
+    rpcUrl:
+      process.env.SMOKE_RPC_URL ??
+      (Number(process.env.SMOKE_CHAIN_ID ?? 84532) === 84532
+        ? (process.env.RPC_URL_BASE_SEPOLIA ?? 'https://sepolia.base.org')
+        : (process.env.PONDER_RPC_URL_2 ?? 'https://ethereum-sepolia-rpc.publicnode.com')),
     // Vite in this repo runs on port 3001 (see apps/web/vite.config.ts). Match the
     // first allowed origin from CORS_ORIGIN; override via SMOKE_ORIGIN env var.
     origin: (

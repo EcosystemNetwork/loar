@@ -262,3 +262,121 @@
 [S19 (19/56)] Generating... (30s)
 [S20 (20/56)] Generating... (30s)
 [S21 (21/56)] Generating... (30s)
+[S19 (19/56)] Generating... (60s)
+[S21 (21/56)] Generating... (60s)
+[S20 (20/56)] Generating... (60s)
+[S19 (19/56)] Generating... (90s)
+[S20 (20/56)] Generating... (90s)
+[S21 (21/56)] Generating... (90s)
+[S20 (20/56)] Generating... (120s)
+[S21 (21/56)] Generating... (120s)
+[S19 (19/56)] Generating... (120s)
+[S20 (20/56)] Retry 1/2 (sanitized)...
+[S20 (20/56)] Task: cgt-20260418161307-gbwwk
+[S21 (21/56)] Generating... (150s)
+[S19 (19/56)] Generating... (150s)
+[S20 (20/56)] Generating... (0s)
+[S21 (21/56)] Video done
+[S19 (19/56)] Video done
+[S20 (20/56)] Generating... (30s)
+[S20 (20/56)] Generating... (60s)
+[S20 (20/56)] Generating... (90s)
+[S20 (20/56)] Generating... (120s)
+[S20 (20/56)] Generating... (150s)
+[S20 (20/56)] Retry 2/2 (sanitized)...
+[S20 (20/56)] Task: cgt-20260418161625-4nq22
+[S20 (20/56)] Generating... (0s)
+[S20 (20/56)] Generating... (30s)
+[S20 (20/56)] Generating... (60s)
+[S20 (20/56)] Generating... (90s)
+[S20 (20/56)] Generating... (120s)
+[S20 (20/56)] Generating... (150s)
+[S20 (20/56)] Generating... (180s)
+[S20 (20/56)] Generating... (210s)
+[S19 (19/56)] Rehosting to Pinata...
+[S19 (19/56)] Pinned: QmTk8BFi3i6i4kBiNfEEpNvomxP58EV2Yzb2RRAc9SUaFr (2.7MB)
+[S19 (19/56)] Node #20
+[S19 (19/56)] DONE — Node #20
+[S20 (20/56)] VIDEO FAILED: All retries exhausted
+[S21 (21/56)] Rehosting to Pinata...
+[S21 (21/56)] Pinned: QmTUQ2WtihJiH3KViUEe2z5JSLNzztySdNpdYLqkf32n2R (2.7MB)
+[S21 (21/56)] Node #21
+[S21 (21/56)] DONE — Node #21
+[BATCH] Completed S19–S21
+
+═══════════════════════════════════════════════════════
+  BATCH: S22–S24 (3 parallel)
+═══════════════════════════════════════════════════════
+[S22 (22/56)] Generating (t2v)...
+[S23 (23/56)] Generating (t2v)...
+[S24 (24/56)] Generating (t2v)...
+[S24 (24/56)] Task: cgt-20260418162142-4zpvs
+[S22 (22/56)] Task: cgt-20260418162142-wnd7k
+[S23 (23/56)] Task: cgt-20260418162142-h57wg
+[S24 (24/56)] Generating... (0s)
+[S22 (22/56)] Generating... (0s)
+[S23 (23/56)] Generating... (0s)
+[S24 (24/56)] Generating... (30s)
+[S22 (22/56)] Generating... (30s)
+[S23 (23/56)] Generating... (30s)
+[S22 (22/56)] Generating... (60s)
+[S24 (24/56)] Generating... (60s)
+[S23 (23/56)] Generating... (60s)
+[S23 (23/56)] Generating... (90s)
+[S24 (24/56)] Generating... (90s)
+[S22 (22/56)] Generating... (90s)
+[S22 (22/56)] Retry 1/2 (sanitized)...
+[S22 (22/56)] Task: cgt-20260418162349-6p92t
+[S24 (24/56)] Retry 1/2 (sanitized)...
+[S24 (24/56)] Task: cgt-20260418162354-z22rr
+[S22 (22/56)] Generating... (0s)
+[S24 (24/56)] Generating... (0s)
+[S23 (23/56)] Generating... (120s)
+[S23 (23/56)] Video done
+[S22 (22/56)] Generating... (30s)
+[S24 (24/56)] Generating... (30s)
+[S22 (22/56)] Generating... (60s)
+[S24 (24/56)] Generating... (60s)
+[S22 (22/56)] Generating... (90s)
+[S24 (24/56)] Generating... (90s)
+[S24 (24/56)] Video done
+[S22 (22/56)] Generating... (120s)
+[S22 (22/56)] Generating... (150s)
+[S22 (22/56)] Video done
+[S22 (22/56)] Rehosting to Pinata...
+[S22 (22/56)] Pinned: QmebJnwjisGejmBLdFMuQA5WqJJEAtr55GAghPA3Suvbio (3.3MB)
+[S22 (22/56)] Node #22
+[S22 (22/56)] DONE — Node #22
+[S23 (23/56)] Rehosting to Pinata...
+[S23 (23/56)] Pinned: QmRqrWRTQpD4UcFAsTrZo99EswMJAV6aHDAUzgoPeZJ828 (6.1MB)
+[S23 (23/56)] Node #23
+[S23 (23/56)] DONE — Node #23
+[S24 (24/56)] Rehosting to Pinata...
+[S24 (24/56)] Pinned: QmWnkjkHLAhE29hvkMeWpM11U8HMcy3X7dEcaFAKCwm2q3 (3.3MB)
+[S24 (24/56)] Node #24
+[S24 (24/56)] DONE — Node #24
+[S24 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776500955960.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S22–S24
+
+═══════════════════════════════════════════════════════
+  BATCH: S25–S27 (3 parallel)
+═══════════════════════════════════════════════════════
+[S25 (25/56)] Generating (t2v)...
+[S26 (26/56)] Generating (t2v)...
+[S27 (27/56)] Generating (t2v)...
+[S27 (27/56)] Task: cgt-20260418162920-z9x4k
+[S26 (26/56)] Task: cgt-20260418162920-99bgm
+[S25 (25/56)] Task: cgt-20260418162920-kwjhm
+[S27 (27/56)] Generating... (0s)
+[S26 (26/56)] Generating... (0s)
+[S25 (25/56)] Generating... (0s)
+[S26 (26/56)] Generating... (30s)
+[S27 (27/56)] Generating... (30s)
+[S25 (25/56)] Generating... (30s)
+[S27 (27/56)] Generating... (60s)
+[S26 (26/56)] Generating... (60s)
+[S25 (25/56)] Generating... (60s)
+[S26 (26/56)] Generating... (90s)
+[S27 (27/56)] Generating... (90s)
+[S25 (25/56)] Generating... (90s)
+[S25 (25/56)] Video done

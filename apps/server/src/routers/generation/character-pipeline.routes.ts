@@ -281,18 +281,9 @@ async function executePipeline(opts: {
       }).catch((err) => console.error('[pipeline] 3D thumbnail attach failed:', err));
     }
 
-    void publishToGallery({
-      creatorUid: userId,
-      mediaUrl: glbUrl,
-      thumbnailUrl: meshyTask.thumbnailUrl || imageUrl,
-      mediaType: '3d',
-      title: `${entityName} — 3D model (untextured)`,
-      description: entityDescription,
-      universeId: universeAddress || null,
-      generationId: `${pipelineId}:3d`,
-      generationModel: 'meshy-image-to-3d',
-      tags: ['character', '3d', 'untextured'],
-    });
+    // Untextured GLB is an intermediate — it stays as an entity attachment
+    // (for raw-asset download) but is NOT published to gallery. Only the
+    // textured result below reaches the wiki.
 
     await updatePipeline(pipelineId, {
       currentStep: 'meshy_3d_complete',
@@ -383,12 +374,29 @@ async function executePipeline(opts: {
         mediaUrl: texturedGlbUrl,
         thumbnailUrl: textureTask.thumbnailUrl || meshyTask.thumbnailUrl || imageUrl,
         mediaType: '3d',
-        title: `${entityName} — textured 3D model`,
+        title: `${entityName} — 3D model`,
         description: entityDescription,
         universeId: universeAddress || null,
         generationId: `${pipelineId}:textured`,
         generationModel: 'meshy-text-to-texture',
         tags: ['character', '3d', 'textured', artStyle],
+      });
+    }
+
+    // Turntable preview of the textured model — published as a video so
+    // users can see the rotating PBR result in the wiki gallery.
+    if (textureTask.videoUrl) {
+      void publishToGallery({
+        creatorUid: userId,
+        mediaUrl: textureTask.videoUrl,
+        thumbnailUrl: textureTask.thumbnailUrl || imageUrl,
+        mediaType: 'video',
+        title: `${entityName} — 3D turntable`,
+        description: `Rotating preview of ${entityName}'s 3D model.`,
+        universeId: universeAddress || null,
+        generationId: `${pipelineId}:turntable`,
+        generationModel: 'meshy-text-to-texture',
+        tags: ['character', '3d', 'turntable', artStyle],
       });
     }
 

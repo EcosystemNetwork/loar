@@ -49,6 +49,9 @@ export async function runIndexerLayer(
     await check('indexer /health → healthy', async () => {
       const { status, body } = await indexerGet(cfg, '/health');
       if (status !== 200) throw new Error(`HTTP ${status}`);
+      // Ponder returns 200 with an empty body on healthy by default; some deployments
+      // return JSON { status }. Accept both.
+      if (body === '' || body == null) return 'healthy';
       const b = body as Record<string, unknown>;
       if (b?.status === 'healthy') return 'healthy';
       if (b?.status === 'degraded') {

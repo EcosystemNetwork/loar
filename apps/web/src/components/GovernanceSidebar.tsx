@@ -101,9 +101,12 @@ function formatTokenAmount(amount: bigint | undefined): string {
 
 /** Sanitize proposal description: strip control chars, limit newlines */
 function sanitizeDescription(desc: string): string {
-  return desc
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars except \n \r \t
-    .slice(0, MAX_PROPOSAL_DESCRIPTION);
+  return (
+    desc
+      // eslint-disable-next-line no-control-regex -- intentionally stripping control chars
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars except \n \r \t
+      .slice(0, MAX_PROPOSAL_DESCRIPTION)
+  );
 }
 
 /** Safely compute voting progress percentage */

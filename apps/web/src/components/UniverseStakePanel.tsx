@@ -46,9 +46,6 @@ interface UniverseStakePanelProps {
 export function UniverseStakePanel({ universeId, universeName }: UniverseStakePanelProps) {
   const chainId = useChainId();
   const { address } = useWalletAccount();
-
-  // Don't render if staking isn't deployed on this chain
-  if (!STAKING_CHAINS.has(chainId)) return null;
   const { pool, refetch: refetchPool } = useUniversePool(universeId);
   const { stake, refetch: refetchStake } = useUniverseStake(universeId);
   const { pendingFormatted, pending, refetch: refetchPending } = usePendingReward(universeId);
@@ -63,6 +60,10 @@ export function UniverseStakePanel({ universeId, universeName }: UniverseStakePa
 
   const [amount, setAmount] = useState('');
   const [mode, setMode] = useState<'stake' | 'unstake'>('stake');
+
+  // Don't render if staking isn't deployed on this chain — must be after hooks
+  // to satisfy rules-of-hooks (hooks must be called in the same order every render)
+  if (!STAKING_CHAINS.has(chainId)) return null;
 
   const refetchAll = () => {
     refetchPool();

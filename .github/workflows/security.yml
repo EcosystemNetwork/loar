@@ -76,6 +76,39 @@ jobs:
           fi
           echo "All pragma versions are correct (no ^0.8.28 mismatches found)"
 
+      - name: UPGRADE-01 — Storage gap presence check on UUPS contracts
+        run: |
+          # Every UUPS contract must declare a `__gap` to allow safe upgrades.
+          # A missing gap can cause permanent fund loss when a future upgrade adds state.
+          FAIL=0
+          for sol in $(grep -lR 'UUPSUpgradeable' src/); do
+            if ! grep -qE 'uint256\[[0-9]+\] private __gap' "$sol"; then
+              echo "::error file=$sol::UUPS contract is missing `__gap` — upgrade-unsafe"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -ne 0 ]; then exit 1; fi
+          echo "All UUPS contracts declare a storage gap."
+
+      - name: UPGRADE-01 — Emit storage layouts for review
+        run: |
+          mkdir -p storage-layouts
+          for contract in PaymentRouter RightsRegistry CanonMarketplace CreditManager \
+                          AdPlacement SubscriptionManager LicensingRegistry CollabManager \
+                          AnalyticsRegistry LaunchpadStaking StoryBounties Escrow \
+                          LoarBurner RemixFees ContentLicensing; do
+            forge inspect "$contract" storage-layout > "storage-layouts/$contract.json" 2>/dev/null \
+              || echo "::warning::Could not inspect $contract"
+          done
+
+      - name: Upload storage-layout artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-layouts-${{ github.run_id }}
+          path: apps/contracts/storage-layouts/
+          retention-days: 90
+
   contracts-mythril:
     name: Contract Security (Mythril)
     runs-on: ubuntu-latest

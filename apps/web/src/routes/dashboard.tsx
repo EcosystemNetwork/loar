@@ -97,12 +97,20 @@ function RouteComponent() {
     navigate({ to: '/universe/$id', params: { id: universeId } });
   };
 
+  const myUniverseList: any[] = (myUniverses as any)?.data ?? [];
+  const recentWorks: any[] = (recentWorksData as any)?.items ?? [];
+
+  // Token portfolio (must be declared before any early return)
+  const myTokens = useMemo(() => {
+    if (!tokenList?.length || !address) return [];
+    return tokenList.filter(
+      (t: EnrichedToken) => t.deployer?.toLowerCase() === address.toLowerCase()
+    );
+  }, [tokenList, address]);
+
   if (isAuthenticating || !isConnected || isLoadingMine) {
     return <DashboardSkeleton />;
   }
-
-  const myUniverseList: any[] = (myUniverses as any)?.data ?? [];
-  const recentWorks: any[] = (recentWorksData as any)?.items ?? [];
 
   // Derived stats
   const creditBalance = creditData?.balance ?? 0;
@@ -116,14 +124,6 @@ function RouteComponent() {
   const totalCollectibles = (portfolioData as any)?.totalCollectibles ?? 0;
   const episodesListed = myNfts?.createdEpisodes?.length ?? 0;
   const nftsCollected = myNfts?.mintedEpisodes?.length ?? 0;
-
-  // Token portfolio
-  const myTokens = useMemo(() => {
-    if (!tokenList?.length || !address) return [];
-    return tokenList.filter(
-      (t: EnrichedToken) => t.deployer?.toLowerCase() === address.toLowerCase()
-    );
-  }, [tokenList, address]);
 
   const totalTokenMarketCap = myTokens.reduce(
     (sum: number, t: EnrichedToken) => sum + (t.marketCap ?? 0),

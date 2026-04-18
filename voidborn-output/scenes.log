@@ -291,3 +291,125 @@
 [S20 (20/35)] Generating... (60s)
 [S21 (21/35)] Generating... (60s)
 [S19 (19/35)] Generating... (60s)
+[S20 (20/35)] Generating... (90s)
+[S19 (19/35)] Generating... (90s)
+[S21 (21/35)] Generating... (90s)
+[S19 (19/35)] Video done
+[S20 (20/35)] Generating... (120s)
+[S21 (21/35)] Generating... (120s)
+[S20 (20/35)] Generating... (150s)
+[S21 (21/35)] Generating... (150s)
+[S20 (20/35)] Video done
+[S21 (21/35)] Video done
+[S19 (19/35)] Rehosting to Pinata...
+[S19 (19/35)] Pinned: QmZMg1gGk7EPBXhxbbdfTN9oGcQMmyZFhfihgYcss7uQpv (3.1MB)
+[S19 (19/35)] Node #19 confirmed
+[S19 (19/35)] DONE — Node #19
+[S20 (20/35)] Rehosting to Pinata...
+[S20 (20/35)] Pinned: QmSURVD5uaZgyfjZbHUwWMYLVwp8jjbhNMeDuVGirPzgfu (5.9MB)
+[S20 (20/35)] Node #20 confirmed
+[S20 (20/35)] DONE — Node #20
+[S21 (21/35)] Rehosting to Pinata...
+[S21 (21/35)] Pinned: QmYTbzyGziZ9bTzZjHojF9ieDtF5SfF2xTVdJcEoGgyVuE (4.9MB)
+[S21 (21/35)] Node #21 confirmed
+[S21 (21/35)] DONE — Node #21
+[S21 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/void-vid-1776500113307.mp4" -frames:v 1 -q:v 2 "/tmp/
+[BATCH] Completed S19–S21
+
+═══════════════════════════════════════════════════════
+  BATCH: S22–S24 (3 scenes parallel)
+═══════════════════════════════════════════════════════
+[S22 (22/35)] Generating video (t2v)...
+[S23 (23/35)] Generating video (t2v)...
+[S24 (24/35)] Generating video (t2v)...
+[S24 (24/35)] Task: cgt-20260418161517-zhtwr
+[S23 (23/35)] Task: cgt-20260418161517-7ksbb
+[S22 (22/35)] Task: cgt-20260418161517-ddkkz
+[S24 (24/35)] Generating... (0s)
+[S22 (22/35)] Generating... (0s)
+[S23 (23/35)] Generating... (0s)
+[S24 (24/35)] Generating... (30s)
+[S23 (23/35)] Generating... (30s)
+[S22 (22/35)] Generating... (30s)
+[S23 (23/35)] Generating... (60s)
+[S22 (22/35)] Generating... (60s)
+[S24 (24/35)] Generating... (60s)
+[S22 (22/35)] Generating... (90s)
+[S24 (24/35)] Generating... (90s)
+[S23 (23/35)] Generating... (90s)
+[S22 (22/35)] Generating... (120s)
+[S24 (24/35)] Generating... (120s)
+[S23 (23/35)] Generating... (120s)
+[S22 (22/35)] Copyright filter triggered (attempt 1)
+[S22 (22/35)] Retry 1/2 (sanitized prompt)...
+[S22 (22/35)] Task: cgt-20260418161804-77dff
+[S24 (24/35)] Generating... (150s)
+[S23 (23/35)] Generating... (150s)
+[S22 (22/35)] Generating... (0s)
+[S24 (24/35)] Video done
+[S23 (23/35)] Generating... (180s)
+[S22 (22/35)] Generating... (30s)
+[S23 (23/35)] Video done
+[S22 (22/35)] Generating... (60s)
+[S22 (22/35)] Generating... (90s)
+[S22 (22/35)] Copyright filter triggered (attempt 2)
+[S22 (22/35)] Retry 2/2 (sanitized prompt)...
+[S22 (22/35)] Task: cgt-20260418162008-pmzsv
+[S22 (22/35)] Generating... (0s)
+[S22 (22/35)] Generating... (30s)
+[S22 (22/35)] Generating... (60s)
+[S22 (22/35)] Generating... (90s)
+[S22 (22/35)] Video done
+[S22 (22/35)] Rehosting to Pinata...
+[S22 (22/35)] Pinned: QmP9UJxmisnDisH7sgxv6YSYUUbDrqg7UPHmr1c8SAcxr5 (3.4MB)
+[S22 (22/35)] Node #22 confirmed
+[S22 (22/35)] DONE — Node #22
+[S23 (23/35)] Rehosting to Pinata...
+[S23 (23/35)] Pinned: QmX56ZVray9q23r42TQgs8HKYL1CnvXEAGnpKNhR98jZUn (4.2MB)
+[S23 (23/35)] Node #23 confirmed
+[S23 (23/35)] DONE — Node #23
+[S24 (24/35)] Rehosting to Pinata...
+[S24 (24/35)] Pinned: QmeJCFYQdsNKENR9A9JteVjvx3CZD51ySmhEvAgRKSEMR5 (2.6MB)
+[S24 (24/35)] Node #24 confirmed
+[S24 (24/35)] DONE — Node #24
+[S24 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/void-vid-1776500739918.mp4" -frames:v 1 -q:v 2 "/tmp/
+[BATCH] Completed S22–S24
+
+═══════════════════════════════════════════════════════
+  BATCH: S25–S27 (3 scenes parallel)
+═══════════════════════════════════════════════════════
+[S25 (25/35)] Generating video (t2v)...
+[S26 (26/35)] Generating video (t2v)...
+[S27 (27/35)] Generating video (t2v)...
+[S26 (26/35)] Task: cgt-20260418162544-hhhcn
+[S27 (27/35)] Task: cgt-20260418162544-qmvg9
+[S25 (25/35)] Task: cgt-20260418162544-8hqfk
+[S26 (26/35)] Generating... (0s)
+[S27 (27/35)] Generating... (0s)
+[S25 (25/35)] Generating... (0s)
+[S26 (26/35)] Generating... (30s)
+[S27 (27/35)] Generating... (30s)
+[S25 (25/35)] Generating... (30s)
+[S26 (26/35)] Generating... (60s)
+[S25 (25/35)] Generating... (60s)
+[S27 (27/35)] Generating... (60s)
+[S26 (26/35)] Generating... (90s)
+[S27 (27/35)] Generating... (90s)
+[S25 (25/35)] Generating... (90s)
+[S26 (26/35)] Video done
+[S27 (27/35)] Video done
+[S25 (25/35)] Video done
+[S25 (25/35)] Rehosting to Pinata...
+[S25 (25/35)] Pinned: QmVUrH7WrcXAZU7A7pTa49m77KXL5iNSkvwJgzcgP797ye (4.5MB)
+[S25 (25/35)] Node #25 confirmed
+[S25 (25/35)] DONE — Node #25
+[S26 (26/35)] Rehosting to Pinata...
+[S26 (26/35)] Pinned: QmR9BqGnqYRu54UZLSaaq8cTSRPePzN2cBohapbyE3YFae (3.1MB)
+[S26 (26/35)] Node #26 confirmed
+[S26 (26/35)] DONE — Node #26
+[S27 (27/35)] Rehosting to Pinata...
+[S27 (27/35)] Pinned: QmYMzECS1veJZ345BoV76w3zMYy2irirdNQJDCPegJAdiP (2.7MB)
+[S27 (27/35)] Node #27 confirmed
+[S27 (27/35)] DONE — Node #27
+[S27 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/void-vid-1776501073688.mp4" -frames:v 1 -q:v 2 "/tmp/
+[BATCH] Completed S25–S27

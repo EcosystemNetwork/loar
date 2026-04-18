@@ -157,8 +157,10 @@ type TestFixtures = {
  * SIWE session pre-injected so protected routes are accessible.
  */
 export const test = base.extend<TestFixtures>({
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- `use` here is the Playwright fixture callback, not React's `use` hook
   authedPage: async ({ page }, use) => {
     await injectMockSession(page);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(page);
   },
 });

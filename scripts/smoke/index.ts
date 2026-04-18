@@ -24,6 +24,14 @@
  *   1 — one or more checks failed
  */
 
+import { config as loadEnv } from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Load root .env so smoke inherits CORS_ORIGIN, VITE_PONDER_URL, etc.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: path.resolve(__dirname, '../../.env') });
+
 import { loadConfig } from './config.ts';
 import { Reporter } from './reporter.ts';
 import { SMOKE_WALLETS } from './fixtures.ts';

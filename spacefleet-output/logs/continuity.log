@@ -485,3 +485,104 @@
 [S25 (25/40)] Generating... (60s)
 [S25 (25/40)] Generating... (90s)
 [S25 (25/40)] Generating... (120s)
+[S25 (25/40)] Generating... (150s)
+[S25 (25/40)] Generating... (180s)
+[S25 (25/40)] Copyright filter triggered (attempt 3)
+[S25 (25/40)] FAILED: Copyright filter blocked all retries
+
+═══════════════════════════════════════════════════════
+  S26: The Invitation
+═══════════════════════════════════════════════════════
+[S26 (26/40)] Generating video (i2v continuity)...
+[S26 (26/40)] Frame rejected (person detected) — falling back to t2v
+[S26 (26/40)] Retry 1/2 (sanitized prompt)...
+[S26 (26/40)] Task: cgt-20260418161223-jffqk
+[S26 (26/40)] Generating... (0s)
+[S26 (26/40)] Generating... (30s)
+[S26 (26/40)] Generating... (60s)
+[S26 (26/40)] Generating... (90s)
+[S26 (26/40)] Generating... (120s)
+[S26 (26/40)] Generating... (150s)
+[S26 (26/40)] Generating... (180s)
+[S26 (26/40)] Video done
+[S26 (26/40)] Node #193 confirmed
+[S26 (26/40)] DONE — Node #193
+[S26 FRAME] Extracted last frame (70KB)
+[S26 FRAME] Frame uploaded: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmWYMDTfXXK2Pydwfdr1mvqi2K1TEUM2zj3e9mVCRUJFR8
+
+═══════════════════════════════════════════════════════
+  S27: Hotel Room — Arriving
+═══════════════════════════════════════════════════════
+[S27 (27/40)] Generating video (i2v continuity)...
+[S27 (27/40)] Frame rejected (person detected) — falling back to t2v
+[S27 (27/40)] Retry 1/2 (sanitized prompt)...
+[S27 (27/40)] Task: cgt-20260418161739-7ffg5
+[S27 (27/40)] Generating... (0s)
+[S27 (27/40)] Generating... (30s)
+[S27 (27/40)] Generating... (60s)
+[S27 (27/40)] Generating... (90s)
+[S27 (27/40)] Video done
+[S27 (27/40)] Node #194 confirmed
+[S27 (27/40)] DONE — Node #194
+[S27 FRAME] Extracted last frame (53KB)
+[S27 FRAME] Frame uploaded: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmcysEQEvT3w3b6BxVs7MQTKMjMJhrg4P5upyYQ34yDJ1P
+
+═══════════════════════════════════════════════════════
+  S28: Eric Zoning Out
+═══════════════════════════════════════════════════════
+[S28 (28/40)] Generating video (i2v continuity)...
+[S28 (28/40)] Frame rejected (person detected) — falling back to t2v
+[S28 (28/40)] Retry 1/2 (sanitized prompt)...
+[S28 (28/40)] Task: cgt-20260418162046-l6rmp
+[S28 (28/40)] Generating... (0s)
+[S28 (28/40)] Generating... (30s)
+[S28 (28/40)] Generating... (60s)
+[S28 (28/40)] Generating... (90s)
+[S28 (28/40)] Generating... (120s)
+[S28 (28/40)] Video done
+[S28 (28/40)] Node #195 confirmed
+[S28 (28/40)] DONE — Node #195
+[S28 FRAME] Extracted last frame (60KB)
+[S28 FRAME] Frame uploaded: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmXCF622C2icCTmAV34teuyqgkudTBHLSnDRANmCc7yMbk
+
+═══════════════════════════════════════════════════════
+  S29: Dante and Marcus — The Conversation
+═══════════════════════════════════════════════════════
+[S29 (29/40)] Generating video (i2v continuity)...
+[S29 (29/40)] Frame rejected (person detected) — falling back to t2v
+[S29 (29/40)] Retry 1/2 (sanitized prompt)...
+[S29 (29/40)] Task: cgt-20260418162446-s4j5p
+[S29 (29/40)] Generating... (0s)
+[S29 (29/40)] Generating... (30s)
+[S29 (29/40)] Generating... (60s)
+[S29 (29/40)] Generating... (90s)
+[S29 (29/40)] Video done
+[S29 (29/40)] Node #196 confirmed
+[S29 (29/40)] DONE — Node #196
+[S29 FRAME] Extracted last frame (81KB)
+[S29 FRAME] Frame uploaded: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmRY7Pg5EvmdnWteNmfVAJM1b3DKeSGDoFyNGnVB7oUfEY
+
+═══════════════════════════════════════════════════════
+  S30: The Demon Symbols — Overheard
+═══════════════════════════════════════════════════════
+[S30 (30/40)] Generating video (i2v continuity)...
+[S30 (30/40)] Frame rejected (person detected) — falling back to t2v
+[S30 (30/40)] Retry 1/2 (sanitized prompt)...
+[S30 (30/40)] Task: cgt-20260418162722-sp2px
+[S30 (30/40)] Generating... (0s)
+[S30 (30/40)] Generating... (30s)
+[S30 (30/40)] Generating... (60s)
+[S30 (30/40)] Generating... (90s)
+[S30 (30/40)] Video done
+[S30 (30/40)] Node #197 confirmed
+[S30 (30/40)] DONE — Node #197
+[S30 FRAME] Extracted last frame (67KB)
+[S30 FRAME] Frame uploaded: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmbDDQijXvuX6txxf7rytVsYZsxgsj5DCoXPPQxGH5f7hR
+
+═══════════════════════════════════════════════════════
+  S31: Eric Leaves — The Poker Face
+═══════════════════════════════════════════════════════
+[S31 (31/40)] Generating video (i2v continuity)...
+[S31 (31/40)] Frame rejected (person detected) — falling back to t2v
+[S31 (31/40)] Retry 1/2 (sanitized prompt)...
+[S31 (31/40)] Task: cgt-20260418163112-ktpq5

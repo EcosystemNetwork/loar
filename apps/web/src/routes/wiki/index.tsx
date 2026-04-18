@@ -568,13 +568,18 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
   });
 
   const galleryItems = galleryData?.items ?? [];
+  // Hide legacy untextured intermediates — the pipeline now publishes only
+  // the final textured model, but old records remain in the collection.
+  const texturedOnly = galleryItems.filter(
+    (item: any) => !(Array.isArray(item.tags) && item.tags.includes('untextured'))
+  );
   const filteredGallery = search.trim()
-    ? galleryItems.filter(
+    ? texturedOnly.filter(
         (item: any) =>
           item.title?.toLowerCase().includes(search.toLowerCase()) ||
           item.description?.toLowerCase().includes(search.toLowerCase())
       )
-    : galleryItems;
+    : texturedOnly;
 
   return (
     <div className="space-y-4">
