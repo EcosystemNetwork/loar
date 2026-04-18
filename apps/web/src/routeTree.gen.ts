@@ -42,6 +42,7 @@ import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as CollabsIndexRouteImport } from './routes/collabs/index'
 import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
+import { Route as AdsIndexRouteImport } from './routes/ads/index'
 import { Route as AdplacementsIndexRouteImport } from './routes/adplacements/index'
 import { Route as WikiKindRouteImport } from './routes/wiki/$kind'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
@@ -69,10 +70,13 @@ import { Route as AnalyticsUniverseIdRouteImport } from './routes/analytics.$uni
 import { Route as AgentsRegisterRouteImport } from './routes/agents/register'
 import { Route as AgentsDashboardRouteImport } from './routes/agents/dashboard'
 import { Route as AgentsUidRouteImport } from './routes/agents/$uid'
+import { Route as AdsNewRouteImport } from './routes/ads/new'
+import { Route as AdsSlotIdRouteImport } from './routes/ads/$slotId'
 import { Route as AdplacementsNewRouteImport } from './routes/adplacements/new'
 import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$slotId'
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
+import { Route as AdsSeedsIndexRouteImport } from './routes/ads/seeds/index'
 import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
@@ -82,6 +86,8 @@ import { Route as UniverseIdDeployTokenRouteImport } from './routes/universe/$id
 import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$address.polls'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
+import { Route as AdsSeedsNewRouteImport } from './routes/ads/seeds/new'
+import { Route as AdsSeedsSeedIdRouteImport } from './routes/ads/seeds/$seedId'
 import { Route as AdplacementsSeedsNewRouteImport } from './routes/adplacements/seeds/new'
 import { Route as AdplacementsSeedsSeedIdRouteImport } from './routes/adplacements/seeds/$seedId'
 
@@ -250,6 +256,11 @@ const AgentsIndexRoute = AgentsIndexRouteImport.update({
   path: '/agents/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdsIndexRoute = AdsIndexRouteImport.update({
+  id: '/ads/',
+  path: '/ads/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdplacementsIndexRoute = AdplacementsIndexRouteImport.update({
   id: '/adplacements/',
   path: '/adplacements/',
@@ -385,6 +396,16 @@ const AgentsUidRoute = AgentsUidRouteImport.update({
   path: '/agents/$uid',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdsNewRoute = AdsNewRouteImport.update({
+  id: '/ads/new',
+  path: '/ads/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsSlotIdRoute = AdsSlotIdRouteImport.update({
+  id: '/ads/$slotId',
+  path: '/ads/$slotId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdplacementsNewRoute = AdplacementsNewRouteImport.update({
   id: '/adplacements/new',
   path: '/adplacements/new',
@@ -403,6 +424,11 @@ const AdminUniversesRoute = AdminUniversesRouteImport.update({
 const AdminModerationRoute = AdminModerationRouteImport.update({
   id: '/admin/moderation',
   path: '/admin/moderation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsSeedsIndexRoute = AdsSeedsIndexRouteImport.update({
+  id: '/ads/seeds/',
+  path: '/ads/seeds/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdplacementsSeedsIndexRoute = AdplacementsSeedsIndexRouteImport.update({
@@ -450,6 +476,16 @@ const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   path: '/event/$universe/$event',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdsSeedsNewRoute = AdsSeedsNewRouteImport.update({
+  id: '/ads/seeds/new',
+  path: '/ads/seeds/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsSeedsSeedIdRoute = AdsSeedsSeedIdRouteImport.update({
+  id: '/ads/seeds/$seedId',
+  path: '/ads/seeds/$seedId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdplacementsSeedsNewRoute = AdplacementsSeedsNewRouteImport.update({
   id: '/adplacements/seeds/new',
   path: '/adplacements/seeds/new',
@@ -491,6 +527,8 @@ export interface FileRoutesByFullPath {
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
   '/adplacements/new': typeof AdplacementsNewRoute
+  '/ads/$slotId': typeof AdsSlotIdRoute
+  '/ads/new': typeof AdsNewRoute
   '/agents/$uid': typeof AgentsUidRoute
   '/agents/dashboard': typeof AgentsDashboardRoute
   '/agents/register': typeof AgentsRegisterRoute
@@ -518,6 +556,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
   '/adplacements/': typeof AdplacementsIndexRoute
+  '/ads/': typeof AdsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
   '/collabs/': typeof CollabsIndexRoute
@@ -528,6 +567,8 @@ export interface FileRoutesByFullPath {
   '/wiki/': typeof WikiIndexRoute
   '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
   '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
+  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
+  '/ads/seeds/new': typeof AdsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
@@ -537,6 +578,7 @@ export interface FileRoutesByFullPath {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
+  '/ads/seeds/': typeof AdsSeedsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -568,6 +610,8 @@ export interface FileRoutesByTo {
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
   '/adplacements/new': typeof AdplacementsNewRoute
+  '/ads/$slotId': typeof AdsSlotIdRoute
+  '/ads/new': typeof AdsNewRoute
   '/agents/$uid': typeof AgentsUidRoute
   '/agents/dashboard': typeof AgentsDashboardRoute
   '/agents/register': typeof AgentsRegisterRoute
@@ -595,6 +639,7 @@ export interface FileRoutesByTo {
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
   '/adplacements': typeof AdplacementsIndexRoute
+  '/ads': typeof AdsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/bounties': typeof BountiesIndexRoute
   '/collabs': typeof CollabsIndexRoute
@@ -605,6 +650,8 @@ export interface FileRoutesByTo {
   '/wiki': typeof WikiIndexRoute
   '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
   '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
+  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
+  '/ads/seeds/new': typeof AdsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
@@ -614,6 +661,7 @@ export interface FileRoutesByTo {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/adplacements/seeds': typeof AdplacementsSeedsIndexRoute
+  '/ads/seeds': typeof AdsSeedsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -646,6 +694,8 @@ export interface FileRoutesById {
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
   '/adplacements/new': typeof AdplacementsNewRoute
+  '/ads/$slotId': typeof AdsSlotIdRoute
+  '/ads/new': typeof AdsNewRoute
   '/agents/$uid': typeof AgentsUidRoute
   '/agents/dashboard': typeof AgentsDashboardRoute
   '/agents/register': typeof AgentsRegisterRoute
@@ -673,6 +723,7 @@ export interface FileRoutesById {
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
   '/adplacements/': typeof AdplacementsIndexRoute
+  '/ads/': typeof AdsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
   '/collabs/': typeof CollabsIndexRoute
@@ -683,6 +734,8 @@ export interface FileRoutesById {
   '/wiki/': typeof WikiIndexRoute
   '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
   '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
+  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
+  '/ads/seeds/new': typeof AdsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
@@ -692,6 +745,7 @@ export interface FileRoutesById {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
+  '/ads/seeds/': typeof AdsSeedsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -725,6 +779,8 @@ export interface FileRouteTypes {
     | '/admin/universes'
     | '/adplacements/$slotId'
     | '/adplacements/new'
+    | '/ads/$slotId'
+    | '/ads/new'
     | '/agents/$uid'
     | '/agents/dashboard'
     | '/agents/register'
@@ -752,6 +808,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/$kind'
     | '/adplacements/'
+    | '/ads/'
     | '/agents/'
     | '/bounties/'
     | '/collabs/'
@@ -762,6 +819,8 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/adplacements/seeds/$seedId'
     | '/adplacements/seeds/new'
+    | '/ads/seeds/$seedId'
+    | '/ads/seeds/new'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
     | '/universe/$address/polls'
@@ -771,6 +830,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/adplacements/seeds/'
+    | '/ads/seeds/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -802,6 +862,8 @@ export interface FileRouteTypes {
     | '/admin/universes'
     | '/adplacements/$slotId'
     | '/adplacements/new'
+    | '/ads/$slotId'
+    | '/ads/new'
     | '/agents/$uid'
     | '/agents/dashboard'
     | '/agents/register'
@@ -829,6 +891,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/$kind'
     | '/adplacements'
+    | '/ads'
     | '/agents'
     | '/bounties'
     | '/collabs'
@@ -839,6 +902,8 @@ export interface FileRouteTypes {
     | '/wiki'
     | '/adplacements/seeds/$seedId'
     | '/adplacements/seeds/new'
+    | '/ads/seeds/$seedId'
+    | '/ads/seeds/new'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
     | '/universe/$address/polls'
@@ -848,6 +913,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/adplacements/seeds'
+    | '/ads/seeds'
   id:
     | '__root__'
     | '/'
@@ -879,6 +945,8 @@ export interface FileRouteTypes {
     | '/admin/universes'
     | '/adplacements/$slotId'
     | '/adplacements/new'
+    | '/ads/$slotId'
+    | '/ads/new'
     | '/agents/$uid'
     | '/agents/dashboard'
     | '/agents/register'
@@ -906,6 +974,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/$kind'
     | '/adplacements/'
+    | '/ads/'
     | '/agents/'
     | '/bounties/'
     | '/collabs/'
@@ -916,6 +985,8 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/adplacements/seeds/$seedId'
     | '/adplacements/seeds/new'
+    | '/ads/seeds/$seedId'
+    | '/ads/seeds/new'
     | '/event/$universe/$event'
     | '/tokens/creator/$address'
     | '/universe/$address/polls'
@@ -925,6 +996,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/adplacements/seeds/'
+    | '/ads/seeds/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -957,6 +1029,8 @@ export interface RootRouteChildren {
   AdminUniversesRoute: typeof AdminUniversesRoute
   AdplacementsSlotIdRoute: typeof AdplacementsSlotIdRoute
   AdplacementsNewRoute: typeof AdplacementsNewRoute
+  AdsSlotIdRoute: typeof AdsSlotIdRoute
+  AdsNewRoute: typeof AdsNewRoute
   AgentsUidRoute: typeof AgentsUidRoute
   AgentsDashboardRoute: typeof AgentsDashboardRoute
   AgentsRegisterRoute: typeof AgentsRegisterRoute
@@ -983,6 +1057,7 @@ export interface RootRouteChildren {
   UniverseIdRoute: typeof UniverseIdRouteWithChildren
   WikiKindRoute: typeof WikiKindRoute
   AdplacementsIndexRoute: typeof AdplacementsIndexRoute
+  AdsIndexRoute: typeof AdsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   BountiesIndexRoute: typeof BountiesIndexRoute
   CollabsIndexRoute: typeof CollabsIndexRoute
@@ -993,12 +1068,15 @@ export interface RootRouteChildren {
   WikiIndexRoute: typeof WikiIndexRoute
   AdplacementsSeedsSeedIdRoute: typeof AdplacementsSeedsSeedIdRoute
   AdplacementsSeedsNewRoute: typeof AdplacementsSeedsNewRoute
+  AdsSeedsSeedIdRoute: typeof AdsSeedsSeedIdRoute
+  AdsSeedsNewRoute: typeof AdsSeedsNewRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
   UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
   WikiEntityIdRoute: typeof WikiEntityIdRoute
   AdplacementsSeedsIndexRoute: typeof AdplacementsSeedsIndexRoute
+  AdsSeedsIndexRoute: typeof AdsSeedsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1234,6 +1312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ads/': {
+      id: '/ads/'
+      path: '/ads'
+      fullPath: '/ads/'
+      preLoaderRoute: typeof AdsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/adplacements/': {
       id: '/adplacements/'
       path: '/adplacements'
@@ -1423,6 +1508,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsUidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ads/new': {
+      id: '/ads/new'
+      path: '/ads/new'
+      fullPath: '/ads/new'
+      preLoaderRoute: typeof AdsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/$slotId': {
+      id: '/ads/$slotId'
+      path: '/ads/$slotId'
+      fullPath: '/ads/$slotId'
+      preLoaderRoute: typeof AdsSlotIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/adplacements/new': {
       id: '/adplacements/new'
       path: '/adplacements/new'
@@ -1449,6 +1548,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/moderation'
       fullPath: '/admin/moderation'
       preLoaderRoute: typeof AdminModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/seeds/': {
+      id: '/ads/seeds/'
+      path: '/ads/seeds'
+      fullPath: '/ads/seeds/'
+      preLoaderRoute: typeof AdsSeedsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/adplacements/seeds/': {
@@ -1512,6 +1618,20 @@ declare module '@tanstack/react-router' {
       path: '/event/$universe/$event'
       fullPath: '/event/$universe/$event'
       preLoaderRoute: typeof EventUniverseEventRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/seeds/new': {
+      id: '/ads/seeds/new'
+      path: '/ads/seeds/new'
+      fullPath: '/ads/seeds/new'
+      preLoaderRoute: typeof AdsSeedsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads/seeds/$seedId': {
+      id: '/ads/seeds/$seedId'
+      path: '/ads/seeds/$seedId'
+      fullPath: '/ads/seeds/$seedId'
+      preLoaderRoute: typeof AdsSeedsSeedIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/adplacements/seeds/new': {
@@ -1589,6 +1709,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminUniversesRoute: AdminUniversesRoute,
   AdplacementsSlotIdRoute: AdplacementsSlotIdRoute,
   AdplacementsNewRoute: AdplacementsNewRoute,
+  AdsSlotIdRoute: AdsSlotIdRoute,
+  AdsNewRoute: AdsNewRoute,
   AgentsUidRoute: AgentsUidRoute,
   AgentsDashboardRoute: AgentsDashboardRoute,
   AgentsRegisterRoute: AgentsRegisterRoute,
@@ -1615,6 +1737,7 @@ const rootRouteChildren: RootRouteChildren = {
   UniverseIdRoute: UniverseIdRouteWithChildren,
   WikiKindRoute: WikiKindRoute,
   AdplacementsIndexRoute: AdplacementsIndexRoute,
+  AdsIndexRoute: AdsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   BountiesIndexRoute: BountiesIndexRoute,
   CollabsIndexRoute: CollabsIndexRoute,
@@ -1625,12 +1748,15 @@ const rootRouteChildren: RootRouteChildren = {
   WikiIndexRoute: WikiIndexRoute,
   AdplacementsSeedsSeedIdRoute: AdplacementsSeedsSeedIdRoute,
   AdplacementsSeedsNewRoute: AdplacementsSeedsNewRoute,
+  AdsSeedsSeedIdRoute: AdsSeedsSeedIdRoute,
+  AdsSeedsNewRoute: AdsSeedsNewRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
   UniverseAddressPollsRoute: UniverseAddressPollsRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
   WikiEntityIdRoute: WikiEntityIdRoute,
   AdplacementsSeedsIndexRoute: AdplacementsSeedsIndexRoute,
+  AdsSeedsIndexRoute: AdsSeedsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
