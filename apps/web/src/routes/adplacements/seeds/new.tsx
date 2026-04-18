@@ -33,10 +33,10 @@ import { useCreateAdSeed } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 
-export const Route = createFileRoute('/ads/seeds/new')({
+export const Route = createFileRoute('/adplacements/seeds/new')({
   beforeLoad: ({ context }) => {
     if (!context.hasSession()) {
-      throw redirect({ to: '/login', search: { redirect: '/ads/seeds/new' } });
+      throw redirect({ to: '/login', search: { redirect: '/adplacements/seeds/new' } });
     }
   },
   component: CreateAdSeedPage,
@@ -127,7 +127,7 @@ export function CreateAdSeedPage() {
 
   useEffect(() => {
     if (!isAuthenticated && !isAuthenticating) {
-      navigate({ to: '/login', search: { redirect: '/ads/seeds/new' } });
+      navigate({ to: '/login', search: { redirect: '/adplacements/seeds/new' } });
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
@@ -193,7 +193,7 @@ export function CreateAdSeedPage() {
   function back() {
     const prev = STEPS[stepIdx - 1];
     if (prev) setStep(prev);
-    else navigate({ to: '/ads/seeds' });
+    else navigate({ to: '/adplacements/seeds' });
   }
 
   async function handleCreate() {
@@ -215,7 +215,7 @@ export function CreateAdSeedPage() {
         targetGenres: form.targetGenres.length > 0 ? form.targetGenres : undefined,
       });
       toast.success('Seed planted! Filmmakers can now claim it.');
-      navigate({ to: '/ads/seeds' });
+      navigate({ to: '/adplacements/seeds' });
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to create seed');
     }

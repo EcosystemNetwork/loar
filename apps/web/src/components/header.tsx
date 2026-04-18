@@ -73,7 +73,7 @@ const moreGroups = [
     label: 'More',
     links: [
       { to: '/agents', label: 'Agents', beta: true },
-      { to: '/ads', label: 'Ads', beta: true },
+      { to: '/adplacements', label: 'Ads', beta: true },
       { to: '/sandbox', label: 'Sandbox', beta: true },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },

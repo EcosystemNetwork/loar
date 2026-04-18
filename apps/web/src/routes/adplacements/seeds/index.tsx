@@ -43,7 +43,7 @@ import {
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useIsAutoConnecting } from 'thirdweb/react';
 
-export const Route = createFileRoute('/ads/seeds/')({
+export const Route = createFileRoute('/adplacements/seeds/')({
   component: SeedDanceHub,
 });
 
@@ -91,7 +91,7 @@ function SeedDanceHub() {
               </p>
             </div>
             {isConnected && (
-              <Link to="/ads/seeds/new">
+              <Link to="/adplacements/seeds/new">
                 <Button size="sm" className="gap-1">
                   <Plus className="w-4 h-4" />
                   Plant Seed
@@ -198,7 +198,7 @@ function BrowseTab({
           <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No open seeds yet</p>
           <p className="text-sm mt-1 mb-4">Be the first brand to plant a seed</p>
-          <Link to="/ads/seeds/new">
+          <Link to="/adplacements/seeds/new">
             <Button variant="outline" size="sm" className="gap-1">
               <Plus className="w-4 h-4" />
               Plant a Seed
@@ -223,7 +223,7 @@ function SeedCard({ seed }: { seed: any }) {
   const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / 86400000));
 
   return (
-    <Link to="/ads/seeds/$seedId" params={{ seedId: seed.id }}>
+    <Link to="/adplacements/seeds/$seedId" params={{ seedId: seed.id }}>
       <Card className="hover:border-primary/30 transition-colors cursor-pointer">
         <CardContent className="p-4">
           <div className="flex items-start justify-between mb-2">
@@ -325,7 +325,7 @@ function MySeedsTab() {
         <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
         <p className="font-medium">No seeds planted</p>
         <p className="text-sm mt-1 mb-4">Create your first ad seed to attract filmmakers</p>
-        <Link to="/ads/seeds/new">
+        <Link to="/adplacements/seeds/new">
           <Button variant="outline" size="sm" className="gap-1">
             <Plus className="w-4 h-4" />
             Plant a Seed
@@ -377,7 +377,7 @@ function MySeedCard({ seed }: { seed: any }) {
   const spent = approved * (seed.rewardPerPlacement || 0);
 
   return (
-    <Link to="/ads/seeds/$seedId" params={{ seedId: seed.id }}>
+    <Link to="/adplacements/seeds/$seedId" params={{ seedId: seed.id }}>
       <Card className="hover:border-primary/30 transition-colors cursor-pointer">
         <CardContent className="p-4">
           <div className="flex items-start justify-between mb-2">
@@ -457,7 +457,7 @@ function MyGigsTab() {
         <p className="text-sm mt-1 mb-4">
           Browse seeds and earn $LOAR by placing ads in your films
         </p>
-        <Link to="/ads/seeds">
+        <Link to="/adplacements/seeds">
           <Button variant="outline" size="sm" className="gap-1">
             Browse Seeds
             <ArrowRight className="w-3.5 h-3.5" />

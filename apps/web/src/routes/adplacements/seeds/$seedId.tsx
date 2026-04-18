@@ -46,7 +46,7 @@ import {
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 
-export const Route = createFileRoute('/ads/seeds/$seedId')({
+export const Route = createFileRoute('/adplacements/seeds/$seedId')({
   component: SeedDetailPage,
 });
 
@@ -108,7 +108,7 @@ function SeedDetailPage() {
         <p className="text-sm text-muted-foreground mb-4">
           This ad seed may have been removed or doesn't exist.
         </p>
-        <Button variant="outline" onClick={() => navigate({ to: '/ads/seeds' })}>
+        <Button variant="outline" onClick={() => navigate({ to: '/adplacements/seeds' })}>
           Back to Seeds
         </Button>
       </div>
@@ -186,7 +186,7 @@ function SeedDetailPage() {
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          onClick={() => navigate({ to: '/ads/seeds' })}
+          onClick={() => navigate({ to: '/adplacements/seeds' })}
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>

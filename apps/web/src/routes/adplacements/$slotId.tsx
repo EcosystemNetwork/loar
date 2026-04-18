@@ -37,7 +37,7 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
 
-export const Route = createFileRoute('/ads/$slotId')({
+export const Route = createFileRoute('/adplacements/$slotId')({
   component: SlotDetailPage,
 });
 
@@ -95,7 +95,7 @@ export function SlotDetailPage() {
         <p className="text-sm text-muted-foreground mb-4">
           This ad slot may have been removed or doesn't exist.
         </p>
-        <Button variant="outline" onClick={() => navigate({ to: '/ads' })}>
+        <Button variant="outline" onClick={() => navigate({ to: '/adplacements' })}>
           Back to Ads
         </Button>
       </div>
@@ -156,7 +156,7 @@ export function SlotDetailPage() {
     try {
       await acceptBid.mutateAsync({ slotId });
       toast.success('Bid accepted — sponsorship is now active!');
-      navigate({ to: '/ads' });
+      navigate({ to: '/adplacements' });
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to accept bid');
     }
@@ -170,7 +170,7 @@ export function SlotDetailPage() {
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          onClick={() => navigate({ to: '/ads' })}
+          onClick={() => navigate({ to: '/adplacements' })}
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>

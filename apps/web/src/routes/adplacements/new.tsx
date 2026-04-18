@@ -29,10 +29,10 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
 
-export const Route = createFileRoute('/ads/new')({
+export const Route = createFileRoute('/adplacements/new')({
   beforeLoad: ({ context }) => {
     if (!context.hasSession()) {
-      throw redirect({ to: '/login', search: { redirect: '/ads/new' } });
+      throw redirect({ to: '/login', search: { redirect: '/adplacements/new' } });
     }
   },
   component: CreateAdSlotPage,
@@ -90,7 +90,7 @@ export function CreateAdSlotPage() {
 
   useEffect(() => {
     if (!isAuthenticated && !isAuthenticating) {
-      navigate({ to: '/login', search: { redirect: '/ads/new' } });
+      navigate({ to: '/login', search: { redirect: '/adplacements/new' } });
     }
   }, [isAuthenticated, isAuthenticating, navigate]);
 
@@ -141,7 +141,7 @@ export function CreateAdSlotPage() {
   function back() {
     const prev = STEPS[stepIdx - 1];
     if (prev) setStep(prev);
-    else navigate({ to: '/ads' });
+    else navigate({ to: '/adplacements' });
   }
 
   async function handleCreate() {
@@ -160,7 +160,7 @@ export function CreateAdSlotPage() {
         constraints: form.constraints || undefined,
       });
       toast.success('Ad slot created! Advertisers can now bid.');
-      navigate({ to: '/ads' });
+      navigate({ to: '/adplacements' });
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to create slot');
     }

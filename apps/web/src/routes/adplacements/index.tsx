@@ -30,7 +30,7 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
 
-export const Route = createFileRoute('/ads/')({
+export const Route = createFileRoute('/adplacements/')({
   component: AdsHubPage,
 });
 
@@ -79,7 +79,7 @@ function AdsHubPage() {
               </p>
             </div>
             {isConnected && (
-              <Link to="/ads/new">
+              <Link to="/adplacements/new">
                 <Button size="sm" className="gap-1">
                   <Plus className="w-4 h-4" />
                   Create Slot
@@ -200,7 +200,7 @@ function BrowseTab({
           <p className="text-xs text-muted-foreground mb-3">
             Plant ad seeds with bounties. Filmmakers earn $LOAR by placing your ads in their films.
           </p>
-          <Link to="/ads/seeds">
+          <Link to="/adplacements/seeds">
             <Button size="sm" className="gap-1">
               Enter Seed Dance
               <ArrowRight className="w-3.5 h-3.5" />

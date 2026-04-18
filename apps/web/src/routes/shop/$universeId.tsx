@@ -251,7 +251,7 @@ function UniverseShopPage() {
             <TabsContent value="ads">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">Open Ad Slots</h3>
-                <Link to="/ads/new">
+                <Link to="/adplacements/new">
                   <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
                     <Plus className="w-3 h-3" />
                     New Slot
@@ -272,7 +272,7 @@ function UniverseShopPage() {
                 <div className="text-center py-12 text-muted-foreground">
                   <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No open ad slots</p>
-                  <Link to="/ads/new">
+                  <Link to="/adplacements/new">
                     <Button variant="outline" size="sm" className="mt-3">
                       Create a Slot
                     </Button>
@@ -406,7 +406,7 @@ function AdSlotCard({ slot }: { slot: any }) {
 
   return (
     <Link
-      to="/ads/$slotId"
+      to="/adplacements/$slotId"
       params={{ slotId: slot.id }}
       search={{
         universeId: slot.universeId,
