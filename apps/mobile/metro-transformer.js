@@ -27,9 +27,11 @@ function replaceImportMetaPlugin({ types: t }) {
   };
 }
 
+const fs = require('fs');
 module.exports.transform = async function transform({ src, filename, options }) {
   let transformedSrc = src;
   if (src.includes('import.meta')) {
+    fs.appendFileSync('/tmp/metro-transform.log', `HIT: ${filename}\n`);
     try {
       const result = transformSync(src, {
         filename,
