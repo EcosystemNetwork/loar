@@ -350,11 +350,39 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             // RENT/LICENSE — check expiry, auto-expire if past
             if (deal.endTime > 0 && block.timestamp > deal.endTime) {
                 deal.status = DealStatus.EXPIRED;
+                emit DealExpired(dealIds[i - 1]);
                 continue;
             }
             return true;
         }
         return false;
+    }
+
+    /// @notice CONTENT-02: Permissionless expiry transition — anyone can push an out-of-time
+    ///         deal from ACTIVE into EXPIRED state. Keeps on-chain state consistent with
+    ///         real-world expiry so `hasAccessFast` cannot return a stale true value.
+    /// @param dealId The deal to expire.
+    function expireDeal(uint256 dealId) external {
+        Deal storage deal = deals[dealId];
+        if (deal.status != DealStatus.ACTIVE) revert DealNotActive();
+        if (deal.dealType == DealType.BUY) revert DealNotActive();   // BUYs never expire
+        if (deal.endTime == 0) revert DealNotActive();               // no expiry set
+        if (block.timestamp <= deal.endTime) revert DealNotActive(); // not yet past deadline
+        deal.status = DealStatus.EXPIRED;
+        emit DealExpired(dealId);
+    }
+
+    /// @notice CONTENT-02: Batch expire — helper for keepers to cheaply sweep stale deals.
+    function expireDeals(uint256[] calldata dealIds) external {
+        for (uint256 i = 0; i < dealIds.length; i++) {
+            Deal storage deal = deals[dealIds[i]];
+            if (deal.status != DealStatus.ACTIVE) continue;
+            if (deal.dealType == DealType.BUY) continue;
+            if (deal.endTime == 0) continue;
+            if (block.timestamp <= deal.endTime) continue;
+            deal.status = DealStatus.EXPIRED;
+            emit DealExpired(dealIds[i]);
+        }
     }
 
     // ── Management ──────────────────────────────────────────────────────
