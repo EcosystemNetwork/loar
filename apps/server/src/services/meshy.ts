@@ -237,25 +237,22 @@ class MeshyService {
    */
   async textToTexture(options: TextToTextureOptions): Promise<{ taskId: string }> {
     const data = await this.post<{ result: string }>(
-      '/text-to-texture',
+      '/retexture',
       {
         model_url: options.modelUrl,
-        object_prompt: options.prompt,
-        negative_prompt: options.negativePrompt || '',
-        style_prompt: options.artStyle || 'realistic',
-        resolution: options.resolution || 2048,
+        text_style_prompt: options.prompt,
+        ai_model: 'meshy-6',
         enable_original_uv: options.enableOriginalUV ?? true,
         enable_pbr: options.enablePbr ?? true,
-        art_style: options.artStyle || 'realistic',
-        painting_style: options.paintingStyle || 'texture',
+        remove_lighting: true,
       },
-      TEXT_TO_3D_BASE
+      IMAGE_TO_3D_BASE
     );
     return { taskId: data.result };
   }
 
   async getTextToTextureTask(taskId: string): Promise<MeshyTextureTask> {
-    const task = await this.get<MeshyTextureTask>(`/text-to-texture/${taskId}`, TEXT_TO_3D_BASE);
+    const task = await this.get<MeshyTextureTask>(`/retexture/${taskId}`, IMAGE_TO_3D_BASE);
     return this.normalizeTask(task) as MeshyTextureTask;
   }
 

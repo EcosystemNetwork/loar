@@ -130,7 +130,8 @@ async function main() {
 
       // ── Step 2: Apply textures via text-to-texture ────────────────
       console.log(`  Step 2: Applying textures (Meshy text-to-texture)...`);
-      const texturePrompt = `${entityName}, ${description}, realistic style, detailed PBR textures, high quality materials`;
+      let texturePrompt = `${entityName}, ${description}, realistic style, detailed PBR textures, high quality materials`;
+      if (texturePrompt.length > 800) texturePrompt = texturePrompt.slice(0, 797) + '...';
 
       const { taskId: textureTaskId } = await meshyService.textToTexture({
         modelUrl: glbUrl,

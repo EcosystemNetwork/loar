@@ -37,11 +37,24 @@ import {
   Music,
   Settings,
   Pencil,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  User,
+  MapPin,
+  Swords,
+  Scroll,
+  Cpu,
+  Bug,
+  Car,
+  Building2,
+  Calendar,
+  Package,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { useChainId } from 'wagmi';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { getExplorerAddressUrl, getExplorerName } from '@/configs/chains';
@@ -481,6 +494,9 @@ export function UniverseSidebar({
                 </Link>
               </div>
 
+              {/* Wiki Entities */}
+              <WikiEntitiesSection universeAddress={universeIdOrAddress} />
+
               {/* Gen Config button */}
               {isBlockchain && (
                 <div>
@@ -691,5 +707,206 @@ export function UniverseSidebar({
         </div>
       )}
     </>
+  );
+}
+
+// ── Kind icons + labels ─────────────────────────────────────────────
+
+const KIND_CONFIG: Record<string, { icon: typeof User; label: string; color: string }> = {
+  person: { icon: User, label: 'Characters', color: 'text-blue-500' },
+  place: { icon: MapPin, label: 'Places', color: 'text-emerald-500' },
+  faction: { icon: Swords, label: 'Factions', color: 'text-red-500' },
+  lore: { icon: Scroll, label: 'Lore', color: 'text-amber-500' },
+  event: { icon: Calendar, label: 'Events', color: 'text-orange-500' },
+  technology: { icon: Cpu, label: 'Technology', color: 'text-cyan-500' },
+  species: { icon: Bug, label: 'Species', color: 'text-green-500' },
+  thing: { icon: Package, label: 'Items', color: 'text-violet-500' },
+  vehicle: { icon: Car, label: 'Vehicles', color: 'text-slate-500' },
+  organization: { icon: Building2, label: 'Organizations', color: 'text-indigo-500' },
+};
+
+const KIND_ORDER = [
+  'person',
+  'place',
+  'faction',
+  'lore',
+  'event',
+  'technology',
+  'species',
+  'thing',
+  'vehicle',
+  'organization',
+];
+
+interface WikiEntity {
+  id: string;
+  name: string;
+  kind: string;
+  description?: string;
+  imageUrl?: string | null;
+}
+
+function WikiEntitiesSection({ universeAddress }: { universeAddress?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [expandedKinds, setExpandedKinds] = useState<Set<string>>(new Set(['person', 'place']));
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['sidebar-entities', universeAddress],
+    queryFn: async () => {
+      if (!universeAddress) return { entities: [] };
+      return trpcClient.entities.list.query({ universeAddress });
+    },
+    enabled: !!universeAddress,
+    staleTime: 60_000,
+  });
+
+  const entities: WikiEntity[] = data?.entities ?? [];
+
+  if (!universeAddress) return null;
+
+  // Group by kind
+  const byKind = new Map<string, WikiEntity[]>();
+  for (const entity of entities) {
+    const list = byKind.get(entity.kind) || [];
+    list.push(entity);
+    byKind.set(entity.kind, list);
+  }
+
+  const toggleKind = (kind: string) => {
+    setExpandedKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
+
+  return (
+    <div className="border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/30 hover:from-blue-100 hover:to-sky-100 dark:hover:from-blue-950/50 dark:hover:to-sky-950/50 transition-all duration-300"
+      >
+        <span className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+          <BookOpen className="h-4 w-4" />
+          Wiki
+          {entities.length > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+              {entities.length}
+            </Badge>
+          )}
+        </span>
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 text-blue-500" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-blue-500" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="max-h-[50vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : entities.length === 0 ? (
+            <div className="text-center py-4 px-3">
+              <p className="text-xs text-muted-foreground mb-2">No entities yet</p>
+              <Link to="/create" search={{ universe: universeAddress }}>
+                <Button size="sm" variant="outline" className="text-xs h-7">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Create
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {KIND_ORDER.filter((k) => byKind.has(k)).map((kind) => {
+                const config = KIND_CONFIG[kind] || {
+                  icon: Package,
+                  label: kind,
+                  color: 'text-muted-foreground',
+                };
+                const Icon = config.icon;
+                const kindEntities = byKind.get(kind)!;
+                const isOpen = expandedKinds.has(kind);
+
+                return (
+                  <div key={kind}>
+                    <button
+                      onClick={() => toggleKind(kind)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      {isOpen ? (
+                        <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      )}
+                      <Icon className={`h-3.5 w-3.5 ${config.color} flex-shrink-0`} />
+                      <span className="text-xs font-medium flex-1">{config.label}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {kindEntities.length}
+                      </span>
+                    </button>
+
+                    {isOpen && (
+                      <div className="pb-1">
+                        {kindEntities.map((entity) => (
+                          <Link
+                            key={entity.id}
+                            to="/wiki/entity/$id"
+                            params={{ id: entity.id }}
+                            className="flex items-center gap-2 px-3 pl-8 py-1 hover:bg-muted/40 transition-colors group"
+                          >
+                            {entity.imageUrl ? (
+                              <img
+                                src={entity.imageUrl}
+                                alt={entity.name}
+                                className="h-6 w-6 rounded object-cover flex-shrink-0 border border-border"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="h-6 w-6 rounded bg-muted flex items-center justify-center flex-shrink-0 border border-border">
+                                <Icon className={`h-3 w-3 ${config.color}`} />
+                              </div>
+                            )}
+                            <span className="text-xs truncate group-hover:text-foreground text-muted-foreground">
+                              {entity.name}
+                            </span>
+                          </Link>
+                        ))}
+                        <Link
+                          to="/create/$kind"
+                          params={{ kind }}
+                          search={{ universe: universeAddress }}
+                          className="flex items-center gap-2 px-3 pl-8 py-1 hover:bg-muted/40 transition-colors"
+                        >
+                          <div className="h-6 w-6 rounded border border-dashed border-muted-foreground/40 flex items-center justify-center flex-shrink-0">
+                            <Plus className="h-3 w-3 text-muted-foreground" />
+                          </div>
+                          <span className="text-xs text-muted-foreground italic">
+                            Add {config.label.toLowerCase()}...
+                          </span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add new kind */}
+              <div className="px-3 py-2">
+                <Link to="/create" search={{ universe: universeAddress }}>
+                  <Button size="sm" variant="ghost" className="w-full text-xs h-7">
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Entity
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -3178,6 +3178,17 @@ function UniverseTimelineEditorInner() {
                     variant="outline"
                     size="sm"
                     asChild
+                    className="hover:bg-blue-500/10 hover:text-blue-400 transition-all duration-300"
+                  >
+                    <Link to="/wiki" search={{ universe: id }}>
+                      <Layers className="h-4 w-4 mr-2" />
+                      Wiki
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
                     className="hover:bg-green-500/10 hover:text-green-400 transition-all duration-300"
                   >
                     <Link to="/upload" search={{ universeId: id }}>
