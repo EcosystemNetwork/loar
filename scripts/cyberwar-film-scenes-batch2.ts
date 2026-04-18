@@ -523,9 +523,9 @@ async function pinToIPFS(
     }
   }
   if (!buf) {
-    // Fallback: use ByteDance URL directly (skip Pinata pin)
-    log(label, 'All download attempts failed — using ByteDance URL directly');
-    return { url: videoUrl, hash: `bd-fallback-${Date.now()}` };
+    // Do NOT fall back to the ephemeral ByteDance URL — on-chain data is permanent
+    // but presigned URLs expire in ~24h, leaving dead links on-chain forever.
+    throw new Error(`download failed after 3 retries — refusing to use ephemeral URL`);
   }
   log(label, `${(buf.byteLength / 1024 / 1024).toFixed(1)} MB → Pinata`);
   const form = new FormData();

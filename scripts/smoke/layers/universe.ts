@@ -55,25 +55,39 @@ export async function runUniverseLayer(cfg: SmokeConfig, token: string): Promise
     })
   );
 
-  // 4. universes.create — Firestore write with wallet signature
+  // 4. universes.create — Firestore write with wallet signature + server nonce
   results.push(
     await check('universes.create → Firestore write', async () => {
+      if (!token) throw new Error('no JWT — auth layer failed');
+      // Fetch a fresh server-issued nonce (prevents signature replay)
+      const nonceRes = await tRPCQuery<{ nonce: string }>(cfg, 'universes.getNonce', null, token);
+      if (!nonceRes?.nonce) throw new Error('universes.getNonce did not return a nonce');
+
       const meta = sampleUniverseMeta(address);
-      const message = buildUniverseCreateMessage(address);
+      const message = buildUniverseCreateMessage(address, nonceRes.nonce);
       const signature = await account.signMessage({ message });
 
-      const result = await tRPCMutate<{ id: string }>(cfg, 'universes.create', {
-        address: meta.address,
-        creator: address,
-        tokenAddress: meta.tokenAddress,
-        governanceAddress: meta.governanceAddress,
-        imageUrl: meta.imageUrl,
-        description: meta.description,
-        signature,
-        message,
-      });
+      const result = await tRPCMutate<{ id: string }>(
+        cfg,
+        'universes.create',
+        {
+          address: meta.address,
+          creator: address,
+          tokenAddress: meta.tokenAddress,
+          governanceAddress: meta.governanceAddress,
+          imageUrl: meta.imageUrl,
+          description: meta.description,
+          signature,
+          message,
+          nonce: nonceRes.nonce,
+          chainId: cfg.chainId,
+        },
+        token
+      );
 
-      const id = (result as Record<string, unknown>)?.id as string | undefined;
+      // Handler wraps the created record as { success, data: {id, ...} }.
+      const r = result as { id?: string; data?: { id?: string } };
+      const id = r?.id ?? r?.data?.id;
       if (!id) throw new Error(`no id in response: ${JSON.stringify(result).slice(0, 120)}`);
       universeId = id;
       return `id=${id.slice(0, 12)}…`;
@@ -84,10 +98,10 @@ export async function runUniverseLayer(cfg: SmokeConfig, token: string): Promise
   if (universeId) {
     results.push(
       await check('universes.get → read-back created universe', async () => {
-        const u = await tRPCQuery<{ id: string; description: string }>(cfg, 'universes.get', {
-          id: universeId,
-        });
-        const desc = (u as Record<string, unknown>)?.description as string | undefined;
+        const u = await tRPCQuery<unknown>(cfg, 'universes.get', { id: universeId });
+        // Handler wraps response as { success, data: {...} }; tolerate either shape.
+        const r = u as { description?: string; data?: { description?: string } };
+        const desc = r?.description ?? r?.data?.description;
         if (!desc)
           throw new Error(`no description in response: ${JSON.stringify(u).slice(0, 120)}`);
         return desc.slice(0, 40) + '…';

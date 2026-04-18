@@ -132,9 +132,7 @@ export default function DraftsScreen() {
                   <Badge variant={item.status === 'promoted' ? 'success' : 'default'}>
                     {item.status}
                   </Badge>
-                  {item.model ? (
-                    <Badge variant="muted">{item.model.slice(0, 12)}</Badge>
-                  ) : null}
+                  {item.model ? <Badge variant="muted">{item.model.slice(0, 12)}</Badge> : null}
                   {item.tags?.slice(0, 2).map((tag) => (
                     <Badge key={tag} variant="muted">
                       {tag}

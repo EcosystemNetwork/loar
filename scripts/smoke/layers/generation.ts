@@ -27,11 +27,13 @@ export async function runGenerationLayer(
   let generationId: string | undefined;
   let videoUrl: string | undefined;
 
-  // 1. generation.getModels — always available, no AI keys required
+  // 1. generation.listModels — always available, no AI keys required
   results.push(
-    await check('generation.getModels → model list returned', async () => {
+    await check('generation.listModels → model list returned', async () => {
       if (!token) throw new Error('no JWT — auth layer failed');
-      const models = await tRPCQuery<unknown[]>(cfg, 'generation.getModels', null, token);
+      // listModels expects an optional object input (or undefined); pass {} to
+      // satisfy tRPC v10's non-null object validator in this router.
+      const models = await tRPCQuery<unknown[]>(cfg, 'generation.listModels', {}, token);
       const count = Array.isArray(models) ? models.length : 0;
       if (count === 0) throw new Error('no models returned — check VIDEO_MODELS config');
       return `${count} model(s)`;

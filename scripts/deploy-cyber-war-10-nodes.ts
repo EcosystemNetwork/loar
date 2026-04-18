@@ -449,9 +449,9 @@ async function uploadToStorage(
   sceneIndex: number
 ): Promise<{ storageUrl: string; contentHash: string }> {
   if (!PINATA_JWT) {
-    log(`UPLOAD ${sceneIndex + 1}/10`, 'No PINATA_JWT — using ByteDance URL directly');
-    const hash = keccak256(toBytes(videoUrl));
-    return { storageUrl: videoUrl, contentHash: hash };
+    // ByteDance URLs are presigned and expire in ~24h. On-chain data is permanent,
+    // so we refuse to write an ephemeral URL on-chain.
+    throw new Error('PINATA_JWT is required — ephemeral URL cannot be written on-chain');
   }
 
   log(`UPLOAD ${sceneIndex + 1}/10`, 'Downloading video from ByteDance...');
@@ -482,9 +482,9 @@ async function uploadToStorage(
 
   if (!pinRes.ok) {
     const text = await pinRes.text();
-    log(`UPLOAD ${sceneIndex + 1}/10`, `Pinata failed (${pinRes.status}), using ByteDance URL`);
-    const hash = keccak256(toBytes(videoUrl));
-    return { storageUrl: videoUrl, contentHash: hash };
+    throw new Error(
+      `Pinata pin failed (${pinRes.status}) ${text.slice(0, 120)} — refusing to use ephemeral URL`
+    );
   }
 
   const pinData = (await pinRes.json()) as { IpfsHash: string; PinSize: number };

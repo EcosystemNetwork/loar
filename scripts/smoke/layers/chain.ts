@@ -34,8 +34,9 @@ const UNIVERSE_MANAGER_ADDRESSES: Record<number, `0x${string}`> = {
 };
 
 const UNIVERSE_MANAGER_ABI = parseAbi([
-  'function universeCount() view returns (uint256)',
-  'function getUniverse(uint256 id) view returns (address)',
+  'function totalSupply() view returns (uint256)',
+  'function getUniverseData(uint256 id) view returns (address universe, address token, address governor)',
+  'function mintFee() view returns (uint256)',
 ]);
 
 const UNIVERSE_ABI = parseAbi([
@@ -87,15 +88,27 @@ export async function runChainLayer(cfg: SmokeConfig): Promise<ChainResult> {
     })
   );
 
-  // 3. Read universe count from UniverseManager
+  // 3. Read universe count from UniverseManager (via ERC721 totalSupply)
   results.push(
-    await check('UniverseManager.universeCount() readable', async () => {
+    await check('UniverseManager.totalSupply() readable', async () => {
       const count = await publicClient.readContract({
         address: UNIVERSE_MANAGER_ADDRESS,
         abi: UNIVERSE_MANAGER_ABI,
-        functionName: 'universeCount',
+        functionName: 'totalSupply',
       });
-      return `${count} universe(s) on-chain`;
+      return `${count} universe(s) minted on-chain`;
+    })
+  );
+
+  // 3b. Read mint fee (proves contract is properly initialized)
+  results.push(
+    await check('UniverseManager.mintFee() readable', async () => {
+      const fee = await publicClient.readContract({
+        address: UNIVERSE_MANAGER_ADDRESS,
+        abi: UNIVERSE_MANAGER_ABI,
+        functionName: 'mintFee',
+      });
+      return `${Number(fee) / 1e18} ETH mint fee`;
     })
   );
 

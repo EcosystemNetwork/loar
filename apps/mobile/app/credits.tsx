@@ -46,7 +46,12 @@ export default function CreditsScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 32,
+          gap: 24,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={balanceQuery.isFetching}
@@ -195,9 +200,7 @@ export default function CreditsScreen() {
                   </View>
                   <Text
                     className={`font-semibold text-sm ${
-                      (tx.credits ?? tx.totalCredits ?? 0) > 0
-                        ? 'text-success'
-                        : 'text-error'
+                      (tx.credits ?? tx.totalCredits ?? 0) > 0 ? 'text-success' : 'text-error'
                     }`}
                   >
                     {(tx.credits ?? tx.totalCredits ?? 0) > 0 ? '+' : ''}

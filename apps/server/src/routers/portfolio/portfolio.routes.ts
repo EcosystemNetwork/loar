@@ -45,21 +45,16 @@ export const portfolioRouter = router({
     const address = ctx.user.address?.toLowerCase();
     const now = new Date();
 
-    const [
-      creditsDoc,
-      universesSnap,
-      subscriptionsSnap,
-      draftsSnap,
-      nftMintsSnap,
-    ] = await Promise.all([
-      creditsCol().doc(uid).get(),
-      address
-        ? universesCol().where('creator', '==', address).get()
-        : Promise.resolve(null),
-      subscriptionsCol().where('uid', '==', uid).get(),
-      sandboxCol().where('creatorAddress', '==', address ?? '').get(),
-      nftMintsCol().where('creatorUid', '==', uid).get(),
-    ]);
+    const [creditsDoc, universesSnap, subscriptionsSnap, draftsSnap, nftMintsSnap] =
+      await Promise.all([
+        creditsCol().doc(uid).get(),
+        address ? universesCol().where('creator', '==', address).get() : Promise.resolve(null),
+        subscriptionsCol().where('uid', '==', uid).get(),
+        sandboxCol()
+          .where('creatorAddress', '==', address ?? '')
+          .get(),
+        nftMintsCol().where('creatorUid', '==', uid).get(),
+      ]);
 
     // Credits
     const credits = creditsDoc.exists ? creditsDoc.data()! : {};
@@ -73,14 +68,10 @@ export const portfolioRouter = router({
 
     // Subscriptions
     const allSubs = subscriptionsSnap.docs.map((d) => d.data());
-    const activeSubs = allSubs.filter(
-      (s) => s.expiresAt?.toDate?.() > now
-    );
+    const activeSubs = allSubs.filter((s) => s.expiresAt?.toDate?.() > now);
 
     // Drafts
-    const pendingDrafts = draftsSnap.docs.filter(
-      (d) => d.data().status === 'draft'
-    );
+    const pendingDrafts = draftsSnap.docs.filter((d) => d.data().status === 'draft');
 
     // NFT listings (minted content)
     const nftCount = nftMintsSnap.docs.length;

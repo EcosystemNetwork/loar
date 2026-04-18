@@ -41,9 +41,9 @@ export default function EarningsScreen() {
   const universes = universesQuery.data ?? [];
 
   // Aggregate subscription stats per universe
-  const subStatsQueries = universes.slice(0, 5).map((u: any) =>
-    trpc.subscriptions.getUniverseStats.queryOptions({ universeId: u.id })
-  );
+  const subStatsQueries = universes
+    .slice(0, 5)
+    .map((u: any) => trpc.subscriptions.getUniverseStats.queryOptions({ universeId: u.id }));
 
   // Placeholder breakdowns — these will be populated as monetization backends mature
   const categories: EarningsCategory[] = [
@@ -62,7 +62,12 @@ export default function EarningsScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 32,
+          gap: 24,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={universesQuery.isFetching}
@@ -122,13 +127,11 @@ export default function EarningsScreen() {
 
         {/* Info */}
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
-          <Text className="text-text-primary font-semibold text-sm">
-            Earnings Aggregation
-          </Text>
+          <Text className="text-text-primary font-semibold text-sm">Earnings Aggregation</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            On-chain revenue (NFT royalties, canon rewards, subscription payments) requires
-            the LOAR indexer to index your universes. Off-chain revenue (ad placements,
-            licensing deals) is tracked in the LOAR server.
+            On-chain revenue (NFT royalties, canon rewards, subscription payments) requires the LOAR
+            indexer to index your universes. Off-chain revenue (ad placements, licensing deals) is
+            tracked in the LOAR server.
           </Text>
         </View>
       </ScrollView>

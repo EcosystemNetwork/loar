@@ -51,14 +51,17 @@ export default function ProfileScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 32, gap: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 24,
+          paddingBottom: 32,
+          gap: 24,
+        }}
       >
         {/* Avatar and name */}
         <View className="items-center gap-3">
           <View className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary items-center justify-center">
-            <Text className="text-3xl">
-              {profile?.avatarUrl ? '🖼' : '👤'}
-            </Text>
+            <Text className="text-3xl">{profile?.avatarUrl ? '🖼' : '👤'}</Text>
           </View>
           <View className="items-center gap-1">
             <Text className="text-text-primary text-xl font-bold">{displayName}</Text>

@@ -10,7 +10,13 @@ interface EmptyStateProps {
   icon?: string;
 }
 
-export function EmptyState({ title, description, actionLabel, onAction, icon = '📭' }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  icon = '📭',
+}: EmptyStateProps) {
   return (
     <View className="flex-1 items-center justify-center gap-4 px-8 py-16">
       <Text className="text-4xl">{icon}</Text>

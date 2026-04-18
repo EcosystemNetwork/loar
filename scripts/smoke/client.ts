@@ -27,6 +27,7 @@ export async function tRPCQuery<T>(
     {
       headers: {
         'Content-Type': 'application/json',
+        Origin: cfg.origin,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     },
@@ -53,6 +54,7 @@ export async function tRPCMutate<T>(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Origin: cfg.origin,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ '0': input }),
@@ -92,6 +94,7 @@ export async function rawGet(
     url,
     {
       headers: {
+        Origin: cfg.origin,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     },
@@ -114,7 +117,7 @@ export async function rawPost(
   path: string,
   payload: unknown,
   token?: string
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: unknown; setCookie: string | null }> {
   const url = `${cfg.serverUrl}${path}`;
   const res = await fetchWithTimeout(
     url,
@@ -122,6 +125,7 @@ export async function rawPost(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Origin: cfg.origin,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(payload),
@@ -129,6 +133,7 @@ export async function rawPost(
     cfg.timeout
   );
 
+  const setCookie = res.headers.get('set-cookie');
   let body: unknown;
   const ct = res.headers.get('content-type') ?? '';
   try {
@@ -137,7 +142,7 @@ export async function rawPost(
     body = null;
   }
 
-  return { status: res.status, body };
+  return { status: res.status, body, setCookie };
 }
 
 /** GET against the indexer (different base URL). */
@@ -194,7 +199,8 @@ export function buildSiweMessage(params: {
   chainId: number;
   statement?: string;
 }): string {
-  const now = new Date().toISOString();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 2 * 60 * 1000);
   return [
     `${params.domain} wants you to sign in with your Ethereum account:`,
     params.address,
@@ -205,14 +211,15 @@ export function buildSiweMessage(params: {
     `Version: 1`,
     `Chain ID: ${params.chainId}`,
     `Nonce: ${params.nonce}`,
-    `Issued At: ${now}`,
+    `Issued At: ${now.toISOString()}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
   ].join('\n');
 }
 
 /** Build the message used by universes.create (verified by verifyMessage in the route). */
-export function buildUniverseCreateMessage(address: string): string {
+export function buildUniverseCreateMessage(address: string, nonce: string): string {
   const timestamp = Math.floor(Date.now() / 1000);
-  return `Create universe as ${address} at ${timestamp}`;
+  return `Create universe as ${address} with nonce ${nonce} at ${timestamp}`;
 }
 
 // ── Fetch with timeout ────────────────────────────────────────────────────────

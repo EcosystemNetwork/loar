@@ -65,16 +65,22 @@ export async function runAuthLayer(cfg: SmokeConfig): Promise<AuthResult> {
 
   if (!message || signature === '0x') return { token, address, checks };
 
-  // 3. POST /auth/verify → JWT
+  // 3. POST /auth/verify → JWT (set as httpOnly cookie siwe-session=<jwt>)
   checks.push(
     await check('POST /auth/verify → JWT issued', async () => {
-      const { status, body } = await rawPost(cfg, '/auth/verify', { message, signature });
+      const { status, body, setCookie } = await rawPost(cfg, '/auth/verify', {
+        message,
+        signature,
+      });
       if (status !== 200) {
         const msg = (body as Record<string, unknown>)?.error ?? JSON.stringify(body);
         throw new Error(`HTTP ${status}: ${msg}`);
       }
-      const b = body as Record<string, unknown>;
-      token = (b?.token as string) ?? '';
+      // Server returns { address, chain, expiresAt } in body and sets the JWT
+      // as an httpOnly cookie named `siwe-session`. Extract the JWT for use
+      // as a Bearer token on subsequent authenticated requests.
+      const cookieMatch = setCookie?.match(/siwe-session=([^;]+)/);
+      token = cookieMatch?.[1] ?? '';
       if (!token || token.split('.').length !== 3) {
         throw new Error(`unexpected token format: ${String(token).slice(0, 40)}`);
       }

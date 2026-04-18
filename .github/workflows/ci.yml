@@ -103,7 +103,7 @@ jobs:
       - name: Build web
         run: pnpm --filter web build
 
-      - name: "Verify no node: imports in bundle"
+      - name: 'Verify no node: imports in bundle'
         run: |
           if grep -rP 'require\("node:|from "node:|from '\''node:' apps/web/dist/assets/*.js 2>/dev/null; then
             echo "ERROR: node: module imports found in browser bundle"

@@ -18,11 +18,7 @@ export function NFTCard({ nft }: NFTCardProps) {
       style={{ width: 160 }}
     >
       {nft.imageUrl ? (
-        <Image
-          source={{ uri: nft.imageUrl }}
-          className="w-full h-40"
-          resizeMode="cover"
-        />
+        <Image source={{ uri: nft.imageUrl }} className="w-full h-40" resizeMode="cover" />
       ) : (
         <View className="w-full h-40 bg-zinc-900 items-center justify-center">
           <Text className="text-4xl">{nft.kind === 'episode' ? '🎬' : '👤'}</Text>

@@ -7,6 +7,10 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
+// Rewrite `import.meta` (unsupported by Hermes) to ES6-compatible form.
+// Applies to all files including node_modules — see metro-transformer.js.
+config.transformer.babelTransformerPath = require.resolve('./metro-transformer.js');
+
 // Watch the monorepo root so packages in the workspace are tracked for HMR.
 config.watchFolders = [workspaceRoot];
 

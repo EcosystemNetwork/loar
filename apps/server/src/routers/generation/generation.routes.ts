@@ -362,11 +362,23 @@ async function autoPublishVideoToGallery(opts: {
   generationId: string;
   thumbnailUrl?: string;
 }): Promise<void> {
+  // Prefer the permanent IPFS URL if the async persist already completed —
+  // avoids a race where the gallery keeps an ephemeral URL forever.
+  let mediaUrl = opts.videoUrl;
+  try {
+    const genDoc = await generationsCol().doc(opts.generationId).get();
+    const permanent = genDoc.data()?.permanentVideoUrl;
+    if (permanent) mediaUrl = permanent;
+  } catch {
+    // Fallback to ephemeral URL — persistVideoToStorage will rewrite the
+    // content doc's mediaUrl once it finishes.
+  }
+
   const thumbnailUrl =
-    opts.thumbnailUrl || (await extractVideoThumbnail(opts.videoUrl, opts.generationId));
+    opts.thumbnailUrl || (await extractVideoThumbnail(mediaUrl, opts.generationId));
   await publishToGallery({
     creatorUid: opts.creatorUid,
-    mediaUrl: opts.videoUrl,
+    mediaUrl,
     thumbnailUrl,
     mediaType: 'ai-video',
     title: opts.prompt.slice(0, 100) || 'Generated Video',
@@ -435,6 +447,19 @@ async function persistVideoToStorage(opts: {
 
       for (const doc of contentDocs.docs) {
         await doc.ref.update({ mediaUrl: permanentUrl });
+      }
+
+      // Update any off-chain timeline nodes (fun-mode universes) referencing
+      // this generation's ephemeral URL — so the universe page shows the
+      // permanent URL once the async persist completes.
+      const offChainNodes = await db
+        .collection('offChainNodes')
+        .where('videoUrl', '==', opts.videoUrl)
+        .limit(10)
+        .get();
+
+      for (const doc of offChainNodes.docs) {
+        await doc.ref.update({ videoUrl: permanentUrl, contentHash: manifest.contentHash });
       }
 
       console.log(`[persist] ${filename} saved permanently: ${permanentUrl}`);

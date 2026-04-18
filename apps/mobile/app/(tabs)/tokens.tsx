@@ -43,7 +43,12 @@ export default function TokensScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 32,
+          gap: 24,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={universesQuery.isFetching}
@@ -95,13 +100,11 @@ export default function TokensScreen() {
 
         {/* Info box */}
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
-          <Text className="text-text-primary font-semibold text-sm">
-            On-Chain Token Balances
-          </Text>
+          <Text className="text-text-primary font-semibold text-sm">On-Chain Token Balances</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            Token balances are read directly from the Sepolia blockchain. Make sure your wallet
-            is connected to Sepolia to see accurate holdings. Full balance tracking via the
-            LOAR indexer is coming in the next release.
+            Token balances are read directly from the Sepolia blockchain. Make sure your wallet is
+            connected to Sepolia to see accurate holdings. Full balance tracking via the LOAR
+            indexer is coming in the next release.
           </Text>
         </View>
       </ScrollView>

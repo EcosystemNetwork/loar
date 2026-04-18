@@ -77,13 +77,14 @@ export const TEST_PNG_URL = 'https://httpbin.org/image/png';
 
 export function sampleUniverseMeta(wallet: `0x${string}`) {
   const ts = Date.now();
+  // Derive unique fake addresses from the timestamp so repeat smoke runs
+  // don't collide on "universe already exists" in Firestore.
   return {
     name: `Smoke Universe ${ts}`,
     description: `Auto-generated smoke test universe — ${new Date(ts).toISOString()}`,
-    // Fake but valid-format addresses for Firestore-only create tests
-    address: '0x0000000000000000000000000000000000000001' as `0x${string}`,
-    tokenAddress: '0x0000000000000000000000000000000000000002' as `0x${string}`,
-    governanceAddress: '0x0000000000000000000000000000000000000003' as `0x${string}`,
+    address: `0x${ts.toString(16).padStart(40, '0')}` as `0x${string}`,
+    tokenAddress: `0x${(ts + 1).toString(16).padStart(40, '0')}` as `0x${string}`,
+    governanceAddress: `0x${(ts + 2).toString(16).padStart(40, '0')}` as `0x${string}`,
     creator: wallet,
     // A real IPFS-hosted placeholder image that will always resolve
     imageUrl: 'https://ipfs.io/ipfs/QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn/readme.txt',

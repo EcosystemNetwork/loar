@@ -115,42 +115,76 @@ const sfx = (d: string, sec?: number) => {
 /* ── FAL ─────────────────────────────────────────────────────────────── */
 const fInit = () => fal.config({ credentials: FK });
 
+/** Submit to fal queue + poll for result. Returns result JSON when done. */
+async function falQueue(
+  modelId: string,
+  input: Record<string, unknown>,
+  maxWaitSec = 300
+): Promise<any> {
+  const submitRes = await fetch(`https://queue.fal.run/${modelId}`, {
+    method: 'POST',
+    headers: { Authorization: `Key ${FK}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!submitRes.ok) {
+    const t = await submitRes.text();
+    throw new Error(`Submit ${submitRes.status}: ${t.slice(0, 200)}`);
+  }
+  const sub = (await submitRes.json()) as { response_url?: string; status_url?: string };
+  if (!sub.status_url || !sub.response_url) throw new Error('No status_url in queue submit');
+
+  const pollInterval = 5000;
+  const maxAttempts = Math.ceil((maxWaitSec * 1000) / pollInterval);
+  for (let i = 0; i < maxAttempts; i++) {
+    await Z(pollInterval);
+    const statusRes = await fetch(sub.status_url, { headers: { Authorization: `Key ${FK}` } });
+    if (!statusRes.ok) continue;
+    const status = (await statusRes.json()) as { status?: string };
+    if (status.status === 'COMPLETED') {
+      const resultRes = await fetch(sub.response_url, { headers: { Authorization: `Key ${FK}` } });
+      if (!resultRes.ok) {
+        const t = await resultRes.text();
+        throw new Error(`Result ${resultRes.status}: ${t.slice(0, 200)}`);
+      }
+      return await resultRes.json();
+    }
+    if (status.status === 'FAILED' || status.status === 'ERROR') {
+      throw new Error(`Queue task ${status.status}`);
+    }
+  }
+  throw new Error(`Timed out after ${maxWaitSec}s`);
+}
+
 async function fMusic(p: string, d: number): Promise<string> {
-  fInit();
-  const clamped = Math.min(d, 30); // musicgen caps at ~30s
-  // Try musicgen stereo first (most available), then musicgen large, then stable-audio
+  const clamped = Math.min(d, 30);
   const MODELS = [
+    { id: 'fal-ai/musicgen', input: { prompt: p, duration: clamped } },
     { id: 'fal-ai/musicgen/stereo-large', input: { prompt: p, duration: clamped } },
-    { id: 'fal-ai/musicgen/large', input: { prompt: p, duration: clamped } },
     { id: 'fal-ai/stable-audio', input: { prompt: p, seconds_total: Math.min(d, 47), steps: 100 } },
   ];
   let lastErr: any = null;
   for (const m of MODELS) {
     try {
-      const r = await fal.subscribe(m.id, { input: m.input, logs: false });
-      const x = (r as any).data || r;
-      const url = x.audio_file?.url || x.audio?.url || x.audio_url || x.url;
+      const result = await falQueue(m.id, m.input, 300);
+      const url = result.audio_file?.url || result.audio?.url || result.audio_url || result.url;
       if (url) return url;
+      lastErr = new Error(`${m.id} returned no audio URL`);
     } catch (e: any) {
       lastErr = e;
+      L('MUSIC', `  ${m.id} failed: ${e.message?.slice(0, 100)}`);
     }
   }
   throw lastErr || new Error('All music models failed');
 }
 
 async function fLip(vu: string, au: string): Promise<string | null> {
-  fInit();
   for (const model of ['fal-ai/lipsync', 'fal-ai/sadtalker']) {
     try {
-      const r = await fal.subscribe(model, {
-        input: { video_url: vu, audio_url: au },
-        logs: true,
-      });
-      const d = (r as any).data || r;
-      const u = d.video?.url || d.video_url || d.url;
+      const r = await falQueue(model, { video_url: vu, audio_url: au }, 300);
+      const u = r.video?.url || r.video_url || r.url;
       if (u) return u;
-    } catch {
-      /* try next */
+    } catch (e: any) {
+      L('LIP', `  ${model} failed: ${e.message?.slice(0, 100)}`);
     }
   }
   return null;
@@ -516,14 +550,28 @@ const MUS = [
 ];
 
 /* ── FFmpeg mixer ─────────────────────────────────────────────────────── */
-function mix(v: string, dlg: string | undefined, sx: string, mu: string, out: string) {
-  const i = ['-i', v, '-i', sx, '-i', mu];
-  const f = ['[1:a]volume=0.5[s]', '[2:a]volume=0.3[m]'];
+function mix(v: string, dlg: string | undefined, sx: string, mu: string | undefined, out: string) {
+  const i = ['-i', v, '-i', sx];
+  const f = ['[1:a]volume=0.5[s]'];
+  const mixLabels: string[] = ['[s]'];
+  let nextIdx = 2;
+  if (mu && fs.existsSync(mu)) {
+    i.push('-i', mu);
+    f.push(`[${nextIdx}:a]volume=0.3[m]`);
+    mixLabels.push('[m]');
+    nextIdx++;
+  }
   if (dlg && fs.existsSync(dlg)) {
     i.push('-i', dlg);
-    f.push('[3:a]volume=1.0[d]', '[d][s][m]amix=inputs=3:duration=first:dropout_transition=2[x]');
+    f.push(`[${nextIdx}:a]volume=1.0[d]`);
+    mixLabels.push('[d]');
+    nextIdx++;
+  }
+  const mixCount = mixLabels.length;
+  if (mixCount > 1) {
+    f.push(`${mixLabels.join('')}amix=inputs=${mixCount}:duration=first:dropout_transition=2[x]`);
   } else {
-    f.push('[s][m]amix=inputs=2:duration=first:dropout_transition=2[x]');
+    f.push(`${mixLabels[0]}acopy[x]`);
   }
   const c = [
     'ffmpeg',
@@ -753,14 +801,11 @@ async function main() {
         await createSoundNode(db, contentId, 'sfx', sfxUrl, s.sx, 10, 0.5);
       }
 
-      // ── Music for scene ──
+      // ── Music for scene (may be missing if fal balance exhausted) ──
       const mu = musicFiles[s.m];
       if (!mu) {
-        L(s.id, 'No music for scene — skipping mix');
-        skip++;
-        continue;
-      }
-      if (contentId && musicUrls[s.m]) {
+        L(s.id, 'No music — mixing video + SFX + dialogue only');
+      } else if (contentId && musicUrls[s.m]) {
         await createSoundNode(
           db,
           contentId,

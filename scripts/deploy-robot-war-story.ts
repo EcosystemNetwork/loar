@@ -23,6 +23,7 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 
 // ── Config ────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';
@@ -257,9 +258,20 @@ async function main() {
   for (let i = 0; i < SCENES.length; i++) {
     let videoUrl: string;
     try {
-      videoUrl = await generateVideo(token, SCENES[i].prompt, i);
+      const ephemeralUrl = await generateVideo(token, SCENES[i].prompt, i);
+      if (isEphemeralVideoUrl(ephemeralUrl)) {
+        log(`VIDEO ${i + 1}`, `Rehosting to Pinata...`);
+        const pin = await rehostVideoToPinata(ephemeralUrl, {
+          filename: `robot-war-${i + 1}.mp4`,
+          pinName: `robot-war/scene-${i + 1}`,
+        });
+        log(`VIDEO ${i + 1}`, `Pinned: ${pin.cid}`);
+        videoUrl = pin.url;
+      } else {
+        videoUrl = ephemeralUrl;
+      }
     } catch (err: any) {
-      log(`VIDEO ${i + 1}`, `Generation failed: ${err.message?.slice(0, 200)}`);
+      log(`VIDEO ${i + 1}`, `Generation/rehost failed: ${err.message?.slice(0, 200)}`);
       videoUrl = `https://loar.fun/placeholder-robot-war-${i + 1}.mp4`;
     }
 

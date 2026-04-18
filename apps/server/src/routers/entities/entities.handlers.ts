@@ -477,9 +477,7 @@ export async function deleteRelation(relationId: string): Promise<void> {
 }
 
 /** Get all relationships where entity is source OR target. */
-export async function getEntityRelations(
-  entityId: string
-): Promise<
+export async function getEntityRelations(entityId: string): Promise<
   Array<
     EntityRelation & {
       sourceName: string;

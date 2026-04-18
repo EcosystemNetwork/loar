@@ -22,6 +22,7 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import { rehostVideoToPinata } from './lib/rehost-video';
 
 const rawKey = process.env.PRIVATE_KEY ?? '';
 const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
@@ -724,9 +725,15 @@ async function main() {
     // Retry whole scene up to 2 times
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const videoUrl = await generateVideo(scene.prompt, label);
+        const ephemeralUrl = await generateVideo(scene.prompt, label);
+        log(label, `Rehosting to Pinata...`);
+        const pin = await rehostVideoToPinata(ephemeralUrl, {
+          filename: `cw-${scene.id}.mp4`,
+          pinName: `cyber-war/${scene.id}`,
+        });
+        log(label, `Pinned: ${pin.cid} (${(pin.size / 1024 / 1024).toFixed(1)}MB)`);
         const contentHash = `cw-${scene.id}-${Date.now()}`;
-        const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
+        const nodeId = await createNode(contentHash, scene.plot, previousId, pin.url, label);
         previousId = nodeId;
         completed++;
         log(label, `DONE — Node #${nodeId}`);

@@ -8,6 +8,8 @@ export interface SmokeConfig {
   indexerUrl: string;
   chainId: number;
   rpcUrl: string;
+  // Origin header to send with CORS-protected requests (must match CORS_ORIGIN on server)
+  origin: string;
   // Optional: enables chain-write and on-chain node tests
   privateKey: `0x${string}` | undefined;
   // Optional: Universe contract address to write a test node into
@@ -33,6 +35,9 @@ export function loadConfig(): SmokeConfig {
     indexerUrl: (process.env.INDEXER_URL ?? 'http://localhost:42069').replace(/\/$/, ''),
     chainId: Number(process.env.SMOKE_CHAIN_ID ?? 84532),
     rpcUrl: process.env.SMOKE_RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? 'https://sepolia.base.org',
+    // Default to the web dev server origin (first entry in default CORS_ORIGIN).
+    // Override via SMOKE_ORIGIN env var to hit a different allowed origin.
+    origin: (process.env.SMOKE_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, ''),
     privateKey,
     universeAddress,
     timeout: Number(process.env.SMOKE_TIMEOUT ?? 15_000),

@@ -29,9 +29,7 @@ export function AssetRow({ icon, label, value, subtitle, onPress, badge }: Asset
         <Text className="text-text-secondary font-semibold text-sm">{value}</Text>
       ) : null}
       {badge ?? null}
-      {onPress ? (
-        <Text className="text-text-tertiary text-base">›</Text>
-      ) : null}
+      {onPress ? <Text className="text-text-tertiary text-base">›</Text> : null}
     </Container>
   );
 }

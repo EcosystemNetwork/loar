@@ -21,11 +21,7 @@ export function UniverseCard({ universe }: UniverseCardProps) {
       style={{ width: 160 }}
     >
       {universe.imageUrl ? (
-        <Image
-          source={{ uri: universe.imageUrl }}
-          className="w-full h-24"
-          resizeMode="cover"
-        />
+        <Image source={{ uri: universe.imageUrl }} className="w-full h-24" resizeMode="cover" />
       ) : (
         <View className="w-full h-24 bg-zinc-900 items-center justify-center">
           <Text className="text-3xl">🌌</Text>

@@ -40,12 +40,14 @@ export async function runServerLayer(cfg: SmokeConfig): Promise<CheckResult[]> {
       const id = setTimeout(() => controller.abort(), cfg.timeout);
       try {
         const res = await fetch(url, {
-          headers: { Origin: 'https://loar.fun' },
+          headers: { Origin: cfg.origin },
           signal: controller.signal,
         });
         const header = res.headers.get('access-control-allow-origin');
         if (!header)
-          throw new Error('access-control-allow-origin header missing (check CORS_ORIGIN)');
+          throw new Error(
+            `access-control-allow-origin header missing for Origin=${cfg.origin} (check CORS_ORIGIN env on server)`
+          );
         return header;
       } finally {
         clearTimeout(id);

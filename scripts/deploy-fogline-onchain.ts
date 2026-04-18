@@ -40,6 +40,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 import { universeManagerAbi, universeAbi } from '../packages/abis/src/generated';
+import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -156,14 +157,16 @@ async function deployUniverseOnChain(name: string, imageURL: string, description
         data: log.data,
         topics: log.topics,
       });
-      if (
-        decoded.eventName === 'UniverseCreated' ||
-        decoded.eventName === 'UniverseCreatedWithToken'
-      ) {
+      if (decoded.eventName === 'UniverseCreatedWithToken') {
+        // (uint256 universeId, address universe, address token, address governor)
         const args = decoded.args as any;
-        universeId = args.universeId ?? args[0];
-        universeAddress = (args.universeAddress ?? args[1]) as Address;
+        universeId = args.universeId;
+        universeAddress = args.universe as Address;
         break;
+      } else if (decoded.eventName === 'UniverseCreated' && !universeAddress) {
+        // (address universe, address creator) — no universeId
+        const args = decoded.args as any;
+        universeAddress = args.universe as Address;
       }
     } catch {
       continue;
@@ -303,7 +306,29 @@ async function createNodesForVideos(universeAddress: Address, existingVideos: an
   const createdNodes: Array<{ sceneId: number; nodeId: bigint; txHash: Hash }> = [];
 
   for (const video of sorted) {
-    const contentHash = keccak256(toBytes(video.videoUrl));
+    // Rehost ephemeral generator URLs (ByteDance/FAL presigned → expire in ~24h)
+    // to Pinata IPFS so the on-chain `link` remains valid forever.
+    let linkUrl: string = video.permanentVideoUrl || video.videoUrl;
+    if (!video.permanentVideoUrl && isEphemeralVideoUrl(video.videoUrl)) {
+      try {
+        console.log(`    Rehosting ephemeral URL to Pinata...`);
+        const pin = await rehostVideoToPinata(video.videoUrl, {
+          filename: `fogline-s${video.sceneId}.mp4`,
+          pinName: `fogline/scene-${video.sceneId}`,
+        });
+        linkUrl = pin.url;
+        await db.collection('videoGenerations').doc(video.id).update({
+          permanentVideoUrl: pin.url,
+          storageContentHash: pin.contentHash,
+          storagePersisted: true,
+        });
+      } catch (err: any) {
+        console.error(`    ❌ Rehost failed: ${err.message?.slice(0, 120)} — skipping`);
+        continue;
+      }
+    }
+
+    const contentHash = keccak256(toBytes(linkUrl));
     const plotText = video.fullPrompt || video.prompt || video.sceneTitle || 'Scene';
     const plotHash = keccak256(toBytes(plotText));
 
@@ -315,7 +340,7 @@ async function createNodesForVideos(universeAddress: Address, existingVideos: an
         address: universeAddress,
         abi: universeAbi,
         functionName: 'createNode',
-        args: [contentHash, plotHash, previousNodeId, video.videoUrl, plotText],
+        args: [contentHash, plotHash, previousNodeId, linkUrl, plotText],
       });
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });

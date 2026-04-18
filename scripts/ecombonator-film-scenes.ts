@@ -21,6 +21,7 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import { rehostVideoToPinata } from './lib/rehost-video';
 
 const rawKey = process.env.PRIVATE_KEY ?? '';
 const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
@@ -782,11 +783,19 @@ async function main() {
 
     try {
       // 1. Generate video
-      const videoUrl = await generateVideo(scene.prompt, label);
+      const ephemeralUrl = await generateVideo(scene.prompt, label);
 
-      // 2. On-chain node
+      // 2. Rehost ephemeral URL to permanent IPFS (Pinata)
+      log(label, `Rehosting to Pinata...`);
+      const pin = await rehostVideoToPinata(ephemeralUrl, {
+        filename: `ecomb-${scene.id}.mp4`,
+        pinName: `ecombonator/${scene.id}`,
+      });
+      log(label, `Pinned: ${pin.cid} (${(pin.size / 1024 / 1024).toFixed(1)}MB)`);
+
+      // 3. On-chain node
       const contentHash = `ecomb-${scene.id}-${Date.now()}`;
-      const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
+      const nodeId = await createNode(contentHash, scene.plot, previousId, pin.url, label);
       previousId = nodeId;
 
       results.push({ id: scene.id, title: scene.title, nodeId });

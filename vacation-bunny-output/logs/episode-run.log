@@ -7,144 +7,129 @@
 ════════════════════════════════════════════════════════════
 [AUTH] Authenticating...
 [AUTH] Authenticated as 0x116C28e6DCABCa363f83217C712d79DCE168d90e
+[RESUME] Skipping to S04 (4/56)
 [SETUP] Balance: 0.8820 ETH
-[SETUP] Latest node: #0
+[SETUP] Latest node: #4
 [MODE] FAST — parallel t2v batches of 3
-
-═══════════════════════════════════════════════════════
-  BATCH: S01–S03 (3 parallel)
-═══════════════════════════════════════════════════════
-[S01 (1/56)] Generating (t2v)...
-[S02 (2/56)] Generating (t2v)...
-[S03 (3/56)] Generating (t2v)...
-[S03 (3/56)] Task: cgt-20260418151109-z7684
-[S02 (2/56)] Task: cgt-20260418151109-l67mb
-[S01 (1/56)] Task: cgt-20260418151109-5vtxp
-[S03 (3/56)] Generating... (0s)
-[S02 (2/56)] Generating... (0s)
-[S01 (1/56)] Generating... (0s)
-[S03 (3/56)] Generating... (30s)
-[S01 (1/56)] Generating... (30s)
-[S02 (2/56)] Generating... (30s)
-[S03 (3/56)] Generating... (60s)
-[S01 (1/56)] Generating... (60s)
-[S02 (2/56)] Generating... (60s)
-[S03 (3/56)] Generating... (90s)
-[S01 (1/56)] Generating... (90s)
-[S02 (2/56)] Generating... (90s)
-[S02 (2/56)] Video done
-[S03 (3/56)] Generating... (120s)
-[S01 (1/56)] Generating... (120s)
-[S03 (3/56)] Video done
-[S01 (1/56)] Video done
-[S01 (1/56)] Node #1
-[S01 (1/56)] DONE — Node #1
-[S02 (2/56)] Node #2
-[S02 (2/56)] DONE — Node #2
-[S03 (3/56)] Node #3
-[S03 (3/56)] DONE — Node #3
-[S03 FRAME] Extracted frame (54KB)
-[BATCH] Completed S01–S03
 
 ═══════════════════════════════════════════════════════
   BATCH: S04–S06 (3 parallel)
 ═══════════════════════════════════════════════════════
-[S04 (4/56)] Generating (i2v continuity)...
+[S04 (4/56)] Generating (t2v)...
 [S05 (5/56)] Generating (t2v)...
 [S06 (6/56)] Generating (t2v)...
-[S06 (6/56)] Task: cgt-20260418151520-dddx5
-[S05 (5/56)] Task: cgt-20260418151520-6dprm
-[S04 (4/56)] Task: cgt-20260418151520-wkqk2
-[S06 (6/56)] Generating... (0s)
+[S05 (5/56)] Task: cgt-20260418153429-r8cbm
+[S06 (6/56)] Task: cgt-20260418153429-lmh4d
+[S04 (4/56)] Task: cgt-20260418153429-mhnhz
 [S05 (5/56)] Generating... (0s)
+[S06 (6/56)] Generating... (0s)
 [S04 (4/56)] Generating... (0s)
+[S04 (4/56)] Generating... (30s)
 [S06 (6/56)] Generating... (30s)
 [S05 (5/56)] Generating... (30s)
-[S04 (4/56)] Generating... (30s)
+[S04 (4/56)] Generating... (60s)
 [S06 (6/56)] Generating... (60s)
 [S05 (5/56)] Generating... (60s)
-[S04 (4/56)] Generating... (60s)
-[S06 (6/56)] Generating... (90s)
 [S05 (5/56)] Generating... (90s)
 [S04 (4/56)] Generating... (90s)
-[S06 (6/56)] Generating... (120s)
-[S04 (4/56)] Generating... (120s)
-[S05 (5/56)] Generating... (120s)
-[S06 (6/56)] Retry 1/2...
-[S06 (6/56)] Task: cgt-20260418151754-vfwrn
-[S06 (6/56)] Generating... (0s)
-[S04 (4/56)] Retry 1/2...
-[S04 (4/56)] Task: cgt-20260418151800-tzqtt
-[S04 (4/56)] Generating... (0s)
-[S05 (5/56)] Retry 1/2...
-[S05 (5/56)] Task: cgt-20260418151816-9qshv
-[S05 (5/56)] Generating... (0s)
-[S06 (6/56)] Generating... (30s)
-[S04 (4/56)] Generating... (30s)
-[S05 (5/56)] Generating... (30s)
-[S06 (6/56)] Generating... (60s)
-[S04 (4/56)] Generating... (60s)
-[S05 (5/56)] Generating... (60s)
 [S06 (6/56)] Generating... (90s)
-[S04 (4/56)] Generating... (90s)
-[S05 (5/56)] Generating... (90s)
-[S06 (6/56)] Generating... (120s)
-[S04 (4/56)] Generating... (120s)
-[S06 (6/56)] Retry 2/2...
-[S06 (6/56)] Task: cgt-20260418152017-m54ns
+[S06 (6/56)] Retry 1/2 (sanitized)...
+[S06 (6/56)] Task: cgt-20260418153642-k9kh9
+[S04 (4/56)] Video done
 [S06 (6/56)] Generating... (0s)
 [S05 (5/56)] Generating... (120s)
-[S04 (4/56)] Retry 2/2...
-[S04 (4/56)] Task: cgt-20260418152033-vvvxk
-[S04 (4/56)] Generating... (0s)
-[S06 (6/56)] Generating... (30s)
-[S05 (5/56)] Generating... (150s)
 [S05 (5/56)] Video done
-[S04 (4/56)] Generating... (30s)
+[S06 (6/56)] Generating... (30s)
 [S06 (6/56)] Generating... (60s)
-[S04 (4/56)] Generating... (60s)
 [S06 (6/56)] Generating... (90s)
-[S04 (4/56)] Generating... (90s)
 [S06 (6/56)] Generating... (120s)
-[S04 (4/56)] Generating... (120s)
-[S04 (4/56)] Generating... (150s)
-[S04 (4/56)] VIDEO FAILED: All retries exhausted
-[S05 (5/56)] Node #4
-[S05 (5/56)] DONE — Node #4
-[S06 (6/56)] VIDEO FAILED: All retries exhausted
-[S06 FRAME] Extracted frame (124KB)
+[S06 (6/56)] Video done
+[S04 (4/56)] Rehosting to Pinata...
+[S04 (4/56)] Pinned: QmZar1cXVCbVBw57hbG79YgvssDvGB54gUzMeCJvbLSdEf (2.5MB)
+[S04 (4/56)] Node #5
+[S04 (4/56)] DONE — Node #5
+[S05 (5/56)] Rehosting to Pinata...
+[S05 (5/56)] Pinned: QmbFH29j3VHPR1WhJqv8q6ZqjXfykwMeMJxW5ie22fzucV (3.3MB)
+[S05 (5/56)] Node #6
+[S05 (5/56)] DONE — Node #6
+[S06 (6/56)] Rehosting to Pinata...
+[S06 (6/56)] Pinned: QmWskYWqhkKBargL65qdg4FT4kDDRJnYyGfwRGPVyA6KE1 (2.2MB)
+[S06 (6/56)] Node #7
+[S06 (6/56)] DONE — Node #7
+[S06 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776498049691.mp4" -frames:v 1 -q:v 2 "/tmp
 [BATCH] Completed S04–S06
 
 ═══════════════════════════════════════════════════════
   BATCH: S07–S09 (3 parallel)
 ═══════════════════════════════════════════════════════
-[S07 (7/56)] Generating (i2v continuity)...
+[S07 (7/56)] Generating (t2v)...
 [S08 (8/56)] Generating (t2v)...
 [S09 (9/56)] Generating (t2v)...
-[S08 (8/56)] Task: cgt-20260418152357-6hchz
-[S09 (9/56)] Task: cgt-20260418152358-2rzpl
-[S07 (7/56)] Task: cgt-20260418152357-bbqgh
+[S09 (9/56)] Task: cgt-20260418154053-gln72
+[S07 (7/56)] Task: cgt-20260418154053-92npv
+[S08 (8/56)] Task: cgt-20260418154053-n2h4l
+[S09 (9/56)] Generating... (0s)
+[S07 (7/56)] Generating... (0s)
 [S08 (8/56)] Generating... (0s)
-[S09 (9/56)] Generating... (0s)
-[S07 (7/56)] Generating... (0s)
+[S09 (9/56)] Generating... (30s)
+[S07 (7/56)] Generating... (30s)
 [S08 (8/56)] Generating... (30s)
-[S09 (9/56)] Generating... (30s)
-[S07 (7/56)] Generating... (30s)
-[S08 (8/56)] Generating... (60s)
 [S09 (9/56)] Generating... (60s)
 [S07 (7/56)] Generating... (60s)
-[S08 (8/56)] Generating... (90s)
+[S08 (8/56)] Generating... (60s)
 [S09 (9/56)] Generating... (90s)
+[S08 (8/56)] Generating... (90s)
 [S07 (7/56)] Generating... (90s)
-[S07 (7/56)] Retry 1/2...
-[S07 (7/56)] Task: cgt-20260418152553-56cl4
-[S07 (7/56)] Generating... (0s)
+[S07 (7/56)] Retry 1/2 (sanitized)...
+[S07 (7/56)] Task: cgt-20260418154248-g2fg6
 [S08 (8/56)] Video done
-[S09 (9/56)] Retry 1/2...
-[S09 (9/56)] Task: cgt-20260418152603-s5gh2
+[S07 (7/56)] Generating... (0s)
+[S09 (9/56)] Retry 1/2 (sanitized)...
+[S09 (9/56)] Task: cgt-20260418154304-sk2n2
 [S09 (9/56)] Generating... (0s)
 [S07 (7/56)] Generating... (30s)
 [S09 (9/56)] Generating... (30s)
 [S07 (7/56)] Generating... (60s)
 [S09 (9/56)] Generating... (60s)
 [S07 (7/56)] Generating... (90s)
+[S09 (9/56)] Generating... (90s)
+[S07 (7/56)] Video done
+[S09 (9/56)] Generating... (120s)
+[S09 (9/56)] Generating... (150s)
+[S09 (9/56)] Video done
+[S07 (7/56)] Rehosting to Pinata...
+[S07 (7/56)] Pinned: QmbHujQL67s5SZvUDe2gpPR6TnYykjiKJ1J5y7xJi1HgsW (2.6MB)
+[S07 (7/56)] Node #8
+[S07 (7/56)] DONE — Node #8
+[S08 (8/56)] Rehosting to Pinata...
+[S08 (8/56)] Pinned: QmX3HaXtWVvifTwLN7sy8TWpjsU2orC2ZRwfwKR59qr5dM (2.9MB)
+[S08 (8/56)] Node #9
+[S08 (8/56)] DONE — Node #9
+[S09 (9/56)] Rehosting to Pinata...
+[S09 (9/56)] Pinned: QmQeFdpJLwPeKLNa9Z5Dvr35hkRvVFRsoRgtzwjtmK9c1B (2.8MB)
+[S09 (9/56)] Node #10
+[S09 (9/56)] DONE — Node #10
+[S09 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776498569505.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S07–S09
+
+═══════════════════════════════════════════════════════
+  BATCH: S10–S12 (3 parallel)
+═══════════════════════════════════════════════════════
+[S10 (10/56)] Generating (t2v)...
+[S11 (11/56)] Generating (t2v)...
+[S12 (12/56)] Generating (t2v)...
+[S12 (12/56)] Task: cgt-20260418154933-l8sjv
+[S11 (11/56)] Task: cgt-20260418154933-2zgq7
+[S10 (10/56)] Task: cgt-20260418154933-r4rzn
+[S12 (12/56)] Generating... (0s)
+[S10 (10/56)] Generating... (0s)
+[S11 (11/56)] Generating... (0s)
+[S12 (12/56)] Generating... (30s)
+[S11 (11/56)] Generating... (30s)
+[S10 (10/56)] Generating... (30s)
+[S12 (12/56)] Generating... (60s)
+[S11 (11/56)] Generating... (60s)
+[S10 (10/56)] Generating... (60s)
+[S12 (12/56)] Generating... (90s)
+[S11 (11/56)] Generating... (90s)
+[S10 (10/56)] Generating... (90s)

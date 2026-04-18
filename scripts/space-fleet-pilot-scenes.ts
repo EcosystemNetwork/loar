@@ -238,6 +238,7 @@ function sanitizePrompt(prompt: string, attempt: number): string {
 import { execSync } from 'child_process';
 import fs from 'fs';
 import { tmpdir } from 'os';
+import { rehostVideoToPinata } from './lib/rehost-video';
 
 async function extractLastFrame(videoUrl: string, label: string): Promise<string | null> {
   try {
@@ -803,16 +804,22 @@ async function main() {
       console.log(`${'═'.repeat(55)}`);
 
       try {
-        const videoUrl = await generateVideo(scene.prompt, label, lastFrameUrl);
+        const ephemeralUrl = await generateVideo(scene.prompt, label, lastFrameUrl);
+        log(label, `Rehosting to Pinata...`);
+        const pin = await rehostVideoToPinata(ephemeralUrl, {
+          filename: `sf-${scene.id}.mp4`,
+          pinName: `space-fleet/${scene.id}`,
+        });
+        log(label, `Pinned: ${pin.cid} (${(pin.size / 1024 / 1024).toFixed(1)}MB)`);
 
         const contentHash = `sf-${scene.id}-${Date.now()}`;
-        const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
+        const nodeId = await createNode(contentHash, scene.plot, previousId, pin.url, label);
         previousId = nodeId;
         results.push({ id: scene.id, title: scene.title, nodeId });
         log(label, `DONE — Node #${nodeId}`);
 
         // Extract last frame for the next scene's i2v input
-        lastFrameUrl = await extractLastFrame(videoUrl, `${scene.id} FRAME`);
+        lastFrameUrl = await extractLastFrame(pin.url, `${scene.id} FRAME`);
       } catch (err: any) {
         log(label, `FAILED: ${err.message?.slice(0, 200)}`);
         // Keep previous lastFrameUrl so next scene still has some reference
@@ -856,17 +863,17 @@ async function main() {
 
         if (result.status === 'fulfilled') {
           try {
+            log(label, `Rehosting to Pinata...`);
+            const pin = await rehostVideoToPinata(result.value.url, {
+              filename: `sf-${scene.id}.mp4`,
+              pinName: `space-fleet/${scene.id}`,
+            });
+            log(label, `Pinned: ${pin.cid} (${(pin.size / 1024 / 1024).toFixed(1)}MB)`);
             const contentHash = `sf-${scene.id}-${Date.now()}`;
-            const nodeId = await createNode(
-              contentHash,
-              scene.plot,
-              previousId,
-              result.value.url,
-              label
-            );
+            const nodeId = await createNode(contentHash, scene.plot, previousId, pin.url, label);
             previousId = nodeId;
             results.push({ id: scene.id, title: scene.title, nodeId });
-            lastVideoUrl = result.value.url;
+            lastVideoUrl = pin.url;
             log(label, `DONE — Node #${nodeId}`);
           } catch (err: any) {
             log(label, `CHAIN FAILED: ${err.message?.slice(0, 200)}`);

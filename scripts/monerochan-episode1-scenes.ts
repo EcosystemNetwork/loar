@@ -40,6 +40,11 @@ const GEN_MODE = (process.env.GEN_MODE ?? 'continuity') as 'continuity' | 'fast'
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '3', 10);
 const RESUME_FRAME = process.env.RESUME_FRAME ?? '';
 const UNIVERSE_ID = process.env.MONEROCHAN_ADDR ?? '';
+/** STYLE=animated → anime-style short film (original spec) | STYLE=photoreal → Hollywood trailer */
+const STYLE = (process.env.STYLE ?? 'photoreal') as 'photoreal' | 'animated';
+/** Episode tag lets us run multiple variants without clobbering each other in the gallery */
+const EPISODE_TAG =
+  process.env.EPISODE_TAG ?? (STYLE === 'animated' ? 'episode-1-animated' : 'episode-1');
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 function log(step: string, msg: string) {
@@ -242,39 +247,78 @@ async function pinVideo(videoUrl: string, label: string): Promise<string> {
   return `${gateway}/ipfs/${IpfsHash}`;
 }
 
-// ── Scene definitions ───────────────────────────────────────────────────
-function buildScenes() {
-  // ── Character Visual DNA ──
-  const MONEROCHAN = [
-    'Monerochan: A fierce, intelligent young woman in her early 20s with subtle Japanese facial features',
-    '(almond-shaped eyes with gentle epicanthic fold, delicate high cheekbones, refined jawline, fair skin with soft East Asian undertones).',
-    'Long flowing straight black hair with subtle orange inner highlights, striking golden-amber eyes that glow with quiet determination,',
-    'athletic yet graceful build, sharp yet elegant facial features.',
-    'Iconic outfit: sleek tactical cyberpunk — dark cropped top exposing midriff with subtle Monero "M" logo,',
-    'orange capelet flowing over shoulders, orange-accented skirt elements, black thighhighs,',
-    'round stud earrings, black tactical jacket with orange details, bright orange high heels.',
-  ].join(' ');
+// ── Pull entity descriptions from wiki for visual consistency ─────────────
+async function fetchWikiDNA(
+  db: FirebaseFirestore.Firestore,
+  universeId: string
+): Promise<Record<string, string>> {
+  log('WIKI', 'Fetching entity DNA from wiki for visual consistency...');
+  const snap = await db
+    .collection('entities')
+    .where('universeAddress', '==', universeId.toLowerCase())
+    .get();
+  const dna: Record<string, string> = {};
+  for (const doc of snap.docs) {
+    const e = doc.data();
+    const name = (e.name || '').trim();
+    if (!name) continue;
+    const desc = (e.description || '').split('\n\n').slice(0, 2).join(' ').slice(0, 600);
+    const key = name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+    dna[key] = `${name}: ${desc}`;
+    log('WIKI', `  [${e.kind}] ${name}`);
+  }
+  log('WIKI', `Loaded ${Object.keys(dna).length} entities`);
+  return dna;
+}
 
-  const MONEROCHAN_BABY =
-    'Newborn baby girl with the same Japanese-inspired facial features, delicate fair skin, wisps of dark hair, golden-amber eyes barely open.';
-  const MONEROCHAN_CHILD =
-    'Young girl age 8-10 with the same Japanese-inspired features, long straight black hair, golden-amber eyes wide with curiosity, simple modest clothing, delicate build.';
-  const MONEROCHAN_TEEN =
-    'Teenage girl age 15-16 with the same Japanese features maturing, long straight black hair, golden-amber eyes now sharp with determination, early version of tactical clothing.';
+// ── Scene definitions ───────────────────────────────────────────────────
+function buildScenes(dna: Record<string, string>) {
+  // ── Character Visual DNA — pull from wiki, fall back to local defaults ──
+  const MONEROCHAN =
+    dna['MONEROCHAN'] ??
+    [
+      'Monerochan: A fierce, intelligent young woman in her early 20s with subtle Japanese facial features',
+      '(almond-shaped eyes with gentle epicanthic fold, delicate high cheekbones, refined jawline, fair skin with soft East Asian undertones).',
+      'Long flowing straight black hair with subtle orange inner highlights, striking golden-amber eyes that glow with quiet determination,',
+      'athletic yet graceful build, sharp yet elegant facial features.',
+      'Iconic outfit: sleek tactical cyberpunk — dark cropped top exposing midriff with subtle Monero "M" logo,',
+      'orange capelet flowing over shoulders, orange-accented skirt elements, black thighhighs,',
+      'round stud earrings, black tactical jacket with orange details, bright orange high heels.',
+    ].join(' ');
+
+  // Aged variants derived from the adult Monerochan DNA above for consistent features.
+  const sharedFeatures =
+    'subtle Japanese facial features (almond eyes, delicate cheekbones, fair skin), golden-amber eyes, long straight black hair with subtle orange inner highlights';
+  const MONEROCHAN_BABY = `Newborn baby girl sharing ${sharedFeatures}, delicate fair skin, wisps of dark hair, golden-amber eyes barely open.`;
+  const MONEROCHAN_CHILD = `Young girl age 8-10 sharing ${sharedFeatures}, eyes wide with curiosity, simple modest clothing, delicate build.`;
+  const MONEROCHAN_TEEN = `Teenage girl age 15-16 sharing ${sharedFeatures}, eyes now sharp with determination, early tactical streetwear.`;
+
   const MASKED_ALLY =
+    dna['THE_FUNGIBILITY_FRONT'] ??
     'A tall, powerfully built man in rugged black tactical gear wearing the iconic Guy Fawkes mask — bone-white stylized smiling face with red cheeks, wide upturned mustache, and thin pointed goatee.';
 
-  // ── Cinematic World Prompt ──
-  const WORLD = [
-    'Cinematic photorealistic Hollywood movie trailer, ultra-realistic live-action, 8K, shot on 35mm film with subtle grain.',
-    'Dramatic volumetric lighting, intense Christopher Nolan / Denis Villeneuve color grading.',
-    'Dark electronic synth pulses mixed with epic orchestral score and heartbeat bass undertone.',
-    'Fast-paced editing with quick cuts and slow-motion beats.',
-    'Bold futuristic text overlays with orange Monero accents where applicable.',
-    'Maximum production value, intense emotional storytelling, no voiceover or narration.',
-    'Photorealistic faces and textures, fluid motion, immersive sound design.',
-    'No text, no watermarks.',
-  ].join(' ');
+  // ── Style-specific WORLD prompt ──
+  const WORLD =
+    STYLE === 'animated'
+      ? [
+          'Beautiful, emotional anime-style animated short film in high cinematic quality, 16:9.',
+          'Vibrant cyberpunk-neon color palette mixed with soft pastel accents.',
+          'Smooth 60fps motion, ultra-detailed character animation, cinematic lighting.',
+          'Dreamy lofi-cyberpunk visual tone, hopeful yet intense emotional storytelling.',
+          'Soft particle effects of ring-signatures and untraceable code float around key moments.',
+          'Perfect facial consistency across all ages of Monerochan.',
+          'No text overlays embedded in the video. No watermarks. No logos.',
+        ].join(' ')
+      : [
+          'Cinematic photorealistic Hollywood movie trailer, ultra-realistic live-action, 8K, shot on 35mm film with subtle grain.',
+          'Dramatic volumetric lighting, intense Christopher Nolan / Denis Villeneuve color grading.',
+          'Dark electronic synth pulses mixed with epic orchestral score and heartbeat bass undertone.',
+          'Fast-paced editing with quick cuts and slow-motion beats.',
+          'Bold futuristic text overlays with orange Monero accents where applicable.',
+          'Maximum production value, intense emotional storytelling, no voiceover or narration.',
+          'Photorealistic faces and textures, fluid motion, immersive sound design.',
+          'No text, no watermarks.',
+        ].join(' ');
 
   return [
     // ═══════════════════════════════════════════════════════════════════
@@ -427,6 +471,7 @@ function buildScenes() {
 async function main() {
   console.log('\n' + '═'.repeat(60));
   console.log('  MONEROCHAN — Episode 1: "Shadows of Freedom"');
+  console.log(`  Style: ${STYLE.toUpperCase()} | Tag: ${EPISODE_TAG}`);
   console.log('  20 Scenes × 10s = ~3.3 min trailer');
   console.log(`  Seedance 2.0 + Audio | Mode: ${GEN_MODE.toUpperCase()}`);
   console.log('═'.repeat(60));
@@ -437,7 +482,6 @@ async function main() {
   }
 
   const db = initFirebase();
-  const SCENES = buildScenes();
 
   // Find the universe ID if not provided
   let universeId = UNIVERSE_ID;
@@ -457,6 +501,10 @@ async function main() {
     universeId = snap.docs[0].id;
   }
   log('INIT', `Universe: ${universeId}`);
+
+  // Pull visual DNA from wiki (MANDATORY — ensures visual consistency across scenes)
+  const dna = await fetchWikiDNA(db, universeId);
+  const SCENES = buildScenes(dna);
 
   // Determine starting scene
   const startIdx = SCENES.findIndex((s) => s.id === START_SCENE);
@@ -509,7 +557,7 @@ async function main() {
               title: `Ep1 ${scene.id}: ${scene.title}`,
               description: scene.plot,
               model: 'seedance2-t2v',
-              tags: ['monerochan', 'episode-1', 'shadows-of-freedom', scene.id.toLowerCase()],
+              tags: ['monerochan', EPISODE_TAG, 'shadows-of-freedom', scene.id.toLowerCase()],
               status: 'active',
               contentStatus: 'active',
               createdAt: new Date(),
@@ -559,7 +607,7 @@ async function main() {
             title: `Ep1 ${scene.id}: ${scene.title}`,
             description: scene.plot,
             model: 'seedance2-i2v',
-            tags: ['monerochan', 'episode-1', 'shadows-of-freedom', scene.id.toLowerCase()],
+            tags: ['monerochan', EPISODE_TAG, 'shadows-of-freedom', scene.id.toLowerCase()],
             status: 'active',
             contentStatus: 'active',
             createdAt: new Date(),

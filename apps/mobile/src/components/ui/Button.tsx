@@ -14,7 +14,10 @@ interface ButtonProps extends Omit<PressableProps, 'style'> {
 
 const variantStyles: Record<Variant, { container: string; text: string }> = {
   primary: { container: 'bg-primary active:bg-purple-700', text: 'text-white font-semibold' },
-  secondary: { container: 'bg-card border border-border active:bg-zinc-800', text: 'text-text-primary font-semibold' },
+  secondary: {
+    container: 'bg-card border border-border active:bg-zinc-800',
+    text: 'text-text-primary font-semibold',
+  },
   ghost: { container: 'active:bg-zinc-900', text: 'text-primary font-semibold' },
   danger: { container: 'bg-error active:bg-red-700', text: 'text-white font-semibold' },
 };

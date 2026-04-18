@@ -4,14 +4,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 
-export function useListingsBrowse(filters: {
-  universeId?: string;
-  productType?: string;
-  rightsLane?: string;
-  search?: string;
-  sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
-  limit?: number;
-} = {}) {
+export function useListingsBrowse(
+  filters: {
+    universeId?: string;
+    productType?: string;
+    rightsLane?: string;
+    search?: string;
+    sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
+    limit?: number;
+  } = {}
+) {
   return useQuery({
     queryKey: ['listings-browse', filters],
     queryFn: () => trpcClient.listings.browse.query(filters as any),
@@ -26,7 +28,9 @@ export function useListing(listingId: string) {
   });
 }
 
-export function useMyListings(status: 'ALL' | 'ACTIVE' | 'DRAFT' | 'SOLD_OUT' | 'DELISTED' = 'ALL') {
+export function useMyListings(
+  status: 'ALL' | 'ACTIVE' | 'DRAFT' | 'SOLD_OUT' | 'DELISTED' = 'ALL'
+) {
   return useQuery({
     queryKey: ['my-listings', status],
     queryFn: () => trpcClient.listings.myListings.query({ status }),

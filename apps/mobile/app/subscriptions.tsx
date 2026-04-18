@@ -63,7 +63,12 @@ export default function SubscriptionsScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 24 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 32,
+          gap: 24,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={subsQuery.isFetching}
@@ -93,14 +98,14 @@ export default function SubscriptionsScreen() {
                         </Text>
                         <Text className="text-text-tertiary text-xs">
                           Expires{' '}
-                          {sub.expiresAt
-                            ? new Date(sub.expiresAt).toLocaleDateString()
-                            : 'unknown'}
+                          {sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString() : 'unknown'}
                         </Text>
                         {sub.autoRenew ? (
                           <Text className="text-success text-xs">Auto-renew on</Text>
                         ) : (
-                          <Text className="text-warning text-xs">Renewal off — expires at period end</Text>
+                          <Text className="text-warning text-xs">
+                            Renewal off — expires at period end
+                          </Text>
                         )}
                       </View>
                       <Badge variant={TIER_VARIANTS[sub.tier] ?? 'default'}>{sub.tier}</Badge>
@@ -146,9 +151,7 @@ export default function SubscriptionsScreen() {
                     </View>
                     <Text className="text-text-tertiary text-xs">
                       Expired{' '}
-                      {sub.expiresAt
-                        ? new Date(sub.expiresAt).toLocaleDateString()
-                        : 'unknown'}
+                      {sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString() : 'unknown'}
                     </Text>
                   </View>
                 ))}
