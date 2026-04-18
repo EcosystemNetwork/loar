@@ -23,6 +23,7 @@ import {
   MousePointerSquareDashed,
   CheckCheck,
   Film,
+  ScrollText,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ interface BulkOperationsToolbarProps {
   onCreateArc: (name: string) => void;
   onShowAudioToolbar: () => void;
   onBuildEpisode: () => void;
+  onScriptToEpisode: () => void;
 }
 
 export function BulkOperationsToolbar({
@@ -72,6 +74,7 @@ export function BulkOperationsToolbar({
   onCreateArc,
   onShowAudioToolbar,
   onBuildEpisode,
+  onScriptToEpisode,
 }: BulkOperationsToolbarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [newArcName, setNewArcName] = useState('');
@@ -272,6 +275,18 @@ export function BulkOperationsToolbar({
           Lip Sync
         </Button>
       </div>
+
+      {/* Script-to-Episode */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1.5 text-sky-400 hover:text-sky-300 hover:bg-sky-500/10"
+        onClick={onScriptToEpisode}
+        title="Generate episode from script"
+      >
+        <ScrollText className="h-4 w-4" />
+        Script
+      </Button>
 
       {/* Episode builder */}
       <Button

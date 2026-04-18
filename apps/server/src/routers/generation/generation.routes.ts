@@ -68,7 +68,7 @@ const modelOverridesCol = () => {
 const routingModeSchema = z.enum(['auto', 'manual']);
 const generationModeSchema = z.enum(['text_to_video', 'image_to_video']);
 
-const generateInputSchema = z.object({
+export const generateInputSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
   imageUrl: z.string().url().optional(),
   mode: generationModeSchema,
@@ -197,7 +197,7 @@ function buildByteDanceInput(
 }
 
 /** Dispatch video generation to the correct provider */
-async function dispatchGeneration(
+export async function dispatchGeneration(
   model: NonNullable<ReturnType<typeof getModelById>>,
   input: z.infer<typeof generateInputSchema>,
   resolvedCastUrls?: string[]
@@ -246,7 +246,7 @@ async function dispatchGeneration(
   return falService.generateVideo(falInput);
 }
 
-async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void> {
+export async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void> {
   await generationsCol()
     .doc(record.id)
     .set({

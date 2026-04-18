@@ -106,6 +106,7 @@ import { NodeContextMenu } from '@/components/flow/NodeContextMenu';
 import { ShortcutsHelpDialog } from '@/components/flow/ShortcutsHelpDialog';
 import { NodeArcOverlay } from '@/components/flow/NodeArcOverlay';
 import { EpisodeBuilder } from '@/components/episodes/EpisodeBuilder';
+import { ScriptToEpisode } from '@/components/episodes/ScriptToEpisode';
 import { useNodeArcs } from '@/hooks/useNodeArcs';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
@@ -253,6 +254,7 @@ function UniverseTimelineEditorInner() {
   const [imageFormat, setImageFormat] = useState<
     'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'
   >('landscape_16_9');
+  const [selectedImageModel, setSelectedImageModel] = useState<string>(''); // '' = auto
 
   // Status message for sidebar
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
@@ -330,6 +332,7 @@ function UniverseTimelineEditorInner() {
   const [showSelectionPlayer, setShowSelectionPlayer] = useState(false);
   const [showAudioToolbar, setShowAudioToolbar] = useState(false);
   const [showEpisodeBuilder, setShowEpisodeBuilder] = useState(false);
+  const [showScriptToEpisode, setShowScriptToEpisode] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -683,6 +686,7 @@ function UniverseTimelineEditorInner() {
     charactersData,
     imageFormat,
     videoDescription,
+    imageModelId: selectedImageModel || undefined,
     setGeneratedImageUrl,
     setShowVideoStep,
     setStatusMessage,
@@ -3245,6 +3249,7 @@ function UniverseTimelineEditorInner() {
                     onCreateArc={handleCreateArcAndAssign}
                     onShowAudioToolbar={() => setShowAudioToolbar(true)}
                     onBuildEpisode={() => setShowEpisodeBuilder(true)}
+                    onScriptToEpisode={() => setShowScriptToEpisode(true)}
                   />
                 </Panel>
               )}
@@ -3368,6 +3373,8 @@ function UniverseTimelineEditorInner() {
                 )
               }
               handleGenerateEventImage={handleGenerateEventImage}
+              selectedImageModel={selectedImageModel}
+              setSelectedImageModel={setSelectedImageModel}
               showVideoStep={showVideoStep}
               setShowVideoStep={setShowVideoStep}
               uploadedUrl={uploadedUrl}
@@ -3847,6 +3854,18 @@ function UniverseTimelineEditorInner() {
           nodes={nodes}
           initialNodeIds={[...selectedNodeIds]}
           onClose={() => setShowEpisodeBuilder(false)}
+        />
+      )}
+
+      {/* Script-to-Episode */}
+      {showScriptToEpisode && (
+        <ScriptToEpisode
+          universeId={id}
+          onClose={() => setShowScriptToEpisode(false)}
+          onComplete={(episodeId) => {
+            setShowScriptToEpisode(false);
+            // Could open EpisodeBuilder with the completed episode here
+          }}
         />
       )}
 

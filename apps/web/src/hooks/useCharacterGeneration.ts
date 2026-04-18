@@ -25,6 +25,8 @@ export interface UseCharacterGenerationProps {
   charactersData: any;
   imageFormat: ImageFormat;
   videoDescription: string;
+  /** Selected image model ID. Empty string or undefined = auto routing. */
+  imageModelId?: string;
   setGeneratedImageUrl: (url: string | null) => void;
   setShowVideoStep: (show: boolean) => void;
   setStatusMessage: (message: StatusMessage | null) => void;
@@ -43,6 +45,7 @@ export function useCharacterGeneration({
   charactersData,
   imageFormat,
   videoDescription,
+  imageModelId,
   setGeneratedImageUrl,
   setShowVideoStep,
   setStatusMessage,
@@ -102,19 +105,23 @@ export function useCharacterGeneration({
         }
       }
 
-      // For scenes without characters, generate directly with Nano Banana
-      const result = await trpcClient.image.generateImage.mutate({
+      // For scenes without characters, use routed image generation with model selection
+      const result = await trpcClient.image.generate.mutate({
         prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
-        model: 'fal-ai/nano-banana',
+        task: 'text_to_image',
         imageSize: imageFormat,
         numImages: 1,
+        routingMode: imageModelId ? 'manual' : 'auto',
+        ...(imageModelId ? { selectedModelId: imageModelId } : {}),
       });
 
-      if (result.status !== 'completed' || !result.imageUrl) {
-        throw new Error(result.error || 'Failed to generate scene image');
+      if (result.status !== 'completed' || !result.imageUrls?.[0]) {
+        throw new Error(
+          ('error' in result ? (result as any).error : null) || 'Failed to generate scene image'
+        );
       }
 
-      return { success: true, imageUrl: result.imageUrl };
+      return { success: true, imageUrl: result.imageUrls[0] };
     },
     onSuccess: (data) => {
       invalidateBalance(); // Refresh credit display after spend

@@ -22,8 +22,6 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
-import * as fal from '@fal-ai/serverless-client';
-
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // ── Firebase Init ───────────────────────────────────────────────────────
@@ -42,12 +40,76 @@ const firebaseApp = initializeApp(
 const db = getFirestore(firebaseApp);
 db.settings({ preferRest: true });
 
-// ── FAL Init ────────────────────────────────────────────────────────────
-if (!process.env.FAL_KEY) {
-  console.error('❌ FAL_KEY is required');
+// ── ByteDance Seedance 2.0 Direct API ──────────────────────────────────
+const BYTEDANCE_API_KEY = process.env.BYTEDANCE_API_KEY;
+if (!BYTEDANCE_API_KEY) {
+  console.error('❌ BYTEDANCE_API_KEY is required for Seedance 2.0');
   process.exit(1);
 }
-fal.config({ credentials: process.env.FAL_KEY });
+const BD_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
+const BD_POLL_INTERVAL = 5000;
+const BD_MAX_POLLS = 120;
+
+async function bdRequest<T>(bdPath: string, body?: any): Promise<T> {
+  const res = await fetch(`${BD_BASE}${bdPath}`, {
+    method: body ? 'POST' : 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${BYTEDANCE_API_KEY}`,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`ByteDance ${res.status}: ${text.slice(0, 300)}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function generateSeedanceVideo(
+  prompt: string,
+  duration: number,
+  audio: boolean
+): Promise<string> {
+  const body = {
+    model: 'dreamina-seedance-2-0-260128',
+    content: [{ type: 'text', text: prompt }],
+    duration,
+    aspect_ratio: '16:9',
+    resolution: '720p',
+    generate_audio: audio,
+  };
+
+  const task = await bdRequest<{ id?: string; task_id?: string }>(
+    '/contents/generations/tasks',
+    body
+  );
+  const taskId = task.id || task.task_id;
+  if (!taskId) throw new Error('No task ID from ByteDance');
+
+  for (let i = 0; i < BD_MAX_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, BD_POLL_INTERVAL));
+    const status = await bdRequest<any>(`/contents/generations/tasks/${taskId}`);
+    const s = status.status?.toLowerCase();
+
+    if (s === 'completed' || s === 'succeeded' || s === 'success') {
+      const url =
+        status.content?.video_url ||
+        status.output?.video_url ||
+        status.output?.video?.url ||
+        status.result?.video_url;
+      if (!url) throw new Error('Task done but no video URL');
+      return url;
+    }
+    if (s === 'failed' || s === 'error' || s === 'cancelled') {
+      const err =
+        typeof status.error === 'string' ? status.error : status.error?.message || 'failed';
+      throw new Error(`Seedance failed: ${err}`);
+    }
+    if (i % 6 === 0 && i > 0) console.log(`    [poll ${i}] ${s}...`);
+  }
+  throw new Error('Seedance timed out');
+}
 
 // ── Config ──────────────────────────────────────────────────────────────
 const UNIVERSE_ID = '0x0000000000000000000000000000019d9e26795c';
@@ -57,7 +119,7 @@ const CREATOR_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const modelIdx = args.indexOf('--model');
-const MODEL = modelIdx >= 0 ? args[modelIdx + 1] : 'fal-ai/veo3.1/fast';
+const MODEL = modelIdx >= 0 ? args[modelIdx + 1] : 'seedance-2.0';
 const startIdx = args.indexOf('--start');
 const START_FROM = startIdx >= 0 ? parseInt(args[startIdx + 1], 10) : 1;
 const scenesIdx = args.indexOf('--scenes');
@@ -758,52 +820,9 @@ async function generateSceneVideo(
     };
   }
 
-  // Build FAL input based on model
-  const input: any = {
-    prompt: fullPrompt,
-  };
-
-  if (model.includes('veo3.1')) {
-    input.duration = '8s';
-    input.aspect_ratio = '16:9';
-    input.resolution = '720p';
-    if (scene.hasDialogue) {
-      input.generate_audio = true;
-    }
-  } else if (model.includes('sora-2')) {
-    input.duration = 8;
-    input.aspect_ratio = '16:9';
-    input.resolution = '720p';
-  } else if (model.includes('kling')) {
-    input.duration = '5';
-    input.aspect_ratio = '16:9';
-  } else if (model.includes('wan')) {
-    input.duration = '5';
-    input.resolution = '1080p';
-  } else if (model.includes('seedance')) {
-    input.duration = '8';
-    input.aspect_ratio = '16:9';
-    input.resolution = '720p';
-    input.generate_audio = scene.hasDialogue;
-  } else {
-    // Generic fallback
-    input.duration = scene.duration;
-    input.aspect_ratio = '16:9';
-  }
-
   try {
-    const result = await fal.subscribe(model, {
-      input,
-      logs: true,
-      pollInterval: 5000,
-    });
-
-    const data = (result as any).data || result;
-    const videoUrl = data?.video?.url || data?.videoUrl || data?.url;
-
-    if (!videoUrl) {
-      throw new Error(`No video URL in response. Keys: ${Object.keys(data || {}).join(', ')}`);
-    }
+    // Generate via ByteDance Seedance 2.0 direct API
+    const videoUrl = await generateSeedanceVideo(fullPrompt, scene.duration, scene.hasDialogue);
 
     const generationId = randomUUID();
 

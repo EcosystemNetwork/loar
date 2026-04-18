@@ -21,7 +21,7 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
-import * as fal from '@fal-ai/serverless-client';
+import { ByteDanceService } from '../apps/server/src/services/bytedance.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -44,12 +44,12 @@ try {
 const db = getFirestore(firebaseApp);
 db.settings({ preferRest: true });
 
-// ── FAL Init ────────────────────────────────────────────────────────────
-if (!process.env.FAL_KEY) {
-  console.error('FAL_KEY is required');
+// ── ByteDance Init ─────────────────────────────────────────────────────
+if (!process.env.BYTEDANCE_API_KEY) {
+  console.error('BYTEDANCE_API_KEY is required');
   process.exit(1);
 }
-fal.config({ credentials: process.env.FAL_KEY });
+const bytedance = new ByteDanceService();
 
 // ── Config ──────────────────────────────────────────────────────────────
 const UNIVERSE_ID = '0x0000000000000000000000000000019d9df4dbf6';
@@ -60,7 +60,7 @@ const EPISODE_TITLE = 'First Proof: The Unfinished';
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const modelIdx = args.indexOf('--model');
-const MODEL = modelIdx >= 0 ? args[modelIdx + 1] : 'bytedance/seedance-2.0/text-to-video';
+const MODEL = modelIdx >= 0 ? args[modelIdx + 1] : 'dreamina-seedance-2-0-260128';
 const startIdx = args.indexOf('--start');
 const START_FROM = startIdx >= 0 ? parseInt(args[startIdx + 1], 10) : 1;
 const scenesIdx = args.indexOf('--scenes');
@@ -867,44 +867,22 @@ async function generateSceneVideo(
     };
   }
 
-  const input: any = { prompt: fullPrompt };
-
-  if (model.includes('veo3.1')) {
-    input.duration = '8s';
-    input.aspect_ratio = '16:9';
-    input.resolution = '720p';
-    if (scene.hasDialogue) input.generate_audio = true;
-  } else if (model.includes('sora-2')) {
-    input.duration = 8;
-    input.aspect_ratio = '16:9';
-    input.resolution = '720p';
-  } else if (model.includes('kling')) {
-    input.duration = '5';
-    input.aspect_ratio = '16:9';
-  } else if (model.includes('seedance')) {
-    input.duration = '8';
-    input.aspect_ratio = '16:9';
-    input.resolution = '720p';
-    input.generate_audio = scene.hasDialogue;
-  } else {
-    input.duration = scene.duration;
-    input.aspect_ratio = '16:9';
-  }
-
   try {
-    const result = await fal.subscribe(model, {
-      input,
-      logs: true,
-      pollInterval: 5000,
+    const result = await bytedance.generateVideo({
+      prompt: fullPrompt,
+      model,
+      mode: 'text_to_video',
+      duration: 8,
+      aspectRatio: '16:9',
+      resolution: '720p',
+      audio: scene.hasDialogue,
     });
 
-    const data = (result as any).data || result;
-    const videoUrl = data?.video?.url || data?.videoUrl || data?.url;
-
-    if (!videoUrl) {
-      throw new Error(`No video URL in response. Keys: ${Object.keys(data || {}).join(', ')}`);
+    if (result.status === 'failed' || !result.videoUrl) {
+      throw new Error(result.error || 'No video URL returned');
     }
 
+    const videoUrl = result.videoUrl;
     const generationId = randomUUID();
 
     // Persist to Firestore
@@ -1002,7 +980,7 @@ ${'='.repeat(60)}
   Model    : ${MODEL}
   Scenes   : ${ONLY_SCENES ? ONLY_SCENES.join(', ') : `${START_FROM}-${SCENES.length}`}
   Dry Run  : ${DRY_RUN}
-  FAL Key  : configured
+  ByteDance: configured
 `);
 
   // Step 1: Fetch wiki entities

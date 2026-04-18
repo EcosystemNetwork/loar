@@ -34,7 +34,7 @@ Dragon Egg is a visual meditation on potential, mystery, and the moment before e
 
 No knights. No quests. No politics. Just the eggs, and the worlds that hold them.`;
 
-// ── Image Generation (Google Imagen 4 + Pinata IPFS) ────────────────
+// ── Image Generation (Nano Banana 2 + Pinata IPFS) ──────────────────
 
 async function generateAndUploadCoverImage(): Promise<string> {
   if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY is not set');
@@ -51,48 +51,65 @@ async function generateAndUploadCoverImage(): Promise<string> {
     'No text, no watermarks, no logos, no characters, no people.',
   ].join(' ');
 
-  console.log('  Calling Google Imagen 4...');
-  const model = 'imagen-4.0-generate-001';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${GOOGLE_API_KEY}`;
+  console.log('  Calling Nano Banana 2 (gemini-3.1-flash-image-preview)...');
+  const model = 'gemini-3.1-flash-image-preview';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GOOGLE_API_KEY,
+    },
     body: JSON.stringify({
-      instances: [{ prompt }],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: '16:9',
-        safetyFilterLevel: 'BLOCK_ONLY_HIGH',
-        personGeneration: 'DONT_ALLOW',
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+        imageConfig: {
+          aspectRatio: '16:9',
+          imageSize: '2K',
+        },
       },
     }),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => response.statusText);
-    throw new Error(`Google Imagen API error ${response.status}: ${text.slice(0, 300)}`);
+    throw new Error(`Nano Banana 2 API error ${response.status}: ${text.slice(0, 300)}`);
   }
 
   const data = (await response.json()) as {
-    predictions?: Array<{ bytesBase64Encoded: string; mimeType: string }>;
+    candidates?: Array<{
+      content: {
+        parts: Array<{
+          text?: string;
+          inlineData?: { mimeType: string; data: string };
+        }>;
+      };
+      finishReason?: string;
+    }>;
   };
 
-  if (!data.predictions?.length) {
+  const candidate = data.candidates?.[0];
+  const imagePart = candidate?.content?.parts?.find((p) => p.inlineData);
+  if (!imagePart?.inlineData) {
+    console.log(`  Response: ${JSON.stringify(data).slice(0, 300)}`);
     throw new Error(
-      'Google Imagen returned no images — prompt may have been blocked by safety filters'
+      'Nano Banana 2 returned no images — prompt may have been blocked by safety filters'
     );
   }
 
-  const base64 = data.predictions[0].bytesBase64Encoded;
-  console.log(`  Generated image (${((base64.length * 0.75) / 1024).toFixed(0)} KB)`);
+  const base64 = imagePart.inlineData.data;
+  const mimeType = imagePart.inlineData.mimeType;
+  console.log(`  Generated image (${((base64.length * 0.75) / 1024).toFixed(0)} KB, ${mimeType})`);
 
   // Upload to Pinata IPFS for permanent hosting
   if (PINATA_JWT) {
     console.log('  Uploading to Pinata IPFS...');
     const buffer = Buffer.from(base64, 'base64');
     const form = new FormData();
-    form.append('file', new Blob([buffer], { type: 'image/png' }), 'dragon-egg-cover.png');
+    const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
+    form.append('file', new Blob([buffer], { type: mimeType }), `dragon-egg-cover.${ext}`);
     form.append('pinataMetadata', JSON.stringify({ name: 'Dragon Egg universe cover art' }));
 
     const pinRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
@@ -111,7 +128,7 @@ async function generateAndUploadCoverImage(): Promise<string> {
   }
 
   // Fallback: base64 data URI
-  return `data:image/png;base64,${base64}`;
+  return `data:${mimeType};base64,${base64}`;
 }
 
 // ── Entity Templates ────────────────────────────────────────────────

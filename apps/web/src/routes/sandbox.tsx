@@ -41,6 +41,7 @@ import {
   X,
   Globe,
 } from 'lucide-react';
+import { ModelSelector } from '@/components/ModelSelector';
 
 export const Route = createFileRoute('/sandbox')({
   component: SandboxPage,
@@ -83,6 +84,7 @@ function SandboxPage() {
     'landscape_16_9'
   );
   const [videoModel, setVideoModel] = useState<VideoModel>('seedance');
+  const [imageModel, setImageModel] = useState<string>(''); // '' = auto routing
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
 
@@ -94,14 +96,23 @@ function SandboxPage() {
   const [movedOn, setMovedOn] = useState(false);
   const movedOnRef = React.useRef(false);
 
-  // Image generation
+  // Image generation — uses routed endpoint with model selection
   const generateImageMutation = useMutation({
-    mutationFn: () =>
-      trpcClient.image.generateImage.mutate({
+    mutationFn: async () => {
+      const result = await trpcClient.image.generate.mutate({
         prompt,
+        task: 'text_to_image',
         imageSize,
         numImages: 1,
-      }),
+        routingMode: imageModel ? 'manual' : 'auto',
+        ...(imageModel ? { selectedModelId: imageModel } : {}),
+      });
+      // Normalize to legacy shape for downstream compat
+      return {
+        imageUrl: result.imageUrls?.[0] ?? null,
+        status: result.status,
+      };
+    },
     onSuccess: (data) => {
       const url = data.imageUrl ?? null;
       if (movedOnRef.current) {
@@ -332,7 +343,7 @@ function SandboxPage() {
               </div>
 
               {/* Settings row */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Image ratio</label>
                   <Select
@@ -351,6 +362,14 @@ function SandboxPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <ModelSelector
+                  type="image"
+                  value={imageModel}
+                  onChange={setImageModel}
+                  label="Image model"
+                  task="text_to_image"
+                  compact
+                />
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Video model</label>
                   <Select value={videoModel} onValueChange={(v) => setVideoModel(v as VideoModel)}>
@@ -436,7 +455,9 @@ function SandboxPage() {
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   <span className="text-primary">
                     {bgGenerations.filter((g) => g.status === 'generating').length} generation
-                    {bgGenerations.filter((g) => g.status === 'generating').length > 1 ? 's' : ''}{' '}
+                    {bgGenerations.filter((g) => g.status === 'generating').length > 1
+                      ? 's'
+                      : ''}{' '}
                     running in background
                   </span>
                   <span className="text-muted-foreground text-xs ml-auto">

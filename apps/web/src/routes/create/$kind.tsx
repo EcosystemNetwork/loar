@@ -31,6 +31,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { ModelSelector } from '@/components/ModelSelector';
 
 type EntityKind =
   | 'person'
@@ -704,6 +705,7 @@ function EntityCreateForm() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [artworkPrompt, setArtworkPrompt] = useState('');
+  const [artworkModel, setArtworkModel] = useState<string>(''); // '' = auto
   const [showArtwork, setShowArtwork] = useState(false);
   const [musicPrompt, setMusicPrompt] = useState('');
   const [showMusic, setShowMusic] = useState(false);
@@ -814,7 +816,8 @@ function EntityCreateForm() {
             task: 'text_to_image',
             imageSize: 'square_hd',
             numImages: 1,
-            routingMode: 'auto',
+            routingMode: artworkModel ? 'manual' : 'auto',
+            ...(artworkModel ? { selectedModelId: artworkModel } : {}),
             entityId: result.id,
           });
           if (artResult.status === 'completed' && artResult.imageUrls?.[0]) {
@@ -1145,6 +1148,13 @@ function EntityCreateForm() {
                   rows={3}
                 />
               </div>
+              <ModelSelector
+                type="image"
+                value={artworkModel}
+                onChange={setArtworkModel}
+                label="Image model"
+                task="text_to_image"
+              />
               {name.trim() && !artworkPrompt.trim() && (
                 <Button
                   type="button"

@@ -37,6 +37,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { trpcClient } from '@/utils/trpc';
+import { ModelSelector } from '@/components/ModelSelector';
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -71,6 +72,8 @@ interface FlowCreationPanelProps {
   imageFormat: string;
   setImageFormat: (format: string) => void;
   handleGenerateEventImage: () => void;
+  selectedImageModel?: string;
+  setSelectedImageModel?: (model: string) => void;
   showVideoStep: boolean;
   setShowVideoStep: (show: boolean) => void;
   uploadedUrl: string | null;
@@ -149,6 +152,8 @@ export function FlowCreationPanel({
   previousEventTitle,
   previousEventWiki,
   handleGenerateEventImage,
+  selectedImageModel,
+  setSelectedImageModel,
   generatedVideoUrl,
   setGeneratedVideoUrl,
   setGeneratedImageUrl,
@@ -704,6 +709,17 @@ export function FlowCreationPanel({
                 ))}
               </div>
             </div>
+
+            {/* Image Model Selection */}
+            {setSelectedImageModel && (
+              <ModelSelector
+                type="image"
+                value={selectedImageModel ?? ''}
+                onChange={setSelectedImageModel}
+                label="Image model"
+                task="text_to_image"
+              />
+            )}
 
             {/* Aspect Ratio */}
             <div className="space-y-2">
