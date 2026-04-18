@@ -74,6 +74,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     event RoyaltyPaid(uint256 indexed dealId, uint256 amount);
     event ContentDeactivated(bytes32 indexed contentHash);
     event PricingUpdated(bytes32 indexed contentHash);
+    /// @notice CONTENT-02: Emitted when a RENT/LICENSE deal's state transitions to EXPIRED.
+    event DealExpired(uint256 indexed dealId);
 
     error NotCreator();
     error ContentNotActive();

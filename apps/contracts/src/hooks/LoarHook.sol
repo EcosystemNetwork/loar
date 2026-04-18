@@ -29,18 +29,9 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     uint256 public constant PROTOCOL_FEE_NUMERATOR = 200_000; // 20% of the imposed LP fee
     int128 public constant FEE_DENOMINATOR = 1_000_000; // Uniswap 100% fee
 
-    /// @notice Protocol fee for the current swap context. This is a transient-like variable:
-    ///         it's set in _beforeSwap and read in _afterSwap within the same atomic swap.
-    ///         HOOK-03: Safe because Uniswap v4 processes beforeSwap→swap→afterSwap atomically
-    ///         per pool. Multi-pool atomic txs don't interleave hooks from different pools.
-    /// @dev HOOK-03 RISK: This single storage slot is shared across all pools using this hook.
-    ///      If a future PoolManager upgrade or custom router enables interleaved multi-pool
-    ///      atomic swaps (where beforeSwap on pool A runs, then beforeSwap on pool B runs
-    ///      before afterSwap on pool A), the protocolFee value would be overwritten.
-    ///      The proper fix is per-pool fee storage (mapping(PoolId => uint24)), but this
-    ///      requires a larger refactor. For now, Uniswap v4's sequential hook execution
-    ///      guarantees correctness.
-    uint24 public protocolFee;
+    /// @notice HOOK-03: Per-pool protocol fee. Stored per PoolId so multi-pool atomic
+    ///         swaps (current or future) cannot cross-contaminate fee state.
+    mapping(PoolId => uint24) public poolProtocolFee;
 
     address public immutable factory;
     address public immutable weth;
@@ -80,13 +71,13 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         return;
     }
 
-    // function to set the protocol fee to 20% of the lp fee
-    function _setProtocolFee(uint24 lpFee) internal {
+    // HOOK-03: set the protocol fee per-pool to 20% of the lp fee.
+    function _setProtocolFee(PoolKey calldata poolKey, uint24 lpFee) internal {
         // casting is safe: result ≤ lpFee (20% of a uint24), uint128 wraps a known constant
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 scaled = (uint256(lpFee) * PROTOCOL_FEE_NUMERATOR) / uint128(FEE_DENOMINATOR);
         // forge-lint: disable-next-line(unsafe-typecast)
-        protocolFee = uint24(scaled);
+        poolProtocolFee[poolKey.toId()] = uint24(scaled);
     }
 
     // function for inheriting hooks to set process data in during initialization flow
@@ -207,9 +198,10 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             // since we're taking the protocol fee before the LP swap, we want to
             // take a slightly smaller amount to keep the taken LP/protocol fee at the 20% ratio,
             // this also helps us match the ExactOutput swappingForLoar scenario
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint128 scaledProtocolFee = (uint128(protocolFee) * 1e18) /
-                (1_000_000 + protocolFee);
+            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) /
+                (1_000_000 + pFee);
             // forge-lint: disable-next-line(unsafe-typecast)
             int128 fee = int128(
                 // forge-lint: disable-next-line(unsafe-typecast)
@@ -234,9 +226,10 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         if (!isExactInput && !swappingForLoar) {
             // we increase the protocol fee here because we want to better match
             // the ExactOutput !swappingForLoar scenario
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint128 scaledProtocolFee = (uint128(protocolFee) * 1e18) /
-                (1_000_000 - protocolFee);
+            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) /
+                (1_000_000 - pFee);
             // forge-lint: disable-next-line(unsafe-typecast)
             int128 fee = int128(
                 // forge-lint: disable-next-line(unsafe-typecast)
@@ -274,12 +267,13 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         // how: the change in unspecified delta is debited to the swaps account post swap,
         // in this case the amount out given to the swapper is decreased
         if (isExactInput && !swappingForLoar) {
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
             // grab non-loar amount out
             int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from it
             unspecifiedDelta =
                 // forge-lint: disable-next-line(unsafe-typecast)
-                (amountOut * int24(protocolFee)) /
+                (amountOut * int24(pFee)) /
                 FEE_DENOMINATOR;
             poolManager.mint(
                 address(this),
@@ -296,12 +290,13 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         // how: the change in unspecified delta is debited to the swapper's account post swap,
         // in this case the amount taken from the swapper's account is increased
         if (!isExactInput && swappingForLoar) {
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
             // grab non-loar amount in
             int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from amount int
             unspecifiedDelta =
                 // forge-lint: disable-next-line(unsafe-typecast)
-                (amountIn * -int24(protocolFee)) /
+                (amountIn * -int24(pFee)) /
                 FEE_DENOMINATOR;
             poolManager.mint(
                 address(this),

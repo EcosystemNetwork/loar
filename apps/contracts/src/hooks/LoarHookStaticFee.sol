@@ -59,7 +59,7 @@ contract LoarHookStaticFee is LoarHook, ILoarHookStaticFee {
             ? pairedFee[poolKey.toId()]
             : loarFee[poolKey.toId()];
 
-        _setProtocolFee(fee);
+        _setProtocolFee(poolKey, fee);
         IPoolManager(poolManager).updateDynamicLPFee(poolKey, fee);
     }
 }

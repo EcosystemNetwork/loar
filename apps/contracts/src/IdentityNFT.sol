@@ -6,6 +6,12 @@ import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {Strings} from "@openzeppelin/utils/Strings.sol";
 import {Base64} from "@openzeppelin/utils/Base64.sol";
 
+/// @dev IDENTITY-02: Minimal interface for dynamic universe metadata lookup at tokenURI time.
+interface IUniverseMeta {
+    function universeName() external view returns (string memory);
+    function universeImageUrl() external view returns (string memory);
+}
+
 /// @title IdentityNFT (INFT)
 /// @notice Soulbound-style identity NFTs for universe co-creators.
 ///         When a universe is created by a Gnosis Safe multi-sig, each signer
@@ -109,10 +115,24 @@ contract IdentityNFT is ERC721, Ownable {
     }
 
     /// @notice Fully on-chain tokenURI. Shows signer fraction, universe info.
+    /// @dev IDENTITY-02: Reads universeName and universeImage dynamically from the
+    ///      Universe contract so rebrands flow through to INFT metadata. Falls back
+    ///      to the snapshot taken at mint if the live call reverts.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
 
         SignerInfo storage info = signerInfo[tokenId];
+
+        string memory liveName = info.universeName;
+        string memory liveImage = info.universeImage;
+        if (info.universeContract != address(0)) {
+            try IUniverseMeta(info.universeContract).universeName() returns (string memory n) {
+                if (bytes(n).length > 0) liveName = n;
+            } catch {}
+            try IUniverseMeta(info.universeContract).universeImageUrl() returns (string memory img) {
+                if (bytes(img).length > 0) liveImage = img;
+            } catch {}
+        }
 
         string memory fraction = string(abi.encodePacked(
             uint256(info.signerIndex).toString(),
@@ -121,19 +141,19 @@ contract IdentityNFT is ERC721, Ownable {
         ));
 
         string memory name = info.totalSigners == 1
-            ? string(abi.encodePacked("LOAR Creator - ", info.universeName))
-            : string(abi.encodePacked("LOAR Signer ", fraction, " - ", info.universeName));
+            ? string(abi.encodePacked("LOAR Creator - ", liveName))
+            : string(abi.encodePacked("LOAR Signer ", fraction, " - ", liveName));
 
         string memory description = info.totalSigners == 1
-            ? string(abi.encodePacked("Identity NFT for the creator of ", info.universeName))
+            ? string(abi.encodePacked("Identity NFT for the creator of ", liveName))
             : string(abi.encodePacked(
-                "Identity NFT for signer ", fraction, " of the multi-sig governing ", info.universeName
+                "Identity NFT for signer ", fraction, " of the multi-sig governing ", liveName
             ));
 
         string memory json = string(abi.encodePacked(
             '{"name":"', name,
             '","description":"', description,
-            '","image":"', info.universeImage,
+            '","image":"', liveImage,
             '","external_url":"https://loar.fun/universe/', info.universeContract.toHexString(),
             '","attributes":[',
                 '{"trait_type":"Universe ID","value":"', info.universeId.toString(), '"}',

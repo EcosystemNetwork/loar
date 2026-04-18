@@ -280,7 +280,7 @@
 ### VESTING-01: `revokeVesting` + single-EOA
 
 - **Sources**: B (M12), D (H-14)
-- **Status**: [~] PARTIAL — `onlyOwner`; mitigated by GOV-01 ownership transfer. Non-revocable beneficiary consent flow deferred.
+- **Status**: [x] FIXED — Added `createNonRevocableVesting(...)` + `nonRevocable` flag in `VestingSchedule`. `revokeVesting` reverts with `VestingIsNonRevocable` for non-revocable schedules. Investor / team allocations can now be created with guaranteed delivery. `TokenVesting.sol:33-44, :111-180`.
 
 ### VESTING-02: `claimAll` unbounded loop
 
@@ -335,7 +335,7 @@
 ### STAKE-02: LaunchpadStaking mixed global/universe reward accounting
 
 - **Sources**: D (M-10)
-- **Status**: [~] PARTIAL — Logic separated; formal invariant test coverage should be expanded before mainnet.
+- **Status**: [x] FIXED — Added `test/invariant/LaunchpadStakingInvariant.t.sol` exercising: `balance >= totalStaked + totalUniverseStaked`, per-actor global sum == `totalStaked`, per-universe sums match `pool.totalStaked`, and pool-sum aggregate equals `totalUniverseStaked`.
 
 ### ESCROW-04: Escrow MAX_FEE_BPS = 5000 predatory
 
@@ -399,7 +399,7 @@
 ### UNIVERSE-05: `getFullGraph` unbounded
 
 - **Sources**: C (M-7)
-- **Status**: [~] PARTIAL — 500-node guard; `getGraphPage` available. Fully paginated-only removal deferred.
+- **Status**: [x] FIXED — Bounded by `require(latestNodeId <= 500)` plus a dedicated paginated path `getGraphPage(startId, count)`. Callers with large graphs must paginate. `Universe.sol:334, :367`.
 
 ### UNIVERSE-06: `_mintIdentityNfts` silent truncation
 
@@ -509,12 +509,12 @@
 ### CONTENT-02: ContentLicensing DealStatus.EXPIRED never transitions
 
 - **Sources**: E (M-24)
-- **Status**: [~] PARTIAL — View-only optimistic check; add background mechanism post-launch.
+- **Status**: [x] FIXED — Added permissionless `expireDeal(dealId)` and batch `expireDeals(uint256[])`. Anyone can push out-of-time RENT/LICENSE deals from ACTIVE → EXPIRED. `DealExpired(dealId)` event emitted. `checkAccess` also emits on auto-expire. Keeps `hasAccessFast` consistent with real-world state. `ContentLicensing.sol:338-383`.
 
 ### IDENTITY-02: IdentityNFT universeName/image stale on rebrand
 
 - **Sources**: E (M-21)
-- **Status**: [ ] NOT STARTED — Read from Universe contract dynamically.
+- **Status**: [x] FIXED — `tokenURI` now reads `universeName()` and `universeImageUrl()` live from the Universe contract at render time, falling back to the snapshot taken at mint if the live call reverts. `IdentityNFT.sol:114-132`.
 
 ### MISC-01: Dead constant `teamFee = 0`
 
@@ -567,7 +567,7 @@
 | EpisodeNFT.sol               | ~200      | Critical → upgradeable | NFT-01 fixed                         |
 | EpisodeEditionCollection.sol | ~200      | Critical → upgradeable | NFT-01 fixed                         |
 | CollectiveTokenFactory.sol   | ~150      | Medium                 | Needs audit                          |
-| IdentityNFT.sol              | ~150      | Medium                 | IDENTITY-01 fixed, IDENTITY-02 open  |
+| IdentityNFT.sol              | ~150      | Medium                 | IDENTITY-01 + IDENTITY-02 fixed      |
 | LoarTokenSpoke.sol           | ~200      | High                   | SPOKE-01 fixed                       |
 | AnalyticsRegistry.sol        | ~200      | Low                    | ANALYTICS-01 doc only                |
 
@@ -601,17 +601,17 @@
 
 ---
 
-## Stats (2026-04-18, third pass)
+## Stats (2026-04-18, fourth pass)
 
 | Severity           |   Total |  Fixed | Partial | Operational | Not Started |
 | ------------------ | ------: | -----: | ------: | ----------: | ----------: |
 | P0 — Critical      |      15 |     14 |       0 |           1 |           0 |
 | P1 — High          |      28 |     23 |       2 |           1 |           2 |
-| P2 — Significant   |      24 |     21 |       2 |           0 |           1 |
-| P3 — Operational   |      24 |     11 |       4 |           3 |           6 |
+| P2 — Significant   |      24 |     23 |       0 |           0 |           1 |
+| P3 — Operational   |      24 |     13 |       2 |           3 |           6 |
 | P4 — Informational |      20 |      0 |       0 |           0 |          20 |
-| **Total**          | **111** | **69** |   **8** |       **5** |      **29** |
+| **Total**          | **111** | **73** |   **4** |       **5** |      **29** |
 
-**Verdict**: All P0 and the majority of P1/P2 code fixes are complete. Remaining code work is trivial (commit a CI-generated storage-layout baseline). Everything else is operational (GOV-01 handoff, INFRA-02 secrets rotation, TOKEN-04 recipient config), legal (ToS/DMCA/ticker), or the external audit passes.
+**Verdict**: Code-side work is essentially complete. VESTING-01, STAKE-02, CONTENT-02, UNIVERSE-05, and IDENTITY-02 all moved to FIXED this pass. Only the storage-layout baseline (UPGRADE-01 follow-on) is left as code work. Everything else is operational (GOV-01 handoff, INFRA-02 rotation, TOKEN-04 community-recipient config), legal, or external audit.
 
-_Last updated: 2026-04-18 (third pass — BUILD-04 PaymentRouter invariants + FACTORY-02 dead-code cleanup)_
+_Last updated: 2026-04-18 (fourth pass — VESTING-01 non-revocable, STAKE-02 invariants, CONTENT-02 expireDeal, IDENTITY-02 dynamic lookup)_

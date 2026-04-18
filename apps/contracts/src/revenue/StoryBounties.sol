@@ -262,36 +262,50 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     function setPlatformFee(uint16 newFeeBps) external onlyOwner {
         require(newFeeBps <= 2000, "Max 20%");
+        uint16 old = platformFeeBps;
         platformFeeBps = newFeeBps;
+        emit PlatformFeeChanged(old, newFeeBps);
     }
 
     function setCancellationFee(uint16 newFeeBps) external onlyOwner {
         require(newFeeBps <= 1000, "Max 10%");
+        uint16 old = cancellationFeeBps;
         cancellationFeeBps = newFeeBps;
+        emit CancellationFeeChanged(old, newFeeBps);
     }
 
     function setMinBountyAmount(uint256 newMin) external onlyOwner {
+        uint256 old = minBountyAmount;
         minBountyAmount = newMin;
+        emit MinBountyChanged(old, newMin);
     }
 
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
+        address old = treasury;
         treasury = newTreasury;
+        emit TreasuryChanged(old, newTreasury);
     }
 
     function setPlatform(address newPlatform) external onlyOwner {
+        address old = platform;
         platform = newPlatform;
+        emit PlatformChanged(old, newPlatform);
     }
 
     /// @notice Set PaymentRouter for consistent revenue routing
     function setPaymentRouter(address _paymentRouter) external onlyOwner {
+        address old = address(paymentRouter);
         paymentRouter = IPaymentRouter(_paymentRouter);
+        emit PaymentRouterChanged(old, _paymentRouter);
     }
 
     event PlatformFeeChanged(uint16 oldBps, uint16 newBps);
     event CancellationFeeChanged(uint16 oldBps, uint16 newBps);
     event MinBountyChanged(uint256 oldMin, uint256 newMin);
     event TreasuryChanged(address indexed oldTreasury, address indexed newTreasury);
+    event PlatformChanged(address indexed oldPlatform, address indexed newPlatform);
+    event PaymentRouterChanged(address indexed oldRouter, address indexed newRouter);
 
     /// @dev Reserved storage gap for future upgrades
     uint256[49] private __gap;

@@ -16,17 +16,17 @@ import {TimelockController} from "@openzeppelin/governance/TimelockController.so
 ///
 /// Default governance parameters (set in constructor, updatable via governance proposals):
 ///
-///   Parameter            | Value           | Rationale
-///   ---------------------|-----------------|-------------------------------------------
-///   Voting Delay         | 7200 blocks     | ~1 day on Base L2 (2s blocks). Gives token
-///                        |                 | holders time to acquire/delegate before vote.
-///   Voting Period        | 50400 blocks    | ~7 days. Standard window for community input.
-///   Proposal Threshold   | 1,000,000 tokens| Prevents spam proposals. ~1% of a typical
-///                        |                 | 100M supply universe.
-///   Quorum               | 10%             | Of total supply must vote FOR to pass.
-///                        |                 | Prevents early-stage takeover by creator.
-///   Timelock Delay       | 24 hours        | Gives community time to exit if hostile
-///                        |                 | proposal passes. Prevents instant execution.
+///   Parameter            | Value            | Rationale
+///   ---------------------|------------------|-------------------------------------------
+///   Voting Delay         | 7200 blocks      | ~1 day on Base L2 (2s blocks). Gives token
+///                        |                  | holders time to acquire/delegate before vote.
+///   Voting Period        | 50400 blocks     | ~7 days. Standard window for community input.
+///   Proposal Threshold   | 10,000,000 tokens| GOV-05: Prevents spam proposals. 1% of a
+///                        |                  | standard 1B supply universe.
+///   Quorum               | 10%              | Of total supply must vote FOR to pass.
+///                        |                  | Prevents early-stage takeover by creator.
+///   Timelock Delay       | 24 hours         | Gives community time to exit if hostile
+///                        |                  | proposal passes. Prevents instant execution.
 ///
 /// Anti-takeover considerations:
 ///   - At T=0 the universe creator holds most tokens (minus LP). The 24h timelock
@@ -50,7 +50,7 @@ contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple,
 
     constructor(IVotes _token, TimelockController _timelock, uint256 _earlyLifeBlocks)
         Governor("UniverseGovernor")
-        GovernorSettings(7200 /* ~1 day on Base L2 @ 2s blocks */, 50400 /* ~7 days */, 1_000_000e18 /* 1M tokens */)
+        GovernorSettings(7200 /* ~1 day on Base L2 @ 2s blocks */, 50400 /* ~7 days */, 10_000_000e18 /* GOV-05: 10M tokens = 1% of 1B supply */)
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(10) // steady-state quorum = 10%
         GovernorTimelockControl(_timelock)

@@ -445,3 +445,59 @@
 [S28 (28/56)] DONE — Node #27
 [S29 (29/56)] Rehosting to Pinata...
 [S29 (29/56)] Pinned: QmXYY8jaRRVFg5ubua8MFXshz7Z3kTRHo3QhNmuBerBv7i (3.9MB)
+[S29 (29/56)] Node #28
+[S29 (29/56)] DONE — Node #28
+[S30 (30/56)] Rehosting to Pinata...
+[S30 (30/56)] Pinned: Qmd8HSfzsWrLGpz8KXdsxFiG4Ad81zPARbaYGCG2wxhaQR (4.3MB)
+[S30 (30/56)] Node #29
+[S30 (30/56)] DONE — Node #29
+[S30 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776501916220.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S28–S30
+
+═══════════════════════════════════════════════════════
+  BATCH: S31–S33 (3 parallel)
+═══════════════════════════════════════════════════════
+[S31 (31/56)] Generating (t2v)...
+[S32 (32/56)] Generating (t2v)...
+[S33 (33/56)] Generating (t2v)...
+[S31 (31/56)] Task: cgt-20260418164520-c7bp5
+[S33 (33/56)] Task: cgt-20260418164520-qg4gw
+[S32 (32/56)] Task: cgt-20260418164521-h69z8
+[S31 (31/56)] Generating... (0s)
+[S33 (33/56)] Generating... (0s)
+[S32 (32/56)] Generating... (0s)
+[S31 (31/56)] Generating... (30s)
+[S33 (33/56)] Generating... (30s)
+[S32 (32/56)] Generating... (30s)
+[S31 (31/56)] Generating... (60s)
+[S32 (32/56)] Generating... (60s)
+[S33 (33/56)] Generating... (60s)
+[S32 (32/56)] Generating... (90s)
+[S33 (33/56)] Generating... (90s)
+[S31 (31/56)] Generating... (90s)
+[S31 (31/56)] Generating... (120s)
+[S33 (33/56)] Generating... (120s)
+[S32 (32/56)] Generating... (120s)
+[S31 (31/56)] Retry 1/2 (sanitized)...
+[S31 (31/56)] Task: cgt-20260418164750-jjknl
+[S31 (31/56)] Generating... (0s)
+[S33 (33/56)] Generating... (150s)
+[S32 (32/56)] Generating... (150s)
+[S32 (32/56)] Retry 1/2 (sanitized)...
+[S32 (32/56)] Task: cgt-20260418164822-gr2n4
+[S31 (31/56)] Generating... (30s)
+[S32 (32/56)] Generating... (0s)
+[S33 (33/56)] Video done
+[S31 (31/56)] Generating... (60s)
+[S32 (32/56)] Generating... (30s)
+[S32 (32/56)] Generating... (60s)
+[S31 (31/56)] Generating... (90s)
+[S31 (31/56)] Video done
+[S32 (32/56)] Generating... (90s)
+[S32 (32/56)] Generating... (120s)
+[S32 (32/56)] Video done
+[S31 (31/56)] Rehosting to Pinata...
+[S31 (31/56)] Pinned: QmNVNztHxttQeHnwWyyiRiHyEPNCddRbTv4s6FUiKdGHhq (4.0MB)
+[S31 (31/56)] Node #30
+[S31 (31/56)] DONE — Node #30
+[S32 (32/56)] Rehosting to Pinata...
