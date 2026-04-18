@@ -36,7 +36,6 @@ import {
   Castle,
   Crown,
   ImageIcon,
-  Video,
   Globe,
   Lock,
   UserCircle,
@@ -72,6 +71,7 @@ import { ModelViewer } from '@/components/ModelViewer';
 
 // New wiki components
 import { EntityCard } from '@/components/wiki/EntityCard';
+import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { SortMenu } from '@/components/wiki/SortMenu';
 import { sortEntities } from '@/components/wiki/sort';
 import { RandomEntityButton } from '@/components/wiki/RandomEntityButton';
@@ -275,81 +275,11 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
         </Link>
       </div>
 
-      {isLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
-
-      {!isLoading && filtered.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <ImageIcon className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
-          <p className="mb-4">No gallery content yet.</p>
-          <p className="text-xs mb-4">
-            Generate images & videos in the Sandbox, then promote them here.
-          </p>
-          <Link to="/sandbox">
-            <Button variant="outline">Open Sandbox</Button>
-          </Link>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((item: any) => {
-          const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-          return (
-            <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-muted relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-                </div>
-                {isVideo && item.mediaUrl ? (
-                  <video
-                    src={item.mediaUrl}
-                    poster={item.thumbnailUrl || undefined}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    muted
-                    playsInline
-                    onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
-                    onMouseLeave={(e) => {
-                      const v = e.currentTarget as HTMLVideoElement;
-                      v.pause();
-                      v.currentTime = 0;
-                    }}
-                  />
-                ) : item.mediaUrl || item.thumbnailUrl ? (
-                  <img
-                    src={item.mediaUrl || item.thumbnailUrl}
-                    alt={item.title}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                ) : null}
-                {isVideo && (
-                  <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
-                    <Video className="h-2.5 w-2.5 mr-1" />
-                    Video
-                  </Badge>
-                )}
-                {item.classification && (
-                  <Badge
-                    variant="outline"
-                    className="absolute top-2 right-2 bg-black/60 text-white border-0 text-[10px]"
-                  >
-                    {item.classification}
-                  </Badge>
-                )}
-              </div>
-              <CardContent className="p-3">
-                <p className="text-sm font-medium truncate">{item.title}</p>
-                {item.description && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {item.description}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      <GalleryGrid
+        items={filtered}
+        isLoading={isLoading}
+        emptyMessage="No gallery content yet. Generate in the Sandbox, then it appears here."
+      />
     </div>
   );
 }

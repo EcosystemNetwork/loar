@@ -53,6 +53,7 @@ contract GovernanceTokenFactory {
     address public owner;
 
     error SymbolBlocked();
+    error InvalidSymbolChar();
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -85,6 +86,9 @@ contract GovernanceTokenFactory {
         uint256 supply,
         address mintTo
     ) external returns (address) {
+        // GOV-08: Reject whitespace/unicode that would bypass the exact-string blocklist
+        // (e.g. " LOAR", "LOAR\u00A0"). Accept only uppercase ASCII letters and digits.
+        _requireCanonicalSymbol(symbol);
         // GOV-03: Enforce symbol blocklist at deployment time (not post-hoc)
         if (blockedSymbols[symbol]) revert SymbolBlocked();
         // Validate symbol length
@@ -95,5 +99,18 @@ contract GovernanceTokenFactory {
         );
         emit TokenCreated(address(token));
         return address(token);
+    }
+
+    /// @dev Enforce canonical ticker form: uppercase A-Z or digits 0-9 only.
+    ///      Prevents blocklist bypass via whitespace/unicode lookalikes.
+    function _requireCanonicalSymbol(string memory symbol) internal pure {
+        bytes memory b = bytes(symbol);
+        uint256 len = b.length;
+        for (uint256 i = 0; i < len; i++) {
+            bytes1 c = b[i];
+            bool isUpper = (c >= 0x41 && c <= 0x5A); // A-Z
+            bool isDigit = (c >= 0x30 && c <= 0x39); // 0-9
+            if (!isUpper && !isDigit) revert InvalidSymbolChar();
+        }
     }
 }

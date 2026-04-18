@@ -42,6 +42,7 @@ import {
   History,
   Hand,
   MousePointer2,
+  Film,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -121,6 +122,7 @@ import { NodeContextMenu } from '@/components/flow/NodeContextMenu';
 import { ShortcutsHelpDialog } from '@/components/flow/ShortcutsHelpDialog';
 import { NodeArcOverlay } from '@/components/flow/NodeArcOverlay';
 import { EpisodeBuilder } from '@/components/episodes/EpisodeBuilder';
+import { EpisodeList } from '@/components/episodes/EpisodeList';
 import { ScriptToEpisode } from '@/components/episodes/ScriptToEpisode';
 import { useNodeArcs } from '@/hooks/useNodeArcs';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
@@ -362,6 +364,7 @@ function UniverseTimelineEditorInner() {
   const [showAudioToolbar, setShowAudioToolbar] = useState(false);
   const [showEpisodeBuilder, setShowEpisodeBuilder] = useState(false);
   const [showScriptToEpisode, setShowScriptToEpisode] = useState(false);
+  const [showEpisodeList, setShowEpisodeList] = useState(false);
 
   // Storage integration state
   const [isSavingToStorage, setIsSavingToStorage] = useState(false);
@@ -747,6 +750,7 @@ function UniverseTimelineEditorInner() {
     videoPrompt,
     setGeneratedVideoUrl,
     setStatusMessage,
+    universeId: id,
   });
 
   // Wrapper to call the hook's handler with the correct parameters
@@ -3088,6 +3092,16 @@ function UniverseTimelineEditorInner() {
 
               <Panel position="top-right">
                 <div className="flex gap-2">
+                  {/* Episodes — browse and export saved episodes */}
+                  <button
+                    onClick={() => setShowEpisodeList(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg text-zinc-300 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors text-sm"
+                    title="Browse & export saved episodes"
+                  >
+                    <Film className="h-4 w-4" />
+                    Episodes
+                  </button>
+
                   {/* Canvas Tool Mode */}
                   <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">
                     <button
@@ -3899,6 +3913,9 @@ function UniverseTimelineEditorInner() {
           onClose={() => setShowEpisodeBuilder(false)}
         />
       )}
+
+      {/* Episode List — browse & export saved episodes */}
+      {showEpisodeList && <EpisodeList universeId={id} onClose={() => setShowEpisodeList(false)} />}
 
       {/* Script-to-Episode */}
       {showScriptToEpisode && (

@@ -1566,6 +1566,8 @@ export const generationRouter = router({
         castMemberIds: z.array(z.string()).max(5).optional(),
         stylePreset: z.string().nullable().optional(),
         startFrameUrl: z.string().url().optional(),
+
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1678,6 +1680,7 @@ export const generationRouter = router({
         source: 'generation.generateVideo',
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
+        ...(input.universeId ? { universeId: input.universeId } : {}),
       });
       if (result.videoUrl) {
         autoPublishVideoToGallery({
@@ -1685,6 +1688,7 @@ export const generationRouter = router({
           videoUrl: result.videoUrl,
           prompt: input.prompt,
           model: input.model || 'fal-ai/ltx-video',
+          universeId: input.universeId,
           generationId: legacyGenId,
           thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
@@ -1705,6 +1709,7 @@ export const generationRouter = router({
           .default(5),
         aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
         motionStrength: z.number().min(1).max(255).optional().default(127),
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1742,6 +1747,7 @@ export const generationRouter = router({
         source: 'generation.veo3ImageToVideo',
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
+        ...(input.universeId ? { universeId: input.universeId } : {}),
       });
       if (result.videoUrl) {
         autoPublishVideoToGallery({
@@ -1749,6 +1755,7 @@ export const generationRouter = router({
           videoUrl: result.videoUrl,
           prompt: input.prompt,
           model: 'fal-ai/veo3.1/fast/image-to-video',
+          universeId: input.universeId,
           generationId: veo3GenId,
           thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
@@ -1770,6 +1777,7 @@ export const generationRouter = router({
         aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
         negativePrompt: z.string().optional(),
         cfgScale: z.number().min(0.1).max(2.0).optional().default(0.5),
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1809,6 +1817,7 @@ export const generationRouter = router({
         source: 'generation.klingVideo',
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
+        ...(input.universeId ? { universeId: input.universeId } : {}),
       });
       if (result.videoUrl) {
         autoPublishVideoToGallery({
@@ -1816,6 +1825,7 @@ export const generationRouter = router({
           videoUrl: result.videoUrl,
           prompt: input.prompt,
           model: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+          universeId: input.universeId,
           generationId: klingGenId,
           thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
@@ -1837,6 +1847,7 @@ export const generationRouter = router({
         resolution: z.enum(['720p', '1080p', 'auto']).optional().default('1080p'),
         negativePrompt: z.string().optional(),
         enablePromptExpansion: z.boolean().optional().default(true),
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1876,6 +1887,7 @@ export const generationRouter = router({
         source: 'generation.wan25ImageToVideo',
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
+        ...(input.universeId ? { universeId: input.universeId } : {}),
       });
       if (result.videoUrl) {
         autoPublishVideoToGallery({
@@ -1883,6 +1895,7 @@ export const generationRouter = router({
           videoUrl: result.videoUrl,
           prompt: input.prompt,
           model: 'fal-ai/wan-25-preview/image-to-video',
+          universeId: input.universeId,
           generationId: wan25GenId,
           thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>
@@ -1903,6 +1916,7 @@ export const generationRouter = router({
           .default(4),
         aspectRatio: z.enum(['16:9', '9:16', '1:1', 'auto']).optional().default('auto'),
         resolution: z.enum(['720p', '1080p', 'auto']).optional().default('auto'),
+        universeId: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1941,6 +1955,7 @@ export const generationRouter = router({
         source: 'generation.soraImageToVideo',
         latencyMs: Date.now() - startTime,
         createdAt: new Date(),
+        ...(input.universeId ? { universeId: input.universeId } : {}),
       });
       if (result.videoUrl) {
         autoPublishVideoToGallery({
@@ -1948,6 +1963,7 @@ export const generationRouter = router({
           videoUrl: result.videoUrl,
           prompt: input.prompt,
           model: 'fal-ai/sora-2/image-to-video',
+          universeId: input.universeId,
           generationId: soraGenId,
           thumbnailUrl: input.imageUrl,
         }).catch((err: Error) =>

@@ -64,6 +64,11 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     uint256 public currentGrantDay;
     uint256 public maxGrantPerUser;
 
+    /// @notice CREDIT-06: Cumulative grants per user. Prevents the balance-based
+    ///         cap from being reset by spending — previously a user could spend
+    ///         credits to drop balance, then receive unlimited follow-on grants.
+    mapping(address => uint256) public grantedPerUser;
+
     // ── Margin constants (informational, actual margins baked into package prices) ──
     uint16 public constant FIAT_MARGIN_BPS = 3500;   // 35%
     uint16 public constant LOAR_MARGIN_BPS = 2500;    // 25%
@@ -295,8 +300,10 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         if (grantedToday + amount > dailyGrantLimit) revert DailyGrantLimitExceeded();
         grantedToday += amount;
 
-        // Per-user cap
-        if (userCredits[user].balance + amount > maxGrantPerUser) revert MaxGrantPerUserExceeded();
+        // CREDIT-06: Per-user cap on cumulative grants (not live balance) —
+        // spending credits must not reset the cap.
+        if (grantedPerUser[user] + amount > maxGrantPerUser) revert MaxGrantPerUserExceeded();
+        grantedPerUser[user] += amount;
 
         userCredits[user].balance += amount;
         userCredits[user].totalPurchased += amount;
@@ -360,6 +367,6 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         return (uc.balance, uc.totalPurchased, uc.totalSpent, uc.totalBonusReceived);
     }
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[49] private __gap;
+    /// @dev Reserved storage gap for future upgrades — reduced by 1 slot for `grantedPerUser`
+    uint256[48] private __gap;
 }

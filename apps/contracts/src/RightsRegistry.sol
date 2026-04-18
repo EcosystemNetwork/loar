@@ -47,6 +47,7 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     error NoPendingFreeze();
     error InvalidSignature();
     error SignatureExpired();
+    error MonetizableRequiresCreatorSig();
 
     modifier onlyOperator() {
         _checkOperator();
@@ -68,17 +69,27 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /// @notice Set the rights classification for a content hash
-    /// @dev RIGHTS-01: On first classification (UNSET), any operator can set and becomes recorded creator.
-    ///      This is intentional for platform operation — operators act on behalf of creators during upload.
-    ///      Subsequent changes require the caller to be the recorded creator or the owner.
-    ///      Cannot change a FROZEN entry — use a new content hash for revised content.
+    /// @notice Set the rights classification for a content hash.
+    /// @dev RIGHTS-01 (hardening): Only the owner may classify content as
+    ///      ORIGINAL/LICENSED/PUBLIC_DOMAIN via this path. A plain operator (platform backend key)
+    ///      can only set non-monetizable classifications (UNSET/FUN). For creator-authenticated
+    ///      monetizable classification, use `setRightsWithCreatorSig`, which carries the creator's
+    ///      signature and binds `contentCreator = creator` (not the operator). This prevents a
+    ///      compromised operator from pre-claiming an unset hash as ORIGINAL + locking
+    ///      `contentCreator = msg.sender` and then flipping classifications without signature.
     function setRights(bytes32 contentHash, RightsType rightsType) external onlyOperator {
         if (contentHash == bytes32(0)) revert ZeroHash();
         if (rights[contentHash] == RightsType.FROZEN) revert AlreadyFrozen();
 
+        bool isMonetizableType = rightsType == RightsType.ORIGINAL
+            || rightsType == RightsType.LICENSED
+            || rightsType == RightsType.PUBLIC_DOMAIN;
+        if (isMonetizableType && msg.sender != owner()) {
+            revert MonetizableRequiresCreatorSig();
+        }
+
         if (rights[contentHash] == RightsType.UNSET) {
-            // First classification — record the creator
+            // First classification — record the caller as creator for downgrade paths.
             contentCreator[contentHash] = msg.sender;
         } else {
             // Subsequent change — only creator or owner

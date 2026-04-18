@@ -65,8 +65,9 @@ contract EntityEditionNFTTest is Test {
         vm.deal(buyer, 100 ether);
         vm.deal(buyer2, 100 ether);
 
-        // Classify content as monetizable
-        vm.startPrank(platform);
+        // Classify content as monetizable (owner bypass for test setup;
+        // production would use setRightsWithCreatorSig).
+        vm.startPrank(deployer);
         registry.setRights(contentHash, IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(contentHash2, IRightsRegistry.RightsType.LICENSED);
         registry.setRights(contentHash3, IRightsRegistry.RightsType.PUBLIC_DOMAIN);
@@ -154,7 +155,7 @@ contract EntityEditionNFTTest is Test {
         bytes32 ch4 = keccak256("entity-4");
         vm.stopPrank();
 
-        vm.prank(platform);
+        vm.prank(deployer);
         registry.setRights(ch4, IRightsRegistry.RightsType.ORIGINAL);
 
         vm.prank(creator);

@@ -9,7 +9,7 @@
  *  2. Progress — per-scene status list, overall progress, completion link
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,6 +22,12 @@ import {
   Film,
   Sparkles,
   Clock,
+  Link2,
+  Split,
+  RotateCw,
+  SkipForward,
+  StopCircle,
+  PauseCircle,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -43,6 +49,14 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
   const [targetDuration, setTargetDuration] = useState(60); // seconds
   const [stylePreset, setStylePreset] = useState('');
   const [qualityTarget, setQualityTarget] = useState<'draft' | 'standard' | 'premium'>('standard');
+  const [mode, setMode] = useState<'continuity' | 'independent'>('continuity');
+  const [maxRetries, setMaxRetries] = useState(10);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Job state ────────────────────────────────────────────────────────
 
@@ -77,12 +91,21 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
         aspectRatio: '16:9',
         resolution: '720p',
         qualityTarget,
+        mode,
+        maxRetries,
         ...(stylePreset ? { stylePreset } : {}),
       });
       return result;
     },
     onSuccess: (result) => {
       setJobId(result.jobId);
+    },
+  });
+
+  const controlMutation = useMutation({
+    mutationFn: async (action: 'abort' | 'skip' | 'retry') => {
+      if (!jobId) return;
+      await trpcClient.episodes.controlJob.mutate({ jobId, action });
     },
   });
 
@@ -104,7 +127,13 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
   const totalClips = jobStatus?.clipCount ?? sceneCount;
   const progressPct =
     totalClips > 0 ? Math.round(((completedCount + failedCount) / totalClips) * 100) : 0;
-  const isJobDone = jobStatus?.status === 'completed' || jobStatus?.status === 'failed';
+  const isJobDone =
+    jobStatus?.status === 'completed' ||
+    jobStatus?.status === 'failed' ||
+    jobStatus?.status === 'aborted';
+  const isJobActive = !!jobStatus && !isJobDone;
+  const awaitingIntervention = jobStatus?.status === 'awaiting_intervention';
+  const currentClip = jobStatus?.clipResults?.[jobStatus.currentSceneIndex ?? 0] ?? null;
 
   // ── Format helpers ───────────────────────────────────────────────────
 
@@ -224,6 +253,66 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                 )}
               </div>
 
+              {/* Generation mode */}
+              <div>
+                <label className="text-xs font-medium text-zinc-400 mb-1.5 block">
+                  Generation Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setMode('continuity')}
+                    className={`flex items-start gap-2 px-3 py-2.5 rounded-lg text-left transition-colors border ${
+                      mode === 'continuity'
+                        ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-100'
+                        : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                    }`}
+                  >
+                    <Link2 className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium">Continuity</div>
+                      <div className="text-[10px] text-zinc-500 leading-snug mt-0.5">
+                        Each scene seeds the next from its last frame. Pauses on failure — never
+                        advances with a stale frame.
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setMode('independent')}
+                    className={`flex items-start gap-2 px-3 py-2.5 rounded-lg text-left transition-colors border ${
+                      mode === 'independent'
+                        ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-100'
+                        : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                    }`}
+                  >
+                    <Split className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium">Independent</div>
+                      <div className="text-[10px] text-zinc-500 leading-snug mt-0.5">
+                        Scenes generated standalone. Failed scenes are refunded and skipped. Faster,
+                        no visual chain.
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {mode === 'continuity' && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <label className="text-[11px] text-zinc-500">Auto-retries per scene:</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={maxRetries}
+                      onChange={(e) =>
+                        setMaxRetries(Math.max(1, Math.min(50, Number(e.target.value) || 10)))
+                      }
+                      className="bg-zinc-800 border-zinc-700 text-white w-16 h-7 text-xs"
+                    />
+                    <span className="text-[11px] text-zinc-600">then pause for your decision</span>
+                  </div>
+                )}
+              </div>
+
               {/* Quality */}
               <div>
                 <label className="text-xs font-medium text-zinc-400 mb-1.5 block">Quality</label>
@@ -284,24 +373,45 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                       ? 'Episode complete'
                       : jobStatus?.status === 'failed'
                         ? 'Generation failed'
-                        : jobStatus?.status === 'assembling'
-                          ? 'Assembling episode...'
-                          : `Generating scene ${(jobStatus?.currentSceneIndex ?? 0) + 1} of ${totalClips}...`}
+                        : jobStatus?.status === 'aborted'
+                          ? 'Aborted'
+                          : jobStatus?.status === 'assembling'
+                            ? 'Assembling episode...'
+                            : awaitingIntervention
+                              ? `Scene ${(jobStatus?.currentSceneIndex ?? 0) + 1} needs your decision`
+                              : currentClip?.retryStatus === 'retrying' ||
+                                  currentClip?.retryStatus === 'backing_off'
+                                ? `Scene ${(jobStatus?.currentSceneIndex ?? 0) + 1} — retry ${currentClip.retryAttempt ?? 0}/${jobStatus?.maxRetries ?? 10}`
+                                : `Generating scene ${(jobStatus?.currentSceneIndex ?? 0) + 1} of ${totalClips}...`}
                   </span>
                   <span className="text-zinc-500">{progressPct}%</span>
                 </div>
                 <div className="w-full bg-zinc-800 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
-                      jobStatus?.status === 'failed'
+                      jobStatus?.status === 'failed' || jobStatus?.status === 'aborted'
                         ? 'bg-red-500'
-                        : jobStatus?.status === 'completed'
-                          ? 'bg-emerald-500'
+                        : awaitingIntervention
+                          ? 'bg-amber-500'
                           : 'bg-emerald-500'
                     }`}
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
+                {jobStatus?.mode ? (
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                    {jobStatus.mode === 'continuity' ? (
+                      <Link2 className="h-3 w-3" />
+                    ) : (
+                      <Split className="h-3 w-3" />
+                    )}
+                    <span>
+                      {jobStatus.mode === 'continuity'
+                        ? 'Continuity chain — next scene waits on this one'
+                        : 'Independent mode — failures are skipped'}
+                    </span>
+                  </div>
+                ) : null}
                 {jobStatus?.creditsRefunded ? (
                   <p className="text-xs text-amber-400">
                     {jobStatus.creditsRefunded} credits refunded for failed clips
@@ -309,67 +419,168 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                 ) : null}
               </div>
 
+              {/* Intervention banner — continuity mode hit max retries */}
+              {awaitingIntervention && (
+                <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <PauseCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-amber-200">
+                        Scene {(jobStatus?.currentSceneIndex ?? 0) + 1} paused — retries exhausted
+                      </div>
+                      <div className="text-xs text-amber-300/80 mt-1">
+                        The next scene needs this one's last frame. Retry to try again, skip to
+                        break the chain (next scene will start without a seed frame), or abort the
+                        whole job.
+                      </div>
+                      {currentClip?.error ? (
+                        <div
+                          className="text-[11px] text-amber-300/70 mt-2 font-mono truncate"
+                          title={currentClip.error}
+                        >
+                          Last error: {currentClip.error}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-amber-600 hover:bg-amber-500 text-white gap-1.5 h-8"
+                      disabled={controlMutation.isPending}
+                      onClick={() => controlMutation.mutate('retry')}
+                    >
+                      <RotateCw className="h-3.5 w-3.5" />
+                      Retry scene
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-700/50 text-amber-200 hover:bg-amber-900/30 gap-1.5 h-8"
+                      disabled={controlMutation.isPending}
+                      onClick={() => controlMutation.mutate('skip')}
+                    >
+                      <SkipForward className="h-3.5 w-3.5" />
+                      Skip scene
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-800/50 text-red-300 hover:bg-red-950/40 gap-1.5 h-8"
+                      disabled={controlMutation.isPending}
+                      onClick={() => controlMutation.mutate('abort')}
+                    >
+                      <StopCircle className="h-3.5 w-3.5" />
+                      Abort job
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Scene list */}
               <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                {jobStatus?.clipResults.map((clip, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
-                      clip.status === 'generating'
-                        ? 'bg-emerald-900/20 border border-emerald-800/30'
-                        : clip.status === 'completed'
-                          ? 'bg-zinc-800/50'
-                          : clip.status === 'failed'
-                            ? 'bg-red-900/10 border border-red-900/20'
-                            : 'bg-zinc-800/30'
-                    }`}
-                  >
-                    {/* Status icon */}
-                    <div className="shrink-0">
-                      {clip.status === 'pending' && <Circle className="h-4 w-4 text-zinc-600" />}
-                      {clip.status === 'generating' && (
-                        <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
+                {jobStatus?.clipResults.map((clip, i) => {
+                  const isCurrent = (jobStatus?.currentSceneIndex ?? -1) === i;
+                  const isBackingOff = clip.retryStatus === 'backing_off';
+                  const isAwaiting = clip.retryStatus === 'awaiting_intervention';
+                  const retryAtMs = clip.retryAt ? Date.parse(clip.retryAt) : 0;
+                  const backoffRemaining =
+                    isBackingOff && retryAtMs
+                      ? Math.max(0, Math.ceil((retryAtMs - now) / 1000))
+                      : 0;
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
+                        isAwaiting
+                          ? 'bg-amber-900/15 border border-amber-700/30'
+                          : isBackingOff
+                            ? 'bg-amber-900/10 border border-amber-800/20'
+                            : clip.status === 'generating'
+                              ? 'bg-emerald-900/20 border border-emerald-800/30'
+                              : clip.status === 'completed'
+                                ? 'bg-zinc-800/50'
+                                : clip.status === 'failed'
+                                  ? 'bg-red-900/10 border border-red-900/20'
+                                  : 'bg-zinc-800/30'
+                      }`}
+                    >
+                      {/* Status icon */}
+                      <div className="shrink-0">
+                        {clip.status === 'pending' && <Circle className="h-4 w-4 text-zinc-600" />}
+                        {clip.status === 'generating' && !isBackingOff && (
+                          <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
+                        )}
+                        {isBackingOff && <Clock className="h-4 w-4 text-amber-400" />}
+                        {isAwaiting && <PauseCircle className="h-4 w-4 text-amber-400" />}
+                        {clip.status === 'completed' && (
+                          <Check className="h-4 w-4 text-emerald-400" />
+                        )}
+                        {clip.status === 'failed' && !isAwaiting && (
+                          <AlertCircle className="h-4 w-4 text-red-400" />
+                        )}
+                      </div>
+
+                      {/* Scene info */}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-zinc-400 mr-2 font-mono text-xs">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <span
+                          className={`${clip.status === 'completed' ? 'text-zinc-300' : 'text-zinc-500'} truncate`}
+                        >
+                          {parsedScenes[i]?.slice(0, 60) || `Scene ${i + 1}`}
+                          {(parsedScenes[i]?.length ?? 0) > 60 ? '...' : ''}
+                        </span>
+                        {isBackingOff ||
+                        isAwaiting ||
+                        (isCurrent && (clip.retryAttempt ?? 0) > 0) ? (
+                          <div className="text-[10px] text-amber-400/80 mt-0.5">
+                            {isAwaiting
+                              ? `Paused — retries exhausted (${clip.retryAttempt}/${jobStatus?.maxRetries ?? 10})`
+                              : isBackingOff
+                                ? `Backing off ${backoffRemaining}s — retry ${clip.retryAttempt ?? 0}/${jobStatus?.maxRetries ?? 10}`
+                                : `Retry ${clip.retryAttempt ?? 0}/${jobStatus?.maxRetries ?? 10}`}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Inline retry-now button during backoff on the active scene */}
+                      {isCurrent && isBackingOff && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 border-amber-700/40 text-amber-300 hover:bg-amber-900/30 gap-1"
+                          disabled={controlMutation.isPending}
+                          onClick={() => controlMutation.mutate('retry')}
+                        >
+                          <RotateCw className="h-3 w-3" />
+                          Now
+                        </Button>
                       )}
-                      {clip.status === 'completed' && (
-                        <Check className="h-4 w-4 text-emerald-400" />
+
+                      {/* Thumbnail for completed clips */}
+                      {clip.status === 'completed' && clip.videoUrl && (
+                        <video
+                          src={clip.videoUrl}
+                          className="h-10 w-16 rounded object-cover shrink-0"
+                          muted
+                          preload="metadata"
+                        />
                       )}
-                      {clip.status === 'failed' && <AlertCircle className="h-4 w-4 text-red-400" />}
+
+                      {/* Error message */}
+                      {clip.status === 'failed' && !isAwaiting && clip.error && (
+                        <span
+                          className="text-xs text-red-400 truncate max-w-[150px]"
+                          title={clip.error}
+                        >
+                          {clip.error.slice(0, 40)}
+                        </span>
+                      )}
                     </div>
-
-                    {/* Scene info */}
-                    <div className="flex-1 min-w-0">
-                      <span className="text-zinc-400 mr-2 font-mono text-xs">
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      <span
-                        className={`${clip.status === 'completed' ? 'text-zinc-300' : 'text-zinc-500'} truncate`}
-                      >
-                        {parsedScenes[i]?.slice(0, 60) || `Scene ${i + 1}`}
-                        {(parsedScenes[i]?.length ?? 0) > 60 ? '...' : ''}
-                      </span>
-                    </div>
-
-                    {/* Thumbnail for completed clips */}
-                    {clip.status === 'completed' && clip.videoUrl && (
-                      <video
-                        src={clip.videoUrl}
-                        className="h-10 w-16 rounded object-cover shrink-0"
-                        muted
-                        preload="metadata"
-                      />
-                    )}
-
-                    {/* Error message */}
-                    {clip.status === 'failed' && clip.error && (
-                      <span
-                        className="text-xs text-red-400 truncate max-w-[150px]"
-                        title={clip.error}
-                      >
-                        {clip.error.slice(0, 40)}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Completion error */}
@@ -407,6 +618,19 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                   <Sparkles className="h-4 w-4" />
                 )}
                 Generate Episode ({sceneCount} clips)
+              </Button>
+            )}
+
+            {isJobActive && !awaitingIntervention && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-800/50 text-red-300 hover:bg-red-950/40 gap-1.5"
+                disabled={controlMutation.isPending}
+                onClick={() => controlMutation.mutate('abort')}
+              >
+                <StopCircle className="h-4 w-4" />
+                Abort job
               </Button>
             )}
 

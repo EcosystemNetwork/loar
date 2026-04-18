@@ -63,8 +63,9 @@ contract EpisodeNFTTest is Test {
         vm.deal(buyer, 100 ether);
         vm.deal(buyer2, 100 ether);
 
-        // Classify content hashes as ORIGINAL
-        vm.startPrank(platform);
+        // Classify content hashes as ORIGINAL (owner bypass for test setup;
+        // production would use setRightsWithCreatorSig).
+        vm.startPrank(deployer);
         registry.setRights(contentHash, IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(contentHash2, IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(contentHash3, IRightsRegistry.RightsType.ORIGINAL);

@@ -65,7 +65,8 @@ contract EpisodeEditionTest is Test {
         vm.deal(buyer2, 100 ether);
 
         // Classify content as ORIGINAL so it passes monetization checks
-        vm.startPrank(platform);
+        // (owner bypass for test setup; production would use setRightsWithCreatorSig).
+        vm.startPrank(deployer);
         registry.setRights(contentHash, IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(contentHash2, IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(contentHash3, IRightsRegistry.RightsType.LICENSED);

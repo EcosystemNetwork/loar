@@ -35,28 +35,27 @@ if (!VALID_CHAINS.includes(PONDER_CHAIN as any)) {
   process.exit(1);
 }
 
-/** Free public RPCs as last-resort fallbacks per chain */
-const PUBLIC_FALLBACKS: Record<(typeof VALID_CHAINS)[number], string[]> = {
-  sepolia: [
-    'https://rpc.sepolia.org',
-    'https://ethereum-sepolia-rpc.publicnode.com',
-    'https://sepolia.drpc.org',
-  ],
-  'base-sepolia': [
-    'https://sepolia.base.org',
-    'https://base-sepolia-rpc.publicnode.com',
-    'https://base-sepolia.drpc.org',
-  ],
-  base: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com', 'https://base.drpc.org'],
+const userFallbacks = (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean);
+
+/**
+ * Default public RPC fallbacks per chain. Indexer downtime cascades into
+ * stale event data the frontend trusts, so we always keep at least one
+ * baked-in fallback if the operator hasn't supplied any via PONDER_RPC_FALLBACKS.
+ * Override via PONDER_RPC_FALLBACKS CSV when better/private endpoints are available.
+ */
+const DEFAULT_FALLBACKS: Record<(typeof VALID_CHAINS)[number], string[]> = {
+  sepolia: ['https://ethereum-sepolia-rpc.publicnode.com', 'https://rpc.sepolia.org'],
+  'base-sepolia': ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'],
+  base: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'],
 };
 
-const userFallbacks = (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter(Boolean);
+const fallbacks =
+  userFallbacks.length > 0
+    ? userFallbacks
+    : DEFAULT_FALLBACKS[PONDER_CHAIN as (typeof VALID_CHAINS)[number]];
 
 export const env = {
   PONDER_RPC_URL: process.env.PONDER_RPC_URL_2 as string,
-  PONDER_RPC_FALLBACKS: [
-    ...userFallbacks,
-    ...PUBLIC_FALLBACKS[PONDER_CHAIN as (typeof VALID_CHAINS)[number]],
-  ],
+  PONDER_RPC_FALLBACKS: fallbacks,
   PONDER_CHAIN: PONDER_CHAIN as (typeof VALID_CHAINS)[number],
 } as const;

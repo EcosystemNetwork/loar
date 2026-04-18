@@ -5,12 +5,13 @@
  * Renamed from cinematicUniverses to align with domain naming conventions.
  */
 import { z } from 'zod';
-import { publicProcedure, protectedProcedure, router } from '../../lib/trpc';
+import { publicProcedure, protectedProcedure, adminProcedure, router } from '../../lib/trpc';
 import {
   createUniverse,
   getUniverse,
   getAllUniverses,
   getUniversesByCreator,
+  setUniverseHidden,
 } from './universes.handlers';
 import { isUniverseAdmin, getSafeInfo } from '../../lib/safe-admin';
 import { db } from '../../lib/firebase';
@@ -147,6 +148,8 @@ export const universesRouter = router({
       const snapshot = await query.limit(fetchLimit).get();
 
       let items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+
+      items = items.filter((u: any) => !u.isHidden);
 
       // Client-side search (Firestore doesn't support full-text)
       if (input.search) {
@@ -366,6 +369,26 @@ export const universesRouter = router({
 
       await db.collection('cinematicUniverses').doc(universeId).update(updates);
       return { ok: true };
+    }),
+
+  /** Admin-only: list every universe (including hidden ones) for the admin dashboard. */
+  adminList: adminProcedure.query(async () => {
+    return await getAllUniverses({ includeHidden: true });
+  }),
+
+  /** Admin-only: soft-delete a universe by flipping its isHidden flag. */
+  setHidden: adminProcedure
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        isHidden: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return await setUniverseHidden(input.universeId, input.isHidden, {
+        uid: ctx.user?.uid,
+        address: ctx.user?.address,
+      });
     }),
 
   /** Get the access model for a universe (public). */

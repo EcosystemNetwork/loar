@@ -119,10 +119,14 @@ export async function getUniverse(id: string) {
   }
 }
 
-export async function getAllUniverses() {
+export async function getAllUniverses(options?: { includeHidden?: boolean }) {
   try {
     const snapshot = await collection().orderBy('created_at').limit(500).get();
-    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+
+    if (!options?.includeHidden) {
+      data = data.filter((u) => !u.isHidden);
+    }
 
     return {
       success: true,
@@ -136,16 +140,59 @@ export async function getAllUniverses() {
   }
 }
 
-export async function getUniversesByCreator(creator: string) {
+/**
+ * Admin-only: soft-delete a universe by flipping the `isHidden` flag.
+ * The doc is preserved; published content keeps its `universeId` reference
+ * and stays visible in the global gallery.
+ *
+ * PRD-10: Writes an immutable `contentAuditLog` entry recording the actor,
+ * universe, and prior/new state so hide/unhide operations are never silent.
+ */
+export async function setUniverseHidden(
+  universeId: string,
+  isHidden: boolean,
+  actor?: { uid?: string; address?: string }
+) {
+  const id = universeId.toLowerCase();
+  const doc = await collection().doc(id).get();
+  if (!doc.exists) throw new Error('Universe not found');
+
+  const previousHidden = Boolean(doc.data()?.isHidden);
+  const now = new Date();
+
+  const batch = db.batch();
+  batch.update(collection().doc(id), { isHidden, updated_at: now });
+  batch.set(db.collection('contentAuditLog').doc(), {
+    action: isHidden ? 'universe_hidden' : 'universe_unhidden',
+    universeId: id,
+    previousHidden,
+    newHidden: isHidden,
+    actorUid: actor?.uid ?? null,
+    actorAddress: actor?.address ?? null,
+    createdAt: now.toISOString(),
+  });
+  await batch.commit();
+
+  return { id, isHidden };
+}
+
+export async function getUniversesByCreator(
+  creator: string,
+  options?: { includeHidden?: boolean }
+) {
   try {
     const snapshot = await collection().where('creator', '==', creator).get();
-    const data = snapshot.docs
+    let data = snapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .sort((a: any, b: any) => {
         const aTime = a.created_at?.toMillis?.() ?? a.created_at ?? 0;
         const bTime = b.created_at?.toMillis?.() ?? b.created_at ?? 0;
         return aTime - bTime;
-      });
+      }) as any[];
+
+    if (!options?.includeHidden) {
+      data = data.filter((u) => !u.isHidden);
+    }
 
     return {
       success: true,

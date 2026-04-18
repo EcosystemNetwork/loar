@@ -183,9 +183,24 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint256 startTime = block.timestamp;
         if (sub.expiresAt > block.timestamp) {
             // Extend existing subscription — still active
-            startTime = sub.expiresAt;
-            // If changing tiers on an active subscription, adjust counts
-            if (sub.tier != tier) {
+            if (sub.tier == tier) {
+                // Same tier renewal — append to end.
+                startTime = sub.expiresAt;
+            } else {
+                // SUB-04: Tier upgrade — prorate remaining old-tier value into
+                // equivalent seconds at the new tier's price. Prevents gifting
+                // free premium time (e.g. 25 days BASIC + 30 days paid PREMIUM
+                // previously yielded ~55 days PREMIUM for one month's price).
+                // Downgrades are blocked above, so new tier price is strictly higher.
+                TierConfig storage oldCfg = tierConfigs[universeId][sub.tier];
+                uint256 remainingSecs = sub.expiresAt - block.timestamp;
+                if (config.pricePerMonth > 0) {
+                    startTime = block.timestamp
+                        + (remainingSecs * oldCfg.pricePerMonth) / config.pricePerMonth;
+                }
+                // If new tier is free-priced (shouldn't happen given downgrade
+                // guard), the upgrade simply begins at block.timestamp.
+
                 if (subscriberCount[universeId][sub.tier] > 0) {
                     subscriberCount[universeId][sub.tier]--;
                 }

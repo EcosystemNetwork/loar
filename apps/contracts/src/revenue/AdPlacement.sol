@@ -197,15 +197,20 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         emit RefundWithdrawn(msg.sender, amount);
     }
 
-    /// @notice Cancel a bid after cooldown or expiry (AD-01)
+    /// @notice Cancel a bid after cooldown (slot deactivated) or expiry.
+    /// @dev AD-01 + AD-03 hardening: while the slot is still `active`, the winning
+    ///      bidder must wait the full BID_EXPIRY (30d) before rescinding. Otherwise
+    ///      an adversary could park a high bid to lock out competitors and then
+    ///      withdraw after only BID_CANCEL_COOLDOWN (3d). Once the creator has
+    ///      deactivated the slot, the shorter cooldown applies so locked funds
+    ///      aren't trapped for 30 days.
     function cancelBid(uint256 slotId) external nonReentrant {
         AdSlot storage slot = adSlots[slotId];
         require(msg.sender == slot.currentBidder, "Not current bidder");
-        require(
-            block.timestamp >= bidPlacedAt[slotId] + BID_CANCEL_COOLDOWN ||
-            block.timestamp >= bidPlacedAt[slotId] + BID_EXPIRY,
-            "Cooldown not elapsed"
-        );
+        uint256 deadline = slot.active
+            ? bidPlacedAt[slotId] + BID_EXPIRY
+            : bidPlacedAt[slotId] + BID_CANCEL_COOLDOWN;
+        require(block.timestamp >= deadline, "Cooldown not elapsed");
         uint256 amount = slot.currentBid;
         slot.currentBid = 0;
         slot.currentBidder = address(0);

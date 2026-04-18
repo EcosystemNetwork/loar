@@ -23,7 +23,7 @@ RUN node -e "\
   const p=JSON.parse(fs.readFileSync('./apps/indexer/package.json')); \
   if(p.devDependencies)delete p.devDependencies.vitest; \
   fs.writeFileSync('./apps/indexer/package.json',JSON.stringify(p,null,2))"
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy indexer source (selective — no vitest.config.ts, no __tests__)
 COPY apps/indexer/src/api ./apps/indexer/src/api

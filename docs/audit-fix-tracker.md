@@ -544,6 +544,55 @@
 
 ---
 
+## Seventh Pass — 2026-04-18 Follow-up Findings
+
+Independent fresh pass after the sixth-pass sign-off surfaced six new issues. All fixed in the same pass.
+
+### RIGHTS-03: Operator pre-claim via `setRights` (P1)
+
+- **Source**: Apr-18 fresh pass
+- **Impact**: A compromised operator could call `setRights(hash, ORIGINAL)` on an unclassified hash, which both classified it monetizable AND recorded `contentCreator = msg.sender`, bypassing the RIGHTS-01 creator-signature requirement entirely.
+- **Status**: [x] FIXED — `setRights` now rejects `ORIGINAL`/`LICENSED`/`PUBLIC_DOMAIN` unless caller is `owner()`. Monetizable classifications for normal users must use `setRightsWithCreatorSig` (which binds `contentCreator` = signer, not operator). `RightsRegistry.sol:72-107`.
+
+### SUB-04: SubscriptionManager tier-upgrade gifts free premium time (P1)
+
+- **Source**: Apr-18 fresh pass
+- **Impact**: User with 25 days remaining BASIC who paid for 1 month PREMIUM received ~55 days of PREMIUM access — old-tier remaining time stacked full at new-tier benefits. Multiplicative loss at scale.
+- **Status**: [x] FIXED — On tier change, remaining old-tier seconds are prorated into equivalent new-tier seconds: `startTime = block.timestamp + remainingSecs * oldPrice / newPrice`. `SubscriptionManager.sol:183-208`.
+
+### AD-03: Grief-bid cancellation lockout (P1)
+
+- **Source**: Apr-18 fresh pass
+- **Impact**: Current winning bidder could `cancelBid` after only `BID_CANCEL_COOLDOWN` (3 days) even while the slot was still `active`, enabling a grief pattern: park a high bid to lock out competitors, wait 3 days, withdraw. Creator loses prospective sponsor with no recourse.
+- **Status**: [x] FIXED — While slot is active, bidder must wait the full `BID_EXPIRY` (30 days). The shorter cooldown only applies once the slot has been deactivated. `AdPlacement.sol:200-217`.
+
+### CREDIT-06: `maxGrantPerUser` bypass via spending (P2)
+
+- **Source**: Apr-18 fresh pass
+- **Impact**: Per-user grant cap checked `balance + amount > maxGrantPerUser`; user spending credits dropped balance, letting a compromised platform key re-grant up to the cap indefinitely. Intended per-user limit was bypassed.
+- **Status**: [x] FIXED — New `grantedPerUser[user]` mapping tracks cumulative grants; cap checked against that. `__gap` reduced 49 → 48 for upgrade safety. `CreditManager.sol:67-70, :297-305`.
+
+### CANON-07: `snapshotBlock` cold-start underflow (P3)
+
+- **Source**: Apr-18 fresh pass
+- **Impact**: `snapshotBlock = block.number - MIN_SNAPSHOT_AGE` reverts on any chain where `block.number < 7200` (≈ first 4h after fresh deploy on Base, longer on testnet forks). `submit()` is bricked during that window.
+- **Status**: [x] FIXED — Clamp to 0: `block.number > MIN_SNAPSHOT_AGE ? block.number - MIN_SNAPSHOT_AGE : 0`. `CanonMarketplace.sol:216-218`.
+
+### GOV-08: Symbol blocklist bypass via whitespace/unicode (P3)
+
+- **Source**: Apr-18 fresh pass
+- **Impact**: `blockedSymbols` is an exact-string match; `" LOAR"` (leading space) or unicode lookalikes were not caught, letting tickers collide with blocked entries (NYSE:LOAR, etc).
+- **Status**: [x] FIXED — `_requireCanonicalSymbol` rejects any byte that is not uppercase A-Z or digit 0-9 before blocklist lookup. `GovernanceTokenFactory.sol:78-112`.
+
+### Server-side follow-ups (same pass)
+
+- **[x] Gallery.claimOrphan creator check** — Only the original content creator (`creatorUid`) can claim an orphan into a universe, closing the siphon vector where a universe admin could hoover legacy un-tagged content. `apps/server/src/routers/gallery/gallery.routes.ts:491-500`.
+- **[x] `setUniverseHidden` audit log** — Admin soft-delete now writes an immutable `contentAuditLog` entry in the same batch, recording `actorUid`, `actorAddress`, previous/new hidden state. `apps/server/src/routers/universes/universes.handlers.ts:148-182`.
+- **[x] Episode job DoS caps** — 24h auto-abort on `awaiting_intervention`, 30/min per-user `controlJob` rate limit, 3 concurrent jobs per user on `generateFromScript`. `apps/server/src/routers/episodes/episodes.routes.ts:32-53, :651-723, :996-1013, :1107`.
+- **[x] Indexer RPC fallback defaults** — Baked-in public RPC fallbacks restored per chain; operators still override via `PONDER_RPC_FALLBACKS`. `apps/indexer/env.ts:38-55`.
+
+---
+
 ## Unreviewed Contracts (Second External Audit Required)
 
 | Contract                     | LOC (est) | Risk                   | Status after internal review         |
@@ -600,17 +649,17 @@
 
 ---
 
-## Stats (2026-04-18, sixth pass)
+## Stats (2026-04-18, seventh pass)
 
 | Severity           |   Total |  Fixed | Partial | Operational | Not Started |
 | ------------------ | ------: | -----: | ------: | ----------: | ----------: |
 | P0 — Critical      |      15 |     14 |       0 |           1 |           0 |
-| P1 — High          |      28 |     24 |       1 |           1 |           2 |
-| P2 — Significant   |      24 |     23 |       0 |           0 |           1 |
-| P3 — Operational   |      24 |     18 |       0 |           3 |           3 |
+| P1 — High          |      31 |     27 |       1 |           1 |           2 |
+| P2 — Significant   |      25 |     24 |       0 |           0 |           1 |
+| P3 — Operational   |      26 |     20 |       0 |           3 |           3 |
 | P4 — Informational |      20 |      8 |       0 |           0 |          12 |
-| **Total**          | **111** | **87** |   **1** |       **5** |      **18** |
+| **Total**          | **117** | **93** |   **1** |       **5** |      **18** |
 
-**Verdict**: ANALYTICS-01 doc locked, pragmas pinned across 122 files with a tightening CI guard, payment verifiers now reject stale transactions (amplifies PAY-01), Firestore rules purged of dead `request.auth` branches. Remaining items: BURN-01 rename upgrade, legal text (LEGAL-01/02/03), INFRA-02 rotation, AD-02 oracle, BondingCurve low-gas-send doc, and the external audit passes.
+**Verdict**: Seventh pass surfaced and fixed 6 new contract findings (RIGHTS-03, SUB-04, AD-03, CREDIT-06, CANON-07, GOV-08) plus 4 server hardening items (gallery orphan authz, universe-hidden audit log, episode job DoS caps, indexer RPC fallback). Remaining items unchanged: BURN-01 rename upgrade, legal text (LEGAL-01/02/03), INFRA-02 rotation, AD-02 oracle, BondingCurve low-gas-send doc, and the external audit passes.
 
-_Last updated: 2026-04-18 (sixth pass — pragma pin + CI, tx age check, ANALYTICS-01 doc, Firestore cleanup)_
+_Last updated: 2026-04-18 (seventh pass — operator pre-claim block, tier-upgrade prorate, grief-bid lockout fix, cumulative grant cap, snapshot underflow clamp, canonical symbol enforcement, server DoS caps)_

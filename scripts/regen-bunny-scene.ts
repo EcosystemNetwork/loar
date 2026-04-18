@@ -57,16 +57,22 @@ const SCENES: Record<string, { title: string; plot: string; prompt: string }> = 
       "A dreamy premium 3D animated children film montage, soft warm nostalgic glow. A gentle slow crossfade between three tender memory images. First: a tall mother bunny with soft white fur and a deep purple dress gently pressing a soft kiss to the top of her small daughter bunny's head, the daughter in a bright yellow puffy tutu, both standing at the parapet of an old stone watchtower high above a sparkling blue coastline at warm sunset, both with tiny matching butterfly pendants glowing softly on their chests. Second: the small daughter bunny sitting on a polished glossy black horse of a magical seaside night carousel, warm golden bulbs glowing, iridescent soap bubbles drifting past her glowing yellow tutu, her purple-eyed face lit with wonder. Third: close-up of two tiny butterfly pendants — one white, one purple — lightly touching on the chests of two bunny characters sitting together on a pale stone bench overlooking a dusk ocean. Each memory dissolves softly into the next. Very warm, very tender, piano mood. High-quality animated feature film style.",
   },
   S53: {
-    title: 'Sitting by the Ocean — Pendants Tap',
-    plot: 'WS sitting by the ocean at dusk. Their matching necklaces lightly tap as they lean together.',
+    title: 'After-Credits: Judy Appears Behind Her',
+    plot: 'After-credits: older daughter bunny at mirror, mother bunny appears behind her, they smile at each other in reflection.',
     prompt:
-      "A gentle cartoon scene, soft warm dusk light. Two cute cartoon bunny characters sit together on a small stone bench outdoors. The bigger one is white with long ears, the smaller one is yellow with short ears. The small bunny leans its head against the big bunny's arm. Close-up on their chests: two tiny enamel butterfly charms on thin silver chains gently touch each other. Soft pink evening sky behind them. Quiet, tender, child-friendly animated short. Warm painterly style.",
+      'A warm tender cartoon scene, soft lamp light, antique gold-framed mirror. An older young-teen cartoon bunny with cream-yellow fur and bright purple eyes stands in front of the mirror wearing a soft fitted yellow dress (no tutu puff, no tiara), a tiny purple butterfly charm on a thin silver chain on her chest. She just finished adding sparkle to her own eyebrow. Then a tall mother bunny with soft white fur and a deep purple dress, her own tiny white butterfly charm at her chest, appears softly behind her daughter in the mirror reflection. Their eyes meet in the mirror. A quiet meaningful shared smile passes between them — not playful, older, tender. Close-up on the mirror reflection. Very warm, child-friendly, emotional mother-daughter moment. Premium animated feature film style.',
   },
   S55: {
     title: 'Beach at Sunrise — Walking Side-by-Side',
     plot: 'WS beach at sunrise. Judy and older Baby Bunny walk side-by-side, almost the same height.',
     prompt:
       'A premium 3D animated children film final scene, soft warm sunrise light, cinematic, dreamy glow. Wide shot of a quiet empty white-sand beach at sunrise, soft pink-gold sky, small gentle waves. A tall mother bunny with soft white fur in a deep purple knee-length dress and her older daughter bunny (now a young teen, tall, cream-yellow fur, wearing a fitted soft yellow dress without a tutu puff, no tiara) walk side by side slowly toward the camera (or away from camera). They are almost the same height now. Both wear tiny matching butterfly pendants on delicate silver chains — one white, one purple. Their long shadows stretch softly on the wet sand behind them. Palm trees in the distance. A single magical butterfly-shaped light glows in the sky. Child-friendly, peaceful, ending-of-film atmosphere. Premium 3D animated feature film style.',
+  },
+  S25: {
+    title: 'The Castle on the Hill',
+    plot: 'WS establishing shot of the old stone castle on a hill above the old town, the tall stone watchtower rising.',
+    prompt:
+      'A premium 3D animated children film establishing shot, warm golden afternoon light, cinematic, dreamy. Wide establishing shot from below of a picturesque medieval old stone castle on a hill above a small old-town French coastal village. Warm sunlit beige stone walls, a tall circular stone watchtower rising above dark green cypress trees, a stone pathway curving up through the trees, the blue Mediterranean sea sparkling in the distant background. No characters. Atmospheric, warm, inviting. Child-friendly kids animated feature film style. Soft painterly textures.',
   },
 };
 

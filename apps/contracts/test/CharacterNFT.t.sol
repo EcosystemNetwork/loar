@@ -61,8 +61,10 @@ contract CharacterNFTTest is Test {
         vm.deal(buyer, 100 ether);
         vm.deal(creator, 10 ether);
 
-        // Classify content hashes as ORIGINAL so they pass the monetization check
-        vm.startPrank(platform);
+        // Classify content hashes as ORIGINAL so they pass the monetization check.
+        // RIGHTS-01 hardening: monetizable classifications now require the owner (or
+        // creator signature); operator-only classification is restricted to UNSET/FUN.
+        vm.startPrank(deployer);
         registry.setRights(visualHash, IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(keccak256("a"), IRightsRegistry.RightsType.ORIGINAL);
         registry.setRights(keccak256("b"), IRightsRegistry.RightsType.ORIGINAL);

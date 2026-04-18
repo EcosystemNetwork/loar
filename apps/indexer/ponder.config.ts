@@ -10,7 +10,7 @@
 import './env'; // validates env and loads .env files — must be first
 import { env } from './env';
 import { createConfig, factory } from 'ponder';
-import { parseAbiItem } from 'viem';
+import { parseAbi, parseAbiItem } from 'viem';
 import {
   universeManagerAbi,
   universeAbi,
@@ -91,6 +91,15 @@ const tokenCreatedEvent = parseAbiItem(
   'event TokenCreated(address msgSender, address indexed tokenAddress, address indexed tokenAdmin, string tokenImage, string tokenName, string tokenSymbol, string tokenMetadata, string tokenContext, int24 startingTick, address poolHook, bytes32 poolId, address pairedToken, address locker, address governor)'
 );
 
+const bondingCurveCreatedEvent = parseAbiItem(
+  'event BondingCurveCreated(uint256 indexed universeId, address indexed token, address indexed bondingCurve, uint256 graduationEth, uint256 curveSupply)'
+);
+
+const bondingCurveAbi = parseAbi([
+  'event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount, uint256 newPrice)',
+  'event TokensSold(address indexed seller, uint256 tokenAmount, uint256 ethReturned, uint256 newPrice)',
+]);
+
 export default createConfig({
   chains: {
     [chainName]: {
@@ -138,6 +147,17 @@ export default createConfig({
         address: address,
         event: tokenCreatedEvent,
         parameter: 'tokenAddress',
+        startBlock: startBlock,
+      }),
+      startBlock: startBlock,
+    },
+    BondingCurve: {
+      chain: chainName,
+      abi: bondingCurveAbi,
+      address: factory({
+        address: address,
+        event: bondingCurveCreatedEvent,
+        parameter: 'bondingCurve',
         startBlock: startBlock,
       }),
       startBlock: startBlock,

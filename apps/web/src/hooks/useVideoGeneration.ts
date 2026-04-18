@@ -47,6 +47,7 @@ export interface UseVideoGenerationProps {
   setGeneratedVideoUrl: (url: string | null) => void;
   setStatusMessage: (message: StatusMessage | null) => void;
   sceneControls?: SceneControlGenParams;
+  universeId?: string;
 }
 
 export interface UseVideoGenerationReturn {
@@ -68,6 +69,7 @@ export function useVideoGeneration({
   setGeneratedVideoUrl,
   setStatusMessage,
   sceneControls,
+  universeId,
 }: UseVideoGenerationProps): UseVideoGenerationReturn {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const { checkCredits, invalidateBalance } = useCreditCheck();
@@ -86,6 +88,7 @@ export function useVideoGeneration({
           aspectRatio: videoRatio,
           motionStrength: 127,
           negativePrompt: negativePrompt || undefined,
+          universeId,
         });
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-kling') {
@@ -97,6 +100,7 @@ export function useVideoGeneration({
           aspectRatio: videoRatio,
           negativePrompt: negativePrompt || undefined,
           cfgScale: 0.5,
+          universeId,
         });
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-wan25') {
@@ -108,6 +112,7 @@ export function useVideoGeneration({
           resolution: '1080p',
           negativePrompt: negativePrompt || undefined,
           enablePromptExpansion: true,
+          universeId,
         });
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-sora') {
@@ -122,6 +127,7 @@ export function useVideoGeneration({
               : 4,
           aspectRatio: videoRatio === '1:1' ? 'auto' : videoRatio,
           resolution: 'auto',
+          universeId,
         });
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'seedance' || selectedVideoModel === 'seedance-fast') {
@@ -138,6 +144,7 @@ export function useVideoGeneration({
           resolution: '720p',
           generateAudio: true,
           negativePrompt: negativePrompt || undefined,
+          universeId,
         });
         return { videoUrl: result.videoUrl };
       }
@@ -316,6 +323,7 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
             duration: selectedVideoDuration,
             aspectRatio: videoRatio,
             negativePrompt: negativePrompt || undefined,
+            universeId,
             // Scene Controls (Node Editor Expansion v1)
             ...(sceneControls?.cameraPreset ? { cameraPreset: sceneControls.cameraPreset } : {}),
             ...(sceneControls?.cameraIntensity
@@ -374,6 +382,7 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
       checkCredits,
       invalidateBalance,
       sceneControls,
+      universeId,
     ]
   );
 

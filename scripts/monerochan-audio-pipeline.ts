@@ -168,9 +168,15 @@ async function fMusic(p: string, d: number): Promise<string> {
   for (const m of MODELS) {
     try {
       const result = await falQueue(m.id, m.input, 300);
-      const url = result.audio_file?.url || result.audio?.url || result.audio_url || result.url;
-      if (url) return url;
-      lastErr = new Error(`${m.id} returned no audio URL`);
+      // fal response shapes vary: audio_file.url, audio.url, audio_url.url (object), audio_url (string), url
+      const url =
+        result.audio_file?.url ||
+        result.audio?.url ||
+        result.audio_url?.url ||
+        (typeof result.audio_url === 'string' ? result.audio_url : null) ||
+        (typeof result.url === 'string' ? result.url : null);
+      if (typeof url === 'string' && url.startsWith('http')) return url;
+      lastErr = new Error(`${m.id} returned no audio URL (keys: ${Object.keys(result).join(',')})`);
     } catch (e: any) {
       lastErr = e;
       L('MUSIC', `  ${m.id} failed: ${e.message?.slice(0, 100)}`);

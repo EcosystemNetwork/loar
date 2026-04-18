@@ -213,7 +213,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             votesAgainst: 0,
             votingDeadline: block.timestamp + votingDuration,
             createdAt: block.timestamp,
-            snapshotBlock: block.number - MIN_SNAPSHOT_AGE
+            // CANON-07: clamp to 0 to avoid underflow on new chains / testnet forks
+            // where block.number < MIN_SNAPSHOT_AGE (7200 blocks ≈ 4h on Base).
+            snapshotBlock: block.number > MIN_SNAPSHOT_AGE ? block.number - MIN_SNAPSHOT_AGE : 0
         });
 
         // Platform takes cut of submission fee via PaymentRouter

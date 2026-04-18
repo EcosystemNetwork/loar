@@ -5,10 +5,22 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Clock, FileCheck, Eye, Heart, Film, Sparkles, Upload } from 'lucide-react';
+import {
+  ShoppingCart,
+  Clock,
+  FileCheck,
+  Eye,
+  Heart,
+  Film,
+  Sparkles,
+  Upload,
+  Globe,
+} from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { formatEther } from 'viem';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { ClaimToUniverseDialog } from './ClaimToUniverseDialog';
 
 interface ContentCardProps {
   content: {
@@ -49,6 +61,9 @@ function formatPrice(wei: string | undefined): string {
 
 export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: ContentCardProps) {
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const { isAuthenticated } = useWalletAuth();
+  const isOrphan = !content.universeId;
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
   const isAIGenerated = content.mediaType?.startsWith('ai-');
   const {
@@ -157,6 +172,22 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           </Link>
         )}
 
+        {/* Claim CTA — only for orphan content, only for authed users */}
+        {isOrphan && isAuthenticated && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              setClaimOpen(true);
+            }}
+          >
+            <Globe className="h-3 w-3 mr-1.5" />
+            Claim to my universe
+          </Button>
+        )}
+
         {/* Pricing */}
         {hasLicensing && (
           <div className="flex flex-wrap gap-1">
@@ -205,6 +236,15 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           </div>
         )}
       </CardContent>
+
+      {claimOpen && (
+        <ClaimToUniverseDialog
+          open={claimOpen}
+          onOpenChange={setClaimOpen}
+          contentId={content.id}
+          contentTitle={content.title}
+        />
+      )}
     </Card>
   );
 }

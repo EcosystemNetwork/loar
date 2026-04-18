@@ -29,6 +29,26 @@ import { publishToGallery } from '../../lib/gallery-publish';
 
 // ── Collections ─────────────────────────────────────────────────────────
 
+// Per-user in-memory rate limits for control/start endpoints. Prevents a
+// single user from signal-flooding (1 Firestore read/write per tick) or
+// parking unbounded concurrent jobs. Cleared on process restart.
+const controlRate = new Map<string, number[]>();
+const CONTROL_WINDOW_MS = 60_000;
+const CONTROL_MAX = 30; // per user per minute
+
+function checkControlRate(uid: string): void {
+  const now = Date.now();
+  const arr = (controlRate.get(uid) ?? []).filter((t) => now - t < CONTROL_WINDOW_MS);
+  if (arr.length >= CONTROL_MAX) {
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: `Control signals rate limit: ${CONTROL_MAX}/min`,
+    });
+  }
+  arr.push(now);
+  controlRate.set(uid, arr);
+}
+
 const episodesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('episodes');
@@ -291,6 +311,20 @@ const scriptToEpisodeInputSchema = z.object({
   clipDurationSec: z.union([z.literal(5), z.literal(10), z.literal(15), z.literal(20)]).default(5),
   targetDurationSec: z.number().min(5).max(1800).optional(),
 
+  /**
+   * continuity  — each scene's last frame seeds the next (i2v). A failed scene
+   *               blocks the loop: retry with backoff until it succeeds, the
+   *               user skips it, or the user aborts. Never advances with a
+   *               stale frame.
+   * independent — scenes are generated independently. A failed scene is
+   *               refunded and skipped; subsequent scenes continue without a
+   *               seed frame from that point.
+   */
+  mode: z.enum(['continuity', 'independent']).default('continuity'),
+
+  /** Max auto-retry attempts per scene before requiring user intervention. */
+  maxRetries: z.number().int().min(1).max(50).default(10),
+
   // Generation config — forwarded to dispatchGeneration
   routingMode: z.enum(['auto', 'manual']).default('auto'),
   selectedModelId: z.string().optional(),
@@ -364,6 +398,29 @@ async function extractLastFrame(videoUrl: string, tag: string): Promise<string |
 
 // ── Script-to-Episode background job ───────────────────────────────────
 
+/**
+ * Read a one-shot control signal the user has written onto the job doc,
+ * consuming it (clearing the field) so the loop only acts on it once.
+ * Signals: 'abort' (stop job), 'skip' (give up on current scene), or
+ * 'retry' (wake from awaiting_intervention and try the current scene again).
+ */
+async function consumeControlSignal(
+  jobRef: FirebaseFirestore.DocumentReference
+): Promise<'abort' | 'skip' | 'retry' | null> {
+  const snap = await jobRef.get();
+  const signal = snap.data()?.controlSignal as 'abort' | 'skip' | 'retry' | undefined;
+  if (!signal) return null;
+  await jobRef.update({
+    controlSignal: FieldValue.delete(),
+    controlSignalAt: FieldValue.delete(),
+  });
+  return signal;
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
 async function runScriptToEpisode(jobId: string, userId: string): Promise<void> {
   const jobRef = scriptJobsCol().doc(jobId);
 
@@ -372,6 +429,8 @@ async function runScriptToEpisode(jobId: string, userId: string): Promise<void> 
     const job = jobSnap.data()!;
     const scenes = job.scenes as { index: number; prompt: string }[];
     const clipDurationSec = job.clipDurationSec as number;
+    const mode = (job.mode as 'continuity' | 'independent') || 'continuity';
+    const maxRetries = Math.max(1, Math.min(50, (job.maxRetries as number) || 10));
 
     await jobRef.update({ status: 'generating', updatedAt: new Date().toISOString() });
 
@@ -409,13 +468,17 @@ async function runScriptToEpisode(jobId: string, userId: string): Promise<void> 
     if (!model) throw new Error('No video model available for generation');
 
     let previousLastFrameUrl: string | null = null;
+    let aborted = false;
 
     for (let i = 0; i < scenes.length; i++) {
+      if (aborted) break;
       const scene = scenes[i];
 
       await jobRef.update({
         currentSceneIndex: i,
         [`clipResults.${i}.status`]: 'generating',
+        [`clipResults.${i}.retryAttempt`]: 0,
+        [`clipResults.${i}.retryStatus`]: null,
         updatedAt: new Date().toISOString(),
       });
 
@@ -478,13 +541,51 @@ async function runScriptToEpisode(jobId: string, userId: string): Promise<void> 
         return { videoUrl: result.videoUrl, generationId };
       };
 
-      // Try with one retry
+      // ── Retry loop ──────────────────────────────────────────────────
+      //
+      // In continuity mode, a scene failure blocks the loop — we cannot
+      // advance without its last frame. Retry with exponential backoff
+      // up to maxRetries. If still failing, transition to
+      // `awaiting_intervention` and wait for the user to skip, abort, or
+      // hit retry. In independent mode, fall back to the legacy 2-attempt
+      // behavior where a failed scene is refunded and the loop moves on.
+      //
+      // Backoff: 10s → 20s → 40s → ... capped at 5 minutes.
+      //
+      const hardRetryCap = mode === 'continuity' ? maxRetries : 2;
+      const BACKOFF_BASE_MS = 10_000;
+      const BACKOFF_CAP_MS = 5 * 60_000;
+
+      let attempt = 0;
       let retried = false;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      let clipDone = false;
+      let sceneSkipped = false;
+      let lastError: string | undefined;
+
+      while (!clipDone && !aborted) {
+        // Honor any user signal queued before this attempt starts.
+        const pre = await consumeControlSignal(jobRef);
+        if (pre === 'abort') {
+          aborted = true;
+          break;
+        }
+        if (pre === 'skip') {
+          sceneSkipped = true;
+          break;
+        }
+
         try {
+          if (attempt > 0) {
+            await jobRef.update({
+              [`clipResults.${i}.retryStatus`]: 'retrying',
+              [`clipResults.${i}.retryAttempt`]: attempt,
+              [`clipResults.${i}.status`]: 'generating',
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
           const { videoUrl, generationId } = await generateOnce();
 
-          // Extract last frame for continuity with next clip
           const lastFrameUrl = await extractLastFrame(videoUrl, `${jobId}-scene-${i}`);
           if (lastFrameUrl) previousLastFrameUrl = lastFrameUrl;
 
@@ -510,33 +611,145 @@ async function runScriptToEpisode(jobId: string, userId: string): Promise<void> 
               lastFrameUrl: lastFrameUrl || null,
               error: null,
               retried,
+              retryAttempt: attempt,
+              retryStatus: null,
             },
             updatedAt: new Date().toISOString(),
           });
-          break; // success
+          clipDone = true;
         } catch (err) {
-          retried = true;
-          if (attempt === 1) {
-            // Final failure — skip clip, refund its credits
+          lastError = (err as Error).message?.slice(0, 300) || 'Unknown error';
+          retried = attempt > 0 ? true : retried;
+          attempt++;
+
+          if (attempt < hardRetryCap) {
+            const backoffMs = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, attempt - 1));
+            const retryAt = new Date(Date.now() + backoffMs).toISOString();
             await jobRef.update({
-              [`clipResults.${i}`]: {
-                index: i,
-                status: 'failed',
-                error: (err as Error).message?.slice(0, 300) || 'Unknown error',
-                retried: true,
-              },
-              creditsRefunded: FieldValue.increment(job.creditsPerClip as number),
+              [`clipResults.${i}.retryAttempt`]: attempt,
+              [`clipResults.${i}.retryStatus`]: 'backing_off',
+              [`clipResults.${i}.retryAt`]: retryAt,
+              [`clipResults.${i}.error`]: lastError,
               updatedAt: new Date().toISOString(),
             });
-            try {
-              await refundCredits(userId, job.creditsPerClip as number);
-            } catch (refundErr) {
-              console.error(`[script-to-episode] Refund failed for scene ${i}:`, refundErr);
+            // Sleep in 2s ticks so user signals are seen promptly.
+            const deadline = Date.now() + backoffMs;
+            while (Date.now() < deadline && !aborted) {
+              const s = await consumeControlSignal(jobRef);
+              if (s === 'abort') {
+                aborted = true;
+                break;
+              }
+              if (s === 'skip') {
+                sceneSkipped = true;
+                break;
+              }
+              // 'retry' during backoff means "try now" — break out of sleep.
+              if (s === 'retry') break;
+              await sleep(Math.min(2000, deadline - Date.now()));
             }
-            // Keep previousLastFrameUrl from last successful clip
+            if (sceneSkipped || aborted) break;
+            continue;
+          }
+
+          // ── Retries exhausted ─────────────────────────────────────
+          if (mode === 'independent') {
+            // Legacy behavior: refund and keep going. `previousLastFrameUrl`
+            // is preserved from the last successful clip.
+            sceneSkipped = true;
+            break;
+          }
+
+          // Continuity: park the job and wait for the user.
+          const parkedAt = Date.now();
+          await jobRef.update({
+            status: 'awaiting_intervention',
+            [`clipResults.${i}.status`]: 'awaiting_intervention',
+            [`clipResults.${i}.retryAttempt`]: attempt,
+            [`clipResults.${i}.retryStatus`]: 'awaiting_intervention',
+            [`clipResults.${i}.error`]: lastError,
+            awaitingInterventionAt: new Date(parkedAt).toISOString(),
+            updatedAt: new Date(parkedAt).toISOString(),
+          });
+
+          // Poll for a user decision. Auto-abort after AWAITING_INTERVENTION_TIMEOUT_MS
+          // so orphaned jobs don't park workers indefinitely (Firestore 2+ reads/sec).
+          const AWAITING_INTERVENTION_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24h
+          while (!clipDone && !aborted && !sceneSkipped) {
+            const s = await consumeControlSignal(jobRef);
+            if (s === 'abort') {
+              aborted = true;
+              break;
+            }
+            if (s === 'skip') {
+              sceneSkipped = true;
+              break;
+            }
+            if (s === 'retry') {
+              // Reset counter so user gets a fresh retry budget.
+              attempt = 0;
+              retried = true;
+              await jobRef.update({
+                status: 'generating',
+                [`clipResults.${i}.status`]: 'generating',
+                [`clipResults.${i}.retryStatus`]: 'retrying',
+                [`clipResults.${i}.retryAttempt`]: 0,
+                [`clipResults.${i}.error`]: null,
+                awaitingInterventionAt: FieldValue.delete(),
+                updatedAt: new Date().toISOString(),
+              });
+              break; // exits inner poll; outer `while (!clipDone)` retries.
+            }
+            if (Date.now() - parkedAt > AWAITING_INTERVENTION_TIMEOUT_MS) {
+              console.warn(
+                `[script-to-episode] Job ${jobId} scene ${i} auto-aborted after ` +
+                  `${AWAITING_INTERVENTION_TIMEOUT_MS}ms without user intervention`
+              );
+              aborted = true;
+              await jobRef.update({
+                [`clipResults.${i}.error`]:
+                  (lastError ? lastError + ' — ' : '') + 'Auto-aborted after 24h no intervention',
+                updatedAt: new Date().toISOString(),
+              });
+              break;
+            }
+            await sleep(3000);
           }
         }
       }
+
+      if (sceneSkipped) {
+        await jobRef.update({
+          [`clipResults.${i}`]: {
+            index: i,
+            status: 'failed',
+            error: lastError || 'Skipped by user',
+            retried: true,
+            retryAttempt: attempt,
+            retryStatus: 'skipped',
+          },
+          creditsRefunded: FieldValue.increment(job.creditsPerClip as number),
+          updatedAt: new Date().toISOString(),
+        });
+        try {
+          await refundCredits(userId, job.creditsPerClip as number);
+        } catch (refundErr) {
+          console.error(`[script-to-episode] Refund failed for scene ${i}:`, refundErr);
+        }
+        // Continuity chain is broken for this scene: clear the seed frame so
+        // the next scene starts as text_to_video rather than i2v from a
+        // frame that no longer matches the narrative beat.
+        if (mode === 'continuity') previousLastFrameUrl = null;
+      }
+    }
+
+    if (aborted) {
+      await jobRef.update({
+        status: 'aborted',
+        abortedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      return;
     }
 
     // ── Assemble episode from completed clips ──────────────────────────
@@ -766,6 +979,22 @@ export const episodesRouter = router({
   generateFromScript: protectedProcedure
     .input(scriptToEpisodeInputSchema)
     .mutation(async ({ input, ctx }) => {
+      // Per-user concurrent-job cap so a single account can't park N workers
+      // in long-running generation or awaiting_intervention loops. Covers both
+      // states that block a worker thread.
+      const MAX_CONCURRENT_JOBS_PER_USER = 3;
+      const inFlight = await scriptJobsCol()
+        .where('userId', '==', ctx.user.uid)
+        .where('status', 'in', ['pending', 'generating', 'awaiting_intervention', 'assembling'])
+        .limit(MAX_CONCURRENT_JOBS_PER_USER + 1)
+        .get();
+      if (inFlight.size >= MAX_CONCURRENT_JOBS_PER_USER) {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: `You have ${inFlight.size} running jobs. Wait for one to finish or abort it before starting another.`,
+        });
+      }
+
       const scenes = splitScript(input.script, input.clipDurationSec, input.targetDurationSec);
       if (scenes.length > 200) {
         throw new TRPCError({
@@ -817,6 +1046,8 @@ export const episodesRouter = router({
           clipDurationSec: input.clipDurationSec,
           targetDurationSec: input.targetDurationSec || scenes.length * input.clipDurationSec,
           clipCount: scenes.length,
+          mode: input.mode,
+          maxRetries: input.maxRetries,
           routingMode: input.routingMode,
           selectedModelId: input.selectedModelId || null,
           aspectRatio: input.aspectRatio,
@@ -835,6 +1066,8 @@ export const episodesRouter = router({
             index: i,
             status: 'pending',
             retried: false,
+            retryAttempt: 0,
+            retryStatus: null,
           })),
           createdAt: now,
           updatedAt: now,
@@ -859,6 +1092,8 @@ export const episodesRouter = router({
         status: data.status as string,
         currentSceneIndex: data.currentSceneIndex as number,
         clipCount: data.clipCount as number,
+        mode: (data.mode as 'continuity' | 'independent') || 'continuity',
+        maxRetries: (data.maxRetries as number) || 10,
         clipResults: data.clipResults as Array<{
           index: number;
           status: string;
@@ -866,10 +1101,49 @@ export const episodesRouter = router({
           videoUrl?: string;
           error?: string;
           retried: boolean;
+          retryAttempt?: number;
+          retryStatus?: 'retrying' | 'backing_off' | 'awaiting_intervention' | 'skipped' | null;
+          retryAt?: string;
         }>,
         episodeId: (data.episodeId as string) || undefined,
         creditsRefunded: data.creditsRefunded as number,
         error: (data.error as string) || undefined,
       };
+    }),
+
+  /**
+   * Send a control signal to a running script-to-episode job.
+   * - abort: stop the whole job after the current attempt
+   * - skip:  give up on the current scene (breaks continuity chain) and move on
+   * - retry: during backoff, try immediately; in awaiting_intervention, resume
+   */
+  controlJob: protectedProcedure
+    .input(
+      z.object({
+        jobId: z.string().min(1),
+        action: z.enum(['abort', 'skip', 'retry']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      checkControlRate(ctx.user.uid);
+      const ref = scriptJobsCol().doc(input.jobId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (doc.data()?.userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the job owner' });
+      }
+      const status = doc.data()?.status as string;
+      if (status === 'completed' || status === 'failed' || status === 'aborted') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Job already ${status} — cannot signal`,
+        });
+      }
+      await ref.update({
+        controlSignal: input.action,
+        controlSignalAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      return { ok: true };
     }),
 });

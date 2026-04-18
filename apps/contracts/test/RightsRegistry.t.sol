@@ -35,25 +35,34 @@ contract RightsRegistryTest is Test {
 
     // ── setRights ──
 
-    function test_setRights_byPlatform() public {
+    function test_setRights_byPlatform_fun() public {
+        // RIGHTS-01 hardening: plain operators may only set non-monetizable classifications.
         vm.prank(platform);
-        registry.setRights(hash1, IRightsRegistry.RightsType.ORIGINAL);
-        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.ORIGINAL));
+        registry.setRights(hash1, IRightsRegistry.RightsType.FUN);
+        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.FUN));
     }
 
-    function test_setRights_byOwner() public {
+    function test_setRights_byOwner_monetizable() public {
         vm.prank(deployer);
         registry.setRights(hash1, IRightsRegistry.RightsType.LICENSED);
         assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.LICENSED));
     }
 
-    function test_setRights_byOperator() public {
+    function test_setRights_byOperator_fun() public {
         vm.prank(deployer);
         registry.setOperator(operator, true);
 
         vm.prank(operator);
+        registry.setRights(hash1, IRightsRegistry.RightsType.FUN);
+        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.FUN));
+    }
+
+    function test_setRights_operator_revert_monetizable() public {
+        // RIGHTS-01 hardening: operator cannot pre-claim ORIGINAL/LICENSED/PUBLIC_DOMAIN;
+        // those require creator signature (setRightsWithCreatorSig) or owner bypass.
+        vm.prank(platform);
+        vm.expectRevert(RightsRegistry.MonetizableRequiresCreatorSig.selector);
         registry.setRights(hash1, IRightsRegistry.RightsType.ORIGINAL);
-        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.ORIGINAL));
     }
 
     function test_setRights_revert_notOperator() public {
@@ -69,11 +78,11 @@ contract RightsRegistryTest is Test {
     }
 
     function test_setRights_revert_frozen() public {
-        vm.startPrank(platform);
+        vm.prank(platform);
         registry.emergencyFreeze(hash1, "DMCA");
+        vm.prank(deployer);
         vm.expectRevert(RightsRegistry.AlreadyFrozen.selector);
         registry.setRights(hash1, IRightsRegistry.RightsType.ORIGINAL);
-        vm.stopPrank();
     }
 
     // ── emergencyFreeze ──
@@ -97,13 +106,13 @@ contract RightsRegistryTest is Test {
     }
 
     function test_isMonetizable_original() public {
-        vm.prank(platform);
+        vm.prank(deployer);
         registry.setRights(hash1, IRightsRegistry.RightsType.ORIGINAL);
         assertTrue(registry.isMonetizable(hash1));
     }
 
     function test_isMonetizable_licensed() public {
-        vm.prank(platform);
+        vm.prank(deployer);
         registry.setRights(hash1, IRightsRegistry.RightsType.LICENSED);
         assertTrue(registry.isMonetizable(hash1));
     }
@@ -121,7 +130,7 @@ contract RightsRegistryTest is Test {
     }
 
     function test_isMonetizable_publicDomain() public {
-        vm.prank(platform);
+        vm.prank(deployer);
         registry.setRights(hash1, IRightsRegistry.RightsType.PUBLIC_DOMAIN);
         assertTrue(registry.isMonetizable(hash1));
     }

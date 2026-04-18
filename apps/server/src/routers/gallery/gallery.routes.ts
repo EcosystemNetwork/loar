@@ -448,4 +448,66 @@ export const galleryRouter = router({
 
       return { ok: true, status: input.accept ? 'ACCEPTED' : 'DECLINED' };
     }),
+
+  /**
+   * Claim an orphan content doc (one without a universeId) into a universe
+   * the caller admins. First-come-first-served; once claimed the content
+   * is scoped to that universe and won't re-appear to other claimers.
+   */
+  claimOrphan: protectedProcedure
+    .input(
+      z.object({
+        contentId: z.string().min(1),
+        universeId: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const address = ctx.user.address;
+      if (!address) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Wallet address required' });
+      }
+
+      const isAdmin = await isUniverseAdmin(input.universeId, address);
+      if (!isAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only claim content into a universe you admin',
+        });
+      }
+
+      const ref = contentCol().doc(input.contentId);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Content not found' });
+      }
+
+      const data = doc.data()!;
+      if (data.universeId) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This content already belongs to a universe',
+        });
+      }
+
+      // Orphan claims must be made by the original creator — otherwise a universe
+      // admin could siphon any un-tagged content (e.g. legacy videos produced
+      // before universe scoping) into their own universe.
+      const creatorUid = data.creatorUid ?? data.createdBy ?? null;
+      if (creatorUid && creatorUid !== ctx.user.uid) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the original creator can claim this content',
+        });
+      }
+
+      await ref.update({
+        universeId: input.universeId,
+        claimedBy: ctx.user.uid,
+        claimedByAddress: address,
+        claimedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return { ok: true, universeId: input.universeId };
+    }),
 });

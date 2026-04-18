@@ -566,6 +566,14 @@
         { "fieldPath": "address", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "offChainNodes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "universeId", "order": "ASCENDING" },
+        { "fieldPath": "nodeId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
