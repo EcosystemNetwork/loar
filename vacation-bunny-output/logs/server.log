@@ -144,3 +144,4 @@ Server listening on http://localhost:3000
 <-- POST /trpc/image.generate?batch=1
 <-- POST /trpc/image.generate?batch=1
 [ByteDance] Generating image: model=seedream-5-0-260128
+[ByteDance] Generating image: model=seedream-5-0-260128
