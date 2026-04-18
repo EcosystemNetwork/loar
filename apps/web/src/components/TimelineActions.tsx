@@ -72,10 +72,10 @@ export function TimelineActions() {
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="nodeLink">Video Link (Walrus URL)</Label>
+                <Label htmlFor="nodeLink">Video Link (IPFS URL)</Label>
                 <Input
                   id="nodeLink"
-                  placeholder="https://aggregator.walrus-testnet.walrus.space/v1/blobs/..."
+                  placeholder="https://gateway.pinata.cloud/ipfs/..."
                   value={nodeLink}
                   onChange={(e) => setNodeLink(e.target.value)}
                 />

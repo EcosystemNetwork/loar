@@ -189,14 +189,14 @@ This document maps every revenue stream: who pays, who receives, what the platfo
 
 ## Unit Economics (Estimated)
 
-| Cost Center                         | Estimated Cost                                 |
-| ----------------------------------- | ---------------------------------------------- |
-| AI Video Generation (FAL)           | ~$0.03-0.10 per video (model-dependent)        |
-| AI Image Generation (FAL)           | ~$0.01-0.03 per image                          |
-| AI Wiki Generation (Gemini/OpenAI)  | ~$0.005 per generation                         |
-| Firestore reads/writes              | ~$0.0001-0.001 per operation                   |
-| Decentralized storage (Walrus/IPFS) | ~$0.001-0.01 per MB                            |
-| Sepolia gas                         | Free (testnet). Mainnet L2: ~$0.01-0.10 per tx |
+| Cost Center                                     | Estimated Cost                                 |
+| ----------------------------------------------- | ---------------------------------------------- |
+| AI Video Generation (FAL)                       | ~$0.03-0.10 per video (model-dependent)        |
+| AI Image Generation (FAL)                       | ~$0.01-0.03 per image                          |
+| AI Wiki Generation (Gemini/OpenAI)              | ~$0.005 per generation                         |
+| Firestore reads/writes                          | ~$0.0001-0.001 per operation                   |
+| Decentralized storage (Pinata/IPFS, Lighthouse) | ~$0.001-0.01 per MB                            |
+| Sepolia gas                                     | Free (testnet). Mainnet L2: ~$0.01-0.10 per tx |
 
 **Key insight:** The platform's primary variable cost is AI generation. Credits must be priced above AI API cost to be margin-positive. Current pricing (5 credits per video) needs validation against actual FAL costs.
 

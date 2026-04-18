@@ -713,7 +713,7 @@ properties: {
   contentId: string,
   durationMs: number,                  // total upload time
   fileSizeMb: number,
-  provider: 'walrus' | 'ipfs' | 'firebase' | 'synapse'  // which storage backend handled it
+  provider: 'pinata' | 'lighthouse' | 'firebase' | 'synapse'  // which storage backend handled it
 }
 
 event_name: upload_failed

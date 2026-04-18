@@ -76,12 +76,12 @@ These are the instrumentation points for tracking actual AI costs:
 
 ### Storage Costs
 
-| Provider               | Cost Model                        | Tracking                                     |
-| ---------------------- | --------------------------------- | -------------------------------------------- |
-| **Walrus**             | Testnet (free) → mainnet TBD      | `storageManifests` per-provider upload count |
-| **IPFS (Pinata)**      | Free tier → $20/mo for 50GB       | Upload count + total size                    |
-| **Filecoin (Synapse)** | Per-deal pricing                  | Upload count + deal size                     |
-| **Firebase Storage**   | $0.026/GB/month + $0.12/GB egress | Bucket usage metrics                         |
+| Provider                  | Cost Model                        | Tracking                  |
+| ------------------------- | --------------------------------- | ------------------------- |
+| **IPFS (Pinata)**         | Free tier → $20/mo for 50GB       | Upload count + total size |
+| **Lighthouse (Filecoin)** | Per-deal pricing                  | Upload count + deal size  |
+| **Filecoin (Synapse)**    | Per-deal pricing                  | Upload count + deal size  |
+| **Firebase Storage**      | $0.026/GB/month + $0.12/GB egress | Bucket usage metrics      |
 
 ---
 

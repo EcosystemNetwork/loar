@@ -90,7 +90,7 @@ contract CollectiveTokenFactory {
     /// @param kind         FACTION or ORGANIZATION
     /// @param name         Full collective name (also ERC20 name)
     /// @param symbol       ERC20 ticker symbol (e.g. "LORE", "GUILD")
-    /// @param metadataURI  IPFS/Walrus URI for collective metadata
+    /// @param metadataURI  IPFS URI for collective metadata
     function deployCollective(
         uint256 universeId,
         CollectiveKind kind,

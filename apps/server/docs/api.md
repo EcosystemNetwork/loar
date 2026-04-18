@@ -5,32 +5,32 @@ Auth is SIWE JWT via `Authorization: Bearer <token>` header.
 
 ## Domain Map
 
-| Domain            | Router Key         | Auth              | Description                                                  |
-| ----------------- | ------------------ | ----------------- | ------------------------------------------------------------ |
-| **Universes**     | `universes`        | public/wallet-sig | Universe CRUD                                                |
-|                   | `collabs`          | protected         | Cross-universe collaborations                                |
-|                   | `universeTeam`     | protected         | Team membership management                                   |
-|                   | `universeTreasury` | protected         | Shared credit pool funding                                   |
-| **Content**       | `content`          | mixed             | User content CRUD (fan/original/licensed)                    |
-|                   | `wiki`             | mixed             | Character wikis, lore generation, Gemini analysis            |
-|                   | `entities`         | mixed             | Universe entities (characters, locations, items)             |
-| **Generation**    | `generation`       | protected         | Unified video gen with smart routing + credits               |
-|                   | `image`            | protected         | Image gen, editing, character creation                       |
-|                   | ~~`fal`~~          | protected         | **Deprecated** — use `generation.*` + `image.*`              |
-| **Marketplace**   | `marketplace`      | mixed             | Canon submissions, voting                                    |
-|                   | `nft`              | mixed             | Episode & character NFT management                           |
-| **Credits**       | `credits`          | mixed             | Credit packages, balance, spend/purchase                     |
-| **Subscriptions** | `subscriptions`    | mixed             | Per-universe subscription tiers                              |
-| **Analytics**     | `analytics`        | mixed             | Views, engagement, trending                                  |
-| **Ads**           | `ads`              | mixed             | Ad slots, sponsorships, bidding                              |
-| **Licensing**     | `licensing`        | mixed             | IP licenses, merch, royalties                                |
-| **Storage**       | `storage`          | mixed             | Unified decentralized storage (Walrus/IPFS/Synapse/Firebase) |
-|                   | `firebaseStorage`  | mixed             | Direct Firebase Storage operations                           |
-|                   | `synapse`          | mixed             | Direct Filecoin Synapse operations                           |
-| **Profiles**      | `profiles`         | mixed             | User profiles, discovery                                     |
-| **Quests**        | `quests`           | mixed             | Quest system, affiliates, daily check-ins                    |
-| **Sandbox**       | `sandbox`          | protected         | Draft creations                                              |
-| **Admin**         | `admin`            | admin             | Platform config, fee management                              |
+| Domain            | Router Key         | Auth              | Description                                                       |
+| ----------------- | ------------------ | ----------------- | ----------------------------------------------------------------- |
+| **Universes**     | `universes`        | public/wallet-sig | Universe CRUD                                                     |
+|                   | `collabs`          | protected         | Cross-universe collaborations                                     |
+|                   | `universeTeam`     | protected         | Team membership management                                        |
+|                   | `universeTreasury` | protected         | Shared credit pool funding                                        |
+| **Content**       | `content`          | mixed             | User content CRUD (fan/original/licensed)                         |
+|                   | `wiki`             | mixed             | Character wikis, lore generation, Gemini analysis                 |
+|                   | `entities`         | mixed             | Universe entities (characters, locations, items)                  |
+| **Generation**    | `generation`       | protected         | Unified video gen with smart routing + credits                    |
+|                   | `image`            | protected         | Image gen, editing, character creation                            |
+|                   | ~~`fal`~~          | protected         | **Deprecated** — use `generation.*` + `image.*`                   |
+| **Marketplace**   | `marketplace`      | mixed             | Canon submissions, voting                                         |
+|                   | `nft`              | mixed             | Episode & character NFT management                                |
+| **Credits**       | `credits`          | mixed             | Credit packages, balance, spend/purchase                          |
+| **Subscriptions** | `subscriptions`    | mixed             | Per-universe subscription tiers                                   |
+| **Analytics**     | `analytics`        | mixed             | Views, engagement, trending                                       |
+| **Ads**           | `ads`              | mixed             | Ad slots, sponsorships, bidding                                   |
+| **Licensing**     | `licensing`        | mixed             | IP licenses, merch, royalties                                     |
+| **Storage**       | `storage`          | mixed             | Unified decentralized storage (Pinata/IPFS, Lighthouse, Firebase) |
+|                   | `firebaseStorage`  | mixed             | Direct Firebase Storage operations                                |
+|                   | `synapse`          | mixed             | Direct Filecoin Synapse operations                                |
+| **Profiles**      | `profiles`         | mixed             | User profiles, discovery                                          |
+| **Quests**        | `quests`           | mixed             | Quest system, affiliates, daily check-ins                         |
+| **Sandbox**       | `sandbox`          | protected         | Draft creations                                                   |
+| **Admin**         | `admin`            | admin             | Platform config, fee management                                   |
 
 ## Auth Matrix
 
@@ -296,7 +296,7 @@ Upload from URL via unified StorageManager.
 // Response (StorageManifest)
 {
   contentHash: "sha256:abc...",
-  providers: { walrus: { blobId: "..." }, firebase: { key: "..." } },
+  providers: { pinata: { cid: "..." }, firebase: { key: "..." } },
   primaryUrl: "https://..."
 }
 ```

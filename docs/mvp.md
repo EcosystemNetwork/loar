@@ -131,7 +131,7 @@ These features are built but their parameters may change:
 
 - **AI model selection** — 65 models (44 video + 21 image) via FAL AI + ModelArk, plus audio (ElevenLabs), 3D (Meshy). Smart auto-routing selects by quality/speed/cost
 - **Credit pricing** — Dual-margin pricing (35% card/ETH, 25% LOAR). Generation costs are estimates, not validated
-- **Storage provider priority** — Pinata > Lighthouse > Firebase ordering may shift (Storacha being sunset, see project notes)
+- **Storage provider priority** — Pinata > Lighthouse > Firebase ordering may shift
 - **Governance parameters** — Voting delay 7200 blocks, voting period 50400 blocks, 10% quorum are defaults, not tuned
 - **Token supply** — 100B per universe is arbitrary, may need economic modeling
 

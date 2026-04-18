@@ -664,11 +664,7 @@ function RecentEpisodes({ universes }: { universes: any[] }) {
           >
             {/* Video thumbnail */}
             <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
-              {ep.videoLink?.includes('walrus') ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30">
-                  <Play className="h-8 w-8 text-white/80 group-hover:scale-110 transition-transform" />
-                </div>
-              ) : ep.videoLink ? (
+              {ep.videoLink ? (
                 <>
                   <video
                     src={ep.videoLink}

@@ -96,7 +96,7 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
     /// @param name        Unique name within universe+kind
     /// @param contentHash SHA-256 of full entity content (stored off-chain)
     /// @param mintPrice   ETH price caller must send (0 = free)
-    /// @param metadataURI IPFS/Walrus URI for NFT metadata
+    /// @param metadataURI IPFS URI for NFT metadata
     function mint(
         uint256 _universeId,
         EntityKind kind,

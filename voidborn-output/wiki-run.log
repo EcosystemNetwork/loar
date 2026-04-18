@@ -1,0 +1,10 @@
+[dotenv@17.3.1] injecting env (58) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+
+════════════════════════════════════════════════════════════
+  VOIDBORN SAGA — Wiki Population
+  Pilot Episode: "Crash Landing"
+  36 entities across all categories
+  Universe: (standalone — no VOIDBORN_ADDR set)
+════════════════════════════════════════════════════════════
+[AUTH] Authenticating...
+FAILED: No session cookie

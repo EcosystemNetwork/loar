@@ -51,8 +51,7 @@ export interface Universe {
   entities: NarrativeEntity[];
 }
 
-const WALRUS_BLOB =
-  'https://aggregator.walrus-testnet.walrus.space/v1/blobs/lBt_Ua5p8I56LFOYgG_z8YiLf3IBVvBNRBlO_94giMI';
+const DEMO_VIDEO_URL = '';
 
 /** Pre-seeded demo universes for the landing page carousel. */
 export const universes: Universe[] = [
@@ -73,7 +72,7 @@ export const universes: Universe[] = [
             title: 'The Neon Awakening',
             description:
               'Our heroes discover the truth behind the corporate conspiracy in the heart of the city.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['vera-ash', 'captain-somnus-blue'],
             position: { x: 100, y: 100 },
             connections: ['node-2', 'node-3'],
@@ -82,7 +81,7 @@ export const universes: Universe[] = [
             id: 'node-2',
             title: 'Underground Alliance',
             description: "A secret meeting in the city's underground tunnels reveals new allies.",
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['vera-ash'],
             position: { x: 200, y: 150 },
             connections: ['node-4'],
@@ -91,7 +90,7 @@ export const universes: Universe[] = [
             id: 'node-3',
             title: 'Tower Infiltration',
             description: 'A daring mission to infiltrate the corporate headquarters.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['captain-somnus-blue'],
             position: { x: 200, y: 50 },
             connections: ['node-4'],
@@ -101,7 +100,7 @@ export const universes: Universe[] = [
             title: 'The Final Confrontation',
             description:
               'All paths converge for the ultimate showdown with the corporate overlords.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['vera-ash', 'captain-somnus-blue'],
             position: { x: 300, y: 100 },
             connections: [],
@@ -117,7 +116,7 @@ export const universes: Universe[] = [
             id: 'alt-node-1',
             title: 'The Peaceful Resolution',
             description: 'Instead of fighting, our heroes choose negotiation.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['vera-ash'],
             position: { x: 100, y: 100 },
             connections: ['alt-node-2'],
@@ -126,7 +125,7 @@ export const universes: Universe[] = [
             id: 'alt-node-2',
             title: 'New World Order',
             description: 'The city transforms under a new cooperative government.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['vera-ash', 'captain-somnus-blue'],
             position: { x: 200, y: 100 },
             connections: [],
@@ -223,7 +222,7 @@ export const universes: Universe[] = [
             id: 'forest-1',
             title: 'The Ancient Grove',
             description: 'Discovery of the sacred trees and their guardians.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['waddles-the-wise', 'sunny-halo'],
             position: { x: 100, y: 100 },
             connections: ['forest-2'],
@@ -233,7 +232,7 @@ export const universes: Universe[] = [
             title: 'The Crystal Cave',
             description:
               'Hidden deep in the forest, a cave of magical crystals holds the key to saving the realm.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['waddles-the-wise', 'sunny-halo'],
             position: { x: 200, y: 100 },
             connections: [],
@@ -304,7 +303,7 @@ export const universes: Universe[] = [
             id: 'space-1',
             title: 'Launch Sequence',
             description: 'The crew prepares for their journey to the unknown reaches of space.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['sunny-glare', 'sunny-halo'],
             position: { x: 100, y: 100 },
             connections: ['space-2', 'space-3'],
@@ -313,7 +312,7 @@ export const universes: Universe[] = [
             id: 'space-2',
             title: 'First Contact',
             description: 'Encountering an alien civilization for the first time.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['sunny-glare'],
             position: { x: 200, y: 50 },
             connections: ['space-4'],
@@ -322,7 +321,7 @@ export const universes: Universe[] = [
             id: 'space-3',
             title: 'Asteroid Mining',
             description: 'A dangerous mission to harvest rare minerals from an asteroid field.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['sunny-halo'],
             position: { x: 200, y: 150 },
             connections: ['space-4'],
@@ -331,7 +330,7 @@ export const universes: Universe[] = [
             id: 'space-4',
             title: 'The Home Return',
             description: 'The crew returns to Earth with new knowledge and alien allies.',
-            videoUrl: WALRUS_BLOB,
+            videoUrl: DEMO_VIDEO_URL,
             characters: ['sunny-glare', 'sunny-halo'],
             position: { x: 300, y: 100 },
             connections: [],

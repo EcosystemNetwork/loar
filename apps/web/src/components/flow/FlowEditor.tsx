@@ -58,7 +58,7 @@ const initialNodes: Node[] = [
       label: 'Cinematic Scene',
       emoji: 'clapperboard',
       description: 'Key visual moment in the narrative',
-      storageType: 'Walrus Protocol',
+      storageType: 'IPFS',
     },
     position: { x: 400, y: 100 },
   },
@@ -302,7 +302,7 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
           description: 'Add description here...',
           ...(type === 'character' && { nftId: 'Unassigned' }),
           ...(type === 'plotPoint' && { canonicity: 'Pending' }),
-          ...(type === 'media' && { storageType: 'Walrus Protocol' }),
+          ...(type === 'media' && { storageType: 'IPFS' }),
           ...(type === 'voting' && { status: 'Pending' }),
           // Add universe context for blockchain integration
           universeAddress: universeAddress,

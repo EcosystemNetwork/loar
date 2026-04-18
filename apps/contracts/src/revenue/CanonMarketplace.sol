@@ -47,7 +47,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         SubmissionStatus status;
         address creator;
         bytes32 contentHash;
-        string metadataURI;          // IPFS/Walrus URI for full content
+        string metadataURI;          // IPFS URI for full content
         uint256 submissionFee;       // fee paid by submitter
         uint256 votesFor;
         uint256 votesAgainst;

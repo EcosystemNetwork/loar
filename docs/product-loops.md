@@ -46,7 +46,7 @@ Attracts fans ─── fans discover ─── fans watch ─── creator is 
 | Universe deployment   | LIVE   | Contract + token + pool                                    |
 | AI generation         | LIVE   | 4 video models, 4 image models, wiki                       |
 | Timeline editor       | LIVE   | ReactFlow + on-chain storage                               |
-| Decentralized storage | LIVE   | Walrus > IPFS > Filecoin > Firebase                        |
+| Decentralized storage | LIVE   | Pinata/IPFS > Lighthouse/Filecoin > Firebase               |
 | Discovery             | LIVE   | Search, filters, content feed                              |
 | Profile setup         | LIVE   | Themes, bio, social links                                  |
 | **Fan engagement**    | BROKEN | No comments, likes, follows. Fans can only watch passively |

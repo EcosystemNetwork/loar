@@ -116,7 +116,7 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     /// @param name          Unique name within universe+layer
     /// @param contentHash   SHA-256 of full world-building content
     /// @param parentTokenId Token ID of containing deed (0 if none)
-    /// @param metadataURI   IPFS/Walrus URI for NFT metadata
+    /// @param metadataURI   IPFS URI for NFT metadata
     function mintDeed(
         uint256 universeId,
         Layer layer,

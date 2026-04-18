@@ -1,7 +1,7 @@
 /**
  * Storage domain barrel — unified + provider-specific storage routers.
  *
- * `storageRouter` — Unified StorageManager (Walrus, IPFS, Synapse, Firebase)
+ * `storageRouter` — Unified StorageManager (Pinata/IPFS, Lighthouse, Firebase)
  * `firebaseStorageRouter` — Direct Firebase Storage operations
  * `synapseRouter` — Direct Filecoin Synapse operations
  */

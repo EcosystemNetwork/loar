@@ -2,7 +2,7 @@
  * Contract Save Hook
  *
  * Handles saving timeline events to blockchain smart contracts with decentralized storage.
- * Uploads to unified storage (Walrus/IPFS/Synapse/Firebase), stores content hashes on-chain.
+ * Uploads to unified storage (Pinata/IPFS, Lighthouse, Firebase), stores content hashes on-chain.
  *
  * Fixes applied:
  * - Save queue prevents concurrent saves from corrupting state
@@ -86,7 +86,7 @@ function parseNodeCreatedEvent(logs: Log[]): {
  * Orchestrates saving a generated video to decentralized storage and the blockchain.
  *
  * Flow:
- * 1. Upload video to unified StorageManager (Walrus/IPFS/Synapse/Firebase)
+ * 1. Upload video to unified StorageManager (Pinata/IPFS, Lighthouse, Firebase)
  * 2. Determine the previous node (linear continuation or branch)
  * 3. Compute keccak256 content/plot hashes
  * 4. Call `createNode` on the Universe contract

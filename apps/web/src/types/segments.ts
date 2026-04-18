@@ -22,7 +22,7 @@ export interface VideoSegment {
   /** Unique segment ID (e.g., "1-seg-1", "1-seg-2") */
   id: string;
 
-  /** Generated video URL (blob URL, Walrus URL, or IPFS hash) */
+  /** Generated video URL (blob URL, IPFS gateway URL, or content hash) */
   videoUrl: string;
 
   /** Segment-specific description */

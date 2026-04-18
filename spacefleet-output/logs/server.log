@@ -70,3 +70,27 @@ server:dev: <-- GET /trpc/entities.get?batch=1&input=%7B%220%22%3A%7B%22entityId
 server:dev: --> GET /trpc/entities.get?batch=1&input=%7B%220%22%3A%7B%22entityId%22%3A%22TbZvgFLV00ZsDIX8qkmK%22%7D%7D [32m200[0m 133ms
 server:dev: <-- GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D
 server:dev: --> GET /trpc/entities.list?batch=1&input=%7B%220%22%3A%7B%22universeAddress%22%3A%220x228295466c531c1d55b9dfdd5cf15ad0b88782fa%22%7D%7D [31m500[0m 165ms
+server:dev: <-- GET /health
+server:dev: --> GET /health [32m200[0m 1ms
+server:dev: <-- GET /trpc/universe.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%7D%7D%7D
+server:dev: --> GET /trpc/universe.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%7D%7D%7D [33m404[0m 0ms
+server:dev: 11:28:51 PM [tsx] change in ./src/routers/storage/storage.routes.ts Restarting...
+server:dev: 
+server:dev: [server] Received SIGTERM — shutting down gracefully...
+server:dev: c[dotenv@17.3.1] injecting env (58) from ../../.env -- tip: ⚙️  enable debug logging with { debug: true }
+server:dev: [sentry] SENTRY_DSN not set — error reporting disabled
+server:dev: Firebase Admin SDK initialized successfully
+server:dev: Starting server on port 3000
+server:dev: CORS origin: http://localhost:3001
+server:dev: Environment: development
+server:dev: Server listening on http://localhost:3000
+server:dev: [pricing] Heartbeat complete: 45 models checked, 0 price changes detected
+server:dev: [pricing] Heartbeat started — checking every 12 hours
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 221ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m403[0m 0ms
+server:dev: <-- GET /auth/nonce
+server:dev: --> GET /auth/nonce [32m200[0m 225ms
+server:dev: <-- POST /auth/verify
+server:dev: --> POST /auth/verify [33m403[0m 1ms

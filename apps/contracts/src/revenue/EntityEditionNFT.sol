@@ -101,7 +101,7 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
     /// @param contentHash SHA-256 of full entity content
     /// @param mintPrice   ETH per copy (0 = free)
     /// @param maxSupply   Edition cap (0 = unlimited)
-    /// @param metadataURI IPFS/Walrus URI for token metadata
+    /// @param metadataURI IPFS URI for token metadata
     function createEdition(
         uint256 _universeId,
         EntityKind kind,

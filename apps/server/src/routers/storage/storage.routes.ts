@@ -1,6 +1,6 @@
 /**
  * Storage router — tRPC procedures for uploading files to the unified
- * decentralized storage layer (Walrus, IPFS, Synapse, Firebase) and
+ * decentralized storage layer (Pinata/IPFS, Lighthouse, Firebase) and
  * resolving content hashes to URLs. Supports sync and async uploads.
  * Includes cost ledger queries (PRD 9).
  */
