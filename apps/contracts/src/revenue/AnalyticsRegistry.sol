@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -159,7 +159,11 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     uint256 public constant MAX_TRENDING = 100;
 
-    /// @notice Set trending universes (computed off-chain, stored on-chain, capped at 100)
+    /// @notice Set trending universes. Capped at 100.
+    /// @dev ANALYTICS-01: "Trending" is PLATFORM-CURATED, not algorithmic. The `platform`
+    ///      address publishes the list computed off-chain. Consumers should treat this as
+    ///      an editorial signal, not a neutral ranking. Transparency is enforced by the
+    ///      `TrendingUpdated(ids)` event and the `onlyPlatform` gate.
     function setTrending(uint256[] calldata universeIds) external onlyPlatform whenNotPaused {
         require(universeIds.length <= MAX_TRENDING, "Too many trending");
         trendingUniverseIds = universeIds;

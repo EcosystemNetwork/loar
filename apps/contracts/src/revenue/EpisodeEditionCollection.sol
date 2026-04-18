@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {ERC1155Upgradeable} from "@openzeppelin-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 /// @notice Controls who can create new nodes in a universe timeline.
 enum NodeCreationOptions {

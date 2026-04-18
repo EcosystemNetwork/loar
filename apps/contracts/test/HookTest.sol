@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Uniswap Hooks (last updated v1.2.0) (test/utils/HookTest.sol)
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";

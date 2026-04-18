@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 import {IUniverse} from "../interfaces/IUniverse.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import "@openzeppelin/governance/IGovernor.sol";

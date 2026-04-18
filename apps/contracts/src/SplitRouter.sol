@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {ReentrancyGuard} from "@openzeppelin/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {ERC721EnumerableUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
@@ -70,9 +70,16 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
         address _paymentRouter,
         address _rightsRegistry,
         uint16 _platformFeeBps,
-        uint16 _royaltyBps
+        uint16 _royaltyBps,
+        string memory _name,
+        string memory _symbol
     ) external initializer {
-        __ERC721_init("LOAR Entities", "ENTITY");
+        // NFT-02: per-universe name/symbol. Callers may pass empty strings to fall back to the
+        // platform-wide default ("LOAR Entities" / "ENTITY") for compatibility.
+        __ERC721_init(
+            bytes(_name).length == 0 ? "LOAR Entities" : _name,
+            bytes(_symbol).length == 0 ? "ENTITY" : _symbol
+        );
         __ERC721Enumerable_init();
         __ERC721URIStorage_init();
         __ERC2981_init();

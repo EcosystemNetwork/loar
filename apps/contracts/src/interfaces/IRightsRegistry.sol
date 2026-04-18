@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 interface IRightsRegistry {
     enum RightsType { UNSET, FUN, ORIGINAL, LICENSED, PUBLIC_DOMAIN, FROZEN }

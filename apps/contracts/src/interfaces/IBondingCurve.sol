@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 /// @title IBondingCurve
 /// @notice Interface for graduated bonding curves that auto-migrate to Uniswap v4 LP.

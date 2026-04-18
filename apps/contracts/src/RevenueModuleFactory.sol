@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.sol";
@@ -106,10 +106,12 @@ contract RevenueModuleFactory is Ownable {
                 universeId, platform, rightsRegistry, paymentRouter,
                 characterAppearanceFeeBps))));
 
+        // NFT-02: empty strings fall back to the default name/symbol; per-universe
+        //         customization can be wired through the factory signature in a future upgrade.
         entities = address(new BeaconProxy(address(entityBeacon),
             abi.encodeCall(EntityNFT.initialize, (
                 universeId, platform, paymentRouter, rightsRegistry,
-                entityPlatformFeeBps, entityRoyaltyBps))));
+                entityPlatformFeeBps, entityRoyaltyBps, "", ""))));
 
         entityEditions = address(new BeaconProxy(address(entityEdBeacon),
             abi.encodeCall(EntityEditionNFT.initialize, (

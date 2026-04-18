@@ -5,6 +5,11 @@ rules_version = '2';
 // All writes go through the server (Firebase Admin SDK), which bypasses these rules.
 // These rules protect against direct client-side access via the Firebase web SDK.
 // Policy: deny all client writes, allow only specific client reads where needed.
+//
+// NOTE: LOAR does NOT use Firebase Auth — authentication is SIWE JWT handled server-side.
+// `request.auth` will always be null from any direct-client read path, so we cannot
+// gate reads on per-user identity here. Anything that must be identity-gated must
+// be fetched through the server (tRPC / REST) where SIWE verification runs.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -46,18 +51,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Content metadata — public unless explicitly marked private
+    // Content metadata — public unless explicitly marked private.
+    // Private content must be fetched through the server (SIWE-gated tRPC).
     match /content/{contentId} {
-      allow read: if resource == null || resource.data.visibility != 'private'
-                   || (request.auth != null && resource.data.creatorUid == request.auth.uid);
+      allow read: if resource == null || resource.data.visibility != 'private';
       allow write: if false;
     }
 
-    // User profiles — public fields only (visibility-filtered reads happen server-side)
-    // Read allowed for profile discovery; write always denied (server-only via Admin SDK)
+    // User profiles — public fields only. Private-profile reads must go through
+    // the server (SIWE-gated tRPC); the client SDK has no way to authenticate here.
     match /profiles/{profileId} {
-      allow read: if resource == null || resource.data.visibility != 'private'
-                   || (request.auth != null && request.auth.uid == profileId);
+      allow read: if resource == null || resource.data.visibility != 'private';
       allow write: if false;
     }
 
@@ -67,25 +71,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ── Authenticated reads (user can read their own data) ──────────
-
-    // User's own credit balance
-    match /userCredits/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
-    }
-
-    // User's own credit transactions
-    match /creditTransactions/{txId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow write: if false;
-    }
-
-    // User's own API keys
-    match /apiKeys/{keyId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow write: if false;
-    }
+    // ── User-scoped collections (server-only) ───────────────────────
+    // These MUST be read via SIWE-gated tRPC endpoints — client SDK cannot
+    // authenticate because LOAR does not use Firebase Auth. Direct client
+    // reads are denied here explicitly for defense-in-depth.
+    match /userCredits/{uid}               { allow read, write: if false; }
+    match /creditTransactions/{txId}       { allow read, write: if false; }
+    match /apiKeys/{keyId}                 { allow read, write: if false; }
 
     // ── Server-only collections (no client access) ──────────────────
     // These are explicitly denied by the default rule above, listed here

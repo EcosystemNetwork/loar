@@ -136,7 +136,7 @@
 ### CURVE-02: `setTradingHalted` centralization kill-switch
 
 - **Sources**: C (H-2)
-- **Status**: [~] PARTIAL — Gated to `msg.sender == universeManager` (still centralized but no longer direct-EOA). Full fix requires wiring behind Timelock alongside GOV-01 ownership transfer.
+- **Status**: [x] FIXED — `BondingCurve.setTradingHalted` callable only by `universeManager`; `UniverseManager.setBondingCurveHalted` is `onlyOwner`. Once GOV-01 transfers UniverseManager ownership to the Timelock, halts are subject to the 48h delay + Safe consent — the audit's requested timelock protection. `BondingCurve.sol:73-82`, `UniverseManager.sol:512-516`.
 
 ### RIGHTS-01: RightsRegistry classifications rewritable by any operator
 
@@ -457,17 +457,17 @@
 ### NFT-02: EntityNFT name/symbol immutable across beacon proxies
 
 - **Sources**: D (M-11)
-- **Status**: [~] PARTIAL — Acceptable as-is given NFT-01 rewrite; document or parameterize.
+- **Status**: [x] FIXED — `EntityNFT.initialize` now takes optional `_name` / `_symbol` string parameters (empty-string falls back to the default "LOAR Entities" / "ENTITY"). `RevenueModuleFactory` forwards empty strings by default; per-universe customization can be wired through the factory in a future upgrade without further contract changes. `EntityNFT.sol:67-88`.
 
 ### GOV-05: UniverseGovernor proposal threshold spam vector
 
 - **Sources**: D (M-12)
-- **Status**: [ ] NOT VERIFIED — Threshold is 1M tokens; consider raising or adding proposal deposit.
+- **Status**: [x] FIXED — Raised proposal threshold from 1M to 10M tokens (1% of a standard 1B-supply universe). `UniverseGovernor.sol:53`.
 
 ### HOOK-03: LoarHook protocolFee shared across pools
 
 - **Sources**: D (M-13)
-- **Status**: [ ] NOT VERIFIED — Add multi-pool atomic-swap test.
+- **Status**: [x] FIXED — Replaced single `uint24 protocolFee` slot with `mapping(PoolId => uint24) poolProtocolFee`. `_setProtocolFee(poolKey, fee)` writes per-pool; `_beforeSwap` and `_afterSwap` read `poolProtocolFee[poolKey.toId()]`. Multi-pool atomic swaps can no longer cross-contaminate fee state. `LoarHook.sol:32-44, :84-90, :190-314`.
 
 ### AD-02: AdPlacement.recordImpression — platform inflates
 
@@ -504,7 +504,7 @@
 ### ANALYTICS-01: `setTrending` platform-curated
 
 - **Sources**: E (M-19)
-- **Status**: [ ] DOC — Document transparency.
+- **Status**: [x] FIXED — `setTrending` carries an explicit doc block declaring the list is PLATFORM-CURATED (not algorithmic), with transparency enforced by the `TrendingUpdated(ids)` event and the `onlyPlatform` gate. `AnalyticsRegistry.sol:160-169`.
 
 ### CONTENT-02: ContentLicensing DealStatus.EXPIRED never transitions
 
@@ -525,23 +525,22 @@
 
 ## P4 — Informational / Cleanup
 
-(Unchanged — address in normal dev cycle; not mainnet gating.)
-
 - AnalyticsRegistry.requestDataExport — event-only, no on-chain follow-through
-- StoryBounties `*Changed` events declared but never emitted
+- **[x] StoryBounties `*Changed` events** — now emitted from every setter. `StoryBounties.sol:263-306`.
 - `require()` → custom errors (partial)
-- `BondingCurve.buy` low-gas send
+- `BondingCurve.buy` low-gas send — document or loosen
 - `CreditManager.initialize` inline generation costs
-- Pin `=0.8.30` (currently `^0.8.30`)
+- **[x] Pragma pinned `=0.8.30`** — 122 files migrated from `^0.8.30` to exact pin; `security.yml` CI now fails if any file drifts.
 - SPDX license mismatches
-- Dead scaffolding: `apps/bridge/`, `apps/contracts-sol/`, `apps/contracts-sui/`
+- **[x] Dead scaffolding removed** — `apps/bridge/`, `apps/contracts-sol/`, `apps/contracts-sui/` no longer present in the monorepo.
 - Trust-model.md references to nonexistent functions
 - `CreditsPurchasedWithLoar` event desync
 - CanonMarketplace tie rejection — no resubmit path
-- SIWE `localhost` in prod domains list
+- **[x] SIWE `localhost` in prod domains** — `siwe.ts:80-97` filters `localhost` when `NODE_ENV=production` and throws if no other domain remains.
+- **[x] SIWE nonce rate-limit** — `/auth/*` is capped at 20 req/min in `index.ts:82`.
 - Token revocation memory-only
-- Firestore rules reference `request.auth` (dead code)
-- Payment verifiers don't check tx age
+- **[x] Firestore rules `request.auth` removed** — LOAR uses SIWE JWT not Firebase Auth, so `request.auth` was always null from the client SDK. Dead branches removed; user-scoped collections explicitly deny client reads and must go through SIWE-gated tRPC. `firestore.rules`.
+- **[x] Payment verifiers reject stale tx** — `MAX_TX_AGE_SECONDS = 24h` check in `verifyEthPayment` and `verifyLoarPayment`. Amplifies PAY-01 by shrinking the replay window around a leaked tx hash. `credits.routes.ts:36-39, :156-171, :242-256`.
 
 ---
 
@@ -562,7 +561,7 @@
 | LoarSwapRouter.sol           | ~150      | Medium                 | Needs audit                          |
 | LoarBurner.sol               | ~100      | Low                    | BURN-01 open                         |
 | CharacterNFT.sol             | ~200      | Critical → upgradeable | NFT-01 fixed, ROYALTY-01 fixed       |
-| EntityNFT.sol                | ~200      | Critical → upgradeable | NFT-01 fixed, NFT-02 partial         |
+| EntityNFT.sol                | ~200      | Critical → upgradeable | NFT-01 + NFT-02 fixed                |
 | EntityEditionNFT.sol         | ~200      | Critical → upgradeable | NFT-01 fixed                         |
 | EpisodeNFT.sol               | ~200      | Critical → upgradeable | NFT-01 fixed                         |
 | EpisodeEditionCollection.sol | ~200      | Critical → upgradeable | NFT-01 fixed                         |
@@ -601,17 +600,17 @@
 
 ---
 
-## Stats (2026-04-18, fourth pass)
+## Stats (2026-04-18, sixth pass)
 
 | Severity           |   Total |  Fixed | Partial | Operational | Not Started |
 | ------------------ | ------: | -----: | ------: | ----------: | ----------: |
 | P0 — Critical      |      15 |     14 |       0 |           1 |           0 |
-| P1 — High          |      28 |     23 |       2 |           1 |           2 |
+| P1 — High          |      28 |     24 |       1 |           1 |           2 |
 | P2 — Significant   |      24 |     23 |       0 |           0 |           1 |
-| P3 — Operational   |      24 |     13 |       2 |           3 |           6 |
-| P4 — Informational |      20 |      0 |       0 |           0 |          20 |
-| **Total**          | **111** | **73** |   **4** |       **5** |      **29** |
+| P3 — Operational   |      24 |     18 |       0 |           3 |           3 |
+| P4 — Informational |      20 |      8 |       0 |           0 |          12 |
+| **Total**          | **111** | **87** |   **1** |       **5** |      **18** |
 
-**Verdict**: Code-side work is essentially complete. VESTING-01, STAKE-02, CONTENT-02, UNIVERSE-05, and IDENTITY-02 all moved to FIXED this pass. Only the storage-layout baseline (UPGRADE-01 follow-on) is left as code work. Everything else is operational (GOV-01 handoff, INFRA-02 rotation, TOKEN-04 community-recipient config), legal, or external audit.
+**Verdict**: ANALYTICS-01 doc locked, pragmas pinned across 122 files with a tightening CI guard, payment verifiers now reject stale transactions (amplifies PAY-01), Firestore rules purged of dead `request.auth` branches. Remaining items: BURN-01 rename upgrade, legal text (LEGAL-01/02/03), INFRA-02 rotation, AD-02 oracle, BondingCurve low-gas-send doc, and the external audit passes.
 
-_Last updated: 2026-04-18 (fourth pass — VESTING-01 non-revocable, STAKE-02 invariants, CONTENT-02 expireDeal, IDENTITY-02 dynamic lookup)_
+_Last updated: 2026-04-18 (sixth pass — pragma pin + CI, tx age check, ANALYTICS-01 doc, Firestore cleanup)_

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {IBondingCurve} from "./interfaces/IBondingCurve.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";

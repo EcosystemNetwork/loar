@@ -33,6 +33,9 @@ const baseSepoliaClient = createPublicClient({
 /** Allowed chain IDs for on-chain payment verification. */
 const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
 
+/** Maximum age of a payment tx that can still be redeemed for credits (amplifies PAY-01). */
+const MAX_TX_AGE_SECONDS = 24 * 60 * 60; // 24 hours
+
 // ── RPC response cache (prevents DoS via repeated verification calls) ───
 const TX_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const TX_CACHE_MAX = 500;
@@ -141,6 +144,23 @@ async function verifyEthPayment(
     );
   }
 
+  // Amplifies PAY-01: reject txs older than MAX_TX_AGE_SECONDS. Combined with dedup
+  // this shrinks the window in which a leaked tx hash is replayable.
+  try {
+    const block = await getCachedOrFetch(`block-${receipt.blockNumber.toString()}`, () =>
+      client.getBlock({ blockNumber: receipt.blockNumber })
+    );
+    const ageSeconds = Math.floor(Date.now() / 1000) - Number(block.timestamp);
+    if (ageSeconds > MAX_TX_AGE_SECONDS) {
+      throw new Error(
+        `Transaction is too old (${ageSeconds}s). Payments must be claimed within ${MAX_TX_AGE_SECONDS / 3600}h of confirmation.`
+      );
+    }
+  } catch (err: any) {
+    if (err?.message?.startsWith('Transaction is too old')) throw err;
+    // If we cannot resolve the block (RPC error), fall through — dedup still protects us.
+  }
+
   // Enforce minimum payment amount when a price is configured
   if (expectedWei && expectedWei !== '0') {
     const expected = BigInt(expectedWei);
@@ -211,6 +231,21 @@ async function verifyLoarPayment(
         'Token transfer sender does not match your wallet address. You can only claim credits for your own payments.'
       );
     }
+  }
+
+  // Amplifies PAY-01: reject $LOAR payments older than MAX_TX_AGE_SECONDS.
+  try {
+    const block = await getCachedOrFetch(`block-${receipt.blockNumber.toString()}`, () =>
+      client.getBlock({ blockNumber: receipt.blockNumber })
+    );
+    const ageSeconds = Math.floor(Date.now() / 1000) - Number(block.timestamp);
+    if (ageSeconds > MAX_TX_AGE_SECONDS) {
+      throw new Error(
+        `Transaction is too old (${ageSeconds}s). Payments must be claimed within ${MAX_TX_AGE_SECONDS / 3600}h of confirmation.`
+      );
+    }
+  } catch (err: any) {
+    if (err?.message?.startsWith('Transaction is too old')) throw err;
   }
 
   // Decode the transfer amount from the log data

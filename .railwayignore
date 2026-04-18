@@ -1,0 +1,46 @@
+# Generated video output dirs (huge, not needed for backend)
+*-output/
+spacefleet-output/
+cyberwar-output/
+monerochan-audio-output/
+vacation-bunny-output/
+voidborn-output/
+
+# Node modules (Railway builds them)
+node_modules/
+**/node_modules/
+
+# Build artifacts
+apps/*/dist/
+apps/*/build/
+apps/*/.next/
+
+# Git
+.git/
+
+# Logs
+*.log
+**/logs/
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Foundry/contracts artifacts
+apps/contracts/cache/
+apps/contracts/out/
+apps/contracts/broadcast/
+
+# Mobile native builds
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/.expo/

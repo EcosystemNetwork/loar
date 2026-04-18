@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 /// @notice Minimal mock that supports ownerOf for registerUniverse lookups
 contract MockUniverseManager {

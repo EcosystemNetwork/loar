@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Universe} from "../Universe.sol";
 import {IUniverseFactory} from "../interfaces/IUniverseFactory.sol";

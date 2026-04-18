@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC165} from "@openzeppelin/interfaces/IERC165.sol";

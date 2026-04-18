@@ -66,15 +66,15 @@ jobs:
           path: apps/contracts/results.sarif
           retention-days: 30
 
-      - name: Check for pragma version mismatches
+      - name: Check for pragma version mismatches (must be exact =0.8.30)
         run: |
-          MISMATCHES=$(grep -rn 'pragma solidity' src/ script/ | grep -v '^0.8.28' | grep -c '\^0\.8\.28' || true)
-          if [ "$MISMATCHES" -gt 0 ]; then
-            echo "::error::Found $MISMATCHES files with ^0.8.28 pragma (should be fixed-version 0.8.28)"
-            grep -rn 'pragma solidity' src/ script/ | grep '\^0\.8\.28'
+          MISMATCHES=$(grep -rn 'pragma solidity' src/ script/ test/ | grep -v '=0.8.30' || true)
+          if [ -n "$MISMATCHES" ]; then
+            echo "::error::Pragmas must be pinned to exactly =0.8.30. Offenders:"
+            echo "$MISMATCHES"
             exit 1
           fi
-          echo "All pragma versions are correct (no ^0.8.28 mismatches found)"
+          echo "All pragmas pinned to =0.8.30"
 
       - name: UPGRADE-01 — Storage gap presence check on UUPS contracts
         run: |

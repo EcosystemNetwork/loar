@@ -587,3 +587,47 @@
 [S31 (31/40)] Retry 1/2 (sanitized prompt)...
 [S31 (31/40)] Task: cgt-20260418163112-ktpq5
 [S31 (31/40)] Generating... (0s)
+[dotenv@17.3.1] injecting env (59) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+
+════════════════════════════════════════════════════════════
+  SPACE FLEET — Pilot: "Return"
+  40 Scenes × 10s = ~7 min core footage
+  Seedance 2.0 → On-chain | Mode: CONTINUITY
+════════════════════════════════════════════════════════════
+[AUTH] Authenticating...
+[AUTH] Authenticated as 0x116C28e6DCABCa363f83217C712d79DCE168d90e
+[WIKI] Fetching ALL entity data from wiki for visual consistency...
+[WIKI] Loaded 0 entities for visual consistency
+[RESUME] Skipping to S31 (scene 31/40)
+[SETUP] Balance: 0.8820 ETH
+[SETUP] Latest node: #204
+[MODE] CONTINUITY — sequential i2v chaining (slower, visually cohesive)
+
+═══════════════════════════════════════════════════════
+  S31: Eric Leaves — The Poker Face
+═══════════════════════════════════════════════════════
+[S31 (31/40)] Generating video (t2v)...
+[S31 (31/40)] Task: cgt-20260418170210-wtwbd
+[S31 (31/40)] Generating... (0s)
+[S31 (31/40)] Generating... (30s)
+[S31 (31/40)] Generating... (60s)
+[S31 (31/40)] Generating... (90s)
+[S31 (31/40)] Generating... (120s)
+[S31 (31/40)] Video done
+[S31 (31/40)] Rehosting to Pinata...
+[S31 (31/40)] Pinned: QmTKr6cRUNUyXJAUADarm4EPMDU6QihuCpMFnCYxtW4YGc (3.7MB)
+[S31 (31/40)] Node #205 confirmed
+[S31 (31/40)] DONE — Node #205
+
+═══════════════════════════════════════════════════════
+  S32: Hotel Corridor — Alone Again
+═══════════════════════════════════════════════════════
+[S32 (32/40)] Generating video (t2v)...
+[S32 (32/40)] Task: cgt-20260418170530-jn5bp
+[S32 (32/40)] Generating... (0s)
+[S32 (32/40)] Generating... (30s)
+[S32 (32/40)] Generating... (60s)
+[S32 (32/40)] Generating... (90s)
+[S32 (32/40)] Generating... (120s)
+[S32 (32/40)] Video done
+[S32 (32/40)] Rehosting to Pinata...

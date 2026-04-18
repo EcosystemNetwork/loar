@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 /// @title ILoarFeeLocker
 /// @notice Interface for the fee escrow contract that holds protocol fees on behalf of fee owners.

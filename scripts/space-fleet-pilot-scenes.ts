@@ -349,22 +349,31 @@ async function generateVideo(
     let copyrightBlock = false;
     for (let i = 0; i < 60; i++) {
       await sleep(5000);
-      // 10-second timeout per poll — prevents hanging on network stalls
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10_000);
-      let poll: Response;
+      // 15-second timeout covering entire fetch + JSON parse
+      let s: any = null;
       try {
-        poll = await fetch(`${BD_BASE}/contents/generations/tasks/${taskId}`, {
-          headers: { Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
-          signal: controller.signal,
-        });
+        const pollPromise = (async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15_000);
+          try {
+            const r = await fetch(`${BD_BASE}/contents/generations/tasks/${taskId}`, {
+              headers: { Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            if (!r.ok) return null;
+            return await r.json();
+          } catch {
+            clearTimeout(timeoutId);
+            return null;
+          }
+        })();
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 20_000));
+        s = await Promise.race([pollPromise, timeout]);
       } catch {
-        clearTimeout(timeoutId);
-        continue;
+        s = null;
       }
-      clearTimeout(timeoutId);
-      if (!poll.ok) continue;
-      const s = (await poll.json()) as any;
+      if (!s) continue;
       const st = s.status?.toLowerCase();
       if (st === 'succeeded' || st === 'completed') {
         const url = s.content?.video_url || s.output?.video_url;

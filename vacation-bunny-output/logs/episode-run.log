@@ -501,3 +501,119 @@
 [S31 (31/56)] Node #30
 [S31 (31/56)] DONE — Node #30
 [S32 (32/56)] Rehosting to Pinata...
+[S32 (32/56)] Pinned: QmUpUFcCZyePf6684qqYKNSM9LkTxwY338kZCPJ9355zMt (3.4MB)
+[S32 (32/56)] Node #31
+[S32 (32/56)] DONE — Node #31
+[S33 (33/56)] Rehosting to Pinata...
+[S33 (33/56)] Pinned: QmRpj5AncWBd9KbrZSXA16canh9iTB4De8k7oMAMvJM41E (5.2MB)
+[S33 (33/56)] Node #32
+[S33 (33/56)] DONE — Node #32
+[S33 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776502418845.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S31–S33
+
+═══════════════════════════════════════════════════════
+  BATCH: S34–S36 (3 parallel)
+═══════════════════════════════════════════════════════
+[S34 (34/56)] Generating (t2v)...
+[S35 (35/56)] Generating (t2v)...
+[S36 (36/56)] Generating (t2v)...
+[S35 (35/56)] Task: cgt-20260418165343-j9b7n
+[S34 (34/56)] Task: cgt-20260418165343-m9wz9
+[S36 (36/56)] Task: cgt-20260418165343-k9v5s
+[S34 (34/56)] Generating... (0s)
+[S35 (35/56)] Generating... (0s)
+[S36 (36/56)] Generating... (0s)
+[S35 (35/56)] Generating... (30s)
+[S34 (34/56)] Generating... (30s)
+[S36 (36/56)] Generating... (30s)
+[S35 (35/56)] Generating... (60s)
+[S34 (34/56)] Generating... (60s)
+[S36 (36/56)] Generating... (60s)
+[S34 (34/56)] Generating... (90s)
+[S35 (35/56)] Generating... (90s)
+[S36 (36/56)] Generating... (90s)
+[S35 (35/56)] Video done
+[S34 (34/56)] Generating... (120s)
+[S36 (36/56)] Generating... (120s)
+[S34 (34/56)] Generating... (150s)
+[S36 (36/56)] Generating... (150s)
+[S36 (36/56)] Video done
+[S34 (34/56)] Video done
+[S34 (34/56)] Rehosting to Pinata...
+[S34 (34/56)] Pinned: QmYJStw5HVhsENKwSXvUSX1ztcTaJYFNnBENQ1q4XC6idq (6.2MB)
+[S34 (34/56)] Node #33
+[S34 (34/56)] DONE — Node #33
+[S35 (35/56)] Rehosting to Pinata...
+[S35 (35/56)] Pinned: QmaC83UN1vCbceq3fJiEQ5fQVUqk7DxaFysvqhakKcGwBr (5.4MB)
+[S35 (35/56)] Node #34
+[S35 (35/56)] DONE — Node #34
+[S36 (36/56)] Rehosting to Pinata...
+[S36 (36/56)] Pinned: QmQvRETPgeGzqhZ9raZoNuhbRHdcZWmVN9tWHGoKqDnfbF (4.8MB)
+[S36 (36/56)] Node #35
+[S36 (36/56)] DONE — Node #35
+[S36 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776502852605.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S34–S36
+
+═══════════════════════════════════════════════════════
+  BATCH: S37–S39 (3 parallel)
+═══════════════════════════════════════════════════════
+[S37 (37/56)] Generating (t2v)...
+[S38 (38/56)] Generating (t2v)...
+[S39 (39/56)] Generating (t2v)...
+[S37 (37/56)] Task: cgt-20260418170057-qtlw4
+[S39 (39/56)] Task: cgt-20260418170057-25zqh
+[S38 (38/56)] Task: cgt-20260418170059-47q4w
+[S39 (39/56)] Generating... (0s)
+[S37 (37/56)] Generating... (0s)
+[S38 (38/56)] Generating... (0s)
+[S39 (39/56)] Generating... (30s)
+[S37 (37/56)] Generating... (30s)
+[S38 (38/56)] Generating... (30s)
+[S39 (39/56)] Generating... (60s)
+[S37 (37/56)] Generating... (60s)
+[S38 (38/56)] Generating... (60s)
+[S39 (39/56)] Generating... (90s)
+[S37 (37/56)] Generating... (90s)
+[S38 (38/56)] Generating... (90s)
+[S39 (39/56)] Video done
+[S37 (37/56)] Generating... (120s)
+[S38 (38/56)] Generating... (120s)
+[S38 (38/56)] Retry 1/2 (sanitized)...
+[S38 (38/56)] Task: cgt-20260418170318-h97vn
+[S38 (38/56)] Generating... (0s)
+[S37 (37/56)] Video done
+[S38 (38/56)] Generating... (30s)
+[S38 (38/56)] Generating... (60s)
+[S38 (38/56)] Generating... (90s)
+[S38 (38/56)] Generating... (120s)
+[S38 (38/56)] Video done
+[S37 (37/56)] Rehosting to Pinata...
+[S37 (37/56)] Pinned: QmcVcGiodEkXvPWCq3A39YwPnZJFcgkiGvY5f6qMJ5XXzZ (4.2MB)
+[S37 (37/56)] Node #36
+[S37 (37/56)] DONE — Node #36
+[S38 (38/56)] Rehosting to Pinata...
+[S38 (38/56)] Pinned: QmarxRQR5p4F5peRTy9kGiHYQHEchc2q4qCzUVzUqqek5f (4.8MB)
+[S38 (38/56)] Node #37
+[S38 (38/56)] DONE — Node #37
+[S39 (39/56)] Rehosting to Pinata...
+[S39 (39/56)] Pinned: QmWdT3zwVCJgHhBC8yBD12S8AgiXwD6ZR7NiyNfUAiGqhv (6.2MB)
+[S39 (39/56)] Node #38
+[S39 (39/56)] DONE — Node #38
+[S39 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776503247861.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S37–S39
+
+═══════════════════════════════════════════════════════
+  BATCH: S40–S42 (3 parallel)
+═══════════════════════════════════════════════════════
+[S40 (40/56)] Generating (t2v)...
+[S41 (41/56)] Generating (t2v)...
+[S42 (42/56)] Generating (t2v)...
+[S41 (41/56)] Task: cgt-20260418170732-n5nxh
+[S42 (42/56)] Task: cgt-20260418170732-8mgx6
+[S40 (40/56)] Task: cgt-20260418170733-6lzp5
+[S41 (41/56)] Generating... (0s)
+[S42 (42/56)] Generating... (0s)
+[S40 (40/56)] Generating... (0s)
+[S41 (41/56)] Generating... (30s)
+[S42 (42/56)] Generating... (30s)
+[S40 (40/56)] Generating... (30s)

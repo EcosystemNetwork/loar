@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
@@ -40,7 +40,9 @@ contract EntityNFTTest is Test {
                 address(router),
                 address(registry),
                 500,
-                250
+                250,
+                "",
+                ""
             ))
         )));
     }
@@ -64,7 +66,7 @@ contract EntityNFTTest is Test {
         new ERC1967Proxy(
             address(impl),
             abi.encodeCall(EntityNFT.initialize, (
-                UNIVERSE_ID, platform, address(router), address(registry), 5001, 250
+                UNIVERSE_ID, platform, address(router), address(registry), 5001, 250, "", ""
             ))
         );
     }
@@ -74,7 +76,7 @@ contract EntityNFTTest is Test {
         EntityNFT nft2 = EntityNFT(address(new ERC1967Proxy(
             address(impl),
             abi.encodeCall(EntityNFT.initialize, (
-                UNIVERSE_ID, platform, address(router), address(registry), 5000, 250
+                UNIVERSE_ID, platform, address(router), address(registry), 5000, 250, "", ""
             ))
         )));
         assertEq(nft2.platformFeeBps(), 5000);
@@ -82,7 +84,7 @@ contract EntityNFTTest is Test {
 
     function test_cannotReinitialize() public {
         vm.expectRevert();
-        nft.initialize(UNIVERSE_ID, platform, address(router), address(registry), 500, 250);
+        nft.initialize(UNIVERSE_ID, platform, address(router), address(registry), 500, 250, "", "");
     }
 
     function test_nameAndSymbol() public view {

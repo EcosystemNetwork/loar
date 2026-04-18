@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 /// @title IOwnable
 /// @notice Minimal ownership interface for querying the contract owner.

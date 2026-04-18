@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Uniswap Hooks (last updated v1.2.0) (test/utils/BalanceDeltaAssertions.sol)
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Test} from "forge-std/Test.sol";
