@@ -53,6 +53,7 @@ import {
 } from '../../services/scene-controls';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
+import { publishToGallery, buildGalleryDoc } from '../../lib/gallery-publish';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -352,8 +353,6 @@ async function extractVideoThumbnail(
 
 // ── Auto-publish video to gallery ────────────────────────────────────
 
-const contentCol = () => db.collection('content');
-
 async function autoPublishVideoToGallery(opts: {
   creatorUid: string;
   videoUrl: string;
@@ -362,35 +361,17 @@ async function autoPublishVideoToGallery(opts: {
   universeId?: string;
   generationId: string;
   thumbnailUrl?: string;
-}) {
-  // If no thumbnail provided, try to extract one from the video
-  let thumbnailUrl = opts.thumbnailUrl || null;
-  if (!thumbnailUrl) {
-    thumbnailUrl = await extractVideoThumbnail(opts.videoUrl, opts.generationId);
-  }
-
-  const now = new Date();
-  await contentCol().add({
-    title: opts.prompt.slice(0, 100) || 'Generated Video',
-    description: opts.prompt,
+}): Promise<void> {
+  const thumbnailUrl =
+    opts.thumbnailUrl || (await extractVideoThumbnail(opts.videoUrl, opts.generationId));
+  await publishToGallery({
+    creatorUid: opts.creatorUid,
     mediaUrl: opts.videoUrl,
     thumbnailUrl,
     mediaType: 'ai-video',
-    classification: 'original',
-    tags: [],
-    ipDeclaration: {
-      isOriginal: true,
-      usesCopyrightedMaterial: false,
-      license: 'all-rights-reserved',
-    },
-    visibility: 'public',
-    creatorUid: opts.creatorUid,
-    ...(opts.universeId ? { universeId: opts.universeId } : {}),
-    createdAt: now,
-    updatedAt: now,
-    views: 0,
-    likes: 0,
-    reviewStatus: 'not_required',
+    title: opts.prompt.slice(0, 100) || 'Generated Video',
+    description: opts.prompt,
+    universeId: opts.universeId ?? null,
     generationId: opts.generationId,
     generationModel: opts.model,
   });
@@ -1490,7 +1471,7 @@ export const generationRouter = router({
       }
 
       // 2. Fetch all content docs that already have a generationId or matching URL
-      const contentSnap = await contentCol().get();
+      const contentSnap = await db.collection('content').get();
       const existingGenIds = new Set<string>();
       const existingUrls = new Set<string>();
       for (const doc of contentSnap.docs) {
@@ -1515,32 +1496,23 @@ export const generationRouter = router({
         const batch = db.batch();
         const chunk = missing.slice(i, i + BATCH_SIZE);
         for (const gen of chunk) {
-          const ref = contentCol().doc();
+          const ref = db.collection('content').doc();
           const createdAt = gen.createdAt?.toDate?.() ?? gen.createdAt ?? new Date();
-          batch.set(ref, {
-            title: (gen.originalPrompt || gen.prompt || '').slice(0, 100) || 'Generated Video',
-            description: gen.originalPrompt || gen.prompt || '',
-            mediaUrl: gen.permanentVideoUrl || gen.videoUrl,
-            thumbnailUrl: gen.imageUrl || null,
-            mediaType: 'ai-video',
-            classification: 'original',
-            tags: [],
-            ipDeclaration: {
-              isOriginal: true,
-              usesCopyrightedMaterial: false,
-              license: 'all-rights-reserved',
-            },
-            visibility: 'public',
-            creatorUid: gen.userId,
-            ...(gen.universeId ? { universeId: gen.universeId } : {}),
-            createdAt,
-            updatedAt: createdAt,
-            views: 0,
-            likes: 0,
-            reviewStatus: 'not_required',
-            generationId: gen.id,
-            generationModel: gen.finalModelId || gen.model || null,
-          });
+          batch.set(
+            ref,
+            buildGalleryDoc({
+              creatorUid: gen.userId,
+              mediaUrl: gen.permanentVideoUrl || gen.videoUrl,
+              thumbnailUrl: gen.imageUrl || null,
+              mediaType: 'ai-video',
+              title: gen.originalPrompt || gen.prompt || 'Generated Video',
+              description: gen.originalPrompt || gen.prompt || '',
+              universeId: gen.universeId ?? null,
+              generationId: gen.id,
+              generationModel: gen.finalModelId || gen.model || '',
+              createdAt,
+            })
+          );
           created++;
         }
         await batch.commit();

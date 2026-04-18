@@ -2,7 +2,7 @@
   "chainId": 84532,
   "environment": "base-sepolia",
   "startBlock": 40078359,
-  "updatedAt": "2026-04-18T07:15:25.856Z",
+  "updatedAt": "2026-04-18T07:20:07.629Z",
   "contracts": {
     "LoarToken": "0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5",
     "LoarFaucet": "0x5Cc879CE26E38e4c9dAeecc0318f0EbdC22aa806",
@@ -33,6 +33,7 @@
     "UniverseMetadataRenderer": "0x43883B2BE785FCC2C098401F07a17a3BbBDAf7d7",
     "LoarLpLockerMultiple": "0xa450Bde3120a23EE3AbB87fDa4fB0E9e9F6D0307",
     "LoarSwapRouter": "0x69c2aA66B3bB3e5f6658Dc2a77022558e7022398",
-    "TokenVesting": "0x36E25222f7E5C6f4dC8f918B68C61da83330C97F"
+    "TokenVesting": "0x36E25222f7E5C6f4dC8f918B68C61da83330C97F",
+    "LoarHookStaticFee": "0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC"
   }
 }

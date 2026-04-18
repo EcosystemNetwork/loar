@@ -104,6 +104,13 @@ export const LoarFeeLocker = {
 
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
 
+export const LoarHookStaticFee = {
+  '84532': '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC',
+  '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
+} as const;
+
+export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
+
 export const LoarLpLockerMultiple = {
   '84532': '0xa450Bde3120a23EE3AbB87fDa4fB0E9e9F6D0307',
   '11155111': '0x7d30fd57e44aB0ca407D312976816E7052905E0A',

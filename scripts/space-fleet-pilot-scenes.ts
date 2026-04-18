@@ -348,9 +348,20 @@ async function generateVideo(
     let copyrightBlock = false;
     for (let i = 0; i < 60; i++) {
       await sleep(5000);
-      const poll = await fetch(`${BD_BASE}/contents/generations/tasks/${taskId}`, {
-        headers: { Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
-      });
+      // 10-second timeout per poll — prevents hanging on network stalls
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
+      let poll: Response;
+      try {
+        poll = await fetch(`${BD_BASE}/contents/generations/tasks/${taskId}`, {
+          headers: { Authorization: `Bearer ${BYTEDANCE_API_KEY}` },
+          signal: controller.signal,
+        });
+      } catch {
+        clearTimeout(timeoutId);
+        continue;
+      }
+      clearTimeout(timeoutId);
       if (!poll.ok) continue;
       const s = (await poll.json()) as any;
       const st = s.status?.toLowerCase();

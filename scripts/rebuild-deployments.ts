@@ -150,13 +150,39 @@ async function main() {
     console.log(`  Found ${creations.length} CREATE transactions across broadcasts`);
 
     const latest = latestPerContract(creations);
+
+    // Merge in any contracts from the prior manifest that aren't in the broadcast
+    // set — some contracts were deployed once via a script whose broadcast was
+    // later overwritten (e.g. LoarHookStaticFee on Sepolia). Verify each prior
+    // address on-chain before keeping.
+    const priorManifestPath = path.resolve(process.cwd(), cfg.manifestFile);
+    const priorNames: string[] = [];
+    if (fs.existsSync(priorManifestPath)) {
+      const prior = JSON.parse(fs.readFileSync(priorManifestPath, 'utf-8'));
+      for (const [name, addr] of Object.entries(prior.contracts ?? {}) as Array<[string, string]>) {
+        if (!latest[name]) {
+          latest[name] = {
+            name,
+            address: getAddress(addr),
+            timestamp: 0,
+            script: '(preserved from prior manifest)',
+          };
+          priorNames.push(name);
+        }
+      }
+    }
+
     const contractNames = Object.keys(latest).sort();
     console.log(`  Resolved ${contractNames.length} unique contracts (most recent per name):\n`);
     for (const cn of contractNames) {
       const c = latest[cn];
-      const d = new Date(c.timestamp * 1000);
+      const when =
+        c.timestamp > 0 ? new Date(c.timestamp * 1000).toISOString().slice(0, 10) : 'preserved';
+      console.log(`    ${cn.padEnd(30)} ${c.address}  [${c.script}, ${when}]`);
+    }
+    if (priorNames.length) {
       console.log(
-        `    ${cn.padEnd(30)} ${c.address}  [${c.script}, ${d.toISOString().slice(0, 10)}]`
+        `\n  Preserved ${priorNames.length} address(es) from prior manifest (not in recent broadcasts): ${priorNames.join(', ')}`
       );
     }
 

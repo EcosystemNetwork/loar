@@ -51,6 +51,7 @@ import { signWithProvenance } from '../../services/provenance';
 import type { ImageGenerationRecord } from '../../services/image-models/types';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
+import { publishToGallery } from '../../lib/gallery-publish';
 
 // ── Collections ───────────────────────────────────────────────────────
 
@@ -276,43 +277,29 @@ async function persistImagesToStorage(opts: {
 
 // ── Auto-publish to gallery ──────────────────────────────────────────
 
-const contentCol = () => db.collection('content');
-
-async function autoPublishToGallery(opts: {
+function autoPublishToGallery(opts: {
   creatorUid: string;
   imageUrls: string[];
   prompt: string;
   model: string;
   universeId?: string;
   generationId: string;
-}) {
-  const now = new Date();
-  for (const url of opts.imageUrls) {
-    await contentCol().add({
-      title: opts.prompt.slice(0, 100) || 'Generated Image',
-      description: opts.prompt,
-      mediaUrl: url,
-      thumbnailUrl: url,
-      mediaType: 'ai-image',
-      classification: 'original',
-      tags: [],
-      ipDeclaration: {
-        isOriginal: true,
-        usesCopyrightedMaterial: false,
-        license: 'all-rights-reserved',
-      },
-      visibility: 'public',
-      creatorUid: opts.creatorUid,
-      ...(opts.universeId ? { universeId: opts.universeId } : {}),
-      createdAt: now,
-      updatedAt: now,
-      views: 0,
-      likes: 0,
-      reviewStatus: 'not_required',
-      generationId: opts.generationId,
-      generationModel: opts.model,
-    });
-  }
+}): Promise<void> {
+  return Promise.all(
+    opts.imageUrls.map((url, i) =>
+      publishToGallery({
+        creatorUid: opts.creatorUid,
+        mediaUrl: url,
+        thumbnailUrl: url,
+        mediaType: 'ai-image',
+        title: opts.prompt.slice(0, 100) || 'Generated Image',
+        description: opts.prompt,
+        universeId: opts.universeId ?? null,
+        generationId: opts.imageUrls.length > 1 ? `${opts.generationId}:${i}` : opts.generationId,
+        generationModel: opts.model,
+      })
+    )
+  ).then(() => undefined);
 }
 
 // ── Router ────────────────────────────────────────────────────────────

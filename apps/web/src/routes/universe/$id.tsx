@@ -474,6 +474,17 @@ function UniverseTimelineEditorInner() {
     ? id // Use the universe ID as the contract address
     : universe?.address || undefined; // For non-blockchain universes, use the stored address
 
+  // ── Strict on-chain vs off-chain mode ──
+  // The universe doc carries `onChainUniverseId` only if it was actually minted
+  // via UniverseManager. Off-chain "fun mode" universes (script-seeded, fan IP,
+  // playgrounds) have it null/undefined even when their doc ID starts with 0x.
+  // Once the universe doc is loaded:
+  //   - If onChainUniverseId is present → strict on-chain mode
+  //   - If not → strict off-chain (Firestore timeline nodes only)
+  // While the doc is still loading we leave isOnChain undefined so the hook
+  // falls back to the legacy isBlockchainUniverse heuristic for back-compat.
+  const isOnChain = universe === undefined ? undefined : !!(universe as any)?.onChainUniverseId;
+
   // Blockchain data fetching - using extracted hook
   const {
     graphData,
@@ -491,6 +502,7 @@ function UniverseTimelineEditorInner() {
     universeId: id,
     contractAddress: timelineContractAddress,
     isBlockchainUniverse,
+    isOnChain,
   });
 
   // Update timeline title when universe data loads

@@ -58,3 +58,92 @@
 [S06 (6/56)] Generating... (0s)
 [S05 (5/56)] Generating... (0s)
 [S04 (4/56)] Generating... (0s)
+[S06 (6/56)] Generating... (30s)
+[S05 (5/56)] Generating... (30s)
+[S04 (4/56)] Generating... (30s)
+[S06 (6/56)] Generating... (60s)
+[S05 (5/56)] Generating... (60s)
+[S04 (4/56)] Generating... (60s)
+[S06 (6/56)] Generating... (90s)
+[S05 (5/56)] Generating... (90s)
+[S04 (4/56)] Generating... (90s)
+[S06 (6/56)] Generating... (120s)
+[S04 (4/56)] Generating... (120s)
+[S05 (5/56)] Generating... (120s)
+[S06 (6/56)] Retry 1/2...
+[S06 (6/56)] Task: cgt-20260418151754-vfwrn
+[S06 (6/56)] Generating... (0s)
+[S04 (4/56)] Retry 1/2...
+[S04 (4/56)] Task: cgt-20260418151800-tzqtt
+[S04 (4/56)] Generating... (0s)
+[S05 (5/56)] Retry 1/2...
+[S05 (5/56)] Task: cgt-20260418151816-9qshv
+[S05 (5/56)] Generating... (0s)
+[S06 (6/56)] Generating... (30s)
+[S04 (4/56)] Generating... (30s)
+[S05 (5/56)] Generating... (30s)
+[S06 (6/56)] Generating... (60s)
+[S04 (4/56)] Generating... (60s)
+[S05 (5/56)] Generating... (60s)
+[S06 (6/56)] Generating... (90s)
+[S04 (4/56)] Generating... (90s)
+[S05 (5/56)] Generating... (90s)
+[S06 (6/56)] Generating... (120s)
+[S04 (4/56)] Generating... (120s)
+[S06 (6/56)] Retry 2/2...
+[S06 (6/56)] Task: cgt-20260418152017-m54ns
+[S06 (6/56)] Generating... (0s)
+[S05 (5/56)] Generating... (120s)
+[S04 (4/56)] Retry 2/2...
+[S04 (4/56)] Task: cgt-20260418152033-vvvxk
+[S04 (4/56)] Generating... (0s)
+[S06 (6/56)] Generating... (30s)
+[S05 (5/56)] Generating... (150s)
+[S05 (5/56)] Video done
+[S04 (4/56)] Generating... (30s)
+[S06 (6/56)] Generating... (60s)
+[S04 (4/56)] Generating... (60s)
+[S06 (6/56)] Generating... (90s)
+[S04 (4/56)] Generating... (90s)
+[S06 (6/56)] Generating... (120s)
+[S04 (4/56)] Generating... (120s)
+[S04 (4/56)] Generating... (150s)
+[S04 (4/56)] VIDEO FAILED: All retries exhausted
+[S05 (5/56)] Node #4
+[S05 (5/56)] DONE — Node #4
+[S06 (6/56)] VIDEO FAILED: All retries exhausted
+[S06 FRAME] Extracted frame (124KB)
+[BATCH] Completed S04–S06
+
+═══════════════════════════════════════════════════════
+  BATCH: S07–S09 (3 parallel)
+═══════════════════════════════════════════════════════
+[S07 (7/56)] Generating (i2v continuity)...
+[S08 (8/56)] Generating (t2v)...
+[S09 (9/56)] Generating (t2v)...
+[S08 (8/56)] Task: cgt-20260418152357-6hchz
+[S09 (9/56)] Task: cgt-20260418152358-2rzpl
+[S07 (7/56)] Task: cgt-20260418152357-bbqgh
+[S08 (8/56)] Generating... (0s)
+[S09 (9/56)] Generating... (0s)
+[S07 (7/56)] Generating... (0s)
+[S08 (8/56)] Generating... (30s)
+[S09 (9/56)] Generating... (30s)
+[S07 (7/56)] Generating... (30s)
+[S08 (8/56)] Generating... (60s)
+[S09 (9/56)] Generating... (60s)
+[S07 (7/56)] Generating... (60s)
+[S08 (8/56)] Generating... (90s)
+[S09 (9/56)] Generating... (90s)
+[S07 (7/56)] Generating... (90s)
+[S07 (7/56)] Retry 1/2...
+[S07 (7/56)] Task: cgt-20260418152553-56cl4
+[S07 (7/56)] Generating... (0s)
+[S08 (8/56)] Video done
+[S09 (9/56)] Retry 1/2...
+[S09 (9/56)] Task: cgt-20260418152603-s5gh2
+[S09 (9/56)] Generating... (0s)
+[S07 (7/56)] Generating... (30s)
+[S09 (9/56)] Generating... (30s)
+[S07 (7/56)] Generating... (60s)
+[S09 (9/56)] Generating... (60s)

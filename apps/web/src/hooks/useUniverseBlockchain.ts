@@ -30,6 +30,16 @@ export interface UseUniverseBlockchainProps {
   universeId: string;
   contractAddress?: string;
   isBlockchainUniverse: boolean;
+  /**
+   * True if this universe was actually deployed on-chain via UniverseManager
+   * (i.e., the universe doc has `onChainUniverseId` set). Distinguishes real
+   * on-chain universes from off-chain "fun mode" universes that happen to
+   * have `0x...` document IDs.
+   *
+   * - true  → ONLY read on-chain nodes (never fall back to off-chain)
+   * - false → ONLY read off-chain Firestore nodes (skip on-chain entirely)
+   */
+  isOnChain?: boolean;
 }
 
 export interface UseUniverseBlockchainReturn {
@@ -186,83 +196,109 @@ export function useUniverseBlockchain({
   universeId,
   contractAddress,
   isBlockchainUniverse,
+  isOnChain,
 }: UseUniverseBlockchainProps): UseUniverseBlockchainReturn {
+  // Strict mode: when isOnChain is explicitly false, this is a fun-mode
+  // universe → never call the on-chain contract. When undefined, fall back
+  // to the legacy isBlockchainUniverse heuristic for backwards compat.
+  const useOnChain = isOnChain === undefined ? isBlockchainUniverse : isOnChain;
+  const useOffChain = isOnChain === undefined ? !isBlockchainUniverse : !isOnChain;
+  const onChainContractAddress = useOnChain ? contractAddress : undefined;
   const {
     data: leavesData,
     isLoading: isLoadingLeaves,
     refetch: refetchLeaves,
-  } = useUniverseLeaves(contractAddress);
+  } = useUniverseLeaves(onChainContractAddress);
   const {
     data: fullGraphData,
     isLoading: isLoadingFullGraph,
     isError: isGraphError,
     error: graphFetchError,
     refetch: refetchFullGraph,
-  } = useUniverseFullGraph(contractAddress);
+  } = useUniverseFullGraph(onChainContractAddress);
   const {
     data: canonChainData,
     isLoading: isLoadingCanonChain,
     refetch: refetchCanonChain,
-  } = useUniverseCanonChain(contractAddress);
+  } = useUniverseCanonChain(onChainContractAddress);
 
   const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
     abi: universeAbi,
-    address: contractAddress as Address,
+    address: onChainContractAddress as Address,
     functionName: 'latestNodeId',
     query: {
-      enabled: !!contractAddress && isBlockchainUniverse,
+      enabled: !!onChainContractAddress,
     },
   });
 
   const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
 
-  // Fetch resolved content from Ponder indexer
-  const { data: contentMap } = useNodeContents(contractAddress);
+  // Fetch resolved content from Ponder indexer (on-chain only)
+  const { data: contentMap } = useNodeContents(onChainContractAddress);
 
-  // ── Off-chain fallback (Fun-Mode universes) ──
-  // Loads Firestore-backed timeline nodes for universes without an on-chain contract.
-  // Activates when there's no contract OR when the on-chain graph is empty.
+  // ── Off-chain timeline nodes (Fun-Mode universes) ──
+  // Only loads when this universe is explicitly off-chain. On-chain universes
+  // never fall back to off-chain — keeps data sources strictly separated.
   const { data: offChainData } = useQuery({
     queryKey: ['offChainNodes', universeId],
     queryFn: () => trpcClient.offChainNodes.list.query({ universeId }),
-    enabled: !!universeId,
+    enabled: !!universeId && useOffChain,
     staleTime: 30_000,
   });
 
   const graphData = useMemo(() => {
-    if (contractAddress && fullGraphData) {
-      const [nodeIds, contentHashes, plotHashes, previousIds, nextIds, flags] = fullGraphData;
+    // ── On-chain branch ──
+    // Strict: ONLY runs for actual on-chain universes. Off-chain nodes are
+    // never merged in here; an on-chain universe with zero nodes shows zero.
+    if (useOnChain) {
+      if (onChainContractAddress && fullGraphData) {
+        const [nodeIds, contentHashes, plotHashes, previousIds, nextIds, flags] = fullGraphData;
 
-      const hashStrings = (contentHashes || []) as readonly string[];
-      const plotHashStrings = (plotHashes || []) as readonly string[];
+        const hashStrings = (contentHashes || []) as readonly string[];
+        const plotHashStrings = (plotHashes || []) as readonly string[];
 
-      // Resolve URLs and descriptions from indexer content map
-      const resolvedUrls: string[] = [];
-      const resolvedDescriptions: string[] = [];
+        // Resolve URLs and descriptions from indexer content map
+        const resolvedUrls: string[] = [];
+        const resolvedDescriptions: string[] = [];
 
-      for (let i = 0; i < (nodeIds || []).length; i++) {
-        const nid = String(nodeIds[i]);
-        const content = contentMap?.get(nid);
+        for (let i = 0; i < (nodeIds || []).length; i++) {
+          const nid = String(nodeIds[i]);
+          const content = contentMap?.get(nid);
 
-        // Use indexer-resolved content if available, otherwise fall back to hash
-        resolvedUrls.push(content?.videoLink || String(hashStrings[i] || ''));
-        resolvedDescriptions.push(content?.plot || String(plotHashStrings[i] || ''));
+          // Use indexer-resolved content if available, otherwise fall back to hash
+          resolvedUrls.push(content?.videoLink || String(hashStrings[i] || ''));
+          resolvedDescriptions.push(content?.plot || String(plotHashStrings[i] || ''));
+        }
+
+        return {
+          nodeIds: (nodeIds || []) as readonly (string | number | bigint)[],
+          contentHashes: hashStrings,
+          plotHashes: plotHashStrings,
+          urls: resolvedUrls,
+          descriptions: resolvedDescriptions,
+          previousNodes: (previousIds || []) as readonly (string | number | bigint)[],
+          children: (nextIds || []) as readonly (string | number | bigint)[][],
+          flags: flags || [],
+          canonChain: (canonChainData || []) as readonly (string | number | bigint)[],
+        };
       }
 
+      // On-chain universe but graph not loaded yet (or genuinely empty)
       return {
-        nodeIds: (nodeIds || []) as readonly (string | number | bigint)[],
-        contentHashes: hashStrings,
-        plotHashes: plotHashStrings,
-        urls: resolvedUrls,
-        descriptions: resolvedDescriptions,
-        previousNodes: (previousIds || []) as readonly (string | number | bigint)[],
-        children: (nextIds || []) as readonly (string | number | bigint)[][],
-        flags: flags || [],
-        canonChain: (canonChainData || []) as readonly (string | number | bigint)[],
+        nodeIds: [],
+        contentHashes: [],
+        plotHashes: [],
+        urls: [],
+        descriptions: [],
+        previousNodes: [],
+        children: [],
+        flags: [],
+        canonChain: [],
       };
     }
 
-    // No on-chain data — try off-chain fallback
+    // ── Off-chain branch ──
+    // Strict: ONLY runs for fun-mode universes. Never reads on-chain data.
     if (offChainData?.nodes && offChainData.nodes.length > 0) {
       const nodes = offChainData.nodes as any[];
       const nodeIds = nodes.map((n) => String(n.nodeId));
@@ -303,10 +339,10 @@ export function useUniverseBlockchain({
     };
   }, [
     universeId,
-    isBlockchainUniverse,
+    useOnChain,
+    onChainContractAddress,
     fullGraphData,
     canonChainData,
-    contractAddress,
     contentMap,
     offChainData,
   ]);

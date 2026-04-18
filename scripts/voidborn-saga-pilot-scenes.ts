@@ -60,7 +60,6 @@ const BD_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const START_SCENE = process.env.START_SCENE ?? 'S01';
 const GEN_MODE = (process.env.GEN_MODE ?? 'continuity') as 'continuity' | 'fast';
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE ?? '5', 10);
-// When resuming continuity mode, pass the last frame URL to maintain the chain
 const RESUME_FRAME = process.env.RESUME_FRAME ?? '';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -125,9 +124,7 @@ async function fetchCharacterDNA(token: string): Promise<Record<string, string>>
 
     const key = name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 
-    // Build rich visual DNA based on entity kind
     if (kind === 'person') {
-      // For characters: use appearance metadata (most detailed visual info)
       const appearance = meta.appearance || '';
       const role = meta.role || '';
       const affiliations = meta.affiliations || '';
@@ -140,7 +137,6 @@ async function fetchCharacterDNA(token: string): Promise<Record<string, string>>
         .filter(Boolean)
         .join(' ');
     } else if (kind === 'place') {
-      // For places: atmosphere + type for scene consistency
       const placeType = meta.placeType || '';
       const atmosphere = meta.atmosphere || '';
       dna[key] = [
@@ -151,7 +147,6 @@ async function fetchCharacterDNA(token: string): Promise<Record<string, string>>
         .filter(Boolean)
         .join(' ');
     } else if (kind === 'technology' || kind === 'vehicle') {
-      // For tech/vehicles: howItWorks + capabilities for visual accuracy
       const techType = meta.techType || meta.vehicleType || '';
       const howItWorks = meta.howItWorks || meta.capabilities || '';
       dna[key] = [
@@ -162,7 +157,6 @@ async function fetchCharacterDNA(token: string): Promise<Record<string, string>>
         .filter(Boolean)
         .join(' ');
     } else {
-      // Fallback: first 3 sentences of description
       dna[key] = `${name}: ${desc.split('.').slice(0, 3).join('.')}.`;
     }
 
@@ -213,7 +207,6 @@ const universeAbi = [
 // ── Sanitize prompt to dodge ByteDance copyright filter ──────────────────
 function sanitizePrompt(prompt: string, attempt: number): string {
   if (attempt === 0) return prompt;
-  // Strip character names and replace with generic descriptions
   let p = prompt
     .replace(/\bZix\b/g, 'the tall indigo alien leader')
     .replace(/\bMora\b/g, 'the moss-green alien engineer')
@@ -244,8 +237,8 @@ import { tmpdir } from 'os';
 
 async function extractLastFrame(videoUrl: string, label: string): Promise<string | null> {
   try {
-    const tmpFile = `${tmpdir()}/sf-frame-${Date.now()}.jpg`;
-    const tmpVid = `${tmpdir()}/sf-vid-${Date.now()}.mp4`;
+    const tmpFile = `${tmpdir()}/void-frame-${Date.now()}.jpg`;
+    const tmpVid = `${tmpdir()}/void-vid-${Date.now()}.mp4`;
     const dlRes = await fetch(videoUrl);
     if (!dlRes.ok) return null;
     fs.writeFileSync(tmpVid, Buffer.from(await dlRes.arrayBuffer()));
@@ -258,8 +251,6 @@ async function extractLastFrame(videoUrl: string, label: string): Promise<string
     fs.unlinkSync(tmpFile);
     log(label, `Extracted last frame (${(frameBuffer.length / 1024).toFixed(0)}KB)`);
 
-    // Upload frame to Pinata so ByteDance can access it via URL
-    // (ByteDance rejects base64 data URIs — needs a real HTTP URL)
     const pinataJwt = process.env.PINATA_JWT;
     if (!pinataJwt) {
       log(label, 'No PINATA_JWT — falling back to data URI (may fail with ByteDance)');
@@ -293,7 +284,6 @@ async function extractLastFrame(videoUrl: string, label: string): Promise<string
 }
 
 // ── Video generation via ByteDance Seedance 2.0 ─────────────────────────
-// Supports optional startImage for scene-to-scene continuity (i2v mode)
 async function generateVideo(
   prompt: string,
   label: string,
@@ -307,8 +297,6 @@ async function generateVideo(
     else
       log(label, startImage ? 'Generating video (i2v continuity)...' : 'Generating video (t2v)...');
 
-    // Build content array — text only or image + text for i2v
-    // startImage may be cleared mid-loop if ByteDance rejects the frame
     const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
     if (startImage) {
       content.push({ type: 'image_url', image_url: { url: startImage } });
@@ -329,9 +317,6 @@ async function generateVideo(
     });
     if (!taskRes.ok) {
       const errText = await taskRes.text().catch(() => '');
-      // If i2v was rejected because the frame contains a "real person",
-      // drop the image and retry as pure t2v — don't let one bad frame
-      // poison the entire rest of the episode
       if (
         startImage &&
         (errText.includes('PrivacyInformation') ||
@@ -339,8 +324,8 @@ async function generateVideo(
           errText.includes('SensitiveContent'))
       ) {
         log(label, 'Frame rejected (person detected) — falling back to t2v');
-        startImage = null; // clear so next attempt skips the image
-        continue; // retry loop will rebuild content without image
+        startImage = null;
+        continue;
       }
       throw new Error(`ByteDance ${taskRes.status}: ${errText.slice(0, 200)}`);
     }
@@ -417,309 +402,304 @@ async function createNode(
 // ── Scene definitions ───────────────────────────────────────────────────
 function buildScenes(dna: Record<string, string>) {
   // ── Character Visual DNA (pulled from wiki entities) ──
-  const ERIC =
-    dna['ERIC'] ||
-    'Eric: Early 20s male, half-Asian mixed heritage, messy black hair falling over eyes, slim build, black hoodie, dark jeans, beat-up Vans. Dilated pupils. Sweat on temples. Cheap festival wristband. Shifts from lost and overwhelmed to transcendent focus.';
-  const MIKEL =
-    dna['MIKEL'] ||
-    'Mikel: Mid-20s male, lean angular build, sharp cheekbones, pale skin, dark eyes that reflect light unnaturally. All-black techwear — fitted tactical jacket, slim cargo pants, matte-black boots. Moves through crowds with inhuman grace. Small silver ring.';
-  const JEFF =
-    dna['JEFF'] ||
-    'Jeff: Early 20s male, big muscular 6\'2", square jaw, short brown hair. SHIRTLESS, tanned athletic build glistening with sweat. Cargo shorts, high-top sneakers, stacked festival wristbands. Huge grin. Water bottle.';
-  const DANTE =
-    dna['DANTE'] ||
-    "Dante: Late 20s male, Mediterranean features, dark curly hair, stubble. Loose white linen shirt over dark pants. Silver chain pendant. Geometric forearm tattoo. Charismatic smile that doesn't reach his eyes.";
-  const MARCUS =
-    dna['MARCUS'] ||
-    'Marcus: Late 20s male, dark skin, shaved head, muscular security build. All black — plain tee, jeans, boots. Ring with symbol. Sits in corners. Watches everything. Positioned near exits.';
+  const ZIX =
+    dna['ZIX'] ||
+    'Zix: Tall slender Voidborn, deep indigo skin with cranial ridges along his temples, large black almond eyes with no whites, a formal expeditionary sash across a scuffed dark-gray uniform jacket. Theatrical body language, always mid-speech.';
+  const MORA =
+    dna['MORA'] ||
+    "Mora: Compact wiry Voidborn engineer, moss-green skin, short braided crest feathers, four-fingered scarred hands, grease-streaked jumpsuit with cross-body tool harness. Expression permanently set to 'I already told you.'";
+  const PEBB =
+    dna['PEBB'] ||
+    'Pebb: Small rotund alien about three feet tall, pastel-lavender fur, huge round expressive eyes, tiny bioluminescent fangs, oversized independently-flicking ears. Scavenged bandolier stuffed with Earth snacks.';
+  const DRAEL =
+    dna['DRAEL'] ||
+    'Drael: Tall broad-shouldered Voidborn, iridescent bronze skin with metallic sheen, jet-black hair perfectly falling into faintly glowing gold eyes, partially unzipped black flight jacket with chrome piping, confident half-smile.';
+  const NUNI =
+    dna['NUNI'] ||
+    "Nuni: Slim nervous Voidborn scholar, pale blue-silver skin, wide amber eyes, two long delicate antennae drooping forward, layered scholar's robe clutching a cracked alien tablet. Earnest and anxious.";
 
-  // ── Location DNA (pulled from wiki) ──
-  const NOS =
-    dna['NOS_EVENT_CENTER'] ||
-    'NOS Event Center San Bernardino: Massive indoor/outdoor rave venue. Industrial building with lasers, outdoor stages with LED towers. Tens of thousands of people. Fog machines, desert dust, bass you feel in your organs.';
-  const CATHEDRAL =
-    dna['MAIN_STAGE___THE_CATHEDRAL'] ||
-    'Main Stage "The Cathedral": Indoor main stage. 40-foot speaker wall, LED fractal panels, laser grid through thick fog. 10,000+ packed dense. The bass is physical. A cathedral of sound.';
-  const HOTEL =
-    dna['THE_HOTEL_ROOM'] ||
-    'Hotel Room: Cheap hotel near NOS. Two queen beds, thin curtains, bedside lamp. Bluetooth speaker, water bottles, vape pens. Afterparty decompression that turns sinister.';
-  const TRUCK =
-    dna['JEFF_S_TRUCK'] ||
-    "Jeff's Truck: Lifted white Toyota Tacoma. Gym bag in back, aux cord. Safety. The ride home. Dashboard glow the only light.";
+  const HIKER =
+    dna['THE_HIKER'] ||
+    'The Hiker: Mid-forties man, weathered face with graying stubble, olive-green flannel over a thermal, sturdy hiking pants, broken-in boots. Headlamp over a dark beanie. Politely concerned expression.';
+  const CLERK =
+    dna['THE_CONVENIENCE_STORE_CLERK'] ||
+    'The Clerk: Early thirties, tired eyes with slight bags, two-day stubble, faded band t-shirt under a cheap store-branded vest. Leaning on the counter, one earbud in, phone in hand.';
+  const TEENS =
+    dna['THE_METEOR_HUNTERS'] ||
+    'Meteor Hunters: Two teenage boys — one lanky in an oversized hoodie and backwards cap with a selfie-mode phone, one heavier in a zip hoodie and basketball shorts with a backpack and energy drink. Both mid-panic.';
 
-  // ── AAA Cinematic World Prompt ──
+  // ── Location DNA ──
+  const RAVINE =
+    dna['THE_RAVINE'] ||
+    'The Ravine: Steep wooded California ravine at night, broken pines on a scarred slope, smoking junky alien ship at the bottom.';
+  const STRIP_MALL =
+    dna['THE_STRIP_MALL'] ||
+    'The Strip Mall: Late-night Southern California strip mall — neon signs for TACO BELL, LIQUOR, NAILS, SMOKE SHOP, COIN LAUNDRY. Oil puddle reflections, palm trees at the edge.';
+  const STORE =
+    dna['THE_24_HOUR_CONVENIENCE_STORE'] ||
+    'The 24-Hour Convenience Store: Fluorescent-lit interior, rows of chips and candy and magazines, humming refrigerators, a roller grill with hot dogs, a counter with a tired clerk and a monitor wall of security feeds.';
+  const CARWASH =
+    dna['THE_ABANDONED_CAR_WASH'] ||
+    'The Abandoned Car Wash: Concrete drive-thru tunnel at night, peeling paint, seized rusted brushes drooping, graffiti, puddles with moonlight, open bay looking out onto a dark industrial lot.';
+  const LOOKOUT =
+    dna['THE_HILLTOP_LOOKOUT'] ||
+    'The Hilltop Lookout: Bald hilltop at pre-dawn over a sleeping California suburb — tract homes, palm trees, fast-food signs, freeway headlights, observatory dome on a far hill catching first blue-gold light.';
+  const STARLING =
+    dna['THE_STARLING'] ||
+    'The Starling: Junky beloved Voidborn explorer hull, oxidized-copper wedge shape with mismatched patch plates, bolted-on tool pods, flickering running lights, a single stencilled alien glyph near the open hatch.';
+
+  // ── AAA Cinematic World Prompt — tuned for Pixar-style 3D animated comedy ──
   const WORLD = [
-    'Shot on ARRI Alexa 65 with Cooke anamorphic lenses.',
-    'Present-day Southern California. Psychedelic sci-fi thriller meets rave culture.',
-    'Color graded: neon magenta, ultraviolet, cyan laser light against deep black.',
-    'Indoor rave: fog-diffused lasers, LED fractal walls, silhouette crowds, bass as visual vibration.',
-    'Outdoor: desert night air, competing stage lights, concrete lots, purple-black sky.',
-    'Hotel: warm yellow lamp vs cold parking lot light through thin curtains.',
-    'Psychedelic distortion: colors breathing, geometry warping, time stretching under psilocybin.',
-    'Shallow depth of field, anamorphic bokeh, subtle film grain, motivated practical lighting.',
-    'Gaspar Noé immersion, Villeneuve scale, A24 intimacy. Cinematic 2.39:1 widescreen.',
-    'Photorealistic. No text, no watermarks.',
+    'Pixar-quality 3D animated feature film style.',
+    'Expressive character proportions, rich tactile materials, cinematic lighting.',
+    'Present-day Southern California at night: palm trees, tract homes, neon strip malls, freeway headlights, an observatory dome on a distant hill.',
+    'Color: warm neon magenta/amber against cool ultraviolet/night-cyan; deep suburban blacks; soft sodium-orange streetlight glow.',
+    'Character-focused animated comedy with moments of cosmic wonder. Specific, readable body language over abstract chaos.',
+    'Cinematic 2.39:1 widescreen composition. Shallow depth of field where appropriate.',
+    'No text, no subtitles, no watermarks, no logos.',
   ].join(' ');
 
   return [
     // ═══════════════════════════════════════════════════════════════════
-    // ACT 1 — THE ARRIVAL (S01–S12)
-    // Getting to the rave, entering NOS, the energy, the crew
+    // COLD OPEN (S01–S04) — Meteor field, the smack, and Earth fills the window
     // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S01',
-      title: "Highway — Jeff's Truck",
-      plot: 'EXT. HIGHWAY 215 — NIGHT. A lifted white Tacoma blasts down the freeway toward San Bernardino. Inside: Jeff driving shirtless and hyped, Mikel in the back seat silent and still, Eric in the passenger seat watching the desert pass. Bass from the truck stereo vibrates the mirrors.',
-      prompt: `${WORLD} ${TRUCK} A lifted white Toyota Tacoma racing down a desert freeway at night. Through the windshield, the glow of San Bernardino in the distance. Inside: a big shirtless muscular guy driving and grinning, a slim figure in black hoodie in passenger seat looking out the window pensively, a lean pale figure in all-black in the back seat perfectly still. The truck stereo bass makes the side mirrors vibrate. Desert highway, night sky, anticipation energy. Tracking shot alongside the truck.`,
+      title: 'Meteor Field — The Starling Sputters',
+      plot: 'EXT. SPACE — NIGHT. The Starling sputters through a meteor field. Warning lights flash. The ship is held together with tape, wires, and hope.',
+      prompt: `${WORLD} ${STARLING} The junky oxidized-copper Voidborn explorer-class hull tumbling through a dense meteor field in deep space, warning running lights flashing across patch-plated panels, chunks of rock and ice streaming past, a bright blue-green planet growing large in the far distance. Tracking shot alongside the ship, debris whipping the frame, tension and comedy combined. Wide establishing space shot.`,
     },
     {
       id: 'S02',
-      title: 'Parking Lot — Arrival',
-      plot: 'EXT. NOS EVENT CENTER PARKING LOT — NIGHT. The truck pulls into a sea of cars. Bass from inside the venue hits them before they even open the doors. Colored light spills into the sky. Jeff is already losing his shirt. Eric looks up at the venue — nervous, excited.',
-      prompt: `${WORLD} ${NOS} A massive parking lot outside the NOS Event Center at night. Hundreds of cars, people walking toward the glowing entrance. The industrial building radiates colored light — magenta, cyan, ultraviolet — through open bay doors. Laser beams shoot into the purple-black sky. A lifted white Tacoma parks among the cars. Three guys climb out — one big and shirtless already pumped, one slim in a black hoodie looking up nervously at the venue, one in all-black scanning the crowd like a predator. Festival energy building.`,
+      title: 'Cockpit — Zix Mid-Speech',
+      plot: 'INT. STARLING COCKPIT — NIGHT. Zix grips the controls with theatrical intensity, mid-speech about Voidborn resolve. Mora braces. Pebb, tiny and wide-eyed, is strapped in. Drael lounges confidently. Nuni clutches a cracked tablet.',
+      prompt: `${WORLD} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Cramped alien cockpit bathed in blinking amber warning light. Zix at the center console mid-speech, one arm raised dramatically, indigo skin catching red warning pulses. Mora in the engineer's seat braced hard against a bulkhead, two charred tools in her scarred four-fingered hands. Pebb strapped to a small jump-seat, oversized ears flicking, huge eyes terrified. Drael leaning back in the co-pilot seat, hair inexplicably perfect. Nuni hugging a bent tablet against her chest like a shield. Ensemble cockpit wide shot.`,
     },
     {
       id: 'S03',
-      title: 'The Entrance — Sensory Wall',
-      plot: "INT. NOS EVENT CENTER ENTRANCE — NIGHT. They push through the entrance and the sound hits them like a physical wall. Bass so loud Eric's vision pulses. Fog machines, laser grids, the smell of sweat and smoke. Jeff whoops. Mikel is already moving through the crowd like water. Eric follows, overwhelmed.",
-      prompt: `${WORLD} ${NOS} POV pushing through the entrance of a massive indoor rave venue. The sensory assault: bass so powerful the camera vibrates, fog machines creating thick atmosphere, laser beams — green, magenta, white — cutting geometric patterns overhead. Silhouettes of thousands of bodies moving. The back of a slim young man in a black hoodie as he enters, flanked by a huge shirtless figure on one side and a lean all-black figure already dissolving into the crowd on the other. The moment normalcy ends. Immersive, overwhelming, entering another world.`,
+      title: 'The Smack — Toilet Flies Past',
+      plot: 'A meteor SMACKS the hull. The ship lurches. A metal toilet flies past. Pebb: "I am panicking in the face of that one specifically!"',
+      prompt: `${WORLD} ${ZIX} ${PEBB} Inside the alien cockpit, violent impact shock — sparks raining from consoles, crew thrown sideways against harnesses. Mid-frame, absurdly, a gleaming chrome alien toilet airborne and tumbling past, trailing droplets. Pebb tiny and lavender in foreground mid-scream, bioluminescent fangs flashing, oversized ears blown back. Zix's dignified speech broken mid-word by pure terror. Comedic disaster shot, rich motion blur, warm amber sparks against indigo shadows.`,
     },
     {
       id: 'S04',
-      title: 'The Crew Moving Through',
-      plot: 'INT. NOS — NIGHT. The three friends push through the crowd toward the main stage. Jeff parts the crowd like a human snowplow. Mikel appears and disappears, always a step ahead. Eric is jostled, catching glimpses of faces, lights, smoke.',
-      prompt: `${WORLD} ${ERIC} ${JEFF} ${MIKEL} Three friends moving through a packed rave crowd. The big shirtless guy physically parts the crowd, grinning and high-fiving strangers. The lean figure in black techwear weaves between bodies without touching anyone — inhuman fluidity. The slim guy in the black hoodie is caught in the flow, bumped by shoulders, catching strobe-lit glimpses of faces and fog. Tracking shot following them through the sea of bodies. Chaotic energy, friendship in motion.`,
+      title: 'Earth Fills the Window',
+      plot: 'A giant BLUE PLANET fills the window. Zix: "Brace for emergency descent!" Pebb: "Can we die later? I just ate glow fruit!"',
+      prompt: `${WORLD} ${ZIX} ${PEBB} Inside the alien cockpit, the front viewport now completely filled by the curve of Earth rushing up — atmospheric glow bloom on the canopy glass, whispers of clouds. Zix in center frame gripping the yoke, indigo jaw set, one hand raised for emphasis. In the foreground, Pebb in his harness clutching a half-eaten translucent pink-gold glow fruit that pulses softly with his heartbeat. Pull in tight on Pebb's panicked face reflected in the glow fruit's skin. Comedic dread.`,
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ACT 1 — RAVINE (S05–S10) — Crash, roll call, the Hiker
+    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S05',
-      title: 'The Cathedral — Approach',
-      plot: 'INT. MAIN STAGE — NIGHT. They reach the main stage. The speaker wall is 40 feet wide, 20 feet tall. LED fractals pulse behind the DJ booth. The crowd is a single breathing organism. Even Mikel pauses to take it in. Eric feels the bass in his teeth.',
-      prompt: `${WORLD} ${CATHEDRAL} Wide shot approaching the indoor main stage. A MASSIVE wall of speakers — 40 feet wide, 20 feet tall — dominates the far end. Behind it, LED panels display fractal patterns synced to the beat. Laser grids cut through fog so thick the crowd becomes silhouettes with raised arms. The scale is cathedral-like — the vaulted industrial ceiling disappears into fog and light. Three figures arrive at the edge of the crowd and stop, taking in the enormity. The bass is visible as vibration in the fog. Awe. Scale. Power.`,
+      title: 'Crash Through the Trees',
+      plot: 'EXT. WOODS OUTSIDE A CALIFORNIA SUBURB — NIGHT. The ship crashes through pine and oak, rips a scar down a hill, and slams into a ravine.',
+      prompt: `${WORLD} ${RAVINE} ${STARLING} The junky oxidized-copper Voidborn ship tumbling through a moonlit California pine forest, trunks snapping, branches exploding into splinters, a deep earth-scar ripping down a steep ravine slope behind it. Smoke and sparks trailing. Failing shield flickering pale green-blue. Cinematic wide action crash sequence, dynamic motion blur, dust and debris catching the moonlight.`,
     },
     {
       id: 'S06',
-      title: 'Jeff in the Pit',
-      plot: "INT. MAIN STAGE — NIGHT. Jeff charges into the dense crowd, pulling Eric by the wrist. Mikel follows. They're deep in the mosh pit now — shoulder to shoulder with strangers, the bass obliterating thought. Jeff is in heaven. Mikel watches the crowd. Eric starts to feel the mushrooms kicking in — edges softening, colors deepening.",
-      prompt: `${WORLD} ${JEFF} ${ERIC} Deep inside the rave mosh pit. A big shirtless guy pulls a smaller friend by the wrist into the densest part of the crowd, both grinning. Bodies packed tight, arms raised, everyone moving to the drop. The smaller guy's expression starts to shift — his pupils dilating, the colors around him becoming more vivid, more liquid. The mushrooms beginning. Laser light reflected in dilating eyes. Close immersive shot from within the pit, sweat and light and bodies.`,
+      title: 'Hatch Falls Open — Roll Call',
+      plot: 'Silence. The hatch falls open. Zix crawls out, singed. Mora emerges carrying two scorched components. Pebb rolls out covered in potato chips somehow. Drael climbs out with perfect hair. Nuni steps out holding a bent tablet.',
+      prompt: `${WORLD} ${RAVINE} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} The crashed alien ship tilted at the bottom of a moonlit wooded ravine, thin smoke rising, hatch fallen open. Zix crawling out singed but dignified, Mora stepping out holding two charred machine components like they personally offended her, Pebb rolling out comically covered in American-brand potato chip bags, Drael climbing down the hull with hair impossibly perfect, Nuni last, hugging a bent alien tablet to her chest. Ensemble hero line-up shot. Cinematic moonlight, warm smoke backlighting.`,
     },
     {
       id: 'S07',
-      title: "Mushrooms Hit — Eric's Vision Shifts",
-      plot: "INT. MAIN STAGE — NIGHT. The psilocybin peaks. Eric's perception transforms. The fog becomes architecture. The bass has geometry — he can see sound waves rippling through the air. Colors breathe and pulse with the beat. The crowd's faces become beautiful and alien. He's not at a rave anymore. He's inside the music.",
-      prompt: `${WORLD} ${ERIC} Psychedelic POV shift — the rave transforms. Fog becomes translucent architecture, sound waves become visible geometric ripples in the air, colors breathe and pulse with the beat — magenta bleeding into cyan, ultraviolet halos around every light source. The crowd's faces are beautiful and strange, lit from impossible angles. The speaker wall is no longer a wall — it's a living organism of light and frequency. The world through psilocybin-enhanced eyes. Gaspar Noé-style POV, reality dissolving into synesthetic wonder. Psychedelic realism, not trippy cartoon — grounded but transcendent.`,
+      title: 'First Look at Earth',
+      plot: 'They stand together and look up at the dark treeline. A dog barks somewhere distant. The moon catches their faces.',
+      prompt: `${WORLD} ${RAVINE} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Five Voidborn standing close together at the bottom of a moonlit ravine, all looking up and out toward a dark pine treeline at the ridge. Moonlight catching their varied alien skin tones — indigo, moss-green, pastel-lavender, iridescent bronze, pale blue-silver. Behind them, the smoking copper wreck of their ship, hatch still hanging open. Quiet beat. Awed, exhausted, alive. Wide hero ensemble shot with strong moonlight rim.`,
     },
     {
       id: 'S08',
-      title: 'Mikel Notices Eric',
-      plot: "INT. MAIN STAGE — NIGHT. Mikel turns to look at Eric and freezes. He can sense something changing in Eric — not the mushrooms, something underneath. A frequency shift. Mikel's dark eyes narrow. He's lived centuries and he recognizes when something ancient moves through a human. Something is waking up inside Eric.",
-      prompt: `${WORLD} ${MIKEL} Close-up of Mikel in the rave crowd. His pale sharp face is lit by alternating magenta and cyan laser light. His dark eyes lock onto something off-camera (Eric) and his expression changes — the easy confidence drops, replaced by ancient recognition and a flash of fear. His pupils contract when everyone else's would dilate. He senses something he hasn't sensed in centuries. The crowd moves around him but he is perfectly still. Predator becomes prey for one heartbeat. Tight portrait shot, alternating colored light, the vampire sensing the impossible.`,
+      title: 'The Hiker Appears',
+      plot: 'A branch snaps. A HUMAN HIKER appears at the top of the ravine with a flashlight, squinting down at them. "Hello? You guys okay down there?"',
+      prompt: `${WORLD} ${RAVINE} ${HIKER} Low-angle shot from the ravine floor looking up. At the top of the ridge, silhouetted against the moonlit sky, a kindly mid-forties man in olive flannel over a thermal, sturdy hiking pants, headlamp over a beanie — politely shining a flashlight down the slope. A dog leash trailing from his other hand. The beam lands on five shocked alien faces in the foreground. Comedic first-contact composition.`,
     },
-
-    // ═══════════════════════════════════════════════════════════════════
-    // ACT 2 — THE SEPARATION & THE AWAKENING (S09–S25)
-    // Lost in the crowd, alone, the power activates, The Frequency speaks
-    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S09',
-      title: 'The Drop — Crowd Surge',
-      plot: "INT. MAIN STAGE — NIGHT. A MASSIVE bass drop hits. The crowd surges like a tidal wave. Eric's phone falls from his pocket. Stomped instantly. The crowd pushes — Eric reaches for Mikel — their fingers miss by inches.",
-      prompt: `${WORLD} The moment of the bass drop — the crowd SURGES like a tidal wave. Bodies crash into each other. A phone screen cracks under stomping feet. Two hands reaching across the chaos — slim fingers in a black hoodie sleeve and pale sharp fingers in a black tactical jacket — inches apart, missing. The crowd flows between them like a river separating two banks. Strobe lights freeze the moment. The separation. Dramatic slow-motion feeling, strobe-frozen chaos, the phone cracking, fingers missing. Emotional action.`,
+      title: 'Camouflage — Botched Disguises',
+      plot: 'Mora slams a camouflage field generator. It fizzles weakly. The crew warps into five botched human approximations — purple-lipped tax accountant, six-eyebrowed woman, Victorian child, absurdly handsome guy, human drawn from memory.',
+      prompt: `${WORLD} ${RAVINE} ${MORA} Close on Mora's scarred four-fingered hand slamming a glowing violet hand-sized Voidborn device onto her palm. Violet shimmer field washes outward. Pull back to reveal the five aliens mid-transformation: one fizzles into a purple-lipped tax accountant in a cheap beige blazer, one into a woman with six neatly-stacked eyebrows, one into a sickly Victorian-era child in an oversized thrifted coat, one into an absurdly dangerously-handsome young man with faintly glowing gold eyes still showing through, one into a human rendered from pure secondhand description — proportions slightly wrong, smile slightly off. Comic-horror ensemble transformation gag.`,
     },
     {
       id: 'S10',
-      title: 'Separated — Eric Alone',
-      plot: "INT. MAIN STAGE — NIGHT. Eric is suddenly alone. Jeff's voice is swallowed by bass. Mikel has vanished. 10,000 strangers surround him. Phone dead under someone's foot. Mushrooms intensifying. He's trapped in a sea of bodies with no anchor.",
-      prompt: `${WORLD} ${ERIC} A young man in a black hoodie stands still in a surging rave crowd — the only unmoving figure in a sea of motion. His face shows the moment of realization: he is alone. His hand reaches instinctively for his pocket — no phone. He looks left, right — strangers' faces strobing in laser light. No friends. No phone. Mushrooms intensifying. Dilated pupils reflecting fractured light. The isolation of one person in ten thousand. Wide shot of Eric motionless in the swirling crowd, lit from above by lasers.`,
+      title: 'Hiker Leaves — Camouflage Flickers Off',
+      plot: 'Hiker squints. "Uh... you folks in costume?" Zix: "Yes. Human costume. We are humans." The hiker shrugs, waves, wanders off. The camouflage flickers off with a violet fizzle.',
+      prompt: `${WORLD} ${RAVINE} ${HIKER} The hiker at the top of a ravine shining a flashlight on five comically mismatched "humans" below, his politely confused expression clearly landing on 'none of my business'. He shrugs, gives a short wave, and walks off into the trees with his dog. Below, the violet camouflage field collapses with a soft electrical fizzle and the five aliens snap back to their true forms, exchanging enormously relieved glances. Two-beat comic moment, moonlit wide.`,
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ACT 1 — STRIP MALL (S11–S13) — Approach + humans
+    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S11',
-      title: 'Jeff Searching',
-      plot: "INT/EXT. NOS — NIGHT. Jeff climbs on top of a concrete barrier, cupping his hands, bellowing ERIC over the bass. It's useless and endearing. Mikel appears beside him, says something in his ear. Mikel looks concerned in a way Jeff has never seen.",
-      prompt: `${WORLD} ${JEFF} ${MIKEL} A big shirtless muscular guy stands on top of a concrete barrier inside the venue, cupping his hands around his mouth, yelling. The bass drowns him out completely. Below, the lean figure in all-black appears beside the barrier, looking up at him with an expression of genuine concern — unusual, almost frightened. The crowd flows around the barrier like water around a rock. Multiple colored stage lights create overlapping shadows. The search for a lost friend.`,
+      title: 'Thrifted Clothes — Approaching the Strip Mall',
+      plot: 'EXT. SUBURBAN EDGE — LATER. The crew approaches a late-night strip mall in stolen mismatched donation-bin clothes. Neon glows ahead like a mothership.',
+      prompt: `${WORLD} ${STRIP_MALL} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Five small alien figures walking in silhouette across an empty asphalt lot toward a glowing Southern California strip mall at 1 AM. Their camouflage is down — they are in their true forms, wearing ridiculously mismatched donation-bin human clothes (oversized coat, grandma cardigan, neon tracksuit, flight jacket, floral muumuu). Palm trees at the lot edge, moths in the sign halos. Cinematic hero walk, warm neon pulling them in.`,
     },
     {
       id: 'S12',
-      title: 'Eric Drifts Deeper',
-      plot: "INT. MAIN STAGE — NIGHT. Eric gives up trying to find the exit and drifts deeper into the crowd toward the speaker wall. The mushrooms are at full peak now. Every bass hit is a color. Every laser is a sound. He's moving toward the music because it's the only thing that makes sense.",
-      prompt: `${WORLD} ${ERIC} ${CATHEDRAL} Eric moving through the dense crowd toward the massive speaker wall, pulled by the music. His face is transformed — eyes wide, pupils massive, lips slightly parted. Under psilocybin, the world has become synesthetic: bass pulses are visible as concentric waves of deep red emanating from the speakers, lasers hum with audible resonance, the fog has texture and geometry. He reaches toward the speaker wall like it's magnetic. The crowd parts slightly around him without knowing why. Walking toward sound as destiny. POV following him through psychedelic space.`,
+      title: 'The Neon Sign',
+      plot: 'Low-angle: the strip mall sign looms above them — TACO BELL, LIQUOR, NAILS, SMOKE SHOP, COIN LAUNDRY.',
+      prompt: `${WORLD} ${STRIP_MALL} Low-angle hero shot of a Southern California strip mall pylon sign at 1 AM glowing with individual neon tenant boards: TACO BELL, LIQUOR, NAILS, SMOKE SHOP, COIN LAUNDRY. Palm tree silhouettes beside it. Gnats halo the bulbs. In the foreground at the bottom of the frame, five small alien figures staring up in awe, their tiny upturned faces lit by the colored neon — indigo, moss-green, lavender, bronze, silver-blue. Cinematic night.`,
     },
     {
       id: 'S13',
-      title: 'The First Sync — Heartbeat and Bass',
-      plot: "INT. MAIN STAGE — NIGHT. Standing near the front, drenched in bass, Eric notices something. The bass is hitting in time with his heartbeat. Not approximately — exactly. When his pulse quickens, the BPM rises. He thinks he's imagining it.",
-      prompt: `${WORLD} ${ERIC} Extreme close-up of Eric's face near the front of the crowd, bathed in speaker vibration. His chest pounds — and the bass hits at exactly the same moment. A visual effect: visible heartbeat pulse rippling outward from his chest in sync with the bass wave from the speakers. His eyes widen with confusion. Is the music following him? Close-up of his face, then his chest, then the speakers — all pulsing in perfect sync. The first clue. Intimate macro shots intercut with the massive speaker wall. The connection forming.`,
+      title: 'Drael Discovers Earth',
+      plot: 'A group of young humans laughs outside the taco place. A woman laughs loudly. Drael places a hand over his heart: "Zix. I understand Earth now."',
+      prompt: `${WORLD} ${STRIP_MALL} ${DRAEL} A group of four young humans in their twenties standing outside a Taco Bell at night, laughing, warm restaurant light washing over them. Across the parking lot, Drael — in his true form, wearing an unzipped oversized hoodie over his flight jacket — watches them like a man having a religious experience, hand pressed to his chest, faintly glowing gold eyes soft with awe. Beside him, Zix (indigo, scandalized) is already opening his mouth to object. Character-focused two-shot.`,
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ACT 2 — CONVENIENCE STORE (S14–S20)
+    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S14',
-      title: 'Fear Makes the Bass Drop',
-      plot: "INT. MAIN STAGE — NIGHT. A spike of anxiety hits Eric — lost, alone, tripping. The moment his fear surges, the bass DROPS. Hard. The whole crowd reacts — thousands of arms thrown up. The DJ didn't trigger that. Eric did.",
-      prompt: `${WORLD} ${ERIC} ${CATHEDRAL} The moment of the drop — but it comes from Eric, not the DJ. Eric's face contorts with a wave of anxiety and at that exact moment the bass DROPS — the speaker wall unleashes a shockwave visible in the fog, the crowd explodes with thousands of arms thrown upward, the laser grid flares white. Eric stumbles backward from the force of what he just caused. The crowd is ecstatic. The DJ behind the LED wall looks confused — that wasn't in the set. The accidental god of the drop. Wide shot of the crowd erupting with Eric at the epicenter, shockwave visible in fog.`,
+      title: 'Entering the Convenience Store',
+      plot: 'INT. 24-HOUR CONVENIENCE STORE — NIGHT. The group enters awkwardly. Coolers hum. Fluorescent lights flatten everything. A tired CLERK at the counter looks up, one earbud in.',
+      prompt: `${WORLD} ${STORE} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} ${CLERK} Interior of a brightly-lit 24-hour convenience store at 1 AM, fluorescent ceiling flattening everything, rows of chips, candy, and magazines visible in the back. Five disguised alien figures just stepping through the glass door in a cautious cluster, wide-eyed. At the counter, a tired thirty-something clerk with an earbud in, leaning on one elbow, raising a single skeptical eyebrow. Sensory-overload establishing shot.`,
     },
     {
       id: 'S15',
-      title: 'Wonder — The Melody Lifts',
-      plot: "INT. MAIN STAGE — NIGHT. Eric feels a moment of pure wonder — this is real, this is him — and the melody responds. It LIFTS. Beautiful, soaring, ethereal. The crowd sways. Someone near Eric starts crying from the beauty of it. Eric realizes he's composing the music with his feelings.",
-      prompt: `${WORLD} ${ERIC} A transcendent moment. Eric's face shifts from fear to wonder, and the music responds — the melody becomes achingly beautiful, soaring above the bass. The laser grid shifts from aggressive cuts to flowing aurora-like waves of color — soft gold, warm pink, ethereal blue. The crowd sways in unison, arms raised gently instead of violently. A girl near Eric has tears streaming down her face from the beauty. Eric's expression: awe at his own power. He is the composer. His feelings are the instrument. Ethereal, transcendent, overwhelming beauty. The crowd as orchestra.`,
+      title: 'Nuni at the Magazine Rack',
+      plot: 'Nuni studies celebrity magazines like sacred texts. "Humans worship high-status image-makers. Fascinating."',
+      prompt: `${WORLD} ${NUNI} Medium close-up: Nuni (pale blue-silver, antennae drooping, scholar's robe peeking under an oversized thrifted cardigan) standing at a convenience-store magazine rack, one four-fingered hand tracing the glossy cover of a gossip magazine showing a movie star. Her amber eyes wide with anthropological reverence. A small alien tablet held discreetly at her side, stylus poised. Bright store light on her face. Warm character study.`,
     },
     {
       id: 'S16',
-      title: 'Full Control — Eric Conducts',
-      plot: 'INT. MAIN STAGE — NIGHT. Eric raises his hand and the crowd raises theirs. He breathes out and the fog machines pulse. He closes his eyes and the music builds — layer by layer, emotion by emotion. For sixty seconds, ten thousand people are extensions of his nervous system.',
-      prompt: `${WORLD} ${ERIC} Eric stands in the crowd with his hand raised, and ten thousand hands rise with his. He is the conductor. Visible concentric sound waves emanate from his body, colored by emotion — gold for wonder, deep red for power. The fog machines pulse with his breathing. The laser grid moves with his gaze. The LED panels behind the DJ display patterns that mirror his heartbeat. His face shows transcendent focus — eyes closed, head tilted slightly back, total surrender to the connection. The crowd is his instrument, the venue is his body, the music is his voice. The most powerful 10 seconds of footage in the episode. Psychedelic transcendence.`,
+      title: 'Pebb Discovers Chips',
+      plot: "Pebb discovers the chip aisle. 'Why are there forty flavors of the same triangle?' Mora: 'Because this planet is sick.'",
+      prompt: `${WORLD} ${PEBB} ${MORA} Low-angle: Pebb (tiny, lavender, bandoliered) standing in front of a towering convenience-store chip wall, arms spread wide in open-mouthed religious awe at the forty flavors. Tiny fangs faintly glowing with excitement. Mora (moss-green, permanently unimpressed) stands behind him with arms crossed, delivering a dry look at camera. Cinematic comic reverence, two-shot with Pebb in hero pose.`,
     },
     {
       id: 'S17',
-      title: 'The DJ Notices',
-      plot: "INT. MAIN STAGE — BEHIND DJ BOOTH. The DJ stares at their equipment. The levels are moving on their own. The set is playing itself. They lift their hands off the controls and the music doesn't stop. Someone — or something — else is driving.",
-      prompt: `${WORLD} Behind the DJ booth. A DJ stands at their equipment looking confused and alarmed. The mixing board's faders move by themselves. The waveform display shows patterns that aren't in any loaded track. The DJ lifts both hands away from the controls — the music continues without them, building and building. LED panels behind them display fractal patterns no one programmed. Through the booth's window, the crowd is in perfect unison. The DJ is no longer in control. Tech-focused shot of autonomous equipment, confused DJ, the music playing itself.`,
+      title: 'Zix Questions the Clerk',
+      plot: 'Zix approaches the counter. "We seek... rare machine components." Clerk (not looking up): "AutoZone is closed."',
+      prompt: `${WORLD} ${STORE} ${ZIX} ${CLERK} Medium shot at the store counter. Zix, indigo and formal, leaning forward with his hands clasped diplomatically. The clerk, earbud in, does not look up from his phone, bored expression, half-eaten hot dog in a paper tray beside him. A small TV behind the counter plays local news on mute. Lotto tickets and cigarette signs fill the backdrop. Comedic deadpan two-shot.`,
     },
     {
       id: 'S18',
-      title: 'The Void Opens',
-      plot: 'INT. MAIN STAGE — NIGHT. Something changes. The LED panels behind the speakers go dark — not off, DARK. A void. A blackness deeper than black that seems to pull light into it. The fog near the speakers stops moving, frozen. The crowd closest to the front freezes for one impossible frame.',
-      prompt: `${WORLD} ${CATHEDRAL} Something wrong happens. The LED panels behind the massive speaker wall go DARK — not powered off but actively void, a blackness that absorbs light. The fog near the speakers freezes mid-swirl, suspended in air. The front rows of the crowd freeze in a single impossible frame — arms raised, mouths open, time stopped for just them. The rest of the crowd behind doesn't notice. The void behind the speakers is not empty — it contains awareness. Something vast and patient is forming behind the wall of sound. Cosmic horror meets rave. The void in the speakers.`,
+      title: 'Local News — Fireball Footage',
+      plot: 'The store TV changes to local news: shaky cell-phone footage of a fireball over Santa Mira County. The crew freezes.',
+      prompt: `${WORLD} ${STORE} Close on the small store TV above the counter. On screen: shaky vertical cell-phone footage of a fireball streaking over a dark California hillside, ANCHOR-style overlay graphics reading LOCAL NEWS. Subtle ghost reflection on the glass of five stunned alien faces in the store aisle behind, caught mid-freeze. Ominous comedic beat. Cinematic screen-within-screen composition.`,
     },
     {
       id: 'S19',
-      title: 'The Frequency Speaks',
-      plot: 'INT. MAIN STAGE — NIGHT. From inside the sound — not through his ears but through his chest, through his bones — a voice. Deep. Ancient. Patient. Not words in the air but words in the bass itself: "I have been waiting for you to return." The music doesn\'t stop. It restructures around the voice like the universe making room.',
-      prompt: `${WORLD} ${ERIC} The most important shot. Eric stands in the frozen-front-row crowd, face lit by the void behind the speakers. His expression transforms from transcendence to primal terror. His chest vibrates — not from the bass but from something speaking THROUGH the bass. The air around him distorts — sound waves become visible dark ripples. The void behind the speakers seems to lean toward him. The music hasn't stopped — it has restructured around a presence, frequencies parting like curtains. Eric is hearing something no human has heard in millennia. Cosmic contact through sub-bass. The moment everything changes. Terror, awe, ancient recognition.`,
+      title: 'Clerk Realizes',
+      plot: "The clerk's security monitor shows the crew in their TRUE forms. He looks at the monitor. He looks at them. Slowly. 'Why do you guys look like that video?'",
+      prompt: `${WORLD} ${STORE} ${CLERK} Close on the clerk behind the counter, his tired face slowly assembling a realization he did not sign up for. Behind him, the security monitor wall flickers — briefly showing the five aliens in the store aisle in their TRUE forms (indigo, green, lavender, bronze, silver-blue). His earbud slips out of his ear. He turns his head, slowly, toward the aisle. Behind him, the TV news still plays the fireball footage. Pure comedic dawning horror.`,
     },
     {
       id: 'S20',
-      title: "Eric's Face — Terror",
-      plot: "INT. MAIN STAGE — NIGHT. Close-up on Eric's face as he hears the voice. His transcendent expression shatters into raw animal fear. His mouth opens. His dilated pupils contract for the first time all night. He understands nothing except that he needs to RUN.",
-      prompt: `${WORLD} ${ERIC} Extreme close-up of Eric's face. The progression: transcendent wonder → confusion → recognition of something ancient → pure animal terror. His dilated pupils CONTRACT — the only time all night they've done that. His mouth opens. Sweat runs down his temple. The rave lights on his face shift from warm gold to cold ultraviolet. Behind him, blurred, the void in the speakers pulses. This is the face of a man who just heard God — or something worse. Macro portrait, the full emotional journey in one face, the terror of contact.`,
+      title: 'The Escape',
+      plot: 'Pebb grabs a hot dog and hisses. Mora: "Run." They BOLT. Clerk (off-screen): "YOU DIDN\'T PAY FOR THOSE CHIPS!"',
+      prompt: `${WORLD} ${STRIP_MALL} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Action wide: five alien figures bursting out of the convenience store through the glass door into the strip-mall parking lot at 1 AM, arms full of stolen snacks and random items — one clutching chips and a roller hot dog, one gripping a disposable burner phone, one holding novelty sunglasses, one gripping a bottle of lighter fluid. Through the glass, the clerk mid-shout. Motion blur. Comic-book action energy, palm trees and neon overhead.`,
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ACT 2 — PARKING LOT ESCAPE (S21–S22)
+    // ═══════════════════════════════════════════════════════════════════
     {
       id: 'S21',
-      title: 'Eric Runs — Music Distorts',
-      plot: 'INT. MAIN STAGE — NIGHT. Eric shoves through the crowd, fighting the current. The music DISTORTS behind him — his panic feeding back into the system. Bass becomes grinding. Melody collapses into dissonance. People around him feel it as a bad trip wave spreading outward.',
-      prompt: `${WORLD} ${ERIC} Eric shoving through the crowd, desperate, fighting against the flow of bodies. Behind him, the music is distorting — visible dark waves of dissonance rippling outward from where he was standing. The crowd he passes through flinches, their expressions souring — his panic is contagious through the sound. The laser grid overhead glitches and flickers. The LED panels display corrupted patterns. His fear is breaking the music. He is the source and he can't control it. Chaotic escape through crowd, distortion waves, panicked motion, music breaking.`,
+      title: 'Behind the Dumpster',
+      plot: 'EXT. STRIP MALL — CONTINUOUS. A police cruiser rolls past the lot. The crew ducks behind dumpsters. Blue lights flash across their faces.',
+      prompt: `${WORLD} ${STRIP_MALL} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Five alien figures crouched together behind a row of dumpsters in a strip-mall back lot, five different silhouettes lit by the pulsing blue-and-red of a passing police cruiser's lightbar out of frame. Close-cropped, comedic tension, the tops of their heads and eyes visible above the dumpster lid. Pebb clutching an armload of chip bags like a baby. Cinematic noir beat.`,
     },
     {
       id: 'S22',
-      title: 'The Dark Corridor — Running',
-      plot: 'INT. DARK CORRIDOR — NIGHT. Eric finds the corridor between indoor and outdoor areas. Sprints through it. Red emergency lights stretch into infinity under psilocybin. The walls vibrate with distorted bass from the stage. His footsteps echo wrong. He bursts through the exit doors.',
-      prompt: `${WORLD} A young man in a black hoodie sprinting through a long concrete corridor lit only by red emergency exit signs. Under psilocybin the corridor STRETCHES impossibly long — the red signs repeat into infinity. The concrete walls vibrate with distorted bass from the other side. His footsteps echo in wrong rhythms. His shadow multiplies in the red light. He runs toward exit doors that glow with cool outdoor light at the end. Running from something with no body. Psychedelic horror, stretched perspective, red infinity, vibrating walls, pure flight.`,
-    },
-    {
-      id: 'S23',
-      title: 'Outside — Desert Air',
-      plot: "EXT. NOS OUTDOOR AREA — NIGHT. Eric bursts through the doors into the outdoor area. The cool desert air hits him like cold water. Stars above. Multiple stages in the distance. He's shaking, drenched in sweat, alone. His phone is dead. He doesn't know where his friends are.",
-      prompt: `${WORLD} ${ERIC} Eric bursts through exit doors into the outdoor festival area. The cool desert night air visible as his hot breath condensing. He doubles over, hands on knees, gasping. Stars barely visible through light pollution above. Multiple stages glow in the distance with competing colored lights. He is soaked in sweat, shaking, alone. Behind him through the closing doors, the distorted bass is still audible. The relief and terror of escape. Wide shot of a single shaken figure in the open space between stages, tiny against the festival scale.`,
+      title: 'Loot Inventory',
+      plot: 'Mora inventories the loot. "Chips, lighter fluid, novelty sunglasses, beef jerky... and..." She holds up a cheap disposable phone. "Actually, good."',
+      prompt: `${WORLD} ${MORA} Close on Mora's scarred four-fingered hand spreading the stolen strip-mall loot on the asphalt beside a dumpster: a pile of colorful chip bags, a can of lighter fluid, novelty heart-shaped sunglasses, a plastic wrapped jerky strip, a cheap flip-style disposable burner phone. Her other hand raises the burner phone triumphantly. Her face — moss-green, unimpressed — is finally showing the ghost of a smirk. Overhead-angle product-beat shot with her reaction insert.`,
     },
 
     // ═══════════════════════════════════════════════════════════════════
-    // ACT 3 — THE HOTEL & THE OVERHEARD (S24–S32)
-    // Dante and Marcus, the afterparty, the demon symbols
+    // ACT 2 — CAR WASH + RADIO (S23–S27)
     // ═══════════════════════════════════════════════════════════════════
     {
+      id: 'S23',
+      title: 'Into the Abandoned Car Wash',
+      plot: 'EXT. ABANDONED CAR WASH — LATER THAT NIGHT. The crew hides out in an abandoned car wash near the suburb. Peeling paint, rusted brushes, puddles that never dry.',
+      prompt: `${WORLD} ${CARWASH} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} The five aliens sneaking into the open bay of an abandoned drive-thru car wash at night. Concrete tunnel with seized rusted mechanical brushes drooping from above, peeling paint, graffiti, puddles catching moonlight. Mora leads carrying the burner phone and a chunk of ship hull; the others file in behind, glancing over their shoulders. Cool moonlit-industrial noir palette.`,
+    },
+    {
       id: 'S24',
-      title: 'Dante Approaches',
-      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. Eric is sitting on a curb, head in hands, shaking. A voice: "Hey man, you good?" It\'s Dante — charismatic, late 20s, linen shirt, silver pendant. He\'s friendly, warm, non-threatening. Exactly what Eric needs right now.',
-      prompt: `${WORLD} ${ERIC} ${DANTE} Eric sitting on a concrete curb outside the venue, head in his hands, clearly shaken. A man approaches — late 20s, dark curly hair, white linen shirt, silver chain necklace, easy smile. He crouches beside Eric, offering a water bottle. The gesture is warm, genuine-seeming. Festival lights glow behind them. The contrast between Eric's distress and Dante's calm composure. Two-shot at ground level on the curb, warm human moment against the cold festival night.`,
+      title: 'Mora Builds the Radio',
+      plot: "Mora has the disposable phone dismantled, wired to a ship fragment and a stolen radio. 'If I piggyback local towers, boost with our emergency beacon, and filter out human spam—'",
+      prompt: `${WORLD} ${CARWASH} ${MORA} Close, intimate low-angle shot: Mora kneeling on wet car-wash concrete, the burner phone opened and its back removed, copper wiring and iridescent alien filaments twisting into a dull-metal Voidborn ship hull fragment the size of a small book, cabled into a thrifted handheld radio. A single indicator light at the junction pulses green-blue. Her moss-green face is lit from below by the rig's glow, focused and smirking. Macro detail on her scarred hands.`,
     },
     {
       id: 'S25',
-      title: 'Marcus in the Background',
-      plot: "EXT. NOS OUTDOOR AREA — NIGHT. Behind Dante, a second figure watches from the shadows. Marcus — shaved head, all black, built like security. He stands near an exit. Watching. Eric doesn't notice him yet.",
-      prompt: `${WORLD} ${MARCUS} In the background of the curb scene, a figure stands in shadow near a venue exit. Muscular, shaved head, all black clothing, arms crossed. He watches Dante and Eric with still, assessing eyes. The festival lights don't quite reach him — he exists in the dark between two light sources. His ring catches a glint of distant laser light. The watcher. Background figure shot — sharp focus on Marcus while the foreground curb scene is slightly soft. The threat you don't notice.`,
+      title: 'Radio Crackles Alive',
+      plot: 'The radio bursts alive with static, music, conspiracy podcasts, and nonsense. The crew gathers close, faces lit by the glow.',
+      prompt: `${WORLD} ${CARWASH} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Medium-wide: the five aliens cluster in the middle of the abandoned car wash tunnel around the improvised radio rig on the concrete, faces lit from below by the rig's green-blue glow. The radio is audibly bursting with overlapping human noise — visible as small iconic waveforms and sparks of energy drifting from the speaker: snippets of pop music, late-night talk, static. Expressions range from skeptical (Mora) to delighted (Pebb) to tense (Zix). Moody noir glow.`,
     },
     {
       id: 'S26',
-      title: 'The Invitation',
-      plot: 'EXT. NOS PARKING LOT — NIGHT. Dante walks Eric toward the parking lot, talking easily about the music, the night, asking nothing invasive. "We got a room at the hotel across the street. Chill afterparty. You\'re welcome to decompress." Eric, alone and scared, says yes.',
-      prompt: `${WORLD} ${ERIC} ${DANTE} Dante and Eric walking through the festival parking lot at night. Dante is animated and easy, gesturing toward a hotel visible across the street — a cheap two-story motel with exterior corridor lights. Eric walks beside him, hugging himself in his hoodie, still shaken but grateful for human contact. Marcus follows ten paces behind. The NOS Event Center glows behind them, bass still audible. The walk from one world to another — festival to afterparty, public to private, safe to dangerous. Walking two-shot toward the motel.`,
+      title: 'The Sleeper Voice',
+      plot: "A distorted voice cuts through: 'Do not trust the flea market man. Repeat, do not trust Hector. Meet at the old observatory before dawn. Use no active tech. Humans are watching.'",
+      prompt: `${WORLD} ${CARWASH} Close on the improvised radio rig on the wet concrete, the green-blue indicator light pulsing differently now — sharper, more deliberate. Violet sparks of signal energy arc out of the ship-hull fragment. The air around the speaker is drawn with faint visible sound-wave ripples in a cool violet tone — the voice is Voidborn in origin. In the soft background bokeh, five alien faces lean in, eyes wide. Close-focus on the rig, shallow depth, supernatural undertone.`,
     },
     {
       id: 'S27',
-      title: 'Hotel Room — Arriving',
-      plot: 'INT. HOTEL ROOM — NIGHT. A cheap room. Two queen beds, thin curtains, warm lamp light. A bluetooth speaker plays ambient music. Dante is the perfect host — water, chill vibes. Marcus sits in the corner near the door. Eric sits on the bed edge, coming down, trying to process what happened at the stage.',
-      prompt: `${WORLD} ${HOTEL} ${ERIC} ${DANTE} ${MARCUS} Interior of a cheap hotel room. Warm bedside lamp is the main light. Two queen beds with generic bedspreads. A bluetooth speaker on the nightstand plays soft ambient music. Dante moves around the room comfortably, handing out water bottles, being the host. Eric sits on the edge of a bed, hoodie pulled around him, staring at the floor — clearly processing something heavy. Marcus sits in a chair in the corner near the door, back to the wall, watching. The room feels safe on the surface. Intimate afterparty establishing shot.`,
-    },
-    {
-      id: 'S28',
-      title: 'Eric Zoning Out',
-      plot: 'INT. HOTEL ROOM — NIGHT. Eric is staring at the carpet, mushrooms fading, replaying the voice in his head. "I have been waiting for you to return." The hotel room feels too small. The ambient music from the speaker feels different now — he can sense its structure, its bones. The power hasn\'t fully turned off.',
-      prompt: `${WORLD} ${ERIC} Close-up of Eric sitting on the hotel bed edge, staring at the carpet. His eyes are unfocused — he's somewhere else mentally. The ambient music from the bluetooth speaker is visualized as faint geometric patterns only he can see — residual psychedelic perception. His hands grip the bedspread. Sweat has dried on his temples. The warm lamp light makes the room feel close and confining. A man replaying the most terrifying moment of his life on loop. Intimate portrait of internal crisis, warm light, confined space.`,
-    },
-    {
-      id: 'S29',
-      title: 'Dante and Marcus — The Conversation',
-      plot: 'INT. HOTEL ROOM — NIGHT. Eric is zoned out on the bed. Near the bathroom, Dante leans against the doorframe talking to Marcus in low voices. They think Eric is too gone to hear. Dante: "Did you see the new ones near the south stage? They\'re not even trying to hide it anymore."',
-      prompt: `${WORLD} ${DANTE} ${MARCUS} Near the bathroom doorframe of the hotel room, two men talk in low voices. Dante leans casually against the frame, one hand gesturing. Marcus stands close, arms crossed, speaking quietly. Their body language is conspiratorial but comfortable — professionals discussing work. In the background, out of focus, Eric sits on the bed — apparently zoned out. The warm lamp creates a split: the two men in shadow near the bathroom, Eric in warm light on the bed. The conversation Eric isn't supposed to hear. Split-focus composition, conspiratorial intimacy.`,
-    },
-    {
-      id: 'S30',
-      title: 'The Demon Symbols — Overheard',
-      plot: 'INT. HOTEL ROOM — NIGHT. Marcus: "Demon summoning sigils. In the LED panel art. In the stage geometry. In the venue floor plan. It\'s getting obvious. Someone is going to notice." Dante shrugs: "Nobody notices. Nobody ever does." Eric, face blank, is listening to every word.',
-      prompt: `${WORLD} ${ERIC} Tight shot of Eric on the bed. His face is CAREFULLY blank — the face of someone pretending not to hear while memorizing every word. His eyes are aimed down at the carpet but his focus is clearly behind him, toward the two men talking. The ambient light on his face shows micro-tension — jaw slightly clenched, breathing controlled. In the blurred background, Dante and Marcus continue their conversation. The skill of being the quiet kid — invisible, underestimated, hearing everything. The eavesdrop. Close portrait of a face performing blankness while the mind races.`,
-    },
-    {
-      id: 'S31',
-      title: 'Eric Leaves — The Poker Face',
-      plot: 'INT. HOTEL ROOM — NIGHT. Eric acts groggy. "Thanks for the hangout man. I need some air." He stands slowly, deliberately. Walks past Marcus at the door. Doesn\'t rush. Doesn\'t look back. Marcus watches him go. The door clicks shut behind him.',
-      prompt: `${WORLD} ${ERIC} ${MARCUS} Eric standing up from the bed slowly, performing exhaustion. He mumbles thanks, moves toward the door. Marcus sits in the corner chair — Eric must pass him to exit. A moment of tension: Eric walks past Marcus, not making eye contact, casual, groggy. Marcus watches him pass — his eyes sharp, assessing. Did Eric hear? The door handle turns. Eric steps into the exterior corridor. The door clicks shut. Shot from Marcus's perspective watching Eric leave — the question hanging: does he know? Tension, poker face, the exit.`,
-    },
-    {
-      id: 'S32',
-      title: 'Hotel Corridor — Alone Again',
-      plot: 'EXT. HOTEL EXTERIOR CORRIDOR — NIGHT. Eric walks down the exterior hotel corridor, lit by fluorescent tubes. As soon as he rounds the corner out of sight, his composure breaks. He leans against the wall, breathing hard. Then he starts walking — fast — back toward NOS.',
-      prompt: `${WORLD} ${ERIC} An exterior hotel corridor at night — cheap motel with fluorescent tube lighting. Eric walks along it, composed, normal pace. The moment he turns the corner and is out of sight of the room, his mask BREAKS. He leans against the stucco wall, eyes wide, breathing hard, one hand over his mouth. Then he pushes off the wall and walks fast — nearly jogging — toward the NOS Event Center lights visible in the distance. The composure shattering. The relief of escaping. The second thing tonight that terrified him. Fluorescent corridor, mask dropping, the walk becoming a run.`,
+      title: 'Earth Changes You',
+      plot: "Before the signal dies: 'To any Voidborn survivors: Earth changes you. That is your first warning.' The radio cuts out. The aliens stare at each other.",
+      prompt: `${WORLD} ${CARWASH} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Tight group portrait: the five aliens frozen in the moment just after the radio cuts out, all of their faces caught mid-reaction — dread, curiosity, wonder, confusion. The rig on the concrete has gone dark. A single trailing violet spark drifts up between them. Moonlight through the open car-wash bay behind. The five of them silhouetted as the credits of their known reality quietly roll. Emotional ensemble beat.`,
     },
 
     // ═══════════════════════════════════════════════════════════════════
-    // ACT 4 — THE REUNION & RIDE HOME (S33–S40)
-    // Finding Jeff and Mikel, the silent ride, the bass doesn't stop
+    // ACT 2 — THE TEEN ENCOUNTER (S28–S30)
     // ═══════════════════════════════════════════════════════════════════
     {
+      id: 'S28',
+      title: 'Teens Pull Into the Lot',
+      plot: 'A cheap sedan pulls into the car wash lot. Two TEEN BOYS get out with energy drinks, backpacks, and phones ready. "Bro, this is where the meteor landed, I swear."',
+      prompt: `${WORLD} ${CARWASH} ${TEENS} Exterior wide: a cheap teenage-owned sedan pulling into an abandoned car wash parking lot at night, headlights sweeping across the concrete, two teenage boys climbing out excited — one lanky in an oversized hoodie and backwards cap holding a selfie-mode phone, one heavier in a zip hoodie and basketball shorts with a backpack and energy drink. Their breath visible in the cold air. In the background, the dark mouth of the abandoned car wash, a subtle green-blue glow just visible inside.`,
+    },
+    {
+      id: 'S29',
+      title: '"Greetings."',
+      plot: 'The teens shine their phone flashlights into the dark car wash. One beam catches Drael\'s glowing gold eyes. Drael slowly smiles: "Greetings."',
+      prompt: `${WORLD} ${CARWASH} ${DRAEL} ${TEENS} Inside the mouth of the abandoned car wash at night. Foreground: two teen boys with their phone flashlights aimed into the darkness, mouths half-open. Background: out of the shadow, only two things visible — Drael's two faintly glowing gold alien eyes, and a calm confident half-smile. Four blurred alien shapes hunched behind him facepalming in the dark. The universal language of 'do not do this, Drael.' Comic-horror composition.`,
+    },
+    {
+      id: 'S30',
+      title: 'Teens Flee',
+      plot: 'The teens SCREAM and run back to their car. Tires squeal. They floor it out of the lot. The aliens watch them go.',
+      prompt: `${WORLD} ${CARWASH} ${DRAEL} ${TEENS} Exterior: the cheap teen sedan peeling out of the abandoned car wash parking lot, brake lights glowing red, tire smoke billowing, the two teens visible through the rear window mid-scream, phones still clutched in their hands. At the mouth of the car wash, Drael stands calmly with a serene half-smile, glowing gold eyes catching the retreating brake lights. Behind him in silhouette, Zix has buried his face in both hands. Comic-heroic composition.`,
+    },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // TAG — HILLTOP AT PRE-DAWN (S31–S35)
+    // ═══════════════════════════════════════════════════════════════════
+    {
+      id: 'S31',
+      title: 'Climbing the Hill at Pre-Dawn',
+      plot: 'EXT. HILLSIDE — PRE-DAWN. The crew climbs a bald hill overlooking the sleeping suburb. The sky is just beginning to fade from black to violet.',
+      prompt: `${WORLD} ${LOOKOUT} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Wide hero shot: five small alien figures climbing the bald grass of a Southern California hill at pre-dawn, backs three-quartered to camera, sky overhead fading from black-purple to deep violet. Below in the middle distance, a sleeping suburb of tract homes, palm trees, and glowing fast-food signs. On a far hill, the white dome of an observatory catching the first hints of blue-gold light. Cinematic dawn climb, cool dew in the grass.`,
+    },
+    {
+      id: 'S32',
+      title: 'Zix Declares the Mission',
+      plot: 'Zix stands at the crest, resolved. "We go to the observatory. We contact the network. We repair the ship. And we leave Earth immediately."',
+      prompt: `${WORLD} ${LOOKOUT} ${ZIX} Low-angle hero portrait: Zix standing alone at the hilltop crest, silhouetted against the pre-dawn violet-gold sky, the sleeping city glowing in the valley behind him, one hand gesturing off toward the distant observatory dome. His indigo skin catches the cool-warm dawn. Full-command dramatic posture, sash billowing slightly in the wind. Cinematic resolve.`,
+    },
+    {
       id: 'S33',
-      title: 'Back at NOS — Searching',
-      plot: "EXT. NOS OUTDOOR AREA — NIGHT. Eric walks through the outdoor area, scanning for Jeff or Mikel. The rave is still going — bass from multiple stages, people laughing, LED art installations. He's sober enough now to function but still feeling residual... connection. The music from the nearest stage responds slightly to his mood.",
-      prompt: `${WORLD} ${ERIC} ${NOS} Eric walking through the outdoor festival area, scanning faces. Multiple stages glow in the background with competing colored lights. LED art installations throw patterns on the concrete. Ravers walk between stages. Eric moves with purpose now — still shaken but functional. A subtle visual hint: the nearest stage's lights shift slightly warmer as he passes, responding to his presence. He doesn't notice but we do. The power is still there, just quieter. Walking search, outdoor festival energy, subtle supernatural undertone.`,
+      title: 'Nobody Is Eager To Leave',
+      plot: 'Zix turns and sees every other crew member staring at the glowing suburb with a look he does not want to see. Nobody looks eager to leave.',
+      prompt: `${WORLD} ${LOOKOUT} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Medium four-shot: Mora, Pebb, Drael, and Nuni standing shoulder-to-shoulder on a bald hilltop at pre-dawn, all four staring out at the sleeping suburb below with identical expressions of soft, unguarded wonder — Mora reluctantly charmed, Pebb in open snack-love, Drael smitten with everything, Nuni's antennae perked with genuine curiosity. The city glow catching their faces warm against the cool dawn. Character-driven ensemble reveal.`,
     },
     {
       id: 'S34',
-      title: 'Jeff Spots Him',
-      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. From the top of a concrete barrier, Jeff\'s voice: "BRO! ERIC! OVER HERE!" The most beautiful sound Eric has ever heard. Jeff is standing on the barrier, arms waving, huge grin, still shirtless.',
-      prompt: `${WORLD} ${JEFF} A big shirtless muscular guy standing on top of a concrete barrier, arms waving wildly, mouth open in a yell, face split with the biggest grin. Festival lights behind him create a silhouette halo. Below, walking toward him through the crowd, a slim figure in a black hoodie looks up — and the relief on his face is overwhelming, nearly tearful. The most mundane miracle: your friend found you. Wide shot with Jeff elevated on the barrier, Eric approaching below, the scale of the festival behind them, the warmth of reunion.`,
+      title: 'Helicopter and Taco Wrapper',
+      plot: 'A helicopter crosses the sky with a blinking red light. A taco wrapper blows past their feet. The suburb hums below.',
+      prompt: `${WORLD} ${LOOKOUT} ${ZIX} ${MORA} ${PEBB} ${DRAEL} ${NUNI} Wide composition: five Voidborn silhouettes on the bald hilltop, backs to camera, watching a single helicopter drift across the fading-violet sky with a blinking red light. In the foreground lower frame, a colorful Taco Bell paper wrapper blowing across the dewy grass past their boots. Below, the sleeping suburb's sodium-orange streetlights and freeway headlight ribbon. A subtle warm California breeze. Cinematic quiet beat, pre-dawn tone.`,
     },
     {
       id: 'S35',
-      title: 'The Reunion Hug',
-      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. Jeff jumps off the barrier and bear-hugs Eric, lifting him off the ground. "WHERE WERE YOU BRO?" Eric can\'t speak. He just holds on.',
-      prompt: `${WORLD} ${JEFF} ${ERIC} A huge shirtless guy bear-hugging a smaller friend in a black hoodie, lifting him completely off the ground. The smaller guy's face is buried in his friend's shoulder — hiding the emotion, the relief, everything he can't say. Festival lights wash over them. Other ravers walk past, some smiling at the reunion. It's simple and perfect and human after everything supernatural that just happened. The hug as salvation. Medium shot, warm festival lighting, the contrast of Jeff's massive frame and Eric's slim build, pure friendship.`,
-    },
-    {
-      id: 'S36',
-      title: 'Mikel Appears',
-      plot: 'EXT. NOS OUTDOOR AREA — NIGHT. Mikel appears from the shadows. As always. His eyes lock onto Eric and something changes in his face — he can sense that Eric is different. Something happened. Something fundamental shifted. Mikel says nothing. He just watches.',
-      prompt: `${WORLD} ${MIKEL} A lean figure in all-black techwear emerges from shadow at the edge of the reunion scene. His pale face is lit by distant stage lights — magenta on one side, blue on the other. His dark eyes lock onto Eric with an intensity that goes beyond friendship. He senses it — the change, the opening, the thing that activated. His expression is complex: relief that Eric is alive, fear of what he's become. He doesn't join the hug. He stands apart. Watching. Knowing. The vampire recognizing what woke up in his friend. Mikel in shadows, dual-lit, the outsider who sees everything.`,
-    },
-    {
-      id: 'S37',
-      title: 'Walking to the Truck',
-      plot: 'EXT. NOS PARKING LOT — NIGHT. The three friends walk to Jeff\'s truck. Jeff talks enough for all of them — recounting his search, his barrier-climbing strategy, how he "almost fought a security guard." Eric is silent. Mikel is silent. The venue bass fades behind them.',
-      prompt: `${WORLD} ${JEFF} ${ERIC} ${MIKEL} Three friends walking through a dark parking lot toward a lifted white Tacoma. The big shirtless one talks animatedly, gesturing, reliving the night. The slim one in the hoodie walks with his arms wrapped around himself, staring straight ahead, silent. The lean one in black walks slightly behind, watching the back of Eric's head. The NOS Event Center glows behind them, growing smaller. Bass fading with distance. Three friends, three different versions of the same night. Walking group shot, the venue receding, the aftermath beginning.`,
-    },
-    {
-      id: 'S38',
-      title: 'In the Truck — Silence',
-      plot: "INT. JEFF'S TRUCK — NIGHT. Jeff drives. Eric stares at the dashboard. Mikel watches Eric from the back seat. Nobody talks. The only sound is the road and the faint vibration of distant bass still audible through the truck frame. Eric can feel it. He can feel ALL of it now. The music from the venue, miles away. The hum of the engine. The frequency of Mikel's attention behind him.",
-      prompt: `${WORLD} ${TRUCK} Interior of the lifted Tacoma. Jeff drives, one hand on the wheel, finally quiet, eyes on the road. Eric in the passenger seat stares at the glowing dashboard instruments — his reflection ghosted in the windshield. In the back seat, Mikel watches Eric's reflection in the side mirror, sharp eyes unblinking. The silence is heavy. The only light is dashboard amber. Through the closed windows, impossibly, the NOS Event Center bass is still faintly audible — or is Eric feeling it from miles away? The ride home where nobody talks about what happened. Three-shot interior, dashboard glow, weighted silence.`,
-    },
-    {
-      id: 'S39',
-      title: 'Eric Feels the Bass Through the Truck',
-      plot: "INT. JEFF'S TRUCK — NIGHT. Close-up of Eric's hand on the armrest. The truck frame vibrates faintly. Eric closes his eyes. He can feel the bass from the rave through the metal of the truck — miles away now. He can feel the crowd still moving. The power isn't stopping. It wasn't the mushrooms. The door opened. And it isn't closing.",
-      prompt: `${WORLD} ${ERIC} Extreme close-up of Eric's hand resting on the truck's center console. The metal vibrates faintly — impossibly, they're miles from the venue. Eric's eyes are closed. His expression is not peace — it's realization. The bass from the NOS Event Center, miles behind them, is still reaching him through the truck frame, through the road, through the earth itself. Subtle visual: faint geometric patterns of sound visible only to Eric, flowing through the metal under his fingers. The power isn't going away. The mushrooms are gone but the door stays open. Macro close-up, vibrating metal, closed eyes, the terrifying permanence.`,
-    },
-    {
-      id: 'S40',
-      title: 'End — Eyes Open',
-      plot: "INT. JEFF'S TRUCK — NIGHT. Eric opens his eyes. In the darkness of the truck, for one frame, his irises reflect something that isn't the dashboard light. Something deeper. Older. A frequency. CUT TO BLACK. Title: SPACE FLEET.",
-      prompt: `${WORLD} ${ERIC} The final shot. Eric opens his eyes in the dark truck. Close-up of his face, lit only by dashboard amber. For one frame — one heartbeat — his irises reflect something impossible: not the dashboard, not the road, but a deep resonance pattern, a frequency made visible, something ancient and alien looking back through his eyes. Then it's gone. Just a scared kid in a truck. But we saw it. And so did Mikel, reflected in the rearview mirror, his face showing ancient recognition and deep, deep fear. Then BLACK. White text: SPACE FLEET. The final frame, the hook, the promise of everything to come.`,
+      title: 'The Signal Blinks Back',
+      plot: "From the dead radio, a last whisper: 'Earth changes you. That is your first warning.' Deep in the suburb below, one tiny blue-green signal blinks back. They are not alone. CUT TO BLACK. Title: VOIDBORN SAGA.",
+      prompt: `${WORLD} ${LOOKOUT} The final shot. Wide aerial composition over the sleeping Southern California suburb at pre-dawn, five tiny alien silhouettes visible on a hilltop in the upper frame, the valley below them dotted with tract-home lights and glowing fast-food signs. Deep in the city, a single tiny blue-green pinprick of signal light blinks on, off, on — too small for the crew to notice but unmistakable to the audience. The dome of the observatory on the far hill catches the very first blue-gold ray of sunrise. The last frame. The hook. CUT TO BLACK.`,
     },
   ];
 }
@@ -727,13 +707,13 @@ function buildScenes(dna: Record<string, string>) {
 // ── Main ────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n' + '═'.repeat(60));
-  console.log('  SPACE FLEET — Pilot: "Return"');
-  console.log('  40 Scenes × 10s = ~7 min core footage');
+  console.log('  VOIDBORN SAGA — Pilot: "Crash Landing"');
+  console.log('  35 Scenes × 10s = ~6 min core footage');
   console.log(`  Seedance 2.0 → On-chain | Mode: ${GEN_MODE.toUpperCase()}`);
   console.log('═'.repeat(60));
 
   if (UNIVERSE_ADDR === '0x0000000000000000000000000000000000000000') {
-    console.error('\n  ERROR: Set SPACE_FLEET_ADDR env var to the deployed universe address.');
+    console.error('\n  ERROR: Set VOIDBORN_ADDR env var to the deployed universe address.');
     process.exit(1);
   }
   if (!BYTEDANCE_API_KEY) {
@@ -741,7 +721,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Auth + fetch character DNA from wiki
   log('AUTH', 'Authenticating...');
   const token = await getAuthToken();
   log('AUTH', `Authenticated as ${account.address}`);
@@ -749,7 +728,6 @@ async function main() {
   const dna = await fetchCharacterDNA(token);
   const SCENES = buildScenes(dna);
 
-  // Find start index
   const startIdx = SCENES.findIndex((s) => s.id === START_SCENE);
   if (startIdx < 0) {
     console.error(`  ERROR: START_SCENE=${START_SCENE} not found.`);
@@ -782,10 +760,6 @@ async function main() {
   );
 
   if (GEN_MODE === 'continuity') {
-    // ── CONTINUITY MODE ─────────────────────────────────────────────
-    // Sequential: each scene extracts the last frame from the previous
-    // scene and uses it as the starting image for i2v. Characters,
-    // environments, and motion stay consistent across cuts.
     for (let i = startIdx; i < SCENES.length; i++) {
       const scene = SCENES[i];
       const label = `${scene.id} (${i + 1}/${SCENES.length})`;
@@ -796,27 +770,19 @@ async function main() {
 
       try {
         const videoUrl = await generateVideo(scene.prompt, label, lastFrameUrl);
-
         const contentHash = `void-${scene.id}-${Date.now()}`;
         const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
         previousId = nodeId;
         results.push({ id: scene.id, title: scene.title, nodeId });
         log(label, `DONE — Node #${nodeId}`);
-
-        // Extract last frame for the next scene's i2v input
         lastFrameUrl = await extractLastFrame(videoUrl, `${scene.id} FRAME`);
       } catch (err: any) {
         log(label, `FAILED: ${err.message?.slice(0, 200)}`);
-        // Keep previous lastFrameUrl so next scene still has some reference
       }
 
       if (i < SCENES.length - 1) await sleep(2000);
     }
   } else {
-    // ── FAST MODE ───────────────────────────────────────────────────
-    // Parallel batches: generate BATCH_SIZE scenes at once as t2v.
-    // First scene per batch uses i2v from previous batch's last frame
-    // for partial continuity. Much faster but characters may vary.
     for (let batchStart = startIdx; batchStart < SCENES.length; batchStart += BATCH_SIZE) {
       const batch = SCENES.slice(batchStart, Math.min(batchStart + BATCH_SIZE, SCENES.length));
 
@@ -826,7 +792,6 @@ async function main() {
       );
       console.log(`${'═'.repeat(55)}`);
 
-      // Generate videos in parallel — first scene uses last frame for partial continuity
       const videoResults = await Promise.allSettled(
         batch.map((scene, idx) => {
           const label = `${scene.id} (${batchStart + idx + 1}/${SCENES.length})`;
@@ -839,7 +804,6 @@ async function main() {
         })
       );
 
-      // Chain on-chain nodes sequentially
       let lastVideoUrl: string | null = null;
       for (let j = 0; j < videoResults.length; j++) {
         const result = videoResults[j];
@@ -868,7 +832,6 @@ async function main() {
         }
       }
 
-      // Extract last frame from final scene in batch for next batch
       if (lastVideoUrl) {
         lastFrameUrl = await extractLastFrame(lastVideoUrl, `${batch[batch.length - 1].id} FRAME`);
       }
@@ -878,9 +841,8 @@ async function main() {
     }
   }
 
-  // Summary
   console.log('\n' + '═'.repeat(60));
-  console.log('  SPACE FLEET — Pilot Episode Generation Complete');
+  console.log('  VOIDBORN SAGA — Pilot Episode Generation Complete');
   console.log('═'.repeat(60));
   console.log(`  Scenes completed: ${results.length}/${SCENES.length - startIdx}`);
   console.log(`  Total footage: ~${results.length * 10}s`);
@@ -892,7 +854,7 @@ async function main() {
     console.log(`  ${r.id} | ${r.title.padEnd(40)} | Node #${r.nodeId}`);
   }
   console.log(`\n  Universe: ${UNIVERSE_ADDR}`);
-  console.log(`  Next: Run space-fleet-audio-pipeline.ts for voice, SFX & music\n`);
+  console.log(`  Next: Run voidborn-saga-audio-pipeline.ts for voice, SFX & music\n`);
 }
 
 main().catch((err) => {

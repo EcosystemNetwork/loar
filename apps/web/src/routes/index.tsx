@@ -1028,7 +1028,7 @@ function SearchOverlay({
       const tokenName = u.tokenData?.name?.toLowerCase() || '';
       const tokenSymbol = u.tokenData?.symbol?.toLowerCase() || '';
       const description = u.description?.toLowerCase() || '';
-      const address = u.id.toLowerCase();
+      const address = u.id?.toLowerCase() || '';
       return (
         name.includes(q) ||
         tokenName.includes(q) ||
@@ -1103,7 +1103,7 @@ function SearchOverlay({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-white truncate">
-                          {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
+                          {u.name || u.tokenData?.name || `Universe ${u.id?.slice(0, 8) ?? ''}`}
                         </div>
                         <div className="text-xs text-muted-foreground line-clamp-1">
                           {u.description || u.tokenData?.metadata || 'No description'}
@@ -1157,7 +1157,7 @@ function SearchOverlay({
                         )}
                       </div>
                       <span className="text-sm font-medium text-white truncate">
-                        {u.name || u.tokenData?.name || `Universe ${u.id.slice(0, 8)}`}
+                        {u.name || u.tokenData?.name || `Universe ${u.id?.slice(0, 8) ?? ''}`}
                       </span>
                     </button>
                   ))}
@@ -1179,9 +1179,9 @@ function HomeComponent() {
   // Keyboard shortcut: Cmd/Ctrl + K to open search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setSearchOpen((prev) => !prev);
+        setSearchOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
@@ -1369,13 +1369,14 @@ function HomeComponent() {
       >
         <Search className="h-3.5 w-3.5" />
         <span>Search</span>
-        <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">
+        <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-0.5">
           {navigator.platform?.includes('Mac') ? (
             <LoarIcon name="command" size={10} className="inline-block" />
           ) : (
-            'Ctrl'
+            <span>Ctrl</span>
           )}
-          K
+          <span>+</span>
+          <span>K</span>
         </kbd>
       </button>
 

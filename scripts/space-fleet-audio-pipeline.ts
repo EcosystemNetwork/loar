@@ -746,8 +746,54 @@ function mix(v: string, dlg: string | undefined, sx: string, mu: string, out: st
 }
 
 /* ── Chain fetch ─────────────────────────────────────────────────────── */
+// Scene-ID → plot-prefix map from space-fleet-pilot-scenes.ts.
+// We match on the unique opening location ("EXT. HIGHWAY 215", etc) so
+// every video gets paired with its scene reliably. If the video script
+// changes, regenerate this map.
+const SCENE_PLOT_PREFIX: Record<string, string> = {
+  S01: 'EXT. HIGHWAY 215',
+  S02: 'EXT. NOS EVENT CENTER PARKING LOT',
+  S03: 'INT. NOS EVENT CENTER ENTRANCE',
+  S04: 'INT. NOS — NIGHT. The three friends push',
+  S05: 'INT. MAIN STAGE — NIGHT. They reach',
+  S06: 'INT. MAIN STAGE — NIGHT. Jeff charges',
+  S07: 'INT. MAIN STAGE — NIGHT. The psilocybin peaks',
+  S08: 'INT. MAIN STAGE — NIGHT. Mikel turns to look',
+  S09: 'INT. MAIN STAGE — NIGHT. A MASSIVE bass drop',
+  S10: 'INT. MAIN STAGE — NIGHT. Eric is suddenly alone',
+  S11: 'INT/EXT. NOS — NIGHT. Jeff climbs',
+  S12: 'INT. MAIN STAGE — NIGHT. Eric gives up',
+  S13: 'INT. MAIN STAGE — NIGHT. Standing near the front',
+  S14: 'INT. MAIN STAGE — NIGHT. A spike of anxiety',
+  S15: 'INT. MAIN STAGE — NIGHT. Eric feels a moment of pure wonder',
+  S16: 'INT. MAIN STAGE — NIGHT. Eric raises his hand',
+  S17: 'INT. MAIN STAGE — BEHIND DJ BOOTH',
+  S18: 'INT. MAIN STAGE — NIGHT. Something changes',
+  S19: 'INT. MAIN STAGE — NIGHT. From inside the sound',
+  S20: "INT. MAIN STAGE — NIGHT. Close-up on Eric's face",
+  S21: 'INT. MAIN STAGE — NIGHT. Eric shoves through the crowd',
+  S22: 'INT. DARK CORRIDOR',
+  S23: 'EXT. NOS OUTDOOR AREA — NIGHT. Eric bursts through',
+  S24: 'EXT. NOS OUTDOOR AREA — NIGHT. Eric is sitting on a curb',
+  S25: 'EXT. NOS OUTDOOR AREA — NIGHT. Behind Dante',
+  S26: 'EXT. NOS PARKING LOT — NIGHT. Dante walks Eric',
+  S27: 'INT. HOTEL ROOM — NIGHT. A cheap room',
+  S28: 'INT. HOTEL ROOM — NIGHT. Eric is staring at the carpet',
+  S29: 'INT. HOTEL ROOM — NIGHT. Eric is zoned out',
+  S30: 'INT. HOTEL ROOM — NIGHT. Marcus:',
+  S31: 'INT. HOTEL ROOM — NIGHT. Eric acts groggy',
+  S32: 'EXT. HOTEL EXTERIOR CORRIDOR',
+  S33: 'EXT. NOS OUTDOOR AREA — NIGHT. Eric walks through',
+  S34: 'EXT. NOS OUTDOOR AREA — NIGHT. From the top of a concrete barrier',
+  S35: 'EXT. NOS OUTDOOR AREA — NIGHT. Jeff jumps off',
+  S36: 'EXT. NOS OUTDOOR AREA — NIGHT. Mikel appears',
+  S37: 'EXT. NOS PARKING LOT — NIGHT. The three friends walk',
+  S38: "INT. JEFF'S TRUCK — NIGHT. Jeff drives. Eric stares",
+  S39: "INT. JEFF'S TRUCK — NIGHT. Close-up of Eric",
+  S40: "INT. JEFF'S TRUCK — NIGHT. Eric opens his eyes",
+};
+
 async function fetchV(): Promise<Record<string, string>> {
-  // Use public RPC to avoid Alchemy free-tier getLogs block range limit
   const publicRpc = 'https://ethereum-sepolia-rpc.publicnode.com';
   const pc = createPublicClient({ chain: sepolia, transport: http(publicRpc) });
   const ev = {
@@ -763,19 +809,42 @@ async function fetchV(): Promise<Record<string, string>> {
       { name: 'plot', type: 'string' as const },
     ],
   };
-  // Get current block and scan from a recent range (universe just deployed)
+  // Public RPC limit is ~5000 blocks per request — paginate to cover the
+  // ~14000-block window the universe has been generating in.
   const latest = await pc.getBlockNumber();
-  const from = latest > 5000n ? latest - 5000n : 0n;
-  L('CHAIN', `Scanning blocks ${from}..${latest}`);
-  const logs = await pc.getLogs({ address: UADDR, event: ev, fromBlock: from, toBlock: 'latest' });
-  L('CHAIN', `Found ${logs.length} NodeCreated events`);
-  const sa = buildSA();
+  const totalRange = 15000n;
+  const chunkSize = 4500n;
+  const startBlock = latest > totalRange ? latest - totalRange : 0n;
+  L('CHAIN', `Scanning blocks ${startBlock}..${latest} in chunks of ${chunkSize}`);
+
+  const allLogs: any[] = [];
+  for (let from = startBlock; from <= latest; from += chunkSize) {
+    const to = from + chunkSize - 1n > latest ? latest : from + chunkSize - 1n;
+    try {
+      const logs = await pc.getLogs({ address: UADDR, event: ev, fromBlock: from, toBlock: to });
+      allLogs.push(...logs);
+    } catch (err: any) {
+      L('CHAIN', `Chunk ${from}..${to} failed: ${err.message?.slice(0, 80)}`);
+    }
+  }
+  L('CHAIN', `Found ${allLogs.length} NodeCreated events total`);
+
   const m: Record<string, string> = {};
-  for (const l of logs) {
+  // Walk events in order and match each plot to the earliest unmatched scene
+  // whose plot prefix it starts with. Later duplicates overwrite earlier ones
+  // (so re-runs of the same scene keep the most recent video).
+  for (const l of allLogs) {
     const lk = (l.args as any).link as string;
     const pl = (l.args as any).plot as string;
-    for (const s of sa) if (pl?.includes(s.t)) m[s.id] = lk;
+    if (!pl || !lk) continue;
+    for (const [sceneId, prefix] of Object.entries(SCENE_PLOT_PREFIX)) {
+      if (pl.startsWith(prefix)) {
+        m[sceneId] = lk;
+        break;
+      }
+    }
   }
+  L('CHAIN', `Matched ${Object.keys(m).length}/40 scenes to videos`);
   return m;
 }
 
