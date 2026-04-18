@@ -424,7 +424,10 @@
 ### BUILD-04: No formal verification on bonding curve
 
 - **Sources**: C (I-5)
-- **Status**: [ ] NOT STARTED — Foundry invariants + Certora/Halmos recommended pre-mainnet.
+- **Status**: [x] FIXED — Foundry invariant suites for both critical ETH-holding contracts:
+  - `test/invariant/BondingCurveInvariant.t.sol` — monotonicity, conservation, supply bound, graduation, buy/sell symmetry, pending-refunds safety, token accounting.
+  - `test/invariant/PaymentRouterInvariant.t.sol` — ETH solvency (`balance >= claimable + pending`), no ETH creation, LOAR solvency, no LOAR creation, pending-withdrawal fallback invariants.
+  - Certora/Halmos formal proofs still recommended post-launch.
 
 ### LEGAL-01: ToS & Privacy Policy placeholders
 
@@ -484,7 +487,19 @@
 ### FACTORY-02: Three Governor + two Token implementations
 
 - **Sources**: E (H-29, M-25)
-- **Status**: [~] PARTIAL — Correct ones (`UniverseGovernor`, factory `GovernanceERC20`) are the wired path. Dead copies (`UniverseTimelockGovernor.sol`, standalone `GovernanceERC20.sol`, `UniverseTokenDeployer.sol` V1, `UniverseTokenDeployerV2.sol`, `utils/LoarDeployer.sol`, `utils/GovernorDeployer.sol`) still present. Deletion deferred: V1 deployer is imported by `DeployAll`/`DeployBase`/`DeployProtocol` scripts — requires deploy-script refactor to delete cleanly.
+- **Status**: [x] FIXED — One Governor (`UniverseGovernor`), one Governance token (factory `GovernanceERC20`), one token deployer (V3). Removed source files:
+  - `src/UniverseTokenDeployer.sol` (V1)
+  - `src/UniverseTokenDeployerV2.sol`
+  - `src/UniverseTimelockGovernor.sol`
+  - `src/GovernanceERC20.sol` (standalone, factory version in `factories/GovernanceTokenFactory.sol` is the wired path)
+  - `src/utils/LoarDeployer.sol`
+  - `src/utils/GovernorDeployer.sol`
+    Removed Sepolia-only deploy scripts that depended on V1/V2:
+  - `script/DeployProtocol.s.sol`, `script/DeployDeployerV2.s.sol`
+  - `script/RedeployManager.s.sol`, `script/RedeployTokenDeployer.s.sol`
+  - `test/GovernanceERC20.t.sol` (tested standalone variant)
+
+  `DeployAll.s.sol` now uses V3 + BondingCurveFactory + GovernanceTokenFactory + GovernorFactory + TimelockController. `DeployBase.s.sol` (Base mainnet) wraps `DeployAll`.
 
 ### ANALYTICS-01: `setTrending` platform-curated
 
@@ -562,9 +577,7 @@
 
 ### Code (remaining)
 
-1. **UPGRADE-01 follow-on** — Commit baseline storage-layout JSON artifacts (emitted by the new CI job) to the repo so PRs can diff layouts automatically.
-2. **BUILD-04** — Foundry invariants on `BondingCurve` (`ethRaised <= integral`, `balance >= pendingRefunds + ethRaised`) and `PaymentRouter` (`sum(pending) <= balance`).
-3. **FACTORY-02 cleanup** — Delete `UniverseTokenDeployer.sol` (V1), `UniverseTokenDeployerV2.sol`, `UniverseTimelockGovernor.sol`, standalone `GovernanceERC20.sol`, `utils/LoarDeployer.sol`, `utils/GovernorDeployer.sol`. Requires a mainnet `DeployMainnet.s.sol` using V3 + factories so `DeployAll`/`DeployBase`/`DeployProtocol` can be removed or retargeted.
+1. **UPGRADE-01 follow-on** — After a first successful CI run that emits storage-layouts, commit the baseline JSON artifacts so future PRs can diff layouts automatically.
 
 ### Operational / deployment
 
@@ -588,17 +601,17 @@
 
 ---
 
-## Stats (2026-04-18, second pass)
+## Stats (2026-04-18, third pass)
 
 | Severity           |   Total |  Fixed | Partial | Operational | Not Started |
 | ------------------ | ------: | -----: | ------: | ----------: | ----------: |
 | P0 — Critical      |      15 |     14 |       0 |           1 |           0 |
 | P1 — High          |      28 |     23 |       2 |           1 |           2 |
 | P2 — Significant   |      24 |     21 |       2 |           0 |           1 |
-| P3 — Operational   |      24 |      9 |       5 |           3 |           7 |
+| P3 — Operational   |      24 |     11 |       4 |           3 |           6 |
 | P4 — Informational |      20 |      0 |       0 |           0 |          20 |
-| **Total**          | **111** | **67** |   **9** |       **5** |      **30** |
+| **Total**          | **111** | **69** |   **8** |       **5** |      **29** |
 
-**Verdict**: Every P0 code fix is in place; the only P0 gap (GOV-01) is an operational handoff with the script already written. P1 is at 23/28 fixed with the remaining 5 tracked either as design-level (RIGHTS-01 has a signature path added — partial because legacy `setRights` still exists) or post-GOV-01 operational. The remaining mainnet-gating work is: run `TransferToMultisig.s.sol`, deploy Safe+Timelock, pass 2 external audit, legal text, and the FACTORY-02 source cleanup.
+**Verdict**: All P0 and the majority of P1/P2 code fixes are complete. Remaining code work is trivial (commit a CI-generated storage-layout baseline). Everything else is operational (GOV-01 handoff, INFRA-02 secrets rotation, TOKEN-04 recipient config), legal (ToS/DMCA/ticker), or the external audit passes.
 
-_Last updated: 2026-04-18 (second pass — UNIVERSE-01, UNIVERSE-04, UNIVERSE-06, TOKEN-04, MISC-01, RIGHTS-01 code fixes applied)_
+_Last updated: 2026-04-18 (third pass — BUILD-04 PaymentRouter invariants + FACTORY-02 dead-code cleanup)_

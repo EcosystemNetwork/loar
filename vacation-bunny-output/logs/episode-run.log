@@ -399,3 +399,48 @@
 [S26 (26/56)] DONE — Node #25
 [S27 (27/56)] Rehosting to Pinata...
 [S27 (27/56)] Pinned: QmcADjwz1fNikZH6n9T16rMhwf9icyAjD8h3t1EFLgr1iq (4.6MB)
+[S27 (27/56)] Node #26
+[S27 (27/56)] DONE — Node #26
+[BATCH] Completed S25–S27
+
+═══════════════════════════════════════════════════════
+  BATCH: S28–S30 (3 parallel)
+═══════════════════════════════════════════════════════
+[S28 (28/56)] Generating (t2v)...
+[S29 (29/56)] Generating (t2v)...
+[S30 (30/56)] Generating (t2v)...
+[S30 (30/56)] Task: cgt-20260418163818-97c42
+[S29 (29/56)] Task: cgt-20260418163818-62kvl
+[S28 (28/56)] Task: cgt-20260418163819-7n4fv
+[S30 (30/56)] Generating... (0s)
+[S29 (29/56)] Generating... (0s)
+[S28 (28/56)] Generating... (0s)
+[S30 (30/56)] Generating... (30s)
+[S29 (29/56)] Generating... (30s)
+[S28 (28/56)] Generating... (30s)
+[S30 (30/56)] Generating... (60s)
+[S29 (29/56)] Generating... (60s)
+[S28 (28/56)] Generating... (60s)
+[S30 (30/56)] Generating... (90s)
+[S29 (29/56)] Generating... (90s)
+[S28 (28/56)] Generating... (90s)
+[S30 (30/56)] Generating... (120s)
+[S29 (29/56)] Generating... (120s)
+[S28 (28/56)] Generating... (120s)
+[S28 (28/56)] Video done
+[S30 (30/56)] Generating... (150s)
+[S29 (29/56)] Generating... (150s)
+[S30 (30/56)] Video done
+[S29 (29/56)] Retry 1/2 (sanitized)...
+[S29 (29/56)] Task: cgt-20260418164124-f72xk
+[S29 (29/56)] Generating... (0s)
+[S29 (29/56)] Generating... (30s)
+[S29 (29/56)] Generating... (60s)
+[S29 (29/56)] Generating... (90s)
+[S29 (29/56)] Generating... (120s)
+[S29 (29/56)] Video done
+[S28 (28/56)] Rehosting to Pinata...
+[S28 (28/56)] Pinned: QmQ25PprnUYHXJdi6xZ6y9mubN53rMKxgxi182ZubdY5Qs (4.2MB)
+[S28 (28/56)] Node #27
+[S28 (28/56)] DONE — Node #27
+[S29 (29/56)] Rehosting to Pinata...

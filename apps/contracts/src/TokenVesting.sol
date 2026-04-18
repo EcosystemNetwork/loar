@@ -35,6 +35,10 @@ contract TokenVesting is Ownable {
         bool revoked;
         /// @notice Amount vested at the time of revocation (caps further vesting).
         uint128 vestedAtRevoke;
+        /// @notice VESTING-01: When true, admin CANNOT revoke the vesting — guarantees
+        ///         beneficiary receives the full allocation. Intended for investor / team
+        ///         commitments that cannot be clawed back.
+        bool nonRevocable;
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -62,6 +66,7 @@ contract TokenVesting is Ownable {
     error NothingToClaim();
     error NotBeneficiary();
     error CliffExceedsVesting();
+    error VestingIsNonRevocable();
 
     // ──────────────────────────────────────────────────────────────────────
     // Events
@@ -115,6 +120,30 @@ contract TokenVesting is Ownable {
         uint64 cliffDuration,
         uint64 vestingDuration
     ) external onlyOwner returns (uint256 vestingId) {
+        return _createVesting(token, beneficiary, totalAmount, cliffDuration, vestingDuration, false);
+    }
+
+    /// @notice VESTING-01: Create a non-revocable vesting schedule. Admin cannot claw back
+    ///         unvested tokens from this schedule under any circumstance. Use for investor
+    ///         and team commitments that must be guaranteed to the beneficiary.
+    function createNonRevocableVesting(
+        address token,
+        address beneficiary,
+        uint128 totalAmount,
+        uint64 cliffDuration,
+        uint64 vestingDuration
+    ) external onlyOwner returns (uint256 vestingId) {
+        return _createVesting(token, beneficiary, totalAmount, cliffDuration, vestingDuration, true);
+    }
+
+    function _createVesting(
+        address token,
+        address beneficiary,
+        uint128 totalAmount,
+        uint64 cliffDuration,
+        uint64 vestingDuration,
+        bool nonRevocable
+    ) internal returns (uint256 vestingId) {
         if (token == address(0)) revert ZeroAddress();
         if (beneficiary == address(0)) revert ZeroAddress();
         if (totalAmount == 0) revert ZeroAmount();
@@ -139,7 +168,8 @@ contract TokenVesting is Ownable {
             cliffDuration: cliffDuration,
             vestingDuration: vestingDuration,
             revoked: false,
-            vestedAtRevoke: 0
+            vestedAtRevoke: 0,
+            nonRevocable: nonRevocable
         });
 
         beneficiaryVestings[beneficiary].push(vestingId);
@@ -157,11 +187,13 @@ contract TokenVesting is Ownable {
 
     /// @notice Revoke a vesting schedule, returning unvested tokens to admin.
     /// @dev Already-vested (but unclaimed) tokens remain claimable by the beneficiary.
+    ///      VESTING-01: Reverts if the schedule was created as non-revocable.
     /// @param vestingId The vesting schedule to revoke.
     function revokeVesting(uint256 vestingId) external onlyOwner {
         VestingSchedule storage v = vestings[vestingId];
         if (v.totalAmount == 0) revert VestingNotFound();
         if (v.revoked) revert VestingAlreadyRevoked();
+        if (v.nonRevocable) revert VestingIsNonRevocable();
 
         uint128 vested = _vestedAmount(v);
         v.revoked = true;

@@ -35,7 +35,7 @@ import {TimelockController} from "@openzeppelin/governance/TimelockController.so
 ///     then drops to 10%. This prevents the creator from rubber-stamping proposals
 ///     before token distribution has a chance to diversify.
 ///   - Additional mitigations: (1) vesting for creator allocation via
-///     UniverseTokenDeployerV2, (2) 24h timelock on all proposals.
+///     UniverseTokenDeployerV3 (FACTORY-02 cleanup), (2) 24h timelock on all proposals.
 contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
 
     /// @notice Block at which this governor was deployed.

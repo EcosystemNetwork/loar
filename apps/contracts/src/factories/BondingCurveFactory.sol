@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import {BondingCurve} from "../BondingCurve.sol";
 
 /// @title BondingCurveFactory
-/// @notice Deploys BondingCurve instances for UniverseTokenDeployer V2/V3.
+/// @notice Deploys BondingCurve instances for UniverseTokenDeployerV3.
 /// @dev Follows the same factory pattern as GovernorFactory and GovernanceTokenFactory.
 contract BondingCurveFactory {
     event BondingCurveCreated(

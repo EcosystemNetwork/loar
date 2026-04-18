@@ -79,10 +79,10 @@ export async function runGenerationLayer(
         throw err;
       }
 
-      generationId = result?.id as string | undefined;
+      generationId = (result?.generationId ?? result?.id) as string | undefined;
       videoUrl = result?.videoUrl as string | undefined;
       const status = result?.status as string | undefined;
-      return `id=${String(generationId).slice(0, 12)}… status=${status}`;
+      return `id=${String(generationId ?? '—').slice(0, 12)}… status=${status}`;
     })
   );
 

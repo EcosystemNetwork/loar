@@ -9,7 +9,11 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
 import {LoarToken} from "../src/LoarToken.sol";
 import {LoarFaucet} from "../src/LoarFaucet.sol";
 import {UniverseManager} from "../src/UniverseManager.sol";
-import {UniverseTokenDeployer} from "../src/UniverseTokenDeployer.sol";
+import {UniverseTokenDeployerV3} from "../src/UniverseTokenDeployerV3.sol";
+import {BondingCurveFactory} from "../src/factories/BondingCurveFactory.sol";
+import {GovernanceTokenFactory} from "../src/factories/GovernanceTokenFactory.sol";
+import {GovernorFactory} from "../src/factories/GovernorFactory.sol";
+import {TimelockController} from "@openzeppelin/governance/TimelockController.sol";
 import {UniverseFactory} from "../src/factories/UniverseFactory.sol";
 import {UniverseMetadataRenderer} from "../src/UniverseMetadataRenderer.sol";
 import {LoarFeeLocker} from "../src/LoarFeeLocker.sol";
@@ -108,8 +112,32 @@ contract DeployAllScript is Script {
         um.setMetadataRenderer(address(umr));
         console.log("[2] Factory + Renderer wired");
 
-        UniverseTokenDeployer utd = new UniverseTokenDeployer(address(um));
-        console.log("[2] UniverseTokenDeployer:", address(utd));
+        // FACTORY-02: V3 factory pattern — deploy the three factories first, then V3 deployer.
+        BondingCurveFactory bcFactory = new BondingCurveFactory();
+        console.log("[2] BondingCurveFactory:", address(bcFactory));
+
+        GovernanceTokenFactory gtFactory = new GovernanceTokenFactory();
+        console.log("[2] GovernanceTokenFactory:", address(gtFactory));
+
+        GovernorFactory govFactory = new GovernorFactory();
+        console.log("[2] GovernorFactory:", address(govFactory));
+
+        // TimelockController for per-universe governance (24h minimum, executable by governor).
+        // Deployer is the temporary admin and will renounce below once the Governor takes over.
+        address[] memory proposers = new address[](0);
+        address[] memory executors = new address[](1);
+        executors[0] = address(0); // anyone can execute after delay
+        TimelockController timelock = new TimelockController(24 hours, proposers, executors, d);
+        console.log("[2] TimelockController:", address(timelock));
+
+        UniverseTokenDeployerV3 utd = new UniverseTokenDeployerV3(
+            address(um),
+            address(gtFactory),
+            address(govFactory),
+            address(bcFactory)
+        );
+        utd.setTimelock(address(timelock));
+        console.log("[2] UniverseTokenDeployerV3:", address(utd));
 
         LoarFeeLocker feeLocker = new LoarFeeLocker(d);
         console.log("[2] LoarFeeLocker:", address(feeLocker));
