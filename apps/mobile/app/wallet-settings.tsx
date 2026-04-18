@@ -1,5 +1,5 @@
 /**
- * Wallet settings screen — CDP wallet session management.
+ * Wallet settings screen — thirdweb wallet session management.
  */
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -11,7 +11,7 @@ import { Button } from '../src/components/ui/Button';
 import { Card } from '../src/components/ui/Card';
 import { SectionHeader } from '../src/components/ui/SectionHeader';
 import { useAuth } from '../src/contexts/AuthContext';
-import { connectCDPWallet, disconnectCDP, getCDPChainId } from '../src/lib/cdp';
+import { connectWallet, disconnectWallet, getWalletChainId } from '../src/lib/thirdweb';
 
 export default function WalletSettingsScreen() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function WalletSettingsScreen() {
   const [chainId, setChainId] = useState<number | null>(null);
 
   useEffect(() => {
-    getCDPChainId()
+    getWalletChainId()
       .then(setChainId)
       .catch(() => setChainId(null));
   }, []);
@@ -40,7 +40,7 @@ export default function WalletSettingsScreen() {
         text: 'Disconnect',
         style: 'destructive',
         onPress: async () => {
-          await disconnectCDP().catch(() => {});
+          await disconnectWallet().catch(() => {});
           await signOut();
           router.replace('/(auth)/login');
         },
@@ -50,8 +50,8 @@ export default function WalletSettingsScreen() {
 
   const handleReconnect = async () => {
     try {
-      await connectCDPWallet();
-      const id = await getCDPChainId();
+      await connectWallet('google');
+      const id = await getWalletChainId();
       setChainId(id);
     } catch {
       // user cancelled
@@ -128,7 +128,7 @@ export default function WalletSettingsScreen() {
             <AssetRow
               icon="🔄"
               label="Reconnect"
-              subtitle="Re-open Coinbase Wallet to reconnect"
+              subtitle="Re-authenticate your wallet session"
               onPress={handleReconnect}
             />
           </View>
@@ -138,9 +138,9 @@ export default function WalletSettingsScreen() {
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
           <Text className="text-text-primary font-semibold text-sm">Security</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            LOAR Vault is non-custodial. Your keys are managed by Coinbase Smart Wallet (Google,
-            Apple, passkeys, or email). We only store a SIWE session JWT, which can be revoked at
-            any time by disconnecting.
+            LOAR Vault is non-custodial. Your keys are managed by a thirdweb in-app wallet (Google,
+            Apple, passkey, or email). We only store a SIWE session JWT, which can be revoked at any
+            time by disconnecting.
           </Text>
         </View>
 

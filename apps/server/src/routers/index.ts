@@ -49,6 +49,7 @@ import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
 import { profilesRouter } from './profiles/profiles.routes';
 import { entitiesRouter } from './entities/entities.index';
+import { offChainNodesRouter } from './offChainNodes/offChainNodes.routes';
 import { questsRouter } from './quests/quests.routes';
 import { sandboxRouter } from './sandbox/sandbox.routes';
 import { collabsRouter } from './collabs/collabs.routes';
@@ -171,6 +172,7 @@ export const appRouter = router({
   wiki: wikiRouter,
   comments: commentsRouter,
   entities: entitiesRouter,
+  offChainNodes: offChainNodesRouter,
   media: mediaRouter,
   collaboration: collaborationRouter,
 

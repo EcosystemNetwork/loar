@@ -43,6 +43,53 @@ const scriptJobsCol = () => {
   return db.collection('scriptToEpisodeJobs');
 };
 
+const contentCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('content');
+};
+
+async function publishClipToGallery(opts: {
+  creatorUid: string;
+  universeId: string;
+  videoUrl: string;
+  thumbnailUrl?: string | null;
+  prompt: string;
+  modelId: string;
+  generationId: string;
+  episodeTitle: string;
+  sceneIndex: number;
+}) {
+  try {
+    const now = new Date();
+    await contentCol().add({
+      title: `${opts.episodeTitle} — Scene ${opts.sceneIndex + 1}`.slice(0, 100),
+      description: opts.prompt,
+      mediaUrl: opts.videoUrl,
+      thumbnailUrl: opts.thumbnailUrl || null,
+      mediaType: 'ai-video',
+      classification: 'original',
+      tags: ['episode', 'script-to-episode'],
+      ipDeclaration: {
+        isOriginal: true,
+        usesCopyrightedMaterial: false,
+        license: 'all-rights-reserved',
+      },
+      visibility: 'public',
+      creatorUid: opts.creatorUid,
+      universeId: opts.universeId,
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+      likes: 0,
+      reviewStatus: 'not_required',
+      generationId: opts.generationId,
+      generationModel: opts.modelId,
+    });
+  } catch (err) {
+    console.error('[script-to-episode] gallery publish failed:', err);
+  }
+}
+
 // ── Schemas ─────────────────────────────────────────────────────────────
 
 const clipSchema = z.object({
@@ -486,6 +533,19 @@ async function runScriptToEpisode(jobId: string, userId: string): Promise<void> 
           // Extract last frame for continuity with next clip
           const lastFrameUrl = await extractLastFrame(videoUrl, `${jobId}-scene-${i}`);
           if (lastFrameUrl) previousLastFrameUrl = lastFrameUrl;
+
+          // Publish clip to gallery so paid generations are never orphaned
+          publishClipToGallery({
+            creatorUid: userId,
+            universeId: job.universeId as string,
+            videoUrl,
+            thumbnailUrl: lastFrameUrl,
+            prompt: scene.prompt,
+            modelId: model!.id,
+            generationId,
+            episodeTitle: job.title as string,
+            sceneIndex: i,
+          });
 
           await jobRef.update({
             [`clipResults.${i}`]: {

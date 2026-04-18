@@ -31,6 +31,7 @@ import {
   getUniverseRelations,
 } from './entities.handlers';
 import { geminiService } from '../../services/gemini';
+import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
@@ -78,6 +79,18 @@ export const entitiesRouter = router({
         },
         ctx.user.address
       );
+
+      // Auto-generate cover image if none was provided (fire-and-forget)
+      if (!input.imageUrl && result.id) {
+        triggerCoverImageGenerationAsync({
+          id: result.id,
+          name: input.name,
+          description: input.description,
+          kind: input.kind,
+          metadata: (input.metadata || {}) as Record<string, unknown>,
+        });
+      }
+
       return { success: true, ...result };
     }),
 

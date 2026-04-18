@@ -1,0 +1,52 @@
+
+> loar-fullstack@ dev:server /home/god/Desktop/LOAR/loar
+> turbo -F server dev
+
+• turbo 2.8.20
+
+   • Packages in scope: server
+   • Running dev in 1 packages
+   • Remote caching disabled
+
+server:dev: cache bypass, force executing e6759dd55c188eea
+server:dev: 
+server:dev: > server@0.1.0 dev /home/god/Desktop/LOAR/loar/apps/server
+server:dev: > tsx watch src/index.ts
+server:dev: 
+server:dev: node:internal/fs/watchers:247
+server:dev:     const error = new UVException({
+server:dev:                   ^
+server:dev: 
+server:dev: Error: ENOSPC: System limit for number of file watchers reached, watch '/home/god/Desktop/LOAR/loar/apps/server/src/index.ts'
+server:dev:     at FSWatcher.<computed> (node:internal/fs/watchers:247:19)
+server:dev:     at Object.watch (node:fs:2503:36)
+server:dev:     at createFsWatchInstance (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:7811)
+server:dev:     at setFsWatchListener (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:8144)
+server:dev:     at ca._watchWithNodeFs (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:9639)
+server:dev:     at ca._handleFile (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:10327)
+server:dev:     at ca._addToNodeFs (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:13460)
+server:dev:     at async file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:25103
+server:dev:     at async Promise.all (index 0)
+server:dev: Emitted 'error' event on FSWatcher instance at:
+server:dev:     at pl._handleError (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:27555)
+server:dev:     at ca._addToNodeFs (file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:13553)
+server:dev:     at async file:///home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:25103
+server:dev:     at async Promise.all (index 0) {
+server:dev:   errno: -28,
+server:dev:   syscall: 'watch',
+server:dev:   code: 'ENOSPC',
+server:dev:   path: '/home/god/Desktop/LOAR/loar/apps/server/src/index.ts',
+server:dev:   filename: '/home/god/Desktop/LOAR/loar/apps/server/src/index.ts'
+server:dev: }
+server:dev: 
+server:dev: Node.js v20.20.1
+server:dev:  ELIFECYCLE  Command failed with exit code 1.
+ ERROR  server#dev: command (/home/god/Desktop/LOAR/loar/apps/server) /home/god/.local/share/pnpm/.tools/pnpm/9.15.0/bin/pnpm run dev exited (1)
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    424ms 
+Failed:    server#dev
+
+ ERROR  run failed: command  exited (1)
+ ELIFECYCLE  Command failed with exit code 1.

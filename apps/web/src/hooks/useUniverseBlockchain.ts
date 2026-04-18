@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
+import { trpcClient } from '@/utils/trpc';
 
 export interface GraphData {
   nodeIds: readonly (string | number | bigint)[];
@@ -218,6 +219,16 @@ export function useUniverseBlockchain({
   // Fetch resolved content from Ponder indexer
   const { data: contentMap } = useNodeContents(contractAddress);
 
+  // ── Off-chain fallback (Fun-Mode universes) ──
+  // Loads Firestore-backed timeline nodes for universes without an on-chain contract.
+  // Activates when there's no contract OR when the on-chain graph is empty.
+  const { data: offChainData } = useQuery({
+    queryKey: ['offChainNodes', universeId],
+    queryFn: () => trpcClient.offChainNodes.list.query({ universeId }),
+    enabled: !!universeId,
+    staleTime: 30_000,
+  });
+
   const graphData = useMemo(() => {
     if (contractAddress && fullGraphData) {
       const [nodeIds, contentHashes, plotHashes, previousIds, nextIds, flags] = fullGraphData;
@@ -251,6 +262,34 @@ export function useUniverseBlockchain({
       };
     }
 
+    // No on-chain data — try off-chain fallback
+    if (offChainData?.nodes && offChainData.nodes.length > 0) {
+      const nodes = offChainData.nodes as any[];
+      const nodeIds = nodes.map((n) => String(n.nodeId));
+      const contentHashes = nodes.map((n) => String(n.contentHash || ''));
+      const plotHashes = nodes.map((n) => String(n.plotHash || ''));
+      const urls = nodes.map((n) => String(n.videoUrl || ''));
+      const descriptions = nodes.map((n) => String(n.title || n.plot || ''));
+      const previousNodes = nodes.map((n) => String(n.previousNodeId || 0));
+      const children = nodes.map((n) =>
+        Array.isArray(n.children) ? (n.children as number[]).map((c) => String(c)) : []
+      );
+      const flags = nodes.map((n) => Boolean(n.canon));
+      const canonChain = nodes.filter((n) => n.canon).map((n) => String(n.nodeId));
+
+      return {
+        nodeIds: nodeIds as readonly (string | number | bigint)[],
+        contentHashes: contentHashes as readonly string[],
+        plotHashes: plotHashes as readonly string[],
+        urls: urls as readonly string[],
+        descriptions: descriptions as readonly string[],
+        previousNodes: previousNodes as readonly (string | number | bigint)[],
+        children: children as readonly (string | number | bigint)[][],
+        flags: flags as readonly boolean[],
+        canonChain: canonChain as readonly (string | number | bigint)[],
+      };
+    }
+
     return {
       nodeIds: [],
       contentHashes: [],
@@ -269,6 +308,7 @@ export function useUniverseBlockchain({
     canonChainData,
     contractAddress,
     contentMap,
+    offChainData,
   ]);
 
   const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingCanonChain;

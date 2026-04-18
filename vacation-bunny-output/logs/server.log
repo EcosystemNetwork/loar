@@ -1,0 +1,9 @@
+[dotenv@17.3.1] injecting env (58) from ../../.env -- tip: 🛡️ auth for agents: https://vestauth.com
+[sentry] SENTRY_DSN not set — error reporting disabled
+Firebase Admin SDK initialized successfully
+Starting server on port 3000
+CORS origin: http://localhost:3001
+Environment: development
+Server listening on http://localhost:3000
+[pricing] Heartbeat complete: 45 models checked, 0 price changes detected
+[pricing] Heartbeat started — checking every 12 hours

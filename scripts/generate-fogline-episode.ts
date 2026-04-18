@@ -22,6 +22,7 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { keccak256, toBytes } from 'viem';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // ── Firebase Init ───────────────────────────────────────────────────────
@@ -871,6 +872,19 @@ async function generateSceneVideo(
       generationModel: model,
     });
 
+    // ── Create off-chain timeline node so it shows on the universe canvas ──
+    try {
+      await createOffChainNode({
+        videoUrl,
+        title: scene.title,
+        plot: scene.prompt,
+        sceneId: scene.id,
+      });
+      console.log(`    ↳ Off-chain timeline node created`);
+    } catch (nodeErr) {
+      console.warn(`    ⚠️ Failed to create timeline node: ${(nodeErr as Error).message}`);
+    }
+
     console.log(`  ✅ Generated: ${videoUrl.slice(0, 80)}...`);
     return {
       sceneId: scene.id,
@@ -882,6 +896,92 @@ async function generateSceneVideo(
   } catch (error) {
     console.error(`  ❌ Failed:`, (error as Error).message);
     throw error;
+  }
+}
+
+// ── Off-Chain Timeline Node Creation ────────────────────────────────────
+
+const offChainNodesCol = () => db.collection('offChainNodes');
+const counterCol = () => db.collection('offChainNodeCounters');
+
+async function nextSequentialNodeId(universeId: string): Promise<number> {
+  const ref = counterCol().doc(universeId);
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    const current = doc.exists ? (doc.data()?.latest as number) || 0 : 0;
+    const next = current + 1;
+    tx.set(ref, { latest: next, updatedAt: new Date() }, { merge: true });
+    return next;
+  });
+}
+
+/**
+ * Tracks the most-recently-created node per universe so we can chain
+ * scenes sequentially via previousNodeId.
+ */
+let _lastNodeIdForUniverse = 0;
+
+async function createOffChainNode(opts: {
+  videoUrl: string;
+  title: string;
+  plot: string;
+  sceneId: number;
+}) {
+  const nodeId = await nextSequentialNodeId(UNIVERSE_ID);
+  const previousNodeId = _lastNodeIdForUniverse;
+  _lastNodeIdForUniverse = nodeId;
+
+  const contentHash = keccak256(toBytes(opts.videoUrl));
+  const plotHash = keccak256(toBytes(opts.plot));
+
+  const docId = randomUUID();
+  await offChainNodesCol()
+    .doc(docId)
+    .set({
+      id: docId,
+      universeId: UNIVERSE_ID,
+      nodeId,
+      creator: CREATOR_ADDRESS.toLowerCase(),
+      contentHash,
+      plotHash,
+      videoUrl: opts.videoUrl,
+      plot: opts.plot,
+      title: opts.title,
+      sceneId: opts.sceneId,
+      previousNodeId,
+      children: [],
+      canon: previousNodeId === 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+  // Append to parent's children array
+  if (previousNodeId > 0) {
+    const parentSnap = await offChainNodesCol()
+      .where('universeId', '==', UNIVERSE_ID)
+      .where('nodeId', '==', previousNodeId)
+      .limit(1)
+      .get();
+    if (!parentSnap.empty) {
+      const parent = parentSnap.docs[0];
+      const children = (parent.data().children || []) as number[];
+      if (!children.includes(nodeId)) {
+        await parent.ref.update({ children: [...children, nodeId], updatedAt: new Date() });
+      }
+    }
+  }
+
+  return nodeId;
+}
+
+/**
+ * Recover state on resume — find the highest existing nodeId so we continue chaining.
+ */
+async function loadLastNodeId() {
+  const counterDoc = await counterCol().doc(UNIVERSE_ID).get();
+  _lastNodeIdForUniverse = counterDoc.exists ? (counterDoc.data()?.latest as number) || 0 : 0;
+  if (_lastNodeIdForUniverse > 0) {
+    console.log(`  Resuming from node ${_lastNodeIdForUniverse}`);
   }
 }
 
@@ -929,6 +1029,9 @@ async function main() {
   Dry Run  : ${DRY_RUN}
   FAL Key  : configured
 `);
+
+  // Load last off-chain node id so we continue chaining sequentially
+  await loadLastNodeId();
 
   // Step 1: Fetch wiki entities
   console.log('Step 1: Fetching wiki entities from Firestore...');

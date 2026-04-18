@@ -4,9 +4,12 @@
  *  - AuthProvider (SIWE session state)
  *  - Expo Router Stack
  *
- * CDP wallet (Coinbase Smart Wallet) is initialised in src/lib/cdp.ts
- * and called directly from the login screen — no global provider needed.
+ * The thirdweb client is initialised lazily in src/lib/thirdweb.ts — no
+ * global provider is required here.
  */
+// thirdweb requires crypto.getRandomValues; polyfill must import before any thirdweb code.
+import 'react-native-get-random-values';
+
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,13 +17,9 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../src/global.css';
 import { AuthProvider } from '../src/contexts/AuthContext';
-import { initCDP } from '../src/lib/cdp';
 import { queryClient } from '../src/lib/trpc';
 
 SplashScreen.preventAutoHideAsync();
-
-// Initialise CDP once at module load
-initCDP();
 
 export default function RootLayout() {
   useEffect(() => {
@@ -42,10 +41,7 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="asset/[id]"
-              options={{ title: 'Asset', presentation: 'card' }}
-            />
+            <Stack.Screen name="asset/[id]" options={{ title: 'Asset', presentation: 'card' }} />
             <Stack.Screen
               name="universe/[id]"
               options={{ title: 'Universe', presentation: 'card' }}
@@ -54,14 +50,8 @@ export default function RootLayout() {
               name="subscriptions"
               options={{ title: 'Subscriptions', presentation: 'card' }}
             />
-            <Stack.Screen
-              name="credits"
-              options={{ title: 'Credits', presentation: 'card' }}
-            />
-            <Stack.Screen
-              name="drafts"
-              options={{ title: 'Drafts', presentation: 'card' }}
-            />
+            <Stack.Screen name="credits" options={{ title: 'Credits', presentation: 'card' }} />
+            <Stack.Screen name="drafts" options={{ title: 'Drafts', presentation: 'card' }} />
             <Stack.Screen
               name="wallet-settings"
               options={{ title: 'Wallet', presentation: 'card' }}

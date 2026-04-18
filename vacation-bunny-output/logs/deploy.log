@@ -1,0 +1,54 @@
+
+════════════════════════════════════════════════════════════
+  LOAR — The Vacation Bunny Universe + $BUNNY
+  Pilot: "Butterfly Days in Cannes"
+  Story by YOONJEONG HAN
+════════════════════════════════════════════════════════════
+  Deployer: 0x116C28e6DCABCa363f83217C712d79DCE168d90e
+  Chain:    Sepolia (11155111)
+  Server:   http://localhost:3000
+
+  [IMAGE] Trying direct Google Imagen 4...
+  [IMAGE] Direct Imagen failed: No images returned
+  [IMAGE] Falling back to server image.generate (model router)...
+  [IMAGE] Server returned: https://ark-acg-ap-southeast-1.tos-ap-southeast-1.volces.com/seedream-5-0/021776...
+  [IMAGE] Generated via server: 372 KB
+  [PINATA] Uploading to IPFS...
+  [PINATA] Pinned: QmSw3Fv36yodwYNeDXr4ZumRDdppbPouqhQTBvE5ZZShRN
+  [PINATA] URL: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmSw3Fv36yodwYNeDXr4ZumRDdppbPouqhQTBvE5ZZShRN
+  [CHAIN] Contract: 0xB82dE188841a799e0dBB58D885D81BEE7A735f00
+  [CHAIN] Balance: 0.932008132525926886 ETH
+  [CHAIN] Mint fee: 0.05 ETH
+  [CHAIN] Simulating atomic createUniverseWithToken...
+  [CHAIN] Atomic reverted — using two-step flow
+  [CHAIN] Step 1/2: createUniverse...
+  [CHAIN] Universe: 0x8e5cDdb763534Fe426766e4eB035449fB9e73913 (ID: 14)
+  [CHAIN] Step 2/2: deployUniverseToken...
+  [CHAIN] TX: 0x756bdfafcf54c4cca7b27194148b04d9049f6a5c2cc5617b9c1efb379a5e0245
+  [CHAIN] Explorer: https://sepolia.etherscan.io/tx/0x756bdfafcf54c4cca7b27194148b04d9049f6a5c2cc5617b9c1efb379a5e0245
+  [CHAIN] Confirmed in block 10682768 (gas: 6406318)
+  [CHAIN] Universe : 0x8e5cDdb763534Fe426766e4eB035449fB9e73913
+  [CHAIN] Token    : 0x0b5D70DE729f196f46F4423c926A713f4b3EF889 ($BUNNY)
+  [CHAIN] Governor : 0xf84556e275e8CE41821651f5459E0d3b0447408b
+  [REGISTER] Authenticating via SIWE...
+  [REGISTER] WARNING: Auth verify failed: {"code":"FORBIDDEN","message":"Cross-origin request blocked"}
+
+════════════════════════════════════════════════════════════
+  COMPLETE
+════════════════════════════════════════════════════════════
+
+  Universe : The Vacation Bunny Universe
+  Address  : 0x8e5cDdb763534Fe426766e4eB035449fB9e73913
+  Token    : $BUNNY @ 0x0b5D70DE729f196f46F4423c926A713f4b3EF889
+  Governor : 0xf84556e275e8CE41821651f5459E0d3b0447408b
+  Image    : https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmSw3Fv36yodwYNeDXr4ZumRDdppbPouqhQTBvE5ZZShRN
+  TX       : https://sepolia.etherscan.io/tx/0x756bdfafcf54c4cca7b27194148b04d9049f6a5c2cc5617b9c1efb379a5e0245
+
+  Next: BUNNY_ADDR=0x8e5cDdb763534Fe426766e4eB035449fB9e73913 pnpm tsx scripts/vacation-bunny-wiki.ts
+
+Registering Vacation Bunny universe in Firestore...
+
+FAILED: fetch failed
+Registering Vacation Bunny universe in Firestore...
+
+FAILED: fetch failed

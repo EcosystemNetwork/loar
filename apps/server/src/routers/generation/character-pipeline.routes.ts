@@ -38,6 +38,53 @@ const userCreditsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('userCredits');
 };
+const contentCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('content');
+};
+
+async function publishToGallery(opts: {
+  creatorUid: string;
+  mediaUrl: string;
+  thumbnailUrl?: string | null;
+  mediaType: 'image' | 'ai-image' | '3d';
+  title: string;
+  description: string;
+  universeId?: string | null;
+  generationId: string;
+  generationModel: string;
+  tags?: string[];
+}) {
+  try {
+    const now = new Date();
+    await contentCol().add({
+      title: opts.title.slice(0, 100),
+      description: opts.description,
+      mediaUrl: opts.mediaUrl,
+      thumbnailUrl: opts.thumbnailUrl || opts.mediaUrl,
+      mediaType: opts.mediaType,
+      classification: 'original',
+      tags: opts.tags || [],
+      ipDeclaration: {
+        isOriginal: true,
+        usesCopyrightedMaterial: false,
+        license: 'all-rights-reserved',
+      },
+      visibility: 'public',
+      creatorUid: opts.creatorUid,
+      ...(opts.universeId ? { universeId: opts.universeId } : {}),
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+      likes: 0,
+      reviewStatus: 'not_required',
+      generationId: opts.generationId,
+      generationModel: opts.generationModel,
+    });
+  } catch (err) {
+    console.error('[pipeline] gallery publish failed:', err);
+  }
+}
 
 // ── Pricing ──────────────────────────────────────────────────────────
 
@@ -131,6 +178,7 @@ async function executePipeline(opts: {
   artStyle: string;
   texturePrompt: string;
   credits: number;
+  universeAddress?: string | null;
 }) {
   const {
     pipelineId,
@@ -142,6 +190,7 @@ async function executePipeline(opts: {
     artStyle,
     texturePrompt,
     credits,
+    universeAddress,
   } = opts;
 
   try {
@@ -188,6 +237,19 @@ async function executePipeline(opts: {
       generationId: pipelineId,
     }).catch((err) => console.error('[pipeline] 2D attach failed:', err));
 
+    await publishToGallery({
+      creatorUid: userId,
+      mediaUrl: imageUrl,
+      thumbnailUrl: imageUrl,
+      mediaType: 'ai-image',
+      title: `${entityName} — concept art`,
+      description: entityDescription,
+      universeId: universeAddress || null,
+      generationId: `${pipelineId}:2d`,
+      generationModel: 'google-imagen-3',
+      tags: ['character', 'concept-art', characterStyle],
+    });
+
     await updatePipeline(pipelineId, {
       currentStep: 'imagen_2d_complete',
       imageUrl,
@@ -208,7 +270,7 @@ async function executePipeline(opts: {
       enablePbr: false,
       aiModel: 'meshy-6',
       topology: 'triangle',
-      targetPolycount: 30000,
+      targetPolycount: 15000,
     });
 
     await updatePipeline(pipelineId, {
@@ -216,8 +278,8 @@ async function executePipeline(opts: {
       stepProgress: `3D conversion in progress (task: ${meshyTaskId})...`,
     });
 
-    // Wait for 3D model to complete (up to 15 min)
-    const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 15 * 60 * 1000);
+    // Wait for 3D model to complete (up to 25 min)
+    const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 25 * 60 * 1000);
 
     const glbUrl = meshyTask.modelUrls?.glb;
     if (!glbUrl) throw new Error('Meshy 3D conversion did not return a GLB model');
@@ -265,6 +327,19 @@ async function executePipeline(opts: {
       }).catch((err) => console.error('[pipeline] 3D thumbnail attach failed:', err));
     }
 
+    await publishToGallery({
+      creatorUid: userId,
+      mediaUrl: glbUrl,
+      thumbnailUrl: meshyTask.thumbnailUrl || imageUrl,
+      mediaType: '3d',
+      title: `${entityName} — 3D model (untextured)`,
+      description: entityDescription,
+      universeId: universeAddress || null,
+      generationId: `${pipelineId}:3d`,
+      generationModel: 'meshy-image-to-3d',
+      tags: ['character', '3d', 'untextured'],
+    });
+
     await updatePipeline(pipelineId, {
       currentStep: 'meshy_3d_complete',
       modelUrls: meshyTask.modelUrls,
@@ -282,9 +357,11 @@ async function executePipeline(opts: {
       stepProgress: 'Applying AI textures to 3D model...',
     });
 
-    const fullTexturePrompt =
+    let fullTexturePrompt =
       texturePrompt ||
       `${entityName}, ${entityDescription}, ${artStyle} style, detailed PBR textures, high quality materials`;
+    // Meshy retexture caps text_style_prompt at 800 chars
+    if (fullTexturePrompt.length > 800) fullTexturePrompt = fullTexturePrompt.slice(0, 797) + '...';
 
     const { taskId: textureTaskId } = await meshyService.textToTexture({
       modelUrl: glbUrl,
@@ -299,8 +376,8 @@ async function executePipeline(opts: {
       stepProgress: `Texturing in progress (task: ${textureTaskId})...`,
     });
 
-    // Wait for texture task to complete (up to 10 min)
-    const textureTask = await meshyService.waitForTextureTask(textureTaskId, 10 * 60 * 1000);
+    // Wait for texture task to complete (up to 20 min)
+    const textureTask = await meshyService.waitForTextureTask(textureTaskId, 20 * 60 * 1000);
 
     // Attach textured model files
     const texturedFormats: [string, string | undefined][] = [
@@ -343,6 +420,22 @@ async function executePipeline(opts: {
         subCategory: 'concept_art',
         generationId: pipelineId,
       }).catch((err) => console.error('[pipeline] textured thumbnail attach failed:', err));
+    }
+
+    const texturedGlbUrl = textureTask.modelUrls?.glb;
+    if (texturedGlbUrl) {
+      await publishToGallery({
+        creatorUid: userId,
+        mediaUrl: texturedGlbUrl,
+        thumbnailUrl: textureTask.thumbnailUrl || meshyTask.thumbnailUrl || imageUrl,
+        mediaType: '3d',
+        title: `${entityName} — textured 3D model`,
+        description: entityDescription,
+        universeId: universeAddress || null,
+        generationId: `${pipelineId}:textured`,
+        generationModel: 'meshy-text-to-texture',
+        tags: ['character', '3d', 'textured', artStyle],
+      });
     }
 
     await updatePipeline(pipelineId, {
@@ -463,6 +556,7 @@ export const characterPipelineRouter = router({
         artStyle: input.artStyle,
         texturePrompt: input.texturePrompt || '',
         credits: totalCredits,
+        universeAddress: input.universeAddress || null,
       }).catch((err) =>
         console.error(`[pipeline] Background pipeline ${pipelineId} unhandled:`, err)
       );

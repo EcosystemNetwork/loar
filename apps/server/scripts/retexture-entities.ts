@@ -119,11 +119,11 @@ async function main() {
         enablePbr: false,
         aiModel: 'meshy-6',
         topology: 'triangle',
-        targetPolycount: 30000,
+        targetPolycount: 15000,
       });
       console.log(`    Task: ${meshyTaskId} — polling...`);
 
-      const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 15 * 60 * 1000);
+      const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 25 * 60 * 1000);
       const glbUrl = meshyTask.modelUrls?.glb;
       if (!glbUrl) throw new Error('Meshy returned no GLB');
       console.log(`    3D model ready`);
@@ -142,7 +142,7 @@ async function main() {
       });
       console.log(`    Task: ${textureTaskId} — polling...`);
 
-      const textureTask = await meshyService.waitForTextureTask(textureTaskId, 10 * 60 * 1000);
+      const textureTask = await meshyService.waitForTextureTask(textureTaskId, 20 * 60 * 1000);
       console.log(`    Textures applied!`);
 
       // ── Step 3: Attach textured models ────────────────────────────

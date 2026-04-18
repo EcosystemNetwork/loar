@@ -35,6 +35,10 @@ const account = privateKeyToAccount(PRIVATE_KEY);
 
 const UNIVERSE_ADDR = process.env.VOIDBORN_ADDR ?? null;
 const START_INDEX = parseInt(process.env.START_INDEX ?? '0', 10);
+const RETRY_NAMES = (process.env.RETRY_NAMES ?? '')
+  .split(',')
+  .map((n) => n.trim())
+  .filter(Boolean);
 
 // ── Entity definitions ──────────────────────────────────────────────────
 interface EntityDef {
@@ -833,7 +837,7 @@ function buildSiweMessage(params: { address: string; nonce: string; chainId: num
     '',
     'Sign in to LOAR',
     '',
-    `URI: http://localhost:5173`,
+    `URI: http://localhost:3001`,
     `Version: 1`,
     `Chain ID: ${params.chainId}`,
     `Nonce: ${params.nonce}`,
@@ -853,7 +857,7 @@ async function getAuthToken(): Promise<string> {
   const signature = await account.signMessage({ message });
   const verifyRes = await fetch(`${SERVER_URL}/auth/verify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:5173' },
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3001' },
     body: JSON.stringify({ message, signature }),
   });
   const setCookie = verifyRes.headers.get('set-cookie') ?? '';
@@ -899,6 +903,7 @@ async function main() {
 
   for (let i = START_INDEX; i < ENTITIES.length; i++) {
     const entity = ENTITIES[i];
+    if (RETRY_NAMES.length > 0 && !RETRY_NAMES.includes(entity.name)) continue;
     const label = `${entity.kind.toUpperCase()} ${i + 1}/${ENTITIES.length}`;
 
     console.log(`\n${'═'.repeat(55)}`);

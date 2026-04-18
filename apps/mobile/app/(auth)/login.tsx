@@ -1,13 +1,13 @@
 /**
- * Login screen — CDP wallet connection + SIWE sign-in.
+ * Login screen — thirdweb in-app wallet connection + SIWE sign-in.
  *
- * Uses @coinbase/wallet-mobile-sdk to deep-link into Coinbase Wallet.
- * Coinbase Wallet supports embedded wallets created via:
- *   Google / Apple / passkeys / email
+ * thirdweb's `inAppWallet` supports Google / Apple / passkey / email login.
+ * OAuth providers open via expo-web-browser and return through the
+ * `loarvault://` deep link scheme configured in app.json.
  *
  * Flow:
- *  1. Tap "Connect Wallet" → deep links into Coinbase Wallet
- *  2. User approves connection (or signs in with Google/Apple/passkeys)
+ *  1. Tap "Continue with Google" → thirdweb opens the OAuth flow
+ *  2. User authenticates and the wallet is created/resumed
  *  3. We get the wallet address
  *  4. We fetch a SIWE nonce from the server
  *  5. We ask the wallet to sign the SIWE message
@@ -20,7 +20,12 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../src/components/ui/Button';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { connectCDPWallet, getCDPChainId, signWithCDP } from '../../src/lib/cdp';
+import {
+  connectWallet,
+  getWalletChainId,
+  signWithWallet,
+  type ConnectStrategy,
+} from '../../src/lib/thirdweb';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -41,18 +46,15 @@ export default function LoginScreen() {
     }
   }, [error, clearError]);
 
-  const handleConnect = async () => {
+  const handleConnect = async (strategy: ConnectStrategy) => {
     setIsConnecting(true);
     try {
-      // 1. Connect wallet via CDP (deep-links to Coinbase Wallet)
-      const address = await connectCDPWallet();
+      const address = await connectWallet(strategy);
       setConnectedAddress(address);
 
-      // 2. Get chain ID
-      const chainId = await getCDPChainId().catch(() => 84532); // default Base Sepolia
+      const chainId = await getWalletChainId().catch(() => 84532);
 
-      // 3. Sign SIWE message
-      await signIn(address, (message) => signWithCDP(message, address), chainId);
+      await signIn(address, (message) => signWithWallet(message), chainId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed';
       const isCancel =
@@ -129,7 +131,7 @@ export default function LoginScreen() {
 
           <View className="flex-1" />
 
-          {/* Connect button */}
+          {/* Connect buttons */}
           <View className="gap-3">
             {connectedAddress && !isAuthenticated ? (
               <View className="bg-zinc-900 rounded-xl p-3 items-center">
@@ -140,12 +142,30 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            <Button onPress={handleConnect} loading={loading} fullWidth size="lg">
-              Connect with Coinbase Wallet
+            <Button onPress={() => handleConnect('google')} loading={loading} fullWidth size="lg">
+              Continue with Google
+            </Button>
+            <Button
+              onPress={() => handleConnect('apple')}
+              loading={loading}
+              fullWidth
+              size="lg"
+              variant="secondary"
+            >
+              Continue with Apple
+            </Button>
+            <Button
+              onPress={() => handleConnect('passkey')}
+              loading={loading}
+              fullWidth
+              size="lg"
+              variant="secondary"
+            >
+              Continue with Passkey
             </Button>
 
             <Text className="text-text-tertiary text-xs text-center">
-              Sign in with Google, Apple, passkeys, or email via Coinbase Smart Wallet
+              Secured by thirdweb. Non-custodial — your keys stay in a wallet only you can unlock.
             </Text>
           </View>
         </View>

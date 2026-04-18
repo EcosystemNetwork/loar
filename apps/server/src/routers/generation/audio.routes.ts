@@ -118,6 +118,51 @@ async function uploadAudio(buffer: Buffer, filename: string): Promise<string> {
 
 // ── Auto-attach helper ───────────────────────────────────────────────
 
+async function autoPublishAudioToGallery(opts: {
+  creatorUid: string;
+  audioUrl: string;
+  prompt: string;
+  modelId: string;
+  universeId?: string | null;
+  generationId: string;
+  genre?: string | null;
+  style?: string | null;
+}) {
+  if (!db) return;
+  try {
+    const now = new Date();
+    const tags: string[] = [];
+    if (opts.genre) tags.push(opts.genre);
+    if (opts.style) tags.push(opts.style);
+    await db.collection('content').add({
+      title: opts.prompt.slice(0, 100) || 'Generated Audio',
+      description: opts.prompt,
+      mediaUrl: opts.audioUrl,
+      thumbnailUrl: null,
+      mediaType: 'audio',
+      classification: 'original',
+      tags,
+      ipDeclaration: {
+        isOriginal: true,
+        usesCopyrightedMaterial: false,
+        license: 'all-rights-reserved',
+      },
+      visibility: 'public',
+      creatorUid: opts.creatorUid,
+      ...(opts.universeId ? { universeId: opts.universeId } : {}),
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+      likes: 0,
+      reviewStatus: 'not_required',
+      generationId: opts.generationId,
+      generationModel: opts.modelId,
+    });
+  } catch (err) {
+    console.error('[audio] gallery publish failed:', err);
+  }
+}
+
 async function autoAttachAudio(opts: {
   creator: string;
   entityId: string | undefined;
@@ -355,6 +400,18 @@ export const audioRouter = router({
           generationId: genId,
           audioUrl: permanentUrl,
           label: `Music — ${input.prompt.slice(0, 60)}`,
+        });
+
+        // Auto-publish to gallery so paid generations are never orphaned
+        autoPublishAudioToGallery({
+          creatorUid: ctx.user.uid,
+          audioUrl: permanentUrl,
+          prompt: input.prompt,
+          modelId,
+          universeId: input.universeId || null,
+          generationId: genId,
+          genre: input.genre || null,
+          style: input.style || null,
         });
 
         return {
