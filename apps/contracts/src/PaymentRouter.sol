@@ -1,0 +1,273 @@
+// SPDX-License-Identifier: MIT
+pragma solidity =0.8.30;
+
+import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
+import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
+
+/// @title PaymentRouter
+/// @notice Centralizes all ETH revenue routing across the LOAR platform.
+///         Callers (revenue contracts) send ETH here via route(). The platform
+///         fee goes immediately to treasury; the creator's cut accrues and is
+///         pulled via claim().
+///
+///         Replaces the scattered platform.call + creator.call patterns in each
+///         revenue contract, giving a single place to adjust fees and routing.
+contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20;
+
+    address public treasury;
+    uint16 public defaultPlatformFeeBps;
+
+    /// @notice Accumulated ETH per creator, claimable via pull pattern
+    mapping(address => uint256) public claimable;
+
+    /// @notice Pending withdrawals for failed treasury transfers (M1 pull pattern fallback)
+    mapping(address => uint256) public pendingWithdrawals;
+
+    event PendingWithdrawal(address indexed account, uint256 amount);
+    event PendingClaimed(address indexed account, uint256 amount);
+
+    /// @notice $LOAR token for dual-currency payments
+    IERC20 public loarToken;
+
+    /// @notice Accumulated $LOAR per creator, claimable via pull pattern
+    mapping(address => uint256) public claimableLoar;
+
+    /// @notice Fee discount for $LOAR payments (default 500 = 5% discount)
+    uint16 public loarFeeDiscountBps;
+
+    /// @notice Whether the $LOAR token address has been permanently locked.
+    ///         Once locked, setLoarToken() cannot be called again, preventing
+    ///         the owner from swapping to a different token while users have
+    ///         claimableLoar balances accrued against the original token.
+    bool public loarTokenLocked;
+
+    event PaymentRouted(
+        address indexed creator,
+        uint256 creatorAmount,
+        uint256 platformAmount,
+        uint16 feeBps
+    );
+    event LoarPaymentRouted(
+        address indexed creator,
+        uint256 creatorAmount,
+        uint256 platformAmount,
+        uint16 feeBps
+    );
+    event Claimed(address indexed creator, uint256 amount);
+    event LoarClaimed(address indexed creator, uint256 amount);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event DefaultFeeUpdated(uint16 indexed newFeeBps);
+    event LoarTokenUpdated(address indexed newToken);
+    event LoarFeeDiscountUpdated(uint16 indexed newDiscountBps);
+
+    error ZeroAddress();
+    error NothingToClaim();
+    error TransferFailed();
+    error FeeTooHigh();
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() { _disableInitializers(); }
+
+    /// @param _treasury Receives the platform's fee cut immediately on each route()
+    /// @param _defaultPlatformFeeBps Default fee in basis points (e.g. 1000 = 10%)
+    /// @param _loarToken $LOAR token for dual-currency payments (can be address(0) initially)
+    /// @param _loarFeeDiscountBps Fee discount for $LOAR payments (e.g. 500 = 5%)
+    function initialize(
+        address _treasury,
+        uint16 _defaultPlatformFeeBps,
+        address _loarToken,
+        uint16 _loarFeeDiscountBps
+    ) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+        __Pausable_init();
+        if (_treasury == address(0)) revert ZeroAddress();
+        if (_defaultPlatformFeeBps > 5000) revert FeeTooHigh();
+        treasury = _treasury;
+        defaultPlatformFeeBps = _defaultPlatformFeeBps;
+        loarToken = IERC20(_loarToken);
+        loarFeeDiscountBps = _loarFeeDiscountBps;
+    }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /// @dev Sentinel value: pass type(uint16).max to use defaultPlatformFeeBps.
+    ///      Pass 0 to explicitly route with zero platform fee.
+    uint16 public constant USE_DEFAULT_FEE = type(uint16).max;
+
+    /// @notice Route a payment: send platform cut to treasury, accrue creator's cut
+    /// @param creator Address that will be able to claim the creator portion
+    /// @param feeBps Platform fee in basis points; pass USE_DEFAULT_FEE to use defaultPlatformFeeBps, 0 for no fee
+    function route(address creator, uint16 feeBps) external payable nonReentrant whenNotPaused {
+        if (msg.value == 0) return;
+        if (creator == address(0)) revert ZeroAddress();
+        uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;
+        if (bps > 5000) revert FeeTooHigh();
+        uint256 platformCut = (msg.value * bps) / 10_000;
+        uint256 creatorCut = msg.value - platformCut;
+
+        if (creatorCut > 0) {
+            claimable[creator] += creatorCut;
+        }
+        if (platformCut > 0) {
+            (bool s,) = treasury.call{value: platformCut}("");
+            if (!s) {
+                // M1 fix: store for later claim instead of reverting
+                pendingWithdrawals[treasury] += platformCut;
+                emit PendingWithdrawal(treasury, platformCut);
+            }
+        }
+
+        emit PaymentRouted(creator, creatorCut, platformCut, bps);
+    }
+
+    /// @notice Route a payment entirely to treasury (no creator split)
+    ///         Used for credit purchases and other platform-only flows.
+    function routeToTreasury() external payable nonReentrant whenNotPaused {
+        if (msg.value == 0) return;
+        (bool s,) = treasury.call{value: msg.value}("");
+        if (!s) {
+            // M1 fix: store for later claim instead of reverting
+            pendingWithdrawals[treasury] += msg.value;
+            emit PendingWithdrawal(treasury, msg.value);
+        }
+    }
+
+    /// @notice Creator pulls accumulated earnings
+    function claim() external nonReentrant {
+        uint256 amount = claimable[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        claimable[msg.sender] = 0;
+        (bool success,) = msg.sender.call{value: amount}("");
+        if (!success) revert TransferFailed();
+        emit Claimed(msg.sender, amount);
+    }
+
+    /// @notice Claim pending withdrawals from failed treasury transfers (M1 fix)
+    function claimPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        pendingWithdrawals[msg.sender] = 0;
+        (bool success,) = msg.sender.call{value: amount}("");
+        if (!success) revert TransferFailed();
+        emit PendingClaimed(msg.sender, amount);
+    }
+
+    error CannotSetSelfAsTreasury();
+
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert ZeroAddress();
+        // TREASURY-02 / M-4: prevent setting treasury to this contract, which would
+        // break accounting as platform-cut transfers would circle back into the router.
+        if (newTreasury == address(this)) revert CannotSetSelfAsTreasury();
+        emit TreasuryUpdated(treasury, newTreasury);
+        treasury = newTreasury;
+    }
+
+    function setDefaultFee(uint16 newFeeBps) external onlyOwner {
+        if (newFeeBps > 5000) revert FeeTooHigh();
+        defaultPlatformFeeBps = newFeeBps;
+        emit DefaultFeeUpdated(newFeeBps);
+    }
+
+    // ── $LOAR Dual Payment ──────────────────────────────────────
+
+    /// @notice Route a $LOAR payment with fee discount. Caller must have approved this contract.
+    /// @param creator Address that will be able to claim the creator portion
+    /// @param feeBps Platform fee in basis points; USE_DEFAULT_FEE to use default (with discount applied)
+    /// @param amount $LOAR amount to route
+    function routeLoar(address creator, uint16 feeBps, uint256 amount) external nonReentrant whenNotPaused {
+        if (amount == 0) return;
+        if (creator == address(0)) revert ZeroAddress();
+        if (address(loarToken) == address(0)) revert ZeroAddress();
+
+        uint16 bps = feeBps == USE_DEFAULT_FEE ? defaultPlatformFeeBps : feeBps;
+        if (bps > 5000) revert FeeTooHigh();
+
+        // Apply $LOAR fee discount (incentivizes paying in $LOAR)
+        if (loarFeeDiscountBps > 0 && bps > loarFeeDiscountBps) {
+            bps -= loarFeeDiscountBps;
+        } else if (loarFeeDiscountBps >= bps) {
+            bps = 0;
+        }
+
+        // Fee-on-transfer protection (TOKEN-02 / H-3): measure actual received
+        // amount rather than trusting the caller's `amount` parameter. If the token
+        // deducts a transfer fee, `received` will be less than `amount`, and all
+        // accounting uses the real balance delta.
+        uint256 balBefore = loarToken.balanceOf(address(this));
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = loarToken.balanceOf(address(this)) - balBefore;
+
+        uint256 platformCut = (received * bps) / 10_000;
+        uint256 creatorCut = received - platformCut;
+
+        if (creatorCut > 0) {
+            claimableLoar[creator] += creatorCut;
+        }
+        if (platformCut > 0) {
+            loarToken.safeTransfer(treasury, platformCut);
+        }
+
+        emit LoarPaymentRouted(creator, creatorCut, platformCut, bps);
+    }
+
+    /// @notice Route $LOAR entirely to treasury
+    function routeLoarToTreasury(uint256 amount) external nonReentrant whenNotPaused {
+        if (amount == 0) return;
+        if (address(loarToken) == address(0)) revert ZeroAddress();
+        // Fee-on-transfer protection: measure actual received amount
+        uint256 balBefore = loarToken.balanceOf(address(this));
+        loarToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = loarToken.balanceOf(address(this)) - balBefore;
+        loarToken.safeTransfer(treasury, received);
+    }
+
+    /// @notice Creator pulls accumulated $LOAR earnings
+    function claimLoar() external nonReentrant {
+        uint256 amount = claimableLoar[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        claimableLoar[msg.sender] = 0;
+        loarToken.safeTransfer(msg.sender, amount);
+        emit LoarClaimed(msg.sender, amount);
+    }
+
+    // ── $LOAR Admin ─────────────────────────────────────────────
+
+    error LoarTokenIsLocked();
+
+    function setLoarToken(address _loarToken) external onlyOwner {
+        if (_loarToken == address(0)) revert ZeroAddress();
+        if (loarTokenLocked) revert LoarTokenIsLocked();
+        loarToken = IERC20(_loarToken);
+        emit LoarTokenUpdated(_loarToken);
+    }
+
+    /// @notice Permanently lock the $LOAR token address. Cannot be undone.
+    function lockLoarToken() external onlyOwner {
+        require(address(loarToken) != address(0), "Set loar token first");
+        loarTokenLocked = true;
+    }
+
+    error DiscountTooHigh();
+
+    function setLoarFeeDiscount(uint16 newDiscountBps) external onlyOwner {
+        if (newDiscountBps > 2000) revert DiscountTooHigh();
+        loarFeeDiscountBps = newDiscountBps;
+        emit LoarFeeDiscountUpdated(newDiscountBps);
+    }
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[44] private __gap;
+}

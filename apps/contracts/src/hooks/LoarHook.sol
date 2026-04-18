@@ -1,0 +1,403 @@
+// SPDX-License-Identifier: MIT
+pragma solidity =0.8.30;
+
+import {ILoarHook} from "../interfaces/ILoarHook.sol";
+import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
+import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {BeforeSwapDelta, toBeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
+import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+
+/// @title LoarHook
+/// @notice Abstract Uniswap v4 hook that collects protocol fees on swaps involving governance tokens.
+/// @dev Implements a dual before/after swap fee strategy: fees are taken on the non-governance-token
+///      side of the swap. The protocol fee is 20% of the LP fee. Only the UniverseManager factory
+///      can initialize new pools through this hook.
+abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
+    using TickMath for int24;
+    using BeforeSwapDeltaLibrary for BeforeSwapDelta;
+
+    uint24 public constant MAX_LP_FEE = 300_000; // LP fee capped at 30%
+    uint256 public constant PROTOCOL_FEE_NUMERATOR = 200_000; // 20% of the imposed LP fee
+    int128 public constant FEE_DENOMINATOR = 1_000_000; // Uniswap 100% fee
+
+    /// @notice HOOK-03: Per-pool protocol fee. Stored per PoolId so multi-pool atomic
+    ///         swaps (current or future) cannot cross-contaminate fee state.
+    mapping(PoolId => uint24) public poolProtocolFee;
+
+    address public immutable factory;
+    address public immutable weth;
+
+    mapping(PoolId => bool) internal loarIsToken0;
+    mapping(PoolId => address) internal locker;
+    mapping(PoolId => uint256) public poolCreationTimestamp;
+
+    /// @notice HOOK-02: Throttle LP locker fee claims to reduce per-swap gas cost
+    mapping(PoolId => uint256) public lastLockerClaimTimestamp;
+    uint256 public constant LOCKER_CLAIM_INTERVAL = 1 hours;
+
+    modifier onlyFactory() {
+        _checkFactory();
+        _;
+    }
+
+    function _checkFactory() internal view {
+        if (msg.sender != factory) {
+            revert OnlyFactory();
+        }
+    }
+
+    constructor(
+        address _poolManager,
+        address _factory,
+        address _weth
+    ) BaseHook(IPoolManager(_poolManager)) Ownable(msg.sender) {
+        factory = _factory;
+        weth = _weth;
+    }
+
+    function _setFee(
+        PoolKey calldata,
+        SwapParams calldata
+    ) internal virtual {
+        return;
+    }
+
+    // HOOK-03: set the protocol fee per-pool to 20% of the lp fee.
+    function _setProtocolFee(PoolKey calldata poolKey, uint24 lpFee) internal {
+        // casting is safe: result ≤ lpFee (20% of a uint24), uint128 wraps a known constant
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 scaled = (uint256(lpFee) * PROTOCOL_FEE_NUMERATOR) / uint128(FEE_DENOMINATOR);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        poolProtocolFee[poolKey.toId()] = uint24(scaled);
+    }
+
+    // function for inheriting hooks to set process data in during initialization flow
+    function _initializePoolData(
+        PoolKey memory,
+        bytes memory
+    ) internal virtual {
+        return;
+    }
+
+    function initializePool(
+        address loar,
+        address pairedToken,
+        int24 tickIfToken0IsLoar,
+        int24 tickSpacing,
+        address _locker,
+        bytes calldata poolData
+    ) public onlyFactory returns (PoolKey memory) {
+        // initialize the pool
+        PoolKey memory poolKey = _initializePool(
+            loar,
+            pairedToken,
+            tickIfToken0IsLoar,
+            tickSpacing,
+            poolData
+        );
+
+        // Store locker so _lpLockerFeeClaim can trigger fee collection on swaps
+        if (_locker != address(0)) {
+            locker[poolKey.toId()] = _locker;
+        }
+
+        emit PoolCreatedFactory({
+            pairedToken: pairedToken,
+            loar: loar,
+            poolId: poolKey.toId(),
+            tickIfToken0IsLoar: tickIfToken0IsLoar,
+            tickSpacing: tickSpacing,
+            locker: _locker
+        });
+
+        return poolKey;
+    }
+
+    // common actions for initializing a pool
+    function _initializePool(
+        address loar,
+        address pairedToken,
+        int24 tickIfToken0IsLoar,
+        int24 tickSpacing,
+        bytes calldata poolData
+    ) internal virtual returns (PoolKey memory) {
+        // ensure that the pool is not an ETH pool
+        if (pairedToken == address(0) || loar == address(0)) {
+            revert ETHPoolNotAllowed();
+        }
+
+        // determine if Loar is token0
+        bool token0IsLoar = loar < pairedToken;
+
+        // create the pool key
+        PoolKey memory _poolKey = PoolKey({
+            currency0: Currency.wrap(token0IsLoar ? loar : pairedToken),
+            currency1: Currency.wrap(token0IsLoar ? pairedToken : loar),
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: tickSpacing,
+            hooks: IHooks(address(this))
+        });
+
+        // Set the storage helpers
+        loarIsToken0[_poolKey.toId()] = token0IsLoar;
+
+        // initialize the pool
+        int24 startingTick = token0IsLoar
+            ? tickIfToken0IsLoar
+            : -tickIfToken0IsLoar;
+        uint160 initialPrice = startingTick.getSqrtPriceAtTick();
+        poolManager.initialize(_poolKey, initialPrice);
+
+        // set the pool creation timestamp
+        poolCreationTimestamp[_poolKey.toId()] = block.timestamp;
+
+        // initialize other pool data
+        _initializePoolData(_poolKey, poolData);
+
+        return _poolKey;
+    }
+
+    function _beforeSwap(
+        address,
+        PoolKey calldata poolKey,
+        SwapParams calldata swapParams,
+        bytes calldata
+    )
+        internal
+        virtual
+        override
+        returns (bytes4, BeforeSwapDelta delta, uint24)
+    {
+        // set the fee for this swap
+        _setFee(poolKey, swapParams);
+
+        // trigger hook fee claim
+        _hookFeeClaim(poolKey);
+
+        _lpLockerFeeClaim(poolKey);
+
+        // variables to determine how to collect protocol fee
+        bool token0IsLoar = loarIsToken0[poolKey.toId()];
+        bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
+        bool isExactInput = swapParams.amountSpecified < 0;
+
+        // case: specified amount paired in, unspecified amount loar out
+        // want to: keep amountIn the same, take fee on amountIn
+        // how: we modulate the specified amount being swapped DOWN, and
+        // transfer the difference into the hook's account before making the swap
+        if (isExactInput && swappingForLoar) {
+            // since we're taking the protocol fee before the LP swap, we want to
+            // take a slightly smaller amount to keep the taken LP/protocol fee at the 20% ratio,
+            // this also helps us match the ExactOutput swappingForLoar scenario
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) /
+                (1_000_000 + pFee);
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int128 fee = int128(
+                // forge-lint: disable-next-line(unsafe-typecast)
+                (swapParams.amountSpecified * -int128(scaledProtocolFee)) / 1e18
+            );
+
+            delta = toBeforeSwapDelta(fee, 0);
+            poolManager.mint(
+                address(this),
+                token0IsLoar
+                    ? poolKey.currency1.toId()
+                    : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
+                uint256(int256(fee))
+            );
+        }
+
+        // case: specified amount paired out, unspecified amount loar in
+        // want to: increase amountOut by fee and take it
+        // how: we modulate the specified amount out UP, and transfer it
+        // into the hook's account
+        if (!isExactInput && !swappingForLoar) {
+            // we increase the protocol fee here because we want to better match
+            // the ExactOutput !swappingForLoar scenario
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) /
+                (1_000_000 - pFee);
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int128 fee = int128(
+                // forge-lint: disable-next-line(unsafe-typecast)
+                (swapParams.amountSpecified * int128(scaledProtocolFee)) / 1e18
+            );
+            delta = toBeforeSwapDelta(fee, 0);
+
+            poolManager.mint(
+                address(this),
+                token0IsLoar
+                    ? poolKey.currency1.toId()
+                    : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
+                uint256(int256(fee))
+            );
+        }
+
+        return (BaseHook.beforeSwap.selector, delta, 0);
+    }
+
+    function _afterSwap(
+        address,
+        PoolKey calldata poolKey,
+        SwapParams calldata swapParams,
+        BalanceDelta delta,
+        bytes calldata
+    ) internal override returns (bytes4, int128 unspecifiedDelta) {
+        // variables to determine how to collect protocol fee
+        bool token0IsLoar = loarIsToken0[poolKey.toId()];
+        bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
+        bool isExactInput = swapParams.amountSpecified < 0;
+
+        // case: specified amount loar in, unspecified amount paired out
+        // want to: take fee on amount out
+        // how: the change in unspecified delta is debited to the swaps account post swap,
+        // in this case the amount out given to the swapper is decreased
+        if (isExactInput && !swappingForLoar) {
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            // grab non-loar amount out
+            int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
+            // take fee from it
+            unspecifiedDelta =
+                // forge-lint: disable-next-line(unsafe-typecast)
+                (amountOut * int24(pFee)) /
+                FEE_DENOMINATOR;
+            poolManager.mint(
+                address(this),
+                token0IsLoar
+                    ? poolKey.currency1.toId()
+                    : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
+                uint256(int256(unspecifiedDelta))
+            );
+        }
+
+        // case: specified amount loar out, unspecified amount paired in
+        // want to: take fee on amount in
+        // how: the change in unspecified delta is debited to the swapper's account post swap,
+        // in this case the amount taken from the swapper's account is increased
+        if (!isExactInput && swappingForLoar) {
+            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            // grab non-loar amount in
+            int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
+            // take fee from amount int
+            unspecifiedDelta =
+                // forge-lint: disable-next-line(unsafe-typecast)
+                (amountIn * -int24(pFee)) /
+                FEE_DENOMINATOR;
+            poolManager.mint(
+                address(this),
+                token0IsLoar
+                    ? poolKey.currency1.toId()
+                    : poolKey.currency0.toId(),
+                // forge-lint: disable-next-line(unsafe-typecast)
+                uint256(int256(unspecifiedDelta))
+            );
+        }
+
+        return (BaseHook.afterSwap.selector, unspecifiedDelta);
+    }
+
+    function _beforeInitialize(
+        address,
+        PoolKey calldata,
+        uint160
+    ) internal virtual override returns (bytes4) {
+        revert UnsupportedInitializePath();
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure returns (bool) {
+        return interfaceId == type(ILoarHook).interfaceId;
+    }
+
+    function _beforeAddLiquidity(
+        address,
+        PoolKey calldata,
+        ModifyLiquidityParams calldata,
+        bytes calldata
+    ) internal virtual override returns (bytes4) {
+        return BaseHook.beforeAddLiquidity.selector;
+    }
+
+    function _lpLockerFeeClaim(PoolKey calldata poolKey) internal {
+        if (locker[poolKey.toId()] == address(0)) {
+            return;
+        }
+
+        // HOOK-02: Only claim every LOCKER_CLAIM_INTERVAL to reduce gas per swap
+        PoolId pid = poolKey.toId();
+        if (block.timestamp < lastLockerClaimTimestamp[pid] + LOCKER_CLAIM_INTERVAL) {
+            return;
+        }
+        lastLockerClaimTimestamp[pid] = block.timestamp;
+
+        address token = loarIsToken0[pid]
+            ? Currency.unwrap(poolKey.currency0)
+            : Currency.unwrap(poolKey.currency1);
+
+        ILoarLpLocker(locker[pid]).collectRewardsWithoutUnlock(token);
+    }
+
+
+    function _hookFeeClaim(PoolKey calldata poolKey) internal {
+        // determine the fee token
+        Currency feeCurrency = loarIsToken0[poolKey.toId()]
+            ? poolKey.currency1
+            : poolKey.currency0;
+
+        // get the fees stored from the previous swap in the pool manager
+        uint256 fee = poolManager.balanceOf(address(this), feeCurrency.toId());
+
+        if (fee == 0) {
+            return;
+        }
+
+        // burn the fee
+        poolManager.burn(address(this), feeCurrency.toId(), fee);
+
+        // take the fee
+        poolManager.take(feeCurrency, factory, fee);
+
+        emit ClaimProtocolFees(Currency.unwrap(feeCurrency), fee);
+    }
+
+    function getHookPermissions()
+        public
+        pure
+        override
+        returns (Hooks.Permissions memory)
+    {
+        return
+            Hooks.Permissions({
+                beforeInitialize: true,
+                afterInitialize: false,
+                beforeAddLiquidity: true,
+                afterAddLiquidity: false,
+                beforeRemoveLiquidity: false,
+                afterRemoveLiquidity: false,
+                beforeSwap: true,
+                afterSwap: true,
+                beforeDonate: false,
+                afterDonate: false,
+                beforeSwapReturnDelta: true,
+                afterSwapReturnDelta: true,
+                afterAddLiquidityReturnDelta: false,
+                afterRemoveLiquidityReturnDelta: false
+            });
+    }
+}

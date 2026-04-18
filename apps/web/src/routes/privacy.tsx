@@ -1,0 +1,467 @@
+/**
+ * Privacy Policy page.
+ *
+ * Covers: data collection, usage, blockchain data permanence, decentralized storage,
+ * third-party services, data retention, cookies & local storage, data security,
+ * international transfers, children, your rights, California residents,
+ * changes, and contact.
+ */
+import { createFileRoute, Link } from '@tanstack/react-router';
+
+export const Route = createFileRoute('/privacy')({
+  component: PrivacyPage,
+});
+
+function PrivacyPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-3xl mx-auto px-6 py-16">
+        <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: April 17, 2026</p>
+
+        <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
+          <section>
+            <p>
+              This Privacy Policy describes how LOAR (&quot;the Company,&quot; &quot;we,&quot;
+              &quot;us,&quot; or &quot;our&quot;) collects, uses, shares, and protects information
+              when you use the LOAR platform at loar.fun (&quot;the Platform&quot;). By using the
+              Platform, you consent to the data practices described in this policy. If you do not
+              agree with this Privacy Policy, please do not use the Platform.
+            </p>
+            <p>
+              This policy should be read in conjunction with our{' '}
+              <Link to="/terms" className="text-primary underline">
+                Terms of Service
+              </Link>
+              .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">1. Information We Collect</h2>
+
+            <p className="mt-3">
+              <strong>1.1 Information You Provide Directly</strong>
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>Wallet address:</strong> Your Ethereum-compatible wallet address, provided
+                when you authenticate via Sign-In with Ethereum (SIWE). This is your primary account
+                identifier. We do not collect email addresses, passwords, or other traditional
+                credentials.
+              </li>
+              <li>
+                <strong>Content:</strong> Images, videos, text, prompts, and other media you upload,
+                create, or generate on the Platform.
+              </li>
+              <li>
+                <strong>Profile information:</strong> Optional display name, bio, avatar, and social
+                links you choose to provide.
+              </li>
+              <li>
+                <strong>Generation parameters:</strong> AI model selections, prompts, settings, and
+                configuration used when generating content through the Platform.
+              </li>
+              <li>
+                <strong>Rights classifications:</strong> The intellectual property lane
+                (Non-Commercial, Creator-Owned, or Rights-Cleared) you assign to your content.
+              </li>
+              <li>
+                <strong>Moderation reports:</strong> Information you submit when flagging content or
+                filing DMCA takedown requests.
+              </li>
+            </ul>
+
+            <p className="mt-3">
+              <strong>1.2 Information Collected Automatically</strong>
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>IP address:</strong> Collected for rate limiting, abuse prevention, and
+                security purposes. IP addresses are not linked to your wallet identity for tracking
+                or profiling purposes.
+              </li>
+              <li>
+                <strong>Device and browser information:</strong> User agent string, screen
+                resolution, operating system, and browser type, collected for compatibility and
+                debugging purposes.
+              </li>
+              <li>
+                <strong>Usage data:</strong> Pages visited, features used, generation history,
+                timestamps, and interaction patterns, collected to improve Platform functionality.
+              </li>
+              <li>
+                <strong>Referral data:</strong> The URL that referred you to the Platform, if
+                applicable.
+              </li>
+            </ul>
+
+            <p className="mt-3">
+              <strong>1.3 Blockchain Transaction Data</strong>
+            </p>
+            <p>
+              When you interact with smart contracts through the Platform, transaction data is
+              recorded on the Base L2 public blockchain. This includes transaction hashes, wallet
+              addresses, content hashes, token transfers, NFT minting events, and governance votes.
+              This data is publicly accessible and is not collected by us — it is generated by your
+              direct interaction with the blockchain network.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">
+              2. How We Use Your Information
+            </h2>
+            <p>We use the information we collect for the following purposes:</p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>Authentication:</strong> Verify your identity via wallet signature (SIWE)
+                and maintain your session.
+              </li>
+              <li>
+                <strong>Service delivery:</strong> Store, serve, index, and display your content;
+                process AI generation requests; execute marketplace transactions.
+              </li>
+              <li>
+                <strong>Content moderation:</strong> Enforce our Terms of Service, rights
+                classification policies, and applicable laws, including reviewing flagged content
+                and processing DMCA takedown requests.
+              </li>
+              <li>
+                <strong>Security and abuse prevention:</strong> Detect and prevent fraud, spam,
+                unauthorized access, and other malicious activity through rate limiting and anomaly
+                detection.
+              </li>
+              <li>
+                <strong>Platform improvement:</strong> Analyze aggregated, anonymized usage patterns
+                to improve features, fix bugs, and optimize performance.
+              </li>
+              <li>
+                <strong>Communication:</strong> Notify you of material changes to the Platform,
+                Terms of Service, or this Privacy Policy.
+              </li>
+              <li>
+                <strong>Legal compliance:</strong> Respond to lawful requests from law enforcement
+                or regulatory authorities, and to protect our legal rights.
+              </li>
+            </ul>
+            <p>
+              We do not use your data for behavioral advertising, and we do not build advertising
+              profiles based on your activity.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">3. On-Chain Data Permanence</h2>
+            <p>
+              Certain data associated with your use of the Platform is recorded on public blockchain
+              networks (Base L2 / Ethereum) and is <strong>permanent and immutable</strong>. This
+              includes:
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Content hashes (SHA-256 digests of your content)</li>
+              <li>NFT metadata and ownership records</li>
+              <li>Token transfer and transaction history</li>
+              <li>Governance votes and proposals</li>
+              <li>Smart contract interaction records</li>
+            </ul>
+            <p>
+              This data is publicly visible by design and exists on a decentralized network outside
+              the Company&apos;s control.{' '}
+              <strong>We cannot delete, modify, or restrict access to on-chain data.</strong>{' '}
+              Deletion requests under any privacy regulation (including GDPR and CCPA) cannot be
+              fulfilled for data that has been committed to the blockchain. You should consider this
+              permanence carefully before initiating on-chain transactions.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">4. Data Storage</h2>
+            <p>
+              Off-chain data (profile information, generation history, moderation records, session
+              data) is stored in Firebase Firestore, hosted on Google Cloud infrastructure in US
+              regions.
+            </p>
+            <p>
+              Content files (images, videos, and other media) may be distributed across multiple
+              storage providers for redundancy, performance, and permanence:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong>Pinata (IPFS):</strong> Primary content delivery network. Content is
+                addressed by its cryptographic hash (CID) and may be cached, replicated, or pinned
+                by any IPFS node operator worldwide.
+              </li>
+              <li>
+                <strong>Lighthouse (Filecoin):</strong> Permanent archival storage on the Filecoin
+                decentralized storage network. Lighthouse also provides optional token-gated
+                encryption for access-controlled content.
+              </li>
+              <li>
+                <strong>Firebase Storage:</strong> Availability fallback for content serving when
+                decentralized storage is temporarily unavailable.
+              </li>
+            </ul>
+            <p>
+              Content stored on decentralized networks (IPFS, Filecoin) may be cached, replicated,
+              or redistributed by third-party nodes beyond the Company&apos;s control. Once content
+              is published to these networks, the Company cannot guarantee its complete removal,
+              even if it is unpinned from Company-controlled nodes.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">5. Third-Party Services</h2>
+            <p>
+              We share data with the following categories of third-party service providers, each of
+              which processes data in accordance with their own privacy policies:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong>AI generation providers</strong> (FAL, OpenAI, ElevenLabs, Meshy, and
+                others): Receive your prompts, input media, and generation parameters to produce
+                AI-generated content. These providers may retain prompt and output data in
+                accordance with their own terms and privacy policies.
+              </li>
+              <li>
+                <strong>Wallet connection provider</strong> (thirdweb): Facilitates wallet
+                connection and SIWE authentication. Processes your wallet address and signature
+                data.
+              </li>
+              <li>
+                <strong>Blockchain RPC providers</strong> (Alchemy and others): Relay your
+                transactions to blockchain networks. Process transaction data including wallet
+                addresses and transaction payloads.
+              </li>
+              <li>
+                <strong>Decentralized storage providers</strong> (Pinata, Lighthouse): Store and
+                serve your content. Process content files and associated metadata.
+              </li>
+              <li>
+                <strong>Cloud infrastructure</strong> (Google Cloud / Firebase): Hosts our backend
+                services, databases, and fallback content storage. Processes all off-chain data.
+              </li>
+            </ul>
+            <p>
+              We do not sell, rent, or trade your personal information to third parties for their
+              marketing purposes.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">6. Data Retention</h2>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>Account data:</strong> Retained for as long as your account is active or as
+                needed to provide services. Upon account termination, off-chain profile data may be
+                deleted upon request.
+              </li>
+              <li>
+                <strong>Content:</strong> Retained on Platform infrastructure as long as your
+                account is active. Content published to decentralized storage may persist
+                indefinitely on those networks.
+              </li>
+              <li>
+                <strong>Transaction and billing records:</strong> Retained for a minimum of seven
+                (7) years for accounting, tax compliance, and audit purposes.
+              </li>
+              <li>
+                <strong>Moderation and audit logs:</strong> Retained indefinitely as an immutable
+                record for legal compliance, dispute resolution, and platform integrity.
+              </li>
+              <li>
+                <strong>IP addresses and access logs:</strong> Retained for up to ninety (90) days,
+                after which they are deleted or anonymized.
+              </li>
+              <li>
+                <strong>On-chain data:</strong> Permanent and immutable. Cannot be deleted.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">
+              7. Cookies &amp; Local Storage
+            </h2>
+            <p>
+              The Platform uses browser local storage to maintain your authentication session (JWT
+              tokens) and to store UI preferences such as theme settings. We do not use third-party
+              tracking cookies or advertising cookies.
+            </p>
+            <p>
+              The Platform may use strictly necessary cookies for session management and security.
+              These are essential for the Platform to function and cannot be disabled.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">8. Data Security</h2>
+            <p>
+              We implement reasonable technical and organizational measures to protect your
+              information, including encryption in transit (TLS), access controls, and secure
+              infrastructure practices. However, no method of transmission over the internet or
+              electronic storage is completely secure, and we cannot guarantee absolute security.
+            </p>
+            <p>
+              You are responsible for maintaining the security of your wallet private keys and seed
+              phrases. The Company does not have access to your wallet credentials and cannot assist
+              with wallet recovery.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">
+              9. International Data Transfers
+            </h2>
+            <p>
+              Your information may be transferred to and processed in the United States and other
+              countries where our service providers operate. These countries may have data
+              protection laws that differ from those in your jurisdiction. By using the Platform,
+              you consent to the transfer of your information to these countries.
+            </p>
+            <p>
+              For users in the European Economic Area (EEA), United Kingdom, or Switzerland, we rely
+              on standard contractual clauses and other lawful transfer mechanisms where applicable.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">10. Children&apos;s Privacy</h2>
+            <p>
+              The Platform is not intended for use by anyone under the age of 18. We do not
+              knowingly collect personal information from individuals under 18 years of age. If we
+              become aware that a user under 18 has provided us with personal information, we will
+              take steps to delete such information and terminate the associated account. If you
+              believe a child has provided us with personal data, please contact us immediately at{' '}
+              <a href="mailto:privacy@loar.fun" className="text-primary underline">
+                privacy@loar.fun
+              </a>
+              .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">11. Your Rights</h2>
+            <p>
+              Depending on your jurisdiction, you may have the following rights regarding your
+              personal data:
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>Access:</strong> Request a copy of the personal data we hold about you.
+              </li>
+              <li>
+                <strong>Correction:</strong> Request correction of inaccurate or incomplete personal
+                data.
+              </li>
+              <li>
+                <strong>Deletion:</strong> Request deletion of your off-chain personal data, subject
+                to our retention obligations and the limitations described in Section 3 (on-chain
+                data cannot be deleted).
+              </li>
+              <li>
+                <strong>Portability:</strong> Request a copy of your data in a structured,
+                machine-readable format.
+              </li>
+              <li>
+                <strong>Objection:</strong> Object to certain processing of your personal data.
+              </li>
+              <li>
+                <strong>Restriction:</strong> Request restriction of processing in certain
+                circumstances.
+              </li>
+              <li>
+                <strong>Withdrawal of consent:</strong> Where processing is based on consent, you
+                may withdraw consent at any time by discontinuing use of the Platform.
+              </li>
+            </ul>
+            <p>
+              To exercise any of these rights, contact us at{' '}
+              <a href="mailto:privacy@loar.fun" className="text-primary underline">
+                privacy@loar.fun
+              </a>
+              . We will respond to verifiable requests within thirty (30) days. We may require you
+              to sign a message with your wallet to verify your identity before processing a
+              request.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">
+              12. California Residents (CCPA)
+            </h2>
+            <p>
+              If you are a California resident, you have additional rights under the California
+              Consumer Privacy Act (CCPA), including the right to know what personal information we
+              collect, the right to request deletion, and the right to opt out of the sale of
+              personal information. We do not sell personal information as defined by the CCPA.
+            </p>
+            <p>
+              California residents may exercise their rights by contacting us at{' '}
+              <a href="mailto:privacy@loar.fun" className="text-primary underline">
+                privacy@loar.fun
+              </a>
+              . We will not discriminate against you for exercising your CCPA rights.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">
+              13. Changes to This Privacy Policy
+            </h2>
+            <p>
+              We may update this Privacy Policy from time to time to reflect changes in our
+              practices, technology, legal requirements, or other factors. Material changes will be
+              communicated by updating the &quot;Last updated&quot; date at the top of this page
+              and, where practicable, through a notice on the Platform. Your continued use of the
+              Platform after any changes constitutes acceptance of the revised Privacy Policy.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">14. Contact</h2>
+            <p>
+              For questions or concerns about this Privacy Policy or our data practices, contact us
+              at:
+            </p>
+            <p>
+              <strong>Privacy inquiries:</strong>{' '}
+              <a href="mailto:privacy@loar.fun" className="text-primary underline">
+                privacy@loar.fun
+              </a>
+              <br />
+              <strong>General support:</strong>{' '}
+              <a href="mailto:support@loar.fun" className="text-primary underline">
+                support@loar.fun
+              </a>
+              <br />
+              <strong>Legal matters:</strong>{' '}
+              <a href="mailto:legal@loar.fun" className="text-primary underline">
+                legal@loar.fun
+              </a>
+              <br />
+              <strong>DMCA requests:</strong>{' '}
+              <Link to={'/dmca' as any} className="text-primary underline">
+                /dmca
+              </Link>
+            </p>
+            <p className="mt-4">
+              <strong>Designated DMCA Agent:</strong>
+              <br />
+              [DMCA Agent Name — TO BE FILED]
+              <br />
+              [Email — TO BE FILED]
+              <br />
+              [Physical Address — TO BE FILED]
+              <br />
+              <span className="text-xs">
+                (Agent designation to be registered with the U.S. Copyright Office pursuant to 17
+                U.S.C. Section 512(c))
+              </span>
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}

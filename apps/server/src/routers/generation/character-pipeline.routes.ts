@@ -1,0 +1,610 @@
+/**
+ * Character Pipeline Router
+ *
+ * End-to-end character creation pipeline:
+ *   1. Create entity in Firestore
+ *   2. Generate 2D character art via Google Imagen 3
+ *   3. Convert to 3D model via Meshy image-to-3D
+ *   4. Apply rich textures via Meshy text-to-texture
+ *
+ * Each step can also be called independently. The full pipeline
+ * is long-running (~5-15 min) and uses polling for 3D steps.
+ *
+ * Pricing (approximate):
+ *   Google Imagen 3     ~$0.04/image
+ *   Meshy image-to-3D   ~$0.15/task
+ *   Meshy text-to-texture ~$0.15/task
+ *   Total pipeline      ~$0.34
+ */
+import { router, protectedProcedure } from '../../lib/trpc';
+import { z } from 'zod';
+import { randomUUID } from 'crypto';
+import { db } from '../../lib/firebase';
+import { googleImagenService } from '../../services/google-imagen';
+import { meshyService } from '../../services/meshy';
+import { createEntity } from '../entities/entities.handlers';
+import { createAttachment } from '../media/media.handlers';
+import { getStorageManager } from '../../services/storage';
+import { FieldValue } from 'firebase-admin/firestore';
+import { logFailedRefund } from '../../lib/refund-audit';
+import { publishToGallery } from '../../lib/gallery-publish';
+
+// ── Collections ──────────────────────────────────────────────────────
+
+const pipelinesCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('characterPipelines');
+};
+const userCreditsCol = () => {
+  if (!db) throw new Error('Firebase is not configured');
+  return db.collection('userCredits');
+};
+
+// ── Pricing ──────────────────────────────────────────────────────────
+
+const LOAR_TO_USD = 0.01;
+const FIAT_MARGIN = 1.35;
+
+const COSTS = {
+  imagen_2d: 0.04,
+  meshy_image_to_3d: 0.15,
+  meshy_texture: 0.15,
+};
+const TOTAL_PIPELINE_COST = COSTS.imagen_2d + COSTS.meshy_image_to_3d + COSTS.meshy_texture;
+
+function toCredits(usd: number) {
+  return Math.ceil((usd * FIAT_MARGIN) / LOAR_TO_USD);
+}
+
+// ── Credit helpers ───────────────────────────────────────────────────
+
+async function deductCredits(userId: string, credits: number): Promise<void> {
+  if (!db) throw new Error('Firebase is not configured');
+  const ref = userCreditsCol().doc(userId);
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
+    if (balance < credits) {
+      throw new Error(
+        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
+      );
+    }
+    tx.update(ref, {
+      balance: balance - credits,
+      totalSpent: (doc.data()?.totalSpent || 0) + credits,
+      updatedAt: new Date(),
+    });
+  });
+}
+
+async function refundCredits(userId: string, credits: number, pipelineId: string): Promise<void> {
+  const ref = userCreditsCol().doc(userId);
+  try {
+    await ref.update({
+      balance: FieldValue.increment(credits),
+      totalSpent: FieldValue.increment(-credits),
+      updatedAt: new Date(),
+    });
+  } catch (err) {
+    console.error(`CRITICAL: Pipeline credit refund failed for ${userId}:`, err);
+    logFailedRefund({
+      userId,
+      credits,
+      source: 'characterPipeline',
+      generationId: pipelineId,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+}
+
+// ── Upload base64 image to storage and get a URL ─────────────────────
+
+async function uploadBase64Image(
+  base64: string,
+  filename: string,
+  userId: string
+): Promise<string> {
+  const buffer = Buffer.from(base64, 'base64');
+  const manager = getStorageManager();
+  const manifest = await manager.upload(buffer, filename, 'image/png', userId);
+  const url = manifest.uploads[0]?.url;
+  if (!url) throw new Error('Failed to upload image to storage');
+  return url;
+}
+
+// ── Pipeline status updater ──────────────────────────────────────────
+
+async function updatePipeline(pipelineId: string, update: Record<string, unknown>) {
+  await pipelinesCol()
+    .doc(pipelineId)
+    .update({ ...update, updatedAt: new Date() });
+}
+
+// ── Background pipeline executor ─────────────────────────────────────
+
+async function executePipeline(opts: {
+  pipelineId: string;
+  userId: string;
+  entityId: string;
+  entityName: string;
+  entityDescription: string;
+  characterStyle: string;
+  artStyle: string;
+  texturePrompt: string;
+  credits: number;
+  universeAddress?: string | null;
+}) {
+  const {
+    pipelineId,
+    userId,
+    entityId,
+    entityName,
+    entityDescription,
+    characterStyle,
+    artStyle,
+    texturePrompt,
+    credits,
+    universeAddress,
+  } = opts;
+
+  try {
+    // ── Step 1: Generate 2D character art via Google Imagen ──────────
+    console.log(`[pipeline ${pipelineId}] Step 1: Generating 2D art with Google Imagen...`);
+    await updatePipeline(pipelineId, {
+      currentStep: 'imagen_2d',
+      stepProgress: 'Generating 2D character art with Google Imagen 3...',
+    });
+
+    const imagenResult = await googleImagenService.generateCharacterPortrait({
+      name: entityName,
+      description: entityDescription,
+      style: characterStyle as any,
+    });
+
+    if (!imagenResult.images.length) {
+      throw new Error('Google Imagen returned no images');
+    }
+
+    // Upload the generated image to permanent storage
+    const imageFilename = `character-${pipelineId}.png`;
+    const imageUrl = await uploadBase64Image(imagenResult.images[0].base64, imageFilename, userId);
+
+    // Update entity with the generated image
+    await db.collection('entities').doc(entityId).update({
+      imageUrl,
+      updatedAt: new Date(),
+    });
+
+    // Attach the 2D image to the entity
+    await createAttachment(userId, {
+      contentHash: `pipeline:${pipelineId}:2d`,
+      originalFilename: imageFilename,
+      mimeType: 'image/png',
+      size: 0,
+      url: imageUrl,
+      targetType: 'entity',
+      targetId: entityId,
+      targetName: entityName,
+      category: 'image',
+      label: 'Character portrait (Google Imagen 3)',
+      subCategory: 'concept_art',
+      generationId: pipelineId,
+    }).catch((err) => console.error('[pipeline] 2D attach failed:', err));
+
+    void publishToGallery({
+      creatorUid: userId,
+      mediaUrl: imageUrl,
+      thumbnailUrl: imageUrl,
+      mediaType: 'ai-image',
+      title: `${entityName} — concept art`,
+      description: entityDescription,
+      universeId: universeAddress || null,
+      generationId: `${pipelineId}:2d`,
+      generationModel: 'google-imagen-3',
+      tags: ['character', 'concept-art', characterStyle],
+    });
+
+    await updatePipeline(pipelineId, {
+      currentStep: 'imagen_2d_complete',
+      imageUrl,
+      stepProgress: '2D character art generated successfully',
+    });
+
+    console.log(`[pipeline ${pipelineId}] Step 1 complete: ${imageUrl}`);
+
+    // ── Step 2: Convert 2D to 3D via Meshy image-to-3D ──────────────
+    console.log(`[pipeline ${pipelineId}] Step 2: Converting to 3D with Meshy...`);
+    await updatePipeline(pipelineId, {
+      currentStep: 'meshy_3d',
+      stepProgress: 'Converting 2D art to 3D model with Meshy...',
+    });
+
+    const { taskId: meshyTaskId } = await meshyService.imageTo3D({
+      imageUrl,
+      enablePbr: false,
+      aiModel: 'meshy-6',
+      topology: 'triangle',
+      targetPolycount: 15000,
+    });
+
+    await updatePipeline(pipelineId, {
+      meshy3dTaskId: meshyTaskId,
+      stepProgress: `3D conversion in progress (task: ${meshyTaskId})...`,
+    });
+
+    // Wait for 3D model to complete (up to 25 min)
+    const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 25 * 60 * 1000);
+
+    const glbUrl = meshyTask.modelUrls?.glb;
+    if (!glbUrl) throw new Error('Meshy 3D conversion did not return a GLB model');
+
+    // Attach 3D model files to entity
+    const modelFormats: [string, string | undefined][] = [
+      ['glb', meshyTask.modelUrls?.glb],
+      ['fbx', meshyTask.modelUrls?.fbx],
+      ['obj', meshyTask.modelUrls?.obj],
+      ['usdz', meshyTask.modelUrls?.usdz],
+    ];
+
+    for (const [format, url] of modelFormats) {
+      if (!url) continue;
+      await createAttachment(userId, {
+        contentHash: `pipeline:${pipelineId}:3d:${format}`,
+        originalFilename: `model.${format}`,
+        mimeType: format === 'glb' ? 'model/gltf-binary' : `model/${format}`,
+        size: 0,
+        url,
+        targetType: 'entity',
+        targetId: entityId,
+        targetName: entityName,
+        category: '3d',
+        label: `3D model (untextured) — ${format.toUpperCase()}`,
+        subCategory: 'game_ready',
+        generationId: pipelineId,
+      }).catch((err) => console.error(`[pipeline] 3D ${format} attach failed:`, err));
+    }
+
+    if (meshyTask.thumbnailUrl) {
+      await createAttachment(userId, {
+        contentHash: `pipeline:${pipelineId}:3d:thumbnail`,
+        originalFilename: 'thumbnail-3d.png',
+        mimeType: 'image/png',
+        size: 0,
+        url: meshyTask.thumbnailUrl,
+        targetType: 'entity',
+        targetId: entityId,
+        targetName: entityName,
+        category: 'image',
+        label: '3D model thumbnail',
+        subCategory: 'concept_art',
+        generationId: pipelineId,
+      }).catch((err) => console.error('[pipeline] 3D thumbnail attach failed:', err));
+    }
+
+    // Untextured GLB is an intermediate — it stays as an entity attachment
+    // (for raw-asset download) but is NOT published to gallery. Only the
+    // textured result below reaches the wiki.
+
+    await updatePipeline(pipelineId, {
+      currentStep: 'meshy_3d_complete',
+      modelUrls: meshyTask.modelUrls,
+      thumbnailUrl: meshyTask.thumbnailUrl,
+      videoUrl: meshyTask.videoUrl,
+      stepProgress: '3D model generated successfully',
+    });
+
+    console.log(`[pipeline ${pipelineId}] Step 2 complete: GLB at ${glbUrl}`);
+
+    // ── Step 3: Apply textures via Meshy text-to-texture ────────────
+    console.log(`[pipeline ${pipelineId}] Step 3: Texturing with Meshy...`);
+    await updatePipeline(pipelineId, {
+      currentStep: 'meshy_texture',
+      stepProgress: 'Applying AI textures to 3D model...',
+    });
+
+    let fullTexturePrompt =
+      texturePrompt ||
+      `${entityName}, ${entityDescription}, ${artStyle} style, detailed PBR textures, high quality materials`;
+    // Meshy retexture caps text_style_prompt at 800 chars
+    if (fullTexturePrompt.length > 800) fullTexturePrompt = fullTexturePrompt.slice(0, 797) + '...';
+
+    const { taskId: textureTaskId } = await meshyService.textToTexture({
+      modelUrl: glbUrl,
+      prompt: fullTexturePrompt,
+      artStyle: (artStyle as any) || 'realistic',
+      enablePbr: true,
+      resolution: 2048,
+    });
+
+    await updatePipeline(pipelineId, {
+      meshyTextureTaskId: textureTaskId,
+      stepProgress: `Texturing in progress (task: ${textureTaskId})...`,
+    });
+
+    // Wait for texture task to complete (up to 20 min)
+    const textureTask = await meshyService.waitForTextureTask(textureTaskId, 20 * 60 * 1000);
+
+    // Attach textured model files
+    const texturedFormats: [string, string | undefined][] = [
+      ['glb', textureTask.modelUrls?.glb],
+      ['fbx', textureTask.modelUrls?.fbx],
+      ['obj', textureTask.modelUrls?.obj],
+      ['usdz', textureTask.modelUrls?.usdz],
+    ];
+
+    for (const [format, url] of texturedFormats) {
+      if (!url) continue;
+      await createAttachment(userId, {
+        contentHash: `pipeline:${pipelineId}:textured:${format}`,
+        originalFilename: `textured-model.${format}`,
+        mimeType: format === 'glb' ? 'model/gltf-binary' : `model/${format}`,
+        size: 0,
+        url,
+        targetType: 'entity',
+        targetId: entityId,
+        targetName: entityName,
+        category: '3d',
+        label: `Textured 3D model — ${format.toUpperCase()}`,
+        subCategory: 'game_ready',
+        generationId: pipelineId,
+      }).catch((err) => console.error(`[pipeline] textured ${format} attach failed:`, err));
+    }
+
+    if (textureTask.thumbnailUrl) {
+      await createAttachment(userId, {
+        contentHash: `pipeline:${pipelineId}:textured:thumbnail`,
+        originalFilename: 'thumbnail-textured.png',
+        mimeType: 'image/png',
+        size: 0,
+        url: textureTask.thumbnailUrl,
+        targetType: 'entity',
+        targetId: entityId,
+        targetName: entityName,
+        category: 'image',
+        label: 'Textured 3D model thumbnail',
+        subCategory: 'concept_art',
+        generationId: pipelineId,
+      }).catch((err) => console.error('[pipeline] textured thumbnail attach failed:', err));
+    }
+
+    const texturedGlbUrl = textureTask.modelUrls?.glb;
+    if (texturedGlbUrl) {
+      void publishToGallery({
+        creatorUid: userId,
+        mediaUrl: texturedGlbUrl,
+        thumbnailUrl: textureTask.thumbnailUrl || meshyTask.thumbnailUrl || imageUrl,
+        mediaType: '3d',
+        title: `${entityName} — 3D model`,
+        description: entityDescription,
+        universeId: universeAddress || null,
+        generationId: `${pipelineId}:textured`,
+        generationModel: 'meshy-text-to-texture',
+        tags: ['character', '3d', 'textured', artStyle],
+      });
+    }
+
+    // Turntable preview of the textured model — published as a video so
+    // users can see the rotating PBR result in the wiki gallery.
+    if (textureTask.videoUrl) {
+      void publishToGallery({
+        creatorUid: userId,
+        mediaUrl: textureTask.videoUrl,
+        thumbnailUrl: textureTask.thumbnailUrl || imageUrl,
+        mediaType: 'video',
+        title: `${entityName} — 3D turntable`,
+        description: `Rotating preview of ${entityName}'s 3D model.`,
+        universeId: universeAddress || null,
+        generationId: `${pipelineId}:turntable`,
+        generationModel: 'meshy-text-to-texture',
+        tags: ['character', '3d', 'turntable', artStyle],
+      });
+    }
+
+    await updatePipeline(pipelineId, {
+      currentStep: 'completed',
+      status: 'completed',
+      texturedModelUrls: textureTask.modelUrls,
+      texturedThumbnailUrl: textureTask.thumbnailUrl,
+      texturedVideoUrl: textureTask.videoUrl,
+      stepProgress: 'Character pipeline complete!',
+      completedAt: new Date(),
+    });
+
+    console.log(`[pipeline ${pipelineId}] Pipeline complete!`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[pipeline ${pipelineId}] Failed:`, error);
+
+    await refundCredits(userId, credits, pipelineId);
+
+    await updatePipeline(pipelineId, {
+      status: 'failed',
+      creditsRefunded: true,
+      failureReason: errorMessage,
+      completedAt: new Date(),
+    }).catch(() => {});
+  }
+}
+
+// ── Router ────────────────────────────────────────────────────────────
+
+const characterStyleSchema = z
+  .enum(['realistic', 'stylized', 'anime', 'fantasy', 'sci-fi'])
+  .default('realistic');
+const artStyleSchema = z
+  .enum(['realistic', 'cartoon', 'low-poly', 'sculpture', 'pbr'])
+  .default('realistic');
+
+export const characterPipelineRouter = router({
+  /**
+   * Launch the full character pipeline:
+   *   entity → 2D (Google Imagen) → 3D (Meshy) → textured 3D (Meshy)
+   *
+   * Returns immediately with a pipeline ID — poll `getStatus` for progress.
+   */
+  launch: protectedProcedure
+    .input(
+      z.object({
+        // Entity fields
+        name: z.string().min(1).max(200),
+        description: z.string().min(1).max(2000),
+        kind: z.enum(['person', 'species', 'vehicle', 'technology', 'thing']).default('person'),
+        universeAddress: z.string().optional(),
+        metadata: z.record(z.string(), z.string()).optional(),
+
+        // 2D generation
+        characterStyle: characterStyleSchema,
+
+        // 3D texturing
+        artStyle: artStyleSchema,
+        texturePrompt: z.string().max(1000).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Verify services are configured
+      if (!googleImagenService.isConfigured()) {
+        throw new Error('Google Imagen is not configured (GOOGLE_API_KEY missing)');
+      }
+      if (!meshyService.isConfigured()) {
+        throw new Error('Meshy is not configured (MESHY_API_KEY missing)');
+      }
+
+      const pipelineId = randomUUID();
+      const totalCredits = toCredits(TOTAL_PIPELINE_COST);
+
+      // ── Create entity ──────────────────────────────────────────────
+      const { id: entityId, data: entity } = await createEntity(
+        {
+          name: input.name,
+          description: input.description,
+          kind: input.kind,
+          universeAddress: input.universeAddress || null,
+          metadata: input.metadata || {},
+        },
+        ctx.user.uid
+      );
+
+      // ── Save pipeline record ───────────────────────────────────────
+      await pipelinesCol()
+        .doc(pipelineId)
+        .set({
+          id: pipelineId,
+          userId: ctx.user.uid,
+          entityId,
+          entityName: input.name,
+          characterStyle: input.characterStyle,
+          artStyle: input.artStyle,
+          texturePrompt: input.texturePrompt || null,
+          providerCostUsd: TOTAL_PIPELINE_COST,
+          creditsCharged: totalCredits,
+          status: 'running',
+          currentStep: 'queued',
+          stepProgress: 'Starting character pipeline...',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+      // ── Deduct credits ─────────────────────────────────────────────
+      await deductCredits(ctx.user.uid, totalCredits);
+
+      // ── Launch pipeline in background ──────────────────────────────
+      executePipeline({
+        pipelineId,
+        userId: ctx.user.uid,
+        entityId,
+        entityName: input.name,
+        entityDescription: input.description,
+        characterStyle: input.characterStyle,
+        artStyle: input.artStyle,
+        texturePrompt: input.texturePrompt || '',
+        credits: totalCredits,
+        universeAddress: input.universeAddress || null,
+      }).catch((err) =>
+        console.error(`[pipeline] Background pipeline ${pipelineId} unhandled:`, err)
+      );
+
+      return {
+        pipelineId,
+        entityId,
+        status: 'running' as const,
+        creditsCharged: totalCredits,
+        estimatedSteps: [
+          {
+            step: 'imagen_2d',
+            label: 'Generate 2D character art (Google Imagen 3)',
+            estimateSeconds: 15,
+          },
+          { step: 'meshy_3d', label: 'Convert to 3D model (Meshy)', estimateSeconds: 300 },
+          { step: 'meshy_texture', label: 'Apply AI textures (Meshy)', estimateSeconds: 300 },
+        ],
+      };
+    }),
+
+  /**
+   * Poll pipeline status. Returns current step, progress, and any URLs
+   * generated so far.
+   */
+  getStatus: protectedProcedure.input(z.object({ pipelineId: z.string() })).query(
+    async ({
+      input,
+      ctx,
+    }): Promise<{
+      id: string;
+      status: 'queued' | 'running' | 'completed' | 'failed';
+      currentStep: string;
+      stepProgress?: string;
+      failureReason?: string;
+      creditsRefunded?: boolean;
+      entityId?: string;
+      imageUrl?: string;
+      meshyTaskId?: string;
+      modelUrl?: string;
+      textureTaskId?: string;
+      texturedModelUrl?: string;
+      creditsCharged?: number;
+      createdAt?: any;
+      updatedAt?: any;
+    } | null> => {
+      const doc = await pipelinesCol().doc(input.pipelineId).get();
+      if (!doc.exists) return null;
+      const data = doc.data()!;
+      if (data.userId !== ctx.user.uid) throw new Error('Not authorized');
+      return { id: doc.id, ...data } as any;
+    }
+  ),
+
+  /**
+   * List user's pipeline history.
+   */
+  history: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(10),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const snapshot = await pipelinesCol()
+        .where('userId', '==', ctx.user.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit)
+        .get();
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }),
+
+  /**
+   * Estimate the total pipeline cost before launching.
+   */
+  estimateCost: protectedProcedure.query(() => {
+    const totalCredits = toCredits(TOTAL_PIPELINE_COST);
+    return {
+      steps: [
+        { step: 'imagen_2d', label: 'Google Imagen 3 (2D art)', costUsd: COSTS.imagen_2d },
+        { step: 'meshy_3d', label: 'Meshy image-to-3D', costUsd: COSTS.meshy_image_to_3d },
+        { step: 'meshy_texture', label: 'Meshy text-to-texture', costUsd: COSTS.meshy_texture },
+      ],
+      totalProviderCostUsd: TOTAL_PIPELINE_COST,
+      totalFiatPriceUsd: +(TOTAL_PIPELINE_COST * FIAT_MARGIN).toFixed(2),
+      totalCredits,
+    };
+  }),
+});

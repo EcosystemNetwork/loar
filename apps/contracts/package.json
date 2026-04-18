@@ -1,0 +1,21 @@
+{
+    "name": "contracts",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Turborepo compatible template for smartcontracts",
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "clean": "rm -rf out && rm -rf cache",
+        "lint": "forge fmt || echo 'forge not found, skipping fmt'",
+        "lint:fix": "forge fmt && pnpm lint:sol-tests --fix && pnpm lint:sol-logic --fix",
+        "lint:sol-logic": "solhint -c .solhint.json 'src/**/*.sol'",
+        "lint:sol-tests": "solhint -c .solhint.tests.json 'test/**/*.sol'",
+        "test": "forge test -vvv",
+        "test:cov": "forge coverage --report summary --report lcov --match-path 'test/unit/*'"
+    },
+    "devDependencies": {
+        "forge-std": "github:foundry-rs/forge-std",
+        "solhint-community": "4.0.0"
+    }
+}

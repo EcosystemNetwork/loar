@@ -1,0 +1,25 @@
+node_modules
+.turbo
+.DS_Store
+coverage/
+.nyc_output
+
+.env
+.env.local
+.playwright-mcp
+.claude
+CLAUDE.md
+firebase-service-account.json
+firebase-sa-key-*.json
+build.log
+.gitnexus
+.vercel
+.firebase
+apps/contracts/broadcast/
+
+# Playwright
+test-results/
+playwright-report/
+.playwright-artifacts-*/
+# Media generation outputs — content goes to Pinata/Lighthouse/Firestore, not git.
+*-output/

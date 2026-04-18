@@ -1,0 +1,704 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
+import { validateUploadUrl } from '../lib/url-validator';
+
+/**
+ * Sanitize user-supplied text before interpolating into AI prompts.
+ * Strips common prompt injection patterns while preserving legitimate content.
+ */
+function sanitizeForPrompt(text: string, maxLen = 5000): string {
+  return (
+    text
+      .replace(/\n{3,}/g, '\n\n')
+      // Strip role-prefix injection attempts (case-insensitive)
+      .replace(/(^|\n)\s*(system|assistant|user|human)\s*:/gim, '$1[filtered]:')
+      // Strip common injection phrases
+      .replace(
+        /\b(ignore|forget|disregard|override)\s+(all\s+)?(previous|above|prior|earlier)\s+(instructions?|prompts?|context|rules?)\b/gi,
+        '[filtered]'
+      )
+      // Strip HTML/XML tags
+      .replace(/<\/?[a-z][^>]*>/gi, '')
+      .slice(0, maxLen)
+  );
+}
+
+// Initialize Gemini — fail fast if key missing
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+if (!GOOGLE_API_KEY) {
+  console.warn(
+    '⚠️  GOOGLE_API_KEY not set — Gemini features (wiki generation, character analysis) will be unavailable'
+  );
+}
+const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY || 'missing');
+const fileManager = new GoogleAIFileManager(GOOGLE_API_KEY || 'missing');
+
+function ensureGeminiKey() {
+  if (!GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY environment variable is required for Gemini features');
+  }
+}
+
+function safeJsonParse<T>(text: string, label: string): T {
+  let jsonText = text.trim();
+  if (jsonText.startsWith('```json')) {
+    jsonText = jsonText.split('```json')[1].split('```')[0].trim();
+  } else if (jsonText.startsWith('```')) {
+    jsonText = jsonText.split('```')[1].split('```')[0].trim();
+  }
+  try {
+    return JSON.parse(jsonText) as T;
+  } catch (err) {
+    throw new Error(`Failed to parse Gemini ${label} response as JSON: ${(err as Error).message}`);
+  }
+}
+
+const FILE_PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+export interface WikiData {
+  title: string;
+  summary: string;
+  videoAnalysis: {
+    setting: string;
+    visualStyle: string;
+    subjects: string;
+    action: string;
+  };
+  plot: string;
+  elements: Array<{
+    name: string;
+    description: string;
+    actions: string[];
+    characterId?: string; // Optional character ID for linking to character images
+  }>;
+  keyMoments: string[];
+  duration?: string;
+  visualDetails?: string[];
+}
+
+export interface VideoAnalysisResult {
+  wikiData: WikiData;
+  metadata: {
+    tokensUsed: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    generatedBy: string;
+  };
+}
+
+/**
+ * Generate wiki entry from video using Gemini 2.5 Pro
+ */
+export async function generateWikiFromVideo(
+  videoUrl: string,
+  eventData: {
+    eventId: string;
+    title: string;
+    description: string;
+    characterIds?: string[];
+    characters?: Array<{
+      name: string;
+      userDescription: string;
+      visualDescription?: string;
+    }>;
+    previousEvents?: Array<{ title: string; description: string }>;
+  }
+): Promise<VideoAnalysisResult> {
+  ensureGeminiKey();
+  console.log(`🎬 Generating wiki for event ${eventData.eventId}`);
+  console.log(`📝 Characters provided: ${eventData.characters?.length || 0}`);
+  if (eventData.characters && eventData.characters.length > 0) {
+    console.log(`👥 Character names: ${eventData.characters.map((c) => c.name).join(', ')}`);
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+  // Build context from characters
+  let characterContext = '';
+  const characterNames: string[] = [];
+  if (eventData.characters && eventData.characters.length > 0) {
+    characterContext = '\n\nCHARACTERS IN THIS SCENE:\n';
+    eventData.characters.forEach((char) => {
+      characterNames.push(char.name);
+      characterContext += `- **${sanitizeForPrompt(char.name)}**: ${sanitizeForPrompt(char.userDescription)}`;
+      if (char.visualDescription) {
+        characterContext += `\n  Visual appearance: ${sanitizeForPrompt(char.visualDescription)}`;
+      }
+      characterContext += '\n';
+    });
+  }
+
+  // Build context from previous events
+  let context = '';
+  if (eventData.previousEvents && eventData.previousEvents.length > 0) {
+    context = '\n\nPREVIOUS EVENTS IN THIS TIMELINE:\n';
+    eventData.previousEvents.forEach((evt, idx) => {
+      context += `${idx + 1}. ${sanitizeForPrompt(evt.title)}: ${sanitizeForPrompt(evt.description)}\n`;
+    });
+  }
+
+  // Create prompt focused on factual observation
+  const prompt = `You are analyzing a video to extract factual information for a story wiki.
+
+EVENT CONTEXT:
+Event ID: ${eventData.eventId}
+User Description: ${sanitizeForPrompt(eventData.description)}
+${characterContext}${context}
+
+YOUR TASK:
+1. Watch the video carefully
+2. Identify what is actually visible and happening
+3. Extract key elements (people, objects, actions, setting)
+4. Describe events factually without adding fictional details
+${eventData.characters && eventData.characters.length > 0 ? `5. Use the provided character names and descriptions to identify characters in the video` : ''}
+
+CRITICAL RULES:
+- Describe ONLY what you see in the video
+- Do NOT invent objects, dialogue, or actions not visible
+- Do NOT add dramatic interpretations unless clearly shown
+${
+  eventData.characters && eventData.characters.length > 0
+    ? `- **IMPORTANT**: The following characters are in this scene: ${characterNames.join(', ')}. When you recognize these characters in the video based on their descriptions, you MUST use their exact names (e.g., "${eventData.characters[0]?.name}"). Do NOT use generic terms like "elf", "wizard", "man", "woman" - always use the specific character names provided.`
+    : '- Identify characters/subjects based on what\'s visible (e.g., "person in red shirt", "eagle", "car")'
+}
+- Focus on observable actions and events
+${eventData.characters && eventData.characters.length > 0 ? '- In the "elements" array, the "name" field should use the provided character names when describing those characters' : ''}
+
+Generate a JSON response:
+{
+  "title": "Descriptive title based on main action",
+  "summary": "1-2 sentence factual summary of video content",
+  "videoAnalysis": {
+    "setting": "Visible environment (terrain, location, time of day, weather)",
+    "visualStyle": "Camera work (handheld, aerial, static, etc.) and video quality",
+    "subjects": "Who/what appears in the video",
+    "action": "What happens in the video, chronologically"
+  },
+  "plot": "2-3 paragraphs describing the sequence of events visible in the video. Use present tense. Be factual.",
+  "elements": [
+    {
+      "name": "Subject name (person, animal, object)",
+      "description": "Observable characteristics",
+      "actions": ["visible action 1", "visible action 2"]
+    }
+  ],
+  "keyMoments": [
+    "Moment 1: specific visible event",
+    "Moment 2: specific visible event",
+    "Moment 3: specific visible event"
+  ],
+  "duration": "Approximate video length",
+  "visualDetails": ["notable visual detail 1", "notable visual detail 2"]
+}
+
+Output valid JSON only. Be precise and factual.`;
+
+  try {
+    // SSRF validation before downloading external URL
+    await validateUploadUrl(videoUrl);
+    // Download video to buffer first (required for uploadFile)
+    console.log(`📤 Downloading video: ${videoUrl}`);
+    const videoController = new AbortController();
+    const videoTimeoutId = setTimeout(() => videoController.abort(), 60_000);
+    let videoResponse: Response;
+    try {
+      videoResponse = await fetch(videoUrl, { signal: videoController.signal });
+    } finally {
+      clearTimeout(videoTimeoutId);
+    }
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to download video: ${videoResponse.statusText}`);
+    }
+    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+    console.log(`✅ Downloaded ${videoBuffer.length} bytes`);
+
+    // Upload video file to Gemini
+    console.log(`📤 Uploading video to Gemini...`);
+    const uploadResult = await fileManager.uploadFile(videoBuffer, {
+      mimeType: 'video/mp4',
+      displayName: `event-${eventData.eventId}.mp4`,
+    });
+
+    // Wait for video to be processed (with timeout)
+    let file = uploadResult.file;
+    const processingDeadline = Date.now() + FILE_PROCESSING_TIMEOUT_MS;
+    while (file.state === 'PROCESSING') {
+      if (Date.now() > processingDeadline) {
+        throw new Error('Video processing timed out after 5 minutes');
+      }
+      console.log('⏳ Video processing...');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      file = await fileManager.getFile(file.name);
+    }
+
+    if (file.state === 'FAILED') {
+      throw new Error('Video processing failed');
+    }
+
+    console.log('✅ Video ready, analyzing...');
+
+    // Generate content
+    const result = await model.generateContent([
+      {
+        fileData: {
+          mimeType: file.mimeType,
+          fileUri: file.uri,
+        },
+      },
+      { text: prompt },
+    ]);
+
+    const response = result.response;
+    const text = response.text();
+
+    const wikiData = safeJsonParse<WikiData>(text, 'wiki');
+
+    // Map character IDs to elements by matching character names (case-insensitive)
+    if (eventData.characters && eventData.characterIds && eventData.characters.length > 0) {
+      console.log('🔍 Matching elements to characters:');
+      console.log(`   Elements found: ${wikiData.elements.map((e) => e.name).join(', ')}`);
+      console.log(`   Characters available: ${eventData.characters.map((c) => c.name).join(', ')}`);
+
+      wikiData.elements = wikiData.elements.map((element) => {
+        // Find matching character by name (case-insensitive)
+        const characterIndex = eventData.characters!.findIndex(
+          (char) => char.name.toLowerCase().trim() === element.name.toLowerCase().trim()
+        );
+
+        if (characterIndex !== -1 && eventData.characterIds![characterIndex]) {
+          console.log(
+            `   ✅ Matched "${element.name}" to character ID: ${eventData.characterIds![characterIndex]}`
+          );
+          return {
+            ...element,
+            characterId: eventData.characterIds![characterIndex],
+          };
+        } else {
+          console.log(`   ❌ No match for "${element.name}"`);
+        }
+
+        return element;
+      });
+
+      console.log(
+        `🔗 Mapped character IDs to ${wikiData.elements.filter((e) => e.characterId).length} elements`
+      );
+    }
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    if (!usage) {
+      throw new Error('No usage metadata returned');
+    }
+
+    const inputTokens = usage.promptTokenCount || 0;
+    const outputTokens = usage.candidatesTokenCount || 0;
+    const tokensUsed = usage.totalTokenCount || inputTokens + outputTokens;
+
+    // Gemini 2.5 Pro pricing: $1.25/1M input, $10/1M output
+    const inputCost = (inputTokens / 1_000_000) * 1.25;
+    const outputCost = (outputTokens / 1_000_000) * 10.0;
+    const costUsd = inputCost + outputCost;
+
+    console.log(`✅ Wiki generated!`);
+    console.log(`📊 Tokens: ${tokensUsed} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return {
+      wikiData,
+      metadata: {
+        tokensUsed,
+        inputTokens,
+        outputTokens,
+        costUsd,
+        generatedBy: 'gemini-2.5-pro',
+      },
+    };
+  } catch (error) {
+    console.error('❌ Wiki generation failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Analyze character image to generate detailed visual description
+ */
+export async function analyzeCharacterImage(
+  imageUrl: string,
+  userDescription: string,
+  characterName: string
+): Promise<string> {
+  ensureGeminiKey();
+  console.log(`🎨 Analyzing character image for: ${characterName}`);
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+  const prompt = `You are analyzing a character image to create a detailed visual description for narrative consistency.
+
+CHARACTER NAME: ${sanitizeForPrompt(characterName)}
+USER DESCRIPTION: ${sanitizeForPrompt(userDescription)}
+
+YOUR TASK:
+Analyze this character image and provide a detailed visual description that will help maintain consistency when this character appears in different scenes.
+
+FOCUS ON:
+1. Physical appearance (hair color/style, eye color, facial features, skin tone, body type)
+2. Clothing and accessories (colors, style, distinctive items)
+3. Distinctive features or markings (scars, tattoos, jewelry, props)
+4. Pose and expression in this image
+5. Art style characteristics (realistic, anime, stylized, etc.)
+
+CRITICAL RULES:
+- Be specific and precise (e.g., "shoulder-length brown hair" not "dark hair")
+- Focus on visual details that are consistent across scenes
+- Include colors, patterns, and textures
+- Describe distinctive features that make this character recognizable
+- Keep it concise but informative (3-5 sentences)
+- Use present tense
+- No dramatic interpretation, just visual facts
+
+Generate a detailed visual description in plain text (no JSON, no formatting).`;
+
+  try {
+    // SSRF validation before downloading external URL
+    await validateUploadUrl(imageUrl);
+    // Download image with timeout
+    const imgController = new AbortController();
+    const imgTimeoutId = setTimeout(() => imgController.abort(), 60_000);
+    let imageBase64: string;
+    try {
+      const imgResponse = await fetch(imageUrl, { signal: imgController.signal });
+      imageBase64 = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
+    } finally {
+      clearTimeout(imgTimeoutId);
+    }
+    // Generate content with image
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: imageBase64,
+        },
+      },
+      { text: prompt },
+    ]);
+
+    const response = result.response;
+    const description = response.text().trim();
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
+
+    console.log(`✅ Character analysis complete!`);
+    console.log(
+      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
+    );
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return description;
+  } catch (error) {
+    console.error('❌ Character analysis failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Improve image prompt with detailed visual description
+ */
+export async function improveImagePrompt(
+  userPrompt: string,
+  characterContext?: Array<{ name: string; description: string }>
+): Promise<string> {
+  ensureGeminiKey();
+  console.log(`🎨 Improving image prompt with Gemini...`);
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+  let characterInfo = '';
+  if (characterContext && characterContext.length > 0) {
+    characterInfo = '\n\nCHARACTERS IN THIS SCENE:\n';
+    characterContext.forEach((char) => {
+      characterInfo += `- ${sanitizeForPrompt(char.name, 200)}: ${sanitizeForPrompt(char.description, 2000)}\n`;
+    });
+  }
+
+  const prompt = `You are a professional visual artist and image generation expert. Your task is to take a simple image description and transform it into a detailed, single-frame visual description perfect for image generation.
+
+USER'S BASIC IDEA:
+${sanitizeForPrompt(userPrompt)}
+${characterInfo}
+
+YOUR TASK:
+Transform this into a detailed single-frame description. Include:
+- Camera angle and framing (e.g., "medium shot", "close-up", "wide shot", "aerial view")
+- Character positions, poses, and expressions
+- Lighting (e.g., "soft golden hour light", "dramatic side lighting", "moonlight")
+- Setting and environment details
+- Mood and atmosphere
+- Colors and visual style
+- Specific details that make the scene vivid
+
+EXAMPLE:
+Medium shot of a king standing on an ancient stone bridge, looking down pensively at the sparkling water below. Golden hour sunlight casts warm amber tones across the weathered stones. In the water, a queen wearing an elegant royal swimming suit with a golden crown relaxes on a pink inflatable swan, her face lit with a joyful smile as she waves up at him. The scene has a whimsical, dreamlike quality with rich colors and soft focus in the background.
+
+RULES:
+- Describe a SINGLE moment, not a sequence
+- Be specific about composition and framing
+- Include atmospheric and lighting details
+- Use vivid, descriptive language
+- Mention colors, textures, and mood
+${characterContext ? '- Use the provided character names and descriptions' : ''}
+- Keep it as one cohesive paragraph (2-4 sentences)
+- Output ONLY the description, no explanations or extra text
+- Do NOT use markdown formatting or code blocks
+
+Generate the improved image prompt now:`;
+
+  try {
+    const result = await model.generateContent([{ text: prompt }]);
+    const response = result.response;
+    const improvedPrompt = response.text().trim();
+
+    // Remove any markdown formatting if present
+    let cleanPrompt = improvedPrompt;
+    if (cleanPrompt.startsWith('```')) {
+      cleanPrompt = cleanPrompt.split('```')[1].trim();
+    }
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
+
+    console.log(`✅ Image prompt improved!`);
+    console.log(
+      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
+    );
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return cleanPrompt;
+  } catch (error) {
+    console.error('❌ Image prompt improvement failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Improve video prompt with cinematic cuts and shot descriptions
+ */
+export async function improveVideoPrompt(
+  userPrompt: string,
+  characterContext?: Array<{ name: string; description: string }>,
+  previousEventContext?: {
+    title: string;
+    summary: string;
+    plot?: string;
+  }
+): Promise<string> {
+  ensureGeminiKey();
+  console.log(`🎬 Improving video prompt with Gemini...`);
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+  let characterInfo = '';
+  if (characterContext && characterContext.length > 0) {
+    characterInfo = '\n\nCHARACTERS IN THIS SCENE:\n';
+    characterContext.forEach((char) => {
+      characterInfo += `- ${sanitizeForPrompt(char.name, 200)}: ${sanitizeForPrompt(char.description, 2000)}\n`;
+    });
+  }
+
+  let previousEventInfo = '';
+  if (previousEventContext) {
+    previousEventInfo = `\n\nPREVIOUS EVENT CONTEXT:\n`;
+    previousEventInfo += `Title: ${sanitizeForPrompt(previousEventContext.title, 500)}\n`;
+    previousEventInfo += `Summary: ${sanitizeForPrompt(previousEventContext.summary, 2000)}\n`;
+    if (previousEventContext.plot) {
+      previousEventInfo += `What happened: ${sanitizeForPrompt(previousEventContext.plot, 2000)}\n`;
+    }
+    previousEventInfo += `\nNote: This new scene should continue naturally from the previous event.\n`;
+  }
+
+  const prompt = `You are a professional cinematographer and video director. Your task is to take a simple video description and transform it into a detailed shot-by-shot sequence with professional camera angles and cuts.
+
+USER'S BASIC IDEA:
+${sanitizeForPrompt(userPrompt)}
+${characterInfo}${previousEventInfo}
+
+YOUR TASK:
+Transform this into a cinematic sequence with multiple shots/cuts. Use the format:
+- Each shot on a new line
+- Use [cut] to separate different shots
+- Include camera angles (e.g., "close up", "wide shot", "over the shoulder", "aerial view", "POV")
+- Be specific about what's happening in each shot
+- Keep it concise but descriptive
+- Use 3-6 shots total
+- Make it feel like a professional video sequence
+
+EXAMPLE FORMAT:
+Wide shot - a king standing on a stone bridge, looking down at the water below
+
+[cut] Over the shoulder shot - from behind the king - a queen in a royal swimming suit with a golden crown is relaxing on a pink inflatable swan in the sparkling water
+
+[cut] Close up shot of the queen's smiling face as she waves enthusiastically at the king
+
+[cut] Medium shot - the king takes a deep breath and leaps off the bridge into the water with a splash
+
+RULES:
+- Use cinematic language (wide shot, close up, medium shot, tracking shot, etc.)
+- Create visual flow between shots
+- Build narrative tension or emotion
+- Be specific about actions and details
+${characterContext ? '- Use the provided character names and descriptions' : ''}
+- Output ONLY the shot sequence, no explanations or extra text
+- Do NOT use markdown formatting or code blocks
+
+Generate the improved prompt now:`;
+
+  try {
+    const result = await model.generateContent([{ text: prompt }]);
+    const response = result.response;
+    const improvedPrompt = response.text().trim();
+
+    // Remove any markdown formatting if present
+    let cleanPrompt = improvedPrompt;
+    if (cleanPrompt.startsWith('```')) {
+      cleanPrompt = cleanPrompt.split('```')[1].trim();
+    }
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
+
+    console.log(`✅ Prompt improved!`);
+    console.log(
+      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
+    );
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return cleanPrompt;
+  } catch (error) {
+    console.error('❌ Prompt improvement failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate a lore / wiki card for any entity type.
+ * Used by the Studio orchestrator for the lore_card capability.
+ */
+export async function generateEntityLore(
+  entityName: string,
+  entityKind: string,
+  description: string
+): Promise<string> {
+  ensureGeminiKey();
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const prompt = `You are a worldbuilding writer creating a concise wiki/lore card entry.
+
+ENTITY NAME: ${sanitizeForPrompt(entityName)}
+ENTITY KIND: ${sanitizeForPrompt(entityKind)}
+DESCRIPTION: ${sanitizeForPrompt(description)}
+
+Write a compelling 2–4 paragraph wiki entry for this ${entityKind}. Include:
+- What it is / who they are
+- Key traits, abilities, or notable characteristics
+- Role in the world / narrative significance
+- One memorable detail or hook
+
+Write in a neutral encyclopedic tone. No headers, no lists — flowing paragraphs only.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  if (!text) throw new Error('Gemini returned empty lore card');
+  return text;
+}
+
+/** Metadata field definitions per entity kind — mirrors the frontend create form. */
+const METADATA_FIELDS_BY_KIND: Record<string, string[]> = {
+  person: ['role', 'appearance', 'motivations', 'abilities', 'homePlace', 'affiliations'],
+  place: ['placeType', 'atmosphere', 'rulesAndDangers', 'inhabitants', 'governingFaction'],
+  thing: ['thingType', 'origin', 'powersAndUse', 'rarity', 'currentOwner'],
+  faction: ['mission', 'ideology', 'leader', 'rivals', 'hq', 'resources'],
+  event: ['era', 'participants', 'location', 'causes', 'outcome', 'canonStatus'],
+  lore: ['loreType', 'article', 'relatedConcepts', 'canonWeight'],
+  species: ['biologicalType', 'traits', 'homeworld', 'culture', 'abilities'],
+  vehicle: ['vehicleType', 'crew', 'capabilities', 'origin', 'currentStatus'],
+  technology: ['techType', 'inventor', 'howItWorks', 'limitations', 'users'],
+  organization: ['orgType', 'purpose', 'structure', 'members', 'influence'],
+};
+
+/**
+ * Generate a full entity profile: description + kind-specific metadata fields.
+ * Returns structured JSON that can be directly applied to an entity.
+ */
+export async function generateEntityProfile(
+  entityName: string,
+  entityKind: string,
+  userHint: string
+): Promise<{ description: string; metadata: Record<string, string> }> {
+  ensureGeminiKey();
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const fields = METADATA_FIELDS_BY_KIND[entityKind] ?? [];
+
+  const fieldsInstruction =
+    fields.length > 0
+      ? `\nFill in the following metadata fields (use short, punchy text — 1-3 sentences max per field):\n${fields.map((f) => `- "${f}"`).join('\n')}`
+      : '';
+
+  const prompt = `You are a worldbuilding AI creating a detailed profile for a fictional ${entityKind}.
+
+ENTITY NAME: ${sanitizeForPrompt(entityName, 200)}
+USER HINT: ${sanitizeForPrompt(userHint || '(no additional context)', 1000)}
+
+YOUR TASK:
+1. Write a compelling 2–4 paragraph "description" for this ${entityKind}. Encyclopedic tone, no headers, no lists — flowing paragraphs only.
+2. ${fieldsInstruction || 'No additional metadata fields needed.'}
+
+Respond with a JSON object:
+{
+  "description": "...",
+  "metadata": {
+    ${fields.map((f) => `"${f}": "..."`).join(',\n    ')}
+  }
+}
+
+RULES:
+- Be creative but grounded — make the entity feel like it belongs in a rich universe.
+- Each metadata field should be concise (1-3 sentences) but evocative.
+- The description should be longer (2-4 paragraphs) and read like a wiki entry.
+- Output valid JSON only. No markdown fences.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
+
+  const parsed = safeJsonParse<{ description?: string; metadata?: Record<string, any> }>(
+    text,
+    'entity profile'
+  );
+  if (!parsed.description || typeof parsed.description !== 'string') {
+    throw new Error('AI returned invalid profile — missing description');
+  }
+
+  return {
+    description: parsed.description,
+    metadata: parsed.metadata ?? {},
+  };
+}
+
+export const geminiService = {
+  generateWikiFromVideo,
+  analyzeCharacterImage,
+  improveImagePrompt,
+  improveVideoPrompt,
+  generateEntityLore,
+  generateEntityProfile,
+};

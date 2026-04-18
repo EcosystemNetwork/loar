@@ -1,0 +1,157 @@
+/**
+ * Ponder Indexer API Client
+ *
+ * Provides a typed GraphQL helper for querying the Ponder blockchain indexer,
+ * along with TypeScript interfaces that mirror the ponder.schema.ts tables.
+ * Used instead of @ponder/client for direct GraphQL access with React Query.
+ */
+
+const PONDER_URL = import.meta.env.VITE_PONDER_URL || '';
+
+/** Circuit breaker: skip requests when indexer is known offline. */
+let _offlineUntil = 0;
+const OFFLINE_COOLDOWN_MS = 60_000; // back off 60s after a connection failure
+
+/** True when no indexer URL is configured or it points to localhost in production build */
+const _disabled = !PONDER_URL;
+
+/**
+ * Deep proxy that returns safe defaults for any property access chain.
+ * Prevents "Cannot read properties of undefined (reading 'items')" when
+ * the indexer is offline and callers do e.g. `d.nodes.items`.
+ */
+const EMPTY_RESULT: any = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (prop === 'items') return [];
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === 'then' || prop === Symbol.iterator) return undefined;
+      return EMPTY_RESULT;
+    },
+  }
+);
+
+/**
+ * Executes a GraphQL query against the Ponder indexer.
+ * Includes a circuit breaker — if the indexer is unreachable, further
+ * requests are short-circuited silently to avoid console spam.
+ * Returns empty data when the indexer is unavailable.
+ */
+export async function ponderGql<T = any>(
+  query: string,
+  variables?: Record<string, unknown>
+): Promise<T> {
+  // No indexer configured — return empty silently
+  if (_disabled) {
+    return EMPTY_RESULT as T;
+  }
+
+  if (Date.now() < _offlineUntil) {
+    return EMPTY_RESULT as T;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${PONDER_URL}/graphql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    });
+  } catch {
+    _offlineUntil = Date.now() + OFFLINE_COOLDOWN_MS;
+    return EMPTY_RESULT as T;
+  }
+
+  // Indexer is reachable — reset circuit breaker
+  _offlineUntil = 0;
+
+  if (!res.ok) throw new Error(`Ponder query failed: ${res.statusText}`);
+
+  const json = await res.json();
+  if (json.errors?.length) {
+    throw new Error(json.errors[0].message);
+  }
+  return json.data;
+}
+
+/** Default React Query options for all ponder queries. */
+export const ponderQueryDefaults = {
+  retry: false,
+  staleTime: 30_000,
+  refetchOnWindowFocus: false,
+} as const;
+
+// ---- Types matching the ponder.schema.ts tables ----
+
+/** On-chain universe entity indexed by Ponder. */
+export interface Universe {
+  id: string;
+  universeId: number | null;
+  creator: string;
+  createdAt: number;
+  name: string;
+  description: string;
+  imageURL: string;
+  tokenAddress: string | null;
+  governorAddress: string | null;
+  nodeCount: number;
+}
+
+/** ERC-20 governance token deployed for a universe. */
+export interface Token {
+  id: string;
+  universeAddress: string;
+  deployer: string;
+  tokenAdmin: string;
+  name: string;
+  symbol: string;
+  imageURL: string;
+  metadata: string;
+  context: string;
+  startingTick: string;
+  poolHook: string;
+  poolId: string;
+  pairedToken: string;
+  locker: string;
+  createdAt: number;
+}
+
+/** Timeline node created on-chain within a universe. */
+export interface Node {
+  id: string;
+  universeAddress: string;
+  nodeId: number;
+  previousNodeId: number;
+  creator: string;
+  createdAt: number;
+}
+
+/** Resolved content for a node (video link and plot text from events). */
+export interface NodeContent {
+  id: string;
+  videoLink: string;
+  plot: string;
+}
+
+/** Uniswap V4 swap event for a universe token pool. */
+export interface Swap {
+  id: string;
+  poolId: string;
+  sender: string;
+  amount0: string;
+  amount1: string;
+  sqrtPriceX96: string;
+  liquidity: string;
+  tick: number;
+  timestamp: number;
+  blockNumber: number;
+}
+
+/** Token holder balance snapshot from transfer events. */
+export interface TokenHolder {
+  id: string;
+  tokenAddress: string;
+  holderAddress: string;
+  balance: string;
+}

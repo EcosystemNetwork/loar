@@ -1,0 +1,8 @@
+packages:
+  - 'apps/web'
+  - 'apps/server'
+  - 'apps/indexer'
+  - 'apps/contracts'
+  - 'apps/mcp'
+  - 'apps/mobile'
+  - 'packages/*'

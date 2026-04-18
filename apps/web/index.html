@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#1a1a1a" />
+    <!-- TODO: Remove noindex,nofollow when deploying to mainnet production -->
+    <meta name="robots" content="noindex,nofollow" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: https: blob:; connect-src 'self' http://localhost:* ws://localhost:* https://*.loar.fun https://*.alchemy.com https://*.publicnode.com https://*.googleapis.com https://*.firebaseio.com https://*.up.railway.app https://*.thirdweb.com https://*.walletconnect.com https://*.walletconnect.org https://pulse.walletconnect.org https://api.web3modal.org https://rpc.sepolia.org https://sepolia.base.org https://mainnet.base.org https://base.drpc.org https://gateway.tenderly.co https://api.unstoppabledomains.com https://*.fal.ai https://*.fal.media https://*.pinata.cloud https://gateway.pinata.cloud https://*.lighthouse.storage https://*.meshy.ai wss://*.walletconnect.com wss://*.walletconnect.org wss://*.thirdweb.com; media-src 'self' blob: https://*.pinata.cloud https://gateway.pinata.cloud https://*.mypinata.cloud https://*.lighthouse.storage https://*.volces.com https://*.fal.ai https://*.fal.media; frame-src 'self' https://*.stripe.com https://*.thirdweb.com https://*.walletconnect.com; base-uri 'self'"
+    />
+    <title>LOAR — AI Cinematic Universe Studio</title>
+    <meta
+      name="description"
+      content="Create, tokenize, and monetize AI-powered cinematic universes on-chain."
+    />
+    <meta property="og:title" content="LOAR" />
+    <meta
+      property="og:description"
+      content="AI cinematic universe studio. Original IP. On-chain governance. Token economy."
+    />
+    <meta property="og:url" content="https://loar.fun" />
+    <meta property="og:image" content="https://loar.fun/og-image.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LOAR" />
+    <meta
+      name="twitter:description"
+      content="AI cinematic universe studio. Original IP. On-chain governance. Token economy."
+    />
+    <meta name="twitter:image" content="https://loar.fun/og-image.png" />
+    <link rel="icon" type="image/x-icon" href="loarlogo.svg" />
+  </head>
+
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

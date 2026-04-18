@@ -1,0 +1,29 @@
+{
+  "name": "@loar/abis",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/generated.ts",
+  "types": "src/generated.ts",
+  "scripts": {
+    "generate": "pnpm exec wagmi generate",
+    "build:ts": "pnpm exec tsc --build",
+    "generate:all": "pnpm run generate && pnpm run build:ts"
+  },
+  "typesVersions": {
+    "*": {
+      "addresses": [
+        "src/addresses.ts"
+      ],
+      "generated": [
+        "src/generated.ts"
+      ]
+    }
+  },
+  "exports": {
+    "./addresses": "./dist/addresses.js",
+    "./generated": "./dist/generated.js"
+  },
+  "dependencies": {
+    "wagmi": "^2.19.5"
+  }
+}

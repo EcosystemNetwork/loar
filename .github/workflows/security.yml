@@ -1,0 +1,164 @@
+name: Security Checks
+
+on:
+  pull_request:
+  push:
+
+# STRICT controls whether Slither failures block the workflow.
+# - Blocking on: any push, or PRs targeting main/release/* (the launch gate)
+# - Informational on: PRs targeting feature branches (allows WIP audit fixes)
+#
+# pnpm audit is ALWAYS blocking (no condition) — dependency vulns are cheap to check.
+#
+# Known contract patterns that may produce Slither warnings:
+#   arbitrary-send-eth: pull-payment claim() functions send to msg.sender — intentional.
+#   These are behind nonReentrant guards and require earned balance. Not attack surface.
+#   unchecked-transfer: Fixed in UniverseTokenDeployer.sol and LoarLpLockerMultiple.sol.
+env:
+  STRICT: >-
+    ${{
+      github.event_name == 'push' ||
+      github.base_ref == 'main' ||
+      startsWith(github.base_ref, 'release/')
+    }}
+
+jobs:
+  contracts-security:
+    name: Contract Security (Slither)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    defaults:
+      run:
+        working-directory: apps/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Forge build (required for Slither)
+        run: forge build
+
+      - name: Run Slither
+        id: slither
+        uses: crytic/slither-action@v0.4.0
+        with:
+          target: apps/contracts
+          slither-config: apps/contracts/slither.config.json
+          fail-on: medium
+          sarif: results.sarif
+        continue-on-error: ${{ env.STRICT != 'true' }}
+
+      - name: Upload Slither SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('apps/contracts/results.sarif') != ''
+        with:
+          sarif_file: apps/contracts/results.sarif
+          category: slither
+
+      - name: Upload Slither SARIF artifact
+        if: always() && hashFiles('apps/contracts/results.sarif') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-sarif-${{ github.run_id }}
+          path: apps/contracts/results.sarif
+          retention-days: 30
+
+      - name: Check for pragma version mismatches (must be exact =0.8.30)
+        run: |
+          MISMATCHES=$(grep -rn 'pragma solidity' src/ script/ test/ | grep -v '=0.8.30' || true)
+          if [ -n "$MISMATCHES" ]; then
+            echo "::error::Pragmas must be pinned to exactly =0.8.30. Offenders:"
+            echo "$MISMATCHES"
+            exit 1
+          fi
+          echo "All pragmas pinned to =0.8.30"
+
+      - name: UPGRADE-01 — Storage gap presence check on UUPS contracts
+        run: |
+          # Every UUPS contract must declare a `__gap` to allow safe upgrades.
+          # A missing gap can cause permanent fund loss when a future upgrade adds state.
+          FAIL=0
+          for sol in $(grep -lR 'UUPSUpgradeable' src/); do
+            if ! grep -qE 'uint256\[[0-9]+\] private __gap' "$sol"; then
+              echo "::error file=$sol::UUPS contract is missing `__gap` — upgrade-unsafe"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -ne 0 ]; then exit 1; fi
+          echo "All UUPS contracts declare a storage gap."
+
+      - name: UPGRADE-01 — Emit storage layouts for review
+        run: |
+          mkdir -p storage-layouts
+          for contract in PaymentRouter RightsRegistry CanonMarketplace CreditManager \
+                          AdPlacement SubscriptionManager LicensingRegistry CollabManager \
+                          AnalyticsRegistry LaunchpadStaking StoryBounties Escrow \
+                          LoarBurner RemixFees ContentLicensing; do
+            forge inspect "$contract" storage-layout > "storage-layouts/$contract.json" 2>/dev/null \
+              || echo "::warning::Could not inspect $contract"
+          done
+
+      - name: Upload storage-layout artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-layouts-${{ github.run_id }}
+          path: apps/contracts/storage-layouts/
+          retention-days: 90
+
+  contracts-mythril:
+    name: Contract Security (Mythril)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Forge build
+        run: forge build
+
+      - name: Install Mythril
+        run: pip3 install mythril
+
+      - name: Run Mythril analysis
+        run: |
+          EXIT_CODE=0
+          for sol in $(find src/ -name '*.sol' -not -path '*/test/*'); do
+            echo "::group::Analyzing $sol"
+            myth analyze "$sol" \
+              --solc-json mythril-remappings.json \
+              --execution-timeout 300 \
+              --max-depth 12 \
+              || EXIT_CODE=1
+            echo "::endgroup::"
+          done
+          exit $EXIT_CODE
+        continue-on-error: ${{ env.STRICT != 'true' }}
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies (high severity)
+        run: pnpm audit --audit-level=high
