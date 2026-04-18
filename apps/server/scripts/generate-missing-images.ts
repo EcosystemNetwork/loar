@@ -406,7 +406,7 @@ async function main() {
       try {
         result = await googleImagenService.generate({
           prompt,
-          model: 'nano-banana-2',
+          model: 'nano-banana-pro-preview',
           negativePrompt: config.negativePrompt,
           numberOfImages: 1,
           aspectRatio: config.aspectRatio,
@@ -424,7 +424,7 @@ async function main() {
           prompt = config.buildPrompt(entity.name, safeDesc, safeMeta);
           result = await googleImagenService.generate({
             prompt,
-            model: 'nano-banana-2',
+            model: 'nano-banana-pro-preview',
             negativePrompt: config.negativePrompt,
             numberOfImages: 1,
             aspectRatio: config.aspectRatio,
