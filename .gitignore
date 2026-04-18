@@ -21,3 +21,4 @@ apps/contracts/broadcast/
 test-results/
 playwright-report/
 .playwright-artifacts-*/
+*-output/
