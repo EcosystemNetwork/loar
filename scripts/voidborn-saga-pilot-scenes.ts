@@ -1,14 +1,15 @@
 /**
- * SPACE FLEET — Pilot Episode: "Return"
+ * VOIDBORN SAGA — Pilot Episode: "Crash Landing"
  *
- * 40 scenes via Seedance 2.0 → on-chain nodes.
+ * 35 scenes via Seedance 2.0 → on-chain nodes.
  * Pulls character DNA from wiki entities for visual consistency.
  *
- * ~7 min episode (40 × 10s = 6.7 min core footage + audio padding)
+ * ~6 min of core footage (35 × 10s = 5:50 + audio padding)
  *
  * Prerequisites:
- *   - Space Fleet universe deployed (create-space-fleet.ts)
- *   - Wiki populated (space-fleet-wiki.ts)
+ *   - Voidborn Saga universe deployed (create-voidborn-saga.ts), address in VOIDBORN_ADDR
+ *   - Wiki populated (voidborn-saga-wiki.ts) — ideally with VOIDBORN_ADDR set so
+ *     entities are attached to the universe
  *   - Server running (pnpm dev:server)
  *
  * Generation Modes:
@@ -22,8 +23,8 @@
  *                          different between scenes.
  *
  * Usage:
- *   GEN_MODE=continuity pnpm tsx scripts/space-fleet-pilot-scenes.ts
- *   GEN_MODE=fast BATCH_SIZE=3 pnpm tsx scripts/space-fleet-pilot-scenes.ts
+ *   VOIDBORN_ADDR=0x... GEN_MODE=continuity pnpm tsx scripts/voidborn-saga-pilot-scenes.ts
+ *   VOIDBORN_ADDR=0x... GEN_MODE=fast BATCH_SIZE=3 pnpm tsx scripts/voidborn-saga-pilot-scenes.ts
  *
  * Resume: Set START_SCENE=S14 env to skip completed scenes.
  */
@@ -53,7 +54,7 @@ const account = privateKeyToAccount(PRIVATE_KEY);
 const publicClient = createPublicClient({ chain: sepolia, transport: http(RPC_URL) });
 const walletClient = createWalletClient({ account, chain: sepolia, transport: http(RPC_URL) });
 
-const UNIVERSE_ADDR = (process.env.SPACE_FLEET_ADDR ??
+const UNIVERSE_ADDR = (process.env.VOIDBORN_ADDR ??
   '0x0000000000000000000000000000000000000000') as `0x${string}`;
 const BD_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const START_SCENE = process.env.START_SCENE ?? 'S01';
@@ -214,22 +215,24 @@ function sanitizePrompt(prompt: string, attempt: number): string {
   if (attempt === 0) return prompt;
   // Strip character names and replace with generic descriptions
   let p = prompt
-    .replace(/\bEric\b/g, 'the young man')
-    .replace(/\bMikel\b/g, 'a lean pale figure')
-    .replace(/\bJeff\b/g, 'a big muscular guy')
-    .replace(/\bDante\b/g, 'a charismatic stranger')
-    .replace(/\bMarcus\b/g, 'a watchful figure')
-    .replace(/NOS Event Center/gi, 'a massive rave venue')
-    .replace(/San Bernardino/gi, 'the desert city');
+    .replace(/\bZix\b/g, 'the tall indigo alien leader')
+    .replace(/\bMora\b/g, 'the moss-green alien engineer')
+    .replace(/\bPebb\b/g, 'the tiny lavender chaos alien')
+    .replace(/\bDrael\b/g, 'the bronze-skinned handsome alien')
+    .replace(/\bNuni\b/g, 'the pale blue-silver alien scholar')
+    .replace(/\bHector\b/g, 'a weathered flea-market vendor')
+    .replace(/\bthe Starling\b/gi, 'the junky alien ship')
+    .replace(/Santa Mira County/gi, 'a California suburb')
+    .replace(/Taco Bell/gi, 'a taco fast-food place');
   if (attempt >= 2) {
     p = p
-      .replace(/SPACE FLEET/gi, 'the series')
+      .replace(/VOIDBORN SAGA/gi, 'the animated series')
+      .replace(/Voidborn/gi, 'alien')
+      .replace(/The Sleeper Network/gi, 'the hidden network')
       .replace(/The Frequency/gi, 'an ancient presence')
-      .replace(/(?:Gaspar Noé|Villeneuve|A24|Fincher|Deakins)/gi, 'cinematic')
+      .replace(/(?:Pixar-quality|Pixar|A24|Gaspar Noé|Villeneuve|Fincher)/gi, 'cinematic')
       .replace(/ARRI Alexa 65/gi, 'professional cinema camera')
-      .replace(/Cooke anamorphic/gi, 'anamorphic')
-      .replace(/photorealistic/gi, 'realistic')
-      .replace(/psilocybin/gi, 'psychedelic experience');
+      .replace(/photorealistic/gi, 'realistic');
   }
   return p;
 }
@@ -794,7 +797,7 @@ async function main() {
       try {
         const videoUrl = await generateVideo(scene.prompt, label, lastFrameUrl);
 
-        const contentHash = `sf-${scene.id}-${Date.now()}`;
+        const contentHash = `void-${scene.id}-${Date.now()}`;
         const nodeId = await createNode(contentHash, scene.plot, previousId, videoUrl, label);
         previousId = nodeId;
         results.push({ id: scene.id, title: scene.title, nodeId });
@@ -845,7 +848,7 @@ async function main() {
 
         if (result.status === 'fulfilled') {
           try {
-            const contentHash = `sf-${scene.id}-${Date.now()}`;
+            const contentHash = `void-${scene.id}-${Date.now()}`;
             const nodeId = await createNode(
               contentHash,
               scene.plot,

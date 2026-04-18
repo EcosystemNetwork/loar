@@ -27,6 +27,7 @@ import { createAttachment } from '../media/media.handlers';
 import { getStorageManager } from '../../services/storage';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { publishToGallery } from '../../lib/gallery-publish';
 
 // ── Collections ──────────────────────────────────────────────────────
 
@@ -38,53 +39,6 @@ const userCreditsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('userCredits');
 };
-const contentCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('content');
-};
-
-async function publishToGallery(opts: {
-  creatorUid: string;
-  mediaUrl: string;
-  thumbnailUrl?: string | null;
-  mediaType: 'image' | 'ai-image' | '3d';
-  title: string;
-  description: string;
-  universeId?: string | null;
-  generationId: string;
-  generationModel: string;
-  tags?: string[];
-}) {
-  try {
-    const now = new Date();
-    await contentCol().add({
-      title: opts.title.slice(0, 100),
-      description: opts.description,
-      mediaUrl: opts.mediaUrl,
-      thumbnailUrl: opts.thumbnailUrl || opts.mediaUrl,
-      mediaType: opts.mediaType,
-      classification: 'original',
-      tags: opts.tags || [],
-      ipDeclaration: {
-        isOriginal: true,
-        usesCopyrightedMaterial: false,
-        license: 'all-rights-reserved',
-      },
-      visibility: 'public',
-      creatorUid: opts.creatorUid,
-      ...(opts.universeId ? { universeId: opts.universeId } : {}),
-      createdAt: now,
-      updatedAt: now,
-      views: 0,
-      likes: 0,
-      reviewStatus: 'not_required',
-      generationId: opts.generationId,
-      generationModel: opts.generationModel,
-    });
-  } catch (err) {
-    console.error('[pipeline] gallery publish failed:', err);
-  }
-}
 
 // ── Pricing ──────────────────────────────────────────────────────────
 
@@ -237,7 +191,7 @@ async function executePipeline(opts: {
       generationId: pipelineId,
     }).catch((err) => console.error('[pipeline] 2D attach failed:', err));
 
-    await publishToGallery({
+    void publishToGallery({
       creatorUid: userId,
       mediaUrl: imageUrl,
       thumbnailUrl: imageUrl,
@@ -327,7 +281,7 @@ async function executePipeline(opts: {
       }).catch((err) => console.error('[pipeline] 3D thumbnail attach failed:', err));
     }
 
-    await publishToGallery({
+    void publishToGallery({
       creatorUid: userId,
       mediaUrl: glbUrl,
       thumbnailUrl: meshyTask.thumbnailUrl || imageUrl,
@@ -424,7 +378,7 @@ async function executePipeline(opts: {
 
     const texturedGlbUrl = textureTask.modelUrls?.glb;
     if (texturedGlbUrl) {
-      await publishToGallery({
+      void publishToGallery({
         creatorUid: userId,
         mediaUrl: texturedGlbUrl,
         thumbnailUrl: textureTask.thumbnailUrl || meshyTask.thumbnailUrl || imageUrl,

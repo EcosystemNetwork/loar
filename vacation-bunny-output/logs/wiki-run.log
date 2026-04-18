@@ -12,3 +12,14 @@
   Judy (person)
 ═══════════════════════════════════════════════════════
 [PERSON 1/21] Generating 2D art via Google Imagen...
+[PERSON 1/21] 2D art failed: fetch failed
+[PERSON 1/21] Creating entity in wiki...
+[PERSON 1/21] Entity created: c88mwBnROKHZwr1K2IDn
+[PERSON 1/21] Kicking off 3D model (fire-and-forget)...
+[PERSON 1/21] 3D task queued: f6690b75-db7d-4eb6-80ed-1ccaa11ed441
+[PERSON 1/21] DONE — "Judy"
+
+═══════════════════════════════════════════════════════
+  Baby Bunny (person)
+═══════════════════════════════════════════════════════
+[PERSON 2/21] Generating 2D art via Google Imagen...

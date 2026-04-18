@@ -44,3 +44,103 @@ Server listening on http://localhost:3000
 --> POST /auth/verify [32m200[0m 329ms
 <-- GET /health
 --> GET /health [32m200[0m 2ms
+<-- GET /health
+--> GET /health [32m200[0m 2ms
+<-- GET /auth/nonce
+--> GET /auth/nonce [32m200[0m 153ms
+<-- POST /auth/verify
+--> POST /auth/verify [32m200[0m 475ms
+<-- POST /trpc/image.generate?batch=1
+[ByteDance] Generating image: model=seedream-5-0-260128
+[ByteDance] Image generated: 1 images
+[StorageManager] Initialized with providers (priority order): pinata, lighthouse, firebase
+[StorageManager] Currently available: pinata, lighthouse, firebase
+[persist] Uploading generation-5e04429d-8ee1-48cc-a091-74bbd723d3ee-0.png to permanent storage...
+--> POST /trpc/image.generate?batch=1 [32m200[0m 41s
+<-- POST /trpc/entities.create?batch=1
+--> POST /trpc/entities.create?batch=1 [32m200[0m 638ms
+<-- POST /trpc/threed.textTo3DPreview?batch=1
+[provenance] c2pa-node loaded successfully
+[provenance] C2PA_PRIVATE_KEY and/or C2PA_CERTIFICATE not set — signing disabled
+[StorageManager] Uploading to pinata…
+--> POST /trpc/threed.textTo3DPreview?batch=1 [32m200[0m 3s
+<-- POST /trpc/image.generate?batch=1
+[ByteDance] Generating image: model=seedream-5-0-260128
+[StorageManager] firebase background attempt 1 failed: {
+  "error": {
+    "code": 404,
+    "message": "The specified bucket does not exist.",
+    "errors": [
+      {
+        "message": "The specified bucket does not exist.",
+        "domain": "global",
+        "reason": "notFound"
+      }
+    ]
+  }
+}
+
+[StorageManager] Retrying firebase background upload in 5000ms (attempt 1/2)
+[persist] generation-5e04429d-8ee1-48cc-a091-74bbd723d3ee-0.png saved permanently: https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmX7xbJiENkm5GK5GEvSFHLZMZM3Jb7ZEJ8X9HzbrkmsY4
+[StorageManager] firebase background attempt 2 failed: {
+  "error": {
+    "code": 404,
+    "message": "The specified bucket does not exist.",
+    "errors": [
+      {
+        "message": "The specified bucket does not exist.",
+        "domain": "global",
+        "reason": "notFound"
+      }
+    ]
+  }
+}
+
+[StorageManager] Retrying firebase background upload in 15000ms (attempt 2/2)
+[StorageManager] lighthouse background attempt 1 failed: fetch failed
+[StorageManager] Retrying lighthouse background upload in 5000ms (attempt 1/2)
+[StorageManager] firebase background attempt 3 failed: {
+  "error": {
+    "code": 404,
+    "message": "The specified bucket does not exist.",
+    "errors": [
+      {
+        "message": "The specified bucket does not exist.",
+        "domain": "global",
+        "reason": "notFound"
+      }
+    ]
+  }
+}
+
+[StorageManager] Background upload to firebase permanently failed: {
+  "error": {
+    "code": 404,
+    "message": "The specified bucket does not exist.",
+    "errors": [
+      {
+        "message": "The specified bucket does not exist.",
+        "domain": "global",
+        "reason": "notFound"
+      }
+    ]
+  }
+}
+
+[StorageManager] lighthouse background attempt 2 failed: fetch failed
+[StorageManager] Retrying lighthouse background upload in 15000ms (attempt 2/2)
+[ByteDance] Image generated: 1 images
+[persist] Uploading generation-209bfb42-8dbb-4c72-b791-53ea7208184a-0.png to permanent storage...
+--> POST /trpc/image.generate?batch=1 [32m200[0m 41s
+<-- POST /trpc/entities.create?batch=1
+--> POST /trpc/entities.create?batch=1 [32m200[0m 278ms
+<-- POST /trpc/threed.textTo3DPreview?batch=1
+<-- POST /trpc/entities.create?batch=1
+--> POST /trpc/entities.create?batch=1 [32m200[0m 236ms
+<-- POST /trpc/threed.textTo3DPreview?batch=1
+--> POST /trpc/threed.textTo3DPreview?batch=1 [32m200[0m 2s
+--> POST /trpc/threed.textTo3DPreview?batch=1 [32m200[0m 2s
+[StorageManager] Uploading to pinata…
+<-- POST /trpc/image.generate?batch=1
+<-- POST /trpc/image.generate?batch=1
+[ByteDance] Generating image: model=seedream-5-0-260128

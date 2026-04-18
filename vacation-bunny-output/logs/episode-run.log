@@ -26,3 +26,35 @@
 [S03 (3/56)] Generating... (30s)
 [S01 (1/56)] Generating... (30s)
 [S02 (2/56)] Generating... (30s)
+[S03 (3/56)] Generating... (60s)
+[S01 (1/56)] Generating... (60s)
+[S02 (2/56)] Generating... (60s)
+[S03 (3/56)] Generating... (90s)
+[S01 (1/56)] Generating... (90s)
+[S02 (2/56)] Generating... (90s)
+[S02 (2/56)] Video done
+[S03 (3/56)] Generating... (120s)
+[S01 (1/56)] Generating... (120s)
+[S03 (3/56)] Video done
+[S01 (1/56)] Video done
+[S01 (1/56)] Node #1
+[S01 (1/56)] DONE — Node #1
+[S02 (2/56)] Node #2
+[S02 (2/56)] DONE — Node #2
+[S03 (3/56)] Node #3
+[S03 (3/56)] DONE — Node #3
+[S03 FRAME] Extracted frame (54KB)
+[BATCH] Completed S01–S03
+
+═══════════════════════════════════════════════════════
+  BATCH: S04–S06 (3 parallel)
+═══════════════════════════════════════════════════════
+[S04 (4/56)] Generating (i2v continuity)...
+[S05 (5/56)] Generating (t2v)...
+[S06 (6/56)] Generating (t2v)...
+[S06 (6/56)] Task: cgt-20260418151520-dddx5
+[S05 (5/56)] Task: cgt-20260418151520-6dprm
+[S04 (4/56)] Task: cgt-20260418151520-wkqk2
+[S06 (6/56)] Generating... (0s)
+[S05 (5/56)] Generating... (0s)
+[S04 (4/56)] Generating... (0s)

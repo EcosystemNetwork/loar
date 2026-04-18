@@ -1,7 +1,11 @@
 /**
  * Contract Address Registry — Sepolia + Base Sepolia
  *
- * Multi-chain addresses (Base mainnet, Solana, SUI) preserved on feature/multi-chain branch.
+ * Auto-generated from deployment manifests. To update, run:
+ *   pnpm sync:addresses
+ *
+ * Beacon addresses are preserved from the prior file — update those manually
+ * after a beacon redeploy.
  */
 
 import type { SupportedEvmChainId } from './chains';
@@ -38,17 +42,17 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
   11155111: {
     universeManager: '0x5441273a432821d20C949768d5940960dEaC6C35',
     loarToken: '0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F',
-    paymentRouter: '0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6',
-    creditManager: '0x5110FCCaf50316D8F874F22428dC1a832F591639',
-    rightsRegistry: '0x3A14A746990498d5a4eCe867db10a197f91856Bc',
+    paymentRouter: '0x0fF81B57D5B47AC5bF2A84EeA69cCf4Aa6eb0C7C',
+    creditManager: '0x42d5F92F550D42B36a119949d26a34Ca1F6b2d1E',
+    rightsRegistry: '0x82b4Fe50cE07a64CbF5f97E9d70F2cEb8af63EA3',
     revenueModuleFactory: '0x6D5CEf09F044224A51bd59EB841769255070e5dA',
-    canonMarketplace: '0xDc5998C5e334345Ac3Aa9a9c6e141f471e929c81',
-    adPlacement: '0x972bD30323B0Fb5f2466E39593cCdE1e8ae3F8C1',
-    subscriptionManager: '0x53542bA1e3445804D9a225C967E2677F017D1d47',
-    licensingRegistry: '0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C',
-    collabManager: '0xE981454B4149BEA3a9018fa2ab77482F388ba01f',
-    analyticsRegistry: '0xB86539C4bf30036B6bd1513320cF38Bc839c7922',
-    loarHook: '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
+    canonMarketplace: '0x2Bb4750B79C48e5D39c29b5e88DE05DB94A6AB1f',
+    adPlacement: '0x07c8962AB19469E48c814783664574156556B4be',
+    subscriptionManager: '0xdce691E3743Ad757D079E14D9C7BDf888eBFa395',
+    licensingRegistry: '0x60F419E0f37dD661AF43e5326872733e89911DA9',
+    collabManager: '0x43883B2BE785FCC2C098401F07a17a3BbBDAf7d7',
+    analyticsRegistry: '0x908Db578775aA2391244d57A87b156f54964aF8e',
+    loarHook: '0x0000000000000000000000000000000000000000',
     lpLocker: '0x7d30fd57e44aB0ca407D312976816E7052905E0A',
     feeLocker: '0x965f5C192E38b86Fa4a79A561E695C48B1DC3582',
     swapRouter: '0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5',
@@ -60,21 +64,21 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
     episodeNftBeacon: '0x3ebb4FFd384Fc971F445AA950055203916b749a5',
   },
   84532: {
-    universeManager: '0x829666ADAc47D954297a9CD1232744E1669B9e83',
+    universeManager: '0xE981454B4149BEA3a9018fa2ab77482F388ba01f',
     loarToken: '0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5',
-    paymentRouter: '0x5d5E30F23487D5D9AF73C3D97b054BEe7c317429',
-    creditManager: '0x60d6Cd20B6aE2d8050Ec96436D3dF7A95B5a0e99',
-    rightsRegistry: '0x30E7b8aC9BA8BA8bCd970714a367d380CED9FbE3',
-    revenueModuleFactory: '0xeE8aC1e1Ae9Ff2e039537559e704E361B39Fb6D8',
-    canonMarketplace: '0x9FC304306Af5eE0f55B92C58cddE1e8ae3F8C1',
-    adPlacement: '0x0a4678b657b558F9fd0461d6B5613f29428EaF6C',
-    subscriptionManager: '0x75F68A9D650B1e9a52506e424Ea2b095Cbb3A52D',
-    licensingRegistry: '0xCc773ed0d6c8f05B90A7C214a7341c8A190627b9',
-    collabManager: '0xFE69b81aBC8F903801AC7f91CaD052d8575AC039',
-    analyticsRegistry: '0x7a580b50b8F8F83D163a03f70c808b3B90537350',
-    loarHook: '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC',
-    lpLocker: '0x6C67EaC980DAF0AC8aDBD6a41E61a7833E2D5FF6',
-    feeLocker: '0x2faA65c60Bb463b1CEC4eC14AD04CC29C7D04981',
+    paymentRouter: '0x3a6C6Bc90F34839a4792c107d9597a92fBCCA984',
+    creditManager: '0x6077Ce7CB99Bfe1eC3c67f8635a597a76e3FbB71',
+    rightsRegistry: '0x3EF8d96cf4336E46cc7091A2325B19f53b65b109',
+    revenueModuleFactory: '0xE15d941140E5504Af7C1b56Ac14da236963A99AE',
+    canonMarketplace: '0x222604e2185802046692293fD31dCb4Bde249Bc3',
+    adPlacement: '0x751ed220B082aE763446Fe1Fd583f3962EeBe6a3',
+    subscriptionManager: '0x056dDe6c068cE3FE17C2E6eE6cfA8F76eB5A5264',
+    licensingRegistry: '0x8e6c09198267B07E3FC8C66F0343759111D63016',
+    collabManager: '0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240',
+    analyticsRegistry: '0xB18db49DFAB0d8B05916260D457574348893601d',
+    loarHook: '0x0000000000000000000000000000000000000000',
+    lpLocker: '0xa450Bde3120a23EE3AbB87fDa4fB0E9e9F6D0307',
+    feeLocker: '0x40e4e01735Be9e8cC5eF64E1f36188e1763e9740',
     swapRouter: '0x69c2aA66B3bB3e5f6658Dc2a77022558e7022398',
     tokenVesting: '0x36E25222f7E5C6f4dC8f918B68C61da83330C97F',
     episodeEditionBeacon: '0x7980622e335E72fc339b2FaA3d08DEE8CC745F4f',

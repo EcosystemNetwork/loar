@@ -40,7 +40,11 @@ import {
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { universeManagerAbi } from '@loar/abis/generated';
-import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
+import {
+  UniverseManager,
+  LoarHookStaticFee,
+  LoarLpLockerMultiple,
+} from '../packages/abis/src/addresses';
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';

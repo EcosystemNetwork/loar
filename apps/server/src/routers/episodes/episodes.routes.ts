@@ -25,6 +25,7 @@ import { firebaseStorageService } from '../../services/firebase-storage';
 import { getStorageManager } from '../../services/storage';
 import { routeModel, getModelById } from '../../services/video-models';
 import { dispatchGeneration, saveGenerationRecord } from '../generation/generation.routes';
+import { publishToGallery } from '../../lib/gallery-publish';
 
 // ── Collections ─────────────────────────────────────────────────────────
 
@@ -42,53 +43,6 @@ const scriptJobsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('scriptToEpisodeJobs');
 };
-
-const contentCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('content');
-};
-
-async function publishClipToGallery(opts: {
-  creatorUid: string;
-  universeId: string;
-  videoUrl: string;
-  thumbnailUrl?: string | null;
-  prompt: string;
-  modelId: string;
-  generationId: string;
-  episodeTitle: string;
-  sceneIndex: number;
-}) {
-  try {
-    const now = new Date();
-    await contentCol().add({
-      title: `${opts.episodeTitle} — Scene ${opts.sceneIndex + 1}`.slice(0, 100),
-      description: opts.prompt,
-      mediaUrl: opts.videoUrl,
-      thumbnailUrl: opts.thumbnailUrl || null,
-      mediaType: 'ai-video',
-      classification: 'original',
-      tags: ['episode', 'script-to-episode'],
-      ipDeclaration: {
-        isOriginal: true,
-        usesCopyrightedMaterial: false,
-        license: 'all-rights-reserved',
-      },
-      visibility: 'public',
-      creatorUid: opts.creatorUid,
-      universeId: opts.universeId,
-      createdAt: now,
-      updatedAt: now,
-      views: 0,
-      likes: 0,
-      reviewStatus: 'not_required',
-      generationId: opts.generationId,
-      generationModel: opts.modelId,
-    });
-  } catch (err) {
-    console.error('[script-to-episode] gallery publish failed:', err);
-  }
-}
 
 // ── Schemas ─────────────────────────────────────────────────────────────
 
@@ -534,17 +488,17 @@ async function runScriptToEpisode(jobId: string, userId: string): Promise<void> 
           const lastFrameUrl = await extractLastFrame(videoUrl, `${jobId}-scene-${i}`);
           if (lastFrameUrl) previousLastFrameUrl = lastFrameUrl;
 
-          // Publish clip to gallery so paid generations are never orphaned
-          publishClipToGallery({
+          void publishToGallery({
             creatorUid: userId,
             universeId: job.universeId as string,
-            videoUrl,
+            mediaUrl: videoUrl,
+            mediaType: 'ai-video',
+            title: `${job.title as string} — Scene ${i + 1}`,
+            description: scene.prompt,
             thumbnailUrl: lastFrameUrl,
-            prompt: scene.prompt,
-            modelId: model!.id,
             generationId,
-            episodeTitle: job.title as string,
-            sceneIndex: i,
+            generationModel: model!.id,
+            tags: ['episode', 'script-to-episode'],
           });
 
           await jobRef.update({

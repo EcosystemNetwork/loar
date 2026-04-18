@@ -52,7 +52,12 @@ const deployment = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'deployments/sepolia.json'), 'utf-8')
 );
 const UNIVERSE_MANAGER = getAddress(deployment.contracts.UniverseManager) as `0x${string}`;
-const HOOK = getAddress(deployment.contracts.LoarHookStaticFee) as `0x${string}`;
+// LoarHookStaticFee was removed from deployments/sepolia.json in commit 1e2f46f
+// but the UniverseManager ABI still requires a hook address. Fall back to the
+// last-known deployed hook from git history (0xF5b2…968CC).
+const HOOK = getAddress(
+  deployment.contracts.LoarHookStaticFee ?? '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC'
+) as `0x${string}`;
 const LOCKER = getAddress(deployment.contracts.LoarLpLockerMultiple) as `0x${string}`;
 const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9' as const; // Sepolia WETH
 
