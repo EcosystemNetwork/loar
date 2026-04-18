@@ -7,3 +7,40 @@ Environment: development
 Server listening on http://localhost:3000
 [pricing] Heartbeat complete: 45 models checked, 0 price changes detected
 [pricing] Heartbeat started — checking every 12 hours
+<-- GET /
+--> GET / [32m200[0m 2ms
+<-- GET /auth/nonce
+--> GET /auth/nonce [32m200[0m 160ms
+<-- GET /auth/nonce
+--> GET /auth/nonce [32m200[0m 206ms
+<-- POST /auth/verify
+--> POST /auth/verify [32m200[0m 356ms
+<-- GET /trpc/universes.getNonce?batch=1&input=%7B%220%22%3Anull%7D
+--> GET /trpc/universes.getNonce?batch=1&input=%7B%220%22%3Anull%7D [32m200[0m 319ms
+<-- POST /trpc/universes.create?batch=1
+--> POST /trpc/universes.create?batch=1 [32m200[0m 2s
+<-- GET /auth/nonce
+--> GET /auth/nonce [32m200[0m 149ms
+<-- POST /auth/verify
+--> POST /auth/verify [32m200[0m 324ms
+<-- POST /trpc/image.generate?batch=1
+[ByteDance] Generating image: model=seedream-5-0-260128
+[ByteDance] Image generation failed: Error: ByteDance API error 400: The request failed because the output image may contain sensitive information. Request id: 02177649622966533f1a7c43c44499172059af1828f5943716d78
+    at ByteDanceService.request (/home/god/Desktop/LOAR/loar/apps/server/src/services/bytedance.ts:102:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async ByteDanceService.generateImage (/home/god/Desktop/LOAR/loar/apps/server/src/services/bytedance.ts:298:22)
+    at async <anonymous> (/home/god/Desktop/LOAR/loar/apps/server/src/routers/generation/image.routes.ts:467:15)
+    at async resolveMiddleware (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/@trpc+server@11.15.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:22)
+    at async callRecursive (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/@trpc+server@11.15.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)
+    at async callRecursive (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/@trpc+server@11.15.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)
+    at async callRecursive (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/@trpc+server@11.15.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)
+    at async callRecursive (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/@trpc+server@11.15.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)
+    at async procedure (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/@trpc+server@11.15.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)
+<-- GET /health
+--> GET /health [32m200[0m 1ms
+<-- GET /auth/nonce
+--> GET /auth/nonce [32m200[0m 135ms
+<-- POST /auth/verify
+--> POST /auth/verify [32m200[0m 329ms
+<-- GET /health
+--> GET /health [32m200[0m 2ms

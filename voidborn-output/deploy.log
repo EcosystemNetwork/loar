@@ -1,0 +1,32 @@
+/home/god/Desktop/LOAR/loar/node_modules/.pnpm/viem@2.47.6_typescript@5.9.3_zod@4.3.6/node_modules/viem/utils/address/getAddress.ts:79
+    throw new InvalidAddressError({ address })
+          ^
+
+
+InvalidAddressError: Address "undefined" is invalid.
+
+- Address must be a hex value of 20 bytes (40 hex characters).
+- Address must match its checksum counterpart.
+
+Version: viem@2.47.6
+    at getAddress (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/viem@2.47.6_typescript@5.9.3_zod@4.3.6/node_modules/viem/utils/address/getAddress.ts:79:11)
+    at path (/home/god/Desktop/LOAR/loar/scripts/create-voidborn-saga.ts:55:14)
+    at Object.<anonymous> (/home/god/Desktop/LOAR/loar/scripts/create-voidborn-saga.ts:538:2)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.transformer (/home/god/Desktop/LOAR/loar/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1104)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Module._load (node:internal/modules/cjs/loader:1091:12)
+    at cjsLoader (node:internal/modules/esm/translators:298:15)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:240:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25) {
+  details: undefined,
+  docsPath: undefined,
+  metaMessages: [
+    '- Address must be a hex value of 20 bytes (40 hex characters).',
+    '- Address must match its checksum counterpart.'
+  ],
+  shortMessage: 'Address "undefined" is invalid.',
+  version: '2.47.6'
+}
+
+Node.js v20.20.1

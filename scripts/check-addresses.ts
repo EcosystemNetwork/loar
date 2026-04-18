@@ -43,7 +43,10 @@ const allContractNames = [...new Set(manifests.flatMap((m) => Object.keys(m.cont
 
 // ── regenerate expected addresses.ts in memory ────────────────────────────────
 let expected = `// Auto-generated from deployment manifests — do not edit directly.\n`;
-expected += `// To update: pnpm sync:addresses\n\n`;
+expected += `// To update: pnpm tsx scripts/rebuild-deployments.ts --apply\n\n`;
+
+// Sort alphabetically for stable output (matches rebuild-deployments.ts)
+allContractNames.sort();
 
 for (const name of allContractNames) {
   expected += `export const ${name} = {\n`;

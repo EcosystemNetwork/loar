@@ -40,6 +40,7 @@ import {
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { universeManagerAbi } from '@loar/abis/generated';
+import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';
@@ -47,10 +48,12 @@ const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${s
 const RPC_URL = process.env.RPC_URL_BASE_SEPOLIA ?? 'https://base-sepolia-rpc.publicnode.com';
 const SERVER_URL = process.env.VITE_SERVER_URL ?? 'http://localhost:3000';
 
-// Base Sepolia contract addresses (redeployed with extcodesize fix)
-const UNIVERSE_MANAGER = '0x7Fa728f17e91AAa4aaD895b7b128Df193b73C0a8' as const;
-const HOOK = '0xcac7d3aDe1F947D9F152B1282086e6598870a8CC' as const;
-const LOCKER = '0xF951065C7d4D28805188F60A3F8bD398B7776eC8' as const;
+// Base Sepolia contract addresses — sourced from canonical deployment manifest
+// (deployments/base-sepolia.json via packages/abis/src/addresses.ts).
+// Do NOT hardcode: update via `pnpm sync:addresses` after a redeploy.
+const UNIVERSE_MANAGER = UniverseManager['84532'] as `0x${string}`;
+const HOOK = LoarHookStaticFee['84532'] as `0x${string}`;
+const LOCKER = LoarLpLockerMultiple['84532'] as `0x${string}`;
 const WETH = '0x4200000000000000000000000000000000000006' as const;
 
 // ── Universe Details ───────────────────────────────────────────────────────────

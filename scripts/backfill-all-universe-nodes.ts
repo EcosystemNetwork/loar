@@ -108,8 +108,29 @@ async function main() {
       existingSnap.docs.map((d) => d.data().sceneId).filter((s) => s != null)
     );
 
-    // 4. Determine gap (videos whose sceneId has no node)
-    const sorted = [...videos].sort((a, b) => (a.sceneId || 0) - (b.sceneId || 0));
+    // 4. Dedupe by sceneId (keep most recent createdAt) — multiple regenerations
+    // of the same scene should collapse to one node, not many.
+    const tsOf = (v: VideoGen) => {
+      const c = v.createdAt;
+      if (!c) return 0;
+      if (typeof c.toMillis === 'function') return c.toMillis();
+      if (c instanceof Date) return c.getTime();
+      if (typeof c === 'number') return c;
+      const d = new Date(c);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+    const bySceneId = new Map<number | string, VideoGen>();
+    for (const v of videos) {
+      const key = v.sceneId as number | string;
+      const existing = bySceneId.get(key);
+      if (!existing || tsOf(v) >= tsOf(existing)) bySceneId.set(key, v);
+    }
+    const dupesCollapsed = videos.length - bySceneId.size;
+
+    // Determine gap (videos whose sceneId has no node)
+    const sorted = [...bySceneId.values()].sort(
+      (a, b) => Number(a.sceneId || 0) - Number(b.sceneId || 0)
+    );
     const missing = sorted.filter((v) => !existingScenes.has(v.sceneId!));
 
     perUniverseReport.push({
@@ -125,7 +146,7 @@ async function main() {
 
     console.log(`🌌 ${universeId}`);
     console.log(
-      `   videos=${videos.length}  existingNodes=${existingSnap.size}  missing=${missing.length}`
+      `   videos=${videos.length}  uniqueScenes=${bySceneId.size}  existingNodes=${existingSnap.size}  missing=${missing.length}${dupesCollapsed ? `  (collapsed ${dupesCollapsed} duplicate-scene regenerations)` : ''}`
     );
 
     if (!APPLY) {
