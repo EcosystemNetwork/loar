@@ -10,7 +10,9 @@ try {
     const val = trimmed.slice(eqIdx + 1).trim();
     if (!process.env[key]) process.env[key] = val;
   }
-} catch {}
+} catch {
+  // .env file is optional — fall through to actual env vars
+}
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';

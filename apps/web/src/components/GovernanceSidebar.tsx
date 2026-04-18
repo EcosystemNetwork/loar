@@ -345,7 +345,7 @@ export function GovernanceSidebar({
 
       const fetchedProposals: Proposal[] = await Promise.all(
         events.map(async (event) => {
-          const args = event.args as {
+          const args = (event as { args: unknown }).args as {
             proposalId: bigint;
             proposer: Address;
             targets: Address[];

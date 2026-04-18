@@ -62,7 +62,7 @@ export interface TextTo3DPreviewOptions {
   negativePrompt?: string;
   artStyle?: MeshyArtStyle;
   seed?: number;
-  aiModel?: 'meshy-4' | 'meshy-5';
+  aiModel?: 'meshy-4' | 'meshy-5' | 'meshy-6';
   topology?: 'quad' | 'triangle';
   targetPolycount?: number; // e.g. 30000
 }
@@ -76,7 +76,7 @@ export interface ImageTo3DOptions {
   imageUrl: string;
   enablePbr?: boolean; // physically based rendering textures
   shouldRemountBackground?: boolean;
-  aiModel?: 'meshy-4' | 'meshy-5';
+  aiModel?: 'meshy-4' | 'meshy-5' | 'meshy-6';
   topology?: 'quad' | 'triangle';
   targetPolycount?: number;
 }

@@ -703,6 +703,12 @@ export const universeTreasuryRouter = router({
         });
       }
       // Verify the deposit was sent by the authenticated user
+      if (!ctx.user.address) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Wallet address required on session. Please re-authenticate.',
+        });
+      }
       if (tx.from?.toLowerCase() !== ctx.user.address.toLowerCase()) {
         throw new TRPCError({
           code: 'FORBIDDEN',

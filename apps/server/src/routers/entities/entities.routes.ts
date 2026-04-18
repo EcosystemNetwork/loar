@@ -327,6 +327,35 @@ export const entitiesRouter = router({
       return { entities, total: entities.length };
     }),
 
+  /**
+   * List entities the current user has bookmarked (via social.like with targetType='entity').
+   * Hydrates the entity records server-side so the wiki can render them in one round-trip.
+   */
+  myBookmarks: protectedProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().positive().max(100).default(50),
+        })
+        .default({ limit: 50 })
+    )
+    .query(async ({ ctx, input }) => {
+      if (!db) return { entities: [], total: 0 };
+      const likesSnap = await db
+        .collection('likes')
+        .where('uid', '==', ctx.user.uid)
+        .where('targetType', '==', 'entity')
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit)
+        .get();
+      const ids = likesSnap.docs.map((d) => d.data().targetId as string);
+      if (ids.length === 0) return { entities: [], total: 0 };
+      const entities = (await Promise.all(ids.map((id) => getEntity(id).catch(() => null)))).filter(
+        (e): e is NonNullable<typeof e> => !!e
+      );
+      return { entities, total: entities.length };
+    }),
+
   // ── Relationships ──────────────────────────────────────────────────
 
   /** Get all relationships for a specific entity. */

@@ -115,7 +115,7 @@ export const commentsRouter = router({
 
       // Fetch replies for each top-level comment
       const topLevelIds = topLevelComments.map((c) => c.id);
-      let replies: any[] = [];
+      const replies: any[] = [];
 
       if (topLevelIds.length > 0) {
         // Firestore `in` queries cap at 30

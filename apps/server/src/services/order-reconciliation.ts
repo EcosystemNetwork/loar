@@ -60,7 +60,7 @@ const creditTxCol = () => {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-interface ReconcileResult {
+export interface ReconcileResult {
   txHash: string;
   orderId: string;
   previousStatus: string;

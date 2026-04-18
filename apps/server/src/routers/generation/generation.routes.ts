@@ -1274,7 +1274,7 @@ export const generationRouter = router({
     .query(async ({ input }) => {
       const snapshot = await generationsCol().where('status', '==', 'completed').limit(1000).get();
 
-      let items = snapshot.docs
+      const items = snapshot.docs
         .map((doc) => {
           const d = doc.data();
           if (!d.videoUrl) return null;

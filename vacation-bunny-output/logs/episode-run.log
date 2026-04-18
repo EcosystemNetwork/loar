@@ -136,3 +136,129 @@
 [S12 (12/56)] Generating... (120s)
 [S11 (11/56)] Generating... (120s)
 [S10 (10/56)] Generating... (120s)
+[S10 (10/56)] Video done
+[S12 (12/56)] Video done
+[S11 (11/56)] Retry 1/2 (sanitized)...
+[S11 (11/56)] Task: cgt-20260418155216-4p4tq
+[S11 (11/56)] Generating... (0s)
+[S11 (11/56)] Generating... (30s)
+[S11 (11/56)] Generating... (60s)
+[S11 (11/56)] Generating... (90s)
+[S11 (11/56)] Video done
+[S10 (10/56)] Rehosting to Pinata...
+[S10 (10/56)] Pinned: QmXwaj4E9ANAKQfhJWjedwRL7RYZpRcHTLJvMZApREACqG (3.1MB)
+[S10 (10/56)] Node #11
+[S10 (10/56)] DONE — Node #11
+[S11 (11/56)] Rehosting to Pinata...
+[S11 (11/56)] Pinned: QmcfgJL2a5LYTFDeQ5Xj135TeThx7zTfKaxhrgMUThx7JF (4.0MB)
+[S11 (11/56)] Node #12
+[S11 (11/56)] DONE — Node #12
+[S12 (12/56)] Rehosting to Pinata...
+[S12 (12/56)] Pinned: Qma7o1zCx2JmMZ2EjyT3FQbpyMLGuGZWkyDMW9Dq8X6TEF (2.6MB)
+[S12 (12/56)] Node #13
+[S12 (12/56)] DONE — Node #13
+[S12 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776498988084.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S10–S12
+
+═══════════════════════════════════════════════════════
+  BATCH: S13–S15 (3 parallel)
+═══════════════════════════════════════════════════════
+[S13 (13/56)] Generating (t2v)...
+[S14 (14/56)] Generating (t2v)...
+[S15 (15/56)] Generating (t2v)...
+[S13 (13/56)] Task: cgt-20260418155631-6wbnr
+[S15 (15/56)] Task: cgt-20260418155631-wznmr
+[S14 (14/56)] Task: cgt-20260418155631-mqfth
+[S13 (13/56)] Generating... (0s)
+[S14 (14/56)] Generating... (0s)
+[S15 (15/56)] Generating... (0s)
+[S14 (14/56)] Generating... (30s)
+[S13 (13/56)] Generating... (30s)
+[S15 (15/56)] Generating... (30s)
+[S14 (14/56)] Generating... (60s)
+[S15 (15/56)] Generating... (60s)
+[S13 (13/56)] Generating... (60s)
+[S14 (14/56)] Generating... (90s)
+[S15 (15/56)] Generating... (90s)
+[S13 (13/56)] Generating... (90s)
+[S14 (14/56)] Video done
+[S13 (13/56)] Generating... (120s)
+[S15 (15/56)] Retry 1/2 (sanitized)...
+[S15 (15/56)] Task: cgt-20260418155854-jvnr5
+[S13 (13/56)] Video done
+[S15 (15/56)] Generating... (0s)
+[S15 (15/56)] Generating... (30s)
+[S15 (15/56)] Generating... (60s)
+[S15 (15/56)] Generating... (90s)
+[S15 (15/56)] Video done
+[S13 (13/56)] Rehosting to Pinata...
+[S13 (13/56)] Pinned: QmWVMnavKyUgJUCndZWrx3vWLmchKMWrggPtSEswbXEVvd (2.8MB)
+[S13 (13/56)] Node #14
+[S13 (13/56)] DONE — Node #14
+[S14 (14/56)] Rehosting to Pinata...
+[S14 (14/56)] Pinned: QmcCbFm6YoKTZFRNVQDCE871mzGrgoTg9JJoVHBT11rh2f (3.5MB)
+[S14 (14/56)] Node #15
+[S14 (14/56)] DONE — Node #15
+[S15 (15/56)] Rehosting to Pinata...
+[S15 (15/56)] Pinned: QmPFFs6NJhw2SAMXMD7AJe1iViy228f4pYGUrCuPVWqW4i (3.5MB)
+[S15 (15/56)] Node #16
+[S15 (15/56)] DONE — Node #16
+[S15 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776499432881.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S13–S15
+
+═══════════════════════════════════════════════════════
+  BATCH: S16–S18 (3 parallel)
+═══════════════════════════════════════════════════════
+[S16 (16/56)] Generating (t2v)...
+[S17 (17/56)] Generating (t2v)...
+[S18 (18/56)] Generating (t2v)...
+[S18 (18/56)] Task: cgt-20260418160357-4d652
+[S16 (16/56)] Task: cgt-20260418160357-zsm5f
+[S17 (17/56)] Task: cgt-20260418160357-sdngf
+[S16 (16/56)] Generating... (0s)
+[S18 (18/56)] Generating... (0s)
+[S17 (17/56)] Generating... (0s)
+[S18 (18/56)] Generating... (30s)
+[S16 (16/56)] Generating... (30s)
+[S17 (17/56)] Generating... (30s)
+[S18 (18/56)] Generating... (60s)
+[S16 (16/56)] Generating... (60s)
+[S17 (17/56)] Generating... (60s)
+[S16 (16/56)] Generating... (90s)
+[S17 (17/56)] Generating... (90s)
+[S18 (18/56)] Generating... (90s)
+[S16 (16/56)] Video done
+[S17 (17/56)] Generating... (120s)
+[S18 (18/56)] Generating... (120s)
+[S17 (17/56)] Video done
+[S18 (18/56)] Video done
+[S16 (16/56)] Rehosting to Pinata...
+[S16 (16/56)] Pinned: QmXKsG3w2z4r1j4mY4LUcPX3kAuzRnFD9iGjAUyofveyWB (4.0MB)
+[S16 (16/56)] Node #17
+[S16 (16/56)] DONE — Node #17
+[S17 (17/56)] Rehosting to Pinata...
+[S17 (17/56)] Pinned: QmbBHBpMBAVivLcaREphsHtzwDea4Tq7ThvEokhuYdYPyU (4.0MB)
+[S17 (17/56)] Node #18
+[S17 (17/56)] DONE — Node #18
+[S18 (18/56)] Rehosting to Pinata...
+[S18 (18/56)] Pinned: QmdZ9TvAtmMpwn12s8aevaHDhcCD7WrzYUiucUboegZoQu (2.7MB)
+[S18 (18/56)] Node #19
+[S18 (18/56)] DONE — Node #19
+[S18 FRAME] Frame extraction failed: Command failed: ffmpeg -y -sseof -0.1 -i "/tmp/bunny-vid-1776499813142.mp4" -frames:v 1 -q:v 2 "/tmp
+[BATCH] Completed S16–S18
+
+═══════════════════════════════════════════════════════
+  BATCH: S19–S21 (3 parallel)
+═══════════════════════════════════════════════════════
+[S19 (19/56)] Generating (t2v)...
+[S20 (20/56)] Generating (t2v)...
+[S21 (21/56)] Generating (t2v)...
+[S21 (21/56)] Task: cgt-20260418161017-682tj
+[S19 (19/56)] Task: cgt-20260418161017-ll96r
+[S20 (20/56)] Task: cgt-20260418161016-qpnt2
+[S19 (19/56)] Generating... (0s)
+[S20 (20/56)] Generating... (0s)
+[S21 (21/56)] Generating... (0s)
+[S19 (19/56)] Generating... (30s)
+[S20 (20/56)] Generating... (30s)
+[S21 (21/56)] Generating... (30s)

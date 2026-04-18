@@ -777,18 +777,24 @@ async function gracefulShutdown(signal: string) {
   try {
     const { shutdownRedis } = await import('./lib/redis');
     shutdownOps.push(shutdownRedis());
-  } catch {}
+  } catch {
+    // Redis optional in dev — skip if unavailable
+  }
 
   if (process.env.REDIS_URL) {
     try {
       const { stopGenerationWorker } = await import('./workers/generation.worker');
       shutdownOps.push(stopGenerationWorker());
-    } catch {}
+    } catch {
+      // Optional shutdown step — module may not be loaded
+    }
 
     try {
       const { shutdownQueues } = await import('./lib/queue');
       shutdownOps.push(shutdownQueues());
-    } catch {}
+    } catch {
+      // Optional shutdown step — module may not be loaded
+    }
   }
 
   await Promise.allSettled(shutdownOps);

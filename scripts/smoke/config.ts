@@ -32,12 +32,20 @@ export function loadConfig(): SmokeConfig {
 
   return {
     serverUrl: (process.env.SERVER_URL ?? 'http://localhost:3000').replace(/\/$/, ''),
-    indexerUrl: (process.env.INDEXER_URL ?? 'http://localhost:42069').replace(/\/$/, ''),
+    indexerUrl: (
+      process.env.INDEXER_URL ??
+      process.env.VITE_PONDER_URL ??
+      'http://localhost:42069'
+    ).replace(/\/$/, ''),
     chainId: Number(process.env.SMOKE_CHAIN_ID ?? 84532),
     rpcUrl: process.env.SMOKE_RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? 'https://sepolia.base.org',
-    // Default to the web dev server origin (first entry in default CORS_ORIGIN).
-    // Override via SMOKE_ORIGIN env var to hit a different allowed origin.
-    origin: (process.env.SMOKE_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, ''),
+    // Vite in this repo runs on port 3001 (see apps/web/vite.config.ts). Match the
+    // first allowed origin from CORS_ORIGIN; override via SMOKE_ORIGIN env var.
+    origin: (
+      process.env.SMOKE_ORIGIN ??
+      process.env.CORS_ORIGIN?.split(',')[0]?.trim() ??
+      'http://localhost:3001'
+    ).replace(/\/$/, ''),
     privateKey,
     universeAddress,
     timeout: Number(process.env.SMOKE_TIMEOUT ?? 15_000),

@@ -73,7 +73,22 @@ import ReactFlow, {
   type Connection,
   type OnSelectionChangeParams,
 } from 'reactflow';
-import type { MiniMapNodeProps } from '@reactflow/minimap';
+type MiniMapNodeProps = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  borderRadius: number;
+  className: string;
+  color: string;
+  shapeRendering: string;
+  strokeColor: string;
+  strokeWidth: number;
+  selected?: boolean;
+  style?: React.CSSProperties;
+  onClick?: (event: React.MouseEvent, id: string) => void;
+};
 import 'reactflow/dist/style.css';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
