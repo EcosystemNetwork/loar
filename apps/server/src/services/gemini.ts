@@ -212,7 +212,10 @@ Output valid JSON only. Be precise and factual.`;
     const videoTimeoutId = setTimeout(() => videoController.abort(), 60_000);
     let videoResponse: Response;
     try {
-      videoResponse = await fetch(videoUrl, { signal: videoController.signal });
+      videoResponse = await fetch(videoUrl, {
+        signal: videoController.signal,
+        redirect: 'error',
+      });
     } finally {
       clearTimeout(videoTimeoutId);
     }
@@ -388,7 +391,10 @@ Generate a detailed visual description in plain text (no JSON, no formatting).`;
     const imgTimeoutId = setTimeout(() => imgController.abort(), 60_000);
     let imageBase64: string;
     try {
-      const imgResponse = await fetch(imageUrl, { signal: imgController.signal });
+      const imgResponse = await fetch(imageUrl, {
+        signal: imgController.signal,
+        redirect: 'error',
+      });
       imageBase64 = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
     } finally {
       clearTimeout(imgTimeoutId);

@@ -155,9 +155,14 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
       const ext = clip.videoUrl.includes('.webm') ? 'webm' : 'mp4';
       const clipPath = join(workDir, `clip-${String(i).padStart(3, '0')}.${ext}`);
 
+      const { validateUploadUrl } = await import('../../lib/url-validator');
+      await validateUploadUrl(clip.videoUrl);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60_000);
-      const res = await fetch(clip.videoUrl, { signal: controller.signal });
+      const res = await fetch(clip.videoUrl, {
+        signal: controller.signal,
+        redirect: 'error',
+      });
       clearTimeout(timeout);
 
       if (!res.ok) throw new Error(`Failed to download clip ${i}: HTTP ${res.status}`);
@@ -175,8 +180,9 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
         // Optional audio overlay
         if (clip.audioUrl) {
           // Download audio
+          await validateUploadUrl(clip.audioUrl);
           const audioPath = join(workDir, `audio-${String(i).padStart(3, '0')}.mp3`);
-          const audioRes = await fetch(clip.audioUrl);
+          const audioRes = await fetch(clip.audioUrl, { redirect: 'error' });
           if (audioRes.ok) {
             await writeFile(audioPath, Buffer.from(await audioRes.arrayBuffer()));
             args.push('-i', audioPath);

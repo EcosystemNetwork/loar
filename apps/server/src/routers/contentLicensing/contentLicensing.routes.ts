@@ -138,16 +138,34 @@ export const contentLicensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Verify the on-chain transaction is real and hasn't been reused
-      await verifyAndClaimTx(
-        input.txHash,
-        `content-deal:${input.registrationId}:${input.dealType}`,
-        ctx.user.uid
-      );
-
       const regDoc = await registrationsCol().doc(input.registrationId).get();
       if (!regDoc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
+      const regData = regDoc.data()!;
+
+      // Bind tx to buyer → registration creator with the quoted price.
+      if (!regData.creatorAddress) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Registration is missing creator address',
+        });
+      }
+      if (!ctx.user.address) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Connected wallet required to record deal',
+        });
+      }
+      await verifyAndClaimTx(
+        input.txHash,
+        `content-deal:${input.registrationId}:${input.dealType}`,
+        ctx.user.uid,
+        {
+          expectedFrom: ctx.user.address,
+          expectedTo: regData.creatorAddress,
+          minValueWei: input.pricePaid,
+        }
+      );
 
       const now = new Date();
       const deal = {
@@ -167,7 +185,6 @@ export const contentLicensingRouter = router({
       const ref = await dealsCol().add(deal);
 
       // Update registration stats
-      const regData = regDoc.data()!;
       await registrationsCol()
         .doc(input.registrationId)
         .update({

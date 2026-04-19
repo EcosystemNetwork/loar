@@ -165,6 +165,27 @@ export const governanceRouter = router({
         });
       }
 
+      // Pin governorAddress to the trusted universe record. Without this
+      // the caller can point the `onChainVerified` check at an attacker-
+      // deployed Governor clone that returns fabricated state/vote counts.
+      if (!db) throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'DB unavailable' });
+      const universeDoc = await db.collection('universes').doc(input.universeId).get();
+      const canonicalGovernor = (universeDoc.data()?.governanceAddress ?? '')
+        .toString()
+        .toLowerCase();
+      if (!canonicalGovernor) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Universe is missing a registered governance address',
+        });
+      }
+      if (input.governorAddress && input.governorAddress.toLowerCase() !== canonicalGovernor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'governorAddress does not match the universe record',
+        });
+      }
+
       const ref = proposalsCol().doc(input.proposalId);
 
       // If doc exists, verify original proposer matches
@@ -179,15 +200,12 @@ export const governanceRouter = router({
         }
       }
 
-      // Verify on-chain state if governor address is provided
-      let onChainState = null;
-      if (input.governorAddress) {
-        onChainState = await readOnChainProposal(
-          input.governorAddress,
-          input.proposalId,
-          input.chainId
-        );
-      }
+      // Always verify on-chain state against the canonical governor.
+      const onChainState = await readOnChainProposal(
+        canonicalGovernor,
+        input.proposalId,
+        input.chainId
+      );
 
       await ref.set(
         {

@@ -856,6 +856,18 @@ export const editingRouter = router({
 
       let lastFrameUrl = input.videoUrl;
       try {
+        // Only accept HTTPS — ffmpeg's default protocol set can read local
+        // files via `file:`, `concat:`, `subfile:`, etc.
+        let parsedVideoUrl: URL;
+        try {
+          parsedVideoUrl = new URL(input.videoUrl);
+        } catch {
+          throw new Error('videoUrl is not a valid URL');
+        }
+        if (parsedVideoUrl.protocol !== 'https:') {
+          throw new Error('videoUrl must be an https: URL');
+        }
+
         const { execFile } = await import('child_process');
         const { promisify } = await import('util');
         const { tmpdir } = await import('os');
@@ -868,7 +880,20 @@ export const editingRouter = router({
         // Extract the last frame using ffmpeg (seek to near-end)
         await execFileAsync(
           'ffmpeg',
-          ['-y', '-sseof', '-0.5', '-i', input.videoUrl, '-frames:v', '1', '-q:v', '2', outPath],
+          [
+            '-y',
+            '-protocol_whitelist',
+            'https,tls,tcp',
+            '-sseof',
+            '-0.5',
+            '-i',
+            input.videoUrl,
+            '-frames:v',
+            '1',
+            '-q:v',
+            '2',
+            outPath,
+          ],
           { timeout: 15000 }
         );
 

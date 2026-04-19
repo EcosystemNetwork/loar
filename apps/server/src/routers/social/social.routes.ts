@@ -330,7 +330,16 @@ export const socialRouter = router({
         unread.docs.forEach((doc) => batch.update(doc.ref, { read: true }));
         await batch.commit();
       } else if (input.notificationId) {
-        await notificationsCol().doc(input.notificationId).update({ read: true });
+        // Load the notification and verify it belongs to the caller before
+        // marking it read. Without this any signed-in user can mark another
+        // user's notifications read to suppress security/follow alerts.
+        const ref = notificationsCol().doc(input.notificationId);
+        const doc = await ref.get();
+        if (!doc.exists) return { ok: true };
+        if (doc.data()?.recipientUid !== ctx.user.uid) {
+          throw new Error('Forbidden: notification belongs to another user');
+        }
+        await ref.update({ read: true });
       }
       return { ok: true };
     }),

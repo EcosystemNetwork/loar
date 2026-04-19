@@ -1177,15 +1177,18 @@ export const imageRouter = router({
           strength: c.strength,
         }));
 
+        const { validateUploadUrl } = await import('../../lib/url-validator');
         const inputImages = await Promise.all(
           controls.map(async (c) => {
-            const res = await fetch(c.guideImageUrl);
+            await validateUploadUrl(c.guideImageUrl);
+            const res = await fetch(c.guideImageUrl, { redirect: 'error' });
             if (!res.ok) {
-              throw new Error(
-                `Failed to fetch guide image ${c.guideImageUrl}: ${res.status} ${res.statusText}`
-              );
+              throw new Error(`Failed to fetch guide image: ${res.status} ${res.statusText}`);
             }
             const mimeType = res.headers.get('content-type') || 'image/png';
+            if (!mimeType.startsWith('image/')) {
+              throw new Error('Guide image URL did not return an image response');
+            }
             const buf = Buffer.from(await res.arrayBuffer());
             return { base64: buf.toString('base64'), mimeType };
           })

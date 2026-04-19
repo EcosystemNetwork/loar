@@ -61,29 +61,44 @@ const usedTxCol = () => {
   return db.collection('usedTransactionHashes');
 };
 
+export interface VerifyTxBinding {
+  /** Require `tx.from` to equal this address (lowercase-compared). */
+  expectedFrom?: string;
+  /** Require `tx.to` to equal this address (lowercase-compared). */
+  expectedTo?: string;
+  /** Require `tx.value >= minValueWei` (string wei). */
+  minValueWei?: string;
+  /** Chain ID (defaults to Sepolia). */
+  chainId?: number;
+}
+
 /**
- * Verify that a transaction hash corresponds to a real, successful on-chain tx.
+ * Verify that a transaction hash corresponds to a real, successful on-chain tx
+ * whose `from`, `to`, and `value` match the expected binding. Without these
+ * bindings a caller can reuse any successful tx as "payment proof"; callers
+ * MUST pass expectedFrom (and expectedTo/minValueWei where the purpose is a
+ * value transfer) to prevent tx replay.
  *
  * Checks:
  * 1. txHash has not been claimed by another operation (deduplication)
  * 2. Transaction exists on-chain and was not reverted
+ * 3. tx.from / tx.to / tx.value match the binding (when provided)
  *
  * On success, marks the txHash as used to prevent replay.
- *
- * @param txHash - The transaction hash to verify
- * @param purpose - A label for the operation claiming this tx (e.g. "license-activate:abc123")
- * @param callerUid - The UID of the caller (for audit)
- * @param chainId - Optional chain ID (defaults to Sepolia)
  */
 export async function verifyAndClaimTx(
   txHash: string,
   purpose: string,
   callerUid: string,
-  chainId?: number
-): Promise<{ receipt: any }> {
+  bindingOrChainId?: VerifyTxBinding | number
+): Promise<{ receipt: any; tx: any }> {
   if (!txHash || !txHash.startsWith('0x') || txHash.length !== 66) {
     throw new Error('Invalid transaction hash format');
   }
+
+  const binding: VerifyTxBinding =
+    typeof bindingOrChainId === 'number' ? { chainId: bindingOrChainId } : (bindingOrChainId ?? {});
+  const chainId = binding.chainId;
 
   const normalizedHash = txHash.toLowerCase();
 
@@ -101,10 +116,16 @@ export async function verifyAndClaimTx(
   const chainName = chainId === baseSepolia.id ? 'Base Sepolia' : 'Sepolia';
 
   let receipt: any;
+  let tx: any;
   try {
-    receipt = await getCachedOrFetch(`receipt-${normalizedHash}`, () =>
-      client.getTransactionReceipt({ hash: normalizedHash as Hash })
-    );
+    [receipt, tx] = await Promise.all([
+      getCachedOrFetch(`receipt-${normalizedHash}`, () =>
+        client.getTransactionReceipt({ hash: normalizedHash as Hash })
+      ),
+      getCachedOrFetch(`tx-${normalizedHash}`, () =>
+        client.getTransaction({ hash: normalizedHash as Hash })
+      ),
+    ]);
   } catch {
     throw new Error(
       `Transaction not found on ${chainName}. Confirm it has been broadcast and included in a block.`
@@ -115,7 +136,28 @@ export async function verifyAndClaimTx(
     throw new Error('Transaction was reverted on-chain.');
   }
 
-  // 3. Mark txHash as claimed (atomic write)
+  // 3. Binding checks — reject if the tx doesn't match the expected principals.
+  if (binding.expectedFrom) {
+    const actualFrom = (tx?.from ?? '').toLowerCase();
+    if (actualFrom !== binding.expectedFrom.toLowerCase()) {
+      throw new Error('Transaction sender does not match the authenticated caller.');
+    }
+  }
+  if (binding.expectedTo) {
+    const actualTo = (tx?.to ?? '').toLowerCase();
+    if (actualTo !== binding.expectedTo.toLowerCase()) {
+      throw new Error('Transaction recipient does not match the expected payee.');
+    }
+  }
+  if (binding.minValueWei) {
+    const required = BigInt(binding.minValueWei);
+    const actual = BigInt(tx?.value ?? 0);
+    if (actual < required) {
+      throw new Error('Transaction value is below the required amount.');
+    }
+  }
+
+  // 4. Mark txHash as claimed (atomic write)
   await usedTxCol()
     .doc(normalizedHash)
     .set({
@@ -125,7 +167,7 @@ export async function verifyAndClaimTx(
       claimedAt: new Date(),
     });
 
-  return { receipt };
+  return { receipt, tx };
 }
 
 /**

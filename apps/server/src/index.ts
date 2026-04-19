@@ -532,6 +532,14 @@ app.post('/api/counter-notice', async (c) => {
   });
 
   try {
+    // Require authenticated wallet: the § 512(g) counter-notice must come from
+    // the subscriber whose content was flagged, not an anonymous caller.
+    const { getCookie } = await import('hono/cookie');
+    const authedUser = await verifyAuth(c.req.raw.headers, getCookie(c, 'siwe-session'));
+    if (!authedUser) {
+      return c.json({ code: 'UNAUTHORIZED', message: 'Authentication required' }, 401);
+    }
+
     const body = await c.req.json();
     const parsed = counterNoticeSchema.safeParse(body);
     if (!parsed.success) {
@@ -556,6 +564,23 @@ app.post('/api/counter-notice', async (c) => {
     const takedownDoc = await fireDb.collection('takedownRequests').doc(takedownRequestId).get();
     if (!takedownDoc.exists) {
       return c.json({ code: 'NOT_FOUND', message: 'Takedown request not found' }, 404);
+    }
+
+    // Only the owner of the flagged content may file a counter-notice. This
+    // prevents anonymous bulk counter-notices that would flip takedown state
+    // and trigger the dmca-putback cron against content the caller has no
+    // claim to.
+    const td = takedownDoc.data() as { contentId?: string } | undefined;
+    if (!td?.contentId) {
+      return c.json({ code: 'NOT_FOUND', message: 'Takedown is missing target content' }, 404);
+    }
+    const contentDoc = await fireDb.collection('content').doc(td.contentId).get();
+    const contentCreatorUid = contentDoc.data()?.creatorUid as string | undefined;
+    if (!contentCreatorUid || contentCreatorUid.toLowerCase() !== authedUser.uid.toLowerCase()) {
+      return c.json(
+        { code: 'FORBIDDEN', message: 'Only the content owner may file a counter-notice' },
+        403
+      );
     }
 
     // Prevent duplicate counter-notices for the same takedown from the same email

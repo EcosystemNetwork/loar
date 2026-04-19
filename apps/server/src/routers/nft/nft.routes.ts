@@ -275,28 +275,57 @@ export const nftRouter = router({
         episodeId: z.string(),
         tokenId: z.number(),
         txHash: z.string(),
-        price: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const epRef = episodesCol().doc(input.episodeId);
+      const epDoc = await epRef.get();
+      if (!epDoc.exists) throw new Error('Episode not found');
+      const ep = epDoc.data()!;
+      if (!ep.active) throw new Error('Episode is not active');
+      if (ep.maxSupply > 0 && (ep.minted || 0) >= ep.maxSupply) {
+        throw new Error('Sold out');
+      }
+
+      // Bind the on-chain mint tx: the authenticated buyer must be the
+      // tx.from and the paid value must meet the episode's recorded
+      // mintPrice. Without this, any signed-in user could inflate the
+      // `minted` counter past maxSupply and brick legitimate mints.
+      if (!ctx.user.address) {
+        throw new Error('Connected wallet required to record mint');
+      }
+      if (!ep.creatorAddress) {
+        throw new Error('Episode is missing creator address');
+      }
+      const { verifyAndClaimTx } = await import('../../services/tx-verify');
+      const { receipt } = await verifyAndClaimTx(
+        input.txHash,
+        `episode-mint:${input.episodeId}:${input.tokenId}`,
+        ctx.user.uid,
+        {
+          expectedFrom: ctx.user.address,
+          minValueWei: ep.mintPrice || '0',
+        }
+      );
+
+      const price = String(ep.mintPrice ?? '0');
       const mintData = {
-        ...input,
+        episodeId: input.episodeId,
+        tokenId: input.tokenId,
+        txHash: input.txHash,
+        price,
         buyerUid: ctx.user.uid,
         buyerAddress: ctx.user.address || null,
         mintedAt: new Date(),
+        blockNumber: receipt?.blockNumber?.toString?.() ?? null,
       };
 
       await nftMintsCol().add(mintData);
 
-      // Increment minted count
-      const epRef = episodesCol().doc(input.episodeId);
-      const epDoc = await epRef.get();
-      if (epDoc.exists) {
-        await epRef.update({
-          minted: (epDoc.data()?.minted || 0) + 1,
-          updatedAt: new Date(),
-        });
-      }
+      await epRef.update({
+        minted: (ep.minted || 0) + 1,
+        updatedAt: new Date(),
+      });
 
       return { ok: true, mint: mintData };
     }),
@@ -387,10 +416,23 @@ export const nftRouter = router({
         reward: z.string(), // wei
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = characterNFTsCol().doc(input.characterId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Character not found');
+
+      // Only the episode owner AND character owner may record an appearance.
+      // Without this check any signed-in user could inflate another user's
+      // character accumulatedRoyalties by arbitrary wei.
+      const epDoc = await episodesCol().doc(input.episodeId).get();
+      if (!epDoc.exists) throw new Error('Episode not found');
+      const caller = ctx.user.uid;
+      if (doc.data()?.creatorUid !== caller) {
+        throw new Error('Only the character creator can record appearances');
+      }
+      if (epDoc.data()?.creatorUid !== caller) {
+        throw new Error('Only the episode creator can record appearances');
+      }
 
       const data = doc.data()!;
       await ref.update({

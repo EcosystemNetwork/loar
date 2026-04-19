@@ -92,8 +92,15 @@ export const licensingRouter = router({
         throw new Error('Only the licensor can activate this license');
       }
 
-      // Verify the on-chain transaction is real and hasn't been reused
-      await verifyAndClaimTx(input.txHash, `license-activate:${input.licenseId}`, ctx.user.uid);
+      // Verify the on-chain upfront-fee payment: must be directed to the
+      // licensor and meet the recorded fee. Prevents reuse of unrelated txs.
+      if (!data.licensorAddress) {
+        throw new Error('License is missing licensor address; re-create the license');
+      }
+      await verifyAndClaimTx(input.txHash, `license-activate:${input.licenseId}`, ctx.user.uid, {
+        expectedTo: data.licensorAddress,
+        minValueWei: data.upfrontFee || '0',
+      });
 
       const startTime = new Date();
       const endTime = new Date(startTime.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
@@ -142,8 +149,14 @@ export const licensingRouter = router({
         throw new Error('Only the licensor or licensee can record royalties');
       }
 
-      // Verify the on-chain transaction is real and hasn't been reused
-      await verifyAndClaimTx(input.txHash, `license-royalty:${input.licenseId}`, ctx.user.uid);
+      // Royalty payment goes to the licensor. Bind recipient + minimum amount.
+      if (!data.licensorAddress) {
+        throw new Error('License is missing licensor address; re-create the license');
+      }
+      await verifyAndClaimTx(input.txHash, `license-royalty:${input.licenseId}`, ctx.user.uid, {
+        expectedTo: data.licensorAddress,
+        minValueWei: input.amount,
+      });
 
       await ref.update({
         totalRoyalties: (BigInt(data.totalRoyalties || '0') + BigInt(input.amount)).toString(),
@@ -283,9 +296,6 @@ export const licensingRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Verify the on-chain transaction is real and hasn't been reused
-      await verifyAndClaimTx(input.txHash, `merch-purchase:${input.merchId}`, ctx.user.uid);
-
       const merchRef = merchCol().doc(input.merchId);
       const merchDoc = await merchRef.get();
       if (!merchDoc.exists) throw new Error('Merch not found');
@@ -296,12 +306,26 @@ export const licensingRouter = router({
         throw new Error('Insufficient stock');
       }
 
+      const totalPrice = (BigInt(data.price) * BigInt(input.quantity)).toString();
+
+      // Bind tx to buyer → seller transfer at least matching the listed price.
+      const sellerAddress = data.creatorAddress || data.universeAdminAddress;
+      if (!sellerAddress) {
+        throw new Error('Merch is missing seller address; contact support');
+      }
+      if (!ctx.user.address) {
+        throw new Error('Connected wallet required to purchase merch');
+      }
+      await verifyAndClaimTx(input.txHash, `merch-purchase:${input.merchId}`, ctx.user.uid, {
+        expectedFrom: ctx.user.address,
+        expectedTo: sellerAddress,
+        minValueWei: totalPrice,
+      });
+
       await merchRef.update({
         sold: (data.sold || 0) + input.quantity,
         updatedAt: new Date(),
       });
-
-      const totalPrice = (BigInt(data.price) * BigInt(input.quantity)).toString();
       const order = {
         merchId: input.merchId,
         buyerUid: ctx.user.uid,

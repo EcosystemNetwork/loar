@@ -31,6 +31,25 @@ jobStatusRouter.get('/:generationId/stream', async (c) => {
   const user = await verifyAuth(c.req.raw.headers, cookieToken);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
+  // Ownership gate — a generationId that doesn't belong to the caller
+  // is indistinguishable from one that doesn't exist. Prevents a signed-in
+  // user from tailing another user's prompt + output URL when they learn
+  // a UUID via a shared link, webhook log, or event stream.
+  try {
+    const queue = getGenerationQueue();
+    const job = await queue.getJob(generationId);
+    if (job) {
+      const ownerUid =
+        (job.data as { userId?: string; creatorUid?: string } | undefined)?.userId ??
+        (job.data as { creatorUid?: string } | undefined)?.creatorUid;
+      if (ownerUid && ownerUid.toLowerCase() !== user.uid.toLowerCase()) {
+        return c.json({ error: 'Not found' }, 404);
+      }
+    }
+  } catch {
+    // Queue not reachable — let the stream fall through and it will close.
+  }
+
   c.header('Content-Type', 'text/event-stream');
   c.header('Cache-Control', 'no-cache');
   c.header('Connection', 'keep-alive');
@@ -167,6 +186,13 @@ jobStatusRouter.get('/:generationId/status', async (c) => {
     const job = await queue.getJob(generationId);
 
     if (!job) {
+      return c.json({ status: 'not_found' }, 404);
+    }
+
+    const ownerUid =
+      (job.data as { userId?: string; creatorUid?: string } | undefined)?.userId ??
+      (job.data as { creatorUid?: string } | undefined)?.creatorUid;
+    if (ownerUid && ownerUid.toLowerCase() !== user.uid.toLowerCase()) {
       return c.json({ status: 'not_found' }, 404);
     }
 

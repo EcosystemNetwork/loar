@@ -35,6 +35,21 @@ export async function extractVideoThumbnail(
   const uploaderUid = options.uploaderUid ?? 'system';
 
   try {
+    // Only accept HTTPS URLs. ffmpeg's default protocol set includes `file:`,
+    // `concat:`, `subfile:`, HLS-with-nested-`file:`, etc., which let an
+    // attacker-controlled `videoUrl` read local files into the encoded frame
+    // (env-var dumps, service-account JSON, /proc/self/environ).
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(videoUrl);
+    } catch {
+      return null;
+    }
+    if (parsedUrl.protocol !== 'https:') {
+      console.warn(`[thumbnail] rejecting non-https videoUrl for ${idHint}`);
+      return null;
+    }
+
     const { execFile } = await import('child_process');
     const { promisify } = await import('util');
     const { tmpdir } = await import('os');
@@ -48,6 +63,10 @@ export async function extractVideoThumbnail(
       'ffmpeg',
       [
         '-y',
+        // Belt-and-braces — even if a future caller slips a non-https URL
+        // through, ffmpeg will refuse to open `file:` / `concat:` / etc.
+        '-protocol_whitelist',
+        'https,tls,tcp',
         '-i',
         videoUrl,
         '-ss',

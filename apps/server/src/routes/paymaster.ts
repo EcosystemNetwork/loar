@@ -28,6 +28,23 @@ export const paymasterRoutes = new Hono();
 
 const DAILY_SPONSOR_LIMIT = parseInt(process.env.PAYMASTER_DAILY_LIMIT || '50', 10);
 
+// Chains the app is actually deployed on. Reject anything else so a caller
+// cannot burn the paymaster balance sponsoring transactions on unrelated
+// networks that thirdweb/Pimlico/Biconomy happen to support.
+const ALLOWED_CHAIN_IDS = new Set<number>([
+  11155111, // Sepolia
+  84532, // Base Sepolia
+]);
+
+// Optional allowlist of ERC-4337 function selectors the paymaster will sponsor,
+// comma-separated (e.g. "purchaseMerch,execute"). If unset we accept any.
+const SPONSORED_ACTIONS = (process.env.PAYMASTER_SPONSORED_ACTIONS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
 type Provider =
   | { kind: 'thirdweb'; secret: string }
   | { kind: 'pimlico'; key: string; chainId: number }
@@ -78,9 +95,53 @@ paymasterRoutes.post('/sponsor', async (c) => {
     );
   }
 
-  // Per-wallet daily quota — shared across replicas via Redis-backed limiter
+  const body = (await c.req.json().catch(() => null)) as SponsorBody | null;
+  if (!body?.userOp) {
+    return c.json({ code: 'BAD_REQUEST', message: 'userOp required' }, 400);
+  }
+
+  // Pin chainId to the protocol's allowlist. Without this, an attacker can
+  // ask the paymaster to sponsor a transaction on any EVM chain the vendor
+  // supports, draining the paymaster balance against arbitrary targets.
+  const chainId = body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
+  if (!ALLOWED_CHAIN_IDS.has(chainId)) {
+    return c.json(
+      {
+        code: 'BAD_REQUEST',
+        message: `chainId ${chainId} is not sponsored on this deployment`,
+      },
+      400
+    );
+  }
+  body.chainId = chainId;
+
+  // Require sender to be present and well-formed. Quota is keyed on the
+  // userOp.sender (not the session uid) so a single user cannot drain
+  // `DAILY_SPONSOR_LIMIT × N` by cycling senders, and so a leaked session
+  // cannot attack an unlimited number of smart accounts.
+  const sender = (body.userOp as { sender?: unknown })?.sender;
+  if (typeof sender !== 'string' || !ADDRESS_RE.test(sender)) {
+    return c.json(
+      { code: 'BAD_REQUEST', message: 'userOp.sender must be a 0x-prefixed address' },
+      400
+    );
+  }
+
+  // Optional functionName allowlist — when configured, reject everything else
+  // so a compromised session cannot sponsor arbitrary contract calls.
+  if (
+    SPONSORED_ACTIONS.length > 0 &&
+    (!body.functionName || !SPONSORED_ACTIONS.includes(body.functionName))
+  ) {
+    return c.json(
+      { code: 'FORBIDDEN', message: 'Requested action is not sponsored by this paymaster' },
+      403
+    );
+  }
+
+  // Per-sender daily quota.
   const { blocked } = await consumeRateLimit(
-    `paymaster:daily:${user.uid.toLowerCase()}`,
+    `paymaster:daily:${sender.toLowerCase()}:${chainId}`,
     24 * 60 * 60 * 1000,
     DAILY_SPONSOR_LIMIT
   );
@@ -92,11 +153,6 @@ paymasterRoutes.post('/sponsor', async (c) => {
       },
       429
     );
-  }
-
-  const body = (await c.req.json().catch(() => null)) as SponsorBody | null;
-  if (!body?.userOp) {
-    return c.json({ code: 'BAD_REQUEST', message: 'userOp required' }, 400);
   }
 
   try {
