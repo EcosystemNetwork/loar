@@ -42,6 +42,8 @@ export const sandboxRouter = router({
   // Save a draft item (image + optional video) to Firestore.
   // Auto-creates a gallery content record so all generated media is immediately visible.
   // Status stays 'draft' — promotion to a universe is an explicit separate action.
+  // Auto-published content defaults to classification: 'fan' (no rights claim) and
+  // visibility: 'unlisted'. Users explicitly upgrade rights/visibility on promote.
   saveDraft: protectedProcedure
     .input(
       z.object({
@@ -58,7 +60,7 @@ export const sandboxRouter = router({
       const hasMedia = !!(input.videoUrl || input.imageUrl);
       const mediaType = input.videoUrl ? 'ai-video' : 'ai-image';
 
-      const doc = await sandboxCol().add({
+      const draftRef = await sandboxCol().add({
         creatorAddress: ctx.user.address,
         creatorUid: ctx.user.uid,
         title: input.title,
@@ -72,67 +74,74 @@ export const sandboxRouter = router({
         updatedAt: now,
       });
 
-      // Auto-publish to gallery when media is present (skip if already published by generation route).
-      // This makes all generated media instantly visible in the gallery per platform policy.
       let contentId: string | null = null;
       if (hasMedia) {
         const mediaUrl = input.videoUrl || input.imageUrl || '';
+        // Transaction prevents duplicate gallery rows when batch generations
+        // resolve concurrently with the same mediaUrl.
+        const result = await db!.runTransaction(async (tx) => {
+          const existingSnap = await tx.get(
+            contentCol()
+              .where('mediaUrl', '==', mediaUrl)
+              .where('creatorUid', '==', ctx.user.uid)
+              .limit(1)
+          );
 
-        const existing = await contentCol()
-          .where('mediaUrl', '==', mediaUrl)
-          .where('creatorUid', '==', ctx.user.uid)
-          .limit(1)
-          .get();
+          if (!existingSnap.empty) {
+            const existingDoc = existingSnap.docs[0];
+            tx.update(existingDoc.ref, {
+              title: input.title,
+              tags: input.tags || [],
+              description: input.prompt || '',
+              updatedAt: now,
+            });
+            return { contentId: existingDoc.id, created: false };
+          }
 
-        if (!existing.empty) {
-          const existingDoc = existing.docs[0];
-          contentId = existingDoc.id;
-          await existingDoc.ref.update({
-            title: input.title,
-            tags: input.tags || [],
-            description: input.prompt || '',
-            updatedAt: now,
-          });
-        } else {
-          const contentData = {
+          const newRef = contentCol().doc();
+          tx.set(newRef, {
             title: input.title,
             description: input.prompt || '',
             mediaUrl,
             thumbnailUrl: input.imageUrl || null,
             mediaType,
-            classification: 'original' as const,
+            classification: 'fan' as const,
             tags: input.tags || [],
             ipDeclaration: {
-              isOriginal: true,
+              isOriginal: false,
               usesCopyrightedMaterial: false,
-              license: 'all-rights-reserved',
+              license: 'fan-work',
             },
-            visibility: 'public',
+            visibility: 'unlisted',
             creatorUid: ctx.user.uid,
             createdAt: now,
             updatedAt: now,
             views: 0,
             likes: 0,
             reviewStatus: 'not_required',
-            promotedFromDraft: doc.id,
+            contentStatus: 'active',
+            contentStatusUpdatedAt: now.toISOString(),
+            promotedFromDraft: draftRef.id,
             generationModel: input.model || null,
-          };
-          const contentRef = await contentCol().add(contentData);
-          contentId = contentRef.id;
+          });
+          return { contentId: newRef.id, created: true };
+        });
+        contentId = result.contentId;
 
-          const profileRef = profilesCol().doc(ctx.user.uid);
-          const profileDoc = await profileRef.get();
-          if (profileDoc.exists) {
-            await profileRef.update({ contentCount: FieldValue.increment(1) });
+        if (result.created) {
+          try {
+            await profilesCol()
+              .doc(ctx.user.uid)
+              .set({ contentCount: FieldValue.increment(1) }, { merge: true });
+          } catch (e) {
+            console.warn('[sandbox] profile counter update failed:', e);
           }
         }
 
-        // Link draft to gallery content without changing status —
-        // 'promoted' is reserved for explicit universe promotion.
-        await doc.update({ galleryContentId: contentId, updatedAt: now });
+        await draftRef.update({ galleryContentId: contentId, updatedAt: now });
       }
 
-      return { id: doc.id, contentId };
+      return { id: draftRef.id, contentId };
     }),
 
   // Update an existing draft
@@ -180,29 +189,55 @@ export const sandboxRouter = router({
       return { ok: true };
     }),
 
-  // Get all drafts for the current user
+  // Get drafts for the current user. Looks up by both creatorUid and legacy
+  // creatorAddress and dedupes, so drafts saved without an address still list.
+  // Returns a flat array for backwards compatibility with existing consumers
+  // (web sandbox UI, mobile drafts screen, ops scripts).
   myDrafts: protectedProcedure.query(async ({ ctx }) => {
-    const snap = await sandboxCol()
-      .where('creatorAddress', '==', ctx.user.address)
-      .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
+    const PER_FIELD_LIMIT = 200;
 
-    return snap.docs.map((doc) => {
-      const d = doc.data();
-      return {
-        id: doc.id,
-        title: d.title as string,
-        prompt: d.prompt as string,
-        imageUrl: d.imageUrl as string | null,
-        videoUrl: d.videoUrl as string | null,
-        model: d.model as string | null,
-        tags: d.tags as string[],
-        status: d.status as string,
-        createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? null,
-        updatedAt: d.updatedAt?.toDate?.()?.toISOString?.() ?? null,
-      };
+    const buildQuery = (field: 'creatorUid' | 'creatorAddress', value: string) =>
+      sandboxCol()
+        .where(field, '==', value)
+        .orderBy('createdAt', 'desc')
+        .limit(PER_FIELD_LIMIT)
+        .get();
+
+    const queries: Promise<FirebaseFirestore.QuerySnapshot>[] = [
+      buildQuery('creatorUid', ctx.user.uid),
+    ];
+    if (ctx.user.address) {
+      queries.push(buildQuery('creatorAddress', ctx.user.address));
+    }
+    const snaps = await Promise.all(queries);
+
+    const seen = new Set<string>();
+    const merged: { id: string; data: FirebaseFirestore.DocumentData }[] = [];
+    for (const snap of snaps) {
+      for (const doc of snap.docs) {
+        if (seen.has(doc.id)) continue;
+        seen.add(doc.id);
+        merged.push({ id: doc.id, data: doc.data() });
+      }
+    }
+    merged.sort((a, b) => {
+      const ta = a.data.createdAt?.toDate?.()?.getTime?.() ?? 0;
+      const tb = b.data.createdAt?.toDate?.()?.getTime?.() ?? 0;
+      return tb - ta;
     });
+
+    return merged.slice(0, PER_FIELD_LIMIT).map(({ id, data: d }) => ({
+      id,
+      title: d.title as string,
+      prompt: d.prompt as string,
+      imageUrl: d.imageUrl as string | null,
+      videoUrl: d.videoUrl as string | null,
+      model: d.model as string | null,
+      tags: d.tags as string[],
+      status: d.status as string,
+      createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? null,
+      updatedAt: d.updatedAt?.toDate?.()?.toISOString?.() ?? null,
+    }));
   }),
 
   /**
@@ -220,7 +255,7 @@ export const sandboxRouter = router({
       z.object({
         draftId: z.string(),
         universeId: z.string().optional(),
-        classification: z.enum(['fan', 'original', 'licensed']).default('original'),
+        classification: z.enum(['fan', 'original', 'licensed']).default('fan'),
         visibility: z.enum(['public', 'private', 'unlisted']).default('public'),
       })
     )
@@ -236,27 +271,41 @@ export const sandboxRouter = router({
       const mediaUrl = draft.videoUrl || draft.imageUrl || '';
       const mediaType = draft.videoUrl ? 'ai-video' : draft.imageUrl ? 'ai-image' : 'image';
 
-      // Check if content record already exists (auto-created by saveDraft or generation route)
-      let contentId: string;
-      const existing = await contentCol()
-        .where('mediaUrl', '==', mediaUrl)
-        .where('creatorUid', '==', ctx.user.uid)
-        .limit(1)
-        .get();
+      // ipDeclaration / reviewStatus follow content.routes.ts rules so the
+      // moderation + monetization gates accept the record.
+      const ipDeclaration =
+        input.classification === 'fan'
+          ? { isOriginal: false, usesCopyrightedMaterial: false, license: 'fan-work' as const }
+          : {
+              isOriginal: true,
+              usesCopyrightedMaterial: false,
+              license: 'all-rights-reserved' as const,
+            };
+      const reviewStatus = input.classification === 'licensed' ? 'pending' : 'not_required';
 
-      if (!existing.empty) {
-        // Update existing content record with universe/classification/visibility
-        const existingDoc = existing.docs[0];
-        contentId = existingDoc.id;
-        const updates: Record<string, any> = {
-          classification: input.classification,
-          visibility: input.visibility,
-          updatedAt: now,
-        };
-        if (input.universeId) updates.universeId = input.universeId;
-        await existingDoc.ref.update(updates);
-      } else {
-        // Create new content record
+      const { contentId, created } = await db!.runTransaction(async (tx) => {
+        const existingSnap = await tx.get(
+          contentCol()
+            .where('mediaUrl', '==', mediaUrl)
+            .where('creatorUid', '==', ctx.user.uid)
+            .limit(1)
+        );
+
+        if (!existingSnap.empty) {
+          const existingDoc = existingSnap.docs[0];
+          const updates: Record<string, any> = {
+            classification: input.classification,
+            visibility: input.visibility,
+            ipDeclaration,
+            reviewStatus,
+            updatedAt: now,
+          };
+          if (input.universeId) updates.universeId = input.universeId;
+          tx.update(existingDoc.ref, updates);
+          return { contentId: existingDoc.id, created: false };
+        }
+
+        const newRef = contentCol().doc();
         const contentData: Record<string, any> = {
           title: draft.title,
           description: draft.prompt || '',
@@ -265,34 +314,34 @@ export const sandboxRouter = router({
           mediaType,
           classification: input.classification,
           tags: draft.tags || [],
-          ipDeclaration: {
-            isOriginal: true,
-            usesCopyrightedMaterial: false,
-            license: 'all-rights-reserved',
-          },
+          ipDeclaration,
           visibility: input.visibility,
           creatorUid: ctx.user.uid,
           createdAt: now,
           updatedAt: now,
           views: 0,
           likes: 0,
-          reviewStatus: 'not_required',
+          reviewStatus,
+          contentStatus: 'active',
+          contentStatusUpdatedAt: now.toISOString(),
           promotedFromDraft: input.draftId,
           generationModel: draft.model || null,
         };
         if (input.universeId) contentData.universeId = input.universeId;
-        const contentRef = await contentCol().add(contentData);
-        contentId = contentRef.id;
+        tx.set(newRef, contentData);
+        return { contentId: newRef.id, created: true };
+      });
 
-        // Update profile content count
-        const profileRef = profilesCol().doc(ctx.user.uid);
-        const profileDoc = await profileRef.get();
-        if (profileDoc.exists) {
-          await profileRef.update({ contentCount: FieldValue.increment(1) });
+      if (created) {
+        try {
+          await profilesCol()
+            .doc(ctx.user.uid)
+            .set({ contentCount: FieldValue.increment(1) }, { merge: true });
+        } catch (e) {
+          console.warn('[sandbox] profile counter update failed:', e);
         }
       }
 
-      // Mark draft as promoted
       await ref.update({
         status: 'promoted',
         promotedTo: contentId,

@@ -66,8 +66,16 @@ type Generation = {
   aspectRatio: AspectRatio;
   error?: string;
   draftId?: string;
+  draftSaveError?: string;
+  retryCount?: number;
   createdAt: number;
 };
+
+const VARIATION_OPTIONS = [1, 2, 4, 10] as const;
+const MAX_CONCURRENT_GENS = 12;
+const MAX_RETRIES_PER_GEN = 2;
+const QUEUE_STORAGE_KEY = 'loar:sandbox:queue:v1';
+const QUEUE_MAX_PERSISTED = 50;
 
 const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
   { value: 'seedance', label: 'Seedance 2.0', badge: 'Free' },
@@ -116,12 +124,37 @@ function SandboxPage() {
   const [imageSize, setImageSize] = useState<ImageSize>('landscape_16_9');
   const [videoModel, setVideoModel] = useState<VideoModel>('seedance');
   const [imageModel, setImageModel] = useState<string>('');
+  const [variations, setVariations] = useState<number>(1);
   const [referenceImage, setReferenceImage] = useState<{ url: string; prompt: string } | null>(
     null
   );
 
-  // Parallel generation queue
-  const [generations, setGenerations] = useState<Generation[]>([]);
+  // Parallel generation queue — finished entries persist via localStorage so
+  // a refresh doesn't lose what you generated. In-flight entries are dropped
+  // on reload (server still completes the job and saves the draft).
+  const [generations, setGenerations] = useState<Generation[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(QUEUE_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed: Generation[] = JSON.parse(raw);
+      return parsed.filter((g) => g && g.status !== 'generating').slice(0, QUEUE_MAX_PERSISTED);
+    } catch {
+      return [];
+    }
+  });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const persistable = generations
+        .filter((g) => g.status !== 'generating')
+        .slice(0, QUEUE_MAX_PERSISTED);
+      window.localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(persistable));
+    } catch {
+      // localStorage may be full or disabled — non-fatal
+    }
+  }, [generations]);
 
   // Drafts panel
   const { data: drafts } = useQuery({
@@ -142,6 +175,24 @@ function SandboxPage() {
     setGenerations((prev) => prev.filter((g) => g.status === 'generating'));
   }, []);
 
+  const inFlightCountRef = React.useRef(0);
+  const checkConcurrency = useCallback((requested: number): number => {
+    const slack = MAX_CONCURRENT_GENS - inFlightCountRef.current;
+    if (slack <= 0) {
+      toast.error(
+        `Queue is full (${MAX_CONCURRENT_GENS} running). Wait for a few to finish, then try again.`
+      );
+      return 0;
+    }
+    if (requested > slack) {
+      toast.message(
+        `Queue cap: starting ${slack} of ${requested}. Re-run to queue the rest once these finish.`
+      );
+      return slack;
+    }
+    return requested;
+  }, []);
+
   const autoSaveDraft = useCallback(
     async (gen: Generation) => {
       try {
@@ -152,19 +203,22 @@ function SandboxPage() {
           videoUrl: gen.videoUrl,
           model: gen.kind === 'video' ? gen.videoModel : gen.imageModel || undefined,
         });
-        updateGen(gen.id, { draftId: result.id });
+        updateGen(gen.id, { draftId: result.id, draftSaveError: undefined });
         queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
       } catch (e: any) {
-        // Non-fatal: generation succeeded, draft save didn't
+        // Generation succeeded but the draft record didn't persist — surface
+        // it on the card so the user can retry instead of silently losing it.
+        const msg = e?.message || 'Failed to save draft';
         console.warn('sandbox auto-save failed:', e);
-        toast.error('Saved generation but failed to create draft');
+        updateGen(gen.id, { draftSaveError: msg });
+        toast.error('Generation kept locally — draft save failed: ' + msg);
       }
     },
     [queryClient, updateGen]
   );
 
   const runImageGen = useCallback(
-    async (p: string, opts: { imageSize: ImageSize; imageModel: string }) => {
+    async (p: string, opts: { imageSize: ImageSize; imageModel: string; retryOf?: Generation }) => {
       const id = makeId();
       const gen: Generation = {
         id,
@@ -174,9 +228,11 @@ function SandboxPage() {
         imageSize: opts.imageSize,
         aspectRatio: aspectFromSize(opts.imageSize),
         imageModel: opts.imageModel || undefined,
+        retryCount: opts.retryOf ? (opts.retryOf.retryCount ?? 0) + 1 : 0,
         createdAt: Date.now(),
       };
       setGenerations((prev) => [gen, ...prev]);
+      inFlightCountRef.current += 1;
       try {
         const result = await trpcClient.image.generate.mutate({
           prompt: p,
@@ -194,6 +250,8 @@ function SandboxPage() {
       } catch (err: any) {
         updateGen(id, { status: 'failed', error: err?.message || 'Image generation failed' });
         toast.error('Image generation failed: ' + (err?.message || ''));
+      } finally {
+        inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
     [autoSaveDraft, updateGen]
@@ -202,7 +260,12 @@ function SandboxPage() {
   const runVideoGen = useCallback(
     async (
       p: string,
-      opts: { videoModel: VideoModel; imageSize: ImageSize; sourceImageUrl?: string }
+      opts: {
+        videoModel: VideoModel;
+        imageSize: ImageSize;
+        sourceImageUrl?: string;
+        retryOf?: Generation;
+      }
     ) => {
       const id = makeId();
       const hasImage = !!opts.sourceImageUrl;
@@ -222,9 +285,11 @@ function SandboxPage() {
         aspectRatio,
         sourceImageUrl: opts.sourceImageUrl,
         imageUrl: opts.sourceImageUrl,
+        retryCount: opts.retryOf ? (opts.retryOf.retryCount ?? 0) + 1 : 0,
         createdAt: Date.now(),
       };
       setGenerations((prev) => [gen, ...prev]);
+      inFlightCountRef.current += 1;
       try {
         const r: any = await trpcClient.generation.generate.mutate({
           prompt: p,
@@ -245,6 +310,8 @@ function SandboxPage() {
       } catch (err: any) {
         updateGen(id, { status: 'failed', error: err?.message || 'Video generation failed' });
         toast.error('Video generation failed: ' + (err?.message || ''));
+      } finally {
+        inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
     [autoSaveDraft, updateGen]
@@ -252,18 +319,38 @@ function SandboxPage() {
 
   const retryGen = useCallback(
     (g: Generation) => {
+      if ((g.retryCount ?? 0) >= MAX_RETRIES_PER_GEN) {
+        toast.error(
+          `Hit retry limit (${MAX_RETRIES_PER_GEN}). Tweak the prompt or pick a different model.`
+        );
+        return;
+      }
+      if (checkConcurrency(1) === 0) return;
       removeGen(g.id);
       if (g.kind === 'image') {
-        runImageGen(g.prompt, { imageSize: g.imageSize, imageModel: g.imageModel || '' });
+        runImageGen(g.prompt, {
+          imageSize: g.imageSize,
+          imageModel: g.imageModel || '',
+          retryOf: g,
+        });
       } else {
         runVideoGen(g.prompt, {
           videoModel: g.videoModel ?? 'seedance',
           imageSize: g.imageSize,
           sourceImageUrl: g.sourceImageUrl,
+          retryOf: g,
         });
       }
     },
-    [removeGen, runImageGen, runVideoGen]
+    [checkConcurrency, removeGen, runImageGen, runVideoGen]
+  );
+
+  const retryDraftSave = useCallback(
+    (g: Generation) => {
+      if (g.draftId || !g.draftSaveError) return;
+      autoSaveDraft(g);
+    },
+    [autoSaveDraft]
   );
 
   const handleAnimate = useCallback((g: Generation) => {
@@ -351,7 +438,7 @@ function SandboxPage() {
               </div>
 
               {/* Settings row */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Aspect</label>
                   <Select value={imageSize} onValueChange={(v) => setImageSize(v as ImageSize)}>
@@ -397,6 +484,29 @@ function SandboxPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    title="Image only — fires N parallel generations from the same prompt"
+                  >
+                    Variations
+                  </label>
+                  <Select
+                    value={String(variations)}
+                    onValueChange={(v) => setVariations(Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VARIATION_OPTIONS.map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}× {n === 1 ? 'image' : 'images'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Reference image slot */}
@@ -427,12 +537,16 @@ function SandboxPage() {
                   className="flex-1"
                   disabled={!canGenerate}
                   onClick={() => {
-                    runImageGen(prompt, { imageSize, imageModel });
+                    const slots = checkConcurrency(variations);
+                    if (slots === 0) return;
+                    for (let i = 0; i < slots; i++) {
+                      runImageGen(prompt, { imageSize, imageModel });
+                    }
                     setPrompt('');
                   }}
                 >
                   <ImageIcon className="h-4 w-4 mr-2" />
-                  Generate Image
+                  {variations > 1 ? `Generate ${variations} Images` : 'Generate Image'}
                 </Button>
                 <Button
                   variant="outline"
@@ -442,6 +556,7 @@ function SandboxPage() {
                     videoNeedsImage ? 'Pick Seedance, or set a reference image first' : undefined
                   }
                   onClick={() => {
+                    if (checkConcurrency(1) === 0) return;
                     runVideoGen(prompt, {
                       videoModel,
                       imageSize,
@@ -457,8 +572,8 @@ function SandboxPage() {
               </div>
 
               <p className="text-[11px] text-muted-foreground -mt-1">
-                Queue is unbounded — keep typing and hitting Generate. Each run auto-saves as a
-                draft.
+                Up to {MAX_CONCURRENT_GENS} generations run in parallel. Each run auto-saves as a
+                draft and stays in your queue across reloads.
               </p>
 
               {/* Queue header */}
@@ -487,6 +602,7 @@ function SandboxPage() {
                       onDismiss={() => removeGen(g.id)}
                       onRetry={() => retryGen(g)}
                       onAnimate={() => handleAnimate(g)}
+                      onRetryDraftSave={() => retryDraftSave(g)}
                     />
                   ))}
                 </div>
@@ -542,9 +658,17 @@ interface GenerationCardProps {
   onDismiss: () => void;
   onRetry: () => void;
   onAnimate: () => void;
+  onRetryDraftSave: () => void;
 }
 
-function GenerationCard({ gen, onDismiss, onRetry, onAnimate }: GenerationCardProps) {
+function GenerationCard({
+  gen,
+  onDismiss,
+  onRetry,
+  onAnimate,
+  onRetryDraftSave,
+}: GenerationCardProps) {
+  const retriesLeft = MAX_RETRIES_PER_GEN - (gen.retryCount ?? 0);
   return (
     <Card className="overflow-hidden">
       <div className="aspect-video bg-muted relative">
@@ -608,11 +732,23 @@ function GenerationCard({ gen, onDismiss, onRetry, onAnimate }: GenerationCardPr
 
       <CardContent className="p-2 space-y-1.5">
         <p className="text-xs text-muted-foreground line-clamp-2">{gen.prompt}</p>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           {gen.status === 'done' && gen.draftId && (
             <Badge variant="outline" className="text-[10px]">
               Saved
             </Badge>
+          )}
+          {gen.status === 'done' && !gen.draftId && gen.draftSaveError && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px] text-destructive"
+              onClick={onRetryDraftSave}
+              title={gen.draftSaveError}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Save draft
+            </Button>
           )}
           {gen.status === 'done' && gen.kind === 'image' && (
             <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onAnimate}>
@@ -620,11 +756,14 @@ function GenerationCard({ gen, onDismiss, onRetry, onAnimate }: GenerationCardPr
               Animate
             </Button>
           )}
-          {gen.status === 'failed' && (
+          {gen.status === 'failed' && retriesLeft > 0 && (
             <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onRetry}>
               <RefreshCw className="h-3 w-3 mr-1" />
-              Retry
+              Retry ({retriesLeft} left)
             </Button>
+          )}
+          {gen.status === 'failed' && retriesLeft <= 0 && (
+            <span className="text-[10px] text-muted-foreground">Retry limit reached</span>
           )}
         </div>
       </CardContent>
