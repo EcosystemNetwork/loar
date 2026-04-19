@@ -32,6 +32,10 @@ const envSchema = z.object({
   // ── Optional endpoints ────────────────────────────────────────────────────
   VITE_PONDER_URL: optionalString,
 
+  // ── IPFS gateway (public) ─────────────────────────────────────────────────
+  VITE_PINATA_GATEWAY_URL: optionalString,
+  VITE_PINATA_GATEWAY_TOKEN: optionalString,
+
   // ── Blockchain (public addresses) ─────────────────────────────────────────
   VITE_LOAR_TOKEN_ADDRESS: optionalAddress,
   VITE_TREASURY_ADDRESS: optionalAddress,

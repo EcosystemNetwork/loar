@@ -17,12 +17,14 @@ export class PinataProvider implements StorageProvider {
 
   private jwt: string;
   private gatewayUrl: string;
+  private gatewayToken: string;
   private consecutiveFailures = 0;
   private lastFailureTime = 0;
 
   constructor() {
     this.jwt = process.env.PINATA_JWT || '';
     this.gatewayUrl = process.env.PINATA_GATEWAY_URL || DEFAULT_GATEWAY;
+    this.gatewayToken = process.env.PINATA_GATEWAY_TOKEN || '';
   }
 
   isAvailable(): boolean {
@@ -92,7 +94,7 @@ export class PinataProvider implements StorageProvider {
   }
 
   async download(cid: string): Promise<Uint8Array> {
-    const response = await fetch(`${this.gatewayUrl}/ipfs/${cid}`);
+    const response = await fetch(this.getPublicUrl(cid));
 
     if (!response.ok) {
       throw new Error(`IPFS download failed: HTTP ${response.status}`);
@@ -102,6 +104,7 @@ export class PinataProvider implements StorageProvider {
   }
 
   getPublicUrl(cid: string): string {
-    return `${this.gatewayUrl}/ipfs/${cid}`;
+    const base = `${this.gatewayUrl}/ipfs/${cid}`;
+    return this.gatewayToken ? `${base}?pinataGatewayToken=${this.gatewayToken}` : base;
   }
 }
