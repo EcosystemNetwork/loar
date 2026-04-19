@@ -120,6 +120,13 @@ authRoutes.post('/verify', async (c) => {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
 
     recordAuthEvent('verify', 'success');
+    // PostHog funnel event — ties the signed-in user to any prior anonymous session.
+    void import('../lib/analytics').then(({ captureServerEvent }) =>
+      captureServerEvent('auth:siwe_verified', {
+        distinctId: address,
+        chain: 'evm',
+      })
+    );
 
     // Return address + expiry (NOT the token) — client uses these for UI state only
     return c.json({

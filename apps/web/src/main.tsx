@@ -17,6 +17,11 @@ validateWebEnv();
 // Must run before router/providers so bootstrap errors are captured.
 import './lib/sentry';
 
+// Product analytics — PostHog. Lazy-loads when VITE_POSTHOG_KEY is set,
+// silent no-op otherwise. Autocaptures clicks + pageviews + session replay.
+import { initAnalytics } from './lib/analytics';
+void initAnalytics();
+
 // Auto-reload when a deployed chunk is missing (stale cache after redeployment)
 window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault();

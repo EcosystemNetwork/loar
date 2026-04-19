@@ -29,9 +29,20 @@ export async function assertGenerationAllowed(uid: string, credits: number): Pro
     // this is a close-enough proxy for the Grafana credits panels until
     // each route migrates to a consolidated lib/credits.ts helper.
     recordCreditsTx('spend', 'success');
+    // PostHog funnel: successful generation admission → user's conversion.
+    void import('./analytics').then(({ captureServerEvent }) =>
+      captureServerEvent('generation:admitted', { distinctId: uid, credits })
+    );
   } catch (err) {
     if (err instanceof FeatureDisabledError || err instanceof MonthlySpendCapExceededError) {
       recordCreditsTx('spend', 'failure');
+      void import('./analytics').then(({ captureServerEvent }) =>
+        captureServerEvent('generation:blocked', {
+          distinctId: uid,
+          reason: err instanceof FeatureDisabledError ? 'kill_switch' : 'spend_cap',
+          credits,
+        })
+      );
       throw new TRPCError({ code: 'FORBIDDEN', message: err.message });
     }
     recordCreditsTx('spend', 'failure');

@@ -61,6 +61,10 @@ const envSchema = z.object({
   // ── Monitoring (Sentry DSN is public by design — safe in the client bundle) ─
   VITE_SENTRY_DSN: optionalString,
   VITE_RELEASE: optionalString,
+
+  // ── Product analytics (PostHog) — public project API key, safe in bundle ──
+  VITE_POSTHOG_KEY: optionalString,
+  VITE_POSTHOG_HOST: optionalString,
 });
 
 export type WebEnv = z.infer<typeof envSchema>;

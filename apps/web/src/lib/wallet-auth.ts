@@ -68,6 +68,11 @@ function setSession(address: string, expiresAt: number) {
   localStorage.setItem(ADDRESS_KEY, address);
   localStorage.setItem(EXPIRY_KEY, String(expiresAt));
   emitChange();
+  // Stitch pre-login anonymous analytics to this wallet. Fire-and-forget.
+  void import('./analytics').then(({ identifyUser, track }) => {
+    void identifyUser(address);
+    void track('auth:login_succeeded', { wallet: address.toLowerCase() });
+  });
 }
 
 /** Clear the SIWE session from local state and optionally revoke server-side. */
@@ -75,6 +80,12 @@ export function clearSiweSession(revoke = false) {
   localStorage.removeItem(ADDRESS_KEY);
   localStorage.removeItem(EXPIRY_KEY);
   emitChange();
+
+  // Un-link the user in analytics so subsequent events are anonymous again.
+  void import('./analytics').then(({ resetUser, track }) => {
+    void track('auth:logout', { manual: revoke });
+    void resetUser();
+  });
 
   // Fire-and-forget server-side revocation (clears httpOnly cookie)
   if (revoke) {
