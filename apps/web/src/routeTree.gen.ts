@@ -46,7 +46,7 @@ import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as CollabsIndexRouteImport } from './routes/collabs/index'
 import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
-import { Route as AdsIndexRouteImport } from './routes/ads/index'
+import { Route as AdplacementsIndexRouteImport } from './routes/adplacements/index'
 import { Route as WorkflowsMarketplaceRouteImport } from './routes/workflows/marketplace'
 import { Route as WorkflowsIdRouteImport } from './routes/workflows/$id'
 import { Route as WikiKindRouteImport } from './routes/wiki/$kind'
@@ -83,7 +83,7 @@ import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$s
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
-import { Route as AdsSeedsIndexRouteImport } from './routes/ads/seeds/index'
+import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
 import { Route as WorkflowsIdRunsRouteImport } from './routes/workflows/$id.runs'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
@@ -610,7 +610,7 @@ export interface FileRoutesByFullPath {
   '/wiki/$kind': typeof WikiKindRoute
   '/workflows/$id': typeof WorkflowsIdRouteWithChildren
   '/workflows/marketplace': typeof WorkflowsMarketplaceRoute
-  '/ads/': typeof AdsIndexRoute
+  '/adplacements/': typeof AdplacementsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
   '/collabs/': typeof CollabsIndexRoute
@@ -620,8 +620,8 @@ export interface FileRoutesByFullPath {
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/workflows/': typeof WorkflowsIndexRoute
-  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
-  '/ads/seeds/new': typeof AdsSeedsNewRoute
+  '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
+  '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
@@ -634,7 +634,7 @@ export interface FileRoutesByFullPath {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/workflows/$id/runs': typeof WorkflowsIdRunsRoute
-  '/ads/seeds/': typeof AdsSeedsIndexRoute
+  '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -701,7 +701,7 @@ export interface FileRoutesByTo {
   '/wiki/$kind': typeof WikiKindRoute
   '/workflows/$id': typeof WorkflowsIdRouteWithChildren
   '/workflows/marketplace': typeof WorkflowsMarketplaceRoute
-  '/ads': typeof AdsIndexRoute
+  '/adplacements': typeof AdplacementsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/bounties': typeof BountiesIndexRoute
   '/collabs': typeof CollabsIndexRoute
@@ -711,8 +711,8 @@ export interface FileRoutesByTo {
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
   '/workflows': typeof WorkflowsIndexRoute
-  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
-  '/ads/seeds/new': typeof AdsSeedsNewRoute
+  '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
+  '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
@@ -725,7 +725,7 @@ export interface FileRoutesByTo {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/workflows/$id/runs': typeof WorkflowsIdRunsRoute
-  '/ads/seeds': typeof AdsSeedsIndexRoute
+  '/adplacements/seeds': typeof AdplacementsSeedsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -793,7 +793,7 @@ export interface FileRoutesById {
   '/wiki/$kind': typeof WikiKindRoute
   '/workflows/$id': typeof WorkflowsIdRouteWithChildren
   '/workflows/marketplace': typeof WorkflowsMarketplaceRoute
-  '/ads/': typeof AdsIndexRoute
+  '/adplacements/': typeof AdplacementsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
   '/collabs/': typeof CollabsIndexRoute
@@ -803,8 +803,8 @@ export interface FileRoutesById {
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/workflows/': typeof WorkflowsIndexRoute
-  '/ads/seeds/$seedId': typeof AdsSeedsSeedIdRoute
-  '/ads/seeds/new': typeof AdsSeedsNewRoute
+  '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
+  '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
@@ -817,7 +817,7 @@ export interface FileRoutesById {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/workflows/$id/runs': typeof WorkflowsIdRunsRoute
-  '/ads/seeds/': typeof AdsSeedsIndexRoute
+  '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -886,7 +886,7 @@ export interface FileRouteTypes {
     | '/wiki/$kind'
     | '/workflows/$id'
     | '/workflows/marketplace'
-    | '/ads/'
+    | '/adplacements/'
     | '/agents/'
     | '/bounties/'
     | '/collabs/'
@@ -896,8 +896,8 @@ export interface FileRouteTypes {
     | '/tokens/'
     | '/wiki/'
     | '/workflows/'
-    | '/ads/seeds/$seedId'
-    | '/ads/seeds/new'
+    | '/adplacements/seeds/$seedId'
+    | '/adplacements/seeds/new'
     | '/event/$universe/$event'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
@@ -910,7 +910,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/workflows/$id/runs'
-    | '/ads/seeds/'
+    | '/adplacements/seeds/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -977,7 +977,7 @@ export interface FileRouteTypes {
     | '/wiki/$kind'
     | '/workflows/$id'
     | '/workflows/marketplace'
-    | '/ads'
+    | '/adplacements'
     | '/agents'
     | '/bounties'
     | '/collabs'
@@ -987,8 +987,8 @@ export interface FileRouteTypes {
     | '/tokens'
     | '/wiki'
     | '/workflows'
-    | '/ads/seeds/$seedId'
-    | '/ads/seeds/new'
+    | '/adplacements/seeds/$seedId'
+    | '/adplacements/seeds/new'
     | '/event/$universe/$event'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
@@ -1001,7 +1001,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/workflows/$id/runs'
-    | '/ads/seeds'
+    | '/adplacements/seeds'
   id:
     | '__root__'
     | '/'
@@ -1068,7 +1068,7 @@ export interface FileRouteTypes {
     | '/wiki/$kind'
     | '/workflows/$id'
     | '/workflows/marketplace'
-    | '/ads/'
+    | '/adplacements/'
     | '/agents/'
     | '/bounties/'
     | '/collabs/'
@@ -1078,8 +1078,8 @@ export interface FileRouteTypes {
     | '/tokens/'
     | '/wiki/'
     | '/workflows/'
-    | '/ads/seeds/$seedId'
-    | '/ads/seeds/new'
+    | '/adplacements/seeds/$seedId'
+    | '/adplacements/seeds/new'
     | '/event/$universe/$event'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
@@ -1092,7 +1092,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/workflows/$id/runs'
-    | '/ads/seeds/'
+    | '/adplacements/seeds/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1159,7 +1159,7 @@ export interface RootRouteChildren {
   WikiKindRoute: typeof WikiKindRoute
   WorkflowsIdRoute: typeof WorkflowsIdRouteWithChildren
   WorkflowsMarketplaceRoute: typeof WorkflowsMarketplaceRoute
-  AdsIndexRoute: typeof AdsIndexRoute
+  AdplacementsIndexRoute: typeof AdplacementsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   BountiesIndexRoute: typeof BountiesIndexRoute
   CollabsIndexRoute: typeof CollabsIndexRoute
@@ -1169,8 +1169,8 @@ export interface RootRouteChildren {
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
   WorkflowsIndexRoute: typeof WorkflowsIndexRoute
-  AdsSeedsSeedIdRoute: typeof AdsSeedsSeedIdRoute
-  AdsSeedsNewRoute: typeof AdsSeedsNewRoute
+  AdplacementsSeedsSeedIdRoute: typeof AdplacementsSeedsSeedIdRoute
+  AdplacementsSeedsNewRoute: typeof AdplacementsSeedsNewRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   StudioEditAssetIdRoute: typeof StudioEditAssetIdRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
@@ -1916,7 +1916,7 @@ const rootRouteChildren: RootRouteChildren = {
   WikiKindRoute: WikiKindRoute,
   WorkflowsIdRoute: WorkflowsIdRouteWithChildren,
   WorkflowsMarketplaceRoute: WorkflowsMarketplaceRoute,
-  AdsIndexRoute: AdsIndexRoute,
+  AdplacementsIndexRoute: AdplacementsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   BountiesIndexRoute: BountiesIndexRoute,
   CollabsIndexRoute: CollabsIndexRoute,
@@ -1926,8 +1926,8 @@ const rootRouteChildren: RootRouteChildren = {
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
   WorkflowsIndexRoute: WorkflowsIndexRoute,
-  AdsSeedsSeedIdRoute: AdsSeedsSeedIdRoute,
-  AdsSeedsNewRoute: AdsSeedsNewRoute,
+  AdplacementsSeedsSeedIdRoute: AdplacementsSeedsSeedIdRoute,
+  AdplacementsSeedsNewRoute: AdplacementsSeedsNewRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   StudioEditAssetIdRoute: StudioEditAssetIdRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
