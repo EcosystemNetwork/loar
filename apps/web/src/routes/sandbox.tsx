@@ -197,14 +197,33 @@ function randomSeed(): number {
 // Phase 2 — quick edit operations exposed inline on done image cards.
 // Each runs against an existing image URL and returns a new image URL,
 // which we treat as a fresh Generation card for consistent UX.
-type EditOp = 'upscale' | 'remove-bg' | 'relight' | 'outpaint';
+type EditOp =
+  | 'upscale'
+  | 'remove-bg'
+  | 'relight'
+  | 'outpaint'
+  | 'restyle'
+  | 'extend'
+  | 'interpolate';
 
 const EDIT_OP_LABELS: Record<EditOp, string> = {
   upscale: '4× Upscale',
   'remove-bg': 'Remove BG',
   relight: 'Relight',
   outpaint: 'Outpaint',
+  restyle: 'Restyle',
+  extend: 'Extend',
+  interpolate: 'Smooth Motion',
 };
+
+const RESTYLE_MODELS = [
+  { id: 'restyle-wan-v2v', label: 'WAN v2v' },
+  { id: 'restyle-kling-v2v', label: 'Kling v2v (premium)' },
+] as const;
+type RestyleModelId = (typeof RESTYLE_MODELS)[number]['id'];
+
+const INTERPOLATE_MULTIPLIERS = [2, 4, 8] as const;
+type InterpolateMultiplier = (typeof INTERPOLATE_MULTIPLIERS)[number];
 
 const QUICK_RELIGHT_PRESETS = [
   { id: 'golden-hour', label: 'Golden Hour' },
@@ -503,9 +522,8 @@ function SandboxPage() {
     [autoSaveDraft, updateGen]
   );
 
-  // Run an image edit operation (upscale / remove-bg / relight / outpaint).
-  // Each op produces a new image URL which we wrap as a fresh Generation card,
-  // auto-saved as a draft just like a top-of-funnel image gen.
+  // Run an image or video edit operation. Each op creates a fresh Generation
+  // card and is auto-saved as a draft just like a top-of-funnel generation.
   const runEditOp = useCallback(
     async (
       source: Generation,
@@ -515,10 +533,18 @@ function SandboxPage() {
         relightFreeText?: string;
         outpaintAspect?: OutpaintAspect;
         outpaintPrompt?: string;
+        restylePrompt?: string;
+        restyleStrength?: number;
+        restyleModelId?: RestyleModelId;
+        extendPrompt?: string;
+        extendDurationSec?: number;
+        interpolateMultiplier?: InterpolateMultiplier;
       } = {}
     ) => {
-      if (!source.imageUrl) {
-        toast.error('Source image missing');
+      const isVideoOp = op === 'restyle' || op === 'extend' || op === 'interpolate';
+      const sourceUrl = isVideoOp ? source.videoUrl : source.imageUrl;
+      if (!sourceUrl) {
+        toast.error(isVideoOp ? 'Source video missing' : 'Source image missing');
         return;
       }
       if (checkConcurrency(1) === 0) return;
@@ -527,7 +553,7 @@ function SandboxPage() {
       const baseLabel = EDIT_OP_LABELS[op];
       const stub: Generation = {
         id,
-        kind: 'image',
+        kind: isVideoOp ? 'video' : 'image',
         prompt: `${baseLabel}: ${source.prompt}`.slice(0, 280),
         status: 'generating',
         imageSize:
@@ -538,7 +564,7 @@ function SandboxPage() {
           op === 'outpaint' && opts.outpaintAspect
             ? (opts.outpaintAspect as AspectRatio)
             : source.aspectRatio,
-        sourceImageUrl: source.imageUrl,
+        sourceImageUrl: isVideoOp ? source.imageUrl : source.imageUrl,
         retryCount: 0,
         createdAt: Date.now(),
       };
@@ -546,15 +572,16 @@ function SandboxPage() {
       inFlightCountRef.current += 1;
       try {
         let outUrl: string | undefined;
+        let outVideoUrl: string | undefined;
         if (op === 'upscale') {
           const r = await trpcClient.editing.upscale.mutate({
-            imageUrl: source.imageUrl,
+            imageUrl: source.imageUrl!,
             scale: 4,
           });
           outUrl = r.imageUrl;
         } else if (op === 'remove-bg') {
           const r = await trpcClient.editing.removeBackground.mutate({
-            imageUrl: source.imageUrl,
+            imageUrl: source.imageUrl!,
           });
           outUrl = r.imageUrl;
         } else if (op === 'relight') {
@@ -564,7 +591,7 @@ function SandboxPage() {
             throw new Error('Pick at least one lighting preset or describe the look');
           }
           const r = await trpcClient.editing.relight.mutate({
-            imageUrl: source.imageUrl,
+            imageUrl: source.imageUrl!,
             presetIds: presets,
             ...(free ? { freeText: free } : {}),
             numImages: 1,
@@ -573,18 +600,50 @@ function SandboxPage() {
         } else if (op === 'outpaint') {
           if (!opts.outpaintAspect) throw new Error('Pick a target aspect');
           const r = await trpcClient.outpaint.expand.mutate({
-            sourceImageUrl: source.imageUrl,
+            sourceImageUrl: source.imageUrl!,
             targetAspect: opts.outpaintAspect,
             mode: 'preserve',
             prompt: opts.outpaintPrompt?.trim() || '',
           });
           outUrl = (r as any).imageUrl ?? (r as any).outputUrl;
+        } else if (op === 'restyle') {
+          const p = opts.restylePrompt?.trim();
+          if (!p) throw new Error('Restyle needs a prompt describing the new look');
+          const r = await trpcClient.editing.restyle.mutate({
+            videoUrl: source.videoUrl!,
+            prompt: p,
+            modelId: opts.restyleModelId ?? 'restyle-wan-v2v',
+            strength: opts.restyleStrength ?? 0.65,
+          });
+          outVideoUrl = (r as any).videoUrl;
+        } else if (op === 'extend') {
+          const p = opts.extendPrompt?.trim();
+          if (!p) throw new Error('Extend needs a prompt for what happens next');
+          const r = await trpcClient.editing.extend.mutate({
+            videoUrl: source.videoUrl!,
+            prompt: p,
+            durationSec: opts.extendDurationSec ?? 5,
+          });
+          outVideoUrl = (r as any).videoUrl;
+        } else if (op === 'interpolate') {
+          const r = await trpcClient.editing.interpolate.mutate({
+            videoUrl: source.videoUrl!,
+            multiplier: opts.interpolateMultiplier ?? 2,
+          });
+          outVideoUrl = (r as any).videoUrl;
         }
 
-        if (!outUrl) throw new Error('Edit returned no image');
-        const updated: Generation = { ...stub, status: 'done', imageUrl: outUrl };
-        setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
-        autoSaveDraft(updated);
+        if (isVideoOp) {
+          if (!outVideoUrl) throw new Error('Edit returned no video');
+          const updated: Generation = { ...stub, status: 'done', videoUrl: outVideoUrl };
+          setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
+          autoSaveDraft(updated);
+        } else {
+          if (!outUrl) throw new Error('Edit returned no image');
+          const updated: Generation = { ...stub, status: 'done', imageUrl: outUrl };
+          setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
+          autoSaveDraft(updated);
+        }
       } catch (err: any) {
         updateGen(id, { status: 'failed', error: err?.message || `${baseLabel} failed` });
         toast.error(`${baseLabel} failed: ` + (err?.message || ''));
@@ -654,47 +713,76 @@ function SandboxPage() {
     });
   }, []);
 
-  // Upload a local file as a style reference. Reuses /api/upload, the same
-  // path the rest of the platform uses, so the URL is permanent + Pinata-backed.
-  const uploadReferenceImage = useCallback(async (file: File, mode: ReferenceMode) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Reference must be an image file');
-      return;
-    }
-    if (file.size > 25 * 1024 * 1024) {
-      toast.error('Reference image too large (25MB max)');
-      return;
-    }
-    setIsUploadingRef(true);
-    try {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`${serverUrl}/api/upload`, {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-      });
-      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-      const json = await res.json();
-      const url: string | undefined = json?.uploads?.[0]?.url || json?.url;
-      if (!url) throw new Error('Upload returned no URL');
-      setReferenceImage({ url, prompt: '', mode });
-      toast.success('Reference image ready');
-    } catch (e: any) {
-      toast.error('Reference upload failed: ' + (e?.message || ''));
-    } finally {
-      setIsUploadingRef(false);
-    }
-  }, []);
+  // Upload a local file. Images become reference images for the next gen;
+  // videos land directly in the queue as 'imported' done cards so users can
+  // immediately run video edit ops (restyle / extend / interpolate) on their
+  // own footage. Reuses /api/upload (Pinata-backed permanent URLs).
+  const uploadAsset = useCallback(
+    async (file: File, mode: ReferenceMode) => {
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+      if (!isImage && !isVideo) {
+        toast.error('Drop an image or video file');
+        return;
+      }
+      const cap = isVideo ? 200 : 25;
+      if (file.size > cap * 1024 * 1024) {
+        toast.error(`${isVideo ? 'Video' : 'Image'} too large (${cap}MB max)`);
+        return;
+      }
+      setIsUploadingRef(true);
+      try {
+        const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`${serverUrl}/api/upload`, {
+          method: 'POST',
+          credentials: 'include',
+          body: fd,
+        });
+        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+        const json = await res.json();
+        const url: string | undefined = json?.uploads?.[0]?.url || json?.url;
+        if (!url) throw new Error('Upload returned no URL');
+
+        if (isImage) {
+          setReferenceImage({ url, prompt: '', mode });
+          toast.success('Reference image ready');
+        } else {
+          // Imported video → drop a synthetic done card into the queue so the
+          // user can run Restyle / Extend / Interpolate on their own footage.
+          const id = makeId();
+          const imported: Generation = {
+            id,
+            kind: 'video',
+            prompt: `Imported: ${file.name}`,
+            status: 'done',
+            videoUrl: url,
+            imageSize: 'landscape_16_9',
+            aspectRatio: '16:9',
+            createdAt: Date.now(),
+          };
+          setGenerations((prev) => [imported, ...prev]);
+          // Persist as a draft so it survives reloads + lands in the gallery.
+          autoSaveDraft(imported);
+          toast.success('Video imported — open the Edit menu to restyle/extend/interpolate');
+        }
+      } catch (e: any) {
+        toast.error('Upload failed: ' + (e?.message || ''));
+      } finally {
+        setIsUploadingRef(false);
+      }
+    },
+    [autoSaveDraft]
+  );
 
   const onRefDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       const file = e.dataTransfer.files?.[0];
-      if (file) uploadReferenceImage(file, referenceImage?.mode ?? 'style');
+      if (file) uploadAsset(file, referenceImage?.mode ?? 'style');
     },
-    [referenceImage?.mode, uploadReferenceImage]
+    [referenceImage?.mode, uploadAsset]
   );
 
   // Prompt enhance — calls Gemini via tRPC. Falls back gracefully if Gemini
@@ -1002,17 +1090,17 @@ function SandboxPage() {
                   )}
                   <span>
                     {isUploadingRef
-                      ? 'Uploading reference…'
-                      : 'Drop or click to add a reference image (style or animate)'}
+                      ? 'Uploading…'
+                      : 'Drop or click to add an image (style/animate ref) or a video (import for restyle/extend/interpolate)'}
                   </span>
                   <input
                     ref={refFileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) uploadReferenceImage(f, 'style');
+                      if (f) uploadAsset(f, 'style');
                       e.target.value = '';
                     }}
                   />
@@ -1249,12 +1337,18 @@ interface GenerationCardProps {
       relightFreeText?: string;
       outpaintAspect?: OutpaintAspect;
       outpaintPrompt?: string;
+      restylePrompt?: string;
+      restyleStrength?: number;
+      restyleModelId?: RestyleModelId;
+      extendPrompt?: string;
+      extendDurationSec?: number;
+      interpolateMultiplier?: InterpolateMultiplier;
     }
   ) => void;
   onRetryDraftSave: () => void;
 }
 
-type EditPanel = null | 'menu' | 'relight' | 'outpaint';
+type EditPanel = null | 'menu' | 'relight' | 'outpaint' | 'restyle' | 'extend';
 
 function GenerationCard({
   gen,
@@ -1271,6 +1365,11 @@ function GenerationCard({
   const [relightFree, setRelightFree] = useState('');
   const [outpaintAspect, setOutpaintAspect] = useState<OutpaintAspect>('16:9');
   const [outpaintPrompt, setOutpaintPrompt] = useState('');
+  const [restylePrompt, setRestylePrompt] = useState('');
+  const [restyleStrength, setRestyleStrength] = useState(0.65);
+  const [restyleModelId, setRestyleModelId] = useState<RestyleModelId>('restyle-wan-v2v');
+  const [extendPrompt, setExtendPrompt] = useState('');
+  const [extendDuration, setExtendDuration] = useState(5);
 
   const toggleRelightPreset = (id: string) => {
     setRelightPresets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -1388,6 +1487,18 @@ function GenerationCard({
                 Edit
               </Button>
             </>
+          )}
+          {gen.status === 'done' && gen.kind === 'video' && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setEditPanel((p) => (p === 'menu' ? null : 'menu'))}
+              title="Video edit operations: restyle, extend, interpolate"
+            >
+              <Wand2 className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
           )}
           {gen.status === 'failed' && retriesLeft > 0 && (
             <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onRetry}>
@@ -1549,6 +1660,169 @@ function GenerationCard({
                 }}
               >
                 Outpaint
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => setEditPanel(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Video edit menu */}
+        {gen.status === 'done' && gen.kind === 'video' && editPanel === 'menu' && (
+          <div className="mt-1.5 pt-1.5 border-t flex flex-wrap gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setEditPanel('restyle')}
+              title="Video-to-video restyle: keep motion, swap look"
+            >
+              <Wand2 className="h-3 w-3 mr-1" />
+              Restyle…
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setEditPanel('extend')}
+              title="Continue the clip from its last frame"
+            >
+              <ArrowRight className="h-3 w-3 mr-1" />
+              Extend…
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => {
+                setEditPanel(null);
+                onEditOp('interpolate', { interpolateMultiplier: 2 });
+              }}
+              title="Frame interpolation — smoother motion (2× by default)"
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              Smooth
+            </Button>
+          </div>
+        )}
+
+        {gen.status === 'done' && gen.kind === 'video' && editPanel === 'restyle' && (
+          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground">Restyle (v2v)</p>
+            <Textarea
+              value={restylePrompt}
+              onChange={(e) => setRestylePrompt(e.target.value)}
+              placeholder="Describe the new look — e.g. 'cyberpunk neon, rain-slick streets'"
+              rows={2}
+              className="resize-none text-[11px]"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-muted-foreground whitespace-nowrap">
+                Strength {restyleStrength.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={restyleStrength}
+                onChange={(e) => setRestyleStrength(Number(e.target.value))}
+                className="flex-1 accent-primary"
+                title="Higher = more aggressive style swap"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {RESTYLE_MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setRestyleModelId(m.id)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                    restyleModelId === m.id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] flex-1"
+                disabled={!restylePrompt.trim()}
+                onClick={() => {
+                  onEditOp('restyle', {
+                    restylePrompt: restylePrompt.trim(),
+                    restyleStrength,
+                    restyleModelId,
+                  });
+                  setEditPanel(null);
+                  setRestylePrompt('');
+                }}
+              >
+                Restyle
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => setEditPanel(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {gen.status === 'done' && gen.kind === 'video' && editPanel === 'extend' && (
+          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground">
+              Extend clip — describe what happens next
+            </p>
+            <Textarea
+              value={extendPrompt}
+              onChange={(e) => setExtendPrompt(e.target.value)}
+              placeholder="What follows the current shot — e.g. 'camera dollies forward, character draws sword'"
+              rows={2}
+              className="resize-none text-[11px]"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-muted-foreground whitespace-nowrap">
+                Duration {extendDuration}s
+              </label>
+              <input
+                type="range"
+                min="2"
+                max="10"
+                step="1"
+                value={extendDuration}
+                onChange={(e) => setExtendDuration(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+            </div>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] flex-1"
+                disabled={!extendPrompt.trim()}
+                onClick={() => {
+                  onEditOp('extend', {
+                    extendPrompt: extendPrompt.trim(),
+                    extendDurationSec: extendDuration,
+                  });
+                  setEditPanel(null);
+                  setExtendPrompt('');
+                }}
+              >
+                Extend
               </Button>
               <Button
                 size="sm"
