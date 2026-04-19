@@ -16,9 +16,13 @@ function DmcaPage() {
     contentId: '',
     claimantName: '',
     claimantEmail: '',
+    claimantAddress: '',
+    claimantPhone: '',
     copyrightWork: '',
     explanation: '',
     goodFaith: false,
+    swornStatement: false,
+    signature: '',
   });
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -62,14 +66,26 @@ function DmcaPage() {
     );
   }
 
+  const CounterNoticeLink = (
+    <p className="text-sm text-muted-foreground mt-2">
+      If your content was removed by mistake, you may file a{' '}
+      <a href="/counter-notice" className="text-primary underline">
+        counter-notice
+      </a>{' '}
+      under 17 U.S.C. § 512(g).
+    </p>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-6 py-16">
         <h1 className="text-3xl font-bold mb-2">DMCA Takedown Request</h1>
-        <p className="text-sm text-muted-foreground mb-8">
+        <p className="text-sm text-muted-foreground mb-2">
           If you believe content on LOAR infringes your copyright, please submit a takedown request
           using the form below.
         </p>
+        {CounterNoticeLink}
+        <div className="h-6" />
 
         <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 mb-8 text-sm text-muted-foreground space-y-3">
           <p>
@@ -140,6 +156,40 @@ function DmcaPage() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">
+              Physical Address{' '}
+              <span className="text-muted-foreground">
+                (required by 17 U.S.C. § 512(c)(3)(A)(iv))
+              </span>
+            </label>
+            <textarea
+              required
+              rows={2}
+              value={form.claimantAddress}
+              onChange={(e) => setForm((f) => ({ ...f, claimantAddress: e.target.value }))}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              placeholder="Street, City, State/Region, Postal Code, Country"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Phone Number{' '}
+              <span className="text-muted-foreground">
+                (required by 17 U.S.C. § 512(c)(3)(A)(iv))
+              </span>
+            </label>
+            <input
+              type="tel"
+              required
+              value={form.claimantPhone}
+              onChange={(e) => setForm((f) => ({ ...f, claimantPhone: e.target.value }))}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              placeholder="+1 555 123 4567"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Original Copyrighted Work</label>
             <textarea
               required
@@ -172,10 +222,44 @@ function DmcaPage() {
               className="mt-0.5"
             />
             <span className="text-muted-foreground">
-              I state, under penalty of perjury, that I have a good faith belief that the use of the
-              copyrighted material is not authorized by the copyright owner, its agent, or the law.
+              <strong className="text-foreground">§ 512(c)(3)(A)(v) — Good-Faith Belief.</strong> I
+              have a good faith belief that the use of the copyrighted material described above is
+              not authorized by the copyright owner, its agent, or the law.
             </span>
           </label>
+
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              required
+              checked={form.swornStatement}
+              onChange={(e) => setForm((f) => ({ ...f, swornStatement: e.target.checked }))}
+              className="mt-0.5"
+            />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">§ 512(c)(3)(A)(vi) — Sworn Statement.</strong> I
+              state, under penalty of perjury, that the information in this notification is accurate
+              and that I am the copyright owner, or am authorized to act on behalf of the owner, of
+              an exclusive right that is allegedly infringed.
+            </span>
+          </label>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Electronic Signature{' '}
+              <span className="text-muted-foreground">
+                (type your full legal name — 17 U.S.C. § 512(c)(3)(A)(i))
+              </span>
+            </label>
+            <input
+              type="text"
+              required
+              value={form.signature}
+              onChange={(e) => setForm((f) => ({ ...f, signature: e.target.value }))}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              placeholder="Full legal name"
+            />
+          </div>
 
           {status === 'error' && <div className="text-sm text-red-400">{errorMsg}</div>}
 

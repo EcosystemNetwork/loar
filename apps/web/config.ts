@@ -20,7 +20,14 @@ const chains = SUPPORTED_EVM_CHAIN_IDS.map((id) => allChains[id]);
 /** Default chain used for contract interactions and wallet prompts. */
 export const defaultChain = chains[0];
 
-const transports = Object.fromEntries(chains.map((c) => [c.id, http()])) as Record<
+// Per-chain RPC URL from VITE_RPC_<chainId>. Public viem defaults cap
+// eth_getLogs ranges and throttle large eth_call responses, which breaks
+// governance proposal loads and getFullGraph on universes with many nodes.
+// Point this at Alchemy/Infura in .env to fix both.
+const rpcFor = (chainId: number): string | undefined =>
+  (import.meta.env[`VITE_RPC_${chainId}`] as string | undefined) || undefined;
+
+const transports = Object.fromEntries(chains.map((c) => [c.id, http(rpcFor(c.id))])) as Record<
   (typeof chains)[number]['id'],
   ReturnType<typeof http>
 >;

@@ -741,15 +741,13 @@ function Top10Strip({ universes }: { universes: any[] }) {
       <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
       <ScrollRow>
         {sorted.map((u) => (
-          <div key={u.id} className="flex-shrink-0 flex items-end gap-0">
-            {/* Large rank number */}
+          <div key={u.id} className="flex-shrink-0 relative flex items-end pl-[60px] md:pl-[75px]">
+            {/* Large rank number — absolutely positioned so digit width doesn't shift the card */}
             <span
-              className="text-[100px] md:text-[120px] font-black leading-none select-none"
+              className="absolute left-0 bottom-0 text-[100px] md:text-[120px] font-black leading-[0.85] select-none pointer-events-none whitespace-nowrap"
               style={{
                 WebkitTextStroke: '2px rgba(255,255,255,0.3)',
                 color: 'transparent',
-                marginRight: '-20px',
-                zIndex: 1,
               }}
             >
               {u._rank + 1}

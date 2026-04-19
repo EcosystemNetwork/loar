@@ -16,6 +16,7 @@ import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as StakingRouteImport } from './routes/staking'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as RelightRouteImport } from './routes/relight'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -32,6 +33,7 @@ import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CreditsRouteImport } from './routes/credits'
+import { Route as CounterNoticeRouteImport } from './routes/counter-notice'
 import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
@@ -66,6 +68,7 @@ import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as LicensingNewRouteImport } from './routes/licensing/new'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
+import { Route as ExtractJobIdRouteImport } from './routes/extract.$jobId'
 import { Route as EditOutpaintRouteImport } from './routes/edit.outpaint'
 import { Route as EditInpaintRouteImport } from './routes/edit.inpaint'
 import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue'
@@ -132,6 +135,11 @@ const StatusRoute = StatusRouteImport.update({
 const StakingRoute = StakingRouteImport.update({
   id: '/staking',
   path: '/staking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SandboxRoute = SandboxRouteImport.update({
@@ -212,6 +220,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const CreditsRoute = CreditsRouteImport.update({
   id: '/credits',
   path: '/credits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CounterNoticeRoute = CounterNoticeRouteImport.update({
+  id: '/counter-notice',
+  path: '/counter-notice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComingSoonRoute = ComingSoonRouteImport.update({
@@ -384,6 +397,11 @@ const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
   path: '/governance/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExtractJobIdRoute = ExtractJobIdRouteImport.update({
+  id: '/extract/$jobId',
+  path: '/extract/$jobId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EditOutpaintRoute = EditOutpaintRouteImport.update({
   id: '/edit/outpaint',
   path: '/edit/outpaint',
@@ -551,6 +569,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
+  '/counter-notice': typeof CounterNoticeRoute
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/discover': typeof DiscoverRoute
@@ -567,6 +586,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
+  '/search': typeof SearchRoute
   '/staking': typeof StakingRoute
   '/status': typeof StatusRoute
   '/studio-controlled': typeof StudioControlledRoute
@@ -591,6 +611,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
+  '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -642,6 +663,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
+  '/counter-notice': typeof CounterNoticeRoute
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/discover': typeof DiscoverRoute
@@ -658,6 +680,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
+  '/search': typeof SearchRoute
   '/staking': typeof StakingRoute
   '/status': typeof StatusRoute
   '/studio-controlled': typeof StudioControlledRoute
@@ -682,6 +705,7 @@ export interface FileRoutesByTo {
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
+  '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -734,6 +758,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
+  '/counter-notice': typeof CounterNoticeRoute
   '/credits': typeof CreditsRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/discover': typeof DiscoverRoute
@@ -750,6 +775,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
+  '/search': typeof SearchRoute
   '/staking': typeof StakingRoute
   '/status': typeof StatusRoute
   '/studio-controlled': typeof StudioControlledRoute
@@ -774,6 +800,7 @@ export interface FileRoutesById {
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
+  '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -827,6 +854,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
+    | '/counter-notice'
     | '/credits'
     | '/dashboard'
     | '/discover'
@@ -843,6 +871,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/relight'
     | '/sandbox'
+    | '/search'
     | '/staking'
     | '/status'
     | '/studio-controlled'
@@ -867,6 +896,7 @@ export interface FileRouteTypes {
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
+    | '/extract/$jobId'
     | '/governance/$universeId'
     | '/licensing/new'
     | '/lineage/$assetId'
@@ -918,6 +948,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
+    | '/counter-notice'
     | '/credits'
     | '/dashboard'
     | '/discover'
@@ -934,6 +965,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/relight'
     | '/sandbox'
+    | '/search'
     | '/staking'
     | '/status'
     | '/studio-controlled'
@@ -958,6 +990,7 @@ export interface FileRouteTypes {
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
+    | '/extract/$jobId'
     | '/governance/$universeId'
     | '/licensing/new'
     | '/lineage/$assetId'
@@ -1009,6 +1042,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
+    | '/counter-notice'
     | '/credits'
     | '/dashboard'
     | '/discover'
@@ -1025,6 +1059,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/relight'
     | '/sandbox'
+    | '/search'
     | '/staking'
     | '/status'
     | '/studio-controlled'
@@ -1049,6 +1084,7 @@ export interface FileRouteTypes {
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
+    | '/extract/$jobId'
     | '/governance/$universeId'
     | '/licensing/new'
     | '/lineage/$assetId'
@@ -1101,6 +1137,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   ComingSoonRoute: typeof ComingSoonRoute
+  CounterNoticeRoute: typeof CounterNoticeRoute
   CreditsRoute: typeof CreditsRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   DiscoverRoute: typeof DiscoverRoute
@@ -1117,6 +1154,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   RelightRoute: typeof RelightRoute
   SandboxRoute: typeof SandboxRoute
+  SearchRoute: typeof SearchRoute
   StakingRoute: typeof StakingRoute
   StatusRoute: typeof StatusRoute
   StudioControlledRoute: typeof StudioControlledRoute
@@ -1140,6 +1178,7 @@ export interface RootRouteChildren {
   CreateKindRoute: typeof CreateKindRoute
   EditInpaintRoute: typeof EditInpaintRoute
   EditOutpaintRoute: typeof EditOutpaintRoute
+  ExtractJobIdRoute: typeof ExtractJobIdRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
   LicensingNewRoute: typeof LicensingNewRoute
   LineageAssetIdRoute: typeof LineageAssetIdRoute
@@ -1229,6 +1268,13 @@ declare module '@tanstack/react-router' {
       path: '/staking'
       fullPath: '/staking'
       preLoaderRoute: typeof StakingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sandbox': {
@@ -1341,6 +1387,13 @@ declare module '@tanstack/react-router' {
       path: '/credits'
       fullPath: '/credits'
       preLoaderRoute: typeof CreditsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/counter-notice': {
+      id: '/counter-notice'
+      path: '/counter-notice'
+      fullPath: '/counter-notice'
+      preLoaderRoute: typeof CounterNoticeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/coming-soon': {
@@ -1579,6 +1632,13 @@ declare module '@tanstack/react-router' {
       path: '/governance/$universeId'
       fullPath: '/governance/$universeId'
       preLoaderRoute: typeof GovernanceUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/extract/$jobId': {
+      id: '/extract/$jobId'
+      path: '/extract/$jobId'
+      fullPath: '/extract/$jobId'
+      preLoaderRoute: typeof ExtractJobIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/edit/outpaint': {
@@ -1858,6 +1918,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   ComingSoonRoute: ComingSoonRoute,
+  CounterNoticeRoute: CounterNoticeRoute,
   CreditsRoute: CreditsRoute,
   DashboardRoute: DashboardRouteWithChildren,
   DiscoverRoute: DiscoverRoute,
@@ -1874,6 +1935,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   RelightRoute: RelightRoute,
   SandboxRoute: SandboxRoute,
+  SearchRoute: SearchRoute,
   StakingRoute: StakingRoute,
   StatusRoute: StatusRoute,
   StudioControlledRoute: StudioControlledRoute,
@@ -1897,6 +1959,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreateKindRoute: CreateKindRoute,
   EditInpaintRoute: EditInpaintRoute,
   EditOutpaintRoute: EditOutpaintRoute,
+  ExtractJobIdRoute: ExtractJobIdRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
   LicensingNewRoute: LicensingNewRoute,
   LineageAssetIdRoute: LineageAssetIdRoute,

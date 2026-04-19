@@ -2,8 +2,15 @@
  * LOAR API Client — HTTP client for calling the LOAR tRPC server
  *
  * Used by MCP tools to make authenticated requests to the LOAR server.
- * Authenticates via API key (X-API-Key header).
+ * Authenticates via API key using `Authorization: Bearer loar_<...>`.
+ * (Server also accepts the legacy `X-API-Key` header for the same key.)
  */
+export declare class LoarApiError extends Error {
+    readonly status: number;
+    readonly body: string;
+    readonly errorCode: string;
+    constructor(status: number, body: string, errorCode: string);
+}
 export interface LoarClientConfig {
     serverUrl: string;
     apiKey: string;

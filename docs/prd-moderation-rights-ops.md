@@ -1,7 +1,7 @@
 # PRD: Minimum Viable Rights, Moderation, and Abuse Ops
 
-> Status: Draft
-> Date: 2026-03-28
+> Status: Implemented (testnet); DMCA schema + statutory-element hardening tracked in audit-fix backlog
+> Date: 2026-03-28 (drafted), 2026-04-18 (rollout status updated)
 > Priority: Testnet survival gate — required before public invite
 
 ---
@@ -488,26 +488,34 @@ Email env var: `ABUSE_EMAIL` (platform team), `TRANSACTIONAL_EMAIL_FROM`.
 
 ### Phase 1 — Server-side infrastructure (ship first)
 
-- [ ] Add `contentStatus`, `contentStatusUpdatedAt`, `contentStatusUpdatedBy` fields to content schema
-- [ ] Create `flags`, `takedownRequests`, `contentAuditLog` Firestore collections + security rules
-- [ ] `moderation` tRPC router (flagContent, submitTakedown, getAuditLog)
-- [ ] `admin.moderation` tRPC router
-- [ ] `assertContentOperable()` enforcement utility + wire into content routes
-- [ ] `POST /api/takedown` Hono endpoint
-- [ ] `GET /api/content/:contentId/status` Hono endpoint
-- [ ] Admin role provisioning (env var + custom claim)
-- [ ] Audit log write helper (called from all moderation actions)
+- [x] Add `contentStatus`, `contentStatusUpdatedAt`, `contentStatusUpdatedBy` fields to content schema
+- [x] Create `flags`, `takedownRequests`, `contentAuditLog` Firestore collections + security rules
+- [x] `moderation` tRPC router (flagContent, submitTakedown, getAuditLog)
+- [x] `admin.moderation` tRPC router
+- [x] `assertContentOperable()` enforcement utility + wire into content routes ([apps/server/src/lib/content-status.ts](../apps/server/src/lib/content-status.ts))
+- [x] `POST /api/takedown` Hono endpoint
+- [x] `GET /api/content/:contentId/status` Hono endpoint
+- [x] Admin role provisioning — shipped as wallet-address allowlist via `ADMIN_ADDRESSES` (`adminProcedure` in [apps/server/src/lib/trpc.ts](../apps/server/src/lib/trpc.ts)), _not_ Firebase custom claims; the Firestore rule example below is aspirational if we later want client-side admin reads
+- [x] Audit log write helper (called from all moderation actions)
 
 ### Phase 2 — Frontend
 
-- [ ] Flag button + modal on content cards
-- [ ] `/dmca` public takedown form
-- [ ] `/admin/moderation` queue (flags + takedowns + audit log)
+- [x] Flag button + modal on content cards
+- [x] `/dmca` public takedown form ([apps/web/src/routes/dmca.tsx](../apps/web/src/routes/dmca.tsx))
+- [x] `/admin/moderation` queue (flags + takedowns + audit log) ([apps/web/src/routes/admin/moderation.tsx](../apps/web/src/routes/admin/moderation.tsx))
 
 ### Phase 3 — Notifications
 
-- [ ] Transactional email on content status changes (creator-facing)
-- [ ] Abuse team email on new takedown receipt
+- [x] Transactional email on content status changes (creator-facing) — wired via [apps/server/src/lib/dmca-email.ts](../apps/server/src/lib/dmca-email.ts)
+- [x] Abuse team email on new takedown receipt — wired via [apps/server/src/lib/dmca-email.ts](../apps/server/src/lib/dmca-email.ts)
+
+### Phase 4 — Backlog (tracked in [audit-fix-tracker.md](./audit-fix-tracker.md))
+
+- [ ] DMCA schema hardening: missing 3 §512(c)(3) statutory elements (audit M-1, medium-high legal risk)
+- [ ] Distributed rate limit for `POST /api/takedown` (currently in-memory; audit M-2)
+- [ ] `TRUST_PROXY` config required for prod IP attribution (audit RL-1)
+- [ ] Counter-notice workflow (deferred past testnet)
+- [ ] Auto-flag threshold (currently manual review only)
 
 ---
 

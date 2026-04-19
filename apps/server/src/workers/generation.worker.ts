@@ -254,8 +254,9 @@ async function processGeneration(
 
     // Auto-publish to gallery — use the permanent URL when rehost succeeded
     // so the gallery doc never stores an expiring provider URL.
+    let contentDocId: string | null = null;
     try {
-      await db.collection('content').add({
+      const contentRef = await db.collection('content').add({
         title: (data.originalPrompt || '').slice(0, 100) || 'Generated Video',
         description: data.originalPrompt || '',
         mediaUrl: finalMediaUrl,
@@ -280,8 +281,40 @@ async function processGeneration(
         generationModel: data.finalModelId,
         ...(storageContentHash ? { storageContentHash } : {}),
       });
+      contentDocId = contentRef.id;
     } catch (err) {
       console.error('[worker] gallery publish failed:', err);
+    }
+
+    // Enqueue VLM extraction + moderation — runs asynchronously, writes
+    // vlmExtractions/ + flags/ + (optionally) contentStatus='under_review'.
+    // Gated by VLM_MODERATION_ON_GENERATION=true because a per-generation
+    // Gemini pass adds real cost. Turn on before mainnet.
+    if (contentDocId && process.env.VLM_MODERATION_ON_GENERATION === 'true') {
+      try {
+        const { getVlmQueue } = await import('../lib/queue');
+        const { randomUUID } = await import('node:crypto');
+        const jobId = `vlm_${randomUUID()}`;
+        await getVlmQueue().add(
+          'extract',
+          {
+            jobId,
+            kind: 'extract',
+            creatorUid: data.userId,
+            input: {
+              assetType: 'video',
+              mediaUrl: finalMediaUrl,
+              mimeType: 'video/mp4',
+              contentId: contentDocId,
+              generationId: data.generationId,
+              universeAddress: data.input.universeId ?? null,
+            },
+          },
+          { jobId }
+        );
+      } catch (err) {
+        console.warn('[worker] VLM moderation enqueue failed:', err);
+      }
     }
 
     // Track quests
@@ -296,6 +329,45 @@ async function processGeneration(
       await trackModelUsage(data.userId, data.finalModelId);
     } catch {
       // Best-effort
+    }
+
+    // Auto-enqueue VLM extraction post-success so every new asset gets a
+    // scene index + moderation risk score. Non-blocking — failure here
+    // does not affect the generation result.
+    if (process.env.GOOGLE_API_KEY && process.env.VLM_AUTO_EXTRACT !== 'false' && finalMediaUrl) {
+      try {
+        const { randomUUID } = await import('node:crypto');
+        const { getVlmQueue } = await import('../lib/queue');
+        const jobId = `vlm_${randomUUID()}`;
+        const vlmInput = {
+          assetType: 'video' as const,
+          mediaUrl: finalMediaUrl,
+          contentId: data.generationId,
+          generationId: data.generationId,
+          universeAddress: data.input.universeId ?? null,
+          options: { model: 'gemini-2.5-flash' },
+        };
+        await db.collection('vlmJobs').doc(jobId).set({
+          jobId,
+          kind: 'extract',
+          status: 'pending',
+          creatorUid: data.userId.toLowerCase(),
+          input: vlmInput,
+          createdAt: new Date(),
+        });
+        await getVlmQueue().add(
+          'extract',
+          {
+            jobId,
+            kind: 'extract',
+            creatorUid: data.userId.toLowerCase(),
+            input: vlmInput,
+          },
+          { jobId }
+        );
+      } catch (err) {
+        console.error('[worker] VLM auto-extract enqueue failed:', err);
+      }
     }
 
     await job.updateProgress(100);

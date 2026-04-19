@@ -2,8 +2,35 @@
  * LOAR API Client — HTTP client for calling the LOAR tRPC server
  *
  * Used by MCP tools to make authenticated requests to the LOAR server.
- * Authenticates via API key (X-API-Key header).
+ * Authenticates via API key using `Authorization: Bearer loar_<...>`.
+ * (Server also accepts the legacy `X-API-Key` header for the same key.)
  */
+export class LoarApiError extends Error {
+  readonly status: number;
+  readonly body: string;
+  readonly errorCode: string;
+  constructor(status: number, body: string, errorCode: string) {
+    super(`LOAR API error (${status}): ${body}`);
+    this.name = 'LoarApiError';
+    this.status = status;
+    this.body = body;
+    this.errorCode = errorCode;
+  }
+}
+
+function classifyHttpError(status: number, body: string): string {
+  if (status === 429) return 'RATE_LIMITED';
+  if (status === 401 || status === 403) {
+    const b = body.toLowerCase();
+    if (b.includes('credit')) return 'INSUFFICIENT_CREDITS';
+    if (b.includes('moderation') || b.includes('flagged')) return 'MODERATION_BLOCKED';
+    return 'FORBIDDEN';
+  }
+  if (status === 400 || status === 422) return 'INVALID_INPUT';
+  if (status === 404) return 'NOT_FOUND';
+  if (status >= 500) return 'UPSTREAM_TIMEOUT';
+  return 'INTERNAL_ERROR';
+}
 
 export interface LoarClientConfig {
   serverUrl: string;
@@ -32,13 +59,13 @@ export class LoarClient {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey,
+        Authorization: `Bearer ${this.apiKey}`,
       },
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`LOAR API error (${res.status}): ${body}`);
+      throw new LoarApiError(res.status, body, classifyHttpError(res.status, body));
     }
 
     const json = await res.json();
@@ -55,14 +82,14 @@ export class LoarClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey,
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(input),
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`LOAR API error (${res.status}): ${body}`);
+      throw new LoarApiError(res.status, body, classifyHttpError(res.status, body));
     }
 
     const json = await res.json();

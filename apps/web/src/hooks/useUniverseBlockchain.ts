@@ -236,6 +236,21 @@ export function useUniverseBlockchain({
   // Fetch resolved content from Ponder indexer (on-chain only)
   const { data: contentMap } = useNodeContents(onChainContractAddress);
 
+  // Off-chain media URL overrides (for nodes whose event-emitted link has
+  // rotted — e.g. expired signed URLs). Server-side writes are gated to the
+  // universe admin; reads are public. When an override exists for a nodeId,
+  // it takes precedence over Ponder's event-derived videoLink.
+  const { data: mediaOverrides } = useQuery({
+    queryKey: ['nodeMediaOverrides', onChainContractAddress],
+    queryFn: async () => {
+      if (!onChainContractAddress) return {} as Record<number, { videoLink: string }>;
+      const res = await trpcClient.nodeMedia.list.query({ universeId: onChainContractAddress });
+      return (res?.overrides ?? {}) as Record<number, { videoLink: string }>;
+    },
+    enabled: !!onChainContractAddress,
+    staleTime: 30_000,
+  });
+
   // ── Off-chain timeline nodes (Fun-Mode universes) ──
   // Only loads when this universe is explicitly off-chain. On-chain universes
   // never fall back to off-chain — keeps data sources strictly separated.
@@ -264,9 +279,12 @@ export function useUniverseBlockchain({
         for (let i = 0; i < (nodeIds || []).length; i++) {
           const nid = String(nodeIds[i]);
           const content = contentMap?.get(nid);
+          const override = mediaOverrides?.[Number(nid)];
 
-          // Use indexer-resolved content if available, otherwise fall back to hash
-          resolvedUrls.push(content?.videoLink || String(hashStrings[i] || ''));
+          // Prefer off-chain override → indexer → on-chain hash fallback
+          resolvedUrls.push(
+            override?.videoLink || content?.videoLink || String(hashStrings[i] || '')
+          );
           resolvedDescriptions.push(content?.plot || String(plotHashStrings[i] || ''));
         }
 
@@ -344,6 +362,7 @@ export function useUniverseBlockchain({
     fullGraphData,
     canonChainData,
     contentMap,
+    mediaOverrides,
     offChainData,
   ]);
 

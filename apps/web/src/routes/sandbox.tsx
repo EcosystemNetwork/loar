@@ -45,6 +45,10 @@ import {
   Dices,
   ChevronDown,
   ChevronUp,
+  Maximize2,
+  Eraser,
+  Sun,
+  Frame,
 } from 'lucide-react';
 import { ModelSelector } from '@/components/ModelSelector';
 
@@ -188,6 +192,38 @@ function applyStylePreset(prompt: string, presetId: string | null): string {
 
 function randomSeed(): number {
   return Math.floor(Math.random() * 2_147_483_647);
+}
+
+// Phase 2 — quick edit operations exposed inline on done image cards.
+// Each runs against an existing image URL and returns a new image URL,
+// which we treat as a fresh Generation card for consistent UX.
+type EditOp = 'upscale' | 'remove-bg' | 'relight' | 'outpaint';
+
+const EDIT_OP_LABELS: Record<EditOp, string> = {
+  upscale: '4× Upscale',
+  'remove-bg': 'Remove BG',
+  relight: 'Relight',
+  outpaint: 'Outpaint',
+};
+
+const QUICK_RELIGHT_PRESETS = [
+  { id: 'golden-hour', label: 'Golden Hour' },
+  { id: 'neon-night', label: 'Neon Night' },
+  { id: 'moonlit-alley', label: 'Moonlit Alley' },
+  { id: 'stage-interview', label: 'Studio' },
+  { id: 'warm-tavern', label: 'Warm Tavern' },
+  { id: 'cold-wasteland', label: 'Cold Wasteland' },
+  { id: 'cinematic-noir', label: 'Noir' },
+  { id: 'volumetric-cathedral', label: 'God Rays' },
+] as const;
+
+const OUTPAINT_ASPECTS = ['1:1', '4:5', '16:9', '9:16', '21:9'] as const;
+type OutpaintAspect = (typeof OUTPAINT_ASPECTS)[number];
+
+function aspectToImageSize(aspect: OutpaintAspect): ImageSize {
+  if (aspect === '9:16') return 'portrait_16_9';
+  if (aspect === '1:1') return 'square_hd';
+  return 'landscape_16_9';
 }
 
 const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
@@ -465,6 +501,98 @@ function SandboxPage() {
       }
     },
     [autoSaveDraft, updateGen]
+  );
+
+  // Run an image edit operation (upscale / remove-bg / relight / outpaint).
+  // Each op produces a new image URL which we wrap as a fresh Generation card,
+  // auto-saved as a draft just like a top-of-funnel image gen.
+  const runEditOp = useCallback(
+    async (
+      source: Generation,
+      op: EditOp,
+      opts: {
+        relightPresetIds?: string[];
+        relightFreeText?: string;
+        outpaintAspect?: OutpaintAspect;
+        outpaintPrompt?: string;
+      } = {}
+    ) => {
+      if (!source.imageUrl) {
+        toast.error('Source image missing');
+        return;
+      }
+      if (checkConcurrency(1) === 0) return;
+
+      const id = makeId();
+      const baseLabel = EDIT_OP_LABELS[op];
+      const stub: Generation = {
+        id,
+        kind: 'image',
+        prompt: `${baseLabel}: ${source.prompt}`.slice(0, 280),
+        status: 'generating',
+        imageSize:
+          op === 'outpaint' && opts.outpaintAspect
+            ? aspectToImageSize(opts.outpaintAspect)
+            : source.imageSize,
+        aspectRatio:
+          op === 'outpaint' && opts.outpaintAspect
+            ? (opts.outpaintAspect as AspectRatio)
+            : source.aspectRatio,
+        sourceImageUrl: source.imageUrl,
+        retryCount: 0,
+        createdAt: Date.now(),
+      };
+      setGenerations((prev) => [stub, ...prev]);
+      inFlightCountRef.current += 1;
+      try {
+        let outUrl: string | undefined;
+        if (op === 'upscale') {
+          const r = await trpcClient.editing.upscale.mutate({
+            imageUrl: source.imageUrl,
+            scale: 4,
+          });
+          outUrl = r.imageUrl;
+        } else if (op === 'remove-bg') {
+          const r = await trpcClient.editing.removeBackground.mutate({
+            imageUrl: source.imageUrl,
+          });
+          outUrl = r.imageUrl;
+        } else if (op === 'relight') {
+          const presets = opts.relightPresetIds ?? [];
+          const free = opts.relightFreeText?.trim();
+          if (presets.length === 0 && !free) {
+            throw new Error('Pick at least one lighting preset or describe the look');
+          }
+          const r = await trpcClient.editing.relight.mutate({
+            imageUrl: source.imageUrl,
+            presetIds: presets,
+            ...(free ? { freeText: free } : {}),
+            numImages: 1,
+          });
+          outUrl = (r as any).imageUrl ?? (r as any).images?.[0]?.url;
+        } else if (op === 'outpaint') {
+          if (!opts.outpaintAspect) throw new Error('Pick a target aspect');
+          const r = await trpcClient.outpaint.expand.mutate({
+            sourceImageUrl: source.imageUrl,
+            targetAspect: opts.outpaintAspect,
+            mode: 'preserve',
+            prompt: opts.outpaintPrompt?.trim() || '',
+          });
+          outUrl = (r as any).imageUrl ?? (r as any).outputUrl;
+        }
+
+        if (!outUrl) throw new Error('Edit returned no image');
+        const updated: Generation = { ...stub, status: 'done', imageUrl: outUrl };
+        setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
+        autoSaveDraft(updated);
+      } catch (err: any) {
+        updateGen(id, { status: 'failed', error: err?.message || `${baseLabel} failed` });
+        toast.error(`${baseLabel} failed: ` + (err?.message || ''));
+      } finally {
+        inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
+      }
+    },
+    [autoSaveDraft, checkConcurrency, updateGen]
   );
 
   const retryGen = useCallback(
@@ -1052,6 +1180,7 @@ function SandboxPage() {
                       onRetry={() => retryGen(g)}
                       onAnimate={() => handleAnimate(g)}
                       onUseAsStyleRef={() => handleUseAsStyleRef(g)}
+                      onEditOp={(op, opts) => runEditOp(g, op, opts)}
                       onRetryDraftSave={() => retryDraftSave(g)}
                     />
                   ))}
@@ -1113,8 +1242,19 @@ interface GenerationCardProps {
   onRetry: () => void;
   onAnimate: () => void;
   onUseAsStyleRef: () => void;
+  onEditOp: (
+    op: EditOp,
+    opts?: {
+      relightPresetIds?: string[];
+      relightFreeText?: string;
+      outpaintAspect?: OutpaintAspect;
+      outpaintPrompt?: string;
+    }
+  ) => void;
   onRetryDraftSave: () => void;
 }
+
+type EditPanel = null | 'menu' | 'relight' | 'outpaint';
 
 function GenerationCard({
   gen,
@@ -1122,9 +1262,19 @@ function GenerationCard({
   onRetry,
   onAnimate,
   onUseAsStyleRef,
+  onEditOp,
   onRetryDraftSave,
 }: GenerationCardProps) {
   const retriesLeft = MAX_RETRIES_PER_GEN - (gen.retryCount ?? 0);
+  const [editPanel, setEditPanel] = useState<EditPanel>(null);
+  const [relightPresets, setRelightPresets] = useState<string[]>([]);
+  const [relightFree, setRelightFree] = useState('');
+  const [outpaintAspect, setOutpaintAspect] = useState<OutpaintAspect>('16:9');
+  const [outpaintPrompt, setOutpaintPrompt] = useState('');
+
+  const toggleRelightPreset = (id: string) => {
+    setRelightPresets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
   return (
     <Card className="overflow-hidden">
       <div className="aspect-video bg-muted relative">

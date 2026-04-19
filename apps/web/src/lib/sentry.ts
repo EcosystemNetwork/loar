@@ -12,6 +12,13 @@ const release = (import.meta.env.VITE_RELEASE as string | undefined) ?? undefine
 
 export const sentryEnabled = Boolean(dsn);
 
+// Session replay captures user interactions — gated behind explicit 'all'
+// consent per GDPR/ePrivacy. Error reporting itself is considered essential
+// (required to keep the service running) and stays enabled.
+const consent =
+  typeof window !== 'undefined' ? window.localStorage.getItem('loar_consent_v1') : null;
+const replayAllowed = consent === 'all';
+
 if (dsn) {
   Sentry.init({
     dsn,
@@ -19,14 +26,18 @@ if (dsn) {
     release,
     integrations: [
       Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({
-        maskAllText: false,
-        blockAllMedia: false,
-      }),
+      ...(replayAllowed
+        ? [
+            Sentry.replayIntegration({
+              maskAllText: false,
+              blockAllMedia: false,
+            }),
+          ]
+        : []),
     ],
     tracesSampleRate: isProduction ? 0.1 : 1.0,
-    replaysSessionSampleRate: isProduction ? 0.1 : 0,
-    replaysOnErrorSampleRate: 1.0,
+    replaysSessionSampleRate: replayAllowed && isProduction ? 0.1 : 0,
+    replaysOnErrorSampleRate: replayAllowed ? 1.0 : 0,
     ignoreErrors: [
       'ResizeObserver loop limit exceeded',
       'ResizeObserver loop completed with undelivered notifications',
@@ -39,7 +50,7 @@ if (dsn) {
     },
   });
   // eslint-disable-next-line no-console
-  console.log(`[sentry] Initialized (env=${envName})`);
+  console.log(`[sentry] Initialized (env=${envName}, replay=${replayAllowed ? 'on' : 'off'})`);
 }
 
 export const captureException = Sentry.captureException.bind(Sentry);

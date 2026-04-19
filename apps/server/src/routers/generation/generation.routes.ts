@@ -56,6 +56,7 @@ import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery, buildGalleryDoc } from '../../lib/gallery-publish';
 import { recordAssetEventAsync } from '../../services/lineage';
+import { reserveClientToken } from '../../lib/jobIdempotency';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -121,6 +122,16 @@ export const generateInputSchema = z.object({
 
   // Style preset (Feature 7)
   stylePreset: z.string().nullable().optional(),
+
+  // Idempotency token — see docs/prd-mcp-integration.md §2.
+  // When set, the same {ownerUid, clientToken} returns the existing jobId
+  // within 24h instead of creating a new job. 16–128 chars, [A-Za-z0-9_-].
+  clientToken: z
+    .string()
+    .min(16)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+    .optional(),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -680,6 +691,39 @@ export const generationRouter = router({
     .use(requirePermission('generation.video'))
     .input(generateInputSchema)
     .mutation(async ({ input, ctx }) => {
+      const generationId = randomUUID();
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      // If the agent retried with the same clientToken, return the existing
+      // job instead of starting a new one. See docs/prd-mcp-integration.md §2.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: generationId,
+          procedure: 'generation.generate',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await generationsCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'completed' | 'failed',
+            videoUrl: (d.permanentVideoUrl ?? d.videoUrl ?? null) as string | null,
+            modelUsed: (d.finalModelId ?? d.model ?? null) as string | null,
+            modelDisplayName:
+              (d.finalModelId ? getModelById(d.finalModelId)?.displayName : null) ?? null,
+            routingMode: input.routingMode,
+            reasonCode: (d.reasonCode ?? 'idempotent_replay') as RoutingReasonCode,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            wasFallback: Boolean(d.wasFallback),
+            originalPrompt: undefined as string | undefined,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
       // Per-user throttle: minimum 2s between generation requests
       checkUserThrottle(ctx.user.uid);
 
@@ -687,7 +731,6 @@ export const generationRouter = router({
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
 
-      const generationId = randomUUID();
       const startTime = Date.now();
 
       // Preserve the user's original prompt before universe config modifies it
@@ -1104,6 +1147,7 @@ export const generationRouter = router({
                 fiatPriceUsd,
                 wasFallback: true,
                 originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
+                idempotentReplay: false as const,
               };
             }
           }
@@ -1197,6 +1241,7 @@ export const generationRouter = router({
           fiatPriceUsd,
           wasFallback: false,
           originalPrompt: originalPrompt !== input.prompt ? originalPrompt : undefined,
+          idempotentReplay: false as const,
         };
       } catch (error) {
         const latencyMs = Date.now() - startTime;

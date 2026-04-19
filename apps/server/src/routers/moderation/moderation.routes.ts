@@ -74,21 +74,32 @@ export const moderationRouter = router({
     }),
 
   // ── Submit DMCA takedown (public, no auth required) ───────────
+  // Schema enforces 17 U.S.C. § 512(c)(3)(A) statutory elements:
+  //   (i)   electronic signature          → signature
+  //   (ii)  identification of work        → copyrightWork
+  //   (iii) identification of material    → contentId
+  //   (iv)  contact info                  → claimantName/Email/Address/Phone
+  //   (v)   good-faith belief             → goodFaith
+  //   (vi)  accuracy under perjury +      → swornStatement
+  //         authority to act
   submitTakedown: publicProcedure
     .input(
       z.object({
         contentId: z.string(),
         claimantName: z.string().min(1),
         claimantEmail: z.string().email(),
-        copyrightWork: z.string().min(10), // Description of the original work
-        explanation: z.string().min(20), // Why this is infringing
-        goodFaith: z.boolean(), // Checkbox: sworn statement
+        claimantAddress: z.string().min(10).max(500), // § 512(c)(3)(A)(iv)
+        claimantPhone: z.string().min(7).max(30), // § 512(c)(3)(A)(iv)
+        copyrightWork: z.string().min(10),
+        explanation: z.string().min(20),
+        goodFaith: z.literal(true), // § 512(c)(3)(A)(v)
+        swornStatement: z.literal(true), // § 512(c)(3)(A)(vi) — perjury + authority
+        signature: z.string().min(2).max(200), // § 512(c)(3)(A)(i) — typed name as e-signature
       })
     )
     .mutation(async ({ input }) => {
       const col = takedownCol();
       if (!col) throw new Error('Not available');
-      if (!input.goodFaith) throw new Error('Good faith declaration required');
 
       // Rate limit: max 3 takedown requests per email per hour
       await checkTakedownRateLimit(input.claimantEmail.toLowerCase());
@@ -108,8 +119,13 @@ export const moderationRouter = router({
         contentId: input.contentId,
         claimantName: input.claimantName,
         claimantEmail: input.claimantEmail,
+        claimantAddress: input.claimantAddress,
+        claimantPhone: input.claimantPhone,
         copyrightWork: input.copyrightWork,
         explanation: input.explanation,
+        signature: input.signature,
+        goodFaithAttested: true,
+        swornAttested: true,
         status: 'pending', // pending | actioned | rejected
         createdAt: now.toISOString(),
       };

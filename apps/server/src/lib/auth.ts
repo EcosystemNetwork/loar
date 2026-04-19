@@ -2,9 +2,9 @@
  * Authentication Verification
  *
  * Supports three auth methods (checked in order):
- * 1. API Key (programmatic agents) — X-API-Key: loar_<agentId>_<hex>
+ * 1. API Key — X-API-Key: loar_<agentId>_<hex>  OR  Authorization: Bearer loar_<...>
  * 2. httpOnly cookie (browser users) — Cookie: siwe-session=<jwt>
- * 3. Bearer token (legacy/mobile) — Authorization: Bearer <jwt>
+ * 3. Bearer JWT (mobile/legacy) — Authorization: Bearer <jwt>
  *
  * Returns a normalized AuthUser for use in tRPC context.
  */
@@ -29,8 +29,10 @@ export interface AuthUser {
  * @param cookieToken — JWT from httpOnly `siwe-session` cookie (extracted by caller)
  */
 export async function verifyAuth(headers: Headers, cookieToken?: string): Promise<AuthUser | null> {
-  // 1. Try API key first (X-API-Key header)
-  const apiKey = headers.get('X-API-Key');
+  // 1. Try API key — accept either X-API-Key or Authorization: Bearer loar_<...>
+  const bearerRaw = headers.get('Authorization')?.replace(/^Bearer\s+/i, '') ?? null;
+  const bearerIsApiKey = bearerRaw?.startsWith('loar_') ?? false;
+  const apiKey = headers.get('X-API-Key') ?? (bearerIsApiKey ? bearerRaw : null);
   if (apiKey) {
     const result = await verifyApiKey(apiKey);
     if (result) {
@@ -55,10 +57,10 @@ export async function verifyAuth(headers: Headers, cookieToken?: string): Promis
     }
   }
 
-  // 3. Fall back to Authorization: Bearer <token> (mobile, legacy clients)
-  const bearerToken = headers.get('Authorization')?.replace('Bearer ', '');
-  if (bearerToken) {
-    const payload = await verifySessionToken(bearerToken);
+  // 3. Fall back to Authorization: Bearer <jwt> (mobile, legacy clients).
+  //    Skipped above when the Bearer value is a loar_ API key.
+  if (bearerRaw && !bearerIsApiKey) {
+    const payload = await verifySessionToken(bearerRaw);
     if (payload?.sub) {
       return {
         uid: payload.sub.toLowerCase(),

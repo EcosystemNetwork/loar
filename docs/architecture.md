@@ -58,6 +58,79 @@ LOAR supports two agent systems with programmatic access:
 
 See [docs/agents.md](agents.md) for full documentation.
 
+## VLM Subsystem (Vision-Language Model intelligence)
+
+LOAR layers a VLM pipeline over generation + upload + canon to turn passive media into structured story intelligence. Full spec: [docs/prd-vlm-subsystem.md](prd-vlm-subsystem.md).
+
+| Capability                          | Router                                                                  | Notes                                                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Video/image → canon**             | `vlm.extract.start` / `.status` / `.get`                                | Async Gemini 2.5 Pro extraction into `vlmExtractions/`. Populates `entityProposals` + `sceneIndex`.       |
+| **Entity proposal review**          | `vlm.proposals.{list,accept,reject,merge}`                              | Human-in-loop. Accept creates a real entity via existing `createEntity`.                                  |
+| **Canon consistency check**         | `vlm.canon.check` / `.getConflicts`                                     | Compares extraction vs. universe bible + entities + recent beats. Severity: info/warn/block.              |
+| **Moderation risk scoring**         | `vlm.moderation.{riskScore,batchRiskScores,requeue,overrideAutoAction}` | Feeds existing `flags` / `contentAuditLog`. High-risk optionally auto-hides.                              |
+| **Multimodal search**               | `vlm.search.query`                                                      | Lexical over `sceneIndex` tags+captions; optional text-embedding-004 behind `VLM_EMBEDDINGS=true`.        |
+| **Generation copilot**              | `vlm.copilot.{improvePrompt,extractStyleBible,scoreOutput}`             | Reference-aware prompt coaching + output scoring + moodboard → style pack.                                |
+| **Trailer / recap / SEO**           | `vlm.recap.generate`                                                    | Chapters, trailer beats, social cuts, title, SEO description, thumbnail suggestions.                      |
+| **Governance canon draft**          | `vlm.governance.{draftProposal,listDrafts}`                             | Grounded proposals with timestamps + pro/con framing; voting remains the canonical governance path.       |
+| **Editing graph / continuous film** | `VLM_GRAPH_NODES` (workflows) + `autoplay.*` (daemon)                   | Feature-flagged behind `VLM_CONTINUOUS_FILM=true`. Node primitives: Planner, Judge, Continuity, Stitcher. |
+
+### Data flow
+
+```mermaid
+graph LR
+  GEN[Generation / Upload] --> WORKER[generation.worker]
+  WORKER -->|on success| VLMQ[[BullMQ 'vlm']]
+  UPLOAD[User-triggered vlm.extract.start] --> VLMQ
+  VLMQ --> VLMW[vlm.worker]
+  VLMW --> GEMINI[Gemini 2.5 Pro/Flash<br/>+ File API]
+  VLMW --> EX[(vlmExtractions)]
+  VLMW --> PROP[(entityProposals)]
+  VLMW --> SI[(sceneIndex)]
+  VLMW --> RISK[(vlmRiskScores)]
+  PROP -->|human accept| ENT[(entities)]
+  EX --> CANON[canon-check]
+  CANON --> CC[(canonConflicts)]
+  EX --> GDRAFT[governance.draftProposal]
+  GDRAFT --> DRAFTS[(canonProposalDrafts)]
+  RISK --> FLAGS[(flags)]
+  RISK --> AUDIT[(contentAuditLog)]
+  SI --> SEARCH[vlm.search.query]
+```
+
+### New Firestore collections
+
+`vlmJobs`, `vlmExtractions`, `entityProposals`, `canonConflicts`, `sceneIndex`, `vlmRiskScores`, `canonProposalDrafts`, `vlmRecaps`, `vlmCopilotScores`, `vlmAutoplayState`.
+
+### Env vars
+
+Server-only (never exposed to browser): `VLM_WORKER_DISABLED`, `VLM_WORKER_CONCURRENCY`, `VLM_AUTO_EXTRACT`, `VLM_AUTO_HIDE_HIGH_RISK`, `VLM_EMBEDDINGS`, `VLM_EXTRACT_PER_USER_PER_HOUR`, `VLM_USER_MONTHLY_USD`, `VLM_CROSS_MODEL`, `CANON_BLOCK_ON_HIGH`, `VLM_CONTINUOUS_FILM`, `VLM_AUTOPLAY_MAX_PER_DAY`, `VLM_AUTOPLAY_BUDGET_USD`, `VLM_AUTOPLAY_REQUIRE_VOTE`. See `.env.example`.
+
+### Frontend surfaces
+
+| Path                                                                                                 | Role                                              |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| [`/extract/$jobId`](../apps/web/src/routes/extract.$jobId.tsx)                                       | Poll + render a VLM extraction job                |
+| [`/search`](../apps/web/src/routes/search.tsx)                                                       | Multimodal scene search                           |
+| [`components/vlm/ExtractionReview.tsx`](../apps/web/src/components/vlm/ExtractionReview.tsx)         | Inline review panel for extractions               |
+| [`components/vlm/CanonValidatorBanner.tsx`](../apps/web/src/components/vlm/CanonValidatorBanner.tsx) | Pre-publish consistency banner                    |
+| [`components/vlm/RiskBadge.tsx`](../apps/web/src/components/vlm/RiskBadge.tsx)                       | Compact risk chip for content cards + admin queue |
+
+## Mobile App (apps/mobile)
+
+LOAR ships a React Native client alongside the web SPA. It reuses the same server contract (tRPC + SIWE JWT) and the same on-chain address set, so all Firestore docs, credits, and wallet activity are shared between web and mobile.
+
+| Layer                | Choice                                                                                                                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**          | Expo 52 (iOS + Android), JS engine: Hermes                                                                                                                                                                                                                                                                                            |
+| **Bundle**           | Production Hermes bytecode builds end-to-end (~16.6MB `.hbc`, 7083 modules). Metro serializer rewrites `import.meta.<x>` → `(undefined)` because Hermes refuses `import.meta` and both `thirdweb` and `brotli_wasm` ship it in their published ESM                                                                                    |
+| **Wallet auth**      | thirdweb `inAppWallet` (google / apple / passkey / email) plus external wallet connectors; SIWE signature → server JWT, identical to the web flow (see [apps/mobile/src/lib/thirdweb.ts](../apps/mobile/src/lib/thirdweb.ts))                                                                                                         |
+| **Crypto polyfill**  | `react-native-get-random-values` imported at the top of [app/\_layout.tsx](../apps/mobile/app/_layout.tsx) before any crypto consumer loads                                                                                                                                                                                           |
+| **Stubbed adapters** | Unused wallet adapters (`@mobile-wallet-protocol/client`, `@coinbase/wallet-mobile-sdk`) resolved to [src/shims/empty.js](../apps/mobile/src/shims/empty.js) via Metro `resolveRequest` to keep the bundle clean                                                                                                                      |
+| **Observability**    | `@sentry/react-native` scaffold wired via side-effect import from [app/\_layout.tsx](../apps/mobile/app/_layout.tsx) → [src/lib/sentry.ts](../apps/mobile/src/lib/sentry.ts). Captures JS-layer crashes today; native (iOS/Android) crash capture requires `expo prebuild` + a native rebuild                                         |
+| **Peer deps**        | Required thirdweb RN peers all declared in [apps/mobile/package.json](../apps/mobile/package.json): `@aws-sdk/client-kms`, `@aws-sdk/client-lambda`, `@aws-sdk/credential-providers`, `amazon-cognito-identity-js`, `react-native-aes-gcm-crypto`, `react-native-passkey`, `react-native-quick-crypto`, `react-native-worklets@0.3.0` |
+
+Mobile workstreams (feed/create, portfolio/wallet, market/shop) are tracked in the `prd-mobile-*.md` docs.
+
 ## Authentication Flow
 
 ```mermaid

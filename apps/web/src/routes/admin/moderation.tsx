@@ -26,7 +26,9 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
+import { RiskBadge } from '@/components/vlm/RiskBadge';
 
 export const Route = createFileRoute('/admin/moderation')({
   beforeLoad: ({ context }) => {
@@ -55,6 +57,17 @@ function ModerationDashboard() {
     queryFn: () =>
       trpcClient.moderation.reviewQueue.query({ type: 'flags', status: 'pending', limit: 50 }),
     enabled: isAuthenticated,
+  });
+
+  // VLM risk scores for all flagged content (one batch call — cheaper than per-row)
+  const flagContentIds = ((flags as any[]) ?? []).map((f) => f.contentId as string).filter(Boolean);
+  const { data: vlmRiskMap } = useQuery({
+    queryKey: ['mod-vlm-risk', flagContentIds.join(',')],
+    queryFn: () =>
+      flagContentIds.length
+        ? trpcClient.vlm.moderation.batchRiskScores.query({ contentIds: flagContentIds })
+        : Promise.resolve({} as Record<string, any>),
+    enabled: isAuthenticated && flagContentIds.length > 0,
   });
 
   const { data: takedowns, isLoading: loadingTakedowns } = useQuery({
@@ -205,18 +218,27 @@ function ModerationDashboard() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <AlertTriangle className="h-4 w-4 text-orange-500" />
                           <span className="font-semibold text-sm">Content: {flag.contentId}</span>
                           <Badge variant="outline" className="text-[10px]">
                             {flag.reason}
                           </Badge>
+                          {flag.source === 'vlm' ? (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-primary/40 text-primary"
+                            >
+                              <Sparkles className="h-3 w-3 mr-1" /> VLM auto-flag
+                            </Badge>
+                          ) : null}
+                          <RiskBadge risk={(vlmRiskMap as any)?.[flag.contentId] ?? null} compact />
                         </div>
                         {flag.description && (
                           <p className="text-xs text-muted-foreground">{flag.description}</p>
                         )}
                         <p className="text-[10px] text-muted-foreground">
-                          Flagged by {flag.flaggerAddress?.slice(0, 8)}... on{' '}
+                          Flagged by {flag.flaggerAddress?.slice(0, 8) ?? 'system'}... on{' '}
                           {new Date(flag.createdAt).toLocaleDateString()}
                         </p>
                       </div>

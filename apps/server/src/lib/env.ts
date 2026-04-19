@@ -93,6 +93,21 @@ const envSchema = z.object({
   MESHY_API_KEY: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
 
+  // ── VLM subsystem (see docs/prd-vlm-subsystem.md) ───────────────────────
+  VLM_WORKER_DISABLED: z.enum(['true', 'false']).optional(),
+  VLM_WORKER_CONCURRENCY: z.string().default('3'),
+  VLM_AUTO_EXTRACT: z.enum(['true', 'false']).optional(),
+  VLM_AUTO_HIDE_HIGH_RISK: z.enum(['true', 'false']).optional(),
+  VLM_EMBEDDINGS: z.enum(['true', 'false']).optional(),
+  VLM_EXTRACT_PER_USER_PER_HOUR: z.string().default('10'),
+  VLM_USER_MONTHLY_USD: z.string().default('5'),
+  VLM_CROSS_MODEL: z.enum(['true', 'false']).optional(),
+  VLM_CONTINUOUS_FILM: z.enum(['true', 'false']).optional(),
+  VLM_AUTOPLAY_MAX_PER_DAY: z.string().default('10'),
+  VLM_AUTOPLAY_BUDGET_USD: z.string().default('20'),
+  VLM_AUTOPLAY_REQUIRE_VOTE: z.enum(['true', 'false']).optional(),
+  CANON_BLOCK_ON_HIGH: z.enum(['true', 'false']).optional(),
+
   // ── Unstoppable Domains (reverse-resolve wallet → domain in UI) ──────────
   UNSTOPPABLE_DOMAINS_API_KEY: z.string().optional(),
 

@@ -19,6 +19,7 @@ export const QUEUE_NAMES = {
   GENERATION: 'generation',
   UPLOAD: 'upload',
   BACKGROUND: 'background',
+  VLM: 'vlm',
 } as const;
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -62,12 +63,47 @@ export interface BackgroundJobData {
   payload: Record<string, any>;
 }
 
+export type VlmJobKind =
+  | 'extract'
+  | 'canon_check'
+  | 'moderation'
+  | 'recap'
+  | 'search_index'
+  | 'governance_draft'
+  | 'copilot_score';
+
+export interface VlmJobData {
+  jobId: string;
+  kind: VlmJobKind;
+  creatorUid: string;
+  input: {
+    assetType: 'video' | 'image' | 'audio';
+    mediaUrl: string;
+    mimeType?: string;
+    contentId?: string;
+    generationId?: string;
+    universeAddress?: string | null;
+    options?: Record<string, any>;
+  };
+}
+
+export interface VlmJobResult {
+  jobId: string;
+  status: 'completed' | 'failed';
+  outputRef?: string;
+  tokensUsed?: number;
+  costUsd?: number;
+  error?: string;
+}
+
 // ── Queue Instances (lazy-initialized) ─────────────────────────────────
 
 let generationQueue: Queue<GenerationJobData, GenerationJobResult> | null = null;
 let uploadQueue: Queue<UploadJobData> | null = null;
 let backgroundQueue: Queue<BackgroundJobData> | null = null;
+let vlmQueue: Queue<VlmJobData, VlmJobResult> | null = null;
 let generationEvents: QueueEvents | null = null;
+let vlmEvents: QueueEvents | null = null;
 
 /** Redis connection options extracted from REDIS_URL */
 function getConnectionOpts() {
@@ -142,6 +178,30 @@ export function getGenerationEvents(): QueueEvents {
   return generationEvents;
 }
 
+export function getVlmQueue(): Queue<VlmJobData, VlmJobResult> {
+  if (!vlmQueue) {
+    const connection = getConnectionOpts();
+    vlmQueue = new Queue(QUEUE_NAMES.VLM, {
+      connection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 10_000 },
+        removeOnComplete: { age: 86400, count: 2000 },
+        removeOnFail: { age: 604800, count: 5000 },
+      },
+    });
+  }
+  return vlmQueue;
+}
+
+export function getVlmEvents(): QueueEvents {
+  if (!vlmEvents) {
+    const connection = getConnectionOpts();
+    vlmEvents = new QueueEvents(QUEUE_NAMES.VLM, { connection });
+  }
+  return vlmEvents;
+}
+
 // ── Admission Control ──────────────────────────────────────────────────
 
 const MAX_CONCURRENT_GENERATIONS = parseInt(process.env.MAX_CONCURRENT_GENERATIONS || '50', 10);
@@ -210,10 +270,14 @@ export async function shutdownQueues(): Promise<void> {
   if (generationQueue) closeOps.push(generationQueue.close());
   if (uploadQueue) closeOps.push(uploadQueue.close());
   if (backgroundQueue) closeOps.push(backgroundQueue.close());
+  if (vlmQueue) closeOps.push(vlmQueue.close());
   if (generationEvents) closeOps.push(generationEvents.close());
+  if (vlmEvents) closeOps.push(vlmEvents.close());
   await Promise.allSettled(closeOps);
   generationQueue = null;
   uploadQueue = null;
   backgroundQueue = null;
+  vlmQueue = null;
   generationEvents = null;
+  vlmEvents = null;
 }

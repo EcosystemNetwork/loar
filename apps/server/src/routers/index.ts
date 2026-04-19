@@ -50,6 +50,7 @@ import { synapseRouter } from './storage/synapse.routes';
 import { profilesRouter } from './profiles/profiles.routes';
 import { entitiesRouter } from './entities/entities.index';
 import { offChainNodesRouter } from './offChainNodes/offChainNodes.routes';
+import { nodeMediaRouter } from './nodeMedia/nodeMedia.routes';
 import { questsRouter } from './quests/quests.routes';
 import { sandboxRouter } from './sandbox/sandbox.routes';
 import { collabsRouter } from './collabs/collabs.routes';
@@ -105,6 +106,7 @@ import { episodesRouter } from './episodes/episodes.routes';
 import { shotTemplatesRouter } from './shotTemplates/shotTemplates.routes';
 import { lineageRouter } from './lineage/lineage.routes';
 import { workflowsRouter } from './workflows/workflows.index';
+import { mcpRouter } from './mcp/mcp.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -180,6 +182,7 @@ export const appRouter = router({
   comments: commentsRouter,
   entities: entitiesRouter,
   offChainNodes: offChainNodesRouter,
+  nodeMedia: nodeMediaRouter,
   media: mediaRouter,
   collaboration: collaborationRouter,
 
@@ -307,6 +310,10 @@ export const appRouter = router({
 
   // ── Asset Lineage, Rights, Credits, Analytics (PRD 10) ─────────────
   lineage: lineageRouter,
+
+  // ── MCP resources surface (agent navigation via loar:// URIs) ────────
+  // See docs/prd-mcp-integration.md §5
+  mcp: mcpRouter,
 });
 
 export type AppRouter = typeof appRouter;

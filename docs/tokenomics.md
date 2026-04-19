@@ -17,7 +17,7 @@ $LOAR is the native utility and governance token for the LOAR platform -- a dece
 3. **Staking rewards**: Stake $LOAR globally for platform-wide fee discounts and priority access, or per-universe for pro-rata revenue share.
 4. **Premium actions**: Spend $LOAR on platform features such as priority generation queue, permanent canon entries, premium creator profiles, and remix boosts.
 
-The token is implemented as an ERC-20 with ERC-20 Permit (gasless approvals) and burn functionality. See `apps/contracts/src/LoarToken.sol`.
+The token is implemented as an ERC-20 with ERC-20 Permit (gasless approvals) and `ERC20Burnable` support (any holder — including the DAO treasury — can voluntarily destroy their own supply via `burn()` / `burnFrom()`). There is **no protocol-level auto-burn**: protocol fees (transfer fee, premium actions, staking penalties) route to LP + treasury, not to `address(0)`. Any supply-reducing burn is a deliberate DAO governance action on treasury holdings, not a passive side-effect of usage. See `apps/contracts/src/LoarToken.sol`.
 
 ---
 
@@ -25,7 +25,7 @@ The token is implemented as an ERC-20 with ERC-20 Permit (gasless approvals) and
 
 **Maximum supply**: 1,000,000,000 (1 billion) $LOAR, with 18 decimal places.
 
-The MAX_SUPPLY cap is enforced via a cumulative `totalMinted` counter that never decreases, even after burns. This means burned tokens cannot reopen minting headroom -- the cap is permanent.
+The MAX_SUPPLY cap is enforced via a cumulative `totalMinted` counter that never decreases, even after a voluntary DAO-initiated burn. This means any burned tokens cannot reopen minting headroom — the cap is permanent. Burning is therefore strictly supply-reducing; it cannot be used to circulate fresh issuance.
 
 ### Initial Distribution
 
