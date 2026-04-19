@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![LOAR Banner](https://fungerbil.com/LOARLOGO.png)
+![LOAR Banner](apps/web/public/loarIconTextLogo.png)
 
 ### _Create AI-powered cinematic universes. Own them on-chain. Monetize them._
 
