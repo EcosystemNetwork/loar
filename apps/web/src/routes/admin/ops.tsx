@@ -17,7 +17,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2, Shield, ShieldOff, Save } from 'lucide-react';
+import { AlertTriangle, Loader2, Shield, ShieldOff, Save, Flag, Check, X } from 'lucide-react';
 
 export const Route = createFileRoute('/admin/ops')({
   beforeLoad: ({ context }) => {
@@ -242,6 +242,9 @@ function OpsDashboard() {
         </CardContent>
       </Card>
 
+      {/* Abuse flags */}
+      <AbuseFlagsSection />
+
       {/* Metadata footer */}
       {cfg.updatedAt && (
         <p className="text-muted-foreground text-xs">
@@ -250,5 +253,156 @@ function OpsDashboard() {
         </p>
       )}
     </div>
+  );
+}
+
+type AbuseFlagRow = {
+  id: string;
+  subjectUid: string;
+  count24h: number;
+  threshold: number;
+  status: 'open' | 'dismissed' | 'confirmed';
+  detectedAt: string;
+  lastDetectedAt: string;
+  reason?: string;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
+  resolutionNote?: string | null;
+};
+
+function AbuseFlagsSection() {
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<'open' | 'dismissed' | 'confirmed' | 'all'>(
+    'open'
+  );
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin-abuse-flags', statusFilter],
+    queryFn: () =>
+      trpcClient.admin.listAbuseFlags.query({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        limit: 50,
+      }),
+    refetchInterval: 30_000,
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: (input: { id: string; status: 'dismissed' | 'confirmed' }) =>
+      trpcClient.admin.updateAbuseFlag.mutate(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-abuse-flags'] });
+      toast.success('Flag updated');
+    },
+    onError: (err: Error) => toast.error(`Update failed: ${err.message}`),
+  });
+
+  const rows = (data?.items as AbuseFlagRow[] | undefined) ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Flag className="h-5 w-5" /> Abuse flags
+          </CardTitle>
+          <div className="flex gap-2">
+            {(['open', 'confirmed', 'dismissed', 'all'] as const).map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={statusFilter === s ? 'default' : 'outline'}
+                onClick={() => setStatusFilter(s)}
+              >
+                {s}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground mb-3 text-sm">
+          Produced by the anomaly-detect job when a wallet exceeds
+          <code className="mx-1">ABUSE_DETECT_DAILY_THRESHOLD</code>
+          generations in 24h. Dismiss when expected (e.g. whitelisted partner); confirm when
+          investigated abuse so the audit trail reflects it.
+        </p>
+        {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}
+        {error && <p className="text-destructive text-sm">Failed to load flags: {error.message}</p>}
+        {!isLoading && rows.length === 0 && (
+          <p className="text-muted-foreground text-sm">No flags in this bucket.</p>
+        )}
+        {rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground text-left">
+                  <th className="py-1 pr-4">Wallet</th>
+                  <th className="py-1 pr-4">24h count</th>
+                  <th className="py-1 pr-4">Threshold</th>
+                  <th className="py-1 pr-4">Last seen</th>
+                  <th className="py-1 pr-4">Status</th>
+                  <th className="py-1">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-t">
+                    <td className="py-2 pr-4 font-mono text-xs">{r.subjectUid}</td>
+                    <td className="py-2 pr-4">{r.count24h}</td>
+                    <td className="py-2 pr-4">{r.threshold}</td>
+                    <td className="py-2 pr-4 text-xs">
+                      {new Date(r.lastDetectedAt).toLocaleString()}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <Badge
+                        variant={
+                          r.status === 'confirmed'
+                            ? 'destructive'
+                            : r.status === 'dismissed'
+                              ? 'secondary'
+                              : 'default'
+                        }
+                      >
+                        {r.status}
+                      </Badge>
+                    </td>
+                    <td className="py-2">
+                      {r.status === 'open' ? (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              resolveMutation.mutate({ id: r.id, status: 'dismissed' })
+                            }
+                            disabled={resolveMutation.isPending}
+                          >
+                            <X className="mr-1 h-3 w-3" /> Dismiss
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() =>
+                              resolveMutation.mutate({ id: r.id, status: 'confirmed' })
+                            }
+                            disabled={resolveMutation.isPending}
+                          >
+                            <Check className="mr-1 h-3 w-3" /> Confirm
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          {r.resolvedBy ? `by ${r.resolvedBy.slice(0, 10)}…` : '—'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

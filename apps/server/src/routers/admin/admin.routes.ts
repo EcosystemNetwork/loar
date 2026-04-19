@@ -155,6 +155,52 @@ export const adminRouter = router({
     return { ok: true, config: reset };
   }),
 
+  // ── Abuse flags (anomaly-detector output) ─────────────────────────
+
+  listAbuseFlags: adminProcedure
+    .input(
+      z.object({
+        status: z.enum(['open', 'dismissed', 'confirmed']).optional(),
+        limit: z.number().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const col = db.collection('abuseFlags');
+      let query = col.orderBy('lastDetectedAt', 'desc');
+      if (input.status) query = query.where('status', '==', input.status) as typeof query;
+      if (input.cursor) {
+        const cursorDoc = await col.doc(input.cursor).get();
+        if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+      }
+      const snap = await query.limit(input.limit).get();
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const nextCursor =
+        snap.docs.length === input.limit ? snap.docs[snap.docs.length - 1].id : undefined;
+      return { items, nextCursor };
+    }),
+
+  updateAbuseFlag: adminProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        status: z.enum(['dismissed', 'confirmed']),
+        note: z.string().max(1000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ref = db.collection('abuseFlags').doc(input.id);
+      const doc = await ref.get();
+      if (!doc.exists) throw new Error('Flag not found');
+      await ref.update({
+        status: input.status,
+        resolvedBy: ctx.user.uid,
+        resolvedAt: new Date().toISOString(),
+        resolutionNote: input.note ?? null,
+      });
+      return { ok: true };
+    }),
+
   // ── Audit history ─────────────────────────────────────────────────
 
   getConfigAudit: adminProcedure
