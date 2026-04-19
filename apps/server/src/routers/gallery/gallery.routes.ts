@@ -39,6 +39,12 @@ const registrationsCol = () => {
 const mediaTypeEnum = z.enum(['video', 'image', 'audio', '3d', 'all']).default('all');
 const sortByEnum = z.enum(['newest', 'trending', 'price_asc', 'price_desc']).default('newest');
 
+// PRD 10 moderation gate. Any read that returns content to the public must
+// filter these statuses. Undefined/legacy docs pass through (treated as active).
+const HIDDEN_STATUSES = ['flagged', 'under_review', 'hidden', 'removed'] as const;
+const isVisible = (status: unknown): boolean =>
+  !status || !HIDDEN_STATUSES.includes(status as (typeof HIDDEN_STATUSES)[number]);
+
 export const galleryRouter = router({
   /** Browse content with filters */
   browse: publicProcedure
@@ -115,14 +121,8 @@ export const galleryRouter = router({
 
       const snapshot = await query.limit(input.limit).get();
 
-      // Filter out moderated content from public gallery
-      const HIDDEN_STATUSES = ['flagged', 'under_review', 'hidden', 'removed'];
-
       const items = snapshot.docs
-        .filter((d) => {
-          const status = d.data().contentStatus;
-          return !status || !HIDDEN_STATUSES.includes(status);
-        })
+        .filter((d) => isVisible(d.data().contentStatus))
         .map((d) => {
           const data = d.data();
           return {
@@ -200,13 +200,8 @@ export const galleryRouter = router({
 
       const snapshot = await query.orderBy('views', 'desc').limit(input.limit).get();
 
-      const HIDDEN_STATUSES_TRENDING = ['flagged', 'under_review', 'hidden', 'removed'];
-
       return snapshot.docs
-        .filter((d) => {
-          const status = d.data().contentStatus;
-          return !status || !HIDDEN_STATUSES_TRENDING.includes(status);
-        })
+        .filter((d) => isVisible(d.data().contentStatus))
         .map((d) => {
           const data = d.data();
           return {
@@ -238,16 +233,16 @@ export const galleryRouter = router({
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((f: any) => !f.expiresAt || f.expiresAt.toDate() > now);
 
-    // Fetch the actual content docs
+    // Fetch the actual content docs in one batched getAll() to avoid the
+    // N+1 Firestore reads the per-id Promise.all was doing.
     const contentIds = active.map((f: any) => f.contentId);
     if (contentIds.length === 0) return [];
 
-    const contentDocs = await Promise.all(
-      contentIds.map((id: string) => contentCol().doc(id).get())
-    );
+    const refs = contentIds.map((id: string) => contentCol().doc(id));
+    const contentDocs = await db!.getAll(...refs);
 
     return contentDocs
-      .filter((d) => d.exists)
+      .filter((d) => d.exists && isVisible(d.data()?.contentStatus))
       .map((d) => {
         const data = d.data()!;
         return {
@@ -327,24 +322,27 @@ export const galleryRouter = router({
         .limit(input.limit)
         .get();
 
-      const content = contentSnapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          title: data.title || 'Untitled',
-          description: data.description || '',
-          mediaUrl: data.mediaUrl || null,
-          thumbnailUrl: data.thumbnailUrl || null,
-          mediaType: data.mediaType || 'image',
-          classification: data.classification || 'fan',
-          tags: data.tags || [],
-          views: data.views || 0,
-          likes: data.likes || 0,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-        };
-      });
+      const content = contentSnapshot.docs
+        .filter((d) => isVisible(d.data().contentStatus))
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.title || 'Untitled',
+            description: data.description || '',
+            mediaUrl: data.mediaUrl || null,
+            thumbnailUrl: data.thumbnailUrl || null,
+            mediaType: data.mediaType || 'image',
+            classification: data.classification || 'fan',
+            tags: data.tags || [],
+            views: data.views || 0,
+            likes: data.likes || 0,
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+          };
+        });
 
-      // Aggregate stats
+      // Aggregate stats — across the visible set only, so hidden content
+      // doesn't inflate a creator's public view/like counts.
       let totalViews = 0;
       let totalLikes = 0;
       content.forEach((c: any) => {
@@ -356,7 +354,7 @@ export const galleryRouter = router({
         profile,
         content,
         stats: {
-          totalContent: contentSnapshot.size,
+          totalContent: content.length,
           totalViews,
           totalLikes,
         },
@@ -486,6 +484,14 @@ export const galleryRouter = router({
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'This content already belongs to a universe',
+        });
+      }
+
+      // Can't resurrect moderated content into a universe.
+      if (!isVisible(data.contentStatus)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This content has been moderated and cannot be claimed',
         });
       }
 

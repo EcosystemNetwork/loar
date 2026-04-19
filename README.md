@@ -14,7 +14,7 @@
 
 </div>
 
-> **Last updated:** April 18, 2026 | **Status:** Testnet Alpha (Sepolia + Base Sepolia)
+> **Last updated:** April 19, 2026 | **Status:** Testnet Alpha (Sepolia + Base Sepolia)
 
 ---
 
@@ -54,41 +54,48 @@ We classify every feature by what actually works end-to-end today, not what has 
 
 ### LIVE (Working end-to-end)
 
-| Feature                             | What Works Today                                                                                                                                                                                                                                    |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Wallet Auth (SIWE)**              | thirdweb wallet connection (EVM) → SIWE signature → JWT. Connect any Ethereum wallet, no seed phrase required                                                                                                                                       |
-| **Universe Creation**               | Atomic single-tx `createUniverseWithToken()` or two-step: Universe contract → token + Uniswap v4 pool. Supports multi-chain (Sepolia, Base Sepolia, Base Mainnet) with chain selector UI                                                            |
-| **Token Deployment**                | Deploy governance token for existing universes via `/universe/$id/deploy-token`. Custom token symbol, configurable allocation splits (LP/creator/treasury/community), multi-recipient LP fee distribution                                           |
-| **LP Yield & Fee Management**       | On-chain fee collection from Uniswap v4 pools, multi-recipient BPS splits, claim UI in dashboard via `LPYieldManager` component. Anyone can trigger fee harvest; recipients claim their share                                                       |
-| **Narrative Timeline Editor**       | ReactFlow-based visual story builder with MiniMap, node search (Ctrl+K), undo/redo (Ctrl+Z), auto-layout, keyboard shortcuts, fullscreen mode, edge labels (Canon/Branch), and zoom controls. Tree layout positions nodes by depth and subtree size |
-| **AI Video Generation**             | 10+ providers (Veo 3.1, Kling 3.0, Wan 2.7, Sora 2, Seedance 2.0, LTX, HunYuan, CogVideoX, PixVerse V6, Runway Gen-3) via FAL AI + ModelArk. 44 model variants, 1-60s duration                                                                      |
-| **AI Image Generation**             | 21 models (FLUX Schnell/Dev/Pro/2 Pro/Kontext, Nano Banana/2/Pro, Recraft V4, Ideogram V3, Seedream 5.0, GPT Image, and more) via FAL AI                                                                                                            |
-| **Model Routing (Smart Auto)**      | Auto-selects best model by quality/speed/cost. Manual override available. 65 models (44 video + 21 image), cost tracked per generation                                                                                                              |
-| **Quest & Affiliate System**        | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards                                                                                                                                        |
-| **AI Wiki Generation**              | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                                                                                                                                                   |
-| **On-Chain Node Storage**           | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                                                                                                                                                         |
-| **Decentralized Storage**           | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Firebase                                                                                                                                                                                    |
-| **Credit System (On-Chain)**        | ETH + $LOAR payment on-chain (Sepolia + Base Sepolia). Dual-margin pricing (35% card/ETH, 25% LOAR). CreditStore UI with package selection. Stripe card payments when `STRIPE_SECRET_KEY` is set                                                    |
-| **Creator Profiles**                | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                                                                                                                                                |
-| **Content Upload**                  | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                                                                                                                                               |
-| **Content Discovery**               | Search/filter by classification, media type, tags. Creator gallery + content feed                                                                                                                                                                   |
-| **Character Wiki**                  | Browse, search, filter characters by collection/traits. Individual character pages                                                                                                                                                                  |
-| **Blockchain Indexer**              | Ponder v0.15 indexing all contract events into 29 GraphQL tables                                                                                                                                                                                    |
-| **ETH Purchase Flow**               | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order                                                                                                                                        |
-| **Identity NFTs**                   | Minted by UniverseManager per universe creator. Tracks co-creators and multi-sig signers                                                                                                                                                            |
-| **TimelockController Governance**   | `UniverseTimelockGovernor` with 24-hour execution delay for major proposals. Per-universe Governor with configurable voting delay/period/quorum                                                                                                     |
-| **Multi-Sig Support**               | Gnosis Safe addresses as universe owners for shared team governance                                                                                                                                                                                 |
-| **AI Audio Generation**             | Music generation, voice TTS, voice cloning (ElevenLabs), sound effects, lip-sync video generation                                                                                                                                                   |
-| **AI 3D Asset Generation**          | Text-to-3D and image-to-3D via Meshy                                                                                                                                                                                                                |
-| **Scene Controls**                  | Per-node camera presets (16 types), style presets (12 types), VFX overlays (14 types), cast member assignment, motion brush masking, keyframe handoff between nodes                                                                                 |
-| **Image-to-Video & Talking Scenes** | `talkingScene.create` combo endpoint (image → motion → lipsync/TTS), motion presets, Animate + Talking tabs in the editor, generation lineage refs (`parentGenerationId`, `sourceImageUrl`) so derived clips link back to their source              |
-| **Cast Management**                 | Universe-wide cast member registry with reference images for character consistency across scenes                                                                                                                                                    |
-| **Worldbuilding Studio**            | `/create` hub with per-kind forms (person, place, thing, faction, event, lore, species, vehicle, technology, organization). Tabbed wiki encyclopedia at `/wiki`                                                                                     |
-| **Social Features**                 | Follow/unfollow, activity feed (Following + Global tabs), notification center, like system, threaded comments on episodes/universes/content, token-gated discussions                                                                                |
-| **AI Agent System**                 | AI agent creation with budget allocation, multi-step pipelines, API key management, MCP server with 25 tools for external AI agents                                                                                                                 |
-| **Private Creator's Room**          | Per-universe private workspace: plot notes, lore vault, draft workspace. Token-gated access                                                                                                                                                         |
-| **Narrative Player**                | Interactive branching narrative playback with choice overlays, player controls, and branch stats                                                                                                                                                    |
-| **Error Toast Notifications**       | Real-time toast feedback on all mutation successes and failures via Sonner                                                                                                                                                                          |
+| Feature                             | What Works Today                                                                                                                                                                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wallet Auth (SIWE)**              | thirdweb wallet connection (EVM) → SIWE signature → JWT. Connect any Ethereum wallet, no seed phrase required                                                                                                                                           |
+| **Universe Creation**               | Atomic single-tx `createUniverseWithToken()` or two-step: Universe contract → token + Uniswap v4 pool. Supports multi-chain (Sepolia, Base Sepolia, Base Mainnet) with chain selector UI                                                                |
+| **Token Deployment**                | Deploy governance token for existing universes via `/universe/$id/deploy-token`. Custom token symbol, configurable allocation splits (LP/creator/treasury/community), multi-recipient LP fee distribution                                               |
+| **LP Yield & Fee Management**       | On-chain fee collection from Uniswap v4 pools, multi-recipient BPS splits, claim UI in dashboard via `LPYieldManager` component. Anyone can trigger fee harvest; recipients claim their share                                                           |
+| **Narrative Timeline Editor**       | ReactFlow-based visual story builder with MiniMap, node search (Ctrl+K), undo/redo (Ctrl+Z), auto-layout, keyboard shortcuts, fullscreen mode, edge labels (Canon/Branch), and zoom controls. Tree layout positions nodes by depth and subtree size     |
+| **AI Video Generation**             | 10+ providers (Veo 3.1, Kling 3.0, Wan 2.7, Sora 2, Seedance 2.0, LTX, HunYuan, CogVideoX, PixVerse V6, Runway Gen-3) via FAL AI + ModelArk. 44 model variants, 1-60s duration                                                                          |
+| **AI Image Generation**             | 21 models (FLUX Schnell/Dev/Pro/2 Pro/Kontext, Nano Banana/2/Pro, Recraft V4, Ideogram V3, Seedream 5.0, GPT Image, and more) via FAL AI                                                                                                                |
+| **Model Routing (Smart Auto)**      | Auto-selects best model by quality/speed/cost. Manual override available. 65 models (44 video + 21 image), cost tracked per generation                                                                                                                  |
+| **Quest & Affiliate System**        | Earn $LOAR tokens for onboarding, engagement, social, and power-user actions. Referral tracking with rewards                                                                                                                                            |
+| **AI Wiki Generation**              | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                                                                                                                                                       |
+| **On-Chain Node Storage**           | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                                                                                                                                                             |
+| **Decentralized Storage**           | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Firebase                                                                                                                                                                                        |
+| **Credit System (On-Chain)**        | ETH + $LOAR payment on-chain (Sepolia + Base Sepolia). Dual-margin pricing (35% card/ETH, 25% LOAR). CreditStore UI with package selection. Stripe card payments when `STRIPE_SECRET_KEY` is set                                                        |
+| **Creator Profiles**                | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                                                                                                                                                    |
+| **Content Upload**                  | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                                                                                                                                                   |
+| **Content Discovery**               | Search/filter by classification, media type, tags. Creator gallery + content feed                                                                                                                                                                       |
+| **Character Wiki**                  | Browse, search, filter characters by collection/traits. Individual character pages                                                                                                                                                                      |
+| **Blockchain Indexer**              | Ponder v0.15 indexing all contract events into 29 GraphQL tables                                                                                                                                                                                        |
+| **ETH Purchase Flow**               | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order                                                                                                                                            |
+| **Identity NFTs**                   | Minted by UniverseManager per universe creator. Tracks co-creators and multi-sig signers                                                                                                                                                                |
+| **TimelockController Governance**   | `UniverseTimelockGovernor` with 24-hour execution delay for major proposals. Per-universe Governor with configurable voting delay/period/quorum                                                                                                         |
+| **Multi-Sig Support**               | Gnosis Safe addresses as universe owners for shared team governance                                                                                                                                                                                     |
+| **AI Audio Generation**             | Music generation, voice TTS, voice cloning (ElevenLabs), sound effects, lip-sync video generation                                                                                                                                                       |
+| **AI 3D Asset Generation**          | Text-to-3D and image-to-3D via Meshy                                                                                                                                                                                                                    |
+| **Scene Controls**                  | Per-node camera presets (16 types), style presets (12 types), VFX overlays (14 types), cast member assignment, motion brush masking, keyframe handoff between nodes                                                                                     |
+| **Image-to-Video & Talking Scenes** | `talkingScene.create` combo endpoint (image → motion → lipsync/TTS), motion presets, Animate + Talking tabs in the editor, generation lineage refs (`parentGenerationId`, `sourceImageUrl`) so derived clips link back to their source                  |
+| **Cast Management**                 | Universe-wide cast member registry with reference images for character consistency across scenes                                                                                                                                                        |
+| **Worldbuilding Studio**            | `/create` hub with per-kind forms (person, place, thing, faction, event, lore, species, vehicle, technology, organization). Tabbed wiki encyclopedia at `/wiki`                                                                                         |
+| **Social Features**                 | Follow/unfollow, activity feed (Following + Global tabs), notification center, like system, threaded comments on episodes/universes/content, token-gated discussions                                                                                    |
+| **AI Agent System**                 | AI agent creation with budget allocation, multi-step pipelines, API key management, MCP server with 25 tools for external AI agents                                                                                                                     |
+| **Private Creator's Room**          | Per-universe private workspace: plot notes, lore vault, draft workspace. Token-gated access                                                                                                                                                             |
+| **Narrative Player**                | Interactive branching narrative playback with choice overlays, player controls, and branch stats                                                                                                                                                        |
+| **Error Toast Notifications**       | Real-time toast feedback on all mutation successes and failures via Sonner                                                                                                                                                                              |
+| **VLM Subsystem**                   | Gemini 2.5 Pro extraction: scenes, entities, canon conflicts, moderation risk, prompt coaching, style-bible, recap/trailer, grounded governance drafts. Multimodal search over `sceneIndex`. See [docs/prd-vlm-subsystem.md](docs/prd-vlm-subsystem.md) |
+| **Cost Tracker (Admin)**            | Per-provider USD cost attribution, gross-margin gauges, daily platform cap, top movers, cost-vs-revenue by model, CSV export. Alert sweep Slacks margin/cap breaches. Dashboard at `/admin/cost`                                                        |
+| **ERC-4337 Paymaster**              | Gas sponsorship for mint/vote/universe-create via thirdweb, Pimlico, or Biconomy. Frontend falls back to user-paid gas when sponsorship is unavailable                                                                                                  |
+| **CSAM Fingerprinting**             | Every image publish scanned via local pHash + PhotoDNA + Hive AI before IPFS pinning. Hit → block upload + audit-log entry                                                                                                                              |
+| **Outbound Webhooks**               | HMAC-signed webhook delivery via BullMQ worker, retry with exponential backoff. 5-minute replay window                                                                                                                                                  |
+| **Product Analytics (PostHog)**     | Autocapture + custom events across web, mobile, server. Session replay (inputs masked), funnels, retention. Privacy: wallet-address identity only, DNT respected. See [docs/analytics.md](docs/analytics.md)                                            |
+| **Sandbox Workspace**               | Tabbed multi-modal draft surface: image / video / voice / audio / 3D / talking. Inline image edits (upscale, relight, outpaint, remove-bg), video edits, bring-your-own-video, style presets, seed, ref upload, keyboard shortcuts                      |
 
 ### PARTIAL (Working but with gaps)
 
@@ -290,10 +297,14 @@ All apps read from a single `.env` at the repo root. Copy `.env.example` and fil
 **Optional (server starts without these):**
 
 - `FAL_KEY` — AI generation
-- `GOOGLE_API_KEY` — Gemini wiki generation
+- `GOOGLE_API_KEY` — Gemini wiki generation + VLM subsystem
 - `OPENAI_API_KEY` — GPT-4o-mini storyline generation
 - `STRIPE_SECRET_KEY` — Enables card payments (card tab disabled without this)
 - `REDIS_URL` — Distributed rate limiting (in-memory if unset, fine for single-instance)
+- `THIRDWEB_SECRET_KEY` / `PIMLICO_API_KEY` / `BICONOMY_API_KEY` — ERC-4337 paymaster (gas sponsorship)
+- `PHOTODNA_*` / `HIVE_API_KEY` — CSAM moderation (required in production)
+- `POSTHOG_API_KEY`, `VITE_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_KEY` — product analytics
+- `WEBHOOK_SIGNING_SECRET` — outbound webhook delivery (HMAC signing)
 
 See [docs/environment.md](docs/environment.md) for the full reference.
 
@@ -404,6 +415,13 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 | [Mobile: Market & Shop](docs/prd-mobile-market-shop-seller.md)           | Mobile marketplace and seller PRD                    |
 | [Security](docs/security.md)                                             | Security architecture and threat model               |
 | [Pre-Launch Checklist](docs/pre-launch-checklist.md)                     | Validation checklist before launch                   |
+| [Product Analytics (PostHog)](docs/analytics.md)                         | Event catalogue, privacy posture, query recipes      |
+| [VLM Subsystem](docs/prd-vlm-subsystem.md)                               | Vision-Language Model pipeline spec                  |
+| [Gas Abstraction](docs/gas-abstraction.md)                               | ERC-4337 paymaster architecture                      |
+| [Social Graph](docs/prd-social-graph.md)                                 | Follow graph + activity feed spec                    |
+| [KYC / AML Compliance](docs/compliance-kyc-aml.md)                       | KYC/AML posture for creator payouts                  |
+| [Tax Reporting](docs/compliance-tax-reporting.md)                        | 1099-K and international reporting                   |
+| [Mobile Store Submission](docs/mobile-store-submission.md)               | App Store + Play Store submission playbook           |
 
 ---
 
@@ -535,7 +553,7 @@ loar/
 │   └── mobile/          # Expo 52 / React Native (iOS + Android)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs + addresses
-├── docs/                # Product + technical documentation (28 docs)
+├── docs/                # Product + technical documentation (50+ docs)
 ├── .env.example         # Environment variable template
 ├── setup.sh             # First-time setup script
 ├── Makefile             # Command shortcuts

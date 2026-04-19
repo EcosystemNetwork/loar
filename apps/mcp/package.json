@@ -10,8 +10,10 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "files": [
-    "dist/",
-    "README.md"
+    "dist/src/",
+    "!dist/**/*.tsbuildinfo",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "dev": "tsx watch src/index.ts",

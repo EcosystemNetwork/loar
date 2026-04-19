@@ -93,6 +93,106 @@ The server starts without these keys but AI features will throw errors when call
 | `TREASURY_ADDRESS`      | server | Ethereum address that receives ETH/$LOAR payments                    |
 | `LOAR_TOKEN_ADDRESS`    | server | $LOAR ERC-20 contract address for token payment verification         |
 
+### ERC-4337 Paymaster / Gas Sponsorship (Optional)
+
+Server-side gas sponsorship for sponsored meta-transactions (mint, vote, universe creation). Provider is resolved in order: thirdweb → Pimlico → Biconomy. Configure exactly **one** — when none are set, `/api/paymaster` returns 501 and sponsored actions silently fall back to user-paid gas. See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
+
+| Variable                     | App    | Description                                                                                             |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `THIRDWEB_SECRET_KEY`        | server | thirdweb paymaster (uses the same project as `VITE_THIRDWEB_CLIENT_ID`). Default provider when present. |
+| `PIMLICO_API_KEY`            | server | Pimlico v2 bundler + paymaster RPC.                                                                     |
+| `BICONOMY_API_KEY`           | server | Biconomy v2 bundler + paymaster RPC.                                                                    |
+| `PAYMASTER_DAILY_LIMIT`      | server | Per-wallet sponsored operations per rolling 24h window. Default `50`.                                   |
+| `PAYMASTER_DEFAULT_CHAIN_ID` | server | Fallback chain when a sponsorship request omits `chainId`. Default `84532` (Base Sepolia).              |
+
+### CSAM / Hash-Matching Moderation
+
+Every image publish is scanned by [apps/server/src/services/fingerprint/csam-providers.ts](../apps/server/src/services/fingerprint/csam-providers.ts) before it can be pinned to IPFS. At least **one** provider should be configured in production — without any provider, only local perceptual hashing runs and previously-seen CSAM can pass through unflagged.
+
+| Variable                    | App    | Description                                                                  |
+| --------------------------- | ------ | ---------------------------------------------------------------------------- |
+| `PHOTODNA_ENDPOINT`         | server | Microsoft PhotoDNA endpoint (e.g. `https://api.microsoftmoderator.com/...`). |
+| `PHOTODNA_SUBSCRIPTION_KEY` | server | PhotoDNA Azure subscription key.                                             |
+| `HIVE_API_KEY`              | server | Hive AI image-moderation API key. Augments or replaces PhotoDNA.             |
+
+### Cost Tracker & Controls (Optional)
+
+Admin-only per-provider cost attribution with gross-margin gauges, daily platform caps, and Slack/email alerts. See [apps/server/src/services/cost-tracker/](../apps/server/src/services/cost-tracker/).
+
+| Variable                      | App    | Description                                                                                                            |
+| ----------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `COST_MARGIN_TARGET`          | server | Target gross margin `(revenue − cost) / revenue`. Flagged when breached. Default `0.30`.                               |
+| `COST_ALERT_ENABLED`          | server | `true` to run the background alert sweep. Enable on **ONE replica only**.                                              |
+| `COST_ALERT_INTERVAL_MS`      | server | Alert sweep interval. Default `600000` (10 min).                                                                       |
+| `COST_ALERT_COOLDOWN_MIN`     | server | Minutes between repeat alerts for the same rule. Default `30`.                                                         |
+| `COST_DAILY_PLATFORM_CAP_USD` | server | Hard daily platform cost cap. When reached, every paid provider call fails with `CostCapExceededError` until rollover. |
+| `COST_CONTROLS_CACHE_MS`      | server | Admin-facing controls cache TTL. Admin mutations invalidate immediately. Default `30000`.                              |
+
+### VLM Subsystem (Optional)
+
+Gemini-backed media-understanding pipeline (moderation, canon checks, multimodal search). See [docs/prd-vlm-subsystem.md](prd-vlm-subsystem.md). Requires `GOOGLE_API_KEY`.
+
+| Variable                        | App    | Description                                                                                |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `VLM_WORKER_DISABLED`           | server | `true` skips the in-process VLM worker (use when running a dedicated worker replica).      |
+| `VLM_WORKER_CONCURRENCY`        | server | VLM worker job concurrency. Default `3`.                                                   |
+| `VLM_AUTO_EXTRACT`              | server | Auto-enqueue extract after every generation. Default `true`.                               |
+| `VLM_AUTO_HIDE_HIGH_RISK`       | server | Auto-hide content when risk=high (requires admin review to un-hide). Default `false`.      |
+| `VLM_EMBEDDINGS`                | server | Store `text-embedding-004` vectors on `sceneIndex` for similarity search. Default `false`. |
+| `VLM_EXTRACT_PER_USER_PER_HOUR` | server | Per-user rate limit for `vlm.extract.start`. Default `10`.                                 |
+| `VLM_USER_MONTHLY_USD`          | server | Per-user monthly VLM spend cap, USD. Default `5`.                                          |
+| `VLM_CROSS_MODEL`               | server | Ensemble Gemini + OpenAI for high-stakes checks. Default `false`.                          |
+| `VLM_MODERATION_ON_GENERATION`  | server | Run VLM moderation on every finished generation. Default `false`.                          |
+| `CANON_BLOCK_ON_HIGH`           | server | Hard-block publish on block-severity canon conflicts. Default `false`.                     |
+| `VLM_CONTINUOUS_FILM`           | server | Phase 7 autoplay loop — enable on **ONE replica only**.                                    |
+| `VLM_AUTOPLAY_MAX_PER_DAY`      | server | Autoplay advancements per universe per day. Default `10`.                                  |
+| `VLM_AUTOPLAY_BUDGET_USD`       | server | Per-universe autoplay daily USD cap. Default `20`.                                         |
+| `VLM_AUTOPLAY_REQUIRE_VOTE`     | server | Require on-chain canon vote before advancing autoplay state. Default `true`.               |
+
+### Webhooks (Optional)
+
+HMAC-signed outbound webhooks delivered by the [webhook worker](../apps/server/src/workers/webhook.worker.ts). Receivers verify `X-Loar-Signature: sha256=<hex>` over `${X-Loar-Timestamp}.${body}`.
+
+| Variable                     | App    | Description                                                                                             |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `WEBHOOK_SIGNING_SECRET`     | server | HMAC-SHA256 secret used to sign outbound webhook bodies. When unset, `enqueueWebhook()` silently skips. |
+| `WEBHOOK_WORKER_CONCURRENCY` | server | Parallel webhook deliveries per worker. Default `10`.                                                   |
+
+### DMCA § 512(g) Auto-Putback (Optional)
+
+Automatically restores taken-down content when a counter-notice has been pending for the configured hold window with no court action filed. Critical for safe-harbor eligibility.
+
+| Variable                   | App    | Description                                                            |
+| -------------------------- | ------ | ---------------------------------------------------------------------- |
+| `DMCA_PUTBACK_ENABLED`     | server | Enable the auto-putback sweep. **ONE replica only.**                   |
+| `DMCA_PUTBACK_INTERVAL_MS` | server | Sweep interval. Default `3600000` (1h).                                |
+| `DMCA_PUTBACK_HOLD_DAYS`   | server | Hold period before putback. Default `14` calendar days (≈10 business). |
+| `DMCA_PUTBACK_BATCH_LIMIT` | server | Counter-notices processed per tick. Default `50`.                      |
+
+### MCP Server (Optional)
+
+| Variable             | App | Description                                                                   |
+| -------------------- | --- | ----------------------------------------------------------------------------- |
+| `LOAR_SERVER_URL`    | mcp | LOAR API base URL the MCP server proxies to. Default `http://localhost:3000`. |
+| `LOAR_API_KEY`       | mcp | API key used to authenticate MCP→server calls.                                |
+| `LOAR_MCP_TRANSPORT` | mcp | Transport: `stdio` (default, direct agent wiring) or `http`.                  |
+| `LOAR_MCP_HOST`      | mcp | HTTP bind host when `LOAR_MCP_TRANSPORT=http`. Default `0.0.0.0`.             |
+| `LOAR_MCP_PORT`      | mcp | HTTP bind port when `LOAR_MCP_TRANSPORT=http`. Default `4000`.                |
+
+### Mobile (Expo — EXPO*PUBLIC* prefix)
+
+Everything prefixed with `EXPO_PUBLIC_` is bundled into the app binary — **no secrets**. Read at build time via `expo-env`.
+
+| Variable                         | App    | Description                                                              |
+| -------------------------------- | ------ | ------------------------------------------------------------------------ |
+| `EXPO_PUBLIC_SERVER_URL`         | mobile | LOAR API base URL.                                                       |
+| `EXPO_PUBLIC_THIRDWEB_CLIENT_ID` | mobile | thirdweb project client ID (mirrors web).                                |
+| `EXPO_PUBLIC_APP_ENV`            | mobile | `production` \| `staging` \| `development`.                              |
+| `EXPO_PUBLIC_SENTRY_DSN`         | mobile | Sentry DSN for JS-layer crashes.                                         |
+| `EXPO_PUBLIC_RELEASE`            | mobile | Git SHA injected by CI at `eas build` time.                              |
+| `EXPO_PUBLIC_POSTHOG_KEY`        | mobile | PostHog project API key.                                                 |
+| `EXPO_PUBLIC_POSTHOG_HOST`       | mobile | PostHog host (`https://us.i.posthog.com` or `https://eu.i.posthog.com`). |
+
 ### Infrastructure (Optional)
 
 | Variable    | App    | Description                                                               |
@@ -111,6 +211,10 @@ When `REDIS_URL` is not set, the server uses an in-memory rate limiter (suitable
 | `LOG_LEVEL`                    | server | pino log level: `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal`. Defaults: `debug` dev, `info` prod.           |
 | `METRICS_AUTH_TOKEN`           | server | Bearer token required on `GET /metrics`. When unset, the endpoint is open — deploy on a private network or proxy allowlist. |
 | `SLACK_WEBHOOK_URL`            | server | Incoming webhook URL. Routes kill-switch flips and abuse flags to a Slack channel. No-op when unset.                        |
+| `POSTHOG_API_KEY`              | server | PostHog project API key for server-side product analytics events. When unset, server analytics is a silent no-op.           |
+| `POSTHOG_HOST`                 | server | PostHog host (`https://us.i.posthog.com`, `https://eu.i.posthog.com`, or self-hosted).                                      |
+| `VITE_POSTHOG_KEY`             | web    | PostHog project API key for the web SDK. Public-safe (write-only, scoped to one project).                                   |
+| `VITE_POSTHOG_HOST`            | web    | PostHog host for the web SDK.                                                                                               |
 | `ABUSE_DETECT_ENABLED`         | server | `true` to run the in-process abuse scan every 30 min. Enable on ONE replica only.                                           |
 | `ABUSE_DETECT_DAILY_THRESHOLD` | server | Spend rows in 24h that trigger a flag. Default `100`.                                                                       |
 | `ABUSE_DETECT_INTERVAL_MS`     | server | How often the scan runs. Default `1800000` (30 min).                                                                        |
@@ -133,6 +237,9 @@ The `/metrics` endpoint emits Prometheus exposition-format text and is intended 
 | `FIREBASE_STORAGE_BUCKET`   | server | Firebase Storage bucket name (for file uploads)                     |
 | `PINATA_JWT`                | server | Pinata API JWT (IPFS pinning — primary hot storage)                 |
 | `PINATA_GATEWAY_URL`        | server | Pinata gateway URL for content retrieval                            |
+| `PINATA_GATEWAY_TOKEN`      | server | Access token for dedicated `*.mypinata.cloud` gateways (optional)   |
+| `VITE_PINATA_GATEWAY_URL`   | web    | Client-side gateway URL (mirrors `PINATA_GATEWAY_URL`)              |
+| `VITE_PINATA_GATEWAY_TOKEN` | web    | Client-side gateway access token                                    |
 | `LIGHTHOUSE_API_KEY`        | server | Lighthouse API key (Filecoin/IPFS permanent storage + token-gating) |
 | `STORAGE_PROVIDER_PRIORITY` | server | Comma-separated priority order (e.g. `pinata,lighthouse,firebase`)  |
 

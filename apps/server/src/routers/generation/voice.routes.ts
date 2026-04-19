@@ -36,6 +36,7 @@ import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { publishToGallery } from '../../lib/gallery-publish';
 import { TRPCError } from '@trpc/server';
 
 // Idempotency token regex shared across voice procedures.
@@ -344,6 +345,17 @@ export const voiceRouter = router({
           category: 'sound',
         });
 
+        void publishToGallery({
+          creatorUid: ctx.user.uid,
+          mediaUrl: audioUrl,
+          mediaType: 'audio',
+          title: input.text.slice(0, 100) || 'Generated Voice',
+          description: input.text,
+          universeId: input.universeId || null,
+          generationId: genId,
+          generationModel: `elevenlabs:${input.modelId}`,
+        });
+
         fireJobWebhook({
           ownerUid: ctx.user.uid,
           webhookUrl: validatedWebhookUrl,
@@ -499,6 +511,17 @@ export const voiceRouter = router({
           audioUrl,
           label: `SFX — ${input.text.slice(0, 60)}`,
           category: 'sound',
+        });
+
+        void publishToGallery({
+          creatorUid: ctx.user.uid,
+          mediaUrl: audioUrl,
+          mediaType: 'audio',
+          title: input.text.slice(0, 100) || 'Generated SFX',
+          description: input.text,
+          generationId: genId,
+          generationModel: 'elevenlabs:sound_effect',
+          tags: ['sfx'],
         });
 
         fireJobWebhook({

@@ -27,6 +27,7 @@ import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { publishToGallery } from '../../lib/gallery-publish';
 import type { MeshyTaskOutput } from '../../services/meshy';
 
 // ── Pricing — loaded from platform config (admin-configurable) ────────
@@ -221,6 +222,12 @@ async function completeThreeDTask(opts: {
   timeoutMs: number;
   webhookUrl?: string;
   clientToken?: string;
+  // Gallery publish metadata — all optional since refine can inherit from the
+  // preview and image-to-3D has no text prompt.
+  prompt?: string | null;
+  universeId?: string | null;
+  parentGenerationId?: string | null;
+  sourceImageUrl?: string | null;
 }) {
   try {
     const task = await meshyService.waitForTask(
@@ -248,6 +255,26 @@ async function completeThreeDTask(opts: {
       thumbnailUrl: task.thumbnailUrl,
       type: opts.generationType,
     });
+
+    // Gallery publish — use GLB as the canonical model URL. Skipped silently
+    // if GLB is missing (provider occasionally omits it for failed textures).
+    const glbUrl = task.modelUrls?.glb;
+    if (glbUrl) {
+      const title = opts.prompt?.slice(0, 100) || 'Generated 3D Model';
+      void publishToGallery({
+        creatorUid: opts.userId,
+        mediaUrl: glbUrl,
+        mediaType: '3d',
+        title,
+        description: opts.prompt ?? '',
+        thumbnailUrl: task.thumbnailUrl ?? null,
+        universeId: opts.universeId ?? null,
+        generationId: opts.genId,
+        generationModel: `meshy:${opts.generationType}`,
+        parentGenerationId: opts.parentGenerationId ?? null,
+        sourceImageUrl: opts.sourceImageUrl ?? null,
+      });
+    }
 
     fireJobWebhook({
       ownerUid: opts.userId,
@@ -403,6 +430,8 @@ export const threedRouter = router({
           webhookUrl: validatedWebhookUrl,
           clientToken: input.clientToken,
           timeoutMs: 10 * 60 * 1000,
+          prompt: input.prompt,
+          universeId: input.universeId || null,
         }).catch((err) => console.error(`Background 3D preview ${genId} error:`, err));
 
         return {
@@ -505,6 +534,9 @@ export const threedRouter = router({
           generationType: 'text_refine',
           credits,
           timeoutMs: 15 * 60 * 1000,
+          prompt: previewData.prompt ?? null,
+          universeId: previewData.universeId ?? null,
+          parentGenerationId: input.previewGenerationId,
         }).catch((err) => console.error(`Background 3D refine ${genId} error:`, err));
 
         return {
@@ -637,6 +669,8 @@ export const threedRouter = router({
           webhookUrl: validatedWebhookUrl,
           clientToken: input.clientToken,
           timeoutMs: 15 * 60 * 1000,
+          universeId: input.universeId || null,
+          sourceImageUrl: input.imageUrls[0] ?? null,
         }).catch((err) => console.error(`Background 3D image-to-3d ${genId} error:`, err));
 
         return {

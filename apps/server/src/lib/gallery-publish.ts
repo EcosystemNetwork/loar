@@ -109,6 +109,7 @@ export function buildGalleryDoc(
     thumbnailUrl: input.thumbnailUrl ?? null,
     mediaType: input.mediaType,
     classification: 'original',
+    contentStatus: 'active',
     tags: input.tags ?? [],
     ipDeclaration: {
       isOriginal: true,

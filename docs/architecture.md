@@ -115,6 +115,55 @@ Server-only (never exposed to browser): `VLM_WORKER_DISABLED`, `VLM_WORKER_CONCU
 | [`components/vlm/CanonValidatorBanner.tsx`](../apps/web/src/components/vlm/CanonValidatorBanner.tsx) | Pre-publish consistency banner                    |
 | [`components/vlm/RiskBadge.tsx`](../apps/web/src/components/vlm/RiskBadge.tsx)                       | Compact risk chip for content cards + admin queue |
 
+## Cost Tracker & Controls
+
+Admin-only cost attribution layer. Every paid provider call (Fal, ByteDance, Gemini, OpenAI, Meshy, ElevenLabs, Lighthouse) goes through `services/cost-tracker/` which records the USD cost, tags it to a user + universe + job, and aggregates it for the `/admin/cost` dashboard.
+
+| Module                               | Purpose                                                                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `cost-tracker/record.ts`             | Single entry point — called from every provider adapter after billing.               |
+| `cost-tracker/controls.ts`           | Hard daily platform cap + margin target. Read-through cache with admin invalidation. |
+| `cost-tracker/alerts.ts`             | Background sweep — Slack + email when margin or cap breached.                        |
+| `cost-tracker/top-movers.ts`         | Biggest week-over-week cost shifts by provider and model.                            |
+| `cost-tracker/by-model.ts`           | Cost vs. revenue per model; surfaces negative-margin models.                         |
+| `cost-tracker/comparison.ts`         | Cost-per-output comparison across providers for the same modality.                   |
+| `cost-tracker/trend.ts`              | Daily cost + margin time series for the dashboard chart.                             |
+| `cost-tracker/csv-export.ts`         | Admin export for accounting / reconciliation.                                        |
+| `jobs/cost-alerts.ts`                | Cron driver for the alert sweep (enable on **ONE replica only**).                    |
+| `routers/admin/cost.routes.ts`       | Admin-only tRPC router — dashboard queries + controls mutations.                     |
+| `routes/admin-cost.ts`               | Hono HTTP route: CSV export endpoint (admin-only, same auth middleware).             |
+| `apps/web/src/routes/admin/cost.tsx` | Admin dashboard: margin gauges, top movers, by-model breakdown, CSV export.          |
+
+Hard cap behaviour: when today's platform spend reaches `COST_DAILY_PLATFORM_CAP_USD`, every paid provider call fails fast with `CostCapExceededError` until day rollover or an admin raises the cap via `admin.cost.controls.update`.
+
+## ERC-4337 Paymaster (Gas Sponsorship)
+
+Meta-transaction sponsorship for user actions (mint, vote, universe creation). Lets new users take on-chain actions without holding gas. See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
+
+- **Provider resolution** (first match wins): `THIRDWEB_SECRET_KEY` → `PIMLICO_API_KEY` → `BICONOMY_API_KEY`. When none set, `/api/paymaster` returns 501.
+- **Endpoints**: `POST /api/paymaster/sponsorUserOp`, `POST /api/paymaster/getUserOperationGasPrice`, `POST /api/paymaster/estimateUserOperationGas`.
+- **Quota**: `PAYMASTER_DAILY_LIMIT` sponsored ops per wallet per rolling 24h window.
+- **Frontend**: [apps/web/src/hooks/useSponsoredTransaction.ts](../apps/web/src/hooks/useSponsoredTransaction.ts) falls back to user-paid gas when sponsorship is unavailable.
+
+## Webhooks
+
+Outbound webhook delivery for external integrations (agents, partner integrations, analytics sinks).
+
+- **Enqueue**: server code calls `enqueueWebhook({url, payload, eventType})` from [apps/server/src/lib/webhooks.ts](../apps/server/src/lib/webhooks.ts).
+- **Worker**: [apps/server/src/workers/webhook.worker.ts](../apps/server/src/workers/webhook.worker.ts) consumes the BullMQ `webhook` queue with `WEBHOOK_WORKER_CONCURRENCY` parallel deliveries, HMAC-signs the body, retries with exponential backoff.
+- **Signing**: `X-Loar-Signature: sha256=<hex>` over `${X-Loar-Timestamp}.${body}` using `WEBHOOK_SIGNING_SECRET`. Receivers reject requests older than 5 minutes to defeat replay.
+- **Fail-open dev**: without `WEBHOOK_SIGNING_SECRET`, `enqueueWebhook()` silently skips so local dev isn't blocked.
+
+## CSAM / Hash-Matching (fingerprint service)
+
+Every image upload is scanned before it can be pinned to IPFS. See [apps/server/src/services/fingerprint/](../apps/server/src/services/fingerprint/).
+
+1. Local perceptual hash (pHash) → match against known-bad local hash list.
+2. External provider (PhotoDNA and/or Hive AI) for canonical industry-standard CSAM matching.
+3. Hit → block upload, write `contentAuditLog` entry, no content ever reaches IPFS.
+
+At least one external provider (`PHOTODNA_*` or `HIVE_API_KEY`) is required in production. Without one, only step 1 runs.
+
 ## Mobile App (apps/mobile)
 
 LOAR ships a React Native client alongside the web SPA. It reuses the same server contract (tRPC + SIWE JWT) and the same on-chain address set, so all Firestore docs, credits, and wallet activity are shared between web and mobile.
@@ -273,6 +322,18 @@ appRouter (61+ routers, 400+ procedures)
 | Lighthouse | `services/storage/`   | Lighthouse            | Filecoin permanent storage          |
 
 _Note: `minio.ts` uses Firebase Storage (migrated from MinIO, filename preserved). Storage providers are managed by `StorageManager` with priority-based fallback._
+
+### Observability & Product Analytics
+
+| Layer               | Tool                                       | Purpose                                                                                                             |
+| ------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Error tracking      | Sentry (server + web + mobile)             | Exception capture, release tagging via `VITE_RELEASE` / `EXPO_PUBLIC_RELEASE`.                                      |
+| Infra metrics       | Prometheus `/metrics` + Grafana            | HTTP, AI generation, storage, credits, auth counters + queue/breaker gauges. Bearer token via `METRICS_AUTH_TOKEN`. |
+| Product analytics   | PostHog (server + web + mobile)            | Autocapture + explicit events (`auth:siwe_verified`, `generation:admitted`, `credits:purchase_completed`, etc.).    |
+| Ops alerts          | Slack incoming webhook                     | Kill-switch flips, abuse flags, cost-cap breach.                                                                    |
+| Kill switch & quota | `platformConfig` Firestore doc + abuse job | Per-feature kill switches + monthly spend caps + auto-flagging.                                                     |
+
+PostHog docs: [docs/analytics.md](analytics.md). Event catalogue and privacy posture live there.
 
 ## Web Architecture
 

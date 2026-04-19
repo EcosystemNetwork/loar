@@ -461,6 +461,9 @@ export const studioRouter = router({
           .max(128)
           .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
           .optional(),
+
+        // Webhook delivery — signed POST on terminal state.
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -470,6 +473,16 @@ export const studioRouter = router({
         throw new Error(
           `Entity "${input.entityId}" not found. Cannot create asset pack for a non-existent entity.`
         );
+      }
+
+      // Validate webhookUrl early.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
       }
 
       const jobId = randomUUID();
@@ -518,6 +531,8 @@ export const studioRouter = router({
           totalFiatPriceUsd: withFiat(totalProviderCost),
           tasks: [],
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       // Deduct credits upfront
@@ -531,11 +546,27 @@ export const studioRouter = router({
             failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId,
+          kind: 'studio',
+          payload: {
+            status: 'failed',
+            errorMessage: err instanceof Error ? err.message : 'Credit deduction failed',
+          },
+        });
         throw err;
       }
 
-      // Fan out capability tasks (fire-and-forget, runs in background)
-      runPackJob(jobId, ctx.user.uid, input, totalCredits).catch((err) => {
+      // Fan out capability tasks (fire-and-forget, runs in background).
+      // Webhook fires from inside runPackJob on terminal state.
+      runPackJob(jobId, ctx.user.uid, input, totalCredits, {
+        webhookUrl: validatedWebhookUrl,
+        clientToken: input.clientToken,
+      }).catch((err) => {
         console.error(`Studio pack job ${jobId} failed:`, err);
       });
 
@@ -595,7 +626,8 @@ async function runPackJob(
     voiceId?: string;
     soundPromptOverride?: string;
   },
-  totalCreditsCharged: number
+  totalCreditsCharged: number,
+  webhookOpts?: { webhookUrl?: string; clientToken?: string }
 ): Promise<void> {
   const results: TaskResult[] = [];
   let creditsActuallyUsed = 0;
@@ -730,4 +762,29 @@ async function runPackJob(
       totalCreditsRefunded: creditsToRefund > 0 ? creditsToRefund : 0,
       completedAt: new Date(),
     });
+
+  // Fire webhook on terminal transition. `partial` counts as completed —
+  // the agent still receives a usable pack; payload includes per-task
+  // status so the caller can branch on counts.
+  if (webhookOpts?.webhookUrl) {
+    fireJobWebhook({
+      ownerUid: userId,
+      webhookUrl: webhookOpts.webhookUrl,
+      clientToken: webhookOpts.clientToken,
+      event: jobStatus === 'failed' ? 'job.failed' : 'job.completed',
+      jobId,
+      kind: 'studio',
+      payload: {
+        status: jobStatus,
+        entityId: input.entityId,
+        entityName: input.entityName,
+        capabilities: input.capabilities,
+        completedCount,
+        totalCount: results.length,
+        totalCreditsCharged,
+        totalCreditsActuallyUsed: creditsActuallyUsed,
+        totalCreditsRefunded: creditsToRefund > 0 ? creditsToRefund : 0,
+      },
+    });
+  }
 }

@@ -338,12 +338,16 @@ async function startSse(client) {
         if (req.method === 'POST' && url.pathname === '/messages') {
             const sessionId = url.searchParams.get('sessionId');
             if (!sessionId) {
-                res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'sessionId query param required' }));
+                res
+                    .writeHead(400, { 'Content-Type': 'application/json' })
+                    .end(JSON.stringify({ error: 'sessionId query param required' }));
                 return;
             }
             const entry = sessions.get(sessionId);
             if (!entry) {
-                res.writeHead(404, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: `Unknown sessionId: ${sessionId}` }));
+                res
+                    .writeHead(404, { 'Content-Type': 'application/json' })
+                    .end(JSON.stringify({ error: `Unknown sessionId: ${sessionId}` }));
                 return;
             }
             try {

@@ -56,17 +56,14 @@ function getClient(): Promise<PostHogLike | null> {
       const posthog = mod.default;
       posthog.init(key, {
         api_host: (import.meta.env.VITE_POSTHOG_HOST as string) ?? 'https://us.i.posthog.com',
-        // Autocapture: every click, form submit, input change — no manual wiring.
-        autocapture: true,
-        capture_pageview: true,
-        capture_pageleave: true,
-        // Session replay — valuable for debugging user-reported issues. Masks
-        // inputs, passwords, and any element with .ph-no-capture class.
-        disable_session_recording: false,
+        // 2026-01-30 defaults bundle turns on autocapture, pageview/pageleave,
+        // session replay with masked inputs, and respect_dnt in one switch.
+        defaults: '2026-01-30',
+        // Only create person profiles for identified (logged-in wallet) users.
+        // Keeps anonymous browsing sessions lightweight + cuts PostHog cost.
+        person_profiles: 'identified_only',
+        // Extra hardening on top of the defaults — mask anything tagged .ph-mask.
         session_recording: { maskAllInputs: true, maskTextSelector: '.ph-mask' },
-        // Respect Do Not Track headers.
-        respect_dnt: true,
-        // In dev, log what's sent to the console for debugging.
         loaded: (ph: PostHogLike) => {
           if (import.meta.env.DEV) {
             ph.debug?.(false);
