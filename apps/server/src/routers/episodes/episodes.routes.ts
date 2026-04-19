@@ -115,11 +115,19 @@ async function deductCredits(uid: string, credits: number): Promise<void> {
 async function refundCredits(uid: string, credits: number): Promise<void> {
   if (!db) return;
   const ref = db.collection('userCredits').doc(uid);
-  await ref.update({
-    balance: FieldValue.increment(credits),
-    totalSpent: FieldValue.increment(-credits),
-    updatedAt: new Date(),
-  });
+  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
+  try {
+    await ref.update({
+      balance: FieldValue.increment(credits),
+      totalSpent: FieldValue.increment(-credits),
+      updatedAt: new Date(),
+    });
+    recordCreditsTx('refund', 'success');
+  } catch (err) {
+    recordCreditsTx('refund', 'failure');
+    throw err;
+  }
+  recordAiGeneration('multi', 'episodes', 'failure');
 }
 
 // ── Background export ───────────────────────────────────────────────────

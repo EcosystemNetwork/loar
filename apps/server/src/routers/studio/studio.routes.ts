@@ -56,6 +56,7 @@ import {
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { reserveClientToken } from '../../lib/jobIdempotency';
 import { createAttachment } from '../media/media.handlers';
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -156,13 +157,16 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
 async function refundCredits(userId: string, credits: number): Promise<void> {
   if (credits <= 0) return;
   const ref = db.collection('userCredits').doc(userId);
+  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
   try {
     await ref.update({
       balance: FieldValue.increment(credits),
       totalSpent: FieldValue.increment(-credits),
       updatedAt: new Date(),
     });
+    recordCreditsTx('refund', 'success');
   } catch (err) {
+    recordCreditsTx('refund', 'failure');
     console.error(`CRITICAL: Studio pack credit refund failed for ${userId}:`, err);
     logFailedRefund({
       userId,
@@ -172,6 +176,7 @@ async function refundCredits(userId: string, credits: number): Promise<void> {
       error: err instanceof Error ? err.message : 'Unknown',
     });
   }
+  recordAiGeneration('multi', 'studio', 'failure');
 }
 
 // ── Task runners ──────────────────────────────────────────────────────
@@ -446,6 +451,14 @@ export const studioRouter = router({
         voiceText: z.string().optional(), // for voice capability
         voiceId: z.string().optional(), // ElevenLabs voice ID for voice capability
         soundPromptOverride: z.string().optional(),
+
+        // Idempotency token — see docs/prd-mcp-integration.md §2.
+        clientToken: z
+          .string()
+          .min(16)
+          .max(128)
+          .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -458,6 +471,28 @@ export const studioRouter = router({
       }
 
       const jobId = randomUUID();
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId,
+          procedure: 'studio.createEntityPack',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await studioJobsCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            jobId: reservation.existing.jobId,
+            status: (d.status ?? 'running') as 'running' | 'completed' | 'failed',
+            capabilities: (d.capabilities ?? input.capabilities) as typeof input.capabilities,
+            totalCreditsCharged: (d.totalCreditsCharged ?? 0) as number,
+            totalFiatPriceUsd: (d.totalFiatPriceUsd ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
 
       // Estimate total credits upfront
       const totalProviderCost = input.capabilities.reduce(
@@ -508,6 +543,7 @@ export const studioRouter = router({
         capabilities: input.capabilities,
         totalCreditsCharged: totalCredits,
         totalFiatPriceUsd: withFiat(totalProviderCost),
+        idempotentReplay: false as const,
       };
     }),
 
