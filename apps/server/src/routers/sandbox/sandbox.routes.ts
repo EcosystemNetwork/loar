@@ -51,14 +51,28 @@ export const sandboxRouter = router({
         prompt: z.string().min(1).max(2000),
         imageUrl: z.string().url().optional(),
         videoUrl: z.string().url().optional(),
+        audioUrl: z.string().url().optional(),
+        modelUrl: z.string().url().optional(),
+        thumbnailUrl: z.string().url().optional(),
+        kind: z.enum(['image', 'video', 'audio', '3d']).optional(),
         model: z.string().optional(),
         tags: z.array(z.string()).max(10).default([]),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
-      const hasMedia = !!(input.videoUrl || input.imageUrl);
-      const mediaType = input.videoUrl ? 'ai-video' : 'ai-image';
+      const hasMedia = !!(input.videoUrl || input.imageUrl || input.audioUrl || input.modelUrl);
+      // Pick the canonical media URL + content media type. Priority follows the
+      // visual richness of the asset so the gallery shows the most useful preview.
+      const primaryMediaUrl =
+        input.videoUrl || input.modelUrl || input.audioUrl || input.imageUrl || '';
+      const mediaType = input.videoUrl
+        ? 'ai-video'
+        : input.modelUrl
+          ? 'ai-3d'
+          : input.audioUrl
+            ? 'ai-audio'
+            : 'ai-image';
 
       const draftRef = await sandboxCol().add({
         creatorAddress: ctx.user.address,
@@ -67,6 +81,10 @@ export const sandboxRouter = router({
         prompt: input.prompt,
         imageUrl: input.imageUrl || null,
         videoUrl: input.videoUrl || null,
+        audioUrl: input.audioUrl || null,
+        modelUrl: input.modelUrl || null,
+        thumbnailUrl: input.thumbnailUrl || input.imageUrl || null,
+        kind: input.kind || (input.videoUrl ? 'video' : input.imageUrl ? 'image' : 'image'),
         model: input.model || null,
         tags: input.tags,
         status: 'draft',
@@ -76,7 +94,7 @@ export const sandboxRouter = router({
 
       let contentId: string | null = null;
       if (hasMedia) {
-        const mediaUrl = input.videoUrl || input.imageUrl || '';
+        const mediaUrl = primaryMediaUrl;
         // Transaction prevents duplicate gallery rows when batch generations
         // resolve concurrently with the same mediaUrl.
         const result = await db!.runTransaction(async (tx) => {
@@ -103,7 +121,7 @@ export const sandboxRouter = router({
             title: input.title,
             description: input.prompt || '',
             mediaUrl,
-            thumbnailUrl: input.imageUrl || null,
+            thumbnailUrl: input.thumbnailUrl || input.imageUrl || null,
             mediaType,
             classification: 'fan' as const,
             tags: input.tags || [],
@@ -232,6 +250,10 @@ export const sandboxRouter = router({
       prompt: d.prompt as string,
       imageUrl: d.imageUrl as string | null,
       videoUrl: d.videoUrl as string | null,
+      audioUrl: (d.audioUrl as string | null) ?? null,
+      modelUrl: (d.modelUrl as string | null) ?? null,
+      thumbnailUrl: (d.thumbnailUrl as string | null) ?? (d.imageUrl as string | null) ?? null,
+      kind: (d.kind as string | null) ?? (d.videoUrl ? 'video' : 'image'),
       model: d.model as string | null,
       tags: d.tags as string[],
       status: d.status as string,
