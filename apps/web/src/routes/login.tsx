@@ -42,7 +42,7 @@ function LoginPage() {
       <div className="max-w-md w-full space-y-8 text-center">
         {/* Logo */}
         <div className="space-y-4">
-          <img src="/loarlogo.svg" alt="LOAR" className="h-16 w-auto mx-auto" />
+          <img src="/loarIconTextLogo.png" alt="LOAR" className="h-16 w-auto mx-auto" />
           <h1 className="text-2xl font-bold tracking-tight">Welcome to LOAR</h1>
           <p className="text-muted-foreground">Decentralized Narrative Control Suite</p>
         </div>

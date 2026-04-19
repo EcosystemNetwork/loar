@@ -101,7 +101,11 @@ export default function Header() {
           {/* Left side - Logo and Navigation */}
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-3">
-              <img src="/loarlogo.svg" alt="LOAR Logo" className="h-9 w-auto object-contain" />
+              <img
+                src="/loarIconTextLogo.png"
+                alt="LOAR Logo"
+                className="h-9 w-auto object-contain"
+              />
             </Link>
             <nav className="hidden lg:flex items-center gap-1">
               {primaryLinks.map(({ to, label }) => {
