@@ -229,6 +229,16 @@ export const moderationRouter = router({
         await batch.commit();
       }
 
+      // PostHog: admin moderation audit trail.
+      void import('../../lib/analytics').then(({ captureServerEvent }) =>
+        captureServerEvent('moderation:content_status_changed', {
+          distinctId: ctx.user.uid,
+          contentId: input.contentId,
+          newStatus: input.newStatus,
+          hasReason: Boolean(input.reason),
+        })
+      );
+
       return { ok: true, newStatus: input.newStatus };
     }),
 
@@ -263,6 +273,14 @@ export const moderationRouter = router({
           createdAt: new Date().toISOString(),
         });
       }
+
+      void import('../../lib/analytics').then(({ captureServerEvent }) =>
+        captureServerEvent('moderation:takedown_resolved', {
+          distinctId: ctx.user.uid,
+          takedownId: input.takedownId,
+          action: input.action,
+        })
+      );
 
       return { ok: true };
     }),

@@ -241,6 +241,22 @@ function PrivacyPage() {
                 <strong>Cloud infrastructure</strong> (Google Cloud / Firebase): Hosts our backend
                 services, databases, and fallback content storage. Processes all off-chain data.
               </li>
+              <li>
+                <strong>Product analytics</strong> (PostHog): Receives anonymised usage events (page
+                views, clicks, session duration, feature usage), your wallet address as user
+                identifier, and optional masked session replay. Input field values are masked and
+                never transmitted. You can opt out via your browser&apos;s Do-Not-Track setting.
+              </li>
+              <li>
+                <strong>Error monitoring</strong> (Sentry): Receives crash reports and stack traces
+                when the application errors, including the URL and minimal context (wallet address,
+                release version). No input data or PII.
+              </li>
+              <li>
+                <strong>Transactional email</strong> (Resend): Sends system emails such as DMCA §
+                512(g) claimant notifications. Receives the recipient email address and message
+                contents.
+              </li>
             </ul>
             <p>
               We do not sell, rent, or trade your personal information to third parties for their
