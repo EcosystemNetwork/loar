@@ -847,6 +847,14 @@ import('./services/pricing/heartbeat')
   .then(({ startPricingHeartbeat }) => startPricingHeartbeat())
   .catch((err) => console.warn('[pricing] Failed to start heartbeat:', err));
 
+// Abuse-detect scan (opt-in via ABUSE_DETECT_ENABLED=true). Only one replica
+// should run this in a multi-replica deploy — gate on e.g. a dedicated
+// worker hostname or a Redis-locked leader election before turning on
+// globally.
+import('./jobs/abuse-detect')
+  .then(({ startAbuseDetectJob }) => startAbuseDetectJob())
+  .catch((err) => console.warn('[abuse-detect] failed to start:', err));
+
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);

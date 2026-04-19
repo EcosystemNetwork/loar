@@ -94,5 +94,6 @@ service cloud.firestore {
     // universeCreditTransactions — universe pool audit trail
     // universeTeamMembers — team membership (server manages)
     // pendingPurchases    — Stripe purchase flow state
+    // abuseFlags          — anomaly-detector output (high-volume wallets)
   }
 }

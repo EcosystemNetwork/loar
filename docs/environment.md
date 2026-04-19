@@ -101,13 +101,19 @@ When `REDIS_URL` is not set, the server uses an in-memory rate limiter (suitable
 
 ### Observability (Optional)
 
-| Variable             | App    | Description                                                                                                                 |
-| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `SENTRY_DSN`         | server | Sentry DSN for server-side error reporting. When unset, Sentry is inert.                                                    |
-| `VITE_SENTRY_DSN`    | web    | Public Sentry DSN for the web bundle. Safe to expose — DSNs are project-scoped write-only keys.                             |
-| `VITE_RELEASE`       | web    | Release identifier (typically a git SHA) injected at build time so Sentry groups errors by deployed version.                |
-| `LOG_LEVEL`          | server | pino log level: `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal`. Defaults: `debug` dev, `info` prod.           |
-| `METRICS_AUTH_TOKEN` | server | Bearer token required on `GET /metrics`. When unset, the endpoint is open — deploy on a private network or proxy allowlist. |
+| Variable                       | App    | Description                                                                                                                 |
+| ------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `SENTRY_DSN`                   | server | Sentry DSN for server-side error reporting. When unset, Sentry is inert.                                                    |
+| `VITE_SENTRY_DSN`              | web    | Public Sentry DSN for the web bundle. Safe to expose — DSNs are project-scoped write-only keys.                             |
+| `VITE_RELEASE`                 | web    | Release identifier (typically a git SHA) injected at build time so Sentry groups errors by deployed version.                |
+| `LOG_LEVEL`                    | server | pino log level: `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal`. Defaults: `debug` dev, `info` prod.           |
+| `METRICS_AUTH_TOKEN`           | server | Bearer token required on `GET /metrics`. When unset, the endpoint is open — deploy on a private network or proxy allowlist. |
+| `SLACK_WEBHOOK_URL`            | server | Incoming webhook URL. Routes kill-switch flips and abuse flags to a Slack channel. No-op when unset.                        |
+| `ABUSE_DETECT_ENABLED`         | server | `true` to run the in-process abuse scan every 30 min. Enable on ONE replica only.                                           |
+| `ABUSE_DETECT_DAILY_THRESHOLD` | server | Spend rows in 24h that trigger a flag. Default `100`.                                                                       |
+| `ABUSE_DETECT_INTERVAL_MS`     | server | How often the scan runs. Default `1800000` (30 min).                                                                        |
+| `ABUSE_DETECT_SCAN_LIMIT`      | server | Most-recent `userCredits` docs to inspect each tick. Default `500`.                                                         |
+| `ABUSE_DETECT_COOLDOWN_MS`     | server | Cooldown window that suppresses re-flagging the same wallet. Default `21600000` (6 hours).                                  |
 
 The `/metrics` endpoint emits Prometheus exposition-format text and is intended to be scraped every 15–60s. It bypasses the global rate limit. In addition to the default Node process metrics (prefix `loar_`), the server exports counters for HTTP requests, AI generations, storage uploads, credits transactions, and auth events, plus live gauges for queue depth and circuit breaker state.
 

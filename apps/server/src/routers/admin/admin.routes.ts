@@ -14,7 +14,19 @@ import {
   getPlatformConfig,
   invalidatePlatformConfigCache,
   DEFAULT_PLATFORM_CONFIG,
+  type PlatformConfig,
 } from '../../services/platformConfig';
+import { sendSlackAlert } from '../../lib/slack';
+
+// Kill-switch fields that warrant a Slack alert when flipped.
+const ALERT_FIELDS = [
+  'generationEnabled',
+  'mintingEnabled',
+  'purchaseEnabled',
+  'registrationEnabled',
+  'monthlySpendCapEnabled',
+] as const;
+type AlertField = (typeof ALERT_FIELDS)[number];
 
 const configCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -89,6 +101,35 @@ export const adminRouter = router({
     });
 
     invalidatePlatformConfigCache();
+
+    // Fire a Slack alert when a kill-switch or the spend-cap toggle flips.
+    // Only report fields whose NEW value differs from the old one — a PATCH
+    // can include a field without changing it (e.g. resending the same
+    // value from the admin UI).
+    const flips: Array<{ field: AlertField; from: unknown; to: unknown }> = [];
+    for (const field of ALERT_FIELDS) {
+      if (field in input) {
+        const before = (current as PlatformConfig)[field];
+        const after = (input as Record<string, unknown>)[field];
+        if (before !== after) flips.push({ field, from: before, to: after });
+      }
+    }
+    if (flips.length > 0) {
+      const critical = flips.some((f) => f.to === false && f.field !== 'monthlySpendCapEnabled');
+      void sendSlackAlert({
+        title: critical
+          ? `Kill switch flipped OFF: ${flips.map((f) => f.field).join(', ')}`
+          : `Platform config toggles changed: ${flips.map((f) => f.field).join(', ')}`,
+        body:
+          `Changed by \`${ctx.user.uid}\`.\n` +
+          `Effect propagates server-wide within ~60s (platformConfig cache TTL).`,
+        fields: flips.map((f) => ({
+          label: f.field,
+          value: `\`${String(f.from)}\` → \`${String(f.to)}\``,
+        })),
+        severity: critical ? 'critical' : 'warn',
+      });
+    }
 
     return { ok: true, config: updated };
   }),
