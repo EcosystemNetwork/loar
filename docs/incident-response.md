@@ -136,6 +136,24 @@ Response:
 2. If lag is < 60 blocks, usually self-corrects. Communicate "indexer catching up" in the #status Slack and wait.
 3. If lag is > 1000 blocks or growing: file SEV2, may need a reindex from a checkpoint.
 
+### DMCA counter-notice received — decide: putback or freeze?
+
+**Signal**: email from the `/dmca` counter-notice form, or Slack ping from the putback job when the 14-day hold is near expiry.
+
+Per 17 U.S.C. § 512(g), when a counter-notice comes in we MUST either restore the content after 10–14 business days OR receive proof the original claimant filed a court action. Auto-putback does #1 for us; #2 requires operator action.
+
+1. Review the counter-notice in [`/admin/ops`](../apps/web/src/routes/admin/ops.tsx) (DMCA section, once the UI ships) or via `admin.listCounterNotices` tRPC.
+2. Check whether the original claimant has filed a court action against the respondent. Typical evidence: a case number and filing court.
+3. **If yes — freeze the putback timer:**
+   - Call `admin.markCourtAction({ takedownId, caseReference })`. Sets the takedown status to `court_action_filed` and the auto-putback job will skip that row.
+   - The content stays down until the case resolves (or an admin manually reinstates).
+4. **If no — let the timer run:**
+   - Do nothing. After `DMCA_PUTBACK_HOLD_DAYS` (default 14) the putback job will auto-restore the content, write an immutable audit row, and Slack-alert `#ops`.
+   - To force the sweep immediately (e.g. staging test, or post-incident backlog), call `admin.runDmcaPutbackSweep` — it respects the hold period so won't release anything early.
+5. File the decision + supporting documents in the legal archive so we can produce them if the safe-harbor defence is ever challenged.
+
+Never manually flip a counter-noticed content back to `active` without either the court-action freeze or the auto-putback having fired. The audit log is the legal defence; bypassing it removes the defence.
+
 ### Governance drift — a contract is no longer owned by the Timelock
 
 **Signal**: weekly drift-check CI job (or an ad-hoc [`VerifyMultisigTransfer.s.sol`](../apps/contracts/script/VerifyMultisigTransfer.s.sol) run) reports `MISMATCHED > 0`. Or Etherscan shows an unexpected `OwnershipTransferred` event on a core contract.

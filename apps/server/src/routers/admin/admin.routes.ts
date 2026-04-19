@@ -201,6 +201,71 @@ export const adminRouter = router({
       return { ok: true };
     }),
 
+  // ── DMCA § 512(g) counter-notice putback management ───────────────
+
+  /** List counter-notices by status — default: pending ones in the hold window. */
+  listCounterNotices: adminProcedure
+    .input(
+      z.object({
+        status: z
+          .enum(['pending', 'putback_complete', 'rejected', 'court_action_filed'])
+          .optional(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      let q = db.collection('counterNotices').orderBy('createdAt', 'desc');
+      if (input.status) q = q.where('status', '==', input.status) as typeof q;
+      const snap = await q.limit(input.limit).get();
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }),
+
+  /**
+   * Claimant filed a court action — freeze the auto-putback timer so the
+   * content stays down. Call before the hold period expires.
+   */
+  markCourtAction: adminProcedure
+    .input(
+      z.object({
+        takedownId: z.string().min(1),
+        caseReference: z.string().min(1).max(500),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date().toISOString();
+      const tdRef = db.collection('takedownRequests').doc(input.takedownId);
+      const tdDoc = await tdRef.get();
+      if (!tdDoc.exists) throw new Error('Takedown not found');
+
+      await tdRef.update({
+        status: 'court_action_filed',
+        courtActionReference: input.caseReference,
+        courtActionMarkedBy: ctx.user.uid,
+        courtActionMarkedAt: now,
+      });
+
+      await db.collection('contentAuditLog').add({
+        contentId: (tdDoc.data() as { contentId?: string }).contentId ?? null,
+        action: 'dmca_court_action_noted',
+        takedownRequestId: input.takedownId,
+        adminUid: ctx.user.uid,
+        reason: `Court action filed: ${input.caseReference}. Auto-putback timer frozen.`,
+        createdAt: now,
+      });
+
+      return { ok: true };
+    }),
+
+  /**
+   * Run the putback sweep immediately. Useful to clear a backlog after the
+   * job has been disabled, or to verify the job's behaviour on staging.
+   * Respects the same hold period — won't release counter-notices early.
+   */
+  runDmcaPutbackSweep: adminProcedure.mutation(async () => {
+    const { dmcaPutbackOnce } = await import('../../jobs/dmca-putback');
+    return dmcaPutbackOnce();
+  }),
+
   // ── Audit history ─────────────────────────────────────────────────
 
   getConfigAudit: adminProcedure

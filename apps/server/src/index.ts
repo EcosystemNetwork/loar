@@ -855,6 +855,12 @@ import('./jobs/abuse-detect')
   .then(({ startAbuseDetectJob }) => startAbuseDetectJob())
   .catch((err) => console.warn('[abuse-detect] failed to start:', err));
 
+// DMCA § 512(g) counter-notice auto-putback (opt-in via DMCA_PUTBACK_ENABLED=true).
+// Like abuse-detect, only ONE replica should run this to avoid duplicate writes.
+import('./jobs/dmca-putback')
+  .then(({ startDmcaPutbackJob }) => startDmcaPutbackJob())
+  .catch((err) => console.warn('[dmca-putback] failed to start:', err));
+
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);
