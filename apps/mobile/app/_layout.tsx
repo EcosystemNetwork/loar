@@ -10,6 +10,10 @@
 // thirdweb requires crypto.getRandomValues; polyfill must import before any thirdweb code.
 import 'react-native-get-random-values';
 
+// Side-effect import: initializes Sentry if EXPO_PUBLIC_SENTRY_DSN is set.
+// Must run before any JS-layer error handlers so bootstrap crashes are captured.
+import '../src/lib/sentry';
+
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
