@@ -81,7 +81,8 @@ add_env "VITE_SERVER_URL"               "https://api.loar.fun"
 add_env "VITE_PONDER_URL"               "https://idx.loar.fun"
 
 # ── Public contract addresses ────────────────────────────────
-add_env "VITE_LOAR_TOKEN_ADDRESS"       "0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F"
+# Per-chain addresses (LOAR token, manager, routers, etc.) are compiled in
+# apps/web/src/configs/addresses.ts — only treasury remains env-driven.
 add_env "VITE_TREASURY_ADDRESS"         "0x116C28e6DCABCa363f83217C712d79DCE168d90e"
 
 # ── Firebase web client (public SDK credentials) ─────────────

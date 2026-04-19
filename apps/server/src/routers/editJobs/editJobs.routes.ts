@@ -17,10 +17,9 @@ import { TRPCError } from '@trpc/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
-import { falService } from '../../services/fal';
 import { getStorageManager } from '../../services/storage/manager';
 import { getEditingModelById } from '../../services/editing-models';
-import { editOpSchema, layerStateSchema, type EditJobRecord } from './editJobs.types';
+import { editOpSchema, layerStateSchema, type EditJobRecord, type EditOp } from './editJobs.types';
 import {
   appendMaskUpload,
   getJob,
@@ -33,9 +32,17 @@ import {
   openSession,
   promoteJobToVersion,
   saveJob,
+  setCapturedFrame,
   setCurrentVersion as setCurrentVersionHandler,
   updateSession,
 } from './editJobs.handlers';
+import {
+  dispatchInpaint,
+  dispatchOutpaint,
+  dispatchRelight,
+  dispatchRetexture,
+  getOutpaintCreditCost,
+} from './dispatchers';
 
 // ── Auth / ownership ────────────────────────────────────────────────────
 
@@ -237,7 +244,62 @@ export const editJobsRouter = router({
       return { maskId, url, contentHash: manifest.contentHash };
     }),
 
-  /** Dispatch an edit job. Phase 1: one op per job (inpaint only). */
+  /**
+   * Capture a still from a video asset into the session so the user can edit
+   * a single frame. The frame is uploaded to storage and its URL becomes the
+   * working surface for image-based ops until cleared or replaced.
+   */
+  captureFrame: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        /** data: URL (image/jpeg or image/png) */
+        frameDataUrl: z.string().min(32),
+        /** seconds offset in the source video */
+        time: z.number().min(0).default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const session = await assertSessionOwner(ctx.user.uid, input.sessionId);
+      const match = /^data:(image\/(?:jpeg|png));base64,(.+)$/i.exec(input.frameDataUrl);
+      if (!match) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'frameDataUrl must be a JPEG/PNG data URL',
+        });
+      }
+      const mime = match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length === 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Empty frame payload' });
+      }
+      if (buffer.length > 15 * 1024 * 1024) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Frame exceeds 15MB' });
+      }
+      const filename = `frame-${session.id}-${Date.now()}.${mime === 'image/jpeg' ? 'jpg' : 'png'}`;
+      const manifest = await getStorageManager().upload(buffer, filename, mime, ctx.user.uid);
+      const url = manifest.uploads[0]?.url;
+      if (!url)
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Frame upload failed' });
+
+      await setCapturedFrame(session.id, { url, time: input.time });
+
+      return { url, time: input.time };
+    }),
+
+  /** Clear the captured frame (go back to editing the source). */
+  clearCapturedFrame: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await assertSessionOwner(ctx.user.uid, input.sessionId);
+      await setCapturedFrame(session.id, null);
+      return { ok: true };
+    }),
+
+  /**
+   * Dispatch an edit job. One op per job. Routes to the right service per
+   * op kind (inpaint/outpaint/relight/retexture).
+   */
   create: protectedProcedure
     .input(
       z.object({
@@ -258,104 +320,83 @@ export const editJobsRouter = router({
       const op = input.ops[0];
       const jobId = randomUUID();
 
-      if (op.kind !== 'inpaint') {
+      // Image-based ops run against the captured frame when the base is video.
+      const baseIsVideo = baseVersion.mediaType === 'video' || baseVersion.mediaType === 'ai-video';
+      const workingUrl = session.capturedFrameUrl ?? baseVersion.mediaUrl;
+      if (baseIsVideo && !session.capturedFrameUrl) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Only inpaint ops are supported in Phase 1',
+          message: 'Capture a frame from the video before running an edit.',
         });
       }
 
-      const model = getEditingModelById(op.modelId);
-      if (!model || model.operation !== 'inpaint') {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid inpaint model' });
-      }
-
-      const mask = (session.maskUploads || []).find((m) => m.id === op.maskId);
-      if (!mask) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Mask not found on session — upload it first',
-        });
-      }
-
-      if (op.mode === 'replace' && !op.prompt.trim()) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Replace mode requires a prompt describing what to fill in.',
-        });
-      }
-
-      await deductCredits(ctx.user.uid, model.creditCost, 'inpaint');
+      // Resolve credit cost + operation label for persistence before dispatch.
+      const { creditCost, operation } = resolveOpCostAndLabel(op);
+      await deductCredits(ctx.user.uid, creditCost, operation);
       const startTime = Date.now();
-
-      // Compose prompts exactly like the existing editing router so behavior
-      // is consistent across /editor and /studio/edit.
-      const { prompt, negativePrompt } = composeInpaintPrompt(op.mode, op.prompt);
-      const finalNegative = op.negativePrompt
-        ? `${negativePrompt}, ${op.negativePrompt}`
-        : negativePrompt;
 
       let record: EditJobRecord = {
         id: jobId,
         userId: ctx.user.uid,
         status: 'running',
-        operation: 'inpaint',
-        modelId: model.id,
+        operation,
+        modelId: 'modelId' in op ? op.modelId : 'nano-banana-pro-preview',
         contentId: session.contentId,
         sessionId: session.id,
         baseVersionId: baseVersion.id,
         resultVersionId: null,
-        inputUrl: baseVersion.mediaUrl,
+        inputUrl: workingUrl,
         outputUrl: null,
-        prompt: op.prompt,
-        negativePrompt: op.negativePrompt ?? null,
-        maskUrl: mask.url,
-        seed: op.seed ?? null,
+        prompt: 'prompt' in op ? (op.prompt ?? null) : null,
+        negativePrompt: 'negativePrompt' in op ? (op.negativePrompt ?? null) : null,
+        maskUrl: null,
+        seed: 'seed' in op && typeof op.seed === 'number' ? op.seed : null,
         providerCostUsd: 0,
         creditsCharged: 0,
         latencyMs: null,
         failureReason: null,
         opsPlan: input.ops,
-        aspectRatio: session.aspectRatio,
+        aspectRatio: op.kind === 'outpaint' ? op.targetAspect : session.aspectRatio,
         createdAt: new Date(),
         completedAt: null,
       };
       await saveJob(record);
 
-      const result = await falService.inpaintImage({
-        imageUrl: baseVersion.mediaUrl,
-        maskUrl: mask.url,
-        prompt,
-        model: model.falModelId,
-        negativePrompt: finalNegative,
-        seed: op.seed,
-        strength: op.strength,
-        guidanceScale: op.guidanceScale,
+      const result = await runDispatcher(op, {
+        session,
+        workingUrl,
+        userId: ctx.user.uid,
+        jobId,
+        creditCost,
       });
 
-      if (result.status === 'failed' || !result.imageUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
+      if (result.status !== 'ok') {
+        await refundCredits(ctx.user.uid, result.creditsToRefund);
         record = {
           ...record,
           status: 'failed',
-          failureReason: result.error || 'Inpaint failed',
+          failureReason: result.error,
           completedAt: new Date(),
           latencyMs: Date.now() - startTime,
         };
         await saveJob(record);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Inpaint failed',
+          message: result.error,
         });
       }
 
       record = {
         ...record,
         status: 'completed',
-        outputUrl: result.imageUrl,
-        seed: result.seed ?? op.seed ?? null,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
+        modelId: result.modelId,
+        outputUrl: result.outputUrl,
+        prompt: result.prompt,
+        negativePrompt: result.negativePrompt,
+        maskUrl: result.maskUrl,
+        seed: result.seed,
+        providerCostUsd: result.providerCostUsd,
+        creditsCharged: result.creditsCharged,
         latencyMs: Date.now() - startTime,
         completedAt: new Date(),
       };
@@ -364,8 +405,8 @@ export const editJobsRouter = router({
       return {
         jobId,
         status: 'completed' as const,
-        outputUrl: result.imageUrl,
-        model: model.displayName,
+        outputUrl: result.outputUrl,
+        model: result.modelDisplayName,
       };
     }),
 
@@ -468,40 +509,110 @@ export const editJobsRouter = router({
     }),
 });
 
-// ── Prompt composition (mirrors editing.routes.ts) ─────────────────────
+// ── Op routing helpers ─────────────────────────────────────────────────
 
-const UNIVERSAL_NEGATIVE =
-  'blurry, low quality, watermark, jpeg artifacts, extra limbs, deformed, seams, halo';
+type OpOperationLabel = EditJobRecord['operation'];
 
-function composeInpaintPrompt(
-  mode: 'replace' | 'remove' | 'add' | 'fix',
-  userPrompt: string
-): { prompt: string; negativePrompt: string } {
-  const trimmed = (userPrompt || '').trim();
-  switch (mode) {
-    case 'remove':
-      return {
-        prompt: trimmed
-          ? `clean background, seamless fill matching surroundings, ${trimmed}, photorealistic, no object, empty space`
-          : 'clean background, seamless fill matching surroundings, photorealistic, no object, empty space',
-        negativePrompt: `${UNIVERSAL_NEGATIVE}, any object, figure, text, logo, character`,
-      };
-    case 'add':
-      return {
-        prompt: trimmed
-          ? `${trimmed}, seamlessly integrated, matching lighting and perspective, photorealistic detail`
-          : 'new object, seamlessly integrated, matching lighting and perspective',
-        negativePrompt: UNIVERSAL_NEGATIVE,
-      };
-    case 'fix':
-      return {
-        prompt: trimmed
-          ? `${trimmed}, highly detailed, anatomically correct, sharp focus, high quality`
-          : 'highly detailed, anatomically correct, sharp focus, high quality, natural proportions',
-        negativePrompt: `${UNIVERSAL_NEGATIVE}, malformed, mutated, bad anatomy, bad hands, extra fingers, fused fingers, disfigured`,
-      };
-    case 'replace':
-    default:
-      return { prompt: trimmed, negativePrompt: UNIVERSAL_NEGATIVE };
+function resolveOpCostAndLabel(op: EditOp): {
+  creditCost: number;
+  operation: OpOperationLabel;
+} {
+  switch (op.kind) {
+    case 'inpaint': {
+      const model = getEditingModelById(op.modelId);
+      if (!model || model.operation !== 'inpaint')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid inpaint model' });
+      return { creditCost: model.creditCost, operation: 'inpaint' };
+    }
+    case 'outpaint': {
+      return { creditCost: getOutpaintCreditCost(), operation: 'outpaint' };
+    }
+    case 'relight': {
+      const model = getEditingModelById(op.modelId);
+      if (!model || model.operation !== 'relight')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid relight model' });
+      return { creditCost: model.creditCost, operation: 'relight' };
+    }
+    case 'retexture': {
+      const model = getEditingModelById(op.modelId);
+      if (!model || model.operation !== 'retexture')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid retexture model' });
+      return { creditCost: model.creditCost, operation: 'retexture' };
+    }
+  }
+}
+
+async function runDispatcher(
+  op: EditOp,
+  ctx: {
+    session: { id: string; maskUploads: Array<{ id: string; url: string }> };
+    workingUrl: string;
+    userId: string;
+    jobId: string;
+    creditCost: number;
+  }
+) {
+  switch (op.kind) {
+    case 'inpaint': {
+      const mask = ctx.session.maskUploads.find((m) => m.id === op.maskId);
+      if (!mask) {
+        return {
+          status: 'error' as const,
+          error: 'Mask not found on session — upload it first',
+          creditsToRefund: ctx.creditCost,
+        };
+      }
+      if (op.mode === 'replace' && !op.prompt.trim()) {
+        return {
+          status: 'error' as const,
+          error: 'Replace mode requires a prompt describing what to fill in.',
+          creditsToRefund: ctx.creditCost,
+        };
+      }
+      return dispatchInpaint({
+        op,
+        inputUrl: ctx.workingUrl,
+        maskUrl: mask.url,
+        creditCost: ctx.creditCost,
+      });
+    }
+    case 'outpaint':
+      return dispatchOutpaint({
+        op,
+        inputUrl: ctx.workingUrl,
+        userId: ctx.userId,
+        jobId: ctx.jobId,
+        creditCost: ctx.creditCost,
+      });
+    case 'relight': {
+      let tonePack = null;
+      if (op.tonePackId && db) {
+        try {
+          const packDoc = await db.collection('universeTonePacks').doc(op.tonePackId).get();
+          if (packDoc.exists) {
+            const data = packDoc.data()!;
+            tonePack = {
+              presetIds: Array.isArray(data.presetIds) ? data.presetIds : [],
+              customPromptFragment: data.customPromptFragment,
+              customNegativeFragment: data.customNegativeFragment,
+            };
+          }
+        } catch (err) {
+          console.warn('[editJobs relight] tone pack load failed:', err);
+        }
+      }
+      return dispatchRelight({
+        op,
+        inputUrl: ctx.workingUrl,
+        tonePack,
+        creditCost: ctx.creditCost,
+      });
+    }
+    case 'retexture':
+      return dispatchRetexture({
+        op,
+        inputUrl: ctx.workingUrl,
+        creditCost: ctx.creditCost,
+      });
   }
 }

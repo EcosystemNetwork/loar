@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from 'reactflow';
+import { ShoppingCart, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,10 +9,13 @@ import { Link } from '@tanstack/react-router';
 import {
   useArchiveWorkflow,
   useEstimateCost,
+  useHasLicense,
+  usePurchaseWorkflow,
   useRunWorkflow,
   useUpdateWorkflow,
   useWorkflow,
 } from '@/hooks/useWorkflows';
+import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { WorkflowCanvas } from './WorkflowCanvas';
 import { NodePalette } from './NodePalette';
 import { NodeInspector } from './NodeInspector';
@@ -27,6 +31,13 @@ export function WorkflowEditorPage({ workflowId }: { workflowId: string }) {
   const archive = useArchiveWorkflow();
   const runMutation = useRunWorkflow();
   const cost = useEstimateCost(workflowId);
+  const { address } = useWalletAccount();
+  const isOwner =
+    !!workflow && !!address && workflow.ownerUid.toLowerCase() === address.toLowerCase();
+  const { data: licenseData } = useHasLicense(
+    workflow && workflow.visibility === 'paid' && !isOwner ? workflowId : undefined
+  );
+  const purchase = usePurchaseWorkflow();
 
   const [name, setName] = useState('');
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -148,12 +159,23 @@ export function WorkflowEditorPage({ workflowId }: { workflowId: string }) {
   }, []);
 
   const onPublish = useCallback(
-    (visibility: Visibility, collaboratorUids: string[]) => {
+    (patch: {
+      visibility: Visibility;
+      collaboratorUids: string[];
+      priceCredits: number;
+      universeAddress: string | null;
+    }) => {
       update.mutate(
-        { id: workflowId, visibility, collaboratorUids },
+        {
+          id: workflowId,
+          visibility: patch.visibility,
+          collaboratorUids: patch.collaboratorUids,
+          priceCredits: patch.priceCredits,
+          universeAddress: patch.universeAddress,
+        },
         {
           onSuccess: () => {
-            toast.success(`Visibility set to ${visibility}`);
+            toast.success(`Visibility set to ${patch.visibility}`);
             setPublishOpen(false);
           },
           onError: (err: any) => toast.error(err?.message ?? 'Publish failed'),
@@ -183,6 +205,88 @@ export function WorkflowEditorPage({ workflowId }: { workflowId: string }) {
 
   if (isLoading || !workflow) {
     return <div className="p-8 text-sm text-muted-foreground">Loading workflow…</div>;
+  }
+
+  // Paid workflow + viewer without a license → show purchase prompt instead of editor.
+  if (workflow.visibility === 'paid' && !isOwner && licenseData && !licenseData.hasLicense) {
+    return (
+      <div className="container mx-auto max-w-xl p-10">
+        <div className="rounded-md border bg-card p-6 text-center shadow-sm">
+          <h1 className="text-xl font-bold">{workflow.name}</h1>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {workflow.description || 'Paid preset — purchase to run.'}
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+            <Badge variant="outline">paid</Badge>
+            <span>{workflow.priceCredits} credits per run</span>
+          </div>
+          <Button
+            className="mt-4"
+            disabled={purchase.isPending}
+            onClick={() =>
+              purchase.mutate(workflowId, {
+                onSuccess: () => toast.success('Purchased — you can now run this workflow'),
+                onError: (err: any) => toast.error(err?.message ?? 'Purchase failed'),
+              })
+            }
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Buy {workflow.priceCredits} cr
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Canon workflow + non-owner: show a read-only summary with a Run button.
+  if ((workflow.visibility === 'canon' || workflow.visibility === 'paid') && !isOwner) {
+    return (
+      <div className="container mx-auto max-w-2xl p-10">
+        <div className="rounded-md border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold">{workflow.name}</h1>
+            <Badge variant="outline">
+              {workflow.visibility === 'canon' ? (
+                <span className="flex items-center gap-1">
+                  <Crown className="h-3 w-3" /> canon
+                </span>
+              ) : (
+                'licensed'
+              )}
+            </Badge>
+          </div>
+          {workflow.description && (
+            <div className="mt-2 text-sm text-muted-foreground">{workflow.description}</div>
+          )}
+          <div className="mt-3 text-xs text-muted-foreground">
+            {workflow.graph.nodes.length} nodes · v{workflow.version} ·
+            {cost.data ? ` est ${cost.data.creditsTotal} credits per run` : ''}
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <Button onClick={onRun} disabled={runMutation.isPending}>
+              {runMutation.isPending ? 'Starting…' : 'Run'}
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/workflows/$id/runs" params={{ id: workflowId }}>
+                My runs
+              </Link>
+            </Button>
+          </div>
+        </div>
+        {activeRunId && (
+          <div className="mt-4 rounded-md border bg-card shadow-sm">
+            <RunPanel
+              runId={activeRunId}
+              onClose={() => {
+                setActiveRunId(null);
+                setActiveNodeIds([]);
+              }}
+              onActiveNodesChange={setActiveNodeIds}
+            />
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -270,6 +374,8 @@ export function WorkflowEditorPage({ workflowId }: { workflowId: string }) {
         onClose={() => setPublishOpen(false)}
         initialVisibility={workflow.visibility as Visibility}
         initialCollaborators={workflow.collaboratorUids}
+        initialPriceCredits={workflow.priceCredits}
+        initialUniverseAddress={workflow.universeAddress}
         onSave={onPublish}
         saving={update.isPending}
       />

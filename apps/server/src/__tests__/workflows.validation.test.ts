@@ -10,7 +10,8 @@ import {
   topologicalLayers,
   estimateCost,
 } from '../routers/workflows/workflows.handlers';
-import type { WorkflowGraph } from '../routers/workflows/workflows.types';
+import { assertPublishAllowed } from '../routers/workflows/workflows.marketplace';
+import type { Workflow, WorkflowGraph } from '../routers/workflows/workflows.types';
 
 const promptDefaults = { kind: 'prompt' as const, text: 'a sunset', aspectRatio: '1:1' as const };
 const refDefaults = { kind: 'ref' as const, assetUrl: 'https://example.com/x.png' };
@@ -236,5 +237,103 @@ describe('workflows estimateCost', () => {
     expect(result.perNode.p1).toBe(3);
     expect(result.perNode.r1).toBe(0);
     expect(result.perNode.u1).toBe(10);
+  });
+});
+
+// ── Phase 2: paid + canon publish gate ────────────────────────────────
+
+const baseWorkflow: Workflow = {
+  id: 'w1',
+  ownerUid: 'owner-uid',
+  name: 'Test',
+  description: '',
+  graph: {
+    nodes: [{ id: 'p1', type: 'prompt', position: { x: 0, y: 0 }, data: promptDefaults }],
+    edges: [],
+  },
+  version: 1,
+  visibility: 'private',
+  priceCredits: 0,
+  universeAddress: null,
+  status: 'active',
+  contentStatus: 'active',
+  collaboratorUids: [],
+  forkedFrom: null,
+  createdAt: 0,
+  updatedAt: 0,
+};
+
+describe('workflows assertPublishAllowed', () => {
+  it('passes through for private/collaborator visibility', async () => {
+    await expect(
+      assertPublishAllowed({
+        current: baseWorkflow,
+        nextVisibility: 'private',
+        callerAddress: null,
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      assertPublishAllowed({
+        current: baseWorkflow,
+        nextVisibility: 'collaborator',
+        callerAddress: null,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects paid without priceCredits >= 1', async () => {
+    await expect(
+      assertPublishAllowed({
+        current: baseWorkflow,
+        nextVisibility: 'paid',
+        nextPriceCredits: 0,
+        callerAddress: '0xabc',
+      })
+    ).rejects.toThrow(/priceCredits/);
+  });
+
+  it('accepts paid with valid priceCredits', async () => {
+    await expect(
+      assertPublishAllowed({
+        current: baseWorkflow,
+        nextVisibility: 'paid',
+        nextPriceCredits: 5,
+        callerAddress: '0xabc',
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects paid for empty graph', async () => {
+    const empty = { ...baseWorkflow, graph: { nodes: [], edges: [] } };
+    await expect(
+      assertPublishAllowed({
+        current: empty,
+        nextVisibility: 'paid',
+        nextPriceCredits: 5,
+        callerAddress: '0xabc',
+      })
+    ).rejects.toThrow(/empty workflow/);
+  });
+
+  it('rejects canon without universeAddress', async () => {
+    await expect(
+      assertPublishAllowed({
+        current: baseWorkflow,
+        nextVisibility: 'canon',
+        nextUniverseAddress: null,
+        callerAddress: '0xabc',
+      })
+    ).rejects.toThrow(/universeAddress/);
+  });
+
+  it('rejects canon without a connected wallet', async () => {
+    await expect(
+      assertPublishAllowed({
+        current: baseWorkflow,
+        nextVisibility: 'canon',
+        nextUniverseAddress: '0x0000000000000000000000000000000000000001',
+        callerAddress: null,
+      })
+    ).rejects.toThrow(/connected wallet/);
   });
 });

@@ -61,7 +61,6 @@ You need **either** `FIREBASE_SERVICE_ACCOUNT` (inline JSON) **or** `FIREBASE_SE
 | `VITE_CHAIN_ID`                 | No       | Default chain ID                               | `11155111`               |
 | `VITE_THIRDWEB_CLIENT_ID`       | Yes      | thirdweb client ID for wallet connection       | —                        |
 | `VITE_WALLETCONNECT_PROJECT_ID` | No       | WalletConnect project ID                       | —                        |
-| `VITE_LOAR_TOKEN_ADDRESS`       | No       | $LOAR ERC-20 contract address (for frontend)   | —                        |
 | `VITE_TREASURY_ADDRESS`         | No       | Treasury address (for frontend payment UI)     | —                        |
 | `VITE_UNIVERSE_MANAGER`         | No       | UniverseManager contract address               | —                        |
 | `VITE_ADMIN_ADDRESSES`          | No       | Comma-separated admin wallet addresses         | —                        |

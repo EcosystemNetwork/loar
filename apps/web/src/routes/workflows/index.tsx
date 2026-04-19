@@ -65,11 +65,17 @@ function WorkflowsListPage() {
         </Button>
       </div>
 
+      <div className="mb-3 flex items-center gap-2">
+        <Button asChild variant="outline" size="sm">
+          <Link to="/workflows/marketplace">Browse marketplace →</Link>
+        </Button>
+      </div>
+
       <Tabs defaultValue="mine" className="w-full">
         <TabsList>
           <TabsTrigger value="mine">My workflows</TabsTrigger>
           <TabsTrigger value="templates" disabled>
-            Templates (Phase 2)
+            Templates (Phase 3)
           </TabsTrigger>
         </TabsList>
         <TabsContent value="mine" className="mt-4">

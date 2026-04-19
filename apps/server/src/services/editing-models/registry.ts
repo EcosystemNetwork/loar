@@ -228,6 +228,27 @@ export const EDITING_MODELS: EditingModelConfig[] = [
     bestFor: 'Same character/scene, new lighting and atmosphere — trailers, ads, episode beats',
   },
 
+  // ── Retexture (image — preserve subject, swap material/surface) ──────
+  {
+    id: 'retexture-nano-banana',
+    operation: 'retexture',
+    provider: 'fal',
+    displayName: 'Nano Banana Retexture',
+    shortDescription:
+      'Swap surface materials, fabric, or texture while preserving subject geometry',
+    falModelId: 'fal-ai/nano-banana/edit',
+    tier: 'standard',
+    providerCostUsd: 0.04,
+    fiatPriceUsd: withFiatMargin(0.04),
+    loarPriceUsd: withLoarMargin(0.04),
+    creditCost: usdToLoar(withFiatMargin(0.04)),
+    isEnabled: true,
+    supportsVideo: false,
+    supportsImage: true,
+    tags: ['retexture', 'material', 'surface', 'subject-preserve'],
+    bestFor: 'Same subject, different material — marble, metal, fabric swaps for concept variants',
+  },
+
   // ── Video Extension ──────────────────────────────────────────────────
   {
     id: 'extend-wan',

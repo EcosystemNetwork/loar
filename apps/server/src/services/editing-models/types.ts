@@ -12,7 +12,8 @@ export type EditingOperation =
   | 'inpaint'
   | 'remove_bg'
   | 'extend'
-  | 'relight';
+  | 'relight'
+  | 'retexture';
 
 export type EditingTier = 'fast' | 'standard' | 'quality';
 

@@ -499,6 +499,43 @@ app.post('/api/counter-notice', async (c) => {
       counterNoticeReceivedAt: now.toISOString(),
     });
 
+    // § 512(g)(2)(B): notify the original claimant so they have a fair
+    // chance to file a court action before the hold period expires.
+    // Fire-and-forget — the counter-notice is already durably stored;
+    // email failures are an operator concern, not a user-facing one.
+    try {
+      const td = takedownDoc.data() as {
+        contentId?: string;
+        claimantName?: string;
+        claimantEmail?: string;
+        copyrightWork?: string;
+        createdAt?: string;
+      };
+      if (td.claimantEmail) {
+        const { emailCounterNoticeToClaimant } = await import('./lib/dmca-email');
+        void emailCounterNoticeToClaimant(
+          {
+            id: takedownRequestId,
+            contentId: td.contentId ?? '',
+            claimantName: td.claimantName,
+            claimantEmail: td.claimantEmail,
+            copyrightWork: td.copyrightWork,
+            createdAt: td.createdAt ?? now.toISOString(),
+          },
+          {
+            id: ref.id,
+            respondentName,
+            respondentEmail,
+            respondentAddress,
+            explanation,
+            createdAt: now.toISOString(),
+          }
+        );
+      }
+    } catch (emailErr) {
+      console.warn('[dmca] counter-notice email dispatch failed:', emailErr);
+    }
+
     return c.json({
       id: ref.id,
       status: 'pending',

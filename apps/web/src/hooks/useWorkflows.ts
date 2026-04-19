@@ -116,3 +116,50 @@ export function useCancelRun() {
     },
   });
 }
+
+// ── Marketplace (Phase 2) ──────────────────────────────────────────────
+
+export function useWorkflowMarketplace(
+  args: {
+    visibility?: 'paid' | 'canon';
+    universeAddress?: string | null;
+    limit?: number;
+  } = {}
+) {
+  return useQuery({
+    queryKey: ['workflows', 'marketplace', args.visibility, args.universeAddress, args.limit],
+    queryFn: () =>
+      trpcClient.workflows.listMarketplace.query({
+        visibility: args.visibility,
+        universeAddress: args.universeAddress ?? undefined,
+        limit: args.limit ?? 50,
+      }),
+  });
+}
+
+export function useHasLicense(id: string | undefined) {
+  return useQuery({
+    queryKey: ['workflows', 'hasLicense', id],
+    queryFn: () => trpcClient.workflows.hasLicense.query({ id: id! }),
+    enabled: !!id,
+  });
+}
+
+export function useMyLicenses() {
+  return useQuery({
+    queryKey: ['workflows', 'myLicenses'],
+    queryFn: () => trpcClient.workflows.myLicenses.query({ limit: 100 }),
+  });
+}
+
+export function usePurchaseWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => trpcClient.workflows.purchase.mutate({ id }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['workflows', 'hasLicense', id] });
+      qc.invalidateQueries({ queryKey: ['workflows', 'myLicenses'] });
+      qc.invalidateQueries({ queryKey: ['workflows', 'marketplace'] });
+    },
+  });
+}

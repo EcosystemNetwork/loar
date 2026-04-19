@@ -59,7 +59,7 @@ export async function startWorkflowRun(args: {
   if (!workflow) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Workflow not found' });
   }
-  assertWorkflowRunnable(workflow, args.ownerUid);
+  await assertWorkflowRunnable(workflow, args.ownerUid);
 
   if (workflow.graph.nodes.length === 0) {
     throw new TRPCError({

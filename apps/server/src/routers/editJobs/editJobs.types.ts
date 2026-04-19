@@ -13,9 +13,14 @@ import { z } from 'zod';
 
 // ── Zod schemas ─────────────────────────────────────────────────────────
 
+export const OUTPAINT_ASPECTS = ['1:1', '4:5', '16:9', '9:16', '21:9'] as const;
+export type OutpaintAspect = (typeof OUTPAINT_ASPECTS)[number];
+
 /**
- * Single edit operation in an ops-plan. v1 supports inpaint only; more
- * operations will light up as their registry entries land.
+ * Single edit operation in an ops-plan. Each variant maps to a specific
+ * service path: inpaint → falService.inpaintImage, outpaint → Google
+ * nano-banana-pro with FAL fallback, relight → falService.editImage +
+ * preset composer, retexture → falService.editImage + texture composer.
  */
 export const editOpSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -28,6 +33,29 @@ export const editOpSchema = z.discriminatedUnion('kind', [
     seed: z.number().int().optional(),
     strength: z.number().min(0).max(1).optional(),
     guidanceScale: z.number().min(1).max(20).optional(),
+  }),
+  z.object({
+    kind: z.literal('outpaint'),
+    targetAspect: z.enum(OUTPAINT_ASPECTS),
+    anchorX: z.number().min(0).max(1).default(0.5),
+    anchorY: z.number().min(0).max(1).default(0.5),
+    zoomFactor: z.number().min(1).max(4).default(1),
+    mode: z.enum(['preserve', 'creative']).default('preserve'),
+    prompt: z.string().max(1000).default(''),
+    negativePrompt: z.string().max(500).optional(),
+  }),
+  z.object({
+    kind: z.literal('relight'),
+    presetIds: z.array(z.string()).max(8).default([]),
+    freeText: z.string().max(500).optional(),
+    tonePackId: z.string().optional(),
+    modelId: z.string().default('relight-nano-banana'),
+  }),
+  z.object({
+    kind: z.literal('retexture'),
+    prompt: z.string().min(1).max(500),
+    negativePrompt: z.string().max(500).optional(),
+    modelId: z.string().default('retexture-nano-banana'),
   }),
 ]);
 
@@ -90,6 +118,11 @@ export interface EditSession {
     url: string;
     createdAt: Date;
   }>;
+  /** When the base version is a video, the user captures a frame to edit.
+   * This URL is used as the working surface for image-based ops; the
+   * resulting version is still chained to the video parent. */
+  capturedFrameUrl: string | null;
+  capturedFrameTime: number | null;
   lastSavedAt: Date;
   createdAt: Date;
   status: 'open' | 'submitted' | 'discarded';
@@ -99,7 +132,15 @@ export interface EditJobRecord {
   id: string;
   userId: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
-  operation: 'inpaint' | 'upscale' | 'remove_bg' | 'relight' | 'restyle' | 'extend';
+  operation:
+    | 'inpaint'
+    | 'outpaint'
+    | 'relight'
+    | 'retexture'
+    | 'upscale'
+    | 'remove_bg'
+    | 'restyle'
+    | 'extend';
   modelId: string;
   contentId: string;
   sessionId: string | null;

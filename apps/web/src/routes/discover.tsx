@@ -355,7 +355,7 @@ function UniversesTabContent({ search }: { search: string }) {
         <span className="text-sm text-muted-foreground mr-1">Type:</span>
         {(
           [
-            { value: undefined, label: 'All' },
+            { value: undefined, label: 'All', icon: null },
             { value: 'fun', label: 'Fun', icon: Sparkles },
             { value: 'monetized', label: 'Monetized', icon: DollarSign },
           ] as const

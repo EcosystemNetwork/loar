@@ -99,6 +99,7 @@ const EDIT_OUTPUT_KIND: Record<EditingOperation, AssetOutputKind> = {
   remove_bg: 'image',
   extend: 'video',
   relight: 'image',
+  retexture: 'image',
 };
 
 async function saveJobRecord(record: EditingJobRecord): Promise<void> {

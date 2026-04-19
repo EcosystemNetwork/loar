@@ -334,7 +334,8 @@ export interface UpdateWorkflowPatch {
 export async function updateWorkflow(
   id: string,
   patch: UpdateWorkflowPatch,
-  ownerUid: string
+  ownerUid: string,
+  callerAddress: string | null = null
 ): Promise<Workflow> {
   const existing = await getWorkflow(id);
   if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Workflow not found' });
@@ -344,11 +345,16 @@ export async function updateWorkflow(
 
   if (patch.graph) validateGraph(patch.graph);
 
-  // Phase 1: reject paid/canon visibility — those are Phase 2
+  // Phase 2: paid/canon visibility require extra rule checks.
   if (patch.visibility === 'paid' || patch.visibility === 'canon') {
-    throw new TRPCError({
-      code: 'NOT_IMPLEMENTED',
-      message: `${patch.visibility} visibility ships in Phase 2`,
+    // Lazy-import to avoid circular dep (marketplace module imports handlers).
+    const { assertPublishAllowed } = await import('./workflows.marketplace');
+    await assertPublishAllowed({
+      current: existing,
+      nextVisibility: patch.visibility,
+      nextPriceCredits: patch.priceCredits,
+      nextUniverseAddress: patch.universeAddress,
+      callerAddress,
     });
   }
 
@@ -434,9 +440,9 @@ export async function listRuns(
 
 /**
  * Assert the workflow can be run by this user. Checks visibility + collaborator
- * gate (paid/canon gating is Phase 2).
+ * gate; paid/canon gating is delegated to the marketplace module.
  */
-export function assertWorkflowRunnable(workflow: Workflow, runnerUid: string): void {
+export async function assertWorkflowRunnable(workflow: Workflow, runnerUid: string): Promise<void> {
   if (workflow.contentStatus === 'removed' || workflow.contentStatus === 'hidden') {
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -455,10 +461,10 @@ export function assertWorkflowRunnable(workflow: Workflow, runnerUid: string): v
       }
       return;
     case 'paid':
-    case 'canon':
-      throw new TRPCError({
-        code: 'NOT_IMPLEMENTED',
-        message: `${workflow.visibility} run-gating ships in Phase 2`,
-      });
+    case 'canon': {
+      const { assertMarketplaceRunAllowed } = await import('./workflows.marketplace');
+      await assertMarketplaceRunAllowed(workflow, runnerUid);
+      return;
+    }
   }
 }

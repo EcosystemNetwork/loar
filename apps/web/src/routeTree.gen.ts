@@ -47,6 +47,7 @@ import { Route as CollabsIndexRouteImport } from './routes/collabs/index'
 import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AdsIndexRouteImport } from './routes/ads/index'
+import { Route as WorkflowsMarketplaceRouteImport } from './routes/workflows/marketplace'
 import { Route as WorkflowsIdRouteImport } from './routes/workflows/$id'
 import { Route as WikiKindRouteImport } from './routes/wiki/$kind'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
@@ -286,6 +287,11 @@ const AgentsIndexRoute = AgentsIndexRouteImport.update({
 const AdsIndexRoute = AdsIndexRouteImport.update({
   id: '/ads/',
   path: '/ads/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkflowsMarketplaceRoute = WorkflowsMarketplaceRouteImport.update({
+  id: '/workflows/marketplace',
+  path: '/workflows/marketplace',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkflowsIdRoute = WorkflowsIdRouteImport.update({
@@ -603,6 +609,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
   '/workflows/$id': typeof WorkflowsIdRouteWithChildren
+  '/workflows/marketplace': typeof WorkflowsMarketplaceRoute
   '/ads/': typeof AdsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
@@ -693,6 +700,7 @@ export interface FileRoutesByTo {
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
   '/workflows/$id': typeof WorkflowsIdRouteWithChildren
+  '/workflows/marketplace': typeof WorkflowsMarketplaceRoute
   '/ads': typeof AdsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/bounties': typeof BountiesIndexRoute
@@ -784,6 +792,7 @@ export interface FileRoutesById {
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
   '/workflows/$id': typeof WorkflowsIdRouteWithChildren
+  '/workflows/marketplace': typeof WorkflowsMarketplaceRoute
   '/ads/': typeof AdsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
@@ -876,6 +885,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/$kind'
     | '/workflows/$id'
+    | '/workflows/marketplace'
     | '/ads/'
     | '/agents/'
     | '/bounties/'
@@ -966,6 +976,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/$kind'
     | '/workflows/$id'
+    | '/workflows/marketplace'
     | '/ads'
     | '/agents'
     | '/bounties'
@@ -1056,6 +1067,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/$kind'
     | '/workflows/$id'
+    | '/workflows/marketplace'
     | '/ads/'
     | '/agents/'
     | '/bounties/'
@@ -1146,6 +1158,7 @@ export interface RootRouteChildren {
   UniverseIdRoute: typeof UniverseIdRouteWithChildren
   WikiKindRoute: typeof WikiKindRoute
   WorkflowsIdRoute: typeof WorkflowsIdRouteWithChildren
+  WorkflowsMarketplaceRoute: typeof WorkflowsMarketplaceRoute
   AdsIndexRoute: typeof AdsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   BountiesIndexRoute: typeof BountiesIndexRoute
@@ -1433,6 +1446,13 @@ declare module '@tanstack/react-router' {
       path: '/ads'
       fullPath: '/ads/'
       preLoaderRoute: typeof AdsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workflows/marketplace': {
+      id: '/workflows/marketplace'
+      path: '/workflows/marketplace'
+      fullPath: '/workflows/marketplace'
+      preLoaderRoute: typeof WorkflowsMarketplaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workflows/$id': {
@@ -1895,6 +1915,7 @@ const rootRouteChildren: RootRouteChildren = {
   UniverseIdRoute: UniverseIdRouteWithChildren,
   WikiKindRoute: WikiKindRoute,
   WorkflowsIdRoute: WorkflowsIdRouteWithChildren,
+  WorkflowsMarketplaceRoute: WorkflowsMarketplaceRoute,
   AdsIndexRoute: AdsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   BountiesIndexRoute: BountiesIndexRoute,

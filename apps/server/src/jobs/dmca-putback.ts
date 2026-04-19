@@ -177,6 +177,38 @@ async function processOnePutback(
 
   await batch.commit();
   result.putback.push(takedownId);
+
+  // Transparency email to the original claimant — no legal requirement but
+  // a clean paper trail eliminates "why is this content back up?" tickets.
+  // Fire-and-forget; the durable audit row already proves we complied.
+  try {
+    const cnDoc = await db.collection('counterNotices').doc(counterNoticeId).get();
+    const cn = cnDoc.exists ? (cnDoc.data() as any) : null;
+    const td = tdDoc.data() as any;
+    if (td?.claimantEmail && cn) {
+      const { emailPutbackToClaimant } = await import('../lib/dmca-email');
+      void emailPutbackToClaimant(
+        {
+          id: takedownId,
+          contentId: td.contentId ?? '',
+          claimantName: td.claimantName,
+          claimantEmail: td.claimantEmail,
+          copyrightWork: td.copyrightWork,
+          createdAt: td.createdAt ?? now,
+        },
+        {
+          id: counterNoticeId,
+          respondentName: cn.respondentName ?? '',
+          respondentEmail: cn.respondentEmail ?? '',
+          respondentAddress: cn.respondentAddress,
+          explanation: cn.explanation ?? '',
+          createdAt: cn.createdAt ?? now,
+        }
+      );
+    }
+  } catch (err) {
+    console.warn(`[dmca-putback] putback email dispatch failed for ${takedownId}:`, err);
+  }
 }
 
 /**

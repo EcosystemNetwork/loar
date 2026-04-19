@@ -227,6 +227,8 @@ export async function openSession(args: {
     aspectRatio: null,
     layers: [{ id: 'source', kind: 'source', visible: true, opacity: 1 }],
     maskUploads: [],
+    capturedFrameUrl: null,
+    capturedFrameTime: null,
     lastSavedAt: now,
     createdAt: now,
     status: 'open',
@@ -259,6 +261,21 @@ export async function appendMaskUpload(
     .doc(sessionId)
     .update({
       maskUploads: FieldValue.arrayUnion({ ...mask, createdAt: new Date() }),
+      lastSavedAt: new Date(),
+    });
+}
+
+export async function setCapturedFrame(
+  sessionId: string,
+  frame: { url: string; time: number } | null
+): Promise<void> {
+  const database = assertDb();
+  await database
+    .collection(EDIT_SESSIONS)
+    .doc(sessionId)
+    .update({
+      capturedFrameUrl: frame?.url ?? null,
+      capturedFrameTime: frame?.time ?? null,
       lastSavedAt: new Date(),
     });
 }

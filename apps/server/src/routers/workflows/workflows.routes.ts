@@ -29,6 +29,12 @@ import {
   updateWorkflowInputSchema,
   workflowGraphSchema,
 } from './workflows.types';
+import {
+  getLicense,
+  listLicensesForBuyer,
+  listMarketplace,
+  purchaseWorkflow,
+} from './workflows.marketplace';
 
 // Sweep stuck runs once on first router import (server start).
 sweepOrphanedRuns().catch((err) => console.error('[workflows] startup sweep failed:', err));
@@ -93,7 +99,7 @@ export const workflowsRouter = router({
     .input(updateWorkflowInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { id, ...patch } = input;
-      const workflow = await updateWorkflow(id, patch, ctx.user.uid);
+      const workflow = await updateWorkflow(id, patch, ctx.user.uid, ctx.user.address ?? null);
       return { workflow };
     }),
 
@@ -168,6 +174,58 @@ export const workflowsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await cancelRun(input.runId, ctx.user.uid);
       return { success: true };
+    }),
+
+  // ── Marketplace (Phase 2) ──────────────────────────────────────────
+
+  /** Browse paid + canon workflows. */
+  listMarketplace: protectedProcedure
+    .input(
+      z
+        .object({
+          visibility: z.enum(['paid', 'canon']).optional(),
+          universeAddress: ethereumAddress.nullish(),
+          limit: z.number().int().positive().max(100).default(50),
+        })
+        .default({ limit: 50 })
+    )
+    .query(async ({ input }) => {
+      const entries = await listMarketplace({
+        visibility: input.visibility,
+        universeAddress: input.universeAddress ?? null,
+        limit: input.limit,
+      });
+      return { entries, total: entries.length };
+    }),
+
+  /** Buy a paid workflow — atomic credit transfer + license issuance. */
+  purchase: protectedProcedure
+    .use(requirePermission('workflows.purchase'))
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await purchaseWorkflow({
+        workflowId: input.id,
+        buyerUid: ctx.user.uid,
+      });
+      return result;
+    }),
+
+  /** Has the caller already purchased this paid workflow? */
+  hasLicense: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const license = await getLicense(input.id, ctx.user.uid);
+      return { hasLicense: !!license, license };
+    }),
+
+  /** List all workflows the caller has purchased licenses for. */
+  myLicenses: protectedProcedure
+    .input(
+      z.object({ limit: z.number().int().positive().max(200).default(100) }).default({ limit: 100 })
+    )
+    .query(async ({ ctx, input }) => {
+      const licenses = await listLicensesForBuyer(ctx.user.uid, input.limit);
+      return { licenses, total: licenses.length };
     }),
 });
 
