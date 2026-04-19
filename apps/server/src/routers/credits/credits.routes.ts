@@ -530,6 +530,16 @@ export const creditsRouter = router({
         });
       });
 
+      void import('../../lib/analytics').then(({ captureServerEvent }) =>
+        captureServerEvent('credits:purchase_completed', {
+          distinctId: ctx.user.uid,
+          paymentMethod: input.paymentMethod,
+          packageId: input.packageId,
+          credits: totalCredits,
+          pricePaidUsd: pkg.fiatPriceUsd,
+        })
+      );
+
       return {
         ok: true,
         creditsAdded: totalCredits,
@@ -613,6 +623,16 @@ export const creditsRouter = router({
           createdAt: new Date(),
         });
       });
+
+      void import('../../lib/analytics').then(({ captureServerEvent }) =>
+        captureServerEvent('credits:purchase_completed', {
+          distinctId: ctx.user.uid,
+          paymentMethod: 'loar',
+          packageId: input.packageId,
+          credits: totalCredits,
+          pricePaidUsd: pkg.loarPriceUsd,
+        })
+      );
 
       return {
         ok: true,

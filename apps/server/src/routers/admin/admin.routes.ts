@@ -17,6 +17,7 @@ import {
   type PlatformConfig,
 } from '../../services/platformConfig';
 import { sendSlackAlert } from '../../lib/slack';
+import { adminCostRouter } from './cost.routes';
 
 // Kill-switch fields that warrant a Slack alert when flipped.
 const ALERT_FIELDS = [
@@ -72,6 +73,9 @@ const configPatchSchema = z.object({
 // ── Router ────────────────────────────────────────────────────────────────
 
 export const adminRouter = router({
+  // ── Cost & margin visibility (all paid provider calls) ───────────
+  cost: adminCostRouter,
+
   // ── Read current config ───────────────────────────────────────────
 
   getConfig: adminProcedure.query(async () => {
@@ -128,6 +132,19 @@ export const adminRouter = router({
           value: `\`${String(f.from)}\` → \`${String(f.to)}\``,
         })),
         severity: critical ? 'critical' : 'warn',
+      });
+
+      // PostHog: separate event per flipped field so funnels can scope.
+      void import('../../lib/analytics').then(({ captureServerEvent }) => {
+        for (const f of flips) {
+          captureServerEvent('admin:kill_switch_flipped', {
+            distinctId: ctx.user.uid,
+            field: f.field,
+            from: String(f.from),
+            to: String(f.to),
+            critical,
+          });
+        }
       });
     }
 

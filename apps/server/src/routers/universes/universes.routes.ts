@@ -86,7 +86,7 @@ export const universesRouter = router({
     }
     await consumeNonce(input.nonce);
 
-    return await createUniverse({
+    const result = await createUniverse({
       address: input.address,
       creator: input.creator,
       name: input.name,
@@ -100,6 +100,17 @@ export const universesRouter = router({
       unstoppableDomain: input.unstoppableDomain ?? null,
       chainId: input.chainId,
     });
+
+    void import('../../lib/analytics').then(({ captureServerEvent }) =>
+      captureServerEvent('universe:created', {
+        distinctId: input.creator,
+        universeAddress: input.address,
+        name: input.name,
+        chainId: input.chainId,
+      })
+    );
+
+    return result;
   }),
 
   /** Get a specific universe by ID. */
