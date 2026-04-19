@@ -148,7 +148,11 @@ async function processGeneration(
               totalSpent: FieldValue.increment(-data.creditsCharged),
               updatedAt: new Date(),
             });
+          const { recordCreditsTx } = await import('../lib/metrics');
+          recordCreditsTx('refund', 'success');
         } catch (refundErr) {
+          const { recordCreditsTx } = await import('../lib/metrics');
+          recordCreditsTx('refund', 'failure');
           console.error(`CRITICAL: Credit refund failed for ${data.userId}:`, refundErr);
           logFailedRefund({
             userId: data.userId,
@@ -327,7 +331,11 @@ async function processGeneration(
             totalSpent: FieldValue.increment(-data.creditsCharged),
             updatedAt: new Date(),
           });
+        const { recordCreditsTx } = await import('../lib/metrics');
+        recordCreditsTx('refund', 'success');
       } catch (refundErr) {
+        const { recordCreditsTx } = await import('../lib/metrics');
+        recordCreditsTx('refund', 'failure');
         console.error(`CRITICAL: Credit refund failed for ${data.userId}:`, refundErr);
         logFailedRefund({
           userId: data.userId,

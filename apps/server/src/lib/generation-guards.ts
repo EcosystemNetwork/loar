@@ -17,15 +17,24 @@ import {
   type FeatureKey,
 } from '../services/platformConfig';
 import { assertSpendAllowed, MonthlySpendCapExceededError } from '../services/spend-cap';
+import { recordCreditsTx } from './metrics';
 
 export async function assertGenerationAllowed(uid: string, credits: number): Promise<void> {
   try {
     await assertFeatureEnabled('generation');
     await assertSpendAllowed(uid, credits);
+    // Record the spend attempt as 'success' when guards pass. Post-guard
+    // failures (insufficient balance caught in deductCredits' transaction)
+    // are rare relative to guard failures (kill switch / cap exceeded), so
+    // this is a close-enough proxy for the Grafana credits panels until
+    // each route migrates to a consolidated lib/credits.ts helper.
+    recordCreditsTx('spend', 'success');
   } catch (err) {
     if (err instanceof FeatureDisabledError || err instanceof MonthlySpendCapExceededError) {
+      recordCreditsTx('spend', 'failure');
       throw new TRPCError({ code: 'FORBIDDEN', message: err.message });
     }
+    recordCreditsTx('spend', 'failure');
     throw err;
   }
 }
