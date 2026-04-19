@@ -507,12 +507,39 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         emit ClaimTeamFees(token, teamFeeRecipient, balance);
     }
 
-    /// @notice Emergency halt or resume trading on a universe's bonding curve.
-    ///         Only callable by contract owner (should be a timelocked multisig).
-    function setBondingCurveHalted(uint256 universeId, bool halted) external onlyOwner {
+    /// @notice Queue a halt/resume of a universe's bonding curve. Executable
+    ///         after the curve's HALT_TIMELOCK elapses (48h). The delay gives
+    ///         buyers a window to exit positions before liquidity freezes.
+    function queueBondingCurveHalt(uint256 universeId, bool halted) external onlyOwner {
         address curve = universeDatas[universeId].bondingCurve;
         require(curve != address(0), "No active bonding curve");
-        IBondingCurve(curve).setTradingHalted(halted);
+        IBondingCurve(curve).queueHalt(halted);
+    }
+
+    /// @notice Cancel a queued halt/resume before the timelock elapses.
+    function cancelBondingCurveHalt(uint256 universeId) external onlyOwner {
+        address curve = universeDatas[universeId].bondingCurve;
+        require(curve != address(0), "No active bonding curve");
+        IBondingCurve(curve).cancelHalt();
+    }
+
+    /// @notice Execute a queued halt/resume after its timelock has elapsed.
+    /// @dev Owner-gated here even though the underlying curve allows anyone —
+    ///      keeps a single oncall surface for emergency response.
+    function executeBondingCurveHalt(uint256 universeId) external onlyOwner {
+        address curve = universeDatas[universeId].bondingCurve;
+        require(curve != address(0), "No active bonding curve");
+        IBondingCurve(curve).executeHalt();
+    }
+
+    /// @notice Bypass the timelock for live-exploit response. Halts only.
+    /// @dev Intended for genuine incidents where a 48h delay would let the
+    ///      exploit drain the curve. Consumed once per halt cycle and reset
+    ///      by a subsequent (timelocked) resume.
+    function emergencyHaltBondingCurve(uint256 universeId) external onlyOwner {
+        address curve = universeDatas[universeId].bondingCurve;
+        require(curve != address(0), "No active bonding curve");
+        IBondingCurve(curve).emergencyHalt();
     }
 
     function setDeprecated(bool deprecated_) external onlyOwner {

@@ -52,7 +52,7 @@ export async function assertMintEligible(entityId: string): Promise<Entity> {
 /** Validate parent-child relationship for structural kinds only. */
 async function validateParent(kind: EntityKind, parentId: string | null): Promise<void> {
   // Creator kinds can have any or no parent — skip strict validation
-  if (!STRUCTURAL_KINDS.includes(kind as any)) return;
+  if (!STRUCTURAL_KINDS.includes(kind)) return;
 
   const allowed = VALID_PARENTS[kind];
 
@@ -90,7 +90,7 @@ export async function createEntity(
   await validateParent(input.kind, parentId);
 
   // Structural kinds must belong to a universe
-  if (STRUCTURAL_KINDS.includes(input.kind as any) && !input.universeAddress) {
+  if (STRUCTURAL_KINDS.includes(input.kind) && !input.universeAddress) {
     throw new Error(`Structural kind "${input.kind}" requires a universeAddress`);
   }
 

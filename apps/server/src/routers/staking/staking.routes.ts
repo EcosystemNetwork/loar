@@ -20,9 +20,15 @@ const getStakingCol = () => (firebaseAvailable ? db.collection('stakingProfiles'
 const getCurationCol = () => (firebaseAvailable ? db.collection('curationRewards') : null);
 
 const TIER_NAMES = ['NONE', 'BRONZE', 'SILVER', 'GOLD', 'DIAMOND'] as const;
-const TIER_THRESHOLDS = [0, 1_000, 10_000, 100_000, 500_000];
-const TIER_FEE_DISCOUNTS = [0, 100, 250, 500, 1000]; // bps
-const TIER_CURATION_BOOSTS = [100, 100, 150, 200, 300]; // 100 = 1x
+
+/// Fallback tier table. Only used when the LaunchpadStaking contract is not
+/// configured/reachable (e.g. local dev without a deployment). Once the
+/// contract responds, on-chain `tierConfigs` become authoritative so server
+/// and chain cannot drift after an admin reconfiguration.
+const FALLBACK_TIER_THRESHOLDS = [0, 1_000, 10_000, 100_000, 500_000];
+const FALLBACK_TIER_FEE_DISCOUNTS = [0, 100, 250, 500, 1000]; // bps
+const FALLBACK_TIER_CURATION_BOOSTS = [100, 100, 150, 200, 300]; // 100 = 1x
+const FALLBACK_TIER_PRIORITY = [false, false, true, true, true];
 
 // ── On-chain clients ───────────────────────────────────────────────
 const sepoliaClient = createPublicClient({
@@ -87,6 +93,19 @@ const STAKING_ABI = [
     type: 'function',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'tierConfigs',
+    type: 'function',
+    inputs: [{ name: '', type: 'uint8' }],
+    outputs: [
+      { name: 'minStake', type: 'uint256' },
+      { name: 'weight', type: 'uint16' },
+      { name: 'feeDiscountBps', type: 'uint16' },
+      { name: 'curationBoost', type: 'uint16' },
+      { name: 'priorityQueue', type: 'bool' },
+    ],
     stateMutability: 'view',
   },
 ] as const;
@@ -219,18 +238,20 @@ export const stakingRouter = router({
           updatedAt: new Date().toISOString(),
         };
       } else {
-        // Fallback: use client-supplied amount (pre-deployment)
+        // Fallback: use client-supplied amount (pre-deployment).
+        // Only reachable when the LaunchpadStaking contract isn't configured —
+        // once deployed, readOnChainStake returns authoritative data above.
         const stakedAmount = input.stakedAmount ?? 0;
-        const tier = calculateTier(stakedAmount);
+        const tier = fallbackCalculateTier(stakedAmount);
         const tierIndex = TIER_NAMES.indexOf(tier);
 
         profile = {
           address,
           tier,
           stakedAmount,
-          feeDiscountBps: TIER_FEE_DISCOUNTS[tierIndex],
-          curationBoost: TIER_CURATION_BOOSTS[tierIndex],
-          priorityQueue: tierIndex >= 2,
+          feeDiscountBps: FALLBACK_TIER_FEE_DISCOUNTS[tierIndex],
+          curationBoost: FALLBACK_TIER_CURATION_BOOSTS[tierIndex],
+          priorityQueue: FALLBACK_TIER_PRIORITY[tierIndex],
           lastSyncTxHash: input.txHash || null,
           onChainVerified: false,
           updatedAt: new Date().toISOString(),
@@ -261,17 +282,41 @@ export const stakingRouter = router({
     }),
 
   // ── Get tier benefits info (public) ────────────────────────
-  tiers: publicProcedure.query(() => {
-    return TIER_NAMES.map((name, i) => ({
-      name,
-      minStake: TIER_THRESHOLDS[i],
-      feeDiscountBps: TIER_FEE_DISCOUNTS[i],
-      curationBoost: TIER_CURATION_BOOSTS[i],
-      priorityQueue: i >= 2,
-      feeDiscountPct: `${(TIER_FEE_DISCOUNTS[i] / 100).toFixed(1)}%`,
-      curationBoostPct: `${(TIER_CURATION_BOOSTS[i] / 100).toFixed(1)}x`,
-    }));
-  }),
+  // Reads tierConfigs from the LaunchpadStaking contract so the displayed
+  // thresholds match what `stake()` will actually honor. Falls back to the
+  // hardcoded defaults only when the contract is not configured.
+  tiers: publicProcedure
+    .input(z.object({ chainId: z.number().optional() }).optional())
+    .query(async ({ input }) => {
+      const onChain = await readTierConfigsFromChain(input?.chainId);
+      return TIER_NAMES.map((name, i) => {
+        if (i === 0) {
+          return {
+            name,
+            minStake: 0,
+            feeDiscountBps: 0,
+            curationBoost: 100,
+            priorityQueue: false,
+            feeDiscountPct: '0.0%',
+            curationBoostPct: '1.0x',
+          };
+        }
+        const cfg = onChain?.[i];
+        const minStake = cfg ? cfg.minStake : FALLBACK_TIER_THRESHOLDS[i];
+        const feeDiscountBps = cfg ? cfg.feeDiscountBps : FALLBACK_TIER_FEE_DISCOUNTS[i];
+        const curationBoost = cfg ? cfg.curationBoost : FALLBACK_TIER_CURATION_BOOSTS[i];
+        const priorityQueue = cfg ? cfg.priorityQueue : FALLBACK_TIER_PRIORITY[i];
+        return {
+          name,
+          minStake,
+          feeDiscountBps,
+          curationBoost,
+          priorityQueue,
+          feeDiscountPct: `${(feeDiscountBps / 100).toFixed(1)}%`,
+          curationBoostPct: `${(curationBoost / 100).toFixed(1)}x`,
+        };
+      });
+    }),
 
   // ── Curation rewards ───────────────────────────────────────
   // Record a curation reward (platform backend calls this when content trends)
@@ -363,10 +408,84 @@ export const stakingRouter = router({
     }),
 });
 
-function calculateTier(amount: number): (typeof TIER_NAMES)[number] {
-  if (amount >= 500_000) return 'DIAMOND';
-  if (amount >= 100_000) return 'GOLD';
-  if (amount >= 10_000) return 'SILVER';
-  if (amount >= 1_000) return 'BRONZE';
+/// Fallback tier classification. Only reachable when the LaunchpadStaking
+/// contract is unreachable — on-chain `getUserTier()` is authoritative
+/// otherwise.
+function fallbackCalculateTier(amount: number): (typeof TIER_NAMES)[number] {
+  if (amount >= FALLBACK_TIER_THRESHOLDS[4]) return 'DIAMOND';
+  if (amount >= FALLBACK_TIER_THRESHOLDS[3]) return 'GOLD';
+  if (amount >= FALLBACK_TIER_THRESHOLDS[2]) return 'SILVER';
+  if (amount >= FALLBACK_TIER_THRESHOLDS[1]) return 'BRONZE';
   return 'NONE';
+}
+
+/// Per-request cache: avoid N round-trips when `tiers` query is called often.
+/// Keyed by chainId; 60s TTL so admin edits propagate within a minute.
+const TIER_CACHE_TTL_MS = 60_000;
+const tierConfigCache = new Map<
+  number,
+  {
+    expiresAt: number;
+    configs: Array<{
+      minStake: number;
+      weight: number;
+      feeDiscountBps: number;
+      curationBoost: number;
+      priorityQueue: boolean;
+    } | null>;
+  }
+>();
+
+async function readTierConfigsFromChain(chainId?: number) {
+  if (!STAKING_CONTRACT_ADDRESS) return null;
+  const cacheKey = chainId ?? 0;
+  const cached = tierConfigCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.configs;
+
+  const client = getChainClient(chainId);
+  try {
+    // Tier enum: 0=NONE, 1=BRONZE, 2=SILVER, 3=GOLD, 4=DIAMOND.
+    // NONE is not configured on-chain, so we query 1..4.
+    const reads = await Promise.all(
+      [1, 2, 3, 4].map((tierIdx) =>
+        client.readContract({
+          address: STAKING_CONTRACT_ADDRESS,
+          abi: STAKING_ABI,
+          functionName: 'tierConfigs',
+          args: [tierIdx],
+        })
+      )
+    );
+    const configs: Array<{
+      minStake: number;
+      weight: number;
+      feeDiscountBps: number;
+      curationBoost: number;
+      priorityQueue: boolean;
+    } | null> = [null];
+    for (const r of reads) {
+      const [minStake, weight, feeDiscountBps, curationBoost, priorityQueue] = r as readonly [
+        bigint,
+        number,
+        number,
+        number,
+        boolean,
+      ];
+      configs.push({
+        minStake: Number(formatUnits(minStake, 18)),
+        weight: Number(weight),
+        feeDiscountBps: Number(feeDiscountBps),
+        curationBoost: Number(curationBoost),
+        priorityQueue,
+      });
+    }
+    tierConfigCache.set(cacheKey, {
+      expiresAt: Date.now() + TIER_CACHE_TTL_MS,
+      configs,
+    });
+    return configs;
+  } catch (err) {
+    console.error('[staking] Failed to read tierConfigs from chain:', err);
+    return null;
+  }
 }

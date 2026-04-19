@@ -39,6 +39,7 @@ import { useQuery } from '@tanstack/react-query';
 import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { useCreditBalance, useMyNFTs, useUniverseMetrics } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
 
@@ -486,10 +487,14 @@ function RecentWorkCard({ item }: { item: any }) {
     <Card className="group overflow-hidden">
       <div className="aspect-video bg-muted relative">
         {item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : isVideo && item.mediaUrl ? (
           <video
-            src={item.mediaUrl}
+            src={resolveIpfsUrl(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted
             loop
@@ -501,7 +506,11 @@ function RecentWorkCard({ item }: { item: any }) {
             }}
           />
         ) : item.mediaUrl ? (
-          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.mediaUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
             No preview
@@ -564,7 +573,7 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
         <div className="h-32 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 relative">
           {(universe.image_url || universe.imageUrl) && (
             <img
-              src={universe.image_url || universe.imageUrl}
+              src={resolveIpfsUrl(universe.image_url || universe.imageUrl)}
               alt={universe.name}
               className="absolute inset-0 w-full h-full object-cover"
             />

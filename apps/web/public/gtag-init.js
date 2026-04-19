@@ -3,4 +3,4 @@ function gtag() {
   dataLayer.push(arguments);
 }
 gtag('js', new Date());
-gtag('config', 'G-2XKYZMVGTS');
+gtag('config', 'G-2XKYZMVGTS', { send_page_view: false });

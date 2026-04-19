@@ -25,14 +25,20 @@
     "smoke": "tsx scripts/smoke/index.ts",
     "smoke:chain": "SMOKE_LAYER=chain tsx scripts/smoke/index.ts",
     "smoke:server": "SMOKE_LAYER=server tsx scripts/smoke/index.ts",
-    "smoke:ci": "tsx scripts/smoke/index.ts --json"
+    "smoke:launchpad": "SMOKE_LAYER=launchpad tsx scripts/smoke/index.ts",
+    "smoke:ci": "tsx scripts/smoke/index.ts --json",
+    "qa:visual": "tsx scripts/qa-visual/index.ts",
+    "qa:visual:shots": "tsx scripts/qa-visual/index.ts --no-review"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@fal-ai/serverless-client": "^0.15.0",
     "@wagmi/cli": "^0.0.0-canary-20251023193249",
+    "dotenv": "^16.4.7",
     "esbuild": "^0.28.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
+    "playwright": "^1.59.1",
     "prettier": "^3.5.3",
     "tsx": "^4.19.2",
     "turbo": "^2.5.4"

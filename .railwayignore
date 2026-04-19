@@ -1,10 +1,14 @@
-# Generated video output dirs (huge, not needed for backend)
+# Generated video output dirs (huge, not needed for backend).
+# Use ** glob to catch suffix variants like "monerochan-audio-output-episode-1".
 *-output/
+*-output-*/
 spacefleet-output/
 cyberwar-output/
 monerochan-audio-output/
+monerochan-audio-output-*/
 vacation-bunny-output/
 voidborn-output/
+firstproof-output/
 
 # Node modules (Railway builds them)
 node_modules/
@@ -35,12 +39,48 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Foundry/contracts artifacts
+# Foundry/contracts — Railway deploys Node apps only, nothing here is
+# needed at runtime or build-time for any service.
 apps/contracts/cache/
 apps/contracts/out/
 apps/contracts/broadcast/
+apps/contracts/dependencies/
+apps/contracts/lib/
+apps/contracts/src/
+apps/contracts/test/
+apps/contracts/script/
+apps/contracts/abis/
+apps/contracts/soldeer.lock
 
-# Mobile native builds
+# Mobile app — React Native, not deployed via Railway
 apps/mobile/ios/
 apps/mobile/android/
 apps/mobile/.expo/
+apps/mobile/src/
+apps/mobile/app/
+apps/mobile/assets/
+
+# Web — source shipped via its own service; other services don't need it
+# (package.json stays in so pnpm-workspace resolves)
+apps/web/src/
+apps/web/public/
+apps/web/dist/
+apps/web/.tanstack/
+
+# ABI packages — heavy generated artifacts; leaf consumers don't need
+# the raw ABIs at runtime (types-only packages are smaller)
+packages/abis/abis/
+
+# Generated artifacts from indexer
+apps/indexer/.ponder/
+apps/indexer/generated/
+
+# Tests — not needed at runtime
+**/*.test.ts
+**/*.test.tsx
+**/__tests__/
+
+# Documentation + scripts (one-off migration scripts aren't deploy surface)
+docs/
+scripts/
+skills/

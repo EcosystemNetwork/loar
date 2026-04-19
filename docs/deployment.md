@@ -46,7 +46,8 @@ Railway auto-deploys from GitHub and manages containers, networking, and HTTPS f
 ### Setup
 
 1. Create a [Railway](https://railway.com) project and connect your GitHub repo
-2. Add two services from the same repo:
+2. Add a **Redis** database: "+ New" → "Database" → "Add Redis". Railway exposes it as reference variable `${{Redis.REDIS_URL}}`.
+3. Add two services from the same repo:
 
 **Service 1: loar-server**
 
@@ -54,17 +55,18 @@ Railway auto-deploys from GitHub and manages containers, networking, and HTTPS f
 - Railway reads `apps/server/railway.toml` automatically
 - Set env vars in the Railway dashboard:
 
-| Variable                   | Required | Notes                                     |
-| -------------------------- | -------- | ----------------------------------------- |
-| `PORT`                     | Yes      | `3000`                                    |
-| `NODE_ENV`                 | Yes      | `production`                              |
-| `SIWE_JWT_SECRET`          | Yes      | `openssl rand -hex 32`                    |
-| `CORS_ORIGIN`              | Yes      | `https://loar.fun`                        |
-| `FIREBASE_SERVICE_ACCOUNT` | Yes      | JSON string of service account            |
-| `RPC_URL`                  | Yes      | Base / Sepolia RPC URL                    |
-| `LOAR_TOKEN_ADDRESS`       | Yes      | Token contract address                    |
-| `TREASURY_ADDRESS`         | Yes      | Treasury wallet address                   |
-| AI keys, storage keys      | Optional | Features degrade gracefully without these |
+| Variable                   | Required | Notes                                                                                          |
+| -------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `PORT`                     | Yes      | `3000`                                                                                         |
+| `NODE_ENV`                 | Yes      | `production`                                                                                   |
+| `SIWE_JWT_SECRET`          | Yes      | `openssl rand -hex 32`                                                                         |
+| `CORS_ORIGIN`              | Yes      | `https://loar.fun`                                                                             |
+| `FIREBASE_SERVICE_ACCOUNT` | Yes      | JSON string of service account                                                                 |
+| `RPC_URL`                  | Yes      | Base / Sepolia RPC URL                                                                         |
+| `LOAR_TOKEN_ADDRESS`       | Yes      | Token contract address                                                                         |
+| `TREASURY_ADDRESS`         | Yes      | Treasury wallet address                                                                        |
+| `REDIS_URL`                | Yes      | Set to `${{Redis.REDIS_URL}}` (reference). Without it, generation jobs run inline and time out |
+| AI keys, storage keys      | Optional | Features degrade gracefully without these                                                      |
 
 **Service 2: loar-indexer**
 

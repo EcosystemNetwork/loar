@@ -39,7 +39,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { URL } from 'node:url';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { createServer as createMcpServer, setupHandlers, LoarClient, } from '@loar/mcp-server';
+import { createServer as createMcpServer, setupHandlers, LoarClient } from '@loar/mcp-server';
 import { sessionStore } from './sessionStore.js';
 import { issueAccessToken, verifyAccessToken } from './tokens.js';
 import { authorizationServerMetadata, protectedResourceMetadata } from './metadata.js';
@@ -103,9 +103,7 @@ const server = http.createServer(async (req, res) => {
             return handleMessages(req, res, url);
         }
         if (req.method === 'GET' && url.pathname === '/health') {
-            res
-                .writeHead(200, { 'Content-Type': 'application/json' })
-                .end(JSON.stringify({
+            res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
                 ok: true,
                 sessions: transports.size,
                 issuer: ISSUER,
@@ -241,9 +239,7 @@ async function handleToken(req, res) {
         scope: bound.scope || 'mcp_server',
         aud: ISSUER,
     });
-    res
-        .writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
-        .end(JSON.stringify({
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify({
         access_token: accessToken,
         token_type: 'Bearer',
         expires_in: 60 * 60,

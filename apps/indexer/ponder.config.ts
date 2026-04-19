@@ -108,6 +108,12 @@ const bondingCurveCreatedEvent = parseAbiItem(
 const bondingCurveAbi = parseAbi([
   'event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount, uint256 newPrice)',
   'event TokensSold(address indexed seller, uint256 tokenAmount, uint256 ethReturned, uint256 newPrice)',
+  'event RefundPending(address indexed buyer, uint256 amount)',
+  'event RefundClaimed(address indexed buyer, uint256 amount)',
+  'event TradingHalted(uint256 indexed universeId)',
+  'event TradingResumed(uint256 indexed universeId)',
+  'event TradingHaltedByManager(uint256 indexed universeId, bool halted)',
+  'event Graduated(uint256 indexed universeId, address indexed token, uint256 ethRaised, uint256 lpTokens)',
 ]);
 
 export default createConfig({

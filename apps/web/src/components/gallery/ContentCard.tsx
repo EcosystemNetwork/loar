@@ -29,6 +29,7 @@ import { formatEther } from 'viem';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { ClaimToUniverseDialog } from './ClaimToUniverseDialog';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface ContentCardProps {
   content: {
@@ -97,8 +98,9 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
     ready: videoReady,
     onLoaded: onVideoSlotDone,
   } = useVideoLoad(isVideo ? content.mediaUrl : undefined);
-  const thumbnail =
+  const rawThumbnail =
     content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
+  const thumbnail = resolveIpfsUrl(rawThumbnail) || rawThumbnail;
   const hasLicensing =
     content.licensing &&
     (content.licensing.buyPrice !== '0' ||
@@ -116,13 +118,13 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           <>
             <video
               ref={videoRef}
-              src={videoReady ? `${content.mediaUrl}#t=0.5` : undefined}
+              src={videoReady ? `${resolveIpfsUrl(content.mediaUrl)}#t=0.5` : undefined}
               className="w-full h-full object-cover"
               muted
               loop
               playsInline
               preload="none"
-              poster={content.thumbnailUrl || content.imageUrl || undefined}
+              poster={resolveIpfsUrl(content.thumbnailUrl || content.imageUrl) || undefined}
               onLoadedData={() => {
                 setVideoLoaded(true);
                 onVideoSlotDone();
@@ -151,7 +153,7 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           // 3D: prefer Meshy's rendered thumbnail; fall back to a cube glyph.
           content.thumbnailUrl ? (
             <img
-              src={content.thumbnailUrl}
+              src={resolveIpfsUrl(content.thumbnailUrl) || content.thumbnailUrl}
               alt={content.title || '3D model'}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"

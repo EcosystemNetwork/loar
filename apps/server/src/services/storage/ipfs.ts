@@ -104,7 +104,15 @@ export class PinataProvider implements StorageProvider {
   }
 
   getPublicUrl(cid: string): string {
-    const base = `${this.gatewayUrl}/ipfs/${cid}`;
-    return this.gatewayToken ? `${base}?pinataGatewayToken=${this.gatewayToken}` : base;
+    // Dedicated Pinata gateways (*.mypinata.cloud) require a token or they 403.
+    // If the env points at a dedicated gateway without a token, fall back to
+    // the public gateway so we never persist a URL the browser can't load.
+    const configured = this.gatewayUrl;
+    const isDedicated = /\.mypinata\.cloud$/i.test(new URL(configured).host);
+    const gateway = isDedicated && !this.gatewayToken ? DEFAULT_GATEWAY : configured;
+    const base = `${gateway}/ipfs/${cid}`;
+    return this.gatewayToken && gateway === configured
+      ? `${base}?pinataGatewayToken=${this.gatewayToken}`
+      : base;
   }
 }

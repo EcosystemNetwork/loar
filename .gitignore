@@ -21,6 +21,9 @@ apps/contracts/broadcast/
 test-results/
 playwright-report/
 .playwright-artifacts-*/
+
+# Visual QA outputs
+docs/qa/visual-*/
 # Media generation outputs — content goes to Pinata/Lighthouse/Firestore, not git.
 *-output/
 ingest-log.json

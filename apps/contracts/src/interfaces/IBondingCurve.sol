@@ -55,8 +55,21 @@ interface IBondingCurve {
     /// @dev Can be called by anyone once ethRaised >= graduationEth.
     function graduate() external;
 
-    /// @notice Emergency halt/resume. Should be behind timelock+multisig (GOV-01). Use only for genuine emergencies.
-    function setTradingHalted(bool halted) external;
+    /// @notice Queue a halt or resume. Executable after `HALT_TIMELOCK` (48h).
+    /// @dev Manager-only. Replaces the old instant `setTradingHalted` so users
+    ///      always have a window to exit positions before trading freezes.
+    function queueHalt(bool halted) external;
+
+    /// @notice Cancel a queued halt/resume before its timelock elapses.
+    function cancelHalt() external;
+
+    /// @notice Execute a queued halt/resume once the timelock has elapsed.
+    /// @dev Permissionless so a queued state can't be silently starved.
+    function executeHalt() external;
+
+    /// @notice Bypass the timelock for live-exploit response. Halts only.
+    /// @dev One-shot per halt cycle; consumed on use, reset by a resume.
+    function emergencyHalt() external;
 
     // ── View functions ─────────────────────────────────────────────────
 

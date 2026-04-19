@@ -4,13 +4,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Runs a full end-to-end journey across every testable layer:
  *
- *   server   → health, CORS, tRPC health check, nonce endpoint
- *   auth     → SIWE nonce → sign → verify → JWT
- *   universe → list, create, read-back via Firestore
- *   storage  → uploadDirect, resolve, getManifest
- *   ai       → model list, optional generation (requires FAL_KEY)
- *   chain    → RPC, contract code, optional createNode (requires SMOKE_PRIVATE_KEY)
- *   indexer  → /health, GraphQL schema, universe/node queries, optional sync check
+ *   server    → health, CORS, tRPC health check, nonce endpoint
+ *   auth      → SIWE nonce → sign → verify → JWT
+ *   universe  → list, create, read-back via Firestore
+ *   storage   → uploadDirect, resolve, getManifest
+ *   ai        → model list, optional generation (requires FAL_KEY)
+ *   chain     → RPC, contract code, optional createNode (requires SMOKE_PRIVATE_KEY)
+ *   indexer   → /health, GraphQL schema, universe/node queries, optional sync check
+ *   launchpad → staking tier configs, distribution-guard surface, bondingCurve halt timelock
  *
  * Usage:
  *   pnpm smoke                           # all layers, localhost defaults
@@ -44,6 +45,7 @@ import { runChainLayer } from './layers/chain.ts';
 import { runIndexerLayer } from './layers/indexer.ts';
 import { runAdminLayer } from './layers/admin.ts';
 import { runEditingLayer } from './layers/editing.ts';
+import { runLaunchpadLayer } from './layers/launchpad.ts';
 
 async function main() {
   const cfg = loadConfig();
@@ -167,6 +169,18 @@ async function main() {
     reporter.recordLayer({
       layer: 'editing',
       title: 'PRD 1-10: edit canvas, workflows, lineage',
+      checks: result.checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 10: launchpad (staking + bonding curve hardening surfaces) ────────
+  if (!only || only === 'launchpad') {
+    reporter.beginLayer('launchpad', 'LaunchpadStaking + BondingCurve');
+    const result = await runLaunchpadLayer(cfg, jwt);
+    reporter.recordLayer({
+      layer: 'launchpad',
+      title: 'LaunchpadStaking + BondingCurve',
       checks: result.checks,
       skipped: false,
     });

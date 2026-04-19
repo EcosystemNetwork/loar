@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { QueryState } from '@/components/QueryState';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
@@ -130,7 +131,7 @@ function DiscoverPage() {
                 >
                   {item.thumbnailUrl || item.mediaUrl ? (
                     <img
-                      src={item.thumbnailUrl || item.mediaUrl}
+                      src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
                       alt={item.title || 'Trending'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -426,7 +427,7 @@ function UniverseCard({ universe }: { universe: any }) {
           <div className="relative aspect-[4/5] bg-muted">
             {imageUrl ? (
               <img
-                src={imageUrl}
+                src={resolveIpfsUrl(imageUrl) || imageUrl}
                 alt={universe.name || 'Universe'}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -772,16 +773,20 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.mediaUrl}
+            src={resolveIpfsUrl(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={item.thumbnailUrl || undefined}
+            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Play className="h-10 w-10 text-muted-foreground" />
@@ -891,16 +896,20 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.mediaUrl}
+            src={resolveIpfsUrl(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             autoPlay
-            poster={item.thumbnailUrl || undefined}
+            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-muted">
             <Play className="h-16 w-16 text-muted-foreground" />
@@ -1005,16 +1014,20 @@ function LongCard({ item }: { item: any }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.mediaUrl}
+            src={resolveIpfsUrl(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={item.thumbnailUrl || undefined}
+            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             <Clapperboard className="h-10 w-10" />
@@ -1179,19 +1192,23 @@ function ContentFeedCard({ item }: { item: any }) {
           <div className="relative aspect-video bg-muted">
             {item.thumbnailUrl ? (
               <img
-                src={item.thumbnailUrl}
+                src={resolveIpfsUrl(item.thumbnailUrl)}
                 alt={item.title}
                 className="w-full h-full object-cover"
               />
             ) : isVideo ? (
               <video
-                src={item.mediaUrl}
+                src={resolveIpfsUrl(item.mediaUrl)}
                 className="w-full h-full object-cover"
                 muted
                 preload="metadata"
               />
             ) : (
-              <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+              <img
+                src={resolveIpfsUrl(item.mediaUrl)}
+                alt={item.title}
+                className="w-full h-full object-cover"
+              />
             )}
             {isVideo && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -102,6 +102,49 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @notice Total $LOAR staked across all universes
     uint256 public totalUniverseStaked;
 
+    // ── Reward distribution hardening (LS-1 / sandwich mitigation) ──
+    //
+    // The original `distributeUniverseReward` had two weaknesses:
+    //   1. Auth was `owner() || treasury` — any treasury EOA compromise
+    //      meant arbitrary, unbounded reward injection.
+    //   2. The full reward incremented `accRewardPerShare` in one tx, so an
+    //      attacker who watched the mempool could `stakeInUniverse` just
+    //      before, claim a slice, and unstake (paying only the 5% penalty).
+    //
+    // Mitigations layered here:
+    //   - `distributors` allowlist replaces the implicit treasury bypass.
+    //   - `maxRewardBpsPerDistribution` bounds a single distribution to a
+    //     fraction of the pool, so a sandwich attacker's gross take cannot
+    //     exceed the early-unstake penalty (5%) and attacks become loss-making.
+    //   - `minDistributionInterval` enforces a per-pool cooldown so a malicious
+    //     distributor cannot drip-distribute around the cap.
+    //
+    // These are *bounds*, not full elimination — a future major version with a
+    // deposit cliff (pending-amount bucket) would close the residual surface.
+
+    /// @notice Authorized reward distributors (e.g., revenue-router contracts).
+    mapping(address => bool) public distributors;
+
+    /// @notice Per-pool block of the most recent distribution. Enforces cooldown.
+    mapping(uint256 => uint256) public lastDistributionBlock;
+
+    /// @notice Min blocks between distributions to a single pool.
+    /// @dev Default 100 blocks (~20min on Ethereum, ~3min on Base) seeds the
+    ///      cooldown without breaking high-frequency revenue plumbing.
+    uint256 public minDistributionInterval;
+
+    /// @notice Max single-distribution amount as a fraction of pool.totalStaked (bps).
+    /// @dev Default 500 bps (5%) caps attacker gain to the early-unstake penalty,
+    ///      making sandwich attacks zero-EV before gas. Set 0 to disable.
+    uint16 public maxRewardBpsPerDistribution;
+
+    event DistributorChanged(address indexed who, bool allowed);
+    event DistributionGuardChanged(uint256 minInterval, uint16 maxRewardBps);
+
+    error NotDistributor();
+    error DistributionTooSoon();
+    error DistributionExceedsCap();
+
     event Staked(address indexed user, uint256 amount, Tier tier);
     event Unstaked(address indexed user, uint256 amount, uint256 penalty);
     event TierChanged(address indexed user, Tier oldTier, Tier newTier);
@@ -311,19 +354,40 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Distribute $LOAR rewards to a universe's staking pool.
-    ///         Called by platform when universe earns trading fees, subscriptions, etc.
+    ///         Called by authorized distributors (revenue routers, treasury bots).
+    /// @dev Auth: owner OR `distributors[msg.sender]`. The legacy
+    ///      `treasury` bypass is gone — re-add via `setDistributor(treasury, true)`
+    ///      if the treasury wallet is supposed to push rewards directly.
     function distributeUniverseReward(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
-        require(msg.sender == owner() || msg.sender == treasury, "Unauthorized");
+        if (msg.sender != owner() && !distributors[msg.sender]) revert NotDistributor();
+
         UniversePool storage pool = universePools[universeId];
         if (pool.totalStaked == 0) {
-            // No stakers — send to treasury
+            // No stakers — send to treasury rather than incrementing
+            // accRewardPerShare against a zero denominator.
             loarToken.safeTransferFrom(msg.sender, treasury, amount);
             return;
+        }
+
+        // Cooldown — prevents drip-distribution around the per-distribution cap.
+        uint256 lastBlock = lastDistributionBlock[universeId];
+        uint256 interval = minDistributionInterval; // SLOAD once
+        if (lastBlock != 0 && interval != 0 && block.number < lastBlock + interval) {
+            revert DistributionTooSoon();
+        }
+
+        // Per-distribution cap — bounds a sandwich attacker's gross take so
+        // it cannot exceed the early-unstake penalty (5%). Set 0 to disable.
+        uint16 maxBps = maxRewardBpsPerDistribution; // SLOAD once
+        if (maxBps != 0) {
+            uint256 cap = (pool.totalStaked * maxBps) / 10_000;
+            if (amount > cap) revert DistributionExceedsCap();
         }
 
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
         pool.accRewardPerShare += (amount * 1e18) / pool.totalStaked;
         pool.totalDistributed += amount;
+        lastDistributionBlock[universeId] = block.number;
 
         emit UniverseRewardDistributed(universeId, amount);
     }
@@ -412,6 +476,23 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     function setTierConfig(Tier tier, uint256 minStake, uint16 weight, uint16 feeDiscountBps, uint16 curationBoost, bool priorityQueue) external onlyOwner {
         require(tier != Tier.NONE, "Cannot configure NONE tier");
+        require(feeDiscountBps <= 10_000, "Fee discount > 100%");
+
+        // Enforce monotonic thresholds so `_calculateTier` remains sound
+        // (a BRONZE threshold above SILVER's would misclassify stakers and
+        // silently break getUserTier/getFeeDiscount invariants).
+        if (tier == Tier.BRONZE) {
+            require(minStake <= tierConfigs[Tier.SILVER].minStake, "BRONZE >= SILVER");
+        } else if (tier == Tier.SILVER) {
+            require(minStake >= tierConfigs[Tier.BRONZE].minStake, "SILVER < BRONZE");
+            require(minStake <= tierConfigs[Tier.GOLD].minStake, "SILVER > GOLD");
+        } else if (tier == Tier.GOLD) {
+            require(minStake >= tierConfigs[Tier.SILVER].minStake, "GOLD < SILVER");
+            require(minStake <= tierConfigs[Tier.DIAMOND].minStake, "GOLD > DIAMOND");
+        } else if (tier == Tier.DIAMOND) {
+            require(minStake >= tierConfigs[Tier.GOLD].minStake, "DIAMOND < GOLD");
+        }
+
         tierConfigs[tier] = TierConfig({
             minStake: minStake,
             weight: weight,
@@ -449,6 +530,46 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit LiquidityPoolChanged(old, newPool);
     }
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[49] private __gap;
+    /// @notice Allowlist a reward distributor. Owner only.
+    /// @dev Use this to authorize the revenue-router contract or a multisig
+    ///      that pushes earned protocol fees into universe pools.
+    function setDistributor(address who, bool allowed) external onlyOwner {
+        if (who == address(0)) revert ZeroAddress();
+        distributors[who] = allowed;
+        emit DistributorChanged(who, allowed);
+    }
+
+    /// @notice Configure the sandwich-mitigation guards for distributions.
+    /// @param newMinInterval Min blocks between distributions to a single pool.
+    /// @param newMaxRewardBps Max distribution size as fraction of pool (bps).
+    /// @dev Pass `newMaxRewardBps == 0` to disable the per-distribution cap.
+    ///      Must be <= 10_000 (100% of the pool); recommended 500 (5%).
+    function setDistributionGuard(uint256 newMinInterval, uint16 newMaxRewardBps) external onlyOwner {
+        require(newMaxRewardBps <= 10_000, "Max bps > 100%");
+        require(newMinInterval <= 100_000, "Interval too large");
+        minDistributionInterval = newMinInterval;
+        maxRewardBpsPerDistribution = newMaxRewardBps;
+        emit DistributionGuardChanged(newMinInterval, newMaxRewardBps);
+    }
+
+    /// @notice One-time post-upgrade defaults for the new sandwich-guard
+    ///         parameters. Safe to call once after the V2 upgrade; further
+    ///         changes go through `setDistributionGuard`.
+    /// @dev Idempotent: only seeds defaults when the guard is uninitialized
+    ///      (both fields zero), so accidental re-calls cannot relax stricter
+    ///      values that owner has set since.
+    function initializeDistributionGuardV2() external onlyOwner {
+        if (minDistributionInterval == 0 && maxRewardBpsPerDistribution == 0) {
+            minDistributionInterval = 100;             // ~20min Eth, ~3min Base
+            maxRewardBpsPerDistribution = 500;         // 5% of pool per distribution
+            emit DistributionGuardChanged(100, 500);
+        }
+    }
+
+    /// @dev Reserved storage gap for future upgrades. Reduced from 49 → 45
+    ///      to make room for: `distributors` mapping (1), `lastDistributionBlock`
+    ///      mapping (1), `minDistributionInterval` (1), and
+    ///      `maxRewardBpsPerDistribution` which sits alone in its own slot (1)
+    ///      because the trailing field is the gap array.
+    uint256[45] private __gap;
 }

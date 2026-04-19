@@ -15,6 +15,9 @@ import {
   token,
   bondingCurve,
   bondingCurveTrade,
+  bondingCurveSnapshot,
+  bondingCurveRefund,
+  bondingCurveHaltEvent,
   hookEvent,
   node,
   nodeCanonization,
@@ -226,10 +229,51 @@ ponder.on('UniverseManager:TokenGraduated', async ({ event, context }) => {
   }
 });
 
+/// Shared helper: recompute curve aggregates on each trade so read paths don't
+/// need to scan bondingCurveTrade. `deltaTokensSold` is signed (positive on buy,
+/// negative on sell).
+async function applyTradeToCurve(
+  context: any,
+  curveAddr: `0x${string}`,
+  deltaTokensSold: bigint,
+  deltaEthRaised: bigint,
+  newPrice: bigint,
+  timestamp: number,
+  blockNumber: number,
+  trigger: 'buy' | 'sell',
+  eventId: string
+) {
+  const row = await context.db.find(bondingCurve, { id: curveAddr });
+  if (!row) return; // Curve not yet indexed (out-of-order events shouldn't happen, but be safe)
+
+  const nextTokensSold = BigInt(row.tokensSold) + deltaTokensSold;
+  const nextEthRaised = BigInt(row.ethRaised) + deltaEthRaised;
+
+  await context.db.update(bondingCurve, { id: curveAddr }).set({
+    tokensSold: (nextTokensSold < 0n ? 0n : nextTokensSold).toString(),
+    ethRaised: (nextEthRaised < 0n ? 0n : nextEthRaised).toString(),
+    lastPrice: newPrice.toString(),
+    tradeCount: row.tradeCount + 1,
+  });
+
+  await context.db.insert(bondingCurveSnapshot).values({
+    id: eventId,
+    bondingCurve: curveAddr,
+    blockNumber,
+    timestamp,
+    tokensSold: (nextTokensSold < 0n ? 0n : nextTokensSold).toString(),
+    ethRaised: (nextEthRaised < 0n ? 0n : nextEthRaised).toString(),
+    price: newPrice.toString(),
+    trigger,
+  });
+}
+
 ponder.on('BondingCurve:TokensPurchased', async ({ event, context }) => {
+  const id = `${event.transaction.hash}:${event.log.logIndex}`;
+  const curveAddr = getAddress(event.log.address);
   await context.db.insert(bondingCurveTrade).values({
-    id: `${event.transaction.hash}:${event.log.logIndex}`,
-    bondingCurve: getAddress(event.log.address),
+    id,
+    bondingCurve: curveAddr,
     trader: getAddress(event.args.buyer),
     isBuy: true,
     ethAmount: event.args.ethAmount.toString(),
@@ -237,18 +281,152 @@ ponder.on('BondingCurve:TokensPurchased', async ({ event, context }) => {
     price: event.args.newPrice.toString(),
     timestamp: Number(event.block.timestamp),
   });
+  await applyTradeToCurve(
+    context,
+    curveAddr,
+    event.args.tokenAmount,
+    event.args.ethAmount,
+    event.args.newPrice,
+    Number(event.block.timestamp),
+    Number(event.block.number),
+    'buy',
+    `${id}:snap`
+  );
 });
 
 ponder.on('BondingCurve:TokensSold', async ({ event, context }) => {
+  const id = `${event.transaction.hash}:${event.log.logIndex}`;
+  const curveAddr = getAddress(event.log.address);
   await context.db.insert(bondingCurveTrade).values({
-    id: `${event.transaction.hash}:${event.log.logIndex}`,
-    bondingCurve: getAddress(event.log.address),
+    id,
+    bondingCurve: curveAddr,
     trader: getAddress(event.args.seller),
     isBuy: false,
     ethAmount: event.args.ethReturned.toString(),
     tokenAmount: event.args.tokenAmount.toString(),
     price: event.args.newPrice.toString(),
     timestamp: Number(event.block.timestamp),
+  });
+  // ETH raised shrinks on sells; tokens sold decreases too.
+  await applyTradeToCurve(
+    context,
+    curveAddr,
+    -event.args.tokenAmount,
+    -event.args.ethReturned,
+    event.args.newPrice,
+    Number(event.block.timestamp),
+    Number(event.block.number),
+    'sell',
+    `${id}:snap`
+  );
+});
+
+// ── H1 refund pull-pattern tracking ─────────────────────────────────
+ponder.on('BondingCurve:RefundPending', async ({ event, context }) => {
+  const curveAddr = getAddress(event.log.address);
+  const buyer = getAddress(event.args.buyer);
+  const id = `${curveAddr.toLowerCase()}:${buyer.toLowerCase()}`;
+  const eventId = `${event.transaction.hash}:${event.log.logIndex}`;
+
+  const existing = await context.db.find(bondingCurveRefund, { id });
+  if (existing && existing.claimedAt === null) {
+    // Outstanding refund grew (multiple failed sends to the same buyer)
+    await context.db.update(bondingCurveRefund, { id }).set({
+      amount: (BigInt(existing.amount) + event.args.amount).toString(),
+      lastEventId: eventId,
+    });
+  } else {
+    await context.db.insert(bondingCurveRefund).values({
+      id,
+      bondingCurve: curveAddr,
+      buyer,
+      amount: event.args.amount.toString(),
+      pendingSince: Number(event.block.timestamp),
+      claimedAt: null,
+      lastEventId: eventId,
+    });
+  }
+
+  // Update aggregate on the curve row
+  const curve = await context.db.find(bondingCurve, { id: curveAddr });
+  if (curve) {
+    await context.db.update(bondingCurve, { id: curveAddr }).set({
+      pendingRefundsTotal: (BigInt(curve.pendingRefundsTotal) + event.args.amount).toString(),
+    });
+  }
+});
+
+ponder.on('BondingCurve:RefundClaimed', async ({ event, context }) => {
+  const curveAddr = getAddress(event.log.address);
+  const buyer = getAddress(event.args.buyer);
+  const id = `${curveAddr.toLowerCase()}:${buyer.toLowerCase()}`;
+  const eventId = `${event.transaction.hash}:${event.log.logIndex}`;
+
+  const existing = await context.db.find(bondingCurveRefund, { id });
+  if (existing) {
+    await context.db.update(bondingCurveRefund, { id }).set({
+      amount: '0',
+      claimedAt: Number(event.block.timestamp),
+      lastEventId: eventId,
+    });
+  }
+
+  const curve = await context.db.find(bondingCurve, { id: curveAddr });
+  if (curve) {
+    const prev = BigInt(curve.pendingRefundsTotal);
+    const next = prev > event.args.amount ? prev - event.args.amount : 0n;
+    await context.db.update(bondingCurve, { id: curveAddr }).set({
+      pendingRefundsTotal: next.toString(),
+    });
+  }
+});
+
+// ── Trading halt/resume ─────────────────────────────────────────────
+// TradingHalted/TradingResumed fire both from manager action AND from
+// graduation. We dedupe the "source" via TradingHaltedByManager: that event
+// is manager-originated, so we log the manager flavor when present.
+ponder.on('BondingCurve:TradingHaltedByManager', async ({ event, context }) => {
+  const curveAddr = getAddress(event.log.address);
+  const timestamp = Number(event.block.timestamp);
+
+  await context.db.insert(bondingCurveHaltEvent).values({
+    id: `${event.transaction.hash}:${event.log.logIndex}`,
+    bondingCurve: curveAddr,
+    universeId: Number(event.args.universeId),
+    halted: event.args.halted,
+    source: 'manager',
+    timestamp,
+    blockNumber: Number(event.block.number),
+  });
+
+  const curve = await context.db.find(bondingCurve, { id: curveAddr });
+  if (curve && curve.tradingStatus !== 'graduated') {
+    await context.db.update(bondingCurve, { id: curveAddr }).set({
+      tradingStatus: event.args.halted ? 'halted' : 'active',
+      tradingStatusUpdatedAt: timestamp,
+    });
+  }
+});
+
+ponder.on('BondingCurve:Graduated', async ({ event, context }) => {
+  // Emitted from inside _graduate() — authoritative graduation signal from
+  // the curve itself (complements UniverseManager:TokenGraduated).
+  const curveAddr = getAddress(event.log.address);
+  const timestamp = Number(event.block.timestamp);
+  await context.db.update(bondingCurve, { id: curveAddr }).set({
+    graduated: true,
+    graduatedAt: timestamp,
+    tradingStatus: 'graduated',
+    tradingStatusUpdatedAt: timestamp,
+  });
+  await context.db.insert(bondingCurveHaltEvent).values({
+    id: `${event.transaction.hash}:${event.log.logIndex}:grad`,
+    bondingCurve: curveAddr,
+    universeId: Number(event.args.universeId),
+    halted: true,
+    source: 'graduation',
+    timestamp,
+    blockNumber: Number(event.block.number),
   });
 });
 
@@ -746,13 +924,11 @@ ponder.on('CollabManager:CollabAccepted', async ({ event, context }) => {
 });
 
 ponder.on('CollabManager:CollabCompleted', async ({ event, context }) => {
-  await context.db
-    .update(collab, { id: event.args.collabId.toString() })
-    .set({
-      status: 3,
-      totalRevenue: event.args.totalRevenue.toString(),
-      endTime: Number(event.block.timestamp),
-    });
+  await context.db.update(collab, { id: event.args.collabId.toString() }).set({
+    status: 3,
+    totalRevenue: event.args.totalRevenue.toString(),
+    endTime: Number(event.block.timestamp),
+  });
 });
 
 ponder.on('CollabManager:CollabCancelled', async ({ event, context }) => {

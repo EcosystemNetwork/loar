@@ -163,27 +163,93 @@ contract BondingCurveTest is Test {
     }
 
     function test_emergencyHalt_onlyManager() public {
+        // Only the manager can fire emergencyHalt
         vm.prank(alice);
-        vm.expectRevert("Only universe manager");
-        curveV1.setTradingHalted(true);
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x07));
+        curveV1.emergencyHalt();
 
         vm.prank(address(manager));
-        curveV1.setTradingHalted(true);
+        curveV1.emergencyHalt();
         assertTrue(curveV1.tradingHalted());
+        assertTrue(curveV1.emergencyHaltUsed());
+
+        // Cannot fire emergencyHalt twice in the same cycle
+        vm.prank(address(manager));
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x0A)); // already halted
+        curveV1.emergencyHalt();
 
         // Can't buy when halted
         vm.prank(alice);
         vm.expectRevert(IBondingCurve.TradingIsHalted.selector);
         curveV1.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
 
-        // Resume
+        // Resume requires the timelocked queueHalt + executeHalt path —
+        // emergency cannot be used to resume.
         vm.prank(address(manager));
-        curveV1.setTradingHalted(false);
+        curveV1.queueHalt(false);
+
+        // Can't execute before timelock elapses
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x06));
+        curveV1.executeHalt();
+
+        vm.warp(block.timestamp + 48 hours + 1);
+        curveV1.executeHalt(); // permissionless
         assertFalse(curveV1.tradingHalted());
+        assertFalse(curveV1.emergencyHaltUsed(), "Emergency fuse resets after resume");
 
         // Can buy again
         vm.prank(alice);
         curveV1.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
+    }
+
+    function test_haltTimelock_queueAndExecute() public {
+        // Non-manager cannot queue
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x01));
+        curveV1.queueHalt(true);
+
+        // Manager queues a halt
+        vm.prank(address(manager));
+        curveV1.queueHalt(true);
+
+        // Trading is NOT halted yet — timelock hasn't elapsed
+        assertFalse(curveV1.tradingHalted(), "Halt should not apply before timelock");
+
+        // Buys still work during the delay
+        vm.prank(alice);
+        curveV1.buy{value: 0.05 ether}(0, block.timestamp + 1 hours);
+
+        // Cannot execute early
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x06));
+        curveV1.executeHalt();
+
+        // After timelock, anyone can execute
+        vm.warp(block.timestamp + 48 hours + 1);
+        curveV1.executeHalt();
+        assertTrue(curveV1.tradingHalted());
+
+        // Now buys revert
+        vm.prank(alice);
+        vm.expectRevert(IBondingCurve.TradingIsHalted.selector);
+        curveV1.buy{value: 0.05 ether}(0, block.timestamp + 1 hours);
+    }
+
+    function test_haltTimelock_cancelable() public {
+        vm.prank(address(manager));
+        curveV1.queueHalt(true);
+
+        // Manager changes their mind
+        vm.prank(address(manager));
+        curveV1.cancelHalt();
+
+        // Even after the timelock, executeHalt should fail because nothing is pending
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x05));
+        curveV1.executeHalt();
+
+        // Buys still work
+        vm.prank(alice);
+        curveV1.buy{value: 0.05 ether}(0, block.timestamp + 1 hours);
     }
 
     function test_getCurrentPricePerToken() public {

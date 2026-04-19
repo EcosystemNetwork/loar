@@ -12,6 +12,7 @@ import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X, Film, GripVertical, Play, Clock, Sparkles, Loader2 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 /** How many generations to load per page */
 const PAGE_SIZE = 20;
@@ -189,7 +190,7 @@ export function GenerationsPanel({
             <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
               {playingId === item.id ? (
                 <video
-                  src={item.permanentVideoUrl || item.videoUrl || item.url}
+                  src={resolveIpfsUrl(item.permanentVideoUrl || item.videoUrl || item.url)}
                   className="w-full h-full object-cover"
                   autoPlay
                   muted

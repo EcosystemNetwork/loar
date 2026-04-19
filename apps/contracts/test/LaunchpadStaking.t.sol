@@ -49,10 +49,14 @@ contract LaunchpadStakingTest is Test {
         vm.prank(deployer);
         loar.approve(address(staking), type(uint256).max);
 
-        // Fund treasury for distributeUniverseReward (treasury is also authorized)
+        // Fund treasury for distributeUniverseReward and authorize as a
+        // distributor (post-LS-1 hardening removed the implicit treasury
+        // bypass — authorization is now explicit via setDistributor).
         loar.mint(treasury, 2_000_000e18);
         vm.prank(treasury);
         loar.approve(address(staking), type(uint256).max);
+        vm.prank(deployer);
+        staking.setDistributor(treasury, true);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -658,8 +662,102 @@ contract LaunchpadStakingTest is Test {
         staking.stakeInUniverse(UNIVERSE_ID, 10_000e18);
 
         vm.prank(random);
-        vm.expectRevert("Unauthorized");
+        vm.expectRevert(LaunchpadStaking.NotDistributor.selector);
         staking.distributeUniverseReward(UNIVERSE_ID, 500e18);
+    }
+
+    function test_setDistributor_authorizesAndDeauthorizes() public {
+        // Initially `rewarder` is not a distributor
+        loar.mint(rewarder, 100_000e18);
+        vm.prank(rewarder);
+        loar.approve(address(staking), type(uint256).max);
+
+        vm.prank(staker);
+        staking.stakeInUniverse(UNIVERSE_ID, 10_000e18);
+
+        vm.prank(rewarder);
+        vm.expectRevert(LaunchpadStaking.NotDistributor.selector);
+        staking.distributeUniverseReward(UNIVERSE_ID, 500e18);
+
+        // Authorize and try again
+        vm.prank(deployer);
+        staking.setDistributor(rewarder, true);
+
+        vm.prank(rewarder);
+        staking.distributeUniverseReward(UNIVERSE_ID, 500e18);
+
+        // Deauthorize and verify it's blocked again
+        vm.prank(deployer);
+        staking.setDistributor(rewarder, false);
+
+        vm.prank(rewarder);
+        vm.expectRevert(LaunchpadStaking.NotDistributor.selector);
+        staking.distributeUniverseReward(UNIVERSE_ID, 500e18);
+    }
+
+    function test_distributionGuard_capsRewardSize() public {
+        vm.prank(staker);
+        staking.stakeInUniverse(UNIVERSE_ID, 100_000e18);
+
+        // 5% cap, no cooldown
+        vm.prank(deployer);
+        staking.setDistributionGuard(0, 500);
+
+        // 5% of 100k = 5k. 5_001 should revert.
+        vm.prank(deployer);
+        vm.expectRevert(LaunchpadStaking.DistributionExceedsCap.selector);
+        staking.distributeUniverseReward(UNIVERSE_ID, 5_001e18);
+
+        // 5_000 should succeed
+        vm.prank(deployer);
+        staking.distributeUniverseReward(UNIVERSE_ID, 5_000e18);
+    }
+
+    function test_distributionGuard_enforcesCooldown() public {
+        vm.prank(staker);
+        staking.stakeInUniverse(UNIVERSE_ID, 100_000e18);
+
+        // 50 block cooldown, no size cap
+        vm.prank(deployer);
+        staking.setDistributionGuard(50, 0);
+
+        vm.prank(deployer);
+        staking.distributeUniverseReward(UNIVERSE_ID, 1_000e18);
+
+        // Same block / next block should revert
+        vm.prank(deployer);
+        vm.expectRevert(LaunchpadStaking.DistributionTooSoon.selector);
+        staking.distributeUniverseReward(UNIVERSE_ID, 1_000e18);
+
+        vm.roll(block.number + 49);
+        vm.prank(deployer);
+        vm.expectRevert(LaunchpadStaking.DistributionTooSoon.selector);
+        staking.distributeUniverseReward(UNIVERSE_ID, 1_000e18);
+
+        // After 50 blocks elapsed, success
+        vm.roll(block.number + 1);
+        vm.prank(deployer);
+        staking.distributeUniverseReward(UNIVERSE_ID, 1_000e18);
+    }
+
+    function test_initializeDistributionGuardV2_seedsDefaultsOnce() public {
+        assertEq(staking.minDistributionInterval(), 0);
+        assertEq(staking.maxRewardBpsPerDistribution(), 0);
+
+        vm.prank(deployer);
+        staking.initializeDistributionGuardV2();
+
+        assertEq(staking.minDistributionInterval(), 100);
+        assertEq(staking.maxRewardBpsPerDistribution(), 500);
+
+        // Owner explicitly tightens; re-running V2 init should NOT relax it
+        vm.prank(deployer);
+        staking.setDistributionGuard(200, 250);
+
+        vm.prank(deployer);
+        staking.initializeDistributionGuardV2(); // no-op
+        assertEq(staking.minDistributionInterval(), 200);
+        assertEq(staking.maxRewardBpsPerDistribution(), 250);
     }
 
     function test_distributeUniverseReward_noStakers_sendsToTreasury() public {

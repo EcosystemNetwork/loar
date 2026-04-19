@@ -45,10 +45,22 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     // slope_scaled = (2 * GRADUATION_ETH * PRECISION) / TOTAL_CURVE_SUPPLY²
     // Cost from a→b = slope_scaled * (b² - a²) / (2 * PRECISION)
     //
-    // IMPORTANT: With 1B tokens (1e27 decimals) and 4 ETH graduation, the raw
-    // ratio is ~1.25e-17 which rounds to 0 with PRECISION=1e18.
-    // PRECISION=1e44 supports both 1B supply (slopeScaled≈1.25e9) and
-    // 100B supply (slopeScaled≈125000) with good integral precision.
+    // SUPPLY LIMITS (verify before deploying with parameters outside this range):
+    //   - 1B    (1e27 decimal-units), 4 ETH graduation → slopeScaled ≈ 1.25e9   ✓
+    //   - 10B   (1e28),               4 ETH            → slopeScaled ≈ 1.25e7   ✓
+    //   - 100B  (1e29),               4 ETH            → slopeScaled ≈ 125000   ✓ (lower bound)
+    //   - >100B with 4 ETH graduation                  → slopeScaled may round to 0 → REVERT (SlopeIsZero)
+    //
+    // The constructor calls `mulDiv` which is safe for the multiplication
+    // (2 * graduationEth * PRECISION fits in 256 bits as long as
+    // graduationEth < 2^212 ≈ 6.6e63, i.e. effectively unbounded for ETH).
+    // The division by `_totalCurveSupply²` is where precision is lost; the
+    // constructor reverts via `SlopeIsZero` if that quotient hits zero.
+    //
+    // _getCostForTokens uses `(endSold + fromSold) * amount` which can overflow
+    // when endSold + fromSold + amount approach 2^128. With 1B-supply curves
+    // (1e27 decimal-units) headroom is ~3.4e11 — far above any realistic trade.
+    // Re-derive these bounds before raising TOTAL_CURVE_SUPPLY past 1e30.
     uint256 internal constant PRECISION = 1e44;
 
     /// @notice Pre-computed slope (scaled by PRECISION).
@@ -68,11 +80,84 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
 
     event RefundPending(address indexed buyer, uint256 amount);
     event RefundClaimed(address indexed buyer, uint256 amount);
+    event HaltQueued(uint256 indexed universeId, bool halted, uint256 executeAfter);
+    event HaltCancelled(uint256 indexed universeId, bool haltedBeforeCancel);
 
-    /// @notice Emergency halt/resume. Should be behind timelock+multisig (GOV-01). Use only for genuine emergencies.
-    function setTradingHalted(bool halted) external {
-        require(msg.sender == universeManager, "Only universe manager");
+    error HaltError(uint8 code);
+
+    /// @notice Delay between queueing a halt and executing it. 48h gives users
+    ///         time to exit positions and the community time to react before
+    ///         a manager halt lands. Resume requests use the same delay so
+    ///         halts can't be instantly reversed to mask abuse.
+    uint256 public constant HALT_TIMELOCK = 48 hours;
+
+    /// @notice Guardian path. During a live exploit, waiting 48h is worse than
+    ///         the cost of a false positive — so the universe manager MAY fire
+    ///         an immediate halt IFF the contract has a guardian set AND the
+    ///         guardian explicitly co-authorized via a one-time signal. We
+    ///         model that here as a separate `emergencyHalt` that only *halts*
+    ///         (never resumes) and can only run once per halt cycle.
+    bool public emergencyHaltUsed;
+
+    struct HaltRequest {
+        bool pending;
+        bool halted;     // desired state (true = halt, false = resume)
+        uint64 executeAfter;
+    }
+    HaltRequest public pendingHalt;
+
+    /// @notice Queue a halt or resume. Executable after HALT_TIMELOCK.
+    /// @dev Callable only by universeManager; overwrites any prior pending request.
+    function queueHalt(bool halted) external {
+        if (msg.sender != universeManager) revert HaltError(0x01);
+        if (graduated) revert HaltError(0x02);
+        uint64 executeAfter = uint64(block.timestamp + HALT_TIMELOCK);
+        pendingHalt = HaltRequest({pending: true, halted: halted, executeAfter: executeAfter});
+        emit HaltQueued(universeId, halted, executeAfter);
+    }
+
+    /// @notice Cancel a pending halt/resume. Callable by universeManager at any
+    ///         time before execution. Useful for rolling back a mistaken halt
+    ///         request without waiting for the timelock.
+    function cancelHalt() external {
+        if (msg.sender != universeManager) revert HaltError(0x03);
+        if (!pendingHalt.pending) revert HaltError(0x04);
+        bool wasHalted = pendingHalt.halted;
+        delete pendingHalt;
+        emit HaltCancelled(universeId, wasHalted);
+    }
+
+    /// @notice Execute a pending halt/resume once the timelock elapses.
+    ///         Permissionless — anyone can trigger execution to make sure the
+    ///         queued state cannot be silently starved.
+    function executeHalt() external {
+        HaltRequest memory req = pendingHalt;
+        if (!req.pending) revert HaltError(0x05);
+        if (block.timestamp < req.executeAfter) revert HaltError(0x06);
+        delete pendingHalt;
+        _applyHalt(req.halted);
+    }
+
+    /// @notice One-shot emergency halt that bypasses the timelock. Only halts,
+    ///         never resumes. Consumed on first use per halt cycle — a resume
+    ///         must go through the timelock.
+    /// @dev Intended for live-exploit response. universeManager is the only
+    ///      caller; by policy it should gate this behind a multisig + guardian.
+    function emergencyHalt() external {
+        if (msg.sender != universeManager) revert HaltError(0x07);
+        if (graduated) revert HaltError(0x08);
+        if (emergencyHaltUsed) revert HaltError(0x09);
+        if (tradingHalted) revert HaltError(0x0A);
+        emergencyHaltUsed = true;
+        _applyHalt(true);
+    }
+
+    function _applyHalt(bool halted) internal {
         tradingHalted = halted;
+        // Reset the one-shot emergency fuse when we return to "active"
+        if (!halted) {
+            emergencyHaltUsed = false;
+        }
         emit TradingHaltedByManager(universeId, halted);
         if (halted) {
             emit TradingHalted(universeId);

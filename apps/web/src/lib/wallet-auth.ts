@@ -96,25 +96,34 @@ export function clearSiweSession(revoke = false) {
   }
 }
 
-/** Refresh the session cookie. Returns true if refreshed, false if expired. */
-export async function refreshSession(): Promise<boolean> {
-  if (!hasSession()) return false;
+export type RefreshResult = 'refreshed' | 'expired' | 'network_error';
+
+/**
+ * Refresh the session cookie.
+ * - 'refreshed': success, new expiry stored.
+ * - 'expired': server rejected the cookie — caller should clear local state.
+ * - 'network_error': server unreachable / 5xx — caller should keep the session
+ *   (a transient failure must not log the user out).
+ */
+export async function refreshSession(): Promise<RefreshResult> {
+  if (!hasSession()) return 'expired';
 
   try {
     const res = await fetch(`${SERVER_URL}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
-    if (!res.ok) return false;
+    if (res.status === 401 || res.status === 403) return 'expired';
+    if (!res.ok) return 'network_error';
     const data = await res.json();
     if (data.ok && data.expiresAt) {
       localStorage.setItem(EXPIRY_KEY, String(data.expiresAt));
       emitChange();
-      return true;
+      return 'refreshed';
     }
-    return false;
+    return 'expired';
   } catch {
-    return false;
+    return 'network_error';
   }
 }
 
@@ -193,8 +202,9 @@ export function initWalletAuth() {
       if (expiresIn <= 0) {
         clearSiweSession();
       } else if (expiresIn < 60 * 60 * 1000) {
-        const ok = await refreshSession();
-        if (!ok) clearSiweSession();
+        const result = await refreshSession();
+        // Only clear on an explicit server rejection — network errors are transient.
+        if (result === 'expired') clearSiweSession();
       }
     });
   }
@@ -291,6 +301,10 @@ export function useWalletAuth() {
   // Track failed sign-in attempts to prevent infinite retry loop
   const signInFailCountRef = useRef(0);
   const MAX_AUTO_SIGN_IN_ATTEMPTS = 2;
+  // Debounce transient wagmi↔thirdweb disconnect flickers so they don't
+  // falsely clear the session on a 50-200ms sync glitch.
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const DISCONNECT_DEBOUNCE_MS = 500;
 
   // Wait for session validation before trusting localStorage
   useEffect(() => {
@@ -352,23 +366,54 @@ export function useWalletAuth() {
     disconnect();
   }, [disconnect]);
 
-  // Auto-clear session if wallet disconnects or address changes
+  // Auto-clear session if wallet disconnects or address changes.
+  // Transient disconnects (wagmi↔thirdweb desync) are debounced so a 50-200ms
+  // flicker during infinite-scroll or wallet modal interaction doesn't log the
+  // user out. Explicit address changes clear immediately (intentional switch).
   useEffect(() => {
-    if (!isConnected || !address) {
-      if (storedAddress) clearSiweSession();
-      rejectedRef.current = false;
-      // Only reset autoSignedForRef if we had a stored session (real disconnect),
-      // not on transient wagmi↔thirdweb sync flickers
-      if (storedAddress) {
-        autoSignedForRef.current = null;
-        signInFailCountRef.current = 0;
+    // Address swapped while connected — intentional switch, clear immediately.
+    if (
+      isConnected &&
+      address &&
+      storedAddress &&
+      storedAddress.toLowerCase() !== address.toLowerCase()
+    ) {
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
       }
-    } else if (storedAddress && storedAddress.toLowerCase() !== address.toLowerCase()) {
-      // Address changed — clear old session and reset for new address
       clearSiweSession();
       rejectedRef.current = false;
       autoSignedForRef.current = null;
       signInFailCountRef.current = 0;
+      return;
+    }
+
+    // Connected cleanly — cancel any pending disconnect clear.
+    if (isConnected && address) {
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Disconnected with no stored session — just reset rejection state.
+    if (!storedAddress) {
+      rejectedRef.current = false;
+      return;
+    }
+
+    // Disconnected while a session exists — debounce the clear so a quick
+    // reconnect cancels it.
+    if (!disconnectTimerRef.current) {
+      disconnectTimerRef.current = setTimeout(() => {
+        disconnectTimerRef.current = null;
+        clearSiweSession();
+        rejectedRef.current = false;
+        autoSignedForRef.current = null;
+        signInFailCountRef.current = 0;
+      }, DISCONNECT_DEBOUNCE_MS);
     }
   }, [isConnected, address, storedAddress]);
 

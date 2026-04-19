@@ -66,6 +66,15 @@ export const bondingCurve = onchainTable(
     graduated: t.boolean().notNull().default(false),
     graduatedAt: t.integer(),
     createdAt: t.integer().notNull(),
+    // Trading status: 'active' | 'halted' | 'graduated'
+    tradingStatus: t.text().notNull().default('active'),
+    tradingStatusUpdatedAt: t.integer(),
+    // Aggregate counters — cheap to update per trade, avoids a scan on read
+    tokensSold: t.text().notNull().default('0'),
+    ethRaised: t.text().notNull().default('0'),
+    lastPrice: t.text().notNull().default('0'),
+    tradeCount: t.integer().notNull().default(0),
+    pendingRefundsTotal: t.text().notNull().default('0'),
   }),
   (table) => ({
     tokenIdx: index('bonding_curve_token_idx').on(table.tokenAddress),
@@ -87,6 +96,63 @@ export const bondingCurveTrade = onchainTable(
   (table) => ({
     curveIdx: index('bct_curve_idx').on(table.bondingCurve),
     traderIdx: index('bct_trader_idx').on(table.trader),
+  })
+);
+
+/// One row per price-moving event (buy/sell). Enables historical price and
+/// volume charts straight from the indexer without client-side polling.
+export const bondingCurveSnapshot = onchainTable(
+  'bonding_curve_snapshot',
+  (t) => ({
+    id: t.text().primaryKey(), // txHash:logIndex (matches bondingCurveTrade.id for buys/sells)
+    bondingCurve: t.hex().notNull(),
+    blockNumber: t.integer().notNull(),
+    timestamp: t.integer().notNull(),
+    tokensSold: t.text().notNull(),
+    ethRaised: t.text().notNull(),
+    price: t.text().notNull(),
+    trigger: t.text().notNull(), // 'buy' | 'sell' | 'graduate'
+  }),
+  (table) => ({
+    curveIdx: index('bcsnap_curve_idx').on(table.bondingCurve),
+    blockIdx: index('bcsnap_block_idx').on(table.blockNumber),
+  })
+);
+
+/// One row per pending refund (H1 pull-pattern). Marked resolved when the
+/// matching RefundClaimed event fires.
+export const bondingCurveRefund = onchainTable(
+  'bonding_curve_refund',
+  (t) => ({
+    id: t.text().primaryKey(), // bondingCurve:buyer
+    bondingCurve: t.hex().notNull(),
+    buyer: t.hex().notNull(),
+    amount: t.text().notNull(), // outstanding amount
+    pendingSince: t.integer().notNull(),
+    claimedAt: t.integer(), // null while outstanding
+    lastEventId: t.text().notNull(), // txHash:logIndex of most recent event
+  }),
+  (table) => ({
+    curveIdx: index('bcrefund_curve_idx').on(table.bondingCurve),
+    buyerIdx: index('bcrefund_buyer_idx').on(table.buyer),
+  })
+);
+
+/// Audit log of every halt/resume so UIs can show history and oncall can
+/// reconstruct incidents even if `tradingStatus` has flipped back.
+export const bondingCurveHaltEvent = onchainTable(
+  'bonding_curve_halt_event',
+  (t) => ({
+    id: t.text().primaryKey(), // txHash:logIndex
+    bondingCurve: t.hex().notNull(),
+    universeId: t.integer().notNull(),
+    halted: t.boolean().notNull(), // true=halt, false=resume
+    source: t.text().notNull(), // 'manager' | 'graduation'
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    curveIdx: index('bchalt_curve_idx').on(table.bondingCurve),
   })
 );
 

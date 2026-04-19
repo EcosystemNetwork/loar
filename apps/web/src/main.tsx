@@ -35,6 +35,7 @@ import { routeTree } from './routeTree.gen';
 
 import { queryClient, trpc } from './utils/trpc';
 
+import { trackPageView } from './lib/ga';
 import { WalletWrapper } from './lib/wallet-provider';
 import { Web3ModeProvider } from './lib/web3-mode';
 import { hasSession, initWalletAuth } from './lib/wallet-auth';
@@ -60,6 +61,12 @@ declare module '@tanstack/react-router' {
     router: typeof router;
   }
 }
+
+router.subscribe('onResolved', () => {
+  const matches = router.state.matches;
+  const last = matches[matches.length - 1];
+  if (last) trackPageView(last.fullPath);
+});
 
 const rootElement = document.getElementById('app');
 

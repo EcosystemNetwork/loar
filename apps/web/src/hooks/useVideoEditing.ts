@@ -5,7 +5,7 @@
  * upscale, interpolate, restyle, inpaint, remove background, extend.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 
@@ -52,7 +52,10 @@ export function useVideoEditing() {
     staleTime: 5 * 60_000,
   });
 
-  const models = (modelsQuery.data || []) as EditingModel[];
+  const models = useMemo<EditingModel[]>(
+    () => (modelsQuery.data ?? []) as EditingModel[],
+    [modelsQuery.data]
+  );
 
   const getModelsForOperation = useCallback(
     (op: EditingOperation) => models.filter((m) => m.operation === op),

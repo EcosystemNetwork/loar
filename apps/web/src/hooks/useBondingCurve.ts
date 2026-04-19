@@ -5,12 +5,29 @@
  * and write actions (buy, sell) for tokens in their bonding curve phase.
  * After graduation, the token trades on Uniswap v4 via the standard swap router.
  */
-import { useState, useCallback, useMemo } from 'react';
-import { useReadContract, useChainId } from 'wagmi';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { useReadContract, useChainId, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useActiveAccount } from 'thirdweb/react';
 import { parseEther, formatEther, type Address } from 'viem';
 import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
+
+/**
+ * Default slippage tolerance for bonding-curve trades (5%).
+ * The contract's linear-price curve is deterministic per tokensSold, so
+ * slippage only comes from other trades landing before ours in the same
+ * block. 5% covers normal mempool churn without exposing the user to a
+ * sandwich-sized loss; callers can override on a per-tx basis.
+ */
+export const DEFAULT_BONDING_CURVE_SLIPPAGE_BPS = 500;
+export const MAX_BONDING_CURVE_SLIPPAGE_BPS = 5000; // 50% hard cap
+
+function applySlippage(expected: bigint, slippageBps: number): bigint {
+  const bps = BigInt(
+    Math.min(Math.max(Math.trunc(slippageBps), 0), MAX_BONDING_CURVE_SLIPPAGE_BPS)
+  );
+  return (expected * (10_000n - bps)) / 10_000n;
+}
 
 // ── BondingCurve ABI (minimal) ───────────────────────────────────────
 
@@ -202,43 +219,113 @@ export function useMaxBuyAmount(bondingCurveAddress: Address | undefined) {
 
 // ── Write hooks ──────────────────────────────────────────────────────
 
+type BuyOpts = { slippageBps?: number; minTokensOut?: bigint };
+type SellOpts = { slippageBps?: number; minEthOut?: bigint };
+
 export function useBondingCurveActions(bondingCurveAddress: Address | undefined) {
   const thirdwebAccount = useActiveAccount();
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
     'idle'
   );
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  /**
+   * Remembers the most recent buy/sell attempt so `retry()` can replay it
+   * after a transient failure (RPC flap, gas underpricing, stale quote)
+   * without the user re-typing amounts.
+   */
+  const lastAttemptRef = useRef<
+    | { kind: 'buy'; ethAmount: string; opts: BuyOpts | number }
+    | { kind: 'sell'; tokenAmount: bigint; opts: SellOpts | bigint }
+    | null
+  >(null);
+
+  // Wait for inclusion so "success" means *mined*, not just *signed*.
+  // Returns true on success, false on timeout/revert (caller handles status).
+  const awaitReceipt = useCallback(
+    async (hash: `0x${string}`) => {
+      if (!publicClient) return true; // optimistic if no client
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+          timeout: 90_000,
+          confirmations: 1,
+        });
+        return receipt.status === 'success';
+      } catch {
+        // Timeout or dropped tx — surface as error; user can retry.
+        return false;
+      }
+    },
+    [publicClient]
+  );
+
   const buy = useCallback(
-    async (ethAmount: string, slippageBps = 500) => {
+    async (ethAmount: string, opts: BuyOpts | number = {}) => {
       if (!bondingCurveAddress || !thirdwebAccount) {
         setError('Wallet not connected');
         setStatus('error');
         return;
       }
 
+      lastAttemptRef.current = { kind: 'buy', ethAmount, opts };
+
+      // Back-compat: earlier callers passed slippageBps as a number directly.
+      const resolved: BuyOpts = typeof opts === 'number' ? { slippageBps: opts } : opts;
+      const slippageBps = resolved.slippageBps ?? DEFAULT_BONDING_CURVE_SLIPPAGE_BPS;
+
       try {
         setStatus('confirming');
         setError(null);
+        setTxHash(null);
 
         const value = parseEther(ethAmount);
-        // minTokensOut = 0 for now (slippage protection via frontend warning)
-        // In production, call getTokensForEth first and apply slippage
-        const minTokensOut = 0n;
+
+        // Compute minTokensOut from a fresh on-chain quote so the tx aborts
+        // if another trade lands between preview and execution.
+        let minTokensOut = resolved.minTokensOut ?? 0n;
+        if (resolved.minTokensOut === undefined) {
+          if (!publicClient) {
+            setError('RPC unavailable — cannot quote slippage protection');
+            setStatus('error');
+            return;
+          }
+          const expected = (await publicClient.readContract({
+            address: bondingCurveAddress,
+            abi: BONDING_CURVE_ABI,
+            functionName: 'getTokensForEth',
+            args: [value],
+          })) as bigint;
+          if (expected === 0n) {
+            setError('Quote returned zero tokens — curve may be graduated or halted');
+            setStatus('error');
+            return;
+          }
+          minTokensOut = applySlippage(expected, slippageBps);
+        }
 
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
 
-        const hash = await writeContractAsync({
+        const hash = (await writeContractAsync({
           address: bondingCurveAddress,
           abi: BONDING_CURVE_ABI,
           functionName: 'buy',
           args: [minTokensOut, deadline],
           value,
-        });
+        })) as `0x${string}`;
 
         setTxHash(hash);
+        setStatus('pending');
+
+        const ok = await awaitReceipt(hash);
+        if (!ok) {
+          setError('Transaction did not confirm in time — you can retry');
+          setStatus('error');
+          return hash;
+        }
         setStatus('success');
         return hash;
       } catch (err: any) {
@@ -251,31 +338,67 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         setStatus('error');
       }
     },
-    [bondingCurveAddress, thirdwebAccount, writeContractAsync]
+    [bondingCurveAddress, thirdwebAccount, writeContractAsync, publicClient, awaitReceipt]
   );
 
   const sell = useCallback(
-    async (tokenAmount: bigint, minEthOut = 0n) => {
+    async (tokenAmount: bigint, opts: SellOpts | bigint = {}) => {
       if (!bondingCurveAddress || !thirdwebAccount) {
         setError('Wallet not connected');
         setStatus('error');
         return;
       }
 
+      lastAttemptRef.current = { kind: 'sell', tokenAmount, opts };
+
+      // Back-compat: earlier callers passed minEthOut as a bigint directly.
+      const resolved: SellOpts = typeof opts === 'bigint' ? { minEthOut: opts } : opts;
+      const slippageBps = resolved.slippageBps ?? DEFAULT_BONDING_CURVE_SLIPPAGE_BPS;
+
       try {
         setStatus('confirming');
         setError(null);
+        setTxHash(null);
+
+        let minEthOut = resolved.minEthOut ?? 0n;
+        if (resolved.minEthOut === undefined) {
+          if (!publicClient) {
+            setError('RPC unavailable — cannot quote slippage protection');
+            setStatus('error');
+            return;
+          }
+          const expected = (await publicClient.readContract({
+            address: bondingCurveAddress,
+            abi: BONDING_CURVE_ABI,
+            functionName: 'getEthForTokens',
+            args: [tokenAmount],
+          })) as bigint;
+          if (expected === 0n) {
+            setError('Quote returned zero ETH — insufficient curve supply');
+            setStatus('error');
+            return;
+          }
+          minEthOut = applySlippage(expected, slippageBps);
+        }
 
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
 
-        const hash = await writeContractAsync({
+        const hash = (await writeContractAsync({
           address: bondingCurveAddress,
           abi: BONDING_CURVE_ABI,
           functionName: 'sell',
           args: [tokenAmount, minEthOut, deadline],
-        });
+        })) as `0x${string}`;
 
         setTxHash(hash);
+        setStatus('pending');
+
+        const ok = await awaitReceipt(hash);
+        if (!ok) {
+          setError('Transaction did not confirm in time — you can retry');
+          setStatus('error');
+          return hash;
+        }
         setStatus('success');
         return hash;
       } catch (err: any) {
@@ -288,16 +411,26 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         setStatus('error');
       }
     },
-    [bondingCurveAddress, thirdwebAccount, writeContractAsync]
+    [bondingCurveAddress, thirdwebAccount, writeContractAsync, publicClient, awaitReceipt]
   );
 
   const reset = useCallback(() => {
     setStatus('idle');
     setTxHash(null);
     setError(null);
+    lastAttemptRef.current = null;
   }, []);
 
-  return { buy, sell, status, error, txHash, reset };
+  const retry = useCallback(async () => {
+    const last = lastAttemptRef.current;
+    if (!last) return;
+    if (last.kind === 'buy') return buy(last.ethAmount, last.opts);
+    return sell(last.tokenAmount, last.opts);
+  }, [buy, sell]);
+
+  const canRetry = status === 'error' && lastAttemptRef.current !== null;
+
+  return { buy, sell, status, error, txHash, reset, retry, canRetry };
 }
 
 // ── Composite hook ───────────────────────────────────────────────────

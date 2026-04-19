@@ -15,6 +15,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { trpcClient } from '../utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface ImageResult {
   status: string;
@@ -203,7 +204,7 @@ export function GenerativeMedia() {
             <div>
               <h3 className="text-lg font-medium mb-2">Generated Image</h3>
               <img
-                src={content.imageUrl}
+                src={resolveIpfsUrl(content.imageUrl)}
                 alt="Generated image"
                 className="w-full rounded-lg border max-h-96 object-contain"
               />
@@ -218,7 +219,7 @@ export function GenerativeMedia() {
                   </Button>
                 </div>
                 <video
-                  src={content.videoUrl}
+                  src={resolveIpfsUrl(content.videoUrl)}
                   controls
                   className="w-full rounded-lg border"
                   preload="metadata"

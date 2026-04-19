@@ -26,6 +26,7 @@
  * the structured error code to the agent.
  */
 import http from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -36,30 +37,23 @@ import { ALL_TOOLS } from './tools.js';
 // Everything else in this module is the stdio/SSE entry point.
 export { LoarClient, LoarApiError } from './loar-client.js';
 export { ALL_TOOLS } from './tools.js';
-// ── Configuration ──────────────────────────────────────────────────────
-const LOAR_SERVER_URL = process.env.LOAR_SERVER_URL || 'http://localhost:3000';
-const LOAR_API_KEY = process.env.LOAR_API_KEY;
-const LOAR_MCP_TRANSPORT = (process.env.LOAR_MCP_TRANSPORT || 'stdio').toLowerCase();
-const LOAR_MCP_PORT = Number(process.env.LOAR_MCP_PORT || 3333);
-const LOAR_MCP_HOST = process.env.LOAR_MCP_HOST || '127.0.0.1';
-if (!LOAR_API_KEY) {
-    console.error('ERROR: LOAR_API_KEY environment variable is required');
-    console.error('Generate one at https://loar.fun (Settings → API Keys).');
-    console.error('The key must include the scopes for the tools you intend to call.');
-    process.exit(1);
-}
-if (!LOAR_API_KEY.startsWith('loar_')) {
-    console.error("ERROR: LOAR_API_KEY does not look valid (expected prefix 'loar_')");
-    process.exit(1);
-}
-if (LOAR_MCP_TRANSPORT !== 'stdio' && LOAR_MCP_TRANSPORT !== 'sse') {
-    console.error(`ERROR: LOAR_MCP_TRANSPORT must be "stdio" or "sse" (got: "${LOAR_MCP_TRANSPORT}")`);
-    process.exit(1);
-}
-if (LOAR_MCP_TRANSPORT === 'sse') {
-    if (!Number.isInteger(LOAR_MCP_PORT) || LOAR_MCP_PORT < 1 || LOAR_MCP_PORT > 65535) {
-        console.error(`ERROR: LOAR_MCP_PORT must be a valid port (got: ${process.env.LOAR_MCP_PORT})`);
-        process.exit(1);
+// ── Entry-point detection ──────────────────────────────────────────────
+//
+// This file is both a library (imported by @loar/mcp-gateway) AND a CLI
+// binary (installed as `loar-mcp-server` via package.json bin). Env-var
+// checks and `main()` must only run in the CLI case — otherwise importing
+// this module from another app triggers a spurious exit.
+//
+// Detection: compare import.meta.url to the resolved path of the process's
+// entry file. Works across Node versions, symlinks, and npm `bin` wrappers.
+function isCliEntrypoint() {
+    if (!process.argv[1])
+        return false;
+    try {
+        return import.meta.url === pathToFileURL(process.argv[1]).href;
+    }
+    catch {
+        return false;
     }
 }
 // ── Input Size Validation (defense-in-depth) ───────────────────────────
@@ -279,12 +273,12 @@ export function createServer() {
     });
 }
 // ── Transports ─────────────────────────────────────────────────────────
-async function startStdio(client) {
+async function startStdio(client, upstreamUrl) {
     const server = createServer();
     setupHandlers(server, client);
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`LOAR MCP Server v0.2.0 started (stdio, upstream: ${LOAR_SERVER_URL})`);
+    console.error(`LOAR MCP Server v0.2.0 started (stdio, upstream: ${upstreamUrl})`);
 }
 /**
  * SSE transport — one MCP session per `GET /sse` request, dispatched by
@@ -295,7 +289,7 @@ async function startStdio(client) {
  *   POST /messages?sessionId=<id>      — send a JSON-RPC message to an open session
  *   GET  /health                       — { ok, sessions, version }
  */
-async function startSse(client) {
+async function startSse(client, cfg) {
     const sessions = new Map();
     const httpServer = http.createServer(async (req, res) => {
         let url;
@@ -375,11 +369,11 @@ async function startSse(client) {
         }
         res.writeHead(404).end();
     });
-    httpServer.listen(LOAR_MCP_PORT, LOAR_MCP_HOST, () => {
-        console.error(`LOAR MCP Server v0.2.0 (SSE) listening on http://${LOAR_MCP_HOST}:${LOAR_MCP_PORT}`);
-        console.error(`  Upstream: ${LOAR_SERVER_URL}`);
-        console.error(`  Agents connect to: http://${LOAR_MCP_HOST}:${LOAR_MCP_PORT}/sse`);
-        console.error(`  Health:            http://${LOAR_MCP_HOST}:${LOAR_MCP_PORT}/health`);
+    httpServer.listen(cfg.port, cfg.host, () => {
+        console.error(`LOAR MCP Server v0.2.0 (SSE) listening on http://${cfg.host}:${cfg.port}`);
+        console.error(`  Upstream: ${cfg.upstreamUrl}`);
+        console.error(`  Agents connect to: http://${cfg.host}:${cfg.port}/sse`);
+        console.error(`  Health:            http://${cfg.host}:${cfg.port}/health`);
     });
     const shutdown = () => {
         console.error(`[sse] shutting down, closing ${sessions.size} session(s)…`);
@@ -393,20 +387,48 @@ async function startSse(client) {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
 }
-// ── Start ──────────────────────────────────────────────────────────────
-const client = new LoarClient({
-    serverUrl: LOAR_SERVER_URL,
-    apiKey: LOAR_API_KEY,
-});
+// ── Start (CLI-only) ───────────────────────────────────────────────────
 async function main() {
+    // Defer env-var reads + the LoarClient instantiation until we're running
+    // as a CLI — importing this module as a library (e.g. from the hosted
+    // gateway) must not touch LOAR_API_KEY.
+    const LOAR_SERVER_URL = process.env.LOAR_SERVER_URL || 'http://localhost:3000';
+    const LOAR_API_KEY = process.env.LOAR_API_KEY;
+    const LOAR_MCP_TRANSPORT = (process.env.LOAR_MCP_TRANSPORT || 'stdio').toLowerCase();
+    const LOAR_MCP_PORT_RAW = process.env.LOAR_MCP_PORT;
+    const LOAR_MCP_PORT = Number(LOAR_MCP_PORT_RAW || 3333);
+    if (!LOAR_API_KEY) {
+        console.error('ERROR: LOAR_API_KEY environment variable is required');
+        console.error('Generate one at https://loar.fun (Settings → API Keys).');
+        console.error('The key must include the scopes for the tools you intend to call.');
+        process.exit(1);
+    }
+    if (!LOAR_API_KEY.startsWith('loar_')) {
+        console.error("ERROR: LOAR_API_KEY does not look valid (expected prefix 'loar_')");
+        process.exit(1);
+    }
+    if (LOAR_MCP_TRANSPORT !== 'stdio' && LOAR_MCP_TRANSPORT !== 'sse') {
+        console.error(`ERROR: LOAR_MCP_TRANSPORT must be "stdio" or "sse" (got: "${LOAR_MCP_TRANSPORT}")`);
+        process.exit(1);
+    }
     if (LOAR_MCP_TRANSPORT === 'sse') {
-        await startSse(client);
+        if (!Number.isInteger(LOAR_MCP_PORT) || LOAR_MCP_PORT < 1 || LOAR_MCP_PORT > 65535) {
+            console.error(`ERROR: LOAR_MCP_PORT must be a valid port (got: ${LOAR_MCP_PORT_RAW})`);
+            process.exit(1);
+        }
+    }
+    const client = new LoarClient({ serverUrl: LOAR_SERVER_URL, apiKey: LOAR_API_KEY });
+    const LOAR_MCP_HOST = process.env.LOAR_MCP_HOST || '127.0.0.1';
+    if (LOAR_MCP_TRANSPORT === 'sse') {
+        await startSse(client, { host: LOAR_MCP_HOST, port: LOAR_MCP_PORT, upstreamUrl: LOAR_SERVER_URL });
     }
     else {
-        await startStdio(client);
+        await startStdio(client, LOAR_SERVER_URL);
     }
 }
-main().catch((err) => {
-    console.error('Failed to start LOAR MCP server:', err);
-    process.exit(1);
-});
+if (isCliEntrypoint()) {
+    main().catch((err) => {
+        console.error('Failed to start LOAR MCP server:', err);
+        process.exit(1);
+    });
+}

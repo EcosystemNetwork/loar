@@ -9,6 +9,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -288,10 +289,14 @@ function ContentCard({
     <Card className="group overflow-hidden">
       <div className="aspect-video bg-muted relative">
         {item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : isVideo && item.mediaUrl ? (
           <video
-            src={item.mediaUrl}
+            src={resolveIpfsUrl(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted
             loop
@@ -302,7 +307,11 @@ function ContentCard({
             }}
           />
         ) : item.mediaUrl ? (
-          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.mediaUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             No preview
@@ -370,11 +379,23 @@ function ContentRow({
       <div className="flex gap-4 items-center">
         <div className="w-28 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
           {item.thumbnailUrl ? (
-            <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl(item.thumbnailUrl)}
+              alt={item.title}
+              className="w-full h-full object-cover"
+            />
           ) : isVideo && item.mediaUrl ? (
-            <video src={item.mediaUrl} className="w-full h-full object-cover" muted />
+            <video
+              src={resolveIpfsUrl(item.mediaUrl)}
+              className="w-full h-full object-cover"
+              muted
+            />
           ) : item.mediaUrl ? (
-            <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl(item.mediaUrl)}
+              alt={item.title}
+              className="w-full h-full object-cover"
+            />
           ) : null}
         </div>
         <div className="flex-1 min-w-0">

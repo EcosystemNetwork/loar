@@ -9,6 +9,7 @@ import { GalleryFilters } from '@/components/gallery/GalleryFilters';
 import { useGalleryBrowse, useGalleryTrending } from '@/hooks/useGallery';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, TrendingUp } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/gallery')({
   component: GalleryPage,
@@ -59,13 +60,13 @@ function GalleryPage() {
                   >
                     {isVideo && item.mediaUrl ? (
                       <video
-                        src={`${item.mediaUrl}#t=0.5`}
+                        src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.5`}
                         className="w-full h-full object-cover"
                         muted
                         loop
                         playsInline
                         preload="metadata"
-                        poster={item.thumbnailUrl || item.imageUrl || undefined}
+                        poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
                         onMouseEnter={(e) => e.currentTarget.play()}
                         onMouseLeave={(e) => {
                           e.currentTarget.pause();
@@ -74,7 +75,7 @@ function GalleryPage() {
                       />
                     ) : (
                       <img
-                        src={thumbnail}
+                        src={resolveIpfsUrl(thumbnail) || thumbnail}
                         alt={item.title || 'Trending'}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {

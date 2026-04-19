@@ -80,23 +80,37 @@ export const queryClient = new QueryClient({
         return;
       }
 
-      // Handle expired/invalid JWT — clear session and prompt re-auth.
-      // Only toast if the user actually had a session; unauthenticated 401s are expected.
-      // Note: we inline the localStorage logic here instead of importing from wallet-auth
-      // to avoid a circular dependency (wallet-auth imports wagmi/thirdweb which have
-      // internal circular deps that cause TDZ errors when loaded synchronously).
+      // Handle expired/invalid JWT — verify with /auth/me before clearing session.
+      // A single 401 from one procedure is not proof the session is dead (could be
+      // a per-endpoint auth race, a bug, or a transient server issue). Wiping
+      // localStorage on every 401 falsely logs out users whose cookie is valid —
+      // e.g. infinite-scroll queries hitting one bad 401. Only clear if /auth/me
+      // confirms the cookie is no longer accepted.
       const httpStatus = error?.data?.httpStatus ?? error?.status;
       if (httpStatus === 401 || error.message?.includes('UNAUTHORIZED')) {
         const address = localStorage.getItem('siwe-address');
         const expiry = localStorage.getItem('siwe-expiry');
         const hadSession = !!(address && expiry && Date.now() < Number(expiry));
-        localStorage.removeItem('siwe-address');
-        localStorage.removeItem('siwe-expiry');
-        if (hadSession) {
-          toast.error('Session expired. Please sign in again.', {
-            id: 'session-expired', // dedupe — one toast even if multiple queries fail
+        if (!hadSession) return;
+
+        void fetch(`${import.meta.env.VITE_SERVER_URL || ''}/auth/me`, {
+          credentials: 'include',
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.authenticated) return; // Cookie still valid — single-query 401, keep session
+            // Dynamic import avoids the wagmi/thirdweb TDZ from a synchronous
+            // wallet-auth import at module init.
+            return import('../lib/wallet-auth').then(({ clearSiweSession }) => {
+              clearSiweSession();
+              toast.error('Session expired. Please sign in again.', {
+                id: 'session-expired', // dedupe — one toast even if multiple queries fail
+              });
+            });
+          })
+          .catch(() => {
+            // Network error reaching /auth/me — assume transient, keep session.
           });
-        }
         return;
       }
 
