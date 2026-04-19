@@ -471,10 +471,23 @@ export async function createRelation(
   return relation;
 }
 
-export async function deleteRelation(relationId: string): Promise<void> {
+export async function deleteRelation(relationId: string, caller: string): Promise<void> {
   const ref = relationsCol().doc(relationId);
   const doc = await ref.get();
   if (!doc.exists) throw new Error('Relationship not found');
+  const relation = doc.data() as EntityRelation;
+  const callerLower = caller.toLowerCase();
+  let authorized = (relation.creator || '').toLowerCase() === callerLower;
+  if (!authorized && relation.sourceId) {
+    const sourceDoc = await entitiesCol().doc(relation.sourceId).get();
+    const source = sourceDoc.exists ? (sourceDoc.data() as Entity) : null;
+    if (source?.creator?.toLowerCase() === callerLower) {
+      authorized = true;
+    }
+  }
+  if (!authorized) {
+    throw new Error('Forbidden: only the relationship creator or source entity owner can delete');
+  }
   await ref.delete();
 }
 

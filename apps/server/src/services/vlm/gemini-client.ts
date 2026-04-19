@@ -58,7 +58,8 @@ export async function downloadToBuffer(url: string): Promise<Buffer> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    // redirect: 'error' prevents post-validation 3xx bounce to internal metadata endpoints.
+    const res = await fetch(url, { signal: controller.signal, redirect: 'error' });
     if (!res.ok) {
       throw new Error(`Failed to fetch media: ${res.status} ${res.statusText}`);
     }

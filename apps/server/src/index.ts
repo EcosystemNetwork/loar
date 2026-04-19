@@ -498,16 +498,9 @@ app.post('/api/takedown', async (c) => {
 
     const ref = await fireDb.collection('takedownRequests').add(request);
 
-    // Auto-flag the content
-    await fireDb
-      .collection('content')
-      .doc(contentId)
-      .update({
-        contentStatus: 'flagged',
-        contentStatusUpdatedAt: now.toISOString(),
-        contentStatusUpdatedBy: 'dmca_takedown',
-      })
-      .catch(() => {});
+    // Do NOT auto-flag content on takedown submission. The tRPC path deliberately
+    // omits this step to prevent abuse of the DMCA process for censorship.
+    // Content status transitions require admin review via admin.moderation.*.
 
     return c.json({
       id: ref.id,

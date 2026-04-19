@@ -159,7 +159,8 @@ async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Prom
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    // redirect: 'error' prevents post-validation 3xx bounce to internal metadata endpoints.
+    const res = await fetch(url, { signal: controller.signal, redirect: 'error' });
     return res;
   } finally {
     clearTimeout(timer);

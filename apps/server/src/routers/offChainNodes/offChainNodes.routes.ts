@@ -24,6 +24,7 @@
  *     updatedAt: Date
  */
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
@@ -50,8 +51,6 @@ const createNodeInput = z.object({
   contentHash: z.string().optional(),
   /** Optional plot hash override; defaults to keccak256(plot) */
   plotHash: z.string().optional(),
-  /** Optional creator override (defaults to authenticated user) */
-  creator: z.string().optional(),
   /** Optional title for display */
   title: z.string().max(300).optional(),
   /** Optional sceneId for ordering when batch-creating */
@@ -90,7 +89,14 @@ async function appendChild(universeId: string, parentId: number, childId: number
 export const offChainNodesRouter = router({
   /** Create a new off-chain timeline node. */
   create: protectedProcedure.input(createNodeInput).mutation(async ({ ctx, input }) => {
-    const creator = (input.creator || ctx.user?.address || ctx.user?.uid || 'system').toLowerCase();
+    // Always derive creator from authenticated principal — never trust client input.
+    const creator = (ctx.user?.address || ctx.user?.uid || '').toLowerCase();
+    if (!creator) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Wallet address or uid required to create node',
+      });
+    }
     const contentHash = input.contentHash || keccak256(toBytes(input.videoUrl));
     const plotHash = input.plotHash || keccak256(toBytes(input.plot));
     const nodeId = await nextSequentialId(input.universeId);
@@ -156,13 +162,22 @@ export const offChainNodesRouter = router({
         canon: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const snap = await nodesCol()
         .where('universeId', '==', input.universeId)
         .where('nodeId', '==', input.nodeId)
         .limit(1)
         .get();
       if (snap.empty) throw new Error(`Node ${input.nodeId} not found`);
+
+      const data = snap.docs[0].data();
+      const caller = (ctx.user?.address || ctx.user?.uid || '').toLowerCase();
+      if (!caller || (data.creator || '').toLowerCase() !== caller) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the node creator can update it',
+        });
+      }
 
       const updates: Record<string, any> = { updatedAt: new Date() };
       if (input.title !== undefined) updates.title = input.title;
@@ -173,13 +188,13 @@ export const offChainNodesRouter = router({
       if (input.canon !== undefined) updates.canon = input.canon;
 
       await snap.docs[0].ref.update(updates);
-      return { ...snap.docs[0].data(), ...updates };
+      return { ...data, ...updates };
     }),
 
   /** Delete a node (and unlink from parent's children array). */
   delete: protectedProcedure
     .input(z.object({ universeId: z.string(), nodeId: z.number().int() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const snap = await nodesCol()
         .where('universeId', '==', input.universeId)
         .where('nodeId', '==', input.nodeId)
@@ -188,6 +203,13 @@ export const offChainNodesRouter = router({
       if (snap.empty) return { deleted: false };
 
       const data = snap.docs[0].data();
+      const caller = (ctx.user?.address || ctx.user?.uid || '').toLowerCase();
+      if (!caller || (data.creator || '').toLowerCase() !== caller) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the node creator can delete it',
+        });
+      }
       const previousId = data.previousNodeId as number;
 
       await snap.docs[0].ref.delete();

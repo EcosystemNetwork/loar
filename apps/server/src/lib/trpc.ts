@@ -125,6 +125,16 @@ export function requirePermission(permission: string) {
 
 /** Protected procedure that also requires admin role */
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  // API-key authenticated requests must not reach admin routes unless the key
+  // explicitly carries the `admin.all` scope. Admin-wallet-owned keys minted
+  // with narrow scopes (e.g. `entities.create`) would otherwise inherit the
+  // admin principal and bypass scope enforcement.
+  if (ctx.user.apiKeyId && !hasScope(ctx.user.apiKeyPermissions, 'admin.all')) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Admin routes require a session token, not a scoped API key',
+    });
+  }
   const rawAddress = ctx.user.address;
   if (!rawAddress) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access requires a wallet address' });

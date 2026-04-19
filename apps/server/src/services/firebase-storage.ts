@@ -8,6 +8,22 @@ import type { Bucket } from '@google-cloud/storage';
 
 const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || '';
 
+/**
+ * Sanitize a client-supplied filename so it cannot escape the `videos/` prefix
+ * in the GCS key. Strips directory separators, leading dots (prevents `..`
+ * segments after any CDN path normalization), and non-safe characters while
+ * preserving the extension for MIME detection.
+ */
+function sanitizeGcsFilename(filename: string): string {
+  const basename = filename.split(/[\\/]/).pop() || '';
+  const cleaned = basename
+    .replace(/\0/g, '')
+    .replace(/^\.+/, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .slice(0, 255);
+  return cleaned || `file-${Date.now()}`;
+}
+
 class StorageService {
   private static instance: StorageService | null = null;
   private _bucket: Bucket | null = null;
@@ -30,11 +46,12 @@ class StorageService {
   }
 
   async upload(buffer: Buffer, filename: string): Promise<string> {
-    const key = `videos/${filename}`;
+    const safeFilename = sanitizeGcsFilename(filename);
+    const key = `videos/${safeFilename}`;
     const file = this.bucket.file(key);
 
     await file.save(buffer, {
-      contentType: this.getContentType(filename),
+      contentType: this.getContentType(safeFilename),
       metadata: { cacheControl: 'public, max-age=31536000' },
     });
 
@@ -53,6 +70,7 @@ class StorageService {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LOARUploader/1.0)' },
       signal: controller.signal,
+      redirect: 'error', // Prevent SSRF bypass via 3xx to internal metadata endpoints
     });
 
     clearTimeout(timeoutId);

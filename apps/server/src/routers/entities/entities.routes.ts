@@ -429,7 +429,10 @@ export const entitiesRouter = router({
     .use(requirePermission('entities.update'))
     .input(z.object({ relationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      await deleteRelation(input.relationId);
+      if (!ctx.user.address) {
+        throw new Error('Wallet address required to delete relationships');
+      }
+      await deleteRelation(input.relationId, ctx.user.address);
       return { success: true };
     }),
 

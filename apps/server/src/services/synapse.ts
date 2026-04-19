@@ -86,6 +86,7 @@ export class SynapseService {
           'User-Agent': 'Mozilla/5.0 (compatible; FilecoinUploader/1.0)',
         },
         signal: controller.signal,
+        redirect: 'error', // Prevent SSRF bypass via 3xx to internal metadata endpoints
       });
 
       clearTimeout(timeoutId);
