@@ -60,6 +60,25 @@ export interface PlatformConfig {
   /** $LOAR awarded to new user on referral sign-up */
   affiliateNewUserLoar: number;
 
+  // ── Feature kill switches ─────────────────────────────────────────
+  // Flip any of these to `false` to instantly stop the matching action path
+  // server-side. Circuit breakers handle *provider* failures; these are for
+  // *product* failures (abuse surge, billing incident, on-chain halt).
+  /** Allow new AI generation jobs to be queued or run. */
+  generationEnabled: boolean;
+  /** Allow universe / episode / NFT mint writes. */
+  mintingEnabled: boolean;
+  /** Allow credit purchases (card, ETH, $LOAR). */
+  purchaseEnabled: boolean;
+  /** Allow new user profile creation. */
+  registrationEnabled: boolean;
+
+  // ── Per-user spend caps ───────────────────────────────────────────
+  /** Enforce the monthly spend cap — turn off for load tests / internal runs. */
+  monthlySpendCapEnabled: boolean;
+  /** Maximum credits a wallet may spend in a rolling 30-day window. */
+  monthlySpendCapCredits: number;
+
   // ── Metadata ─────────────────────────────────────────────────────
   updatedAt?: Date;
   updatedBy?: string;
@@ -85,6 +104,14 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
 
   affiliateReferrerLoar: 100,
   affiliateNewUserLoar: 50,
+
+  generationEnabled: true,
+  mintingEnabled: true,
+  purchaseEnabled: true,
+  registrationEnabled: true,
+
+  monthlySpendCapEnabled: true,
+  monthlySpendCapCredits: 2000,
 };
 
 // ── Simple in-process cache (TTL: 60 s) ──────────────────────────────────
@@ -127,4 +154,48 @@ export function bpsToFraction(bps: number): number {
 /** Helper: compute platform fee amount from a total */
 export function calcPlatformFee(totalWei: bigint, feeBps: number): bigint {
   return (totalWei * BigInt(feeBps)) / BigInt(10_000);
+}
+
+// ── Kill switches ────────────────────────────────────────────────────────
+
+export type FeatureKey = 'generation' | 'minting' | 'purchase' | 'registration';
+
+const FEATURE_KEY_MAP: Record<FeatureKey, keyof PlatformConfig> = {
+  generation: 'generationEnabled',
+  minting: 'mintingEnabled',
+  purchase: 'purchaseEnabled',
+  registration: 'registrationEnabled',
+};
+
+/**
+ * Returns whether the named feature is currently enabled.
+ * Fails open when the config fetch fails — circuit breakers and rate limits
+ * are the last line of defence, not this.
+ */
+export async function isFeatureEnabled(feature: FeatureKey): Promise<boolean> {
+  const cfg = await getPlatformConfig();
+  const flagName = FEATURE_KEY_MAP[feature];
+  const value = cfg[flagName];
+  return value !== false;
+}
+
+/**
+ * Throws a user-visible error when the feature is disabled.
+ * Call at the top of write routes (generation jobs, mints, credit purchases,
+ * registrations) so disabling the switch instantly closes new work.
+ */
+export async function assertFeatureEnabled(feature: FeatureKey): Promise<void> {
+  if (!(await isFeatureEnabled(feature))) {
+    throw new FeatureDisabledError(feature);
+  }
+}
+
+export class FeatureDisabledError extends Error {
+  readonly code = 'FEATURE_DISABLED';
+  readonly feature: FeatureKey;
+  constructor(feature: FeatureKey) {
+    super(`The ${feature} feature is temporarily disabled by the platform. ` + `Try again later.`);
+    this.feature = feature;
+    this.name = 'FeatureDisabledError';
+  }
 }

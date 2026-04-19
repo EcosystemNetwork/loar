@@ -75,8 +75,15 @@ jobs:
             chmod +x scripts/smoke-test.sh scripts/rollback.sh
 
             # ── 3. Build & start containers (production: nginx LB + Redis + workers) ─
+            # Replica counts come from .env (SERVER_REPLICAS / WORKER_REPLICAS).
+            # Defaults match compose file defaults. `deploy.replicas` is
+            # ignored under plain compose, so --scale flags are required.
+            SERVER_REPLICAS="${SERVER_REPLICAS:-4}"
+            WORKER_REPLICAS="${WORKER_REPLICAS:-2}"
             docker compose -f docker-compose.prod.yml build
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml up -d \
+              --scale server=$SERVER_REPLICAS \
+              --scale worker=$WORKER_REPLICAS
             docker compose -f docker-compose.prod.yml ps
 
             # ── 4. Wait for HTTP health endpoints (max 90s) ────────────────────

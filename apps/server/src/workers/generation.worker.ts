@@ -179,9 +179,41 @@ async function processGeneration(
     markProviderHealthy(model.provider);
     await job.updateProgress(80);
 
+    // Rehost to permanent storage (IPFS/Filecoin) BEFORE writing the content
+    // doc, so the gallery never points to an ephemeral provider URL that will
+    // 403 when the short-lived signed URL expires.
+    let permanentUrl: string | null = null;
+    let storageContentHash: string | null = null;
+    try {
+      const manager = getStorageManager();
+      const filename = `generation-${data.generationId}.mp4`;
+      const response = await fetch(result.videoUrl!);
+      const arrayBuf = await response.arrayBuffer();
+      const rawBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
+
+      const videoBuffer = await signWithProvenance(rawBuffer, filename, {
+        model: data.finalModelId,
+        prompt: data.originalPrompt,
+        generatedAt: new Date().toISOString(),
+        mimeType: 'video/mp4',
+      });
+
+      const manifest = await manager.upload(videoBuffer, filename, 'video/mp4', data.userId);
+      permanentUrl = manifest.uploads[0]?.url ?? null;
+      storageContentHash = manifest.contentHash;
+    } catch (err) {
+      console.error(`[worker] storage persist failed for ${data.generationId}:`, err);
+      // Fall through — content doc will use the ephemeral URL rather than fail the job.
+    }
+
+    const finalMediaUrl = permanentUrl ?? result.videoUrl!;
+
     await generationsCol.doc(data.generationId).update({
       status: 'completed',
-      videoUrl: result.videoUrl,
+      videoUrl: finalMediaUrl,
+      ephemeralVideoUrl: result.videoUrl, // kept for debugging / provenance audit
+      ...(permanentUrl ? { permanentVideoUrl: permanentUrl } : {}),
+      ...(storageContentHash ? { storageContentHash, storagePersisted: true } : {}),
       latencyMs,
       completedAt: new Date(),
     });
@@ -213,12 +245,13 @@ async function processGeneration(
 
     await job.updateProgress(90);
 
-    // Auto-publish to gallery
+    // Auto-publish to gallery — use the permanent URL when rehost succeeded
+    // so the gallery doc never stores an expiring provider URL.
     try {
       await db.collection('content').add({
         title: (data.originalPrompt || '').slice(0, 100) || 'Generated Video',
         description: data.originalPrompt || '',
-        mediaUrl: result.videoUrl,
+        mediaUrl: finalMediaUrl,
         thumbnailUrl: data.input.imageUrl || null,
         mediaType: 'ai-video',
         classification: 'original',
@@ -238,38 +271,10 @@ async function processGeneration(
         reviewStatus: 'not_required',
         generationId: data.generationId,
         generationModel: data.finalModelId,
+        ...(storageContentHash ? { storageContentHash } : {}),
       });
     } catch (err) {
       console.error('[worker] gallery publish failed:', err);
-    }
-
-    // Persist to permanent storage (IPFS/Filecoin) — best-effort
-    try {
-      const manager = getStorageManager();
-      const filename = `generation-${data.generationId}.mp4`;
-      const response = await fetch(result.videoUrl!);
-      const arrayBuf = await response.arrayBuffer();
-      const rawBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
-
-      const videoBuffer = await signWithProvenance(rawBuffer, filename, {
-        model: data.finalModelId,
-        prompt: data.originalPrompt,
-        generatedAt: new Date().toISOString(),
-        mimeType: 'video/mp4',
-      });
-
-      const manifest = await manager.upload(videoBuffer, filename, 'video/mp4', data.userId);
-      const permanentUrl = manifest.uploads[0]?.url;
-
-      if (permanentUrl) {
-        await generationsCol.doc(data.generationId).update({
-          permanentVideoUrl: permanentUrl,
-          storageContentHash: manifest.contentHash,
-          storagePersisted: true,
-        });
-      }
-    } catch (err) {
-      console.error(`[worker] storage persist failed for ${data.generationId}:`, err);
     }
 
     // Track quests

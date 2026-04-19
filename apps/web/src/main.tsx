@@ -13,6 +13,10 @@
 import { validateWebEnv } from './lib/env';
 validateWebEnv();
 
+// Side-effect import: initializes Sentry if VITE_SENTRY_DSN is set.
+// Must run before router/providers so bootstrap errors are captured.
+import './lib/sentry';
+
 // Auto-reload when a deployed chunk is missing (stale cache after redeployment)
 window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault();

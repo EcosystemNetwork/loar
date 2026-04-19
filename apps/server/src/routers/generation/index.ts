@@ -13,3 +13,4 @@ export { characterPipelineRouter } from './character-pipeline.routes';
 export { lipsyncRouter } from './lipsync.routes';
 export { cutdownRouter } from './cutdown.routes';
 export { sceneAudioRouter } from './sceneAudio.routes';
+export { talkingSceneRouter } from './talking-scene.routes';

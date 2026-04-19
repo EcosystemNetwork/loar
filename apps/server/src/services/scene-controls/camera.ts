@@ -92,6 +92,16 @@ const CAMERA_PROMPT_FRAGMENTS: Record<CameraPresetId, Record<CameraIntensity, st
     standard: 'whip pan to the right, fast horizontal sweep',
     pronounced: 'extreme whip pan right, blur-speed horizontal camera sweep',
   },
+  crash_zoom: {
+    subtle: 'quick zoom in toward subject',
+    standard: 'crash zoom into subject, sudden aggressive zoom',
+    pronounced: 'extreme crash zoom, snap-zoom slamming toward subject',
+  },
+  walk_up: {
+    subtle: 'camera approaching subject on foot',
+    standard: 'POV walking forward toward subject, steady human-paced approach',
+    pronounced: 'urgent walk-up to subject, hurried POV approach with natural footstep cadence',
+  },
 };
 
 /**
@@ -129,6 +139,8 @@ const BD_CAMERA_MAP: Record<CameraPresetId, { control: string; baseSpeed: number
   crane_up: { control: 'crane_up', baseSpeed: 0.5 },
   crane_down: { control: 'crane_down', baseSpeed: 0.5 },
   whip_pan_right: { control: 'whip_pan_right', baseSpeed: 0.9 },
+  crash_zoom: { control: 'dolly_in', baseSpeed: 0.95 },
+  walk_up: { control: 'dolly_in', baseSpeed: 0.45 },
 };
 
 const INTENSITY_MULTIPLIER: Record<CameraIntensity, number> = {

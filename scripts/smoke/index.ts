@@ -42,6 +42,8 @@ import { runStorageLayer } from './layers/storage.ts';
 import { runGenerationLayer } from './layers/generation.ts';
 import { runChainLayer } from './layers/chain.ts';
 import { runIndexerLayer } from './layers/indexer.ts';
+import { runAdminLayer } from './layers/admin.ts';
+import { runEditingLayer } from './layers/editing.ts';
 
 async function main() {
   const cfg = loadConfig();
@@ -133,6 +135,38 @@ async function main() {
     reporter.recordLayer({
       layer: 'indexer',
       title: 'Ponder GraphQL',
+      checks: result.checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 8: admin + ops ─────────────────────────────────────────────────────
+  // Metrics shape, admin auth gates, public DMCA endpoint. Only runs when the
+  // auth layer produced a JWT — otherwise there's nothing to test auth against.
+  if (!only || only === 'admin' || only === 'ops') {
+    reporter.beginLayer('admin', 'Metrics + admin auth gates + DMCA');
+    const checks = await runAdminLayer(cfg, {
+      userToken: jwt,
+      // Optional: an already-minted admin token from env lets the smoke verify
+      // getConfig succeeds end-to-end. Without it, the smoke still verifies the
+      // auth gate works (unauth → denied, user → denied).
+      adminToken: process.env.SMOKE_ADMIN_TOKEN,
+    });
+    reporter.recordLayer({
+      layer: 'admin',
+      title: 'Metrics + admin auth gates + DMCA',
+      checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 9: editing (PRDs 1-10: edit canvas, workflows, lineage, etc.) ─────
+  if (!only || only === 'editing') {
+    reporter.beginLayer('editing', 'PRD 1-10: edit canvas, workflows, lineage');
+    const result = await runEditingLayer(cfg, jwt);
+    reporter.recordLayer({
+      layer: 'editing',
+      title: 'PRD 1-10: edit canvas, workflows, lineage',
       checks: result.checks,
       skipped: false,
     });

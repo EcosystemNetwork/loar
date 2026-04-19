@@ -40,6 +40,28 @@ app.onError(errorHandler);
 // Security headers on all responses
 app.use('/*', securityHeaders);
 
+// ── Prometheus /metrics — registered BEFORE rate limiting and auth so a
+// scraper hitting it every 15s doesn't get throttled. Protected by bearer
+// token when METRICS_AUTH_TOKEN is set; otherwise open (deploy on a private
+// network or behind a reverse-proxy allowlist).
+const { renderMetrics } = await import('./lib/metrics');
+const { metricsMiddleware } = await import('./middleware/metrics');
+app.get('/metrics', async (c) => {
+  const expected = process.env.METRICS_AUTH_TOKEN;
+  if (expected) {
+    const auth = c.req.header('authorization') || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (token !== expected) {
+      return c.text('Unauthorized', 401);
+    }
+  }
+  const { body, contentType } = await renderMetrics();
+  return c.text(body, 200, { 'Content-Type': contentType });
+});
+
+// Record request counts + durations for everything else.
+app.use('/*', metricsMiddleware());
+
 // Rate limiting: 100 requests per minute per IP
 app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 
@@ -84,6 +106,10 @@ app.route('/auth', authRoutes);
 
 // Add image serving routes
 app.route('/images', imageRouter);
+
+// Unstoppable Domains reverse-resolve proxy (browser → server → UD).
+const { unstoppableRoutes } = await import('./routes/unstoppable');
+app.route('/api/ud', unstoppableRoutes);
 
 /** Detect MIME type from file magic bytes. Returns null if unrecognised. */
 function detectMimeFromMagic(header: Buffer): string | null {
@@ -473,6 +499,43 @@ app.post('/api/counter-notice', async (c) => {
       counterNoticeReceivedAt: now.toISOString(),
     });
 
+    // § 512(g)(2)(B): notify the original claimant so they have a fair
+    // chance to file a court action before the hold period expires.
+    // Fire-and-forget — the counter-notice is already durably stored;
+    // email failures are an operator concern, not a user-facing one.
+    try {
+      const td = takedownDoc.data() as {
+        contentId?: string;
+        claimantName?: string;
+        claimantEmail?: string;
+        copyrightWork?: string;
+        createdAt?: string;
+      };
+      if (td.claimantEmail) {
+        const { emailCounterNoticeToClaimant } = await import('./lib/dmca-email');
+        void emailCounterNoticeToClaimant(
+          {
+            id: takedownRequestId,
+            contentId: td.contentId ?? '',
+            claimantName: td.claimantName,
+            claimantEmail: td.claimantEmail,
+            copyrightWork: td.copyrightWork,
+            createdAt: td.createdAt ?? now.toISOString(),
+          },
+          {
+            id: ref.id,
+            respondentName,
+            respondentEmail,
+            respondentAddress,
+            explanation,
+            createdAt: now.toISOString(),
+          }
+        );
+      }
+    } catch (emailErr) {
+      console.warn('[dmca] counter-notice email dispatch failed:', emailErr);
+    }
+
     return c.json({
       id: ref.id,
       status: 'pending',
@@ -820,6 +883,20 @@ process.on('unhandledRejection', async (reason, promise) => {
 import('./services/pricing/heartbeat')
   .then(({ startPricingHeartbeat }) => startPricingHeartbeat())
   .catch((err) => console.warn('[pricing] Failed to start heartbeat:', err));
+
+// Abuse-detect scan (opt-in via ABUSE_DETECT_ENABLED=true). Only one replica
+// should run this in a multi-replica deploy — gate on e.g. a dedicated
+// worker hostname or a Redis-locked leader election before turning on
+// globally.
+import('./jobs/abuse-detect')
+  .then(({ startAbuseDetectJob }) => startAbuseDetectJob())
+  .catch((err) => console.warn('[abuse-detect] failed to start:', err));
+
+// DMCA § 512(g) counter-notice auto-putback (opt-in via DMCA_PUTBACK_ENABLED=true).
+// Like abuse-detect, only ONE replica should run this to avoid duplicate writes.
+import('./jobs/dmca-putback')
+  .then(({ startDmcaPutbackJob }) => startDmcaPutbackJob())
+  .catch((err) => console.warn('[dmca-putback] failed to start:', err));
 
 const port = env.PORT;
 

@@ -7,23 +7,18 @@ import { useChainId, useReadContract, usePublicClient } from 'wagmi';
 import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, parseUnits, formatUnits, type Address } from 'viem';
-import { sepolia } from 'viem/chains';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
+import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
 
-// $LOAR token contract address (update after deployment)
-const LOAR_TOKEN_ADDRESS = (import.meta.env.VITE_LOAR_TOKEN_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
-// Platform treasury address
+// Platform treasury address (EOA — chain-independent, safe to keep as env)
 const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
   '0x0000000000000000000000000000000000000000') as Address;
-// Faucet contract address (testnet only)
-const LOAR_FAUCET_ADDRESS = (import.meta.env.VITE_LOAR_FAUCET_ADDRESS ?? '') as Address;
 
 // Minimal ERC20 ABI for approve + transfer + error decoding
 const ERC20_ABI = [
@@ -309,6 +304,10 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
+  const addrs = getEvmAddresses(chainId);
+  const ZERO = '0x0000000000000000000000000000000000000000' as const;
+  const LOAR_TOKEN_ADDRESS: `0x${string}` = addrs?.loarToken ?? ZERO;
+  const LOAR_FAUCET_ADDRESS: `0x${string}` = addrs?.loarFaucet ?? ZERO;
 
   const { data: ethPriceData } = useQuery({
     queryKey: ['ethPrice'],
@@ -372,10 +371,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled:
-        !!address &&
-        !!LOAR_TOKEN_ADDRESS &&
-        LOAR_TOKEN_ADDRESS !== '0x0000000000000000000000000000000000000000',
+      enabled: !!address && !isZeroAddress(LOAR_TOKEN_ADDRESS),
       refetchInterval: 15000,
     },
   });
@@ -385,7 +381,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   const pkgs = (packages || []) as CreditPackage[];
 
   // ── Faucet state ───────────────────────────────────────────────────
-  const hasFaucet = !!LOAR_FAUCET_ADDRESS && LOAR_FAUCET_ADDRESS !== '0x';
+  const hasFaucet = !isZeroAddress(LOAR_FAUCET_ADDRESS);
   const [isClaiming, setIsClaiming] = useState(false);
 
   const { data: canClaimData, refetch: refetchCanClaim } = useReadContract({
@@ -393,7 +389,6 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     abi: FAUCET_ABI,
     functionName: 'canClaim',
     args: address ? [address] : undefined,
-    chainId: sepolia.id,
     query: { enabled: hasFaucet && !!address },
   });
 
@@ -401,7 +396,6 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     address: LOAR_FAUCET_ADDRESS,
     abi: FAUCET_ABI,
     functionName: 'claimAmount',
-    chainId: sepolia.id,
     query: { enabled: hasFaucet },
   });
 
@@ -419,7 +413,6 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
         address: LOAR_FAUCET_ADDRESS,
         abi: FAUCET_ABI,
         functionName: 'claim',
-        chainId: sepolia.id,
       });
       toast.success(`Claimed ${faucetAmount.toLocaleString()} $LOAR!`);
       refetchCanClaim();

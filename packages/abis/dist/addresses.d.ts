@@ -71,6 +71,11 @@ export declare const LoarFeeLocker: {
     readonly '11155111': "0x965f5C192E38b86Fa4a79A561E695C48B1DC3582";
 };
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
+export declare const LoarHookStaticFee: {
+    readonly '84532': "0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC";
+    readonly '11155111': "0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC";
+};
+export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
 export declare const LoarLpLockerMultiple: {
     readonly '84532': "0xa450Bde3120a23EE3AbB87fDa4fB0E9e9F6D0307";
     readonly '11155111': "0x7d30fd57e44aB0ca407D312976816E7052905E0A";

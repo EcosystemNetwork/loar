@@ -60,7 +60,17 @@ const deployment = require(`../../deployments/${chainConfig.deploymentFile}`);
 const address = getAddress(deployment.contracts.UniverseManager);
 const startBlock = deployment.startBlock;
 
-// Revenue contract addresses (deployed separately via DeployRevenue.s.sol)
+// Revenue contract addresses (deployed separately via DeployRevenue.s.sol).
+// For any revenue contract not yet deployed on this chain we register a
+// disabled stub: zero address + far-future startBlock. This keeps the contract
+// in the config type (so ponder.on() handlers typecheck unconditionally)
+// without indexing anything from address(0). When the contract is deployed,
+// swap in the real address + real startBlock and the handlers light up.
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+// ~9.9B — larger than any real block number on any chain we index, so ponder
+// treats the contract as dormant until the deployment file is updated.
+const UNDEPLOYED_BLOCK = 9_999_999_999;
+
 const paymentRouterAddress = deployment.contracts.PaymentRouter
   ? getAddress(deployment.contracts.PaymentRouter)
   : undefined;
@@ -168,62 +178,50 @@ export default createConfig({
       address: poolManagerAddress,
       startBlock: startBlock,
     },
-    // ── Revenue contracts (indexed for on-chain source of truth) ─────
-    ...(paymentRouterAddress && {
-      PaymentRouter: {
-        chain: chainName,
-        abi: paymentRouterAbi,
-        address: paymentRouterAddress,
-        startBlock: startBlock,
-      },
-    }),
-    ...(creditManagerAddress && {
-      CreditManager: {
-        chain: chainName,
-        abi: creditManagerAbi,
-        address: creditManagerAddress,
-        startBlock: startBlock,
-      },
-    }),
-    ...(subscriptionManagerAddress && {
-      SubscriptionManager: {
-        chain: chainName,
-        abi: subscriptionManagerAbi,
-        address: subscriptionManagerAddress,
-        startBlock: startBlock,
-      },
-    }),
-    ...(canonMarketplaceAddress && {
-      CanonMarketplace: {
-        chain: chainName,
-        abi: canonMarketplaceAbi,
-        address: canonMarketplaceAddress,
-        startBlock: startBlock,
-      },
-    }),
-    ...(adPlacementAddress && {
-      AdPlacement: {
-        chain: chainName,
-        abi: adPlacementAbi,
-        address: adPlacementAddress,
-        startBlock: startBlock,
-      },
-    }),
-    ...(licensingRegistryAddress && {
-      LicensingRegistry: {
-        chain: chainName,
-        abi: licensingRegistryAbi,
-        address: licensingRegistryAddress,
-        startBlock: startBlock,
-      },
-    }),
-    ...(collabManagerAddress && {
-      CollabManager: {
-        chain: chainName,
-        abi: collabManagerAbi,
-        address: collabManagerAddress,
-        startBlock: startBlock,
-      },
-    }),
+    // ── Revenue contracts (always present in the config type so handlers
+    //    typecheck; disabled with address(0) + far-future startBlock until
+    //    the deployment file lists a real address for this chain). ─────────
+    PaymentRouter: {
+      chain: chainName,
+      abi: paymentRouterAbi,
+      address: paymentRouterAddress ?? ZERO_ADDRESS,
+      startBlock: paymentRouterAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
+    CreditManager: {
+      chain: chainName,
+      abi: creditManagerAbi,
+      address: creditManagerAddress ?? ZERO_ADDRESS,
+      startBlock: creditManagerAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
+    SubscriptionManager: {
+      chain: chainName,
+      abi: subscriptionManagerAbi,
+      address: subscriptionManagerAddress ?? ZERO_ADDRESS,
+      startBlock: subscriptionManagerAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
+    CanonMarketplace: {
+      chain: chainName,
+      abi: canonMarketplaceAbi,
+      address: canonMarketplaceAddress ?? ZERO_ADDRESS,
+      startBlock: canonMarketplaceAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
+    AdPlacement: {
+      chain: chainName,
+      abi: adPlacementAbi,
+      address: adPlacementAddress ?? ZERO_ADDRESS,
+      startBlock: adPlacementAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
+    LicensingRegistry: {
+      chain: chainName,
+      abi: licensingRegistryAbi,
+      address: licensingRegistryAddress ?? ZERO_ADDRESS,
+      startBlock: licensingRegistryAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
+    CollabManager: {
+      chain: chainName,
+      abi: collabManagerAbi,
+      address: collabManagerAddress ?? ZERO_ADDRESS,
+      startBlock: collabManagerAddress ? startBlock : UNDEPLOYED_BLOCK,
+    },
   },
 });

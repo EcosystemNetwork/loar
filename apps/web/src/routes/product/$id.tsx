@@ -25,12 +25,13 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { trpc, trpcClient } from '@/utils/trpc';
 import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
+import { useChainId } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { BuyNFTDialog } from '@/components/BuyNFTDialog';
 import { useVocab } from '@/hooks/use-vocab';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 
-const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
 const ERC20_ABI = [
@@ -69,6 +70,9 @@ function ProductDetailPage() {
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
   const queryClient = useQueryClient();
+  const chainId = useChainId();
+  const LOAR_TOKEN_ADDRESS = getEvmAddresses(chainId)?.loarToken;
+  const hasLoarToken = !!LOAR_TOKEN_ADDRESS && !isZeroAddress(LOAR_TOKEN_ADDRESS);
 
   // Like system
   const { data: likedData } = useQuery(
@@ -183,8 +187,8 @@ function ProductDetailPage() {
 
       // For $LOAR listings routed through a contract
       if (l.currency === 'LOAR' && l.price !== '0' && l.contractAddress) {
-        if (!LOAR_TOKEN_ADDRESS) {
-          toast.error('$LOAR token address not configured');
+        if (!hasLoarToken || !LOAR_TOKEN_ADDRESS) {
+          toast.error('$LOAR token is not deployed on this chain');
           return;
         }
         const recipient = l.contractAddress as Address;

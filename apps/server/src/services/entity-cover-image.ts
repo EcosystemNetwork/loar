@@ -23,6 +23,8 @@ type EntityKind =
   | 'vehicle'
   | 'technology'
   | 'organization'
+  | 'moodboard'
+  | 'style_pack'
   | 'timeline'
   | 'reality'
   | 'dimension'

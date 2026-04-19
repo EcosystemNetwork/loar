@@ -1061,7 +1061,17 @@ export class FalService {
     prompt: string;
     model?: string;
     negativePrompt?: string;
-  }): Promise<{ id: string; status: string; imageUrl?: string; error?: string }> {
+    seed?: number;
+    strength?: number;
+    guidanceScale?: number;
+    numInferenceSteps?: number;
+  }): Promise<{
+    id: string;
+    status: string;
+    imageUrl?: string;
+    seed?: number;
+    error?: string;
+  }> {
     this.ensureConfigured();
     try {
       const model = options.model || 'fal-ai/flux/dev/inpainting';
@@ -1072,10 +1082,51 @@ export class FalService {
       };
 
       if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+      if (typeof options.seed === 'number') input.seed = options.seed;
+      if (typeof options.strength === 'number') input.strength = options.strength;
+      if (typeof options.guidanceScale === 'number') input.guidance_scale = options.guidanceScale;
+      if (typeof options.numInferenceSteps === 'number')
+        input.num_inference_steps = options.numInferenceSteps;
 
       const result = await fal.subscribe(model, { input, logs: true });
       const data = (result as any).data || result;
       const imageUrl = data.images?.[0]?.url || data.image?.url || data.url;
+      const seed = typeof data.seed === 'number' ? data.seed : options.seed;
+
+      if (!imageUrl)
+        throw new Error(`No image URL in response. Keys: ${Object.keys(data).join(', ')}`);
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        imageUrl,
+        seed,
+      };
+    } catch (error: any) {
+      console.error('Inpaint failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Inpaint failed' };
+    }
+  }
+
+  /** Erase a masked region — prompt-free, fills with plausible surroundings (lama) */
+  async eraseRegion(options: { imageUrl: string; maskUrl: string; model?: string }): Promise<{
+    id: string;
+    status: string;
+    imageUrl?: string;
+    seed?: number;
+    error?: string;
+  }> {
+    this.ensureConfigured();
+    try {
+      const model = options.model || 'fal-ai/lama';
+      const input = {
+        image_url: options.imageUrl,
+        mask_url: options.maskUrl,
+      };
+
+      const result = await fal.subscribe(model, { input, logs: true });
+      const data = (result as any).data || result;
+      const imageUrl = data.image?.url || data.images?.[0]?.url || data.url;
 
       if (!imageUrl)
         throw new Error(`No image URL in response. Keys: ${Object.keys(data).join(', ')}`);
@@ -1086,8 +1137,8 @@ export class FalService {
         imageUrl,
       };
     } catch (error: any) {
-      console.error('Inpaint failed:', error.message);
-      return { id: '', status: 'failed', error: error.message || 'Inpaint failed' };
+      console.error('Erase failed:', error.message);
+      return { id: '', status: 'failed', error: error.message || 'Erase failed' };
     }
   }
 

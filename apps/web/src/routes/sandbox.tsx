@@ -1,9 +1,9 @@
 /**
  * Sandbox Creator
  *
- * A friction-free creative workspace. Generate images and videos from prompts
- * without needing to set up a universe first. Save drafts, edit them, and
- * promote to a universe when ready.
+ * A friction-free creative workspace. Queue up as many image/video generations
+ * as you want — they run in parallel, each is auto-saved to drafts on success,
+ * and you can promote any draft to a universe or gallery later.
  */
 
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -24,11 +24,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Wand2,
   Video,
-  Save,
   Trash2,
   Plus,
   Sparkles,
@@ -40,6 +39,8 @@ import {
   Check,
   X,
   Globe,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { ModelSelector } from '@/components/ModelSelector';
 
@@ -48,14 +49,24 @@ export const Route = createFileRoute('/sandbox')({
 });
 
 type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3' | 'seedance' | 'seedance-fast';
+type ImageSize = 'landscape_16_9' | 'portrait_16_9' | 'square_hd';
+type AspectRatio = '16:9' | '9:16' | '1:1';
 
-type BgGeneration = {
+type Generation = {
   id: string;
+  kind: 'image' | 'video';
   prompt: string;
-  model: string;
   status: 'generating' | 'done' | 'failed';
-  videoUrl?: string;
   imageUrl?: string;
+  videoUrl?: string;
+  sourceImageUrl?: string;
+  imageModel?: string;
+  videoModel?: VideoModel;
+  imageSize: ImageSize;
+  aspectRatio: AspectRatio;
+  error?: string;
+  draftId?: string;
+  createdAt: number;
 };
 
 const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
@@ -65,6 +76,8 @@ const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
   { value: 'fal-wan25', label: 'Wan 2.5' },
   { value: 'fal-veo3', label: 'Veo 3' },
 ];
+const VALID_VIDEO_MODELS = new Set<VideoModel>(VIDEO_MODELS.map((m) => m.value));
+const SEEDANCE_MODELS = new Set<VideoModel>(['seedance', 'seedance-fast']);
 
 const IMAGE_SIZES = [
   { value: 'landscape_16_9', label: '16:9 Landscape' },
@@ -72,213 +85,196 @@ const IMAGE_SIZES = [
   { value: 'square_hd', label: '1:1 Square' },
 ] as const;
 
+const MODEL_REGISTRY_MAP: Record<VideoModel, { t2v: string; i2v: string }> = {
+  seedance: { t2v: 'seedance2-t2v', i2v: 'seedance2-i2v' },
+  'seedance-fast': { t2v: 'seedance2-fast-t2v', i2v: 'seedance2-fast-i2v' },
+  'fal-kling': { t2v: 'kling-t2v', i2v: 'kling-i2v' },
+  'fal-wan25': { t2v: 'wan25-t2v', i2v: 'wan25-i2v' },
+  'fal-veo3': { t2v: 'veo31-t2v', i2v: 'veo31-i2v' },
+};
+
+function aspectFromSize(size: ImageSize): AspectRatio {
+  if (size === 'portrait_16_9') return '9:16';
+  if (size === 'square_hd') return '1:1';
+  return '16:9';
+}
+
+function makeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function SandboxPage() {
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Creation state
+  // Form state
   const [prompt, setPrompt] = useState('');
-  const [title, setTitle] = useState('');
-  const [imageSize, setImageSize] = useState<'landscape_16_9' | 'portrait_16_9' | 'square_hd'>(
-    'landscape_16_9'
-  );
+  const [imageSize, setImageSize] = useState<ImageSize>('landscape_16_9');
   const [videoModel, setVideoModel] = useState<VideoModel>('seedance');
-  const [imageModel, setImageModel] = useState<string>(''); // '' = auto routing
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [imageModel, setImageModel] = useState<string>('');
+  const [referenceImage, setReferenceImage] = useState<{ url: string; prompt: string } | null>(
+    null
+  );
 
-  // Background generations — tracks generations the user has "moved on" from
-  const [bgGenerations, setBgGenerations] = useState<BgGeneration[]>([]);
-  const bgGenerationsRef = React.useRef<BgGeneration[]>([]);
+  // Parallel generation queue
+  const [generations, setGenerations] = useState<Generation[]>([]);
 
-  // Track whether the user has "moved on" from the current generation
-  const [movedOn, setMovedOn] = useState(false);
-  const movedOnRef = React.useRef(false);
+  // Drafts panel
+  const { data: drafts } = useQuery({
+    queryKey: ['sandbox-drafts'],
+    queryFn: () => trpcClient.sandbox.myDrafts.query(),
+    enabled: isAuthenticated,
+  });
 
-  // Image generation — uses routed endpoint with model selection
-  const generateImageMutation = useMutation({
-    mutationFn: async () => {
-      const result = await trpcClient.image.generate.mutate({
-        prompt,
-        task: 'text_to_image',
-        imageSize,
-        numImages: 1,
-        routingMode: imageModel ? 'manual' : 'auto',
-        ...(imageModel ? { selectedModelId: imageModel } : {}),
-      });
-      // Normalize to legacy shape for downstream compat
-      return {
-        imageUrl: result.imageUrls?.[0] ?? null,
-        status: result.status,
+  const updateGen = useCallback((id: string, patch: Partial<Generation>) => {
+    setGenerations((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  }, []);
+
+  const removeGen = useCallback((id: string) => {
+    setGenerations((prev) => prev.filter((g) => g.id !== id));
+  }, []);
+
+  const clearDone = useCallback(() => {
+    setGenerations((prev) => prev.filter((g) => g.status === 'generating'));
+  }, []);
+
+  const autoSaveDraft = useCallback(
+    async (gen: Generation) => {
+      try {
+        const result = await trpcClient.sandbox.saveDraft.mutate({
+          title: gen.prompt.slice(0, 80) || 'Untitled',
+          prompt: gen.prompt,
+          imageUrl: gen.imageUrl,
+          videoUrl: gen.videoUrl,
+          model: gen.kind === 'video' ? gen.videoModel : gen.imageModel || undefined,
+        });
+        updateGen(gen.id, { draftId: result.id });
+        queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+      } catch (e: any) {
+        // Non-fatal: generation succeeded, draft save didn't
+        console.warn('sandbox auto-save failed:', e);
+        toast.error('Saved generation but failed to create draft');
+      }
+    },
+    [queryClient, updateGen]
+  );
+
+  const runImageGen = useCallback(
+    async (p: string, opts: { imageSize: ImageSize; imageModel: string }) => {
+      const id = makeId();
+      const gen: Generation = {
+        id,
+        kind: 'image',
+        prompt: p,
+        status: 'generating',
+        imageSize: opts.imageSize,
+        aspectRatio: aspectFromSize(opts.imageSize),
+        imageModel: opts.imageModel || undefined,
+        createdAt: Date.now(),
       };
-    },
-    onSuccess: (data) => {
-      const url = data.imageUrl ?? null;
-      if (movedOnRef.current) {
-        setBgGenerations((prev) => {
-          const next = prev.map((g) =>
-            g.status === 'generating'
-              ? { ...g, status: 'done' as const, imageUrl: url ?? undefined }
-              : g
-          );
-          bgGenerationsRef.current = next;
-          return next;
+      setGenerations((prev) => [gen, ...prev]);
+      try {
+        const result = await trpcClient.image.generate.mutate({
+          prompt: p,
+          task: 'text_to_image',
+          imageSize: opts.imageSize,
+          numImages: 1,
+          routingMode: opts.imageModel ? 'manual' : 'auto',
+          ...(opts.imageModel ? { selectedModelId: opts.imageModel } : {}),
         });
-        toast.success('Background image ready! Saved to drafts.', { duration: 5000 });
-        const bg = bgGenerationsRef.current.find((g) => g.status === 'generating');
-        if (bg && url) {
-          trpcClient.sandbox.saveDraft
-            .mutate({
-              title: bg.prompt.slice(0, 80),
-              prompt: bg.prompt,
-              imageUrl: url,
-              model: bg.model,
-            })
-            .then(() => queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] }))
-            .catch(() => {});
-        }
-      } else {
-        setGeneratedImageUrl(url);
-        setGeneratedVideoUrl(null);
-        if (!url) toast.error('No image returned');
+        const url = result.imageUrls?.[0];
+        if (!url) throw new Error('No image returned');
+        const updated: Generation = { ...gen, status: 'done', imageUrl: url };
+        setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
+        autoSaveDraft(updated);
+      } catch (err: any) {
+        updateGen(id, { status: 'failed', error: err?.message || 'Image generation failed' });
+        toast.error('Image generation failed: ' + (err?.message || ''));
       }
     },
-    onError: (err: any) => {
-      if (movedOnRef.current) {
-        setBgGenerations((prev) =>
-          prev.map((g) => (g.status === 'generating' ? { ...g, status: 'failed' as const } : g))
-        );
-        toast.error('Background image failed: ' + (err.message || 'Unknown error'));
-      } else {
-        toast.error(err.message || 'Image generation failed');
-      }
-    },
-  });
+    [autoSaveDraft, updateGen]
+  );
 
-  // Reset form for a new generation while current one runs in the background
-  const startNew = () => {
-    const currentPrompt = prompt;
-    const currentModel = videoModel;
-    const currentImageUrl = generatedImageUrl;
-    const newBg: BgGeneration = {
-      id: Date.now().toString(),
-      prompt: currentPrompt,
-      model: currentModel,
-      status: 'generating',
-      imageUrl: currentImageUrl ?? undefined,
-    };
-    setBgGenerations((prev) => {
-      const next = [...prev, newBg];
-      bgGenerationsRef.current = next;
-      return next;
-    });
-    movedOnRef.current = true;
-    setMovedOn(true);
-    setPrompt('');
-    setTitle('');
-    setGeneratedImageUrl(null);
-    setGeneratedVideoUrl(null);
-    toast('Started fresh! Your generation is running in the background.', { duration: 3000 });
-  };
-
-  // Map sandbox model IDs to registry model IDs for the unified generate endpoint
-  const MODEL_REGISTRY_MAP: Record<VideoModel, { t2v: string; i2v: string }> = {
-    seedance: { t2v: 'seedance2-t2v', i2v: 'seedance2-i2v' },
-    'seedance-fast': { t2v: 'seedance2-fast-t2v', i2v: 'seedance2-fast-i2v' },
-    'fal-kling': { t2v: 'kling-t2v', i2v: 'kling-i2v' },
-    'fal-wan25': { t2v: 'wan25-t2v', i2v: 'wan25-i2v' },
-    'fal-veo3': { t2v: 'veo31-t2v', i2v: 'veo31-i2v' },
-  };
-
-  // Video generation — uses unified generate endpoint (correct pricing per model)
-  const generateVideoMutation = useMutation({
-    mutationFn: async () => {
-      const hasImage = !!generatedImageUrl;
+  const runVideoGen = useCallback(
+    async (
+      p: string,
+      opts: { videoModel: VideoModel; imageSize: ImageSize; sourceImageUrl?: string }
+    ) => {
+      const id = makeId();
+      const hasImage = !!opts.sourceImageUrl;
       const mode = hasImage ? 'image_to_video' : 'text_to_video';
-      const modelIds = MODEL_REGISTRY_MAP[videoModel];
+      const modelIds = MODEL_REGISTRY_MAP[opts.videoModel];
       const selectedModelId = hasImage ? modelIds.i2v : modelIds.t2v;
-      const isSeedance = videoModel === 'seedance' || videoModel === 'seedance-fast';
+      const isSeedance = SEEDANCE_MODELS.has(opts.videoModel);
+      const aspectRatio = aspectFromSize(opts.imageSize);
 
-      const r = await trpcClient.generation.generate.mutate({
-        prompt,
-        mode,
-        routingMode: 'manual',
-        selectedModelId,
-        ...(hasImage ? { imageUrl: generatedImageUrl } : {}),
-        durationSec: 5,
-        resolution: '720p',
-        aspectRatio: imageSize === 'portrait_16_9' ? '9:16' : '16:9',
-        audio: isSeedance, // Seedance supports native audio
-      });
-      return 'videoUrl' in r ? r.videoUrl : undefined;
-    },
-    onSuccess: (url) => {
-      if (movedOnRef.current) {
-        // User started a new prompt — auto-save this as a draft in the background
-        setBgGenerations((prev) => {
-          const next = prev.map((g) =>
-            g.status === 'generating'
-              ? { ...g, status: 'done' as const, videoUrl: url ?? undefined }
-              : g
-          );
-          bgGenerationsRef.current = next;
-          return next;
+      const gen: Generation = {
+        id,
+        kind: 'video',
+        prompt: p,
+        status: 'generating',
+        videoModel: opts.videoModel,
+        imageSize: opts.imageSize,
+        aspectRatio,
+        sourceImageUrl: opts.sourceImageUrl,
+        imageUrl: opts.sourceImageUrl,
+        createdAt: Date.now(),
+      };
+      setGenerations((prev) => [gen, ...prev]);
+      try {
+        const r: any = await trpcClient.generation.generate.mutate({
+          prompt: p,
+          mode,
+          routingMode: 'manual',
+          selectedModelId,
+          ...(hasImage ? { imageUrl: opts.sourceImageUrl } : {}),
+          durationSec: 5,
+          resolution: '720p',
+          aspectRatio,
+          audio: isSeedance,
         });
-        toast.success('Background generation finished! Saved to drafts.', { duration: 5000 });
-        // Auto-save as draft
-        const bg = bgGenerationsRef.current.find((g) => g.status === 'generating');
-        if (bg) {
-          trpcClient.sandbox.saveDraft
-            .mutate({
-              title: bg.prompt.slice(0, 80),
-              prompt: bg.prompt,
-              imageUrl: bg.imageUrl ?? undefined,
-              videoUrl: url ?? undefined,
-              model: bg.model,
-            })
-            .then(() => queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] }))
-            .catch(() => {});
-        }
-      } else {
-        setGeneratedVideoUrl(url ?? null);
+        const url = r?.videoUrl;
+        if (!url) throw new Error('No video returned');
+        const updated: Generation = { ...gen, status: 'done', videoUrl: url };
+        setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
+        autoSaveDraft(updated);
+      } catch (err: any) {
+        updateGen(id, { status: 'failed', error: err?.message || 'Video generation failed' });
+        toast.error('Video generation failed: ' + (err?.message || ''));
       }
     },
-    onError: (err: any) => {
-      if (movedOnRef.current) {
-        setBgGenerations((prev) =>
-          prev.map((g) => (g.status === 'generating' ? { ...g, status: 'failed' as const } : g))
-        );
-        toast.error('Background generation failed: ' + (err.message || 'Unknown error'));
+    [autoSaveDraft, updateGen]
+  );
+
+  const retryGen = useCallback(
+    (g: Generation) => {
+      removeGen(g.id);
+      if (g.kind === 'image') {
+        runImageGen(g.prompt, { imageSize: g.imageSize, imageModel: g.imageModel || '' });
       } else {
-        toast.error(err.message || 'Video generation failed');
+        runVideoGen(g.prompt, {
+          videoModel: g.videoModel ?? 'seedance',
+          imageSize: g.imageSize,
+          sourceImageUrl: g.sourceImageUrl,
+        });
       }
     },
-  });
+    [removeGen, runImageGen, runVideoGen]
+  );
 
-  // Save draft
-  const saveDraftMutation = useMutation({
-    mutationFn: () =>
-      trpcClient.sandbox.saveDraft.mutate({
-        title: title || prompt.slice(0, 80),
-        prompt,
-        imageUrl: generatedImageUrl ?? undefined,
-        videoUrl: generatedVideoUrl ?? undefined,
-        model: videoModel,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
-      toast.success('Draft saved!');
-      setPrompt('');
-      setTitle('');
-      setGeneratedImageUrl(null);
-      setGeneratedVideoUrl(null);
-    },
-    onError: (err: any) => toast.error(err.message || 'Failed to save draft'),
-  });
+  const handleAnimate = useCallback((g: Generation) => {
+    if (!g.imageUrl) return;
+    setReferenceImage({ url: g.imageUrl, prompt: g.prompt });
+    setPrompt(g.prompt);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast('Reference image loaded — pick a video model and hit Animate', { duration: 3000 });
+  }, []);
 
-  // Delete draft
-  const deleteDraftMutation = useMutation({
+  const delDraftMutation = useMutation({
     mutationFn: (id: string) => trpcClient.sandbox.deleteDraft.mutate({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
@@ -287,35 +283,47 @@ function SandboxPage() {
     onError: (err: any) => toast.error(err.message || 'Failed to delete draft'),
   });
 
-  // Load saved drafts
-  const { data: drafts } = useQuery({
-    queryKey: ['sandbox-drafts'],
-    queryFn: () => trpcClient.sandbox.myDrafts.query(),
-    enabled: isAuthenticated,
-  });
-
-  const isGeneratingImage = generateImageMutation.isPending;
-  const isGeneratingVideo = generateVideoMutation.isPending;
-  const hasContent = !!generatedImageUrl || !!generatedVideoUrl;
+  const canGenerate = prompt.trim().length > 0;
+  // Non-Seedance video models run image-to-video only in the registry, so they need a reference.
+  const videoNeedsImage = !SEEDANCE_MODELS.has(videoModel) && !referenceImage;
+  const activeCount = generations.filter((g) => g.status === 'generating').length;
+  const hasDoneGens = generations.some((g) => g.status !== 'generating');
 
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-bold">Sandbox</h1>
-            <Badge variant="secondary">Beta</Badge>
+        <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <Sparkles className="h-6 w-6 text-primary" />
+              <h1 className="text-3xl font-bold">Sandbox</h1>
+              <Badge variant="secondary">Beta</Badge>
+              {activeCount > 0 && (
+                <Badge className="bg-primary/20 text-primary border-primary/30">
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  {activeCount} running
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground">
+              Queue up as many generations as you want — they run in parallel and auto-save to your
+              drafts.
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Create freely. No universe required — generate images and videos, then decide what to do
-            with them.
-          </p>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={() => navigate({ to: '/create' })}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Universe
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
         </div>
 
         {!isAuthenticated && !isAuthenticating ? (
-          <Card className="mb-8">
+          <Card>
             <CardContent className="py-10 flex flex-col items-center gap-4">
               <Wand2 className="h-10 w-10 text-muted-foreground" />
               <p className="text-muted-foreground text-center max-w-sm">
@@ -326,7 +334,7 @@ function SandboxPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left: Creation Panel */}
+            {/* Left: create + queue */}
             <div className="flex flex-col gap-4">
               <h2 className="text-lg font-semibold">Create</h2>
 
@@ -345,11 +353,8 @@ function SandboxPage() {
               {/* Settings row */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Image ratio</label>
-                  <Select
-                    value={imageSize}
-                    onValueChange={(v) => setImageSize(v as typeof imageSize)}
-                  >
+                  <label className="text-xs font-medium text-muted-foreground">Aspect</label>
+                  <Select value={imageSize} onValueChange={(v) => setImageSize(v as ImageSize)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -394,160 +399,101 @@ function SandboxPage() {
                 </div>
               </div>
 
-              {/* Action buttons */}
+              {/* Reference image slot */}
+              {referenceImage && (
+                <div className="flex items-center gap-3 p-2 rounded-lg border border-primary/30 bg-primary/5">
+                  <img src={referenceImage.url} alt="" className="h-12 w-12 rounded object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium">Reference image</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      Will be animated by the selected video model
+                    </p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => setReferenceImage(null)}
+                    title="Clear reference"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Actions */}
               <div className="flex gap-2">
-                {isGeneratingImage || isGeneratingVideo ? (
-                  /* While generating: show progress + Start New button */
-                  <>
-                    <Button disabled className="flex-1" variant="outline">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      {isGeneratingImage ? 'Generating image…' : `Generating video…`}
-                    </Button>
-                    <Button onClick={startNew} className="flex-1">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Start New
-                    </Button>
-                  </>
-                ) : (
-                  /* Normal state: Generate Image / Generate Video */
-                  <>
-                    <Button
-                      onClick={() => {
-                        movedOnRef.current = false;
-                        setMovedOn(false);
-                        generateImageMutation.mutate();
-                      }}
-                      disabled={!prompt.trim()}
-                      className="flex-1"
-                    >
-                      <ImageIcon className="h-4 w-4 mr-2" />
-                      Generate Image
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        movedOnRef.current = false;
-                        setMovedOn(false);
-                        generateVideoMutation.mutate();
-                      }}
-                      disabled={
-                        (!generatedImageUrl &&
-                          videoModel !== 'seedance' &&
-                          videoModel !== 'seedance-fast') ||
-                        !prompt.trim()
-                      }
-                      title={
-                        videoModel === 'seedance' || videoModel === 'seedance-fast'
-                          ? 'Seedance supports text-to-video — no image needed'
-                          : 'Generate an image first, then animate'
-                      }
-                    >
-                      <Video className="h-4 w-4 mr-2" />
-                      {generatedImageUrl ? 'Animate' : 'Generate Video'}
-                    </Button>
-                  </>
-                )}
+                <Button
+                  className="flex-1"
+                  disabled={!canGenerate}
+                  onClick={() => {
+                    runImageGen(prompt, { imageSize, imageModel });
+                    setPrompt('');
+                  }}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  Generate Image
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!canGenerate || videoNeedsImage}
+                  title={
+                    videoNeedsImage ? 'Pick Seedance, or set a reference image first' : undefined
+                  }
+                  onClick={() => {
+                    runVideoGen(prompt, {
+                      videoModel,
+                      imageSize,
+                      sourceImageUrl: referenceImage?.url,
+                    });
+                    setReferenceImage(null);
+                    setPrompt('');
+                  }}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  {referenceImage ? 'Animate' : 'Generate Video'}
+                </Button>
               </div>
 
-              {/* Background generation banner */}
-              {bgGenerations.some((g) => g.status === 'generating') && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="text-primary">
-                    {bgGenerations.filter((g) => g.status === 'generating').length} generation
-                    {bgGenerations.filter((g) => g.status === 'generating').length > 1
-                      ? 's'
-                      : ''}{' '}
-                    running in background
-                  </span>
-                  <span className="text-muted-foreground text-xs ml-auto">
-                    Auto-saves when done
-                  </span>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Queue is unbounded — keep typing and hitting Generate. Each run auto-saves as a
+                draft.
+              </p>
+
+              {/* Queue header */}
+              {generations.length > 0 && (
+                <div className="flex items-center justify-between pt-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    {activeCount > 0
+                      ? `${activeCount} running · ${generations.length - activeCount} done`
+                      : `${generations.length} recent`}
+                  </h3>
+                  {hasDoneGens && (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearDone}>
+                      Clear done
+                    </Button>
+                  )}
                 </div>
               )}
 
-              {/* Preview */}
-              {(generatedImageUrl ||
-                generatedVideoUrl ||
-                isGeneratingImage ||
-                isGeneratingVideo) && (
-                <div className="rounded-lg overflow-hidden bg-muted aspect-video flex items-center justify-center">
-                  {isGeneratingImage && (
-                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                      <p className="text-sm">Generating image…</p>
-                      <p className="text-xs text-muted-foreground/60">
-                        Click "Start New" above to begin another while this finishes
-                      </p>
-                    </div>
-                  )}
-                  {isGeneratingVideo && (
-                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                      <p className="text-sm">
-                        {generatedImageUrl ? 'Animating' : 'Generating video'} with{' '}
-                        {VIDEO_MODELS.find((m) => m.value === videoModel)?.label}…
-                      </p>
-                      <p className="text-xs text-muted-foreground/60">
-                        This can take 1-3 min — click "Start New" to keep creating
-                      </p>
-                    </div>
-                  )}
-                  {!isGeneratingImage && !isGeneratingVideo && generatedVideoUrl && (
-                    <video
-                      src={generatedVideoUrl}
-                      controls
-                      autoPlay
-                      loop
-                      className="w-full h-full object-contain"
+              {/* Queue grid */}
+              {generations.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  {generations.map((g) => (
+                    <GenerationCard
+                      key={g.id}
+                      gen={g}
+                      onDismiss={() => removeGen(g.id)}
+                      onRetry={() => retryGen(g)}
+                      onAnimate={() => handleAnimate(g)}
                     />
-                  )}
-                  {!isGeneratingImage &&
-                    !isGeneratingVideo &&
-                    !generatedVideoUrl &&
-                    generatedImageUrl && (
-                      <img
-                        src={generatedImageUrl}
-                        alt="Generated"
-                        className="w-full h-full object-contain"
-                      />
-                    )}
-                </div>
-              )}
-
-              {/* Save / publish actions */}
-              {hasContent && (
-                <div className="flex flex-col gap-3 pt-1">
-                  <Input
-                    placeholder="Give it a title (optional)"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => saveDraftMutation.mutate()}
-                      disabled={saveDraftMutation.isPending}
-                    >
-                      {saveDraftMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
-                      Save Draft
-                    </Button>
-                    <Button className="flex-1" onClick={() => navigate({ to: '/create' })}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Universe
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Right: Drafts Gallery */}
+            {/* Right: drafts */}
             <div className="flex flex-col gap-4">
               <h2 className="text-lg font-semibold">Your Drafts</h2>
 
@@ -556,7 +502,7 @@ function SandboxPage() {
                   <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
                     <Wand2 className="h-8 w-8 text-muted-foreground/50" />
                     <p className="text-muted-foreground text-sm">
-                      Nothing saved yet. Generate something and hit Save Draft.
+                      Nothing saved yet. Generate something and it'll show up here.
                     </p>
                   </CardContent>
                 </Card>
@@ -566,13 +512,15 @@ function SandboxPage() {
                     <DraftCard
                       key={draft.id}
                       draft={draft}
-                      onDelete={() => deleteDraftMutation.mutate(draft.id)}
-                      onLoad={() => {
+                      onDelete={() => delDraftMutation.mutate(draft.id)}
+                      onReuse={() => {
                         setPrompt(draft.prompt);
-                        setTitle(draft.title);
-                        setGeneratedImageUrl(draft.imageUrl);
-                        setGeneratedVideoUrl(draft.videoUrl);
-                        if (draft.model) setVideoModel(draft.model as VideoModel);
+                        if (draft.model && VALID_VIDEO_MODELS.has(draft.model as VideoModel)) {
+                          setVideoModel(draft.model as VideoModel);
+                        }
+                        if (draft.imageUrl) {
+                          setReferenceImage({ url: draft.imageUrl, prompt: draft.prompt });
+                        }
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                     />
@@ -587,7 +535,104 @@ function SandboxPage() {
   );
 }
 
-// ── Draft Card with Edit + Promote ──────────────────────────────────
+// ── Generation Card ─────────────────────────────────────────────────
+
+interface GenerationCardProps {
+  gen: Generation;
+  onDismiss: () => void;
+  onRetry: () => void;
+  onAnimate: () => void;
+}
+
+function GenerationCard({ gen, onDismiss, onRetry, onAnimate }: GenerationCardProps) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="aspect-video bg-muted relative">
+        {gen.status === 'generating' && (
+          <>
+            {gen.sourceImageUrl && (
+              <img
+                src={gen.sourceImageUrl}
+                alt=""
+                className="w-full h-full object-cover opacity-30"
+              />
+            )}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="text-xs text-muted-foreground">Generating {gen.kind}…</span>
+            </div>
+          </>
+        )}
+        {gen.status === 'failed' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center">
+            <AlertCircle className="h-6 w-6 text-destructive" />
+            <span className="text-xs text-destructive">Failed</span>
+            {gen.error && (
+              <span className="text-[10px] text-muted-foreground line-clamp-2">{gen.error}</span>
+            )}
+          </div>
+        )}
+        {gen.status === 'done' && gen.videoUrl && (
+          <video
+            src={gen.videoUrl}
+            className="w-full h-full object-cover"
+            controls
+            muted
+            loop
+            playsInline
+          />
+        )}
+        {gen.status === 'done' && !gen.videoUrl && gen.imageUrl && (
+          <img src={gen.imageUrl} alt="" className="w-full h-full object-cover" />
+        )}
+
+        <Button
+          size="icon"
+          variant="secondary"
+          className="absolute top-1.5 right-1.5 h-6 w-6 opacity-80 hover:opacity-100"
+          onClick={onDismiss}
+          title="Dismiss from queue"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+
+        <Badge variant="secondary" className="absolute top-1.5 left-1.5 text-[10px]">
+          {gen.kind === 'video' ? (
+            <Video className="h-2.5 w-2.5 mr-1" />
+          ) : (
+            <ImageIcon className="h-2.5 w-2.5 mr-1" />
+          )}
+          {gen.kind}
+        </Badge>
+      </div>
+
+      <CardContent className="p-2 space-y-1.5">
+        <p className="text-xs text-muted-foreground line-clamp-2">{gen.prompt}</p>
+        <div className="flex items-center gap-1">
+          {gen.status === 'done' && gen.draftId && (
+            <Badge variant="outline" className="text-[10px]">
+              Saved
+            </Badge>
+          )}
+          {gen.status === 'done' && gen.kind === 'image' && (
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onAnimate}>
+              <Video className="h-3 w-3 mr-1" />
+              Animate
+            </Button>
+          )}
+          {gen.status === 'failed' && (
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onRetry}>
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Draft Card ─────────────────────────────────────────────────
 
 interface DraftData {
   id: string;
@@ -604,25 +649,22 @@ interface DraftData {
 interface DraftCardProps {
   draft: DraftData;
   onDelete: () => void;
-  onLoad: () => void;
+  onReuse: () => void;
 }
 
-function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
+function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
   const queryClient = useQueryClient();
   const thumb = draft.videoUrl || draft.imageUrl;
   const isPromoted = draft.status === 'promoted';
 
-  // Inline edit state
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(draft.title);
 
-  // Promote state — '__gallery__' = general gallery (no universe)
   const [showPromote, setShowPromote] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState('__gallery__');
   const [classification, setClassification] = useState<'fan' | 'original' | 'licensed'>('original');
   const [visibility, setVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
 
-  // Fetch user's universes for promote selector
   const { data: universesResult } = useQuery({
     queryKey: ['all-universes'],
     queryFn: () => trpcClient.universes.getAll.query(),
@@ -630,7 +672,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
   });
   const universes = (universesResult as any)?.data ?? universesResult ?? [];
 
-  // Update draft mutation
   const updateMutation = useMutation({
     mutationFn: (input: { id: string; title?: string; tags?: string[] }) =>
       trpcClient.sandbox.updateDraft.mutate(input),
@@ -642,7 +683,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
     onError: (err: any) => toast.error(err.message || 'Failed to update'),
   });
 
-  // Promote mutation
   const promoteMutation = useMutation({
     mutationFn: () =>
       trpcClient.sandbox.promoteToUniverse.mutate({
@@ -672,7 +712,9 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
               className="w-full h-full object-cover"
               muted
               playsInline
-              onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLVideoElement).play().catch(() => {});
+              }}
               onMouseLeave={(e) => {
                 const v = e.currentTarget as HTMLVideoElement;
                 v.pause();
@@ -688,14 +730,12 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
           </div>
         )}
 
-        {/* Status badge */}
         {isPromoted && (
           <div className="absolute top-2 left-2">
             <Badge className="bg-green-500/90 text-white border-0 text-[10px]">Promoted</Badge>
           </div>
         )}
 
-        {/* Hover actions */}
         {!showPromote && (
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
             {!isPromoted && (
@@ -704,8 +744,8 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
                 Promote
               </Button>
             )}
-            <Button size="sm" variant="secondary" onClick={onLoad}>
-              Load
+            <Button size="sm" variant="secondary" onClick={onReuse}>
+              Reuse
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" />
@@ -725,7 +765,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
       </div>
 
       <CardContent className="p-3">
-        {/* Inline title edit */}
         {editing ? (
           <div className="flex items-center gap-1">
             <Input
@@ -786,7 +825,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
           )}
         </div>
 
-        {/* Promote to Universe panel */}
         {showPromote && !isPromoted && (
           <div className="mt-3 pt-3 border-t space-y-2">
             <p className="text-xs font-semibold flex items-center gap-1.5">
@@ -794,7 +832,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
               Promote to Universe
             </p>
 
-            {/* Target selector — gallery or universe */}
             <Select value={selectedTarget} onValueChange={setSelectedTarget}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select destination" />
@@ -812,7 +849,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
               </SelectContent>
             </Select>
 
-            {/* Classification */}
             <div className="flex gap-1">
               {(['original', 'fan', 'licensed'] as const).map((c) => (
                 <button
@@ -829,7 +865,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
               ))}
             </div>
 
-            {/* Visibility */}
             <Select value={visibility} onValueChange={(v) => setVisibility(v as typeof visibility)}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
@@ -847,7 +882,6 @@ function DraftCard({ draft, onDelete, onLoad }: DraftCardProps) {
               </SelectContent>
             </Select>
 
-            {/* Actions */}
             <div className="flex gap-1.5">
               <Button
                 size="sm"

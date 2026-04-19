@@ -2555,6 +2555,20 @@ export const contentLicensingAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'dealId', internalType: 'uint256', type: 'uint256' }],
+    name: 'expireDeal',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'dealIds', internalType: 'uint256[]', type: 'uint256[]' }],
+    name: 'expireDeals',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'contentHash', internalType: 'bytes32', type: 'bytes32' }],
     name: 'getContentDeals',
     outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
@@ -2974,6 +2988,19 @@ export const contentLicensingAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'dealId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'DealExpired',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'version',
         internalType: 'uint64',
         type: 'uint64',
@@ -3080,7 +3107,6 @@ export const contentLicensingAbi = [
   { type: 'error', inputs: [], name: 'AlreadyRegistered' },
   { type: 'error', inputs: [], name: 'ContentNotActive' },
   { type: 'error', inputs: [], name: 'ContentNotMonetizable' },
-  { type: 'error', inputs: [], name: 'DealExpired' },
   { type: 'error', inputs: [], name: 'DealNotActive' },
   { type: 'error', inputs: [], name: 'DurationTooLong' },
   {
@@ -3231,6 +3257,13 @@ export const creditManagerAbi = [
     name: 'grantCredits',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'grantedPerUser',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -4440,6 +4473,8 @@ export const entityNftAbi = [
       { name: '_rightsRegistry', internalType: 'address', type: 'address' },
       { name: '_platformFeeBps', internalType: 'uint16', type: 'uint16' },
       { name: '_royaltyBps', internalType: 'uint16', type: 'uint16' },
+      { name: '_name', internalType: 'string', type: 'string' },
+      { name: '_symbol', internalType: 'string', type: 'string' },
     ],
     name: 'initialize',
     outputs: [],
@@ -9859,8 +9894,8 @@ export const loarHookStaticFeeAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'protocolFee',
+    inputs: [{ name: '', internalType: 'PoolId', type: 'bytes32' }],
+    name: 'poolProtocolFee',
     outputs: [{ name: '', internalType: 'uint24', type: 'uint24' }],
     stateMutability: 'view',
   },
@@ -12315,6 +12350,13 @@ export const rightsRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'creatorNonce',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'reason', internalType: 'string', type: 'string' },
@@ -12423,6 +12465,23 @@ export const rightsRegistryAbi = [
       },
     ],
     name: 'setRights',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+      {
+        name: 'rightsType',
+        internalType: 'enum IRightsRegistry.RightsType',
+        type: 'uint8',
+      },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'deadline', internalType: 'uint256', type: 'uint256' },
+      { name: 'signature', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'setRightsWithCreatorSig',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -12596,6 +12655,17 @@ export const rightsRegistryAbi = [
     name: 'AddressEmptyCode',
   },
   { type: 'error', inputs: [], name: 'AlreadyFrozen' },
+  { type: 'error', inputs: [], name: 'ECDSAInvalidSignature' },
+  {
+    type: 'error',
+    inputs: [{ name: 'length', internalType: 'uint256', type: 'uint256' }],
+    name: 'ECDSAInvalidSignatureLength',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 's', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'ECDSAInvalidSignatureS',
+  },
   {
     type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
@@ -12604,6 +12674,8 @@ export const rightsRegistryAbi = [
   { type: 'error', inputs: [], name: 'ERC1967NonPayable' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'InvalidSignature' },
+  { type: 'error', inputs: [], name: 'MonetizableRequiresCreatorSig' },
   { type: 'error', inputs: [], name: 'NoPendingFreeze' },
   { type: 'error', inputs: [], name: 'NotCreatorOrOwner' },
   { type: 'error', inputs: [], name: 'NotFrozen' },
@@ -12619,6 +12691,7 @@ export const rightsRegistryAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'OwnableUnauthorizedAccount',
   },
+  { type: 'error', inputs: [], name: 'SignatureExpired' },
   { type: 'error', inputs: [], name: 'UUPSUnauthorizedCallContext' },
   {
     type: 'error',
@@ -13825,6 +13898,44 @@ export const storyBountiesAbi = [
       },
     ],
     name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldRouter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newRouter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'PaymentRouterChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newPlatform',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'PlatformChanged',
   },
   {
     type: 'event',
@@ -17021,6 +17132,31 @@ export const universeManagerAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'actualCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'mintedCount',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'SignersTruncated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'msgSender',
         internalType: 'address',
         type: 'address',
@@ -19946,6 +20082,22 @@ export const useContentLicensing_DeactivateContent_write = /*#__PURE__*/ createU
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"expireDeal"`
+ */
+export const useContentLicensing_ExpireDeal_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'expireDeal',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"expireDeals"`
+ */
+export const useContentLicensing_ExpireDeals_write = /*#__PURE__*/ createUseWriteContract({
+  abi: contentLicensingAbi,
+  functionName: 'expireDeals',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"initialize"`
  */
 export const useContentLicensing_Initialize_write = /*#__PURE__*/ createUseWriteContract({
@@ -20072,6 +20224,22 @@ export const useContentLicensing_DeactivateContent_simulate =
     abi: contentLicensingAbi,
     functionName: 'deactivateContent',
   });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"expireDeal"`
+ */
+export const useContentLicensing_ExpireDeal_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'expireDeal',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"expireDeals"`
+ */
+export const useContentLicensing_ExpireDeals_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: contentLicensingAbi,
+  functionName: 'expireDeals',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contentLicensingAbi}__ and `functionName` set to `"initialize"`
@@ -20224,6 +20392,14 @@ export const useContentLicensing_ContentRented_watch = /*#__PURE__*/ createUseWa
 });
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"DealExpired"`
+ */
+export const useContentLicensing_DealExpired_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: contentLicensingAbi,
+  eventName: 'DealExpired',
+});
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contentLicensingAbi}__ and `eventName` set to `"Initialized"`
  */
 export const useContentLicensing_Initialized_watch = /*#__PURE__*/ createUseWatchContractEvent({
@@ -20357,6 +20533,14 @@ export const useCreditManager_GetGenerationCost_read = /*#__PURE__*/ createUseRe
 export const useCreditManager_GetUserStats_read = /*#__PURE__*/ createUseReadContract({
   abi: creditManagerAbi,
   functionName: 'getUserStats',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link creditManagerAbi}__ and `functionName` set to `"grantedPerUser"`
+ */
+export const useCreditManager_GrantedPerUser_read = /*#__PURE__*/ createUseReadContract({
+  abi: creditManagerAbi,
+  functionName: 'grantedPerUser',
 });
 
 /**
@@ -25533,11 +25717,11 @@ export const useLoarHookStaticFee_PoolManager_read = /*#__PURE__*/ createUseRead
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"protocolFee"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link loarHookStaticFeeAbi}__ and `functionName` set to `"poolProtocolFee"`
  */
-export const useLoarHookStaticFee_ProtocolFee_read = /*#__PURE__*/ createUseReadContract({
+export const useLoarHookStaticFee_PoolProtocolFee_read = /*#__PURE__*/ createUseReadContract({
   abi: loarHookStaticFeeAbi,
-  functionName: 'protocolFee',
+  functionName: 'poolProtocolFee',
 });
 
 /**
@@ -27875,6 +28059,14 @@ export const useRightsRegistry_ContentCreator_read = /*#__PURE__*/ createUseRead
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"creatorNonce"`
+ */
+export const useRightsRegistry_CreatorNonce_read = /*#__PURE__*/ createUseReadContract({
+  abi: rightsRegistryAbi,
+  functionName: 'creatorNonce',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"isMonetizable"`
  */
 export const useRightsRegistry_IsMonetizable_read = /*#__PURE__*/ createUseReadContract({
@@ -27994,6 +28186,16 @@ export const useRightsRegistry_SetRights_write = /*#__PURE__*/ createUseWriteCon
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setRightsWithCreatorSig"`
+ */
+export const useRightsRegistry_SetRightsWithCreatorSig_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: rightsRegistryAbi,
+    functionName: 'setRightsWithCreatorSig',
+  }
+);
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"transferOwnership"`
  */
 export const useRightsRegistry_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
@@ -28081,6 +28283,15 @@ export const useRightsRegistry_SetRights_simulate = /*#__PURE__*/ createUseSimul
   abi: rightsRegistryAbi,
   functionName: 'setRights',
 });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"setRightsWithCreatorSig"`
+ */
+export const useRightsRegistry_SetRightsWithCreatorSig_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: rightsRegistryAbi,
+    functionName: 'setRightsWithCreatorSig',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link rightsRegistryAbi}__ and `functionName` set to `"transferOwnership"`
@@ -29302,6 +29513,23 @@ export const useStoryBounties_OwnershipTransferred_watch =
 export const useStoryBounties_Paused_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: storyBountiesAbi,
   eventName: 'Paused',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"PaymentRouterChanged"`
+ */
+export const useStoryBounties_PaymentRouterChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: storyBountiesAbi,
+    eventName: 'PaymentRouterChanged',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link storyBountiesAbi}__ and `eventName` set to `"PlatformChanged"`
+ */
+export const useStoryBounties_PlatformChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: storyBountiesAbi,
+  eventName: 'PlatformChanged',
 });
 
 /**
@@ -31893,6 +32121,14 @@ export const useUniverseManager_SetTeamFeeRecipient_watch =
 export const useUniverseManager_SetTokenDeployer_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeManagerAbi,
   eventName: 'SetTokenDeployer',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"SignersTruncated"`
+ */
+export const useUniverseManager_SignersTruncated_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeManagerAbi,
+  eventName: 'SignersTruncated',
 });
 
 /**

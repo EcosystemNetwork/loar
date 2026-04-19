@@ -58,6 +58,7 @@ export async function createUniverse(input: CreateUniverseInput) {
       isMultiSig: false,
       multiSigAddress: null,
       accessModel: 'open', // open | subscription | token_gate | both
+      universeType: 'monetized', // 'fun' (no monetization) | 'monetized' (revenue-bearing)
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -174,6 +175,44 @@ export async function setUniverseHidden(
   await batch.commit();
 
   return { id, isHidden };
+}
+
+/**
+ * Admin-only: permanently delete a universe doc. The on-chain contract is
+ * untouched (immutable), and related collections (gallery content, credits,
+ * privateSectionConfig) are intentionally preserved — deleting the universe
+ * only removes its metadata row so it disappears from every listing path.
+ *
+ * Writes an immutable `contentAuditLog` entry capturing the snapshot of the
+ * deleted doc so the action is recoverable (manually) and never silent.
+ */
+export async function deleteUniverse(
+  universeId: string,
+  actor?: { uid?: string; address?: string },
+  reason?: string
+) {
+  const id = universeId.toLowerCase();
+  const ref = collection().doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new Error('Universe not found');
+
+  const snapshot = doc.data() ?? {};
+  const now = new Date();
+
+  const batch = db.batch();
+  batch.delete(ref);
+  batch.set(db.collection('contentAuditLog').doc(), {
+    action: 'universe_deleted',
+    universeId: id,
+    actorUid: actor?.uid ?? null,
+    actorAddress: actor?.address ?? null,
+    reason: reason ?? null,
+    deletedSnapshot: JSON.parse(JSON.stringify(snapshot)),
+    createdAt: now.toISOString(),
+  });
+  await batch.commit();
+
+  return { id, deleted: true };
 }
 
 export async function getUniversesByCreator(

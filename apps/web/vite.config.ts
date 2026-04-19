@@ -3,6 +3,7 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { defineConfig, type Plugin, type Rollup } from 'vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 /**
  * Vite plugin that fails the build if browser code imports Node.js builtins
@@ -109,9 +110,27 @@ export default defineConfig({
     browserBoundaryGuard(),
     failOnCircularImports(),
     tailwindcss(),
+    // TanStack Router plugin MUST come before the JSX transform (react()).
+    // autoCodeSplitting splits each file-based route into its own chunk. Without
+    // this every route's component + imports land in the main entry bundle,
+    // which pushes the index chunk past 1.5MB gzipped. With it, marketing pages
+    // (landing, pricing) don't pay for wallet/wagmi code until the user
+    // navigates to a route that actually needs it.
+    tanstackRouter({ autoCodeSplitting: true }),
     react(),
-    tanstackRouter({}),
-  ],
+    // Bundle analyzer — only when BUNDLE_ANALYZE=1 so normal builds stay fast.
+    // Produces apps/web/dist/stats.html with a treemap of chunk sizes, gzip,
+    // and brotli. Open after build to see where the weight lives.
+    process.env.BUNDLE_ANALYZE === '1'
+      ? visualizer({
+          filename: 'dist/stats.html',
+          template: 'treemap',
+          gzipSize: true,
+          brotliSize: true,
+          open: false,
+        })
+      : null,
+  ].filter(Boolean) as Plugin[],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
+import { resolveIpfsUrl as resolveMediaUrl } from '@/utils/ipfs-url';
 import {
   Dialog,
   DialogContent,
@@ -235,20 +236,6 @@ function MiniMapNode({
 const nodeTypes = {
   timelineEvent: TimelineEventNode,
 };
-
-// Browsers can't load ipfs:// URIs in <video>/<img> src — rewrite to a gateway.
-const IPFS_GATEWAY = (
-  import.meta.env.VITE_PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud'
-).replace(/\/$/, '');
-
-function resolveMediaUrl(url?: string | null): string {
-  if (!url) return '';
-  if (url.startsWith('ipfs://')) {
-    const path = url.slice('ipfs://'.length).replace(/^ipfs\//, '');
-    return `${IPFS_GATEWAY}/ipfs/${path}`;
-  }
-  return url;
-}
 
 function UniverseTimelineEditorInner() {
   const { id } = useParams({ from: '/universe/$id' });
@@ -444,6 +431,7 @@ function UniverseTimelineEditorInner() {
               tokenAddress: d.tokenAddress,
               governanceAddress: d.governanceAddress,
               isDefault: false,
+              universeType: (d.universeType as 'fun' | 'monetized') ?? 'monetized',
             };
           }
         } catch {

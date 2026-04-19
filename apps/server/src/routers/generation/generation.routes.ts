@@ -55,6 +55,7 @@ import {
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery, buildGalleryDoc } from '../../lib/gallery-publish';
+import { recordAssetEventAsync } from '../../services/lineage';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -104,6 +105,12 @@ export const generateInputSchema = z.object({
 
   // Cast / character identity conditioning (Feature 3)
   castMemberIds: z.array(z.string()).max(5).optional(),
+
+  // Reference bundle (Feature 6 — Character Identity Lock + Multi-Reference Editing)
+  /** Pull reference slots + locks from this entity (and its parent chain). */
+  referenceBundleEntityId: z.string().optional(),
+  /** Respect the entity's reference bundle. Defaults to true when the ID is set. */
+  useReferenceBundle: z.boolean().default(true),
 
   // Motion mask (Feature 4)
   motionMaskUrl: z.string().url().optional(),
@@ -425,6 +432,11 @@ const LEGACY_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as co
 /** Deduct credits from user balance. Throws if insufficient. */
 async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
   if (!db) return;
+
+  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+  const { invalidateSpendCache } = await import('../../services/spend-cap');
+  await assertGenerationAllowed(uid, cost);
+
   const userRef = db.collection('userCredits').doc(uid);
 
   await db.runTransaction(async (transaction) => {
@@ -454,6 +466,10 @@ async function deductCredits(uid: string, cost: number, generationType: string):
       createdAt: new Date(),
     });
   });
+
+  // Invalidate spend-cache so the next assertSpendAllowed reflects this charge
+  // within the 30s window that normally uses cached totals.
+  invalidateSpendCache(uid);
 }
 
 /** Refund credits on generation failure. Best-effort — never throws. */
@@ -904,6 +920,42 @@ export const generationRouter = router({
         }
       }
 
+      // ── Resolve reference bundle (Feature 6) ─────────────────────
+      // Walks the parent chain from referenceBundleEntityId (falls back to
+      // entityId) and merges slots, locks, and identityStrength. Reference
+      // URLs are appended to resolvedCastUrls so providers that already
+      // understand reference images (ByteDance) pick them up; lock hints are
+      // appended to the prompt for providers without structured identity
+      // support.
+      const bundleTargetId =
+        (input.useReferenceBundle ?? true) && (input.referenceBundleEntityId || input.entityId);
+      if (bundleTargetId) {
+        try {
+          const { resolveReferenceBundle, flattenReferenceUrls, buildLockPromptSuffix } =
+            await import('../entities/entities.reference-bundle');
+          const bundle = await resolveReferenceBundle(bundleTargetId);
+          if (bundle) {
+            const bundleUrls = flattenReferenceUrls(bundle);
+            if (bundleUrls.length > 0) {
+              const existing = new Set(resolvedCastUrls ?? []);
+              const merged = [...(resolvedCastUrls ?? [])];
+              for (const url of bundleUrls) {
+                if (!existing.has(url) && merged.length < 5) {
+                  merged.push(url);
+                  existing.add(url);
+                }
+              }
+              resolvedCastUrls = merged;
+            }
+            const lockSuffix = buildLockPromptSuffix(bundle);
+            if (lockSuffix) input.prompt = `${input.prompt}. ${lockSuffix}`;
+          }
+        } catch (err) {
+          console.error('[generation] Failed to resolve reference bundle:', err);
+          // Non-fatal — generation continues without the bundle
+        }
+      }
+
       // ── Admission control ────────────────────────────────────────────
       // Check if queue can accept new jobs (prevents overload)
       let useQueue = !!process.env.REDIS_URL;
@@ -1109,6 +1161,29 @@ export const generationRouter = router({
           generationId,
           thumbnailUrl: input.imageUrl,
         }).catch((err) => console.error('[video] gallery publish failed:', err.message));
+
+        // PRD 10: generate lineage event
+        recordAssetEventAsync({
+          assetId: generationId,
+          parentAssetId: null,
+          kind: 'generate',
+          tool: finalModelId,
+          step: input.mode === 'image_to_video' ? 'image_to_video' : 'text_to_video',
+          prompt: originalPrompt,
+          promptRefs: input.imageUrl
+            ? [{ kind: 'image', url: input.imageUrl }]
+            : (resolvedCastUrls?.map((url) => ({ kind: 'identity' as const, url })) ?? []),
+          modelId: finalModelId,
+          modelProvider: model.provider,
+          creditCost: creditsCharged,
+          latencyMs,
+          creatorUid: ctx.user.uid,
+          creatorAddress: ctx.user.address ?? null,
+          universeId: input.universeId ?? null,
+          outputUrl: result.videoUrl!,
+          outputKind: 'video',
+          status: 'completed',
+        });
 
         return {
           generationId,

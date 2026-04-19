@@ -264,7 +264,7 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @dev CANON-06: On rejection or expiry, only the creator's held portion is refunded.
     ///      The platform fee (taken in submit()) is intentionally retained as an anti-spam
     ///      measure — without this cost, attackers could flood the voting queue for free.
-    function finalize(uint256 submissionId) external whenNotPaused {
+    function finalize(uint256 submissionId) external nonReentrant whenNotPaused {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.VOTING) revert InvalidStatus();
         if (block.timestamp < sub.votingDeadline) revert VotingNotEnded();

@@ -116,6 +116,23 @@ function getStore(): RateLimitStore {
   return store;
 }
 
+/**
+ * Consume one token from a named bucket. Uses Redis when configured, in-memory
+ * otherwise. Returns `blocked: true` when the bucket is exhausted.
+ *
+ * Intended for non-HTTP rate limiting (e.g. the public DMCA takedown form,
+ * cron-triggered side-effects) that can't piggyback on the middleware. Keys
+ * should be namespaced (e.g. `takedown:email:foo@bar.com`) to avoid
+ * collisions with middleware buckets.
+ */
+export async function consumeRateLimit(
+  key: string,
+  windowMs: number,
+  max: number
+): Promise<{ remaining: number; blocked: boolean }> {
+  return getStore().consume(key, windowMs, max);
+}
+
 // ── Client identification ───────────────────────────────────────────────
 
 /**

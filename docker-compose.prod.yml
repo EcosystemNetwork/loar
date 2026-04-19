@@ -1,14 +1,28 @@
 ##
 ## Production Docker Compose — Horizontal Scaling
 ##
-## Usage:
-##   docker compose -f docker-compose.prod.yml up -d --scale server=4 --scale worker=2
+## Usage (plain docker compose — NOT swarm):
+##   docker compose -f docker-compose.prod.yml up -d \
+##     --scale server=${SERVER_REPLICAS:-4} \
+##     --scale worker=${WORKER_REPLICAS:-2}
+##
+## Or with env vars set in .env (recommended):
+##   SERVER_REPLICAS=4 WORKER_REPLICAS=2 WORKER_CONCURRENCY=5 \
+##     docker compose -f docker-compose.prod.yml up -d \
+##     --scale server=${SERVER_REPLICAS} --scale worker=${WORKER_REPLICAS}
 ##
 ## This gives you:
 ##   - nginx load balancer (port 80) distributing across N server replicas
 ##   - Redis for shared state (rate limiting, job queue, circuit breakers)
 ##   - Separate worker fleet for generation jobs (doesn't block API)
 ##   - Health checks on all services
+##
+## NOTE on `deploy.replicas`: under plain `docker compose` (not swarm) the
+## `deploy.replicas` key is IGNORED. The value here is a documentation hint
+## + a target for swarm/k8s deployments. Ops MUST pass `--scale server=N`
+## on the CLI (or via the wrapper script) to actually run N replicas.
+##
+## Sizing guidance: see docs/scale-readiness-10k.md § Horizontal scaling.
 ##
 
 services:
@@ -87,6 +101,8 @@ services:
     networks:
       - loar-network
     deploy:
+      # NOTE: ignored under plain `docker compose` — pass `--scale server=N`
+      # on the CLI. See the scaling note at the top of this file.
       replicas: 4
       resources:
         limits:
@@ -107,7 +123,11 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379
-      - WORKER_CONCURRENCY=5
+      # WORKER_CONCURRENCY is the number of jobs ONE worker container runs in
+      # parallel. Total concurrent generation = WORKER_REPLICAS × WORKER_CONCURRENCY.
+      # Rule of thumb: each job pegs 1 CPU during encode/poll, so keep the
+      # product below the host's CPU count for headroom.
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-5}
     # Override CMD to run the worker process instead of the server
     command: ['node', 'apps/server/dist/workers/generation.worker.js']
     restart: unless-stopped
@@ -124,6 +144,8 @@ services:
     networks:
       - loar-network
     deploy:
+      # NOTE: ignored under plain `docker compose` — pass `--scale worker=N`
+      # on the CLI. See the scaling note at the top of this file.
       replicas: 2
       resources:
         limits:

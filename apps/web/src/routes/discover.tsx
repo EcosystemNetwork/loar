@@ -300,14 +300,16 @@ function DiscoverPage() {
 function UniversesTabContent({ search }: { search: string }) {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
   const [accessFilter, setAccessFilter] = useState<string | undefined>();
+  const [typeFilter, setTypeFilter] = useState<'fun' | 'monetized' | undefined>();
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['discover-universes', search, sortBy, accessFilter],
+    queryKey: ['discover-universes', search, sortBy, accessFilter, typeFilter],
     queryFn: () =>
       trpcClient.universes.discover.query({
         search: search || undefined,
         sortBy,
         accessModel: accessFilter as any,
+        universeType: typeFilter,
         limit: 40,
       }),
   });
@@ -346,6 +348,26 @@ function UniversesTabContent({ search }: { search: string }) {
           >
             {opt.value === 'token_gate' && <Lock className="h-3 w-3" />}
             {opt.value === 'subscription' && <Crown className="h-3 w-3" />}
+            {opt.label}
+          </Button>
+        ))}
+        <div className="w-px h-6 bg-border mx-2" />
+        <span className="text-sm text-muted-foreground mr-1">Type:</span>
+        {(
+          [
+            { value: undefined, label: 'All', icon: null },
+            { value: 'fun', label: 'Fun', icon: Sparkles },
+            { value: 'monetized', label: 'Monetized', icon: DollarSign },
+          ] as const
+        ).map((opt) => (
+          <Button
+            key={opt.label}
+            variant={typeFilter === opt.value ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setTypeFilter(opt.value)}
+            className="gap-1"
+          >
+            {opt.icon && <opt.icon className="h-3 w-3" />}
             {opt.label}
           </Button>
         ))}
@@ -388,6 +410,7 @@ function UniversesTabContent({ search }: { search: string }) {
 function UniverseCard({ universe }: { universe: any }) {
   const imageUrl = universe.portrait_image_url || universe.image_url;
   const accessModel = universe.accessModel || 'open';
+  const universeType = (universe.universeType || 'monetized') as 'fun' | 'monetized';
 
   return (
     <Link to="/universe/$id" params={{ id: universe.id }}>
@@ -428,17 +451,26 @@ function UniverseCard({ universe }: { universe: any }) {
               )}
             </div>
 
-            {/* Multi-sig badge */}
-            {universe.isMultiSig && (
-              <div className="absolute top-3 left-3">
+            {/* Top-left stack: type label + multi-sig */}
+            <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+              {universeType === 'fun' ? (
+                <Badge className="bg-pink-600/80 text-white border-0 backdrop-blur-sm text-xs gap-1">
+                  <Sparkles className="h-3 w-3" /> Fun
+                </Badge>
+              ) : (
+                <Badge className="bg-emerald-600/80 text-white border-0 backdrop-blur-sm text-xs gap-1">
+                  <DollarSign className="h-3 w-3" /> Monetized
+                </Badge>
+              )}
+              {universe.isMultiSig && (
                 <Badge
                   variant="outline"
                   className="bg-black/40 text-white border-white/20 backdrop-blur-sm text-xs gap-1"
                 >
                   <Users className="h-3 w-3" /> Multi-Sig
                 </Badge>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Bottom info */}
             <div className="absolute bottom-0 inset-x-0 p-4">

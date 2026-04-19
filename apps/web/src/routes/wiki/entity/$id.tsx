@@ -58,6 +58,8 @@ import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
 import { VoiceProfileCard } from '@/components/VoiceProfileCard';
+import { ReferenceBundleEditor } from '@/components/ReferenceBundleEditor';
+import { CanonStylePackToggle } from '@/components/CanonStylePackToggle';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { Input } from '@/components/ui/input';
 import {
@@ -937,6 +939,13 @@ function EntityPage() {
               </div>
             </CardContent>
           </Card>
+
+          {entity.kind === 'style_pack' && entity.universeAddress && (
+            <CanonStylePackToggle
+              stylePackEntityId={entity.id}
+              universeAddress={entity.universeAddress}
+            />
+          )}
         </div>
 
         {/* Right column — name, description, metadata fields */}
@@ -1051,6 +1060,9 @@ function EntityPage() {
             universeId={entity.universeAddress || null}
             isOwner={isOwner}
           />
+
+          {/* Reference bundle — character identity lock + multi-reference editing */}
+          <ReferenceBundleEditor entityId={id} isOwner={isOwner} />
 
           {/* Relationships */}
           <RelationshipsCard entityId={id} isOwner={isOwner} />

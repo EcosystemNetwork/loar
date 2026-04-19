@@ -50,6 +50,9 @@ import {
   Building2,
   Calendar,
   Package,
+  DollarSign,
+  Palette,
+  GitBranch,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
@@ -245,7 +248,7 @@ export function UniverseSidebar({
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 truncate">
                         {finalUniverse?.name}
                       </h2>
@@ -258,6 +261,11 @@ export function UniverseSidebar({
                           On-Chain
                         </Badge>
                       )}
+                      <UniverseTypeBadge
+                        universeId={finalUniverse?.address || finalUniverse?.id}
+                        initialType={finalUniverse?.universeType}
+                        canEdit={isAdmin}
+                      />
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
                       {finalUniverse?.description}
@@ -508,6 +516,22 @@ export function UniverseSidebar({
                     >
                       <Sparkles className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-cyan-600 dark:text-cyan-400" />
                       Gen Config
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              {/* Lineage & Analytics button */}
+              {isBlockchain && (
+                <div>
+                  <Link to="/universe/$id/lineage" params={{ id: universeIdOrAddress || '' }}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/30 hover:from-violet-100 hover:to-fuchsia-100 dark:hover:from-violet-950/50 dark:hover:to-fuchsia-950/50 border-violet-200 dark:border-violet-800 transition-all duration-300 group/btn h-10"
+                    >
+                      <GitBranch className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-violet-600 dark:text-violet-400" />
+                      Lineage
                     </Button>
                   </Link>
                 </div>
@@ -908,5 +932,79 @@ function WikiEntitiesSection({ universeAddress }: { universeAddress?: string }) 
         </div>
       )}
     </div>
+  );
+}
+
+function UniverseTypeBadge({
+  universeId,
+  initialType,
+  canEdit,
+}: {
+  universeId?: string;
+  initialType?: 'fun' | 'monetized';
+  canEdit: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const enabled = !!universeId;
+
+  const { data } = useQuery({
+    queryKey: ['universe-type', universeId],
+    queryFn: () => trpcClient.universes.getUniverseType.query({ universeId: universeId! }),
+    enabled,
+    initialData: initialType ? { universeType: initialType } : undefined,
+  });
+
+  const [pending, setPending] = useState(false);
+  const universeType = (data?.universeType as 'fun' | 'monetized') || initialType || 'monetized';
+  const isFun = universeType === 'fun';
+
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canEdit || !universeId || pending) return;
+    const next: 'fun' | 'monetized' = isFun ? 'monetized' : 'fun';
+    setPending(true);
+    try {
+      await trpcClient.universes.setUniverseType.mutate({ universeId, universeType: next });
+      queryClient.invalidateQueries({ queryKey: ['universe-type', universeId] });
+      queryClient.invalidateQueries({ queryKey: ['universe-metadata', universeId] });
+      toast.success(`Marked as ${next === 'fun' ? 'Fun' : 'Monetized'}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Failed to update universe type');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const className = `text-xs px-2 py-0.5 ${
+    isFun
+      ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300 border-pink-200 dark:border-pink-800'
+      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+  } ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`;
+
+  return (
+    <Badge
+      variant="secondary"
+      className={className}
+      onClick={canEdit ? handleToggle : undefined}
+      title={
+        canEdit
+          ? `Click to switch to ${isFun ? 'Monetized' : 'Fun'}`
+          : isFun
+            ? 'Sandbox / no monetization'
+            : 'Revenue-bearing universe'
+      }
+    >
+      {isFun ? (
+        <>
+          <Palette className="h-3 w-3 mr-1" />
+          Fun
+        </>
+      ) : (
+        <>
+          <DollarSign className="h-3 w-3 mr-1" />
+          Monetized
+        </>
+      )}
+    </Badge>
   );
 }

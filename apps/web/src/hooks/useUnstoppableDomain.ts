@@ -1,58 +1,46 @@
 /**
  * useUnstoppableDomain — Resolve Unstoppable Domains names and avatars
- * for wallet addresses via the public UD API.
+ * for wallet addresses through our server proxy.
  *
- * Uses the Unstoppable Domains public HTTP API instead of the SDK to avoid
- * bundling node-fetch, js-sha256, and other Node.js dependencies that crash
- * in browser ES module builds (require('crypto') / require('buffer')).
+ * The browser cannot call api.unstoppabledomains.com directly: the endpoint
+ * requires bearer auth and returns no CORS headers. The server route at
+ * /api/ud/reverse/:address holds the API key and exposes a same-origin
+ * lookup the UI can use safely.
  */
 import { useQuery } from '@tanstack/react-query';
 
-const UD_API = 'https://api.unstoppabledomains.com';
+const SERVER_URL =
+  (import.meta.env.VITE_SERVER_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-/** Cache resolved profiles in memory to avoid repeated lookups */
-const profileCache = new Map<string, { name: string | null; avatar: string | null }>();
+interface UDProfile {
+  name: string | null;
+  avatar: string | null;
+}
 
-/**
- * Resolve an Unstoppable Domains reverse record for a wallet address
- * using the public HTTP API (no SDK needed).
- */
-async function resolveUD(address: string): Promise<{ name: string | null; avatar: string | null }> {
+async function resolveUD(address: string): Promise<UDProfile> {
   const key = address.toLowerCase();
-  const cached = profileCache.get(key);
-  if (cached) return cached;
+  if (!ADDRESS_RE.test(key)) return { name: null, avatar: null };
 
   try {
-    const res = await fetch(`${UD_API}/resolve/reverse/${key}`);
-    if (!res.ok) {
-      const result = { name: null, avatar: null };
-      profileCache.set(key, result);
-      return result;
-    }
-
-    const data = await res.json();
-    const name = data?.meta?.domain ?? null;
-    const avatar = data?.records?.['social.picture.value'] ?? null;
-
-    const result = { name, avatar };
-    profileCache.set(key, result);
-    return result;
+    const res = await fetch(`${SERVER_URL}/api/ud/reverse/${key}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) return { name: null, avatar: null };
+    const data = (await res.json()) as Partial<UDProfile>;
+    return { name: data?.name ?? null, avatar: data?.avatar ?? null };
   } catch {
-    const result = { name: null, avatar: null };
-    profileCache.set(key, result);
-    return result;
+    return { name: null, avatar: null };
   }
 }
 
-/**
- * React hook to resolve an Unstoppable Domains name for a wallet address.
- */
 export function useUnstoppableDomain(address: string | undefined) {
   const { data, isLoading } = useQuery({
     queryKey: ['ud-domain', address?.toLowerCase()],
     queryFn: () => resolveUD(address!),
-    enabled: !!address,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!address && ADDRESS_RE.test(address ?? ''),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -64,9 +52,7 @@ export function useUnstoppableDomain(address: string | undefined) {
   };
 }
 
-/**
- * Format a display name — shows UD domain if available, otherwise truncated address.
- */
+/** Format a display name — shows UD domain if available, otherwise truncated address. */
 export function formatDisplayName(
   address: string | undefined,
   udName: string | null | undefined

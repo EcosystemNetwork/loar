@@ -12,20 +12,16 @@
 import { z } from 'zod';
 import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
+import { consumeRateLimit } from '../../middleware/rate-limit';
 
-// ── In-memory rate limiter for public DMCA endpoint ──────────────────────
-// Max 3 takedown requests per email per hour
-const takedownRateMap = new Map<string, number[]>();
-
-function checkTakedownRateLimit(email: string): void {
-  const now = Date.now();
-  const oneHourAgo = now - 60 * 60 * 1000;
-  const timestamps = (takedownRateMap.get(email) || []).filter((t) => t > oneHourAgo);
-  if (timestamps.length >= 3) {
+// Max 3 takedown requests per email per hour. Backed by Redis in prod so the
+// limit survives process restarts and applies across replicas (Railway can
+// scale the server horizontally).
+async function checkTakedownRateLimit(email: string): Promise<void> {
+  const { blocked } = await consumeRateLimit(`takedown:email:${email}`, 60 * 60 * 1000, 3);
+  if (blocked) {
     throw new Error('Rate limit exceeded: max 3 takedown requests per hour');
   }
-  timestamps.push(now);
-  takedownRateMap.set(email, timestamps);
 }
 
 const flagsCol = () => (firebaseAvailable ? db.collection('flags') : null);
@@ -95,7 +91,7 @@ export const moderationRouter = router({
       if (!input.goodFaith) throw new Error('Good faith declaration required');
 
       // Rate limit: max 3 takedown requests per email per hour
-      checkTakedownRateLimit(input.claimantEmail.toLowerCase());
+      await checkTakedownRateLimit(input.claimantEmail.toLowerCase());
 
       // Dedup: prevent same email from filing multiple takedowns for same content
       const existing = await col

@@ -75,6 +75,7 @@ const moreGroups = [
       { to: '/agents', label: 'Agents', beta: true },
       { to: '/adplacements', label: 'Ads', beta: true },
       { to: '/sandbox', label: 'Sandbox', beta: true },
+      { to: '/workflows', label: 'Workflows', beta: true },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },
       { to: '/pricing', label: 'Pricing' },

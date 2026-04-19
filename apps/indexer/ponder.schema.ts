@@ -375,7 +375,7 @@ export const canonSubmission = onchainTable(
     universeId: t.integer().notNull(),
     universeToken: t.hex().notNull(),
     submissionType: t.integer().notNull(), // 0=CHARACTER, 1=PLOT_ARC, 2=LOCATION, 3=LORE_RULE
-    status: t.integer().notNull(), // 0=PENDING, 1=VOTING, 2=ACCEPTED, 3=REJECTED
+    status: t.integer().notNull(), // 0=PENDING, 1=VOTING, 2=ACCEPTED, 3=REJECTED, 4=EXPIRED
     creator: t.hex().notNull(),
     contentHash: t.hex().notNull(),
     metadataURI: t.text().notNull(),

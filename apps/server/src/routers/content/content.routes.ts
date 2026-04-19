@@ -10,6 +10,8 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 import { triggerContentThumbnailAsync } from '../../services/content-cover-image';
+import { recordAssetEventAsync } from '../../services/lineage';
+import type { AssetOutputKind } from '../../services/lineage/types';
 
 const contentCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -55,6 +57,8 @@ const createContentSchema = z.object({
   licensingProof: licensingProofSchema.optional(),
   universeId: z.string().optional(),
   visibility: z.enum(['public', 'private', 'unlisted']).default('public'),
+  /** PRD 10: lineage parent — the generationId / editJobId this was derived from. */
+  sourceGenerationId: z.string().optional(),
 });
 
 const updateContentSchema = z.object({
@@ -124,6 +128,26 @@ export const contentRouter = router({
         creatorUid: ctx.user.uid,
       });
     }
+
+    // PRD 10: publish lineage event.
+    const outputKind: AssetOutputKind = input.mediaType.includes('image') ? 'image' : 'video';
+    recordAssetEventAsync({
+      assetId: ref.id,
+      parentAssetId: input.sourceGenerationId ?? null,
+      kind: 'publish',
+      tool: 'publish',
+      step: 'publish',
+      prompt: input.description || null,
+      promptRefs: [],
+      creditCost: 0,
+      creatorUid: ctx.user.uid,
+      creatorAddress: ctx.user.address ?? null,
+      universeId: input.universeId ?? null,
+      rightsClass: input.classification,
+      outputUrl: input.mediaUrl,
+      outputKind,
+      status: 'completed',
+    });
 
     return { id: ref.id, ...contentData };
   }),

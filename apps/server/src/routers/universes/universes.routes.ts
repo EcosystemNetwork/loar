@@ -12,6 +12,7 @@ import {
   getAllUniverses,
   getUniversesByCreator,
   setUniverseHidden,
+  deleteUniverse,
 } from './universes.handlers';
 import { isUniverseAdmin, getSafeInfo } from '../../lib/safe-admin';
 import { db } from '../../lib/firebase';
@@ -118,6 +119,7 @@ export const universesRouter = router({
         search: z.string().optional(),
         sortBy: z.enum(['newest', 'oldest', 'name']).default('newest'),
         accessModel: z.enum(['open', 'subscription', 'token_gate', 'both']).optional(),
+        universeType: z.enum(['fun', 'monetized']).optional(),
         limit: z.number().min(1).max(50).default(20),
         cursor: z.string().optional(),
       })
@@ -150,6 +152,12 @@ export const universesRouter = router({
       let items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
 
       items = items.filter((u: any) => !u.isHidden);
+
+      // Client-side filter — universeType is stored on a per-doc basis and may be missing
+      // on legacy records, in which case it defaults to 'monetized' (pre-label behavior).
+      if (input.universeType) {
+        items = items.filter((u: any) => (u.universeType || 'monetized') === input.universeType);
+      }
 
       // Client-side search (Firestore doesn't support full-text)
       if (input.search) {
@@ -391,6 +399,27 @@ export const universesRouter = router({
       });
     }),
 
+  /**
+   * Admin-only: permanently delete a universe's Firestore doc. The on-chain
+   * contract remains; gallery content keeps its `universeId` reference but
+   * the universe itself disappears from every listing. Irreversible — prefer
+   * `setHidden` unless the universe needs to be fully removed (abuse, spam).
+   */
+  adminDelete: adminProcedure
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        reason: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return await deleteUniverse(
+        input.universeId,
+        { uid: ctx.user?.uid, address: ctx.user?.address },
+        input.reason
+      );
+    }),
+
   /** Get the access model for a universe (public). */
   getAccessModel: publicProcedure
     .input(z.object({ universeId: z.string() }))
@@ -401,6 +430,100 @@ export const universesRouter = router({
         .get();
       if (!doc.exists) return { accessModel: 'open' };
       return { accessModel: doc.data()?.accessModel || 'open' };
+    }),
+
+  /**
+   * Set the universe label as 'fun' (sandbox / no monetization) or 'monetized'
+   * (revenue-bearing). Admin-only. Pure label for now — does not gate any
+   * commercial transactions.
+   */
+  setUniverseType: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        universeType: z.enum(['fun', 'monetized']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can update the universe type');
+      }
+
+      await db.collection('cinematicUniverses').doc(universeId).update({
+        universeType: input.universeType,
+        updated_at: new Date(),
+      });
+
+      return { ok: true, universeType: input.universeType };
+    }),
+
+  /** Get the universe type label (public). Defaults to 'monetized' for legacy docs. */
+  getUniverseType: publicProcedure
+    .input(z.object({ universeId: z.string() }))
+    .query(async ({ input }) => {
+      const doc = await db
+        .collection('cinematicUniverses')
+        .doc(input.universeId.toLowerCase())
+        .get();
+      if (!doc.exists) return { universeType: 'monetized' as const };
+      return {
+        universeType: (doc.data()?.universeType as 'fun' | 'monetized') || 'monetized',
+      };
+    }),
+
+  /**
+   * Mark a style_pack entity as the universe's official canon style (admin only).
+   * Passing `null` clears the canon designation. The referenced entity is not
+   * verified to be a style_pack here — admins are trusted, and swapping kinds
+   * would just surface as a no-op in the style composer.
+   */
+  setCanonStylePack: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        stylePackEntityId: z.string().min(1).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe admin can set the canon style pack');
+      }
+
+      if (input.stylePackEntityId) {
+        const entityDoc = await db.collection('entities').doc(input.stylePackEntityId).get();
+        if (!entityDoc.exists) {
+          throw new Error('Style pack entity not found');
+        }
+        if (entityDoc.data()?.kind !== 'style_pack') {
+          throw new Error('Selected entity is not a style_pack');
+        }
+      }
+
+      await db.collection('cinematicUniverses').doc(universeId).update({
+        canonStylePackEntityId: input.stylePackEntityId,
+        canonStylePackUpdatedAt: new Date(),
+        canonStylePackUpdatedBy: ctx.user.uid,
+        updated_at: new Date(),
+      });
+
+      return { ok: true, canonStylePackEntityId: input.stylePackEntityId };
+    }),
+
+  /** Public read of the canon style pack entity id for a universe. */
+  getCanonStylePack: publicProcedure
+    .input(z.object({ universeId: z.string() }))
+    .query(async ({ input }) => {
+      const doc = await db
+        .collection('cinematicUniverses')
+        .doc(input.universeId.toLowerCase())
+        .get();
+      if (!doc.exists) return { canonStylePackEntityId: null };
+      return {
+        canonStylePackEntityId:
+          (doc.data()?.canonStylePackEntityId as string | null | undefined) ?? null,
+      };
     }),
 });
 

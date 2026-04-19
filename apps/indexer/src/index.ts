@@ -9,6 +9,7 @@
  * - PoolManager: Uniswap v4 swap events
  */
 import { ponder } from 'ponder:registry';
+import { sql } from 'ponder';
 import {
   universe,
   token,
@@ -137,14 +138,14 @@ ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
   if (resolvedUniverseAddress === '0x0000000000000000000000000000000000000000') {
     try {
       const deployerLower = deployer.toLowerCase();
-      const universes = await context.db.sql`
+      const universes = await context.db.sql.execute(sql`
         SELECT id FROM universe
         WHERE LOWER(creator) = ${deployerLower} AND "tokenAddress" IS NULL
         ORDER BY "createdAt" DESC
         LIMIT 1
-      `;
+      `);
       if (universes.rows.length > 0) {
-        resolvedUniverseAddress = universes.rows[0].id as `0x${string}`;
+        resolvedUniverseAddress = universes.rows[0]!.id as `0x${string}`;
       }
     } catch (err) {
       console.error('SQL fallback for universe resolution also failed:', err);
@@ -209,13 +210,13 @@ ponder.on('UniverseManager:BondingCurveCreated', async ({ event, context }) => {
 ponder.on('UniverseManager:TokenGraduated', async ({ event, context }) => {
   // Find the bonding curve by token address and mark as graduated
   try {
-    const curves = await context.db.sql`
+    const curves = await context.db.sql.execute(sql`
       SELECT id FROM bonding_curve
       WHERE LOWER("tokenAddress") = ${getAddress(event.args.token).toLowerCase()}
       LIMIT 1
-    `;
+    `);
     if (curves.rows.length > 0) {
-      await context.db.update(bondingCurve, { id: curves.rows[0].id as string }).set({
+      await context.db.update(bondingCurve, { id: curves.rows[0]!.id as string }).set({
         graduated: true,
         graduatedAt: Number(event.block.timestamp),
       });
@@ -513,122 +514,247 @@ ponder.on('PoolManager:Swap', async ({ event, context }) => {
 
 // ── CanonMarketplace ──────────────────────────────────────────────────
 
+// Status codes mirror the SubmissionStatus enum in CanonMarketplace.sol:
+// 0=PENDING, 1=VOTING, 2=ACCEPTED, 3=REJECTED, 4=EXPIRED.
 ponder.on('CanonMarketplace:SubmissionCreated', async ({ event, context }) => {
+  const submissionId = event.args.id;
+
+  // SubmissionCreated doesn't carry universeToken/metadataURI/submissionFee/votingDeadline;
+  // read them from the submissions() struct getter.
+  const sub = (await context.client.readContract({
+    abi: context.contracts.CanonMarketplace.abi,
+    address: context.contracts.CanonMarketplace.address as `0x${string}`,
+    functionName: 'submissions',
+    args: [submissionId],
+  })) as readonly [
+    bigint,
+    bigint,
+    `0x${string}`,
+    number,
+    number,
+    `0x${string}`,
+    `0x${string}`,
+    string,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+  ];
+
   await context.db.insert(canonSubmission).values({
-    id: event.args.id.toString(),
+    id: submissionId.toString(),
     universeId: Number(event.args.universeId),
+    universeToken: getAddress(sub[2]),
+    submissionType: Number(event.args.subType),
+    status: 1, // VOTING
     creator: getAddress(event.args.creator),
     contentHash: event.args.contentHash,
-    subType: Number(event.args.subType),
-    status: 'pending',
-    voteFor: 0,
-    voteAgainst: 0,
-    timestamp: Number(event.block.timestamp),
+    metadataURI: sub[7],
+    submissionFee: sub[8].toString(),
+    votesFor: '0',
+    votesAgainst: '0',
+    votingDeadline: Number(sub[11]),
+    createdAt: Number(event.block.timestamp),
   });
 });
 
 ponder.on('CanonMarketplace:VoteCast', async ({ event, context }) => {
-  const submissionId = event.args.submissionId.toString();
+  const submissionIdStr = event.args.submissionId.toString();
   await context.db.insert(canonVote).values({
-    id: `${submissionId}:${getAddress(event.args.voter)}`,
-    submissionId,
+    id: `${submissionIdStr}:${getAddress(event.args.voter)}`,
+    submissionId: Number(event.args.submissionId),
     voter: getAddress(event.args.voter),
     support: event.args.support,
     weight: event.args.weight.toString(),
     timestamp: Number(event.block.timestamp),
   });
+
+  // Keep the aggregate tallies on canonSubmission in sync with per-vote rows.
+  const existing = await context.db.find(canonSubmission, { id: submissionIdStr });
+  if (existing) {
+    const weight = event.args.weight;
+    if (event.args.support) {
+      await context.db
+        .update(canonSubmission, { id: submissionIdStr })
+        .set({ votesFor: (BigInt(existing.votesFor) + weight).toString() });
+    } else {
+      await context.db
+        .update(canonSubmission, { id: submissionIdStr })
+        .set({ votesAgainst: (BigInt(existing.votesAgainst) + weight).toString() });
+    }
+  }
 });
 
 ponder.on('CanonMarketplace:SubmissionAccepted', async ({ event, context }) => {
   await context.db
     .update(canonSubmission, { id: event.args.submissionId.toString() })
-    .set({ status: 'accepted' });
+    .set({ status: 2, finalizedAt: Number(event.block.timestamp) });
 });
 
+// Emitted for both merit-rejection and quorum-expiry paths; indexer can't distinguish
+// without a dedicated event. Both land as status=3 (REJECTED) here.
 ponder.on('CanonMarketplace:SubmissionRejected', async ({ event, context }) => {
   await context.db
     .update(canonSubmission, { id: event.args.submissionId.toString() })
-    .set({ status: 'rejected' });
+    .set({ status: 3, finalizedAt: Number(event.block.timestamp) });
 });
 
 // ── AdPlacement ───────────────────────────────────────────────────────
+// AdSlotCreated doesn't carry episodesRemaining, and SponsorshipActivated
+// doesn't carry totalPaid — read them from the adSlots()/sponsorships()
+// struct getters so the schema's notNull contract holds.
 
 ponder.on('AdPlacement:AdSlotCreated', async ({ event, context }) => {
+  const slotId = event.args.slotId;
+
+  const slot = (await context.client.readContract({
+    abi: context.contracts.AdPlacement.abi,
+    address: context.contracts.AdPlacement.address as `0x${string}`,
+    functionName: 'adSlots',
+    args: [slotId],
+  })) as readonly [bigint, bigint, number, bigint, bigint, `0x${string}`, string, bigint, boolean];
+
   await context.db.insert(adSlot).values({
-    id: event.args.slotId.toString(),
+    id: slotId.toString(),
     universeId: Number(event.args.universeId),
     placementType: Number(event.args.placementType),
     minBid: event.args.minBid.toString(),
+    episodesRemaining: Number(slot[7]),
     active: true,
-    timestamp: Number(event.block.timestamp),
+    createdAt: Number(event.block.timestamp),
   });
 });
 
 ponder.on('AdPlacement:SponsorshipActivated', async ({ event, context }) => {
+  const sponsorshipId = event.args.sponsorshipId;
+
+  const spon = (await context.client.readContract({
+    abi: context.contracts.AdPlacement.abi,
+    address: context.contracts.AdPlacement.address as `0x${string}`,
+    functionName: 'sponsorships',
+    args: [sponsorshipId],
+  })) as readonly [bigint, bigint, `0x${string}`, bigint, bigint, bigint, boolean];
+
   await context.db.insert(sponsorship).values({
-    id: event.args.sponsorshipId.toString(),
-    slotId: event.args.slotId.toString(),
+    id: sponsorshipId.toString(),
+    adSlotId: Number(event.args.slotId),
     sponsor: getAddress(event.args.sponsor),
-    active: true,
+    totalPaid: spon[3].toString(),
     impressions: 0,
-    timestamp: Number(event.block.timestamp),
+    active: true,
+    startedAt: Number(event.block.timestamp),
   });
 });
 
 // ── LicensingRegistry ─────────────────────────────────────────────────
+// License status (integer): 0=PROPOSED, 1=ACTIVE, 2=EXPIRED, 3=REVOKED.
+// licensor + royaltyBps aren't in LicenseCreated — read from licenses() struct.
 
 ponder.on('LicensingRegistry:LicenseCreated', async ({ event, context }) => {
+  const licenseId = event.args.licenseId;
+
+  const lic = (await context.client.readContract({
+    abi: context.contracts.LicensingRegistry.abi,
+    address: context.contracts.LicensingRegistry.address as `0x${string}`,
+    functionName: 'licenses',
+    args: [licenseId],
+  })) as readonly [
+    bigint,
+    bigint,
+    number,
+    number,
+    `0x${string}`,
+    `0x${string}`,
+    bigint,
+    number,
+    bigint,
+    bigint,
+    bigint,
+    string,
+  ];
+
   await context.db.insert(license).values({
-    id: event.args.licenseId.toString(),
+    id: licenseId.toString(),
     universeId: Number(event.args.universeId),
     licenseType: Number(event.args.licenseType),
+    status: 0, // PROPOSED
+    licensor: getAddress(lic[4]),
     licensee: getAddress(event.args.licensee),
     upfrontFee: event.args.upfrontFee.toString(),
-    status: 'pending',
-    timestamp: Number(event.block.timestamp),
+    royaltyBps: Number(lic[7]),
+    createdAt: Number(event.block.timestamp),
   });
 });
 
 ponder.on('LicensingRegistry:LicenseActivated', async ({ event, context }) => {
   await context.db
     .update(license, { id: event.args.licenseId.toString() })
-    .set({ status: 'active' });
+    .set({ status: 1, startTime: Number(event.block.timestamp) });
 });
 
 ponder.on('LicensingRegistry:LicenseRevoked', async ({ event, context }) => {
   await context.db
     .update(license, { id: event.args.licenseId.toString() })
-    .set({ status: 'revoked' });
+    .set({ status: 3, endTime: Number(event.block.timestamp) });
 });
 
 // ── CollabManager ─────────────────────────────────────────────────────
+// Collab status (integer): 0=PROPOSED, 1=ACCEPTED, 2=ACTIVE, 3=COMPLETED, 4=CANCELLED.
+// revenueShareBps isn't in CollabProposed — read from collabs() struct.
 
 ponder.on('CollabManager:CollabProposed', async ({ event, context }) => {
+  const collabId = event.args.collabId;
+
+  const c = (await context.client.readContract({
+    abi: context.contracts.CollabManager.abi,
+    address: context.contracts.CollabManager.address as `0x${string}`,
+    functionName: 'collabs',
+    args: [collabId],
+  })) as readonly [
+    bigint,
+    bigint,
+    bigint,
+    `0x${string}`,
+    `0x${string}`,
+    number,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    string,
+    bigint,
+  ];
+
   await context.db.insert(collab).values({
-    id: event.args.collabId.toString(),
+    id: collabId.toString(),
     universeA: Number(event.args.universeA),
     universeB: Number(event.args.universeB),
     proposer: getAddress(event.args.proposer),
-    status: 'proposed',
+    status: 0, // PROPOSED
+    revenueShareBps: Number(c[6]),
     totalRevenue: '0',
-    timestamp: Number(event.block.timestamp),
+    createdAt: Number(event.block.timestamp),
   });
 });
 
 ponder.on('CollabManager:CollabAccepted', async ({ event, context }) => {
   await context.db
     .update(collab, { id: event.args.collabId.toString() })
-    .set({ status: 'accepted' });
+    .set({ status: 1, acceptor: getAddress(event.args.acceptor) });
 });
 
 ponder.on('CollabManager:CollabCompleted', async ({ event, context }) => {
   await context.db
     .update(collab, { id: event.args.collabId.toString() })
-    .set({ status: 'completed', totalRevenue: event.args.totalRevenue.toString() });
+    .set({
+      status: 3,
+      totalRevenue: event.args.totalRevenue.toString(),
+      endTime: Number(event.block.timestamp),
+    });
 });
 
 ponder.on('CollabManager:CollabCancelled', async ({ event, context }) => {
-  await context.db
-    .update(collab, { id: event.args.collabId.toString() })
-    .set({ status: 'cancelled' });
+  await context.db.update(collab, { id: event.args.collabId.toString() }).set({ status: 4 });
 });

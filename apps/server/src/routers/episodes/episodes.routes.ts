@@ -92,6 +92,8 @@ const EXPORT_PER_CLIP_CREDITS = 1; // per clip in the episode
 
 async function deductCredits(uid: string, credits: number): Promise<void> {
   if (!db) return;
+  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+  await assertGenerationAllowed(uid, credits);
   const ref = db.collection('userCredits').doc(uid);
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
