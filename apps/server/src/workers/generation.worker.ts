@@ -10,6 +10,7 @@
 import { Worker, type Job } from 'bullmq';
 import { QUEUE_NAMES, type GenerationJobData, type GenerationJobResult } from '../lib/queue';
 import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker';
+import { recordAiGeneration } from '../lib/metrics';
 
 // ── Connection ─────────────────────────────────────────────────────────
 
@@ -166,6 +167,8 @@ async function processGeneration(
         completedAt: new Date(),
       });
 
+      recordAiGeneration(model.provider, 'video', 'failure', latencyMs / 1000);
+
       return {
         generationId: data.generationId,
         status: 'failed',
@@ -293,6 +296,8 @@ async function processGeneration(
 
     await job.updateProgress(100);
 
+    recordAiGeneration(model.provider, 'video', 'success', latencyMs / 1000);
+
     return {
       generationId: data.generationId,
       status: 'completed',
@@ -304,7 +309,10 @@ async function processGeneration(
     const latencyMs = Date.now() - startTime;
 
     if (error instanceof CircuitOpenError) {
-      // Don't count circuit-open as a job failure — just requeue with delay
+      // Don't count circuit-open as a job failure — just requeue with delay.
+      // Record the timeout status so Grafana can distinguish provider-unhealthy
+      // retries from real failures.
+      recordAiGeneration(model.provider, 'video', 'timeout', latencyMs / 1000);
       throw error; // BullMQ will retry after backoff
     }
 
@@ -337,6 +345,8 @@ async function processGeneration(
       latencyMs,
       completedAt: new Date(),
     });
+
+    recordAiGeneration(model.provider, 'video', 'failure', latencyMs / 1000);
 
     return {
       generationId: data.generationId,
