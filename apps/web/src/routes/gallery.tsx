@@ -108,8 +108,32 @@ function GalleryPage() {
       <GalleryGrid
         items={browseData?.items || []}
         isLoading={isLoading}
-        emptyMessage="No content yet. Be the first to create something!"
+        emptyMessage={emptyMessageFor(mediaType, originFilter)}
       />
     </div>
   );
+}
+
+/**
+ * MediaType-aware empty state copy. The generic "No content yet" is misleading
+ * when a filter is active — users think the gallery is empty when actually
+ * that media kind just hasn't been generated yet.
+ */
+function emptyMessageFor(mediaType: string, origin: string): string {
+  if (origin === 'uploaded') return 'No uploaded content matches this filter yet.';
+  if (origin === 'generated' && mediaType === 'all') {
+    return 'No AI-generated content yet. Try the studio.';
+  }
+  switch (mediaType) {
+    case '3d':
+      return 'No 3D models yet — generate one from the studio.';
+    case 'audio':
+      return 'No audio yet — try voice synthesis or music generation.';
+    case 'video':
+      return 'No videos yet — try image-to-video in the studio.';
+    case 'image':
+      return 'No images yet — try text-to-image in the studio.';
+    default:
+      return 'No content yet. Be the first to create something!';
+  }
 }

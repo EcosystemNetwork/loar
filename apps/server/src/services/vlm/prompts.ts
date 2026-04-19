@@ -200,6 +200,9 @@ RULES:
 - title: punchy, <80 chars.
 - seoDescription: factual, 1–2 paragraphs, no spoilers beyond premise.
 - previouslyOn: a "previously on..." paragraph as if this were an episode.
+- thumbnailSuggestions: 3–5 candidate frames, ORDERED BEST-FIRST. The first
+  entry MUST be the single strongest hero frame (clear subject, readable at
+  thumbnail size, no motion blur, composed for poster use).
 
 Output JSON with this exact shape:
 {

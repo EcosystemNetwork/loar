@@ -4,8 +4,9 @@ import { useMutation } from '@tanstack/react-query';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
 import { trpc } from '../../utils/trpc';
-import { encodeFunctionData } from 'viem';
+import { encodeFunctionData, isAddress, isHex } from 'viem';
 import { universeAbi } from '@loar/abis/generated';
+import { toast } from 'sonner';
 
 type ProposalTemplate = 'canonize' | 'custom';
 
@@ -23,49 +24,70 @@ export function ProposalCreateDialog({
   const [customTarget, setCustomTarget] = useState('');
   const [customCalldata, setCustomCalldata] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const syncProposal = useMutation(trpc.governance.syncProposal.mutationOptions());
 
   const { governorAddress, universeAddress, tokenAddress } = useUniverseAddresses(universeId);
 
-  const { propose } = useUniverseGovernor(governorAddress);
+  const { propose, isPending, isConfirming } = useUniverseGovernor(governorAddress);
 
   const handleSubmit = async () => {
-    if (!address || !governorAddress || !universeAddress) return;
-    setIsSubmitting(true);
+    setErrorMsg(null);
+    if (!address || !governorAddress || !universeAddress) {
+      setErrorMsg('Wallet or governor not available');
+      return;
+    }
+    if (!description.trim()) {
+      setErrorMsg('Description is required');
+      return;
+    }
+
+    let targets: `0x${string}`[];
+    let values: bigint[];
+    let calldatas: `0x${string}`[];
 
     try {
-      let targets: `0x${string}`[];
-      let values: bigint[];
-      let calldatas: `0x${string}`[];
-
-      if (template === 'canonize' && nodeId) {
+      if (template === 'canonize') {
+        if (!nodeId) throw new Error('Node ID is required');
+        const nodeBig = BigInt(nodeId);
         targets = [universeAddress];
         values = [0n];
         calldatas = [
           encodeFunctionData({
             abi: universeAbi,
             functionName: 'setCanon',
-            args: [BigInt(nodeId)],
+            args: [nodeBig],
           }),
         ];
       } else {
+        if (!isAddress(customTarget)) throw new Error('Target must be a valid 0x address');
+        if (!isHex(customCalldata)) throw new Error('Calldata must be a 0x-prefixed hex string');
         targets = [customTarget as `0x${string}`];
         values = [0n];
         calldatas = [customCalldata as `0x${string}`];
       }
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? 'Invalid input');
+      return;
+    }
 
-      // Submit proposal on-chain (writeContract is fire-and-forget in wagmi v2)
-      // The tx hash is tracked via useWriteContract state, not return value
-      await propose?.({ targets, values, calldatas, description });
+    setIsSubmitting(true);
+    try {
+      const { txHash, proposalId } = await propose({
+        targets,
+        values,
+        calldatas,
+        description,
+      });
 
-      // Sync to Firestore with a generated proposal ID
-      // (actual on-chain proposalId will be synced on tx confirmation)
-      const tempId = `pending_${Date.now()}_${address}`;
+      // Sync to Firestore using the real on-chain proposalId when we can parse it.
+      // Fall back to the tx hash (still unique) when the receipt wasn't available.
+      const syncedId = proposalId !== null ? proposalId.toString() : txHash;
       await syncProposal.mutateAsync({
-        proposalId: tempId,
+        proposalId: syncedId,
         universeId,
-        governorAddress: governorAddress || '',
+        governorAddress,
         tokenAddress: tokenAddress || '',
         description,
         proposer: address,
@@ -77,13 +99,23 @@ export function ProposalCreateDialog({
         endBlock: 0,
       });
 
+      toast.success('Proposal created', {
+        description:
+          proposalId !== null
+            ? `Proposal #${syncedId.slice(0, 10)}…`
+            : `Tx: ${txHash.slice(0, 10)}…`,
+      });
       onClose();
-    } catch (err) {
-      // Error surfaced via UI state
+    } catch (err: any) {
+      const msg = err?.shortMessage || err?.message || 'Proposal submission failed';
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const busy = isSubmitting || isPending || isConfirming;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -170,19 +202,26 @@ export function ProposalCreateDialog({
           </div>
         </div>
 
+        {errorMsg && (
+          <p className="text-xs text-red-400 mt-4" role="alert">
+            {errorMsg}
+          </p>
+        )}
+
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
+            disabled={busy}
+            className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !description}
+            disabled={busy || !description}
             className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg text-sm font-medium transition-colors"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Proposal'}
+            {busy ? 'Submitting...' : 'Submit Proposal'}
           </button>
         </div>
       </div>

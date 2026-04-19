@@ -19,6 +19,7 @@ import type {
 import { buildExtractionPrompt, PROMPT_VERSION } from './prompts';
 import { extractionOutputSchema, type ExtractionOutput } from './schemas';
 import { callJson, mediaPartFromUrl } from './gemini-client';
+import { linkProposalsToCanon } from './entity-linker';
 
 export interface ExtractorArgs {
   input: VlmJobInput;
@@ -136,6 +137,28 @@ export async function runExtraction({
     metadata: e.metadata,
     _rawKind: e.kind,
   }));
+
+  // Auto-link proposals to existing canon entities so downstream reviewers
+  // don't have to manually dedupe. Env-gated; on failure returns empty map
+  // and proposals pass through unlinked.
+  if (process.env.VLM_ENTITY_AUTOLINK === 'true' && input.universeAddress && proposals.length) {
+    const linkMap = await linkProposalsToCanon(
+      proposals.map((p) => ({
+        proposalId: p.proposalId,
+        kind: p.kind,
+        name: p.name,
+        description: p.description,
+      })),
+      input.universeAddress
+    );
+    for (const p of proposals) {
+      const m = linkMap[p.proposalId];
+      if (m) {
+        p.linkedEntityId = m.entityId;
+        p.linkedConfidence = m.confidence;
+      }
+    }
+  }
 
   // Build a lightweight scene index as a side-effect — good enough for text
   // search even without a dedicated index pass. The search worker later

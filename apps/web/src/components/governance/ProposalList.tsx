@@ -55,7 +55,7 @@ export function ProposalList({
 
 function ProposalCard({
   proposal,
-  universeId,
+  universeId: _universeId,
   governorAddress,
 }: {
   proposal: Proposal;
@@ -63,9 +63,25 @@ function ProposalCard({
   governorAddress: `0x${string}` | undefined;
 }) {
   const { address } = useAccount();
-  const { castVote } = useUniverseGovernor(governorAddress);
+  const { castVote, useHasVoted } = useUniverseGovernor(governorAddress);
   const [voting, setVoting] = useState(false);
-  const [voted, setVoted] = useState(false);
+
+  // Proposal IDs created on-chain are uint256. Legacy synced IDs may be tx hashes.
+  // Only attempt on-chain reads/writes when the id is numeric.
+  let proposalIdBig: bigint | null = null;
+  try {
+    if (proposal.proposalId && !proposal.proposalId.startsWith('0x')) {
+      proposalIdBig = BigInt(proposal.proposalId);
+    }
+  } catch {
+    proposalIdBig = null;
+  }
+
+  const { data: hasVotedOnChain } = useHasVoted(
+    proposalIdBig ?? undefined,
+    address as `0x${string}` | undefined
+  );
+  const alreadyVoted = hasVotedOnChain === true;
 
   const forVotes = BigInt(proposal.forVotes || '0');
   const againstVotes = BigInt(proposal.againstVotes || '0');
@@ -73,18 +89,21 @@ function ProposalCard({
   const forPercent = totalVotes > 0n ? Number((forVotes * 100n) / totalVotes) : 0;
 
   const isActive = proposal.state === 'Active';
-  const canVote = isActive && !!address && !!governorAddress && !voted;
+  const canVote =
+    isActive && !!address && !!governorAddress && !alreadyVoted && proposalIdBig !== null;
 
   async function handleVote(support: 0 | 1 | 2) {
-    if (!canVote || !castVote) return;
+    if (!canVote || !proposalIdBig) return;
     setVoting(true);
     try {
-      await castVote({ proposalId: BigInt(proposal.proposalId), support });
-      setVoted(true);
-      toast.success(support === 1 ? 'Voted For' : support === 0 ? 'Voted Against' : 'Abstained');
+      const txHash = await castVote({ proposalId: proposalIdBig, support });
+      toast.success(support === 1 ? 'Voted For' : support === 0 ? 'Voted Against' : 'Abstained', {
+        description: `Tx: ${txHash.slice(0, 10)}…`,
+      });
     } catch (err: any) {
-      if (!err?.message?.includes('rejected')) {
-        toast.error(err?.message ?? 'Vote failed');
+      const msg = err?.shortMessage || err?.message || 'Vote failed';
+      if (!msg.toLowerCase().includes('reject')) {
+        toast.error(msg);
       }
     } finally {
       setVoting(false);
@@ -154,7 +173,12 @@ function ProposalCard({
         </div>
       )}
 
-      {voted && <p className="text-xs text-green-400 mt-2">Vote submitted on-chain</p>}
+      {alreadyVoted && <p className="text-xs text-green-400 mt-2">You already voted on-chain</p>}
+      {isActive && proposalIdBig === null && (
+        <p className="text-xs text-amber-400 mt-2">
+          Pending — this proposal is awaiting on-chain confirmation
+        </p>
+      )}
     </div>
   );
 }

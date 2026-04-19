@@ -4,5 +4,6 @@ packages:
   - 'apps/indexer'
   - 'apps/contracts'
   - 'apps/mcp'
+  - 'apps/mcp-gateway'
   - 'apps/mobile'
   - 'packages/*'

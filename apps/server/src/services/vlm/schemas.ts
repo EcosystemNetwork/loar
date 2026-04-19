@@ -165,6 +165,12 @@ export const recapOutputSchema = z.object({
       })
     )
     .default([]),
+  /**
+   * Derived at parse-time from the best entry in thumbnailSuggestions (the
+   * prompt instructs Gemini to order them best-first). Populated by runRecap
+   * so a single content card can `thumbnailUrl = extractFrame(mediaUrl, selectedThumbnailSec)`.
+   */
+  selectedThumbnailSec: z.number().nonnegative().optional(),
 });
 
 export type RecapOutput = z.infer<typeof recapOutputSchema>;

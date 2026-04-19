@@ -525,20 +525,20 @@
 
 ## P4 — Informational / Cleanup
 
-- AnalyticsRegistry.requestDataExport — event-only, no on-chain follow-through
+- **[x] AnalyticsRegistry.requestDataExport documented** — clarified as intentional event-only signal for off-chain workers; no on-chain follow-through is by design. `AnalyticsRegistry.sol:174-183`.
 - **[x] StoryBounties `*Changed` events** — now emitted from every setter. `StoryBounties.sol:263-306`.
-- `require()` → custom errors (partial)
-- `BondingCurve.buy` low-gas send — document or loosen
-- `CreditManager.initialize` inline generation costs
+- `require()` → custom errors (partial) — deferred; some `require` strings are intentionally human-readable and the gas savings here are marginal vs. test-rewrite cost.
+- **[x] `BondingCurve.buy` low-gas send documented** — added inline rationale explaining the 50_000-gas stipend (tight enough to block reentrancy, large enough for EOA + Safe-style proxy receivers) and the `pendingRefunds` pull-pattern fallback. `BondingCurve.sol:139-156`.
+- `CreditManager.initialize` inline generation costs — kept as deploy-time defaults; updated post-deploy via `setGenerationCost`. Not a bug.
 - **[x] Pragma pinned `=0.8.30`** — 122 files migrated from `^0.8.30` to exact pin; `security.yml` CI now fails if any file drifts.
-- SPDX license mismatches
+- **[x] SPDX license mismatches normalized** — all `test/*.sol` files standardized from `UNLICENSED` to `MIT`, matching `src/*.sol` and `script/*.sol`. CI grep can now assert a single license.
 - **[x] Dead scaffolding removed** — `apps/bridge/`, `apps/contracts-sol/`, `apps/contracts-sui/` no longer present in the monorepo.
-- Trust-model.md references to nonexistent functions
-- `CreditsPurchasedWithLoar` event desync
-- CanonMarketplace tie rejection — no resubmit path
+- **[x] Trust-model.md references audited** — confirmed all referenced UniverseManager functions exist; added missing rows for `setMetadataRenderer`, `lockMetadataRenderer`, `setUniverseFactory`, `setIdentityNft`; added "owner CANNOT replace renderer after lock" guarantee. `docs/trust-model.md`.
+- **[x] `CreditsPurchasedWithLoar` event desync** — verified event payload `(credits, bonus, loarPaid)` matches the corresponding `userCredits` mutations exactly (`pkg.credits` → `totalPurchased`, `pkg.bonusCredits + loarBonus` → `totalBonusReceived`, `loarAmount` → routed via PaymentRouter). `CreditManager.sol:262-266`.
+- CanonMarketplace tie rejection — current behavior (tie → REJECTED) is intentional: canon entry requires affirmative majority. `submit()` has no duplicate-hash guard, so resubmission is already free-form (creator pays new fee).
 - **[x] SIWE `localhost` in prod domains** — `siwe.ts:80-97` filters `localhost` when `NODE_ENV=production` and throws if no other domain remains.
 - **[x] SIWE nonce rate-limit** — `/auth/*` is capped at 20 req/min in `index.ts:82`.
-- Token revocation memory-only
+- **[x] Token revocation persisted** — `revokeToken`/`isTokenRevoked` use Firestore `revokedTokens` collection in production; in-memory `Map` with bounded LRU eviction is the dev-only fallback when Firebase is unavailable. `siwe.ts:297-341`.
 - **[x] Firestore rules `request.auth` removed** — LOAR uses SIWE JWT not Firebase Auth, so `request.auth` was always null from the client SDK. Dead branches removed; user-scoped collections explicitly deny client reads and must go through SIWE-gated tRPC. `firestore.rules`.
 - **[x] Payment verifiers reject stale tx** — `MAX_TX_AGE_SECONDS = 24h` check in `verifyEthPayment` and `verifyLoarPayment`. Amplifies PAY-01 by shrinking the replay window around a leaked tx hash. `credits.routes.ts:36-39, :156-171, :242-256`.
 
@@ -657,9 +657,9 @@ Independent fresh pass after the sixth-pass sign-off surfaced six new issues. Al
 | P1 — High          |      31 |     27 |       1 |           1 |           2 |
 | P2 — Significant   |      25 |     24 |       0 |           0 |           1 |
 | P3 — Operational   |      26 |     20 |       0 |           3 |           3 |
-| P4 — Informational |      20 |      8 |       0 |           0 |          12 |
-| **Total**          | **117** | **93** |   **1** |       **5** |      **18** |
+| P4 — Informational |      20 |     14 |       0 |           0 |           6 |
+| **Total**          | **117** | **99** |   **1** |       **5** |      **12** |
 
-**Verdict**: Seventh pass surfaced and fixed 6 new contract findings (RIGHTS-03, SUB-04, AD-03, CREDIT-06, CANON-07, GOV-08) plus 4 server hardening items (gallery orphan authz, universe-hidden audit log, episode job DoS caps, indexer RPC fallback). Remaining items unchanged: BURN-01 rename upgrade, legal text (LEGAL-01/02/03), INFRA-02 rotation, AD-02 oracle, BondingCurve low-gas-send doc, and the external audit passes.
+**Verdict**: Seventh pass surfaced and fixed 6 new contract findings (RIGHTS-03, SUB-04, AD-03, CREDIT-06, CANON-07, GOV-08) plus 4 server hardening items (gallery orphan authz, universe-hidden audit log, episode job DoS caps, indexer RPC fallback). P4 cleanup pass (2026-04-19) closed 6 informational items: SPDX normalization across `test/*.sol`, BondingCurve refund-rationale doc, AnalyticsRegistry export-event doc, trust-model admin-table completeness, CreditsPurchasedWithLoar event/state alignment verification, token-revocation persistence verification. Remaining items: BURN-01 rename upgrade, legal text (LEGAL-01/02/03), INFRA-02 rotation, AD-02 oracle, and the external audit passes.
 
 _Last updated: 2026-04-18 (seventh pass — operator pre-claim block, tier-upgrade prorate, grief-bid lockout fix, cumulative grant cap, snapshot underflow clamp, canonical symbol enforcement, server DoS caps)_

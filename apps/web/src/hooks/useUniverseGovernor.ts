@@ -1,7 +1,7 @@
-import { useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
+import { useWaitForTransactionReceipt, useReadContract, useChainId, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeGovernorAbi } from '@loar/abis/generated';
-import { encodeAbiParameters } from 'viem';
+import { decodeEventLog, encodeAbiParameters } from 'viem';
 import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';
 
 /**
@@ -13,102 +13,144 @@ import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';
  */
 export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) {
   const chainId = useChainId();
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const publicClient = usePublicClient();
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   /**
-   * Create a new governance proposal
-   * @param targets - Array of target contract addresses
-   * @param values - Array of ETH values to send
-   * @param calldatas - Array of encoded function calls
-   * @param description - Proposal description (used for proposal ID)
+   * Create a new governance proposal. Waits for the tx receipt and parses the
+   * ProposalCreated event to return the real on-chain `proposalId`.
    */
   const propose = async (params: {
     targets: `0x${string}`[];
     values: bigint[];
     calldatas: `0x${string}`[];
     description: string;
-  }) => {
+  }): Promise<{ txHash: `0x${string}`; proposalId: bigint | null }> => {
     if (!governorAddress) {
       throw new Error('Governor address is required');
     }
 
-    writeContract({
+    const txHash = await writeContractAsync({
       address: governorAddress,
       abi: universeGovernorAbi,
       functionName: 'propose',
       args: [params.targets, params.values, params.calldatas, params.description],
       chainId,
     });
+
+    let proposalId: bigint | null = null;
+    if (publicClient) {
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        for (const log of receipt.logs) {
+          if (log.address.toLowerCase() !== governorAddress.toLowerCase()) continue;
+          try {
+            const decoded = decodeEventLog({
+              abi: universeGovernorAbi,
+              data: log.data,
+              topics: log.topics,
+            });
+            if (decoded.eventName === 'ProposalCreated') {
+              const args = decoded.args as { proposalId?: bigint } | readonly unknown[];
+              proposalId =
+                'proposalId' in args && typeof args.proposalId === 'bigint'
+                  ? args.proposalId
+                  : ((args as readonly unknown[])[0] as bigint);
+              break;
+            }
+          } catch {
+            /* unrelated log */
+          }
+        }
+      } catch {
+        /* receipt fetch failed — caller can sync later */
+      }
+    }
+
+    return { txHash, proposalId };
   };
 
   /**
-   * Cast a vote on a proposal
-   * @param proposalId - The proposal ID
-   * @param support - 0 = Against, 1 = For, 2 = Abstain
+   * Cast a vote on a proposal. Awaits tx confirmation.
+   * @param support 0 = Against, 1 = For, 2 = Abstain
    */
-  const castVote = async (params: { proposalId: bigint; support: 0 | 1 | 2 }) => {
+  const castVote = async (params: {
+    proposalId: bigint;
+    support: 0 | 1 | 2;
+  }): Promise<`0x${string}`> => {
     if (!governorAddress) {
       throw new Error('Governor address is required');
     }
 
-    writeContract({
+    const txHash = await writeContractAsync({
       address: governorAddress,
       abi: universeGovernorAbi,
       functionName: 'castVote',
       args: [params.proposalId, params.support],
       chainId,
     });
+
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+    }
+
+    return txHash;
   };
 
   /**
-   * Cast a vote with a reason
-   * @param proposalId - The proposal ID
-   * @param support - 0 = Against, 1 = For, 2 = Abstain
-   * @param reason - Reason for the vote
+   * Cast a vote with a reason. Awaits tx confirmation.
    */
   const castVoteWithReason = async (params: {
     proposalId: bigint;
     support: 0 | 1 | 2;
     reason: string;
-  }) => {
+  }): Promise<`0x${string}`> => {
     if (!governorAddress) {
       throw new Error('Governor address is required');
     }
 
-    writeContract({
+    const txHash = await writeContractAsync({
       address: governorAddress,
       abi: universeGovernorAbi,
       functionName: 'castVoteWithReason',
       args: [params.proposalId, params.support, params.reason],
       chainId,
     });
+
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+    }
+
+    return txHash;
   };
 
   /**
-   * Execute a proposal that has passed
-   * @param targets - Array of target contract addresses
-   * @param values - Array of ETH values to send
-   * @param calldatas - Array of encoded function calls
-   * @param descriptionHash - Keccak256 hash of the description
+   * Execute a proposal that has passed (post-timelock).
    */
   const execute = async (params: {
     targets: `0x${string}`[];
     values: bigint[];
     calldatas: `0x${string}`[];
     descriptionHash: `0x${string}`;
-  }) => {
+  }): Promise<`0x${string}`> => {
     if (!governorAddress) {
       throw new Error('Governor address is required');
     }
 
-    writeContract({
+    const txHash = await writeContractAsync({
       address: governorAddress,
       abi: universeGovernorAbi,
       functionName: 'execute',
       args: [params.targets, params.values, params.calldatas, params.descriptionHash],
       chainId,
     });
+
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+    }
+
+    return txHash;
   };
 
   /**

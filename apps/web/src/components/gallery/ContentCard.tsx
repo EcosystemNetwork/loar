@@ -181,7 +181,17 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
             className={`absolute top-2 left-2 text-xs gap-1 ${isAIGenerated ? 'bg-violet-500/80 text-white border-violet-400/50' : ''}`}
           >
             {isAIGenerated ? <Sparkles className="h-3 w-3" /> : <Upload className="h-3 w-3" />}
-            {isVideo ? 'Video' : is3D ? '3D' : isAudio ? 'Audio' : 'Image'}
+            {isVideo
+              ? isAIGenerated
+                ? 'AI Video'
+                : 'Video'
+              : is3D
+                ? '3D'
+                : isAudio
+                  ? 'Audio'
+                  : isAIGenerated
+                    ? 'AI Image'
+                    : 'Image'}
           </Badge>
         )}
         {/* Rights classification badge — `original` is the default and implied,

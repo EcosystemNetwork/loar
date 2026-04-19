@@ -56,7 +56,11 @@ export function GalleryGrid({
           />
         ))}
       </div>
-      <MediaLightbox content={lightboxItem} onClose={() => setLightboxItem(null)} />
+      <MediaLightbox
+        content={lightboxItem}
+        onClose={() => setLightboxItem(null)}
+        onNavigate={(item) => setLightboxItem(item)}
+      />
     </>
   );
 }

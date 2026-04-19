@@ -137,14 +137,17 @@ export const galleryRouter = router({
         query = query.where('mediaType', 'in', finalTypes);
       }
 
-      // Sorting
+      // Sorting — always tiebreak on __name__ so cursor pagination is stable
+      // even when two docs share a sort value (same createdAt or views).
+      // Without the tiebreaker, startAfter(cursorDoc) can duplicate or skip
+      // items once a filter changes between pages.
       switch (input.sortBy) {
         case 'trending':
-          query = query.orderBy('views', 'desc');
+          query = query.orderBy('views', 'desc').orderBy('__name__', 'desc');
           break;
         case 'newest':
         default:
-          query = query.orderBy('createdAt', 'desc');
+          query = query.orderBy('createdAt', 'desc').orderBy('__name__', 'desc');
           break;
       }
 
@@ -218,6 +221,61 @@ export const galleryRouter = router({
       return snapshot.docs
         .filter((d) => isVisible(d.data().contentStatus))
         .map(serializeGalleryItem);
+    }),
+
+  /**
+   * Get the lineage neighborhood for a single content doc:
+   *   - `parent`: the one content doc this was derived from, if any
+   *   - `derivatives`: content docs that list this one as their parent
+   *
+   * Lives on the public gallery router because the detail view needs it for
+   * any visitor, not just the creator. Moderated content is filtered out of
+   * the response on both sides so hidden/removed items never surface via the
+   * family tree.
+   */
+  lineage: publicProcedure
+    .input(
+      z.object({
+        contentId: z.string().min(1),
+        derivativeLimit: z.number().int().min(1).max(20).default(12),
+      })
+    )
+    .query(async ({ input }) => {
+      const rootDoc = await contentCol().doc(input.contentId).get();
+      if (!rootDoc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Content not found' });
+      }
+      const root = rootDoc.data()!;
+
+      let parent: ReturnType<typeof serializeGalleryItem> | null = null;
+      const parentGenId: string | undefined = root.parentGenerationId;
+      if (parentGenId) {
+        const parentSnap = await contentCol()
+          .where('generationId', '==', parentGenId)
+          .limit(1)
+          .get();
+        const parentDoc = parentSnap.docs[0];
+        if (parentDoc && isVisible(parentDoc.data().contentStatus)) {
+          parent = serializeGalleryItem(parentDoc);
+        }
+      }
+
+      // Derivatives = docs whose parentGenerationId points at this content's
+      // generationId. The unique field is generationId, not the content doc id.
+      let derivatives: ReturnType<typeof serializeGalleryItem>[] = [];
+      const rootGenId: string | undefined = root.generationId;
+      if (rootGenId) {
+        const derivSnap = await contentCol()
+          .where('parentGenerationId', '==', rootGenId)
+          .orderBy('createdAt', 'desc')
+          .limit(input.derivativeLimit)
+          .get();
+        derivatives = derivSnap.docs
+          .filter((d) => isVisible(d.data().contentStatus))
+          .map(serializeGalleryItem);
+      }
+
+      return { parent, derivatives };
     }),
 
   /** Get admin-curated featured content for a universe */

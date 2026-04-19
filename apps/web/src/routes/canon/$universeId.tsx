@@ -58,7 +58,8 @@ import { useUniverseAddresses } from '@/hooks/useUniverseAddresses';
 import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useReadContract, useWriteContract, useChainId, usePublicClient } from 'wagmi';
+import { useReadContract, useChainId, usePublicClient } from 'wagmi';
+import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { canonMarketplaceAbi, governanceErc20Abi } from '@loar/abis/generated';
 import { CanonMarketplace } from '@loar/abis/addresses';
 import { formatEther, parseEther } from 'viem';
@@ -203,7 +204,15 @@ function SubmissionCard({
   tokenAddress?: `0x${string}`;
 }) {
   const vote = useVoteCanon();
+  const finalizeSrv = useFinalizeCanon();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
+  const canonAddress = CanonMarketplace[String(chainId) as keyof typeof CanonMarketplace] as
+    | `0x${string}`
+    | undefined;
   const [voted, setVoted] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
 
   // Read governance token balance for weighted voting
   const { data: tokenBalance } = useReadContract({
@@ -222,9 +231,11 @@ function SubmissionCard({
   const deadline =
     submission.votingDeadline?.toDate?.() ??
     (submission.votingDeadline ? new Date(submission.votingDeadline) : null);
+  const deadlinePassed = deadline ? Date.now() >= deadline.getTime() : false;
   const daysLeft = deadline
     ? Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / 86_400_000))
     : null;
+  const onChainSubmissionId: string | null = submission.onChainSubmissionId ?? null;
 
   async function castVote(support: boolean) {
     if (!isConnected) {
@@ -242,6 +253,38 @@ function SubmissionCard({
       toast.success(support ? 'Voted for!' : 'Voted against');
     } catch (e: any) {
       toast.error(e?.message ?? 'Vote failed');
+    }
+  }
+
+  async function finalize() {
+    if (!isConnected) {
+      toast.error('Connect your wallet to finalize');
+      return;
+    }
+    setFinalizing(true);
+    try {
+      let txHash: string | undefined;
+      // On-chain finalize when the submission has an on-chain ID.
+      if (onChainSubmissionId && canonAddress) {
+        const hash = await writeContractAsync({
+          address: canonAddress,
+          abi: canonMarketplaceAbi,
+          functionName: 'finalize',
+          args: [BigInt(onChainSubmissionId)],
+        });
+        txHash = hash;
+        if (publicClient) {
+          await publicClient.waitForTransactionReceipt({ hash });
+        }
+      }
+      const res = await finalizeSrv.mutateAsync({ submissionId: submission.id, txHash });
+      toast.success(res.accepted ? 'Accepted into canon!' : 'Submission rejected', {
+        description: txHash ? `On-chain tx: ${txHash.slice(0, 10)}…` : undefined,
+      });
+    } catch (e: any) {
+      toast.error(e?.shortMessage || e?.message || 'Finalize failed');
+    } finally {
+      setFinalizing(false);
     }
   }
 
@@ -291,7 +334,7 @@ function SubmissionCard({
             size="sm"
             variant={voted ? 'secondary' : 'outline'}
             className="flex-1 gap-1 text-xs h-8"
-            disabled={voted || vote.isPending}
+            disabled={voted || vote.isPending || deadlinePassed}
             onClick={() => castVote(true)}
           >
             <ThumbsUp className="w-3 h-3" />
@@ -301,13 +344,43 @@ function SubmissionCard({
             size="sm"
             variant={voted ? 'secondary' : 'outline'}
             className="flex-1 gap-1 text-xs h-8"
-            disabled={voted || vote.isPending}
+            disabled={voted || vote.isPending || deadlinePassed}
             onClick={() => castVote(false)}
           >
             <ThumbsDown className="w-3 h-3" />
             Against ({submission.votesAgainst ?? 0})
           </Button>
         </div>
+
+        {/* Finalize — anyone can call once the voting deadline has passed.
+            If the submission has an on-chain id, we call CanonMarketplace.finalize()
+            on-chain first, then mirror the result in Firestore. */}
+        {deadlinePassed && (
+          <div className="mt-3 pt-3 border-t space-y-2">
+            <Button
+              size="sm"
+              variant="default"
+              className="w-full gap-1 text-xs h-8"
+              disabled={finalizing || finalizeSrv.isPending}
+              onClick={finalize}
+            >
+              {finalizing || finalizeSrv.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-3 h-3" />
+              )}
+              Finalize voting
+              {onChainSubmissionId && canonAddress && (
+                <span className="ml-1 opacity-70">(on-chain)</span>
+              )}
+            </Button>
+            {!onChainSubmissionId && (
+              <p className="text-[10px] text-muted-foreground">
+                Off-chain submission — Firestore-only finalize.
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -316,6 +389,9 @@ function SubmissionCard({
 // ---- Accepted canon card ----
 
 function CanonCard({ entry }: { entry: any }) {
+  const [licenseOpen, setLicenseOpen] = useState(false);
+  const { isConnected } = useWalletAuth();
+
   return (
     <Card className="border-green-500/20">
       <CardContent className="p-4">
@@ -354,8 +430,144 @@ function CanonCard({ entry }: { entry: any }) {
             </p>
           </div>
         )}
+
+        <div className="mt-3 pt-3 border-t">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full gap-1 text-xs h-8"
+            disabled={!isConnected}
+            onClick={() => setLicenseOpen(true)}
+          >
+            <FileCheck className="w-3 h-3" />
+            {isConnected ? 'License this canon' : 'Connect wallet to license'}
+          </Button>
+        </div>
       </CardContent>
+      {licenseOpen && (
+        <LicenseCanonDialog entry={entry} open={licenseOpen} onOpenChange={setLicenseOpen} />
+      )}
     </Card>
+  );
+}
+
+// ---- License canon dialog (on-chain payable + tRPC record) ----
+
+function LicenseCanonDialog({
+  entry,
+  open,
+  onOpenChange,
+}: {
+  entry: any;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [ethAmount, setEthAmount] = useState('0.01');
+  const [submitting, setSubmitting] = useState(false);
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const chainId = useChainId();
+  const licenseSrv = useLicenseCanon();
+  const canonAddress = CanonMarketplace[String(chainId) as keyof typeof CanonMarketplace] as
+    | `0x${string}`
+    | undefined;
+  const onChainSubmissionId: string | null = entry.onChainSubmissionId ?? null;
+
+  async function handleLicense() {
+    if (!onChainSubmissionId) {
+      toast.error('This canon entry has no on-chain submission id — cannot license on-chain.');
+      return;
+    }
+    if (!canonAddress) {
+      toast.error('CanonMarketplace is not deployed on the current network.');
+      return;
+    }
+    let parsedValue: bigint;
+    try {
+      parsedValue = parseEther(ethAmount || '0');
+    } catch {
+      toast.error('Enter a valid ETH amount.');
+      return;
+    }
+    if (parsedValue <= 0n) {
+      toast.error('License fee must be greater than zero.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const hash = await writeContractAsync({
+        address: canonAddress,
+        abi: canonMarketplaceAbi,
+        functionName: 'licenseCanon',
+        args: [BigInt(onChainSubmissionId)],
+        value: parsedValue,
+      });
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
+      await licenseSrv.mutateAsync({
+        submissionId: entry.id,
+        fee: parsedValue.toString(),
+        txHash: hash,
+      });
+      toast.success('Canon licensed!', {
+        description: `Tx: ${hash.slice(0, 10)}…`,
+      });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.shortMessage || e?.message || 'License failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>License canon</DialogTitle>
+          <DialogDescription>
+            Pay ETH to license <span className="font-medium">{entry.title}</span>. The fee is routed
+            to the creator via PaymentRouter; a protocol cut is taken per{' '}
+            <code className="text-xs">canonLicenseFeeBps</code>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1">
+            <Label htmlFor="license-eth">License fee (ETH)</Label>
+            <Input
+              id="license-eth"
+              type="number"
+              step="0.001"
+              min="0"
+              value={ethAmount}
+              onChange={(e) => setEthAmount(e.target.value)}
+              disabled={submitting}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              The amount is up to you — higher fees strengthen your rights claim.
+            </p>
+          </div>
+          {!onChainSubmissionId && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              This legacy entry has no on-chain submission id. On-chain licensing is disabled.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleLicense}
+            disabled={submitting || !onChainSubmissionId || !canonAddress}
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+            License
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

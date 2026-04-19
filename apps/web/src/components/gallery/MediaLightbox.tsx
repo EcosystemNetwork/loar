@@ -3,9 +3,10 @@
  * Click a gallery card to pop it out into this immersive viewer.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { X, Download, Heart, Eye } from 'lucide-react';
+import { X, Download, Heart, Eye, GitBranch, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useGalleryLineage } from '@/hooks/useGallery';
 
 interface MediaLightboxProps {
   content: {
@@ -19,17 +20,31 @@ interface MediaLightboxProps {
     creatorAddress?: string;
     views?: number;
     likes?: number;
+    parentGenerationId?: string | null;
+    sourceImageUrl?: string | null;
   } | null;
   onClose: () => void;
+  /** Called when the user clicks a lineage tile to jump to another content
+   *  doc. The item is passed in full (shape matches the lineage DTO) so the
+   *  grid can swap to items that aren't on the currently loaded page. */
+  onNavigate?: (item: NonNullable<MediaLightboxProps['content']>) => void;
 }
 
-export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
+export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxProps) {
   const [loaded, setLoaded] = useState(false);
   const isVideo = content?.mediaType === 'video' || content?.mediaType === 'ai-video';
   // Prefer the full-quality source; fall back to thumbnail so images always display
   const videoSrc = content?.mediaUrl;
   const imageSrc = content?.mediaUrl || content?.imageUrl || content?.thumbnailUrl;
   const mediaSrc = isVideo ? videoSrc : imageSrc;
+
+  // Lineage — only fetched when a node is open and likely has a family tree
+  // (parent ref or source image set). Avoids a flood of requests for the
+  // common case where most gallery items are leaf nodes.
+  const lineageEnabled = Boolean(content && (content.parentGenerationId || content.sourceImageUrl));
+  const { data: lineage } = useGalleryLineage(lineageEnabled ? content?.id : undefined);
+  const hasDerivatives = (lineage?.derivatives?.length ?? 0) > 0;
+  const hasLineagePanel = lineageEnabled || hasDerivatives || Boolean(content?.sourceImageUrl);
 
   // Reset loaded state when content changes
   useEffect(() => {
@@ -148,6 +163,89 @@ export function MediaLightbox({ content, onClose }: MediaLightboxProps) {
             )}
           </div>
         </div>
+
+        {/* Lineage / family tree */}
+        {hasLineagePanel && (
+          <div className="mt-4 w-full max-w-2xl text-white space-y-3 border-t border-white/10 pt-3">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-white/40">
+              <GitBranch className="h-3 w-3" />
+              Lineage
+            </div>
+
+            {/* Parent — either a prior gallery item or just a raw source image. */}
+            {(lineage?.parent || content?.sourceImageUrl) && (
+              <div>
+                <div className="text-xs text-white/50 mb-1">Derived from</div>
+                {lineage?.parent ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.(lineage.parent!)}
+                    className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg p-2 w-full text-left transition-colors"
+                  >
+                    <img
+                      src={
+                        lineage.parent.thumbnailUrl || lineage.parent.mediaUrl || '/placeholder.jpg'
+                      }
+                      alt={lineage.parent.title}
+                      className="w-16 h-10 object-cover rounded"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm truncate">{lineage.parent.title}</div>
+                      <div className="text-xs text-white/50 truncate">
+                        {lineage.parent.mediaType}
+                      </div>
+                    </div>
+                    <ArrowUpRight className="h-4 w-4 text-white/40 flex-shrink-0" />
+                  </button>
+                ) : content?.sourceImageUrl ? (
+                  <a
+                    href={content.sourceImageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg p-2 transition-colors"
+                  >
+                    <img
+                      src={content.sourceImageUrl}
+                      alt="Source image"
+                      className="w-16 h-10 object-cover rounded"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm">Source image</div>
+                      <div className="text-xs text-white/50 truncate">Uploaded reference</div>
+                    </div>
+                    <ArrowUpRight className="h-4 w-4 text-white/40 flex-shrink-0" />
+                  </a>
+                ) : null}
+              </div>
+            )}
+
+            {/* Derivatives grid */}
+            {hasDerivatives && (
+              <div>
+                <div className="text-xs text-white/50 mb-1">
+                  Used as source by {lineage!.derivatives.length}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {lineage!.derivatives.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => onNavigate?.(d)}
+                      className="relative aspect-square overflow-hidden rounded bg-white/5 hover:ring-2 hover:ring-white/40 transition-all"
+                      title={d.title}
+                    >
+                      <img
+                        src={d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg'}
+                        alt={d.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

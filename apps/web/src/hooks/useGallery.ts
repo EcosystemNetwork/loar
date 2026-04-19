@@ -58,6 +58,22 @@ export function useSetFeatured() {
   });
 }
 
+/**
+ * Lineage neighborhood — parent (derived-from) and derivatives for a content
+ * doc. Scoped to a single id so we fetch on-demand when the lightbox opens.
+ */
+export function useGalleryLineage(contentId: string | undefined, derivativeLimit = 12) {
+  return useQuery({
+    queryKey: ['gallery', 'lineage', contentId, derivativeLimit],
+    queryFn: () =>
+      contentId
+        ? trpcClient.gallery.lineage.query({ contentId, derivativeLimit })
+        : { parent: null, derivatives: [] },
+    enabled: !!contentId,
+    staleTime: GALLERY_STALE_TIME,
+  });
+}
+
 /** Get a creator's portfolio */
 export function useCreatorPortfolio(creatorUid: string | undefined, limit?: number) {
   return useQuery({

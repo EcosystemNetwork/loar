@@ -138,12 +138,22 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
 
         IERC20(token).safeTransfer(msg.sender, tokensBought);
 
-        // Refund excess ETH (H1 fix: gas-limited call + pull pattern fallback)
+        // Refund excess ETH. Gas-bounded push, pull-pattern fallback.
+        //
+        // The 50_000-gas stipend is enough for an EOA receive (2_300 base + room
+        // for 1-2 SSTOREs in a Safe-style proxy), but intentionally too tight for
+        // a buyer contract to do meaningful work (and certainly insufficient to
+        // re-enter `buy`). Tightness is the safety property — do not raise it
+        // without auditing every contract that may receive a refund.
+        //
+        // If the bounded send fails (out-of-gas, revert, contract that needs
+        // more than 50k to accept ETH), the refund is moved to `pendingRefunds`
+        // and the buyer claims it via `claimRefund()`. This avoids reverting the
+        // whole purchase on a recipient that mishandles ETH receipt.
         uint256 refund = msg.value - actualCost;
         if (refund > 0) {
             (bool sent,) = msg.sender.call{value: refund, gas: 50000}("");
             if (!sent) {
-                // Store for later withdrawal instead of reverting
                 pendingRefunds[msg.sender] += refund;
                 totalPendingRefunds += refund;
                 emit RefundPending(msg.sender, refund);

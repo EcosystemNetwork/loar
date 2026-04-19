@@ -80,6 +80,13 @@ export interface ExtractedEntityProposal {
   firstSeenAtSec?: number;
   evidenceSceneIndexes: number[];
   metadata?: Record<string, string>;
+  /**
+   * Populated by the post-extraction entity-linker: id of an existing
+   * canon entity this proposal resolves to, plus the linker's confidence
+   * (0.6–1.0). Absent when the proposal is judged to be a new entity.
+   */
+  linkedEntityId?: string;
+  linkedConfidence?: number;
 }
 
 export interface ExtractedRelationship {

@@ -171,7 +171,13 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         emit TrendingUpdated(universeIds);
     }
 
-    /// @notice Request data export (emits event for off-chain processing)
+    /// @notice Request a data export for a universe.
+    /// @dev Intentionally event-only: the on-chain contract has no concept of an "export";
+    ///      it just emits a signal that an off-chain worker (indexer, analytics pipeline)
+    ///      observes and fulfills out-of-band (e.g. by writing a CSV/Parquet to object
+    ///      storage and notifying the requester). There is no on-chain follow-through —
+    ///      callers should not expect any state mutation here. Permissionless by design:
+    ///      anyone willing to pay the gas can request a snapshot of public on-chain data.
     function requestDataExport(uint256 universeId) external whenNotPaused {
         emit DataExportRequested(msg.sender, universeId, block.timestamp);
     }

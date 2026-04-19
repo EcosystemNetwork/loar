@@ -45,6 +45,13 @@ export async function runRecap(input: RecapArgs): Promise<{
     label: 'recap',
   });
 
+  // Best-first ordering is enforced in the prompt, so index 0 is the hero frame.
+  // Images have no meaningful timestamp — suppress selection so consumers
+  // don't try to seek a still image.
+  if (input.assetType === 'video' && data.thumbnailSuggestions.length > 0) {
+    data.selectedThumbnailSec = data.thumbnailSuggestions[0].startSec;
+  }
+
   // Persist a lightweight record for reuse on the content card.
   if (firebaseAvailable && input.extraction?.contentId) {
     await db
@@ -57,6 +64,8 @@ export async function runRecap(input: RecapArgs): Promise<{
             seoDescription: data.seoDescription,
             chapters: data.chapters,
             previouslyOn: data.previouslyOn,
+            thumbnailSuggestions: data.thumbnailSuggestions,
+            selectedThumbnailSec: data.selectedThumbnailSec ?? null,
             updatedAt: new Date(),
           },
         },
