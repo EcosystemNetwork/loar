@@ -99,6 +99,18 @@ The server starts without these keys but AI features will throw errors when call
 
 When `REDIS_URL` is not set, the server uses an in-memory rate limiter (suitable for single-process deployments).
 
+### Observability (Optional)
+
+| Variable             | App    | Description                                                                                                                 |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `SENTRY_DSN`         | server | Sentry DSN for server-side error reporting. When unset, Sentry is inert.                                                    |
+| `VITE_SENTRY_DSN`    | web    | Public Sentry DSN for the web bundle. Safe to expose — DSNs are project-scoped write-only keys.                             |
+| `VITE_RELEASE`       | web    | Release identifier (typically a git SHA) injected at build time so Sentry groups errors by deployed version.                |
+| `LOG_LEVEL`          | server | pino log level: `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal`. Defaults: `debug` dev, `info` prod.           |
+| `METRICS_AUTH_TOKEN` | server | Bearer token required on `GET /metrics`. When unset, the endpoint is open — deploy on a private network or proxy allowlist. |
+
+The `/metrics` endpoint emits Prometheus exposition-format text and is intended to be scraped every 15–60s. It bypasses the global rate limit. In addition to the default Node process metrics (prefix `loar_`), the server exports counters for HTTP requests, AI generations, storage uploads, credits transactions, and auth events, plus live gauges for queue depth and circuit breaker state.
+
 ### Blockchain
 
 | Variable           | App     | Required | Description                                                      |

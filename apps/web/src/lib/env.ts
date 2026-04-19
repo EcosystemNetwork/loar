@@ -9,13 +9,21 @@ import { z } from 'zod';
 /** Coerces empty strings to undefined so `.optional()` correctly skips unset Vite env vars */
 const optionalString = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
 
-const optionalAddress = z.preprocess(
-  (v) => (v === '' ? undefined : v),
-  z
-    .string()
-    .regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid Ethereum address')
-    .optional()
-);
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+/**
+ * Drops empty strings and placeholder values (e.g. "0x...") to undefined
+ * so an unfilled `.env.example` entry does not surface as a validation error.
+ */
+const optionalAddress = z.preprocess((v) => {
+  if (typeof v !== 'string' || v === '') return undefined;
+  if (!ADDRESS_RE.test(v)) {
+    if (typeof console !== 'undefined') {
+      console.info(`[env] Ignoring placeholder/invalid address value: "${v}"`);
+    }
+    return undefined;
+  }
+  return v;
+}, z.string().regex(ADDRESS_RE).optional());
 
 const envSchema = z.object({
   // ── Server URL (falls back to relative path if unset) ─────────────────────
@@ -44,6 +52,10 @@ const envSchema = z.object({
   VITE_FIREBASE_STORAGE_BUCKET: optionalString,
   VITE_FIREBASE_MESSAGING_SENDER_ID: optionalString,
   VITE_FIREBASE_APP_ID: optionalString,
+
+  // ── Monitoring (Sentry DSN is public by design — safe in the client bundle) ─
+  VITE_SENTRY_DSN: optionalString,
+  VITE_RELEASE: optionalString,
 });
 
 export type WebEnv = z.infer<typeof envSchema>;

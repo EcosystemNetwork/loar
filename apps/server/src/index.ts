@@ -40,6 +40,28 @@ app.onError(errorHandler);
 // Security headers on all responses
 app.use('/*', securityHeaders);
 
+// ── Prometheus /metrics — registered BEFORE rate limiting and auth so a
+// scraper hitting it every 15s doesn't get throttled. Protected by bearer
+// token when METRICS_AUTH_TOKEN is set; otherwise open (deploy on a private
+// network or behind a reverse-proxy allowlist).
+const { renderMetrics } = await import('./lib/metrics');
+const { metricsMiddleware } = await import('./middleware/metrics');
+app.get('/metrics', async (c) => {
+  const expected = process.env.METRICS_AUTH_TOKEN;
+  if (expected) {
+    const auth = c.req.header('authorization') || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (token !== expected) {
+      return c.text('Unauthorized', 401);
+    }
+  }
+  const { body, contentType } = await renderMetrics();
+  return c.text(body, 200, { 'Content-Type': contentType });
+});
+
+// Record request counts + durations for everything else.
+app.use('/*', metricsMiddleware());
+
 // Rate limiting: 100 requests per minute per IP
 app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 
