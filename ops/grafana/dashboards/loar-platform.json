@@ -1,0 +1,442 @@
+{
+  "$schema": "https://grafana.com/schemas/dashboard/v10.json",
+  "title": "LOAR Platform",
+  "uid": "loar-platform",
+  "tags": ["loar", "platform"],
+  "editable": true,
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "version": 1,
+  "description": "Phase 0.4 of docs/scale-readiness-10k.md — Boards 1 (RPS + p95), 2 (AI spend), 3 (Firestore-adjacent health + breakers). Scrapes the server's /metrics endpoint (prom-client). When METRICS_AUTH_TOKEN is set, configure the Prometheus scrape job to send 'Authorization: Bearer ${token}'.",
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROM",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "name": "route",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "query": "label_values(loar_http_requests_total, route)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Board 1 — Traffic + Latency",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "RPS by route (sum)",
+      "description": "5-minute rate of incoming requests per matched route.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum by (route) (rate(loar_http_requests_total{route=~\"$route\"}[5m]))",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "p95 / p99 latency by route",
+      "description": "Histogram quantiles from loar_http_request_duration_seconds.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (route, le) (rate(loar_http_request_duration_seconds_bucket{route=~\"$route\"}[5m])))",
+          "legendFormat": "p95 {{route}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (route, le) (rate(loar_http_request_duration_seconds_bucket{route=~\"$route\"}[5m])))",
+          "legendFormat": "p99 {{route}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Error rate (5xx / 4xx)",
+      "description": "% of requests returning 5xx or 4xx over the last 5 minutes.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(loar_http_requests_total{status=~\"5..|5xx\"}[5m])) / clamp_min(sum(rate(loar_http_requests_total[5m])), 1)",
+          "legendFormat": "5xx %",
+          "refId": "A"
+        },
+        {
+          "expr": "100 * sum(rate(loar_http_requests_total{status=~\"4..|4xx\"}[5m])) / clamp_min(sum(rate(loar_http_requests_total[5m])), 1)",
+          "legendFormat": "4xx %",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Auth success rate",
+      "description": "Share of SIWE verify/refresh calls that succeeded.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 9 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(loar_auth_events_total{status=\"success\"}[15m])) / clamp_min(sum(rate(loar_auth_events_total[15m])), 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Uptime (process)",
+      "description": "Process uptime in seconds (loar_process_start_time_seconds derived).",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 9 },
+      "targets": [
+        {
+          "expr": "time() - loar_process_start_time_seconds",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "yellow", "value": null },
+              { "color": "green", "value": 300 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Board 2 — AI Spend + Generation",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "AI generations / minute by provider + status",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "expr": "sum by (provider, status) (rate(loar_ai_generation_total[5m])) * 60",
+          "legendFormat": "{{provider}} / {{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } } }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "AI generation p95 duration by kind",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (kind, le) (rate(loar_ai_generation_duration_seconds_bucket[10m])))",
+          "legendFormat": "p95 {{kind}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "palette-classic" } } }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Credits spent — last 24h",
+      "description": "Sum of successful 'spend' credit transactions. Multiply by your per-credit provider cost to approximate AI $ spend.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "expr": "sum(increase(loar_credits_transactions_total{kind=\"spend\",status=\"success\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100000 },
+              { "color": "red", "value": 500000 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Credit refund rate",
+      "description": "refunds / (spends + refunds). High refund rate means generation jobs are failing after billing.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 22 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(loar_credits_transactions_total{kind=\"refund\"}[1h])) / clamp_min(sum(rate(loar_credits_transactions_total{kind=~\"spend|refund\"}[1h])), 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Storage fallback rate (1h)",
+      "description": "Uploads that hit a fallback provider after the primary failed. Rising = primary provider degraded.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 22 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(loar_storage_upload_total{status=\"fallback\"}[1h])) / clamp_min(sum(rate(loar_storage_upload_total[1h])), 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 3,
+      "type": "row",
+      "title": "Board 3 — Queue + Provider Health",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Generation queue depth by state",
+      "description": "From loar_queue_depth — refreshed on every /metrics scrape.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "targets": [
+        {
+          "expr": "loar_queue_depth",
+          "legendFormat": "{{queue}} / {{state}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Circuit breakers — open providers",
+      "description": "Providers currently in 'open' state (2). Hover for the full breaker table.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "targets": [
+        {
+          "expr": "loar_circuit_breaker_state",
+          "legendFormat": "{{provider}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "closed" },
+                "1": { "text": "half-open" },
+                "2": { "text": "open" }
+              }
+            }
+          ],
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Memory / CPU (process)",
+      "description": "Node process RSS + CPU seconds.",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 35 },
+      "targets": [
+        {
+          "expr": "loar_process_resident_memory_bytes",
+          "legendFormat": "RSS",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(loar_process_cpu_seconds_total[1m])",
+          "legendFormat": "CPU (cores)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "RSS" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "CPU (cores)" },
+            "properties": [{ "id": "unit", "value": "short" }]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+name: Governance drift check
+
+# Weekly verification that every platform contract is still owned by the
+# TimelockController (and that the Safe still holds PROPOSER + EXECUTOR
+# roles on that Timelock). Catches:
+#   - a Safe proposal that accidentally re-pointed ownership somewhere else
+#   - a legitimate Timelock rotation that left this repo's env stale
+#   - an attacker with a compromised key silently calling transferOwnership
+#
+# When the drift check fails, the workflow fails + uploads the forge log
+# as an artifact. Pair this with a Slack notification on workflow_run for
+# SEV1 paging (see docs/incident-response.md § Governance drift).
+#
+# Prerequisites:
+#   Repo secrets:
+#     - BASE_RPC_URL           Base mainnet RPC (or testnet URL)
+#     - TIMELOCK_ADDRESS       Expected owner of every target
+#     - SAFE_ADDRESS           Expected PROPOSER + EXECUTOR on the timelock
+#   Repo vars (optional, override per-contract addresses):
+#     - UNIVERSE_MANAGER, LOAR_TOKEN_ADDRESS, IDENTITY_NFT_ADDRESS, ...
+#     (see apps/contracts/script/VerifyMultisigTransfer.s.sol for the full list)
+
+on:
+  schedule:
+    # Mondays at 15:00 UTC — after the weekend, before the EU/US workweek
+    # peaks. Shift as needed for your on-call rotation.
+    - cron: '0 15 * * 1'
+  workflow_dispatch:
+    inputs:
+      rpc_url:
+        description: 'RPC URL (overrides BASE_RPC_URL secret)'
+        required: false
+        type: string
+
+jobs:
+  verify-governance:
+    runs-on: ubuntu-latest
+    # Not a deploy job — no write credentials needed. Fail fast if the env
+    # is missing the critical pieces.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Run VerifyMultisigTransfer script
+        env:
+          # VerifyMultisigTransfer.s.sol reads every contract address +
+          # TIMELOCK_ADDRESS + SAFE_ADDRESS from env. Failure = drift.
+          TIMELOCK_ADDRESS: ${{ secrets.TIMELOCK_ADDRESS }}
+          SAFE_ADDRESS: ${{ secrets.SAFE_ADDRESS }}
+          UNIVERSE_MANAGER: ${{ vars.UNIVERSE_MANAGER }}
+          LOAR_TOKEN_ADDRESS: ${{ vars.LOAR_TOKEN_ADDRESS }}
+          IDENTITY_NFT_ADDRESS: ${{ vars.IDENTITY_NFT_ADDRESS }}
+          FEE_LOCKER_ADDRESS: ${{ vars.FEE_LOCKER_ADDRESS }}
+          SPLIT_ROUTER_ADDRESS: ${{ vars.SPLIT_ROUTER_ADDRESS }}
+          REVENUE_MODULE_FACTORY: ${{ vars.REVENUE_MODULE_FACTORY }}
+          LOAR_FAUCET_ADDRESS: ${{ vars.LOAR_FAUCET_ADDRESS }}
+          SLOP_MARKET_ADDRESS: ${{ vars.SLOP_MARKET_ADDRESS }}
+          PAYMENT_ROUTER_ADDRESS: ${{ vars.PAYMENT_ROUTER_ADDRESS }}
+          RIGHTS_REGISTRY_ADDRESS: ${{ vars.RIGHTS_REGISTRY_ADDRESS }}
+          CANON_MARKETPLACE_ADDRESS: ${{ vars.CANON_MARKETPLACE_ADDRESS }}
+          CREDIT_MANAGER_ADDRESS: ${{ vars.CREDIT_MANAGER_ADDRESS }}
+          AD_PLACEMENT_ADDRESS: ${{ vars.AD_PLACEMENT_ADDRESS }}
+          SUBSCRIPTION_MANAGER_ADDRESS: ${{ vars.SUBSCRIPTION_MANAGER_ADDRESS }}
+          LICENSING_REGISTRY_ADDRESS: ${{ vars.LICENSING_REGISTRY_ADDRESS }}
+          COLLAB_MANAGER_ADDRESS: ${{ vars.COLLAB_MANAGER_ADDRESS }}
+          ANALYTICS_REGISTRY_ADDRESS: ${{ vars.ANALYTICS_REGISTRY_ADDRESS }}
+          LAUNCHPAD_STAKING_ADDRESS: ${{ vars.LAUNCHPAD_STAKING_ADDRESS }}
+          STORY_BOUNTIES_ADDRESS: ${{ vars.STORY_BOUNTIES_ADDRESS }}
+          ESCROW_ADDRESS: ${{ vars.ESCROW_ADDRESS }}
+          LOAR_BURNER_ADDRESS: ${{ vars.LOAR_BURNER_ADDRESS }}
+          REMIX_FEES_ADDRESS: ${{ vars.REMIX_FEES_ADDRESS }}
+          CONTENT_LICENSING_ADDRESS: ${{ vars.CONTENT_LICENSING_ADDRESS }}
+          EPISODE_EDITION_BEACON: ${{ vars.EPISODE_EDITION_BEACON }}
+          CHARACTER_NFT_BEACON: ${{ vars.CHARACTER_NFT_BEACON }}
+          ENTITY_NFT_BEACON: ${{ vars.ENTITY_NFT_BEACON }}
+          ENTITY_EDITION_BEACON: ${{ vars.ENTITY_EDITION_BEACON }}
+          EPISODE_NFT_BEACON: ${{ vars.EPISODE_NFT_BEACON }}
+        working-directory: apps/contracts
+        run: |
+          RPC_URL="${{ inputs.rpc_url || secrets.BASE_RPC_URL }}"
+          if [ -z "$RPC_URL" ]; then
+            echo "::error::BASE_RPC_URL secret is not set and no override provided."
+            exit 1
+          fi
+          if [ -z "$TIMELOCK_ADDRESS" ]; then
+            echo "::error::TIMELOCK_ADDRESS secret is not set — cannot verify drift without a known good owner."
+            exit 1
+          fi
+
+          # Capture both stdout and exit code so we can upload the full log.
+          set +e
+          forge script script/VerifyMultisigTransfer.s.sol \
+            --rpc-url "$RPC_URL" \
+            -vv 2>&1 | tee verify-output.txt
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$STATUS" -ne 0 ]; then
+            echo "::error::Governance drift detected — one or more contracts are no longer owned by the Timelock."
+            echo "::error::See verify-output.txt artifact and docs/incident-response.md § Governance drift."
+            exit 1
+          fi
+
+      - name: Upload verifier output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-output
+          path: apps/contracts/verify-output.txt
+          retention-days: 90
+
+      - name: Notify Slack on failure
+        if: failure() && env.OPS_SLACK_WEBHOOK_URL != ''
+        env:
+          OPS_SLACK_WEBHOOK_URL: ${{ secrets.OPS_SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-Type: application/json' \
+            --data '{"text":":rotating_light: *SEV1 candidate — governance drift detected*\nOne or more LOAR contracts no longer owned by the Timelock. See run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+            "$OPS_SLACK_WEBHOOK_URL"
