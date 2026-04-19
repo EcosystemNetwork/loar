@@ -52,6 +52,28 @@ import type { ImageGenerationRecord, ImageModelConfig } from '../../services/ima
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery } from '../../lib/gallery-publish';
+
+/**
+ * Atomically deduct `cost` credits from `userCredits/{uid}.balance`.
+ * Without a transaction, two concurrent mutations both read balance=B,
+ * both pass the check, and both write B-cost — leaving the user with
+ * cost × (N-1) free credits for N concurrent calls.
+ */
+async function deductLegacyCredits(uid: string, cost: number): Promise<void> {
+  if (!db) return;
+  const userRef = db.collection('userCredits').doc(uid);
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(userRef);
+    const balance: number = doc.data()?.balance || 0;
+    if (balance < cost) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
+      });
+    }
+    tx.update(userRef, { balance: balance - cost, updatedAt: new Date() });
+  });
+}
 import { googleImagenService } from '../../services/google-imagen';
 import { recordAssetEventAsync } from '../../services/lineage';
 import { reserveClientToken } from '../../lib/jobIdempotency';
@@ -1527,18 +1549,7 @@ export const imageRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const cost = 3;
-      if (db) {
-        const userRef = db.collection('userCredits').doc(ctx.user.uid);
-        const userDoc = await userRef.get();
-        const balance = userDoc.data()?.balance || 0;
-        if (balance < cost) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
-          });
-        }
-        await userRef.update({ balance: balance - cost, updatedAt: new Date() });
-      }
+      await deductLegacyCredits(ctx.user.uid, cost);
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
@@ -1611,18 +1622,7 @@ export const imageRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const cost = 3;
-      if (db) {
-        const userRef = db.collection('userCredits').doc(ctx.user.uid);
-        const userDoc = await userRef.get();
-        const balance = userDoc.data()?.balance || 0;
-        if (balance < cost) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
-          });
-        }
-        await userRef.update({ balance: balance - cost, updatedAt: new Date() });
-      }
+      await deductLegacyCredits(ctx.user.uid, cost);
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
@@ -1703,18 +1703,7 @@ export const imageRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const cost = 3;
-      if (db) {
-        const userRef = db.collection('userCredits').doc(ctx.user.uid);
-        const userDoc = await userRef.get();
-        const balance = userDoc.data()?.balance || 0;
-        if (balance < cost) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
-          });
-        }
-        await userRef.update({ balance: balance - cost, updatedAt: new Date() });
-      }
+      await deductLegacyCredits(ctx.user.uid, cost);
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
@@ -1785,7 +1774,12 @@ export const imageRouter = router({
         universeId: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Charge credits atomically. Without this any signed-in user could
+      // burn FAL spend in a loop without a balance cost.
+      const cost = 3;
+      await deductLegacyCredits(ctx.user.uid, cost);
+
       const stylePrompts: Record<string, string> = {
         cute: 'cute kawaii style, adorable, soft colors',
         realistic: 'photorealistic, detailed, cinematic lighting',
@@ -1799,14 +1793,33 @@ export const imageRouter = router({
       const safeDesc = input.description.replace(/[\n\r]/g, ' ').slice(0, 300);
       const fullPrompt = `Character portrait of ${safeName}, ${safeDesc}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
 
-      const imageResult = await falService.generateImage({
-        prompt: fullPrompt,
-        model: 'fal-ai/nano-banana',
-        imageSize: 'square_hd',
-        numImages: 1,
-      });
+      let imageResult;
+      try {
+        imageResult = await falService.generateImage({
+          prompt: fullPrompt,
+          model: 'fal-ai/nano-banana',
+          imageSize: 'square_hd',
+          numImages: 1,
+        });
+      } catch (genError) {
+        if (db) {
+          await db
+            .collection('userCredits')
+            .doc(ctx.user.uid)
+            .update({ balance: FieldValue.increment(cost), updatedAt: new Date() })
+            .catch(() => {});
+        }
+        throw genError;
+      }
 
       if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
+        if (db) {
+          await db
+            .collection('userCredits')
+            .doc(ctx.user.uid)
+            .update({ balance: FieldValue.increment(cost), updatedAt: new Date() })
+            .catch(() => {});
+        }
         throw new Error(imageResult.error || 'Failed to generate character image');
       }
 
@@ -1830,6 +1843,9 @@ export const imageRouter = router({
             description: input.description,
             detailed_visual_description: input.detailedVisualDescription || null,
             universe_id: input.universeId || null,
+            // Tag the creator so downstream ownership checks can gate edits.
+            creator_uid: ctx.user.uid,
+            creator_address: ctx.user.address?.toLowerCase() || null,
             created_at: new Date(),
             updated_at: new Date(),
           });
@@ -1853,8 +1869,15 @@ export const imageRouter = router({
         userDescription: z.string().min(1, 'Description is required'),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // analyzeCharacter calls Gemini on an arbitrary user-supplied URL.
+      // Charge a small credit cost so this isn't a free vector for burning
+      // provider spend, and validate the URL for SSRF before Gemini opens it.
+      const cost = 1;
+      await deductLegacyCredits(ctx.user.uid, cost);
       try {
+        const { validateUploadUrl } = await import('../../lib/url-validator');
+        await validateUploadUrl(input.imageUrl);
         const detailedDescription = await geminiService.analyzeCharacterImage(
           input.imageUrl,
           input.userDescription,
@@ -1866,6 +1889,13 @@ export const imageRouter = router({
           detailedVisualDescription: detailedDescription,
         };
       } catch (error) {
+        if (db) {
+          await db
+            .collection('userCredits')
+            .doc(ctx.user.uid)
+            .update({ balance: FieldValue.increment(cost), updatedAt: new Date() })
+            .catch(() => {});
+        }
         throw wrapError(error, 'Failed to analyze character image');
       }
     }),
@@ -1881,7 +1911,7 @@ export const imageRouter = router({
         universeId: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const characterId = `nano-${Date.now()}-${randomUUID().slice(0, 8)}`;
       await charactersCol()
         .doc(characterId)
@@ -1896,6 +1926,10 @@ export const imageRouter = router({
           description: input.description,
           detailed_visual_description: input.detailedVisualDescription || null,
           universe_id: input.universeId || null,
+          // Tag the creator so the character can be revoked/edited only
+          // by the person who saved it.
+          creator_uid: ctx.user.uid,
+          creator_address: ctx.user.address?.toLowerCase() || null,
           created_at: new Date(),
           updated_at: new Date(),
         });

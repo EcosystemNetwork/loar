@@ -9,6 +9,13 @@ import type { Context, Next } from 'hono';
 /** Requests that can mutate state require Origin validation. */
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/**
+ * Name of the auth cookie. When this cookie is present on a mutating request,
+ * the request is implicitly cookie-authed and therefore CSRF-sensitive, so a
+ * missing Origin header must not be allowed through.
+ */
+const SESSION_COOKIE_NAME = 'siwe-session';
+
 export function csrfProtection(allowedOrigins: string[]) {
   const originsSet = new Set(allowedOrigins);
 
@@ -18,11 +25,22 @@ export function csrfProtection(allowedOrigins: string[]) {
     }
 
     const origin = c.req.header('Origin');
+    const cookie = c.req.header('Cookie') || '';
+    const hasSessionCookie = cookie.includes(`${SESSION_COOKIE_NAME}=`);
 
-    // No Origin header = non-browser request (curl, server-to-server, MCP).
-    // These are authenticated via API key / JWT, not cookies, so CSRF
-    // doesn't apply. Allow through.
     if (!origin) {
+      // For cookie-authed requests, a missing Origin is not safe: an older
+      // WebView, a proxy, or certain form-submission contexts can omit
+      // Origin while still carrying the session cookie. Reject instead of
+      // allowing through.
+      if (hasSessionCookie) {
+        return c.json(
+          { code: 'FORBIDDEN', message: 'Missing Origin header on cookie-authed request' },
+          403
+        );
+      }
+      // Non-cookie requests (API key / bearer JWT) are authenticated by
+      // header and are not CSRF-vulnerable — allow through.
       return next();
     }
 

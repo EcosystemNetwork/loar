@@ -12,7 +12,7 @@
  * See docs/prd-mcp-integration.md §Week 4 and docs/mcp-hosted-sse-deploy.md.
  */
 import { Hono } from 'hono';
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { generateApiKey } from '../lib/apiKeys';
 import { db, firebaseAvailable } from '../lib/firebase';
@@ -20,17 +20,23 @@ import { db, firebaseAvailable } from '../lib/firebase';
 const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 /**
- * Constant-time service-key comparison. Returns false when either side is
- * missing so a misconfigured gateway or leaked-then-rotated secret fails
- * closed rather than open.
+ * Constant-time service-key comparison.
+ *
+ * Why hash both sides before comparing: the previous implementation returned
+ * early on a length mismatch, so an attacker could recover the expected key
+ * length by measuring response-time differentials (different length → fast
+ * reject; equal length → slower `timingSafeEqual`). Hashing both values to
+ * the same fixed size ensures constant work regardless of presented length,
+ * and `timingSafeEqual` then operates on two equal-length hashes.
  */
 function verifyServiceKey(presented: string | undefined | null): boolean {
   const expected = process.env.MCP_GATEWAY_SERVICE_KEY;
-  if (!expected || !presented) return false;
-  const a = Buffer.from(expected);
-  const b = Buffer.from(presented);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  if (!expected || typeof presented !== 'string' || presented.length === 0) {
+    return false;
+  }
+  const expectedHash = createHash('sha256').update(expected).digest();
+  const presentedHash = createHash('sha256').update(presented).digest();
+  return timingSafeEqual(expectedHash, presentedHash);
 }
 
 // ── Key cache ─────────────────────────────────────────────────────────

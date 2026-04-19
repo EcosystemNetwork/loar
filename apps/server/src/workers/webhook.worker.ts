@@ -42,6 +42,16 @@ const DELIVERY_TIMEOUT_MS = 10_000;
 async function deliver(job: Job<WebhookJobData, WebhookJobResult>): Promise<WebhookJobResult> {
   const { url, event, payload, clientToken, ownerUid } = job.data;
 
+  // Re-resolve the hostname at delivery time and reject if it now points at
+  // a private IP or metadata endpoint. Registration-time validation alone is
+  // not enough — an attacker can register a webhook at an attacker-controlled
+  // domain, then flip the A record to 169.254.169.254 / 10.x / 127.0.0.1
+  // before the worker fires, exfiltrating the signed payload to internal
+  // services. Redirects are also refused so a 3xx to the same targets can't
+  // bypass the DNS check.
+  const { validateUploadUrl } = await import('../lib/url-validator');
+  await validateUploadUrl(url);
+
   // Stable payload shape — receivers should treat unknown fields as
   // additive; never rely on field order.
   const body = JSON.stringify({
@@ -70,6 +80,7 @@ async function deliver(job: Job<WebhookJobData, WebhookJobResult>): Promise<Webh
       },
       body,
       signal: controller.signal,
+      redirect: 'error',
     });
 
     if (!res.ok) {

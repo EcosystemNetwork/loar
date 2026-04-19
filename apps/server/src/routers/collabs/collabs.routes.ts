@@ -130,6 +130,15 @@ export const collabsRouter = router({
         contentHash: z.string(),
         mediaUrl: z.string().optional(),
         revenue: z.string().regex(/^\d+$/, 'Revenue must be a non-negative integer string (wei)'),
+        /** Optional on-chain proof of the stated revenue. When present the
+         *  caller's wallet must be the tx sender and the tx value must meet
+         *  or exceed `revenue`. Without a txHash, `revenue` is clamped to 0
+         *  to prevent a participant from inflating the shared totalRevenue
+         *  field purely by self-assertion. */
+        txHash: z
+          .string()
+          .regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash')
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -142,12 +151,31 @@ export const collabsRouter = router({
         throw new Error('Only collab participants can record episodes');
       }
 
+      let bookedRevenue = '0';
+      if (input.txHash) {
+        if (!ctx.user.address) {
+          throw new Error('Connected wallet required to book revenue');
+        }
+        const { verifyAndClaimTx } = await import('../../services/tx-verify');
+        await verifyAndClaimTx(
+          input.txHash,
+          `collab-episode:${input.collabId}:${input.contentHash}`,
+          ctx.user.uid,
+          {
+            expectedFrom: ctx.user.address,
+            minValueWei: input.revenue,
+          }
+        );
+        bookedRevenue = input.revenue;
+      }
+
       const episode = {
         collabId: input.collabId,
         title: input.episodeTitle,
         contentHash: input.contentHash,
         mediaUrl: input.mediaUrl || null,
-        revenue: input.revenue,
+        revenue: bookedRevenue,
+        txHash: input.txHash ?? null,
         creatorUid: ctx.user.uid,
         createdAt: new Date(),
       };
@@ -157,7 +185,7 @@ export const collabsRouter = router({
       const data = collabDoc.data()!;
       await collabRef.update({
         episodeCount: (data.episodeCount || 0) + 1,
-        totalRevenue: (BigInt(data.totalRevenue || '0') + BigInt(input.revenue)).toString(),
+        totalRevenue: (BigInt(data.totalRevenue || '0') + BigInt(bookedRevenue)).toString(),
         updatedAt: new Date(),
       });
 

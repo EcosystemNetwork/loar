@@ -147,23 +147,26 @@ export const revenueRouter = router({
         });
       }
 
-      // Verify the transaction succeeded on-chain
-      const client = input.chainId === baseSepolia.id ? baseSepoliaClient : sepoliaClient;
-      try {
-        const receipt = await client.getTransactionReceipt({
-          hash: input.txHash as `0x${string}`,
+      // Bind tx sender to the authed wallet so a caller cannot credit
+      // their dashboard against an unrelated successful Sepolia tx. The
+      // txHash-based global dedup still prevents the same tx from being
+      // counted twice.
+      if (!ctx.user.address) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Connected wallet required to record claim',
         });
-        if (receipt.status !== 'success') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Claim transaction was reverted on-chain',
-          });
-        }
+      }
+      const { verifyAndClaimTx } = await import('../../services/tx-verify');
+      try {
+        await verifyAndClaimTx(input.txHash, `revenue-claim:${ctx.user.uid}`, ctx.user.uid, {
+          chainId: input.chainId,
+          expectedFrom: ctx.user.address,
+        });
       } catch (err: any) {
-        if (err instanceof TRPCError) throw err;
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Claim transaction not found on-chain',
+          message: err?.message || 'Claim transaction could not be verified',
         });
       }
 

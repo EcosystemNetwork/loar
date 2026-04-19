@@ -156,34 +156,38 @@ export async function verifySiweSignature(
   signature: `0x${string}`,
   requestOrigin?: string
 ): Promise<string> {
-  // Extract and validate domain from the SIWE message (line 1)
+  // Extract and validate domain from the SIWE message (line 1). Fail-closed:
+  // a message whose preamble doesn't match the expected pattern must be
+  // rejected, otherwise an attacker can craft a misformatted line 1 showing
+  // `evil.com` to the wallet UI while bypassing the domain + origin check.
   const lines = message.split('\n');
   const domainLine = lines[0]?.trim();
   const domainMatch = domainLine?.match(/^(.+?) wants you to sign in/);
-  if (domainMatch) {
-    const messageDomain = domainMatch[1];
-    // Strip port from domain for comparison — window.location.host includes the port
-    // (e.g. "localhost:3001") but ALLOWED_DOMAINS lists hostnames only.
-    const messageDomainHostname = messageDomain.replace(/:\d+$/, '');
-    if (!ALLOWED_DOMAINS.has(messageDomain) && !ALLOWED_DOMAINS.has(messageDomainHostname)) {
-      throw new Error(`SIWE domain "${messageDomain}" is not allowed`);
-    }
+  if (!domainMatch) {
+    throw new Error('SIWE message is missing or malformed domain line');
+  }
+  const messageDomain = domainMatch[1];
+  // Strip port from domain for comparison — window.location.host includes the port
+  // (e.g. "localhost:3001") but ALLOWED_DOMAINS lists hostnames only.
+  const messageDomainHostname = messageDomain.replace(/:\d+$/, '');
+  if (!ALLOWED_DOMAINS.has(messageDomain) && !ALLOWED_DOMAINS.has(messageDomainHostname)) {
+    throw new Error(`SIWE domain "${messageDomain}" is not allowed`);
+  }
 
-    // Cross-check SIWE domain against the request Origin header to prevent
-    // an attacker signing a message with domain "loar.fun" from "evil.com"
-    if (requestOrigin) {
-      try {
-        const originHost = new URL(requestOrigin).hostname;
-        if (messageDomain !== originHost && originHost !== 'localhost') {
-          throw new Error(
-            `SIWE domain "${messageDomain}" does not match request origin "${originHost}"`
-          );
-        }
-      } catch (e) {
-        if (e instanceof Error && e.message.includes('does not match')) throw e;
-        // Malformed origin — reject instead of silently passing
-        throw new Error('Malformed request origin');
+  // Cross-check SIWE domain against the request Origin header to prevent
+  // an attacker signing a message with domain "loar.fun" from "evil.com"
+  if (requestOrigin) {
+    try {
+      const originHost = new URL(requestOrigin).hostname;
+      if (messageDomain !== originHost && originHost !== 'localhost') {
+        throw new Error(
+          `SIWE domain "${messageDomain}" does not match request origin "${originHost}"`
+        );
       }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('does not match')) throw e;
+      // Malformed origin — reject instead of silently passing
+      throw new Error('Malformed request origin');
     }
   }
 
@@ -344,55 +348,57 @@ async function isTokenRevoked(jti: string): Promise<boolean> {
  *  Supports secret rotation: tries the current secret first, then falls back to
  *  SIWE_JWT_SECRET_PREVIOUS if set (see INFRA-02 rotation procedure above). */
 export async function verifySessionToken(token: string): Promise<SiweSessionPayload | null> {
+  const result = await verifySessionTokenDetailed(token);
+  return result?.payload ?? null;
+}
+
+/** Verify a SIWE session JWT and return which secret validated it. Callers
+ *  that mint a new token from an old one (refreshSessionToken) use this to
+ *  refuse extending sessions that only verified against the previous secret,
+ *  so a leaked pre-rotation token does not become durable post-rotation. */
+export async function verifySessionTokenDetailed(
+  token: string
+): Promise<{ payload: SiweSessionPayload; secret: 'current' | 'previous' } | null> {
   const verifyOpts = { issuer: JWT_ISSUER, audience: JWT_AUDIENCE };
 
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET, verifyOpts);
-
-    // Check revocation if token has a jti
-    if (payload.jti && (await isTokenRevoked(payload.jti))) {
+    if (payload.jti && (await isTokenRevoked(payload.jti))) return null;
+    return { payload: payload as SiweSessionPayload, secret: 'current' };
+  } catch {
+    if (!JWT_SECRET_PREVIOUS) return null;
+    try {
+      const { payload } = await jwtVerify(token, JWT_SECRET_PREVIOUS, verifyOpts);
+      if (payload.jti && (await isTokenRevoked(payload.jti))) return null;
+      console.warn(
+        '[SIWE] Token verified with previous secret — rotation still in progress. ' +
+          'Remove SIWE_JWT_SECRET_PREVIOUS after 24h.'
+      );
+      return { payload: payload as SiweSessionPayload, secret: 'previous' };
+    } catch {
       return null;
     }
-
-    return payload as SiweSessionPayload;
-  } catch {
-    // Current secret failed — try the previous secret during rotation
-    if (JWT_SECRET_PREVIOUS) {
-      try {
-        const { payload } = await jwtVerify(token, JWT_SECRET_PREVIOUS, verifyOpts);
-
-        // Check revocation if token has a jti
-        if (payload.jti && (await isTokenRevoked(payload.jti))) {
-          return null;
-        }
-
-        console.warn(
-          '[SIWE] Token verified with previous secret — rotation still in progress. ' +
-            'Remove SIWE_JWT_SECRET_PREVIOUS after 24h.'
-        );
-        return payload as SiweSessionPayload;
-      } catch {
-        return null;
-      }
-    }
-    return null;
   }
 }
 
 /**
- * Refresh a session token. Returns a new JWT if the existing one is valid.
- * Revokes the old token to prevent token accumulation.
+ * Refresh a session token. Returns a new JWT if the existing one is valid
+ * AND was signed with the CURRENT secret. Tokens that only verify against
+ * the previous secret are refused during rotation so a leaked pre-rotation
+ * token cannot be upgraded into a new 24h current-secret session. Those
+ * users must re-sign-in.
  */
 export async function refreshSessionToken(token: string): Promise<string | null> {
-  const payload = await verifySessionToken(token);
-  if (!payload?.sub) return null;
+  const result = await verifySessionTokenDetailed(token);
+  if (!result?.payload?.sub) return null;
+  if (result.secret !== 'current') return null;
 
   // Revoke the old token so it can't be reused
-  if (payload.jti) {
-    await revokeToken(payload.jti);
+  if (result.payload.jti) {
+    await revokeToken(result.payload.jti);
   }
 
-  return issueSessionToken(payload.sub);
+  return issueSessionToken(result.payload.sub);
 }
 
 /** Construct a SIWE-compliant message string. */

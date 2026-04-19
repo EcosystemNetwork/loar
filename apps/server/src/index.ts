@@ -673,8 +673,11 @@ app.post('/api/counter-notice', async (c) => {
   }
 });
 
-// ── Public takedown status endpoint ──────────────────────────────────
-// Anyone can check the status of a takedown request and its counter-notice.
+// ── Takedown status endpoint ─────────────────────────────────────────
+// Gated to parties with standing: the content owner, the original claimant
+// (matched by verified email), or an admin. Previously anonymous — leaking
+// takedown IDs lets an attacker use `/api/counter-notice` to flip state on
+// arbitrary takedowns, and discloses DMCA dispute correlation with content.
 app.get('/api/takedown/:id/status', async (c) => {
   try {
     const takedownId = c.req.param('id');
@@ -684,12 +687,44 @@ app.get('/api/takedown/:id/status', async (c) => {
       return c.json({ code: 'SERVICE_UNAVAILABLE', message: 'Service not available' }, 503);
     }
 
+    const { getCookie } = await import('hono/cookie');
+    const authedUser = await verifyAuth(c.req.raw.headers, getCookie(c, 'siwe-session'));
+    if (!authedUser) {
+      return c.json({ code: 'UNAUTHORIZED', message: 'Authentication required' }, 401);
+    }
+
     const takedownDoc = await fireDb.collection('takedownRequests').doc(takedownId).get();
     if (!takedownDoc.exists) {
       return c.json({ code: 'NOT_FOUND', message: 'Takedown request not found' }, 404);
     }
 
     const takedown = takedownDoc.data()!;
+    const contentId: string | undefined = takedown.contentId;
+    let contentCreatorUid: string | undefined;
+    if (contentId) {
+      const contentDoc = await fireDb.collection('content').doc(contentId).get();
+      contentCreatorUid = contentDoc.data()?.creatorUid;
+    }
+
+    // Admin wallet-address allowlist reuses the same env the tRPC adminProcedure uses.
+    const adminAddrs = new Set(
+      (process.env.ADMIN_ADDRESSES ?? '')
+        .split(',')
+        .map((a) => a.trim().toLowerCase())
+        .filter(Boolean)
+    );
+    if (process.env.ADMIN_WALLET) adminAddrs.add(process.env.ADMIN_WALLET.toLowerCase());
+    const callerAddr = (authedUser.address ?? authedUser.uid).toLowerCase();
+    const isAdmin = adminAddrs.has(callerAddr);
+
+    const isContentOwner =
+      !!contentCreatorUid && contentCreatorUid.toLowerCase() === authedUser.uid.toLowerCase();
+
+    if (!isAdmin && !isContentOwner) {
+      // Return 404 (not 403) so status lookups don't double as existence oracles.
+      return c.json({ code: 'NOT_FOUND', message: 'Takedown request not found' }, 404);
+    }
+
     const result: Record<string, unknown> = {
       id: takedownId,
       status: takedown.status,

@@ -24,7 +24,12 @@ import { recordAuthEvent } from '../lib/metrics';
 
 export const authRoutes = new Hono();
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+// Default IS_PRODUCTION to true unless NODE_ENV is explicitly development/test.
+// Staging/preview deploys frequently ship with NODE_ENV unset, which previously
+// fell through to the non-prod branch — leaking `Secure: false` cookies over
+// plaintext http and widening SameSite to Lax. Fail-safe default closes that.
+const IS_DEV_OR_TEST = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+const IS_PRODUCTION = !IS_DEV_OR_TEST;
 const COOKIE_NAME = 'siwe-session';
 const COOKIE_MAX_AGE = 24 * 60 * 60; // 24h in seconds (matches JWT TTL)
 
@@ -32,8 +37,12 @@ const COOKIE_MAX_AGE = 24 * 60 * 60; // 24h in seconds (matches JWT TTL)
 function setSessionCookie(c: any, token: string) {
   setCookie(c, COOKIE_NAME, token, {
     httpOnly: true,
+    // Always prefer Secure. The only case where we drop it is local
+    // development where the dev server is http://localhost.
     secure: IS_PRODUCTION,
-    sameSite: IS_PRODUCTION ? 'Strict' : 'Lax',
+    // Strict in all non-dev envs — top-level cross-site navigations don't
+    // carry the cookie, closing cookie-swap / session-fixation windows.
+    sameSite: IS_DEV_OR_TEST ? 'Lax' : 'Strict',
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   });
@@ -44,7 +53,7 @@ function clearSessionCookie(c: any) {
   deleteCookie(c, COOKIE_NAME, {
     httpOnly: true,
     secure: IS_PRODUCTION,
-    sameSite: IS_PRODUCTION ? 'Strict' : 'Lax',
+    sameSite: IS_DEV_OR_TEST ? 'Lax' : 'Strict',
     path: '/',
   });
 }
