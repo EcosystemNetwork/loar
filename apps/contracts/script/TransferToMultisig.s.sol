@@ -38,6 +38,7 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     SPLIT_ROUTER_ADDRESS      - SplitRouter
  *     REVENUE_MODULE_FACTORY    - RevenueModuleFactory
  *     LOAR_FAUCET_ADDRESS       - LoarFaucet (testnet)
+ *     SLOP_MARKET_ADDRESS       - SlopMarket (secondary NFT market)
  *
  *   UUPS proxy addresses (OwnableUpgradeable):
  *     PAYMENT_ROUTER_ADDRESS           - PaymentRouter
@@ -128,6 +129,7 @@ contract TransferToMultisigScript is Script {
         _transferOwnable("SPLIT_ROUTER_ADDRESS", timelockAddr);
         _transferOwnable("REVENUE_MODULE_FACTORY", timelockAddr);
         _transferOwnable("LOAR_FAUCET_ADDRESS", timelockAddr);
+        _transferOwnable("SLOP_MARKET_ADDRESS", timelockAddr);
 
         // ── UUPS proxy contracts (OwnableUpgradeable) ──────────────
         console.log("\n--- UUPS Proxy Contracts ---");

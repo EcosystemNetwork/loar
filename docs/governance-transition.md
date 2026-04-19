@@ -128,14 +128,23 @@ forge script script/TransferToMultisig.s.sol \
 
 ### Step 4: Verify On-Chain
 
-For each contract, verify ownership transferred correctly:
+Run the verifier script — it loops every target address in env, calls `owner()`, and asserts the return value equals `TIMELOCK_ADDRESS`. Exits non-zero if any contract is still owned by the deployer EOA (or anything else).
 
 ```bash
-# Example: check UniverseManager owner
+TIMELOCK_ADDRESS=0x... SAFE_ADDRESS=0x... \
+  forge script script/VerifyMultisigTransfer.s.sol --rpc-url base -vv
+```
+
+Expected output: every configured contract shows `OK`, summary prints `MISMATCHED: 0`. A non-zero `MISMATCHED` reverts the script with the list of drifting envs.
+
+> **Re-run this periodically** (suggested: weekly CI job) to catch governance drift — e.g. a legitimate Timelock-rotation that left a stale `TIMELOCK_ADDRESS` env, or an unauthorised `OwnershipTransferred` event. See the [governance drift section of the incident response runbook](./incident-response.md#governance-drift--a-contract-is-no-longer-owned-by-the-timelock) for SEV response.
+
+For manual per-contract spot checks:
+
+```bash
 cast call $UNIVERSE_MANAGER "owner()(address)" --rpc-url base
 # Should return $TIMELOCK_ADDRESS
 
-# Check TimelockController roles
 cast call $TIMELOCK_ADDRESS \
   "hasRole(bytes32,address)(bool)" \
   $(cast keccak "PROPOSER_ROLE") \

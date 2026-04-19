@@ -116,21 +116,62 @@ Note: the spend-cap path is fail-closed — a Firestore outage surfaces as a use
 2. If lag is < 60 blocks, usually self-corrects. Communicate "indexer catching up" in the #status Slack and wait.
 3. If lag is > 1000 blocks or growing: file SEV2, may need a reindex from a checkpoint.
 
+### Governance drift — a contract is no longer owned by the Timelock
+
+**Signal**: weekly drift-check CI job (or an ad-hoc [`VerifyMultisigTransfer.s.sol`](../apps/contracts/script/VerifyMultisigTransfer.s.sol) run) reports `MISMATCHED > 0`. Or Etherscan shows an unexpected `OwnershipTransferred` event on a core contract.
+
+This is a **SEV1**. Losing Timelock ownership means someone (or a bug in a recent upgrade) replaced the governance gate. Until it's restored, upgrades and admin actions can bypass the 48h delay.
+
+1. Run the verifier immediately:
+   ```bash
+   TIMELOCK_ADDRESS=0x... SAFE_ADDRESS=0x... \
+     forge script apps/contracts/script/VerifyMultisigTransfer.s.sol --rpc-url base -vv
+   ```
+   Note which contract(s) drifted and their current owner.
+2. Check Etherscan for the `OwnershipTransferred` event on the affected address. Who signed the transferring tx? Was it the Timelock (via a Safe proposal) or an unexpected EOA?
+3. **If the drifting owner is the deployer EOA or an attacker**: assume compromise. Flip every relevant kill switch in [`/admin/ops`](../apps/web/src/routes/admin/ops.tsx) while you figure out blast radius. File the Safe proposal to re-transfer ownership back to the Timelock.
+4. **If the drifting owner is a new Timelock/Safe that a signer deliberately rotated to** without documenting it: ping the signer. Worst case the rotation was legitimate but the `TIMELOCK_ADDRESS` env in this runbook is stale — update it and re-run the verifier.
+
+### SIWE JWT secret rotation (scheduled or emergency)
+
+Rotation is built into [`apps/server/src/lib/siwe.ts`](../apps/server/src/lib/siwe.ts) via dual-key verification: `SIWE_JWT_SECRET` (active, used for signing) and `SIWE_JWT_SECRET_PREVIOUS` (accepted for verification only). Tokens issued under the old secret keep working until their 24h TTL expires.
+
+**Scheduled rotation (every 90 days, INFRA-02):**
+
+1. Generate a new secret: `openssl rand -hex 32`.
+2. In your secret manager (Doppler / Infisical / GCP Secret Manager), set:
+   - `SIWE_JWT_SECRET_PREVIOUS` = current `SIWE_JWT_SECRET` value.
+   - `SIWE_JWT_SECRET` = the new hex value.
+3. Deploy. New sign-ins mint tokens under the new secret; existing tokens keep working.
+4. **Wait 24 hours** (matches the JWT TTL). Do not skip — skipping logs every active user out.
+5. Remove `SIWE_JWT_SECRET_PREVIOUS` from the secret store. Re-deploy.
+
+**Emergency rotation (secret is suspected leaked):**
+
+1. Generate a new secret as above.
+2. Set `SIWE_JWT_SECRET` to the new value. **Do not set** `SIWE_JWT_SECRET_PREVIOUS` — this invalidates every active session immediately (the whole point of an emergency).
+3. Deploy. All users will be forced to re-sign.
+4. Post in `#ops`: we emergency-rotated, everyone must sign in again; link the incident doc.
+5. If the leak also affected `FIREBASE_SERVICE_ACCOUNT` or any on-chain signer, rotate those too — and for on-chain keys, use the Safe to revoke the compromised wallet's allowances.
+
+Failure mode to avoid: rotating `SIWE_JWT_SECRET` without setting `SIWE_JWT_SECRET_PREVIOUS` outside an emergency. You'll log every active user out at once, Sentry will light up with false alarms, and your sign-in page will be a bottleneck for ~15 minutes while everyone retries.
+
 ---
 
 ## Tools Reference
 
-| Tool                        | What it's for                                       | URL                                                                                   |
-| --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Grafana (or equivalent APM) | p95 latency, RPS, error rate, AI spend, queue depth | Internal — see `docs/environment.md`                                                  |
-| Sentry web                  | JavaScript errors, session replay on errors         | `sentry.io/org/loar/`                                                                 |
-| Sentry server               | Server exceptions, unhandled rejections             | Same org                                                                              |
-| `/health`                   | Liveness + dependency status                        | `https://api.loar.fun/health`                                                         |
-| `/metrics`                  | Prometheus scrape target                            | `https://api.loar.fun/metrics` (bearer-token protected when `METRICS_AUTH_TOKEN` set) |
-| `/admin/ops`                | Feature kill switches, spend cap, abuse flags       | `https://loar.fun/admin/ops`                                                          |
-| `/admin/moderation`         | Content flags, DMCA takedowns, audit log            | `https://loar.fun/admin/moderation`                                                   |
-| `platformConfigAudit`       | Who changed what config and when                    | Firestore → server-only; query via admin tRPC                                         |
-| Safe (multisig)             | Contract ownership + timelock execution             | `app.safe.global` — see [governance-transition.md](./governance-transition.md)        |
+| Tool                           | What it's for                                       | URL                                                                                                         |
+| ------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Grafana (or equivalent APM)    | p95 latency, RPS, error rate, AI spend, queue depth | Internal — see `docs/environment.md`                                                                        |
+| Sentry web                     | JavaScript errors, session replay on errors         | `sentry.io/org/loar/`                                                                                       |
+| Sentry server                  | Server exceptions, unhandled rejections             | Same org                                                                                                    |
+| `/health`                      | Liveness + dependency status                        | `https://api.loar.fun/health`                                                                               |
+| `/metrics`                     | Prometheus scrape target                            | `https://api.loar.fun/metrics` (bearer-token protected when `METRICS_AUTH_TOKEN` set)                       |
+| `/admin/ops`                   | Feature kill switches, spend cap, abuse flags       | `https://loar.fun/admin/ops`                                                                                |
+| `/admin/moderation`            | Content flags, DMCA takedowns, audit log            | `https://loar.fun/admin/moderation`                                                                         |
+| `platformConfigAudit`          | Who changed what config and when                    | Firestore → server-only; query via admin tRPC                                                               |
+| Safe (multisig)                | Contract ownership + timelock execution             | `app.safe.global` — see [governance-transition.md](./governance-transition.md)                              |
+| `VerifyMultisigTransfer.s.sol` | Read-only owner() drift check across every target   | [apps/contracts/script/VerifyMultisigTransfer.s.sol](../apps/contracts/script/VerifyMultisigTransfer.s.sol) |
 
 ---
 
