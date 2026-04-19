@@ -1377,6 +1377,16 @@ function GenerationCard({
                 <ImageIcon className="h-3 w-3 mr-1" />
                 Style ref
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => setEditPanel((p) => (p === 'menu' ? null : 'menu'))}
+                title="Image edit operations"
+              >
+                <Wand2 className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
             </>
           )}
           {gen.status === 'failed' && retriesLeft > 0 && (
@@ -1389,6 +1399,168 @@ function GenerationCard({
             <span className="text-[10px] text-muted-foreground">Retry limit reached</span>
           )}
         </div>
+
+        {/* Edit menu — one-click ops + expandable panels */}
+        {gen.status === 'done' && gen.kind === 'image' && editPanel === 'menu' && (
+          <div className="mt-1.5 pt-1.5 border-t flex flex-wrap gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => {
+                setEditPanel(null);
+                onEditOp('upscale');
+              }}
+              title="4× super-resolution upscale"
+            >
+              <Maximize2 className="h-3 w-3 mr-1" />
+              4× Upscale
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => {
+                setEditPanel(null);
+                onEditOp('remove-bg');
+              }}
+              title="Remove background — outputs transparent PNG"
+            >
+              <Eraser className="h-3 w-3 mr-1" />
+              Remove BG
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setEditPanel('relight')}
+            >
+              <Sun className="h-3 w-3 mr-1" />
+              Relight…
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setEditPanel('outpaint')}
+              title="Extend the canvas to a new aspect ratio"
+            >
+              <Frame className="h-3 w-3 mr-1" />
+              Outpaint…
+            </Button>
+          </div>
+        )}
+
+        {gen.status === 'done' && editPanel === 'relight' && (
+          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground">
+              Pick lighting (multi-select OK)
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {QUICK_RELIGHT_PRESETS.map((p) => {
+                const active = relightPresets.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => toggleRelightPreset(p.id)}
+                    className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            <Input
+              value={relightFree}
+              onChange={(e) => setRelightFree(e.target.value)}
+              placeholder="Or describe the look in your own words"
+              className="h-7 text-[11px]"
+            />
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] flex-1"
+                disabled={relightPresets.length === 0 && !relightFree.trim()}
+                onClick={() => {
+                  onEditOp('relight', {
+                    relightPresetIds: relightPresets,
+                    relightFreeText: relightFree.trim() || undefined,
+                  });
+                  setEditPanel(null);
+                  setRelightPresets([]);
+                  setRelightFree('');
+                }}
+              >
+                Relight
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => setEditPanel(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {gen.status === 'done' && editPanel === 'outpaint' && (
+          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground">Target aspect</p>
+            <div className="flex flex-wrap gap-1">
+              {OUTPAINT_ASPECTS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setOutpaintAspect(a)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                    outpaintAspect === a
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <Input
+              value={outpaintPrompt}
+              onChange={(e) => setOutpaintPrompt(e.target.value)}
+              placeholder="Optional: hint at what to add in the new canvas"
+              className="h-7 text-[11px]"
+            />
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] flex-1"
+                onClick={() => {
+                  onEditOp('outpaint', {
+                    outpaintAspect,
+                    outpaintPrompt: outpaintPrompt.trim() || undefined,
+                  });
+                  setEditPanel(null);
+                  setOutpaintPrompt('');
+                }}
+              >
+                Outpaint
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => setEditPanel(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
