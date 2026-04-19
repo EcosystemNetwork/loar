@@ -108,6 +108,26 @@ Note: the spend-cap path is fail-closed — a Firestore outage surfaces as a use
 3. Flip `mintingEnabled=false` while investigating.
 4. If the contract itself needs pausing (bigger than a config flip), see [docs/governance-transition.md](./governance-transition.md) — requires Safe signers + Timelock proposal.
 
+### Generation queue backing up
+
+**Signal**: `loar_queue_depth{queue="generation",state="waiting"}` climbs on Grafana. `/status` shows a growing Waiting number. Users complain that their generation hasn't started.
+
+This is a capacity problem, not a bug — workers aren't consuming as fast as jobs arrive. Two usual causes:
+
+1. **Demand spike** — more users hit `Create` than normal. Workers are fine, just outnumbered.
+2. **Provider stall** — a provider (FAL, Seedance) is slow or rate-limiting. Workers are busy waiting on upstream.
+
+Response:
+
+1. Check `loar_circuit_breaker_state` on Grafana (or `/status` → External providers). If a provider is in `open` or `half_open` state, cause #2 is it — flip the relevant generation model off in admin config or wait for the breaker to close.
+2. If all breakers are green, it's demand. Scale workers horizontally without a full redeploy:
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d --scale worker=10 --no-recreate
+   ```
+   See [scale-readiness-10k.md § Horizontal Scaling Playbook](./scale-readiness-10k.md#horizontal-scaling-playbook) for sizing math.
+3. If the queue is >500 deep AND you have no headroom for more workers: flip `generationEnabled=false` in [`/admin/ops`](../apps/web/src/routes/admin/ops.tsx) to stop new admission, then let existing jobs drain before re-enabling. The BullMQ admission gate (`MAX_QUEUED_GENERATIONS`) should have caught this earlier — check it's not set too high.
+4. After mitigation: note the peak queue depth + duration in the post-mortem. This calibrates the next worker-count default.
+
 ### Indexer lag
 
 **Signal**: User sees content in UI that doesn't appear in the indexer view. `/health` on the indexer shows lag seconds.

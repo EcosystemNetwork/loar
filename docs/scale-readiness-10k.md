@@ -198,6 +198,67 @@ These are **not** implementation choices — they are product / business calls t
 
 ---
 
+## Horizontal Scaling Playbook
+
+Production uses [`docker-compose.prod.yml`](../docker-compose.prod.yml) with nginx load-balancing across `N` server replicas and `M` worker replicas, all sharing one Redis for rate limits + BullMQ. Replica counts are env-driven: set `SERVER_REPLICAS` and `WORKER_REPLICAS` in `.env`, the deploy workflow passes them as `docker compose up --scale`.
+
+### Sizing math
+
+**Server replicas** — each Node/Hono instance handles ~500 RPS sustained on a 1-vCPU / 2GB box before p95 degrades. nginx round-robins.
+
+| Active users (peak concurrent) | Server replicas | Memory / CPU total |
+| ------------------------------ | --------------- | ------------------ |
+| < 500                          | 1               | 2GB / 1 vCPU       |
+| 500 – 2,000                    | 2               | 4GB / 2 vCPU       |
+| 2,000 – 5,000                  | 3               | 6GB / 3 vCPU       |
+| 5,000 – 10,000                 | 4–6             | 8–12GB / 4–6 vCPU  |
+
+**Worker replicas** — total concurrent AI jobs = `WORKER_REPLICAS × WORKER_CONCURRENCY`. Each job pegs ~1 CPU during video encode/upload. Keep the product ≤ `vCPUs - 1` per host so the scheduler has headroom.
+
+| Expected concurrent generations | Config (replicas × concurrency) | Throughput @ 2-min avg job |
+| ------------------------------- | ------------------------------- | -------------------------- |
+| ≤ 5                             | 1 × 5                           | ~150 jobs/hour             |
+| ≤ 10                            | 2 × 5 (default)                 | ~300 jobs/hour             |
+| ≤ 25                            | 5 × 5                           | ~750 jobs/hour             |
+| ≤ 50                            | 10 × 5                          | ~1,500 jobs/hour           |
+
+**10K users, 5% active, 10% of active queue a generation** → ~50 concurrent generations at peak. Plan for `WORKER_REPLICAS=10 WORKER_CONCURRENCY=5` minimum, which also assumes AI providers (FAL, Seedance, ElevenLabs) accept your sustained QPS. If they rate-limit, workers idle — bottleneck moves upstream.
+
+### Scaling commands
+
+```bash
+# Scale up before a traffic spike (no downtime)
+SERVER_REPLICAS=6 WORKER_REPLICAS=10 \
+  docker compose -f docker-compose.prod.yml up -d \
+  --scale server=$SERVER_REPLICAS --scale worker=$WORKER_REPLICAS
+
+# Scale workers only (server untouched)
+docker compose -f docker-compose.prod.yml up -d --scale worker=10 --no-recreate
+
+# Drain workers (e.g. during a kill-switch incident so queued jobs don't clear)
+docker compose -f docker-compose.prod.yml up -d --scale worker=0
+
+# One-off: check current replica counts
+docker compose -f docker-compose.prod.yml ps --format table
+```
+
+### Known ceilings we can't fix with more replicas
+
+- **Firestore reads/sec** — quota is per-project, not per-replica. At 10K users hitting the wiki/gallery, expect ~5–10K reads/sec peak. Free tier is 50K reads/day → you'll burn it in minutes. Blaze plan covers 10K. A rogue unbounded listener on the server can blow this up — watch the Firestore usage dashboard.
+- **Redis memory** — rate-limit keys + BullMQ queue state. 256MB handles 10K users. Bump to 1GB if you see `maxmemory` evictions in the Redis logs.
+- **AI provider QPS** — each provider's per-key limit. Scaling workers past the provider's limit just makes them wait in line. Shard keys across regions or tiers if you hit this.
+- **Pinata / Lighthouse upload rate** — measured, circuit-breaker-protected; the StorageManager falls over between providers. At 10K users uploading generated content, verify both provider plans are on paid tiers.
+
+### Expected behaviour under overload
+
+- Rate limit (`rateLimiter` middleware) returns 429 **before** any of the above ceilings trip. User sees "too many requests".
+- Generation queue backs up — new jobs wait in BullMQ. The BullMQ admission gate (`MAX_QUEUED_GENERATIONS=200` in `.env.example`) rejects new jobs with a user-visible "platform is busy" error rather than letting the queue grow unbounded.
+- Worker failures → circuit breakers open → client sees "provider unavailable", StorageManager falls over, job ends up in failed state and refund is issued.
+
+All three of these are already coded. The scaling knobs above only matter until you hit the first of those ceilings; after that, scaling workers further makes no difference until the ceiling is raised.
+
+---
+
 ## What this plan deliberately excludes
 
 - **Horizontal scaling beyond 10K** — Firestore, Hono on Fly/Railway, and Redis handle 10K comfortably. Past 50K we'd need read replicas, pub/sub, and probably a managed Postgres for hot-path reads. Not in scope.
