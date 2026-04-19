@@ -149,10 +149,9 @@ export function getSessionValidationDone(): Promise<void> {
       }
     })
     .catch(() => {
-      // AUTH-04: Fail closed on network error — clear session rather than keeping potentially stale auth
-      localStorage.removeItem(ADDRESS_KEY);
-      localStorage.removeItem(EXPIRY_KEY);
-      emitChange();
+      // AUTH-04: Fail open on transient network errors (server cold start, latency, DNS).
+      // Only the explicit `authenticated: false` branch above should clear the session.
+      // Clearing here caused sign-in spam on the live app whenever /auth/me was unreachable.
     })
     .finally(() => {
       _sessionValidated = true;
