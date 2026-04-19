@@ -120,7 +120,7 @@ app.get('/creator/:address/summary', async (c) => {
 });
 
 app.get('/universe/:address', async (c) => {
-  const address = c.req.param('address').toLowerCase();
+  const address = c.req.param('address').toLowerCase() as `0x${string}`;
 
   // Query only the specific universe — NOT the entire database
   const universeData = await db.select().from(universe).where(eq(universe.id, address)).limit(1);
