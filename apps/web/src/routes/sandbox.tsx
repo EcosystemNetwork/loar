@@ -83,6 +83,12 @@ type Generation = {
   videoModel?: VideoModel;
   imageSize: ImageSize;
   aspectRatio: AspectRatio;
+  // Video-only settings preserved across retries
+  videoDurationSec?: number;
+  videoResolution?: VideoResolution;
+  cameraPreset?: string;
+  cameraIntensity?: CameraIntensity;
+  videoAudio?: boolean;
   // For async ops (3D) — server-side generation ID we poll on
   pollGenerationId?: string;
   // Sub-flavor for audio cards (drives the badge)
@@ -245,6 +251,36 @@ type RestyleModelId = (typeof RESTYLE_MODELS)[number]['id'];
 const INTERPOLATE_MULTIPLIERS = [2, 4, 8] as const;
 type InterpolateMultiplier = (typeof INTERPOLATE_MULTIPLIERS)[number];
 
+// Phase 4 — video generation controls. Mirrors generation.routes.ts
+// generateInputSchema + scene-controls/types.ts CAMERA_PRESETS.
+const VIDEO_DURATIONS = [3, 5, 8, 10] as const;
+const VIDEO_RESOLUTIONS = ['720p', '1080p'] as const;
+type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
+
+const CAMERA_PRESET_OPTIONS = [
+  { id: '', label: 'No motion preset' },
+  { id: 'locked', label: 'Locked' },
+  { id: 'handheld_subtle', label: 'Handheld' },
+  { id: 'dolly_in_slow', label: 'Dolly In (slow)' },
+  { id: 'dolly_in_fast', label: 'Dolly In (fast)' },
+  { id: 'dolly_out_slow', label: 'Dolly Out (slow)' },
+  { id: 'dolly_out_fast', label: 'Dolly Out (fast)' },
+  { id: 'pan_left', label: 'Pan Left' },
+  { id: 'pan_right', label: 'Pan Right' },
+  { id: 'tilt_up', label: 'Tilt Up' },
+  { id: 'tilt_down', label: 'Tilt Down' },
+  { id: 'orbit_left_slow', label: 'Orbit Left' },
+  { id: 'orbit_right_slow', label: 'Orbit Right' },
+  { id: 'orbit_right_fast', label: 'Orbit Right (fast)' },
+  { id: 'crane_up', label: 'Crane Up' },
+  { id: 'crane_down', label: 'Crane Down' },
+  { id: 'whip_pan_right', label: 'Whip Pan' },
+  { id: 'crash_zoom', label: 'Crash Zoom' },
+  { id: 'walk_up', label: 'Walk Up (POV)' },
+] as const;
+
+type CameraIntensity = 'subtle' | 'standard' | 'pronounced';
+
 const QUICK_RELIGHT_PRESETS = [
   { id: 'golden-hour', label: 'Golden Hour' },
   { id: 'neon-night', label: 'Neon Night' },
@@ -326,6 +362,13 @@ function SandboxPage() {
   const [isUploadingRef, setIsUploadingRef] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const refFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Video controls (only relevant in video mode)
+  const [videoDuration, setVideoDuration] = useState<number>(5);
+  const [videoResolution, setVideoResolution] = useState<VideoResolution>('720p');
+  const [cameraPreset, setCameraPreset] = useState<string>('');
+  const [cameraIntensity, setCameraIntensity] = useState<CameraIntensity>('standard');
+  const [videoAudioOn, setVideoAudioOn] = useState<boolean>(true);
 
   // Voice / audio / talking-scene state
   const [voiceMode, setVoiceMode] = useState<'tts' | 'sfx'>('tts');
@@ -519,6 +562,11 @@ function SandboxPage() {
         sourceImageUrl?: string;
         negativePrompt?: string;
         stylePresetId?: string | null;
+        durationSec?: number;
+        resolution?: VideoResolution;
+        cameraPreset?: string;
+        cameraIntensity?: CameraIntensity;
+        audioOn?: boolean;
         retryOf?: Generation;
       }
     ) => {
@@ -529,6 +577,7 @@ function SandboxPage() {
       const selectedModelId = hasImage ? modelIds.i2v : modelIds.t2v;
       const isSeedance = SEEDANCE_MODELS.has(opts.videoModel);
       const aspectRatio = aspectFromSize(opts.imageSize);
+      const audio = opts.audioOn !== undefined ? opts.audioOn : isSeedance;
 
       const gen: Generation = {
         id,
@@ -543,6 +592,11 @@ function SandboxPage() {
         referenceMode: hasImage ? 'animate' : undefined,
         negativePrompt: opts.negativePrompt || undefined,
         stylePresetId: opts.stylePresetId || undefined,
+        videoDurationSec: opts.durationSec,
+        videoResolution: opts.resolution,
+        cameraPreset: opts.cameraPreset || undefined,
+        cameraIntensity: opts.cameraPreset ? opts.cameraIntensity : undefined,
+        videoAudio: audio,
         retryCount: opts.retryOf ? (opts.retryOf.retryCount ?? 0) + 1 : 0,
         createdAt: Date.now(),
       };
@@ -556,10 +610,14 @@ function SandboxPage() {
           selectedModelId,
           ...(hasImage ? { imageUrl: opts.sourceImageUrl } : {}),
           ...(opts.negativePrompt ? { negativePrompt: opts.negativePrompt } : {}),
-          durationSec: 5,
-          resolution: '720p',
+          durationSec: opts.durationSec ?? 5,
+          resolution: opts.resolution ?? '720p',
           aspectRatio,
-          audio: isSeedance,
+          audio,
+          ...(opts.cameraPreset ? { cameraPreset: opts.cameraPreset } : {}),
+          ...(opts.cameraPreset && opts.cameraIntensity
+            ? { cameraIntensity: opts.cameraIntensity }
+            : {}),
         });
         const url = r?.videoUrl;
         if (!url) throw new Error('No video returned');
@@ -962,6 +1020,11 @@ function SandboxPage() {
           sourceImageUrl: g.sourceImageUrl,
           negativePrompt: g.negativePrompt,
           stylePresetId: g.stylePresetId ?? null,
+          durationSec: g.videoDurationSec,
+          resolution: g.videoResolution,
+          cameraPreset: g.cameraPreset,
+          cameraIntensity: g.cameraIntensity,
+          audioOn: g.videoAudio,
           retryOf: g,
         });
       }
@@ -1495,6 +1558,104 @@ function SandboxPage() {
                     )}
                   </div>
 
+                  {/* Video controls — only relevant in video mode */}
+                  {mode === 'video' && (
+                    <div className="border border-border rounded-lg p-3 space-y-2.5">
+                      <p className="text-[11px] font-semibold text-muted-foreground">
+                        Video controls
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[11px] text-muted-foreground">
+                            Duration ({videoDuration}s)
+                          </label>
+                          <div className="flex gap-1">
+                            {VIDEO_DURATIONS.map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setVideoDuration(d)}
+                                className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
+                                  videoDuration === d
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                }`}
+                              >
+                                {d}s
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[11px] text-muted-foreground">Resolution</label>
+                          <div className="flex gap-1">
+                            {VIDEO_RESOLUTIONS.map((r) => (
+                              <button
+                                key={r}
+                                type="button"
+                                onClick={() => setVideoResolution(r)}
+                                className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
+                                  videoResolution === r
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                }`}
+                              >
+                                {r}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-muted-foreground">Camera motion</label>
+                        <Select value={cameraPreset} onValueChange={setCameraPreset}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CAMERA_PRESET_OPTIONS.map((p) => (
+                              <SelectItem key={p.id || 'none'} value={p.id}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {cameraPreset && (
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[11px] text-muted-foreground">
+                            Camera intensity
+                          </label>
+                          <div className="flex gap-1">
+                            {(['subtle', 'standard', 'pronounced'] as const).map((i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setCameraIntensity(i)}
+                                className={`flex-1 text-[10px] py-1 rounded border transition-colors capitalize ${
+                                  cameraIntensity === i
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                }`}
+                              >
+                                {i}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <label className="flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={videoAudioOn}
+                          onChange={(e) => setVideoAudioOn(e.target.checked)}
+                          className="accent-primary"
+                        />
+                        Generate audio (only used by models that support it — Seedance, Veo 3)
+                      </label>
+                    </div>
+                  )}
+
                   {/* Actions */}
                   <div className="flex gap-2">
                     <Button
@@ -1543,6 +1704,11 @@ function SandboxPage() {
                           sourceImageUrl: useAnimate ? referenceImage!.url : undefined,
                           negativePrompt: negativePrompt.trim() || undefined,
                           stylePresetId: stylePreset ?? null,
+                          durationSec: videoDuration,
+                          resolution: videoResolution,
+                          cameraPreset: cameraPreset || undefined,
+                          cameraIntensity: cameraPreset ? cameraIntensity : undefined,
+                          audioOn: videoAudioOn,
                         });
                         if (useAnimate) setReferenceImage(null);
                         setPrompt('');
