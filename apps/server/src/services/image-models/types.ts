@@ -18,11 +18,12 @@ export type PriceTier = 'low' | 'medium' | 'high';
 
 export interface ImageModelConfig {
   id: string;
-  provider: 'fal' | 'comfyui' | 'bytedance';
+  provider: 'fal' | 'comfyui' | 'bytedance' | 'google';
   displayName: string;
   shortDescription: string;
   falModelId?: string; // undefined for non-fal providers
   bytedanceModelId?: string; // ModelArk model ID (used when provider='bytedance')
+  googleModelId?: string; // Google generativelanguage model id (used when provider='google')
   tasks: ImageGenerationTask[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

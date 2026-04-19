@@ -26,9 +26,22 @@ const profilesCol = () => {
   return db.collection('profiles');
 };
 
+// Ownership check helper — supports drafts created by either address or uid.
+// Drafts pre-2026-04-18 only had creatorAddress; new drafts have both.
+function ownsDraft(
+  data: FirebaseFirestore.DocumentData | undefined,
+  user: { address?: string; uid: string }
+): boolean {
+  if (!data) return false;
+  if (data.creatorUid && data.creatorUid === user.uid) return true;
+  if (data.creatorAddress && user.address && data.creatorAddress === user.address) return true;
+  return false;
+}
+
 export const sandboxRouter = router({
   // Save a draft item (image + optional video) to Firestore.
   // Auto-creates a gallery content record so all generated media is immediately visible.
+  // Status stays 'draft' — promotion to a universe is an explicit separate action.
   saveDraft: protectedProcedure
     .input(
       z.object({
@@ -43,27 +56,28 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const hasMedia = !!(input.videoUrl || input.imageUrl);
-      const mediaType = input.videoUrl ? 'ai-video' : input.imageUrl ? 'ai-image' : 'image';
+      const mediaType = input.videoUrl ? 'ai-video' : 'ai-image';
 
       const doc = await sandboxCol().add({
         creatorAddress: ctx.user.address,
+        creatorUid: ctx.user.uid,
         title: input.title,
         prompt: input.prompt,
         imageUrl: input.imageUrl || null,
         videoUrl: input.videoUrl || null,
         model: input.model || null,
         tags: input.tags,
-        status: hasMedia ? 'promoted' : 'draft',
+        status: 'draft',
         createdAt: now,
         updatedAt: now,
       });
 
-      // Auto-publish to gallery when media is present (skip if already published by generation route)
+      // Auto-publish to gallery when media is present (skip if already published by generation route).
+      // This makes all generated media instantly visible in the gallery per platform policy.
       let contentId: string | null = null;
       if (hasMedia) {
         const mediaUrl = input.videoUrl || input.imageUrl || '';
 
-        // Check if a content record already exists for this media URL (auto-created by generation route)
         const existing = await contentCol()
           .where('mediaUrl', '==', mediaUrl)
           .where('creatorUid', '==', ctx.user.uid)
@@ -71,7 +85,6 @@ export const sandboxRouter = router({
           .get();
 
         if (!existing.empty) {
-          // Already in gallery — update title/tags and link to this draft
           const existingDoc = existing.docs[0];
           contentId = existingDoc.id;
           await existingDoc.ref.update({
@@ -81,7 +94,6 @@ export const sandboxRouter = router({
             updatedAt: now,
           });
         } else {
-          // Not yet in gallery — create content record
           const contentData = {
             title: input.title,
             description: input.prompt || '',
@@ -108,7 +120,6 @@ export const sandboxRouter = router({
           const contentRef = await contentCol().add(contentData);
           contentId = contentRef.id;
 
-          // Update profile content count
           const profileRef = profilesCol().doc(ctx.user.uid);
           const profileDoc = await profileRef.get();
           if (profileDoc.exists) {
@@ -116,8 +127,9 @@ export const sandboxRouter = router({
           }
         }
 
-        // Link draft to content
-        await doc.update({ promotedTo: contentId, status: 'promoted', updatedAt: now });
+        // Link draft to gallery content without changing status —
+        // 'promoted' is reserved for explicit universe promotion.
+        await doc.update({ galleryContentId: contentId, updatedAt: now });
       }
 
       return { id: doc.id, contentId };
@@ -129,6 +141,8 @@ export const sandboxRouter = router({
       z.object({
         id: z.string(),
         title: z.string().min(1).max(200).optional(),
+        prompt: z.string().min(1).max(2000).optional(),
+        model: z.string().optional(),
         videoUrl: z.string().url().optional(),
         imageUrl: z.string().url().optional(),
         tags: z.array(z.string()).max(10).optional(),
@@ -138,11 +152,13 @@ export const sandboxRouter = router({
       const ref = sandboxCol().doc(input.id);
       const snap = await ref.get();
       if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Draft not found' });
-      if (snap.data()?.creatorAddress !== ctx.user.address)
+      if (!ownsDraft(snap.data(), ctx.user))
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
 
       const updates: Record<string, any> = { updatedAt: new Date() };
       if (input.title !== undefined) updates.title = input.title;
+      if (input.prompt !== undefined) updates.prompt = input.prompt;
+      if (input.model !== undefined) updates.model = input.model;
       if (input.videoUrl !== undefined) updates.videoUrl = input.videoUrl;
       if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl;
       if (input.tags !== undefined) updates.tags = input.tags;
@@ -158,7 +174,7 @@ export const sandboxRouter = router({
       const ref = sandboxCol().doc(input.id);
       const snap = await ref.get();
       if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Draft not found' });
-      if (snap.data()?.creatorAddress !== ctx.user.address)
+      if (!ownsDraft(snap.data(), ctx.user))
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
       await ref.delete();
       return { ok: true };
@@ -214,7 +230,7 @@ export const sandboxRouter = router({
       if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Draft not found' });
 
       const draft = snap.data()!;
-      if (draft.creatorAddress !== ctx.user.address)
+      if (!ownsDraft(draft, ctx.user))
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
       const now = new Date();
       const mediaUrl = draft.videoUrl || draft.imageUrl || '';
@@ -292,7 +308,7 @@ export const sandboxRouter = router({
     const snap = await sandboxCol().doc(input.id).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
-    if (d.creatorAddress !== ctx.user.address) {
+    if (!ownsDraft(d, ctx.user)) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
     }
     return {

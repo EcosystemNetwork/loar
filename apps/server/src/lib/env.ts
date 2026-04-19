@@ -64,6 +64,13 @@ const envSchema = z.object({
   // ── Redis (required for production — rate limiting, job queue, circuit breakers) ──
   REDIS_URL: z.string().url('REDIS_URL must be a valid URL (redis://...)').optional(),
 
+  // ── Reverse proxy ───────────────────────────────────────────────────────
+  // Set to 'true' when behind a trusted reverse proxy (Railway, Fly, Vercel,
+  // nginx). Without this, the rate limiter keys on the socket remote address
+  // — which on hosted platforms is the load balancer's IP, collapsing every
+  // client into one bucket.
+  TRUST_PROXY: z.enum(['true', 'false']).optional(),
+
   // ── Scaling ─────────────────────────────────────────────────────────────
   MAX_CONCURRENT_GENERATIONS: z.string().default('50'),
   MAX_QUEUED_GENERATIONS: z.string().default('200'),
@@ -85,6 +92,9 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   MESHY_API_KEY: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
+
+  // ── Unstoppable Domains (reverse-resolve wallet → domain in UI) ──────────
+  UNSTOPPABLE_DOMAINS_API_KEY: z.string().optional(),
 
   // ── Storage — Pinata ──────────────────────────────────────────────────────
   PINATA_JWT: z.string().optional(),
@@ -188,6 +198,15 @@ export function validateEnv(): Env {
       console.warn(
         '⚠️  REDIS_URL is not set — rate limiting, job queues, and circuit breakers will use in-memory fallbacks. ' +
           'This means no horizontal scaling and data loss on restart. Set REDIS_URL for production.'
+      );
+    }
+
+    if (env.TRUST_PROXY !== 'true') {
+      prodErrors.push(
+        'TRUST_PROXY=true is required in production. Hosted platforms (Railway/Fly/Vercel/nginx) ' +
+          'terminate TLS at a load balancer; without this flag the rate limiter keys on the LB IP ' +
+          'and collapses every client into a single bucket. Verify your reverse proxy strips ' +
+          'client-supplied x-forwarded-for / x-real-ip headers before enabling.'
       );
     }
 

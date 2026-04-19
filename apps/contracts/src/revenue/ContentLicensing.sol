@@ -282,8 +282,6 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit ContentLicensed(dealId, contentHash, msg.sender, reg.licenseFee, endTime);
     }
 
-    error DealExpired();
-
     /// @notice Pay ongoing royalty for a LICENSE deal.
     /// @dev Enforces endTime — auto-expires the deal if past deadline.
     function payRoyalty(uint256 dealId) external payable nonReentrant whenNotPaused {

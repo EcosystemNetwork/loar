@@ -107,6 +107,10 @@ app.route('/auth', authRoutes);
 // Add image serving routes
 app.route('/images', imageRouter);
 
+// Unstoppable Domains reverse-resolve proxy (browser → server → UD).
+const { unstoppableRoutes } = await import('./routes/unstoppable');
+app.route('/api/ud', unstoppableRoutes);
+
 /** Detect MIME type from file magic bytes. Returns null if unrecognised. */
 function detectMimeFromMagic(header: Buffer): string | null {
   if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return 'image/jpeg';

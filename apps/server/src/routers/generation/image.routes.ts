@@ -48,10 +48,11 @@ import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { getStorageManager } from '../../services/storage';
 import { signWithProvenance } from '../../services/provenance';
-import type { ImageGenerationRecord } from '../../services/image-models/types';
+import type { ImageGenerationRecord, ImageModelConfig } from '../../services/image-models/types';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { googleImagenService } from '../../services/google-imagen';
 
 // ── Collections ───────────────────────────────────────────────────────
 
@@ -112,9 +113,129 @@ async function saveRecord(record: ImageGenerationRecord): Promise<void> {
   await imageGenerationsCol().doc(record.id).set(clean);
 }
 
+// ── Provider dispatch ───────────────────────────────────────────────
+
+function imageSizeToAspectRatio(size?: string): '1:1' | '3:4' | '4:3' | '9:16' | '16:9' {
+  switch (size) {
+    case 'portrait_4_3':
+      return '3:4';
+    case 'landscape_4_3':
+      return '4:3';
+    case 'portrait_16_9':
+      return '9:16';
+    case 'landscape_16_9':
+      return '16:9';
+    default:
+      return '1:1';
+  }
+}
+
+interface DispatchResult {
+  status: 'completed' | 'failed';
+  images?: Array<{ url: string }>;
+  seed?: number;
+  error?: string;
+}
+
+/**
+ * Single dispatch path for all image providers. For Google, base64 results
+ * are uploaded to permanent storage synchronously so the return value is a
+ * URL just like FAL/ByteDance.
+ */
+async function dispatchImageGen(
+  model: ImageModelConfig,
+  input: z.infer<typeof generateSchema>,
+  ctx: { userId: string; generationId: string }
+): Promise<DispatchResult> {
+  if (model.provider === 'google') {
+    if (!googleImagenService.isConfigured()) {
+      return { status: 'failed', error: 'GOOGLE_API_KEY is not configured' };
+    }
+    try {
+      const result = await googleImagenService.generate({
+        prompt: input.prompt,
+        negativePrompt: input.negativePrompt,
+        numberOfImages: input.numImages,
+        aspectRatio: imageSizeToAspectRatio(input.imageSize),
+        model: (model.googleModelId as any) || 'nano-banana-pro-preview',
+      });
+      const manager = getStorageManager();
+      const images: Array<{ url: string }> = [];
+      for (let i = 0; i < result.images.length; i++) {
+        const img = result.images[i];
+        const filename = `generation-${ctx.generationId}-${i}.png`;
+        const buf = Buffer.from(img.base64, 'base64');
+        const signed = await signWithProvenance(buf, filename, {
+          model: model.googleModelId || 'nano-banana-pro-preview',
+          prompt: input.prompt,
+          generatedAt: new Date().toISOString(),
+          mimeType: img.mimeType || 'image/png',
+        });
+        const manifest = await manager.upload(
+          signed,
+          filename,
+          img.mimeType || 'image/png',
+          ctx.userId
+        );
+        const url = manifest.uploads[0]?.url;
+        if (url) images.push({ url });
+      }
+      if (images.length === 0) {
+        return { status: 'failed', error: 'Google returned no images (storage upload failed)' };
+      }
+      return { status: 'completed', images };
+    } catch (err) {
+      return {
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Google API error',
+      };
+    }
+  }
+
+  if (model.provider === 'bytedance') {
+    const result = await bytedanceService.generateImage({
+      prompt: input.prompt,
+      model: model.bytedanceModelId || 'seedream-5-0-260128',
+      negativePrompt: input.negativePrompt,
+      numImages: input.numImages,
+      seed: input.seed,
+    });
+    if (result.status === 'completed' && result.images?.length) {
+      return {
+        status: 'completed',
+        images: result.images.map((img) => ({ url: img.url })),
+        seed: result.seed,
+      };
+    }
+    return { status: 'failed', error: result.error || 'ByteDance returned no images' };
+  }
+
+  // FAL (default)
+  if (!process.env.FAL_KEY) {
+    return { status: 'failed', error: 'FAL_KEY is not configured' };
+  }
+  const result = await falService.generateImage({
+    prompt: input.prompt,
+    model: model.falModelId as any,
+    negativePrompt: input.negativePrompt,
+    imageSize: input.imageSize,
+    numImages: input.numImages,
+    seed: input.seed,
+  });
+  if (result.status === 'completed' && result.images?.length) {
+    return {
+      status: 'completed',
+      images: result.images.map((img) => ({ url: img.url })),
+      seed: result.seed,
+    };
+  }
+  return { status: 'failed', error: result.error || 'FAL returned no images' };
+}
+
 async function attemptFallback(
   input: z.infer<typeof generateSchema>,
-  failedModelId: string
+  failedModelId: string,
+  ctx: { userId: string; generationId: string }
 ): Promise<{ imageUrls: string[]; fallbackModelId: string } | null> {
   const candidates = getVisibleImageModels()
     .filter((m) => m.id !== failedModelId && m.isEnabled && m.tasks.includes(input.task))
@@ -127,23 +248,7 @@ async function attemptFallback(
 
   for (const candidate of candidates.slice(0, 2)) {
     try {
-      const result =
-        candidate.provider === 'bytedance'
-          ? await bytedanceService.generateImage({
-              prompt: input.prompt,
-              model: candidate.bytedanceModelId || 'seedream-5-0-260128',
-              negativePrompt: input.negativePrompt,
-              numImages: input.numImages,
-              seed: input.seed,
-            })
-          : await falService.generateImage({
-              prompt: input.prompt,
-              model: candidate.falModelId as any,
-              negativePrompt: input.negativePrompt,
-              imageSize: input.imageSize,
-              numImages: input.numImages,
-              seed: input.seed,
-            });
+      const result = await dispatchImageGen(candidate, input, ctx);
       if (result.status === 'completed' && result.images?.length) {
         markImageProviderHealthy(candidate.provider);
         return {
@@ -151,7 +256,9 @@ async function attemptFallback(
           fallbackModelId: candidate.id,
         };
       }
-    } catch {
+      markImageProviderUnhealthy(candidate.provider);
+    } catch (err) {
+      console.error(`[image] fallback ${candidate.id} threw:`, err);
       markImageProviderUnhealthy(candidate.provider);
     }
   }
@@ -416,13 +523,20 @@ export const imageRouter = router({
       await saveRecord(record);
 
       // ── Deduct credits ───────────────────────────────────────────────
-      if (!db) throw new Error('Firebase is not configured — cannot deduct credits');
+      if (!db) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Server storage is not configured — cannot deduct credits',
+        });
+      }
       const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
+      let insufficientCredits = false;
       try {
         await db.runTransaction(async (tx) => {
           const doc = await tx.get(userCreditsRef);
           const balance = doc.exists ? doc.data()?.balance || 0 : 0;
           if (balance < totalCredits) {
+            insufficientCredits = true;
             throw new Error(
               `Insufficient credits. Need ${totalCredits}, have ${balance}. Purchase more credits to continue.`
             );
@@ -434,44 +548,33 @@ export const imageRouter = router({
           });
         });
       } catch (err) {
+        const message = err instanceof Error ? err.message : 'Credit deduction failed';
         await imageGenerationsCol()
           .doc(genId)
-          .update({
-            status: 'failed',
-            failureReason: err instanceof Error ? err.message : 'Credit deduction failed',
-            completedAt: new Date(),
-          });
-        throw err;
+          .update({ status: 'failed', failureReason: message, completedAt: new Date() });
+        if (insufficientCredits) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
       }
 
       // ── Generate ─────────────────────────────────────────────────────
       try {
         await imageGenerationsCol().doc(genId).update({ status: 'running' });
 
-        // Dispatch to correct provider
-        const result =
-          model.provider === 'bytedance'
-            ? await bytedanceService.generateImage({
-                prompt: input.prompt,
-                model: model.bytedanceModelId || 'seedream-5-0-260128',
-                negativePrompt: input.negativePrompt,
-                numImages: input.numImages,
-                seed: input.seed,
-              })
-            : await falService.generateImage({
-                prompt: input.prompt,
-                model: model.falModelId as any,
-                negativePrompt: input.negativePrompt,
-                imageSize: input.imageSize,
-                numImages: input.numImages,
-                seed: input.seed,
-              });
+        const result = await dispatchImageGen(model, input, {
+          userId: ctx.user.uid,
+          generationId: genId,
+        });
 
         if (result.status !== 'completed' || !result.images?.length) {
           markImageProviderUnhealthy(model.provider);
 
           if (input.allowFallback) {
-            const fallback = await attemptFallback(input, model.id);
+            const fallback = await attemptFallback(input, model.id, {
+              userId: ctx.user.uid,
+              generationId: genId,
+            });
             if (fallback) {
               const latencyMs = Date.now() - startTime;
               await imageGenerationsCol().doc(genId).update({
@@ -545,7 +648,13 @@ export const imageRouter = router({
             latencyMs: failLatencyMs,
             completedAt: new Date(),
           });
-          throw new Error(failReason);
+          // Map provider-config errors to SERVICE_UNAVAILABLE so the client
+          // sees a clear 503 instead of a generic 500.
+          const isConfigError = /API_KEY|FAL_KEY|GOOGLE_API_KEY|not configured/i.test(failReason);
+          throw new TRPCError({
+            code: isConfigError ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
+            message: failReason,
+          });
         }
 
         markImageProviderHealthy(model.provider);

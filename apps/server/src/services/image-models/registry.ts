@@ -120,10 +120,11 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
 
   {
     id: 'nano-banana-2',
-    provider: 'fal',
+    provider: 'google',
     displayName: 'Nano Banana 2',
-    shortDescription: 'Next-gen versatile image generation and editing',
-    falModelId: 'fal-ai/nano-banana-2',
+    shortDescription: 'Next-gen versatile image generation (Google direct)',
+    googleModelId: 'nano-banana-pro-preview',
+    falModelId: 'fal-ai/nano-banana-2', // FAL fallback if Google is unavailable
     tasks: ['text_to_image', 'image_to_image'],
     qualityTier: 'standard',
     speedTier: 'fast',
@@ -146,8 +147,8 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
     isEnabled: true,
     isVisibleToUsers: true,
     allowedPlans: [],
-    tags: ['standard', 'fast', 'versatile', 'character', 'scene'],
-    bestFor: 'Versatile image generation and editing with improved quality',
+    tags: ['standard', 'fast', 'versatile', 'character', 'scene', 'google'],
+    bestFor: 'Versatile image generation and editing — served via Google direct API',
   },
   {
     id: 'nano-banana-pro',

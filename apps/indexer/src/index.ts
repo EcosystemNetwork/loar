@@ -513,42 +513,91 @@ ponder.on('PoolManager:Swap', async ({ event, context }) => {
 
 // ── CanonMarketplace ──────────────────────────────────────────────────
 
+// Status codes mirror the SubmissionStatus enum in CanonMarketplace.sol:
+// 0=PENDING, 1=VOTING, 2=ACCEPTED, 3=REJECTED, 4=EXPIRED.
 ponder.on('CanonMarketplace:SubmissionCreated', async ({ event, context }) => {
+  const submissionId = event.args.id;
+
+  // SubmissionCreated doesn't carry universeToken/metadataURI/submissionFee/votingDeadline;
+  // read them from the submissions() struct getter.
+  const sub = (await context.client.readContract({
+    abi: context.contracts.CanonMarketplace.abi,
+    address: context.contracts.CanonMarketplace.address as `0x${string}`,
+    functionName: 'submissions',
+    args: [submissionId],
+  })) as readonly [
+    bigint,
+    bigint,
+    `0x${string}`,
+    number,
+    number,
+    `0x${string}`,
+    `0x${string}`,
+    string,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+  ];
+
   await context.db.insert(canonSubmission).values({
-    id: event.args.id.toString(),
+    id: submissionId.toString(),
     universeId: Number(event.args.universeId),
+    universeToken: getAddress(sub[2]),
+    submissionType: Number(event.args.subType),
+    status: 1, // VOTING
     creator: getAddress(event.args.creator),
     contentHash: event.args.contentHash,
-    subType: Number(event.args.subType),
-    status: 'pending',
-    voteFor: 0,
-    voteAgainst: 0,
-    timestamp: Number(event.block.timestamp),
+    metadataURI: sub[7],
+    submissionFee: sub[8].toString(),
+    votesFor: '0',
+    votesAgainst: '0',
+    votingDeadline: Number(sub[11]),
+    createdAt: Number(event.block.timestamp),
   });
 });
 
 ponder.on('CanonMarketplace:VoteCast', async ({ event, context }) => {
-  const submissionId = event.args.submissionId.toString();
+  const submissionIdStr = event.args.submissionId.toString();
   await context.db.insert(canonVote).values({
-    id: `${submissionId}:${getAddress(event.args.voter)}`,
-    submissionId,
+    id: `${submissionIdStr}:${getAddress(event.args.voter)}`,
+    submissionId: Number(event.args.submissionId),
     voter: getAddress(event.args.voter),
     support: event.args.support,
     weight: event.args.weight.toString(),
     timestamp: Number(event.block.timestamp),
   });
+
+  // Keep the aggregate tallies on canonSubmission in sync with per-vote rows.
+  const existing = await context.db.find(canonSubmission, { id: submissionIdStr });
+  if (existing) {
+    const weight = event.args.weight;
+    if (event.args.support) {
+      await context.db
+        .update(canonSubmission, { id: submissionIdStr })
+        .set({ votesFor: (BigInt(existing.votesFor) + weight).toString() });
+    } else {
+      await context.db
+        .update(canonSubmission, { id: submissionIdStr })
+        .set({ votesAgainst: (BigInt(existing.votesAgainst) + weight).toString() });
+    }
+  }
 });
 
 ponder.on('CanonMarketplace:SubmissionAccepted', async ({ event, context }) => {
   await context.db
     .update(canonSubmission, { id: event.args.submissionId.toString() })
-    .set({ status: 'accepted' });
+    .set({ status: 2, finalizedAt: Number(event.block.timestamp) });
 });
 
+// Emitted for both merit-rejection and quorum-expiry paths; indexer can't distinguish
+// without a dedicated event. Both land as status=3 (REJECTED) here.
 ponder.on('CanonMarketplace:SubmissionRejected', async ({ event, context }) => {
   await context.db
     .update(canonSubmission, { id: event.args.submissionId.toString() })
-    .set({ status: 'rejected' });
+    .set({ status: 3, finalizedAt: Number(event.block.timestamp) });
 });
 
 // ── AdPlacement ───────────────────────────────────────────────────────
