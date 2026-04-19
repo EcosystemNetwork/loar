@@ -54,6 +54,7 @@ import {
 import { ModelSelector } from '@/components/ModelSelector';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/sandbox')({
   component: SandboxPage,
@@ -2482,7 +2483,7 @@ function GenerationCard({
             {gen.videoUrl ? (
               // Turntable preview if Meshy returned one
               <video
-                src={gen.videoUrl}
+                src={resolveIpfsUrl(gen.videoUrl)}
                 className="w-full h-full object-cover"
                 autoPlay
                 muted
@@ -2490,7 +2491,11 @@ function GenerationCard({
                 playsInline
               />
             ) : gen.thumbnailUrl ? (
-              <img src={gen.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+              <img
+                src={resolveIpfsUrl(gen.thumbnailUrl)}
+                alt=""
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
                 <Frame className="h-8 w-8 text-muted-foreground" />
@@ -2504,7 +2509,7 @@ function GenerationCard({
           gen.kind !== '3d-model' &&
           gen.videoUrl && (
             <video
-              src={gen.videoUrl}
+              src={resolveIpfsUrl(gen.videoUrl)}
               className="w-full h-full object-cover"
               controls
               muted
@@ -2516,7 +2521,9 @@ function GenerationCard({
           gen.kind !== 'audio' &&
           gen.kind !== '3d-model' &&
           !gen.videoUrl &&
-          gen.imageUrl && <img src={gen.imageUrl} alt="" className="w-full h-full object-cover" />}
+          gen.imageUrl && (
+            <img src={resolveIpfsUrl(gen.imageUrl)} alt="" className="w-full h-full object-cover" />
+          )}
 
         <Button
           size="icon"
@@ -3073,7 +3080,7 @@ function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
         ) : draftKind === '3d-model' ? (
           draft.thumbnailUrl || draft.imageUrl ? (
             <img
-              src={(draft.thumbnailUrl || draft.imageUrl)!}
+              src={resolveIpfsUrl((draft.thumbnailUrl || draft.imageUrl)!)}
               alt={draft.title}
               className="w-full h-full object-cover"
             />
@@ -3085,7 +3092,7 @@ function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
           )
         ) : draft.videoUrl ? (
           <video
-            src={draft.videoUrl}
+            src={resolveIpfsUrl(draft.videoUrl)}
             className="w-full h-full object-cover"
             muted
             playsInline
@@ -3099,7 +3106,11 @@ function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
             }}
           />
         ) : draft.imageUrl ? (
-          <img src={draft.imageUrl} alt={draft.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(draft.imageUrl)}
+            alt={draft.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Wand2 className="h-6 w-6 text-muted-foreground/30" />

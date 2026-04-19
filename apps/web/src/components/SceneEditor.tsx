@@ -37,6 +37,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface VideoSegment {
   id: string;
@@ -274,7 +275,7 @@ export function SceneEditor({
           <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
             <video
               ref={videoRef}
-              src={currentSegmentInfo.segment.videoUrl}
+              src={resolveIpfsUrl(currentSegmentInfo.segment.videoUrl)}
               className="w-full h-full object-contain"
               onTimeUpdate={(e) => {
                 const segmentLocalTime = e.currentTarget.currentTime;
@@ -369,13 +370,13 @@ export function SceneEditor({
                       {/* Segment Thumbnail/Preview */}
                       {segment.imageUrl ? (
                         <img
-                          src={segment.imageUrl}
+                          src={resolveIpfsUrl(segment.imageUrl)}
                           alt={`Segment ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
                       ) : (
                         <video
-                          src={segment.videoUrl}
+                          src={resolveIpfsUrl(segment.videoUrl)}
                           className="w-full h-full object-cover"
                           muted
                         />

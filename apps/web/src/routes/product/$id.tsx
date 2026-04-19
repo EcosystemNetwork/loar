@@ -31,6 +31,7 @@ import { BuyNFTDialog } from '@/components/BuyNFTDialog';
 import { useVocab } from '@/hooks/use-vocab';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
@@ -238,14 +239,14 @@ function ProductDetailPage() {
         {l.mediaUrl || l.thumbnailUrl ? (
           l.mediaUrl?.endsWith('.mp4') || l.mediaUrl?.endsWith('.webm') ? (
             <video
-              src={l.mediaUrl}
+              src={resolveIpfsUrl(l.mediaUrl)}
               controls
               className="w-full h-full object-contain"
               poster={l.thumbnailUrl ?? undefined}
             />
           ) : (
             <img
-              src={l.mediaUrl ?? l.thumbnailUrl}
+              src={resolveIpfsUrl(l.mediaUrl ?? l.thumbnailUrl)}
               alt={l.title}
               className="w-full h-full object-contain"
             />

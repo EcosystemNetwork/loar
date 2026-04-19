@@ -68,6 +68,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ModelViewer } from '@/components/ModelViewer';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 // New wiki components
 import { EntityCard } from '@/components/wiki/EntityCard';
@@ -328,7 +329,7 @@ function CollectionTab() {
                 </div>
                 {char.image_url && (
                   <img
-                    src={char.image_url}
+                    src={resolveIpfsUrl(char.image_url)}
                     alt={char.character_name}
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
@@ -441,7 +442,7 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
                   </div>
                   {entity.imageUrl && (
                     <img
-                      src={entity.imageUrl}
+                      src={resolveIpfsUrl(entity.imageUrl)}
                       alt={entity.name}
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {
@@ -556,7 +557,7 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
                 </div>
                 {(item.thumbnailUrl || item.mediaUrl) && (
                   <img
-                    src={item.thumbnailUrl || item.mediaUrl}
+                    src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
                     alt={item.title}
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
@@ -593,7 +594,7 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
           {selectedItem?.mediaUrl ? (
             <div className="h-[60vh] w-full">
               <ModelViewer
-                src={selectedItem.mediaUrl}
+                src={resolveIpfsUrl(selectedItem.mediaUrl)}
                 poster={selectedItem.thumbnailUrl || undefined}
                 alt={selectedItem.title || '3D Model'}
                 className="h-full"
@@ -766,7 +767,7 @@ function WikiPage() {
             >
               {u.image_url ? (
                 <img
-                  src={u.image_url}
+                  src={resolveIpfsUrl(u.image_url)}
                   alt=""
                   className="h-5 w-5 rounded object-cover flex-shrink-0"
                   onError={(e) => {
@@ -792,7 +793,7 @@ function WikiPage() {
         <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
             <img
-              src={universeInfo.image_url}
+              src={resolveIpfsUrl(universeInfo.image_url)}
               alt=""
               className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
             />

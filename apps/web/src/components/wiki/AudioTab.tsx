@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Music, Play, Pause, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Link } from '@tanstack/react-router';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface AudioTabProps {
   universeAddress?: string;
@@ -96,7 +97,7 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
               <div className="aspect-square bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 relative flex items-center justify-center">
                 {item.thumbnailUrl ? (
                   <img
-                    src={item.thumbnailUrl}
+                    src={resolveIpfsUrl(item.thumbnailUrl)}
                     alt={item.title}
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {

@@ -12,6 +12,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Clock, CheckCircle2 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export function HistoryPanel({
   contentId,
@@ -61,7 +62,7 @@ export function HistoryPanel({
               >
                 {v.mediaUrl ? (
                   <img
-                    src={v.mediaUrl}
+                    src={resolveIpfsUrl(v.mediaUrl)}
                     alt=""
                     className="h-10 w-10 rounded object-cover shrink-0"
                   />

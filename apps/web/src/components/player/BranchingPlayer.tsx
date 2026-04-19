@@ -7,6 +7,7 @@ import { PlayerControls } from './PlayerControls';
 import { BranchStats } from './BranchStats';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface NodeData {
   id: number;
@@ -204,7 +205,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
-        src={currentNode?.mediaUrl || ''}
+        src={resolveIpfsUrl(currentNode?.mediaUrl || '')}
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleVideoEnd}
         onPlay={() => setIsPlaying(true)}

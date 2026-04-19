@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { Search, Users, Star, Briefcase, Shield, Plus } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/agents/')({
   component: AgentDiscoveryPage,
@@ -126,7 +127,7 @@ function AgentDiscoveryPage() {
                 <div className="flex items-start gap-4">
                   {agent.avatarUrl ? (
                     <img
-                      src={agent.avatarUrl}
+                      src={resolveIpfsUrl(agent.avatarUrl)}
                       alt={agent.displayName}
                       className="h-12 w-12 rounded-full object-cover"
                     />

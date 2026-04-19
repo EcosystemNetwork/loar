@@ -7,6 +7,7 @@ import { X, Download, Heart, Eye, GitBranch, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGalleryLineage } from '@/hooks/useGallery';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface MediaLightboxProps {
   content: {
@@ -183,9 +184,9 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
                     className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg p-2 w-full text-left transition-colors"
                   >
                     <img
-                      src={
+                      src={resolveIpfsUrl(
                         lineage.parent.thumbnailUrl || lineage.parent.mediaUrl || '/placeholder.jpg'
-                      }
+                      )}
                       alt={lineage.parent.title}
                       className="w-16 h-10 object-cover rounded"
                     />
@@ -235,7 +236,7 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
                       title={d.title}
                     >
                       <img
-                        src={d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg'}
+                        src={resolveIpfsUrl(d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg')}
                         alt={d.title}
                         className="w-full h-full object-cover"
                       />

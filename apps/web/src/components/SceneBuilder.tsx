@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface VideoSegment {
   id: string;
@@ -199,7 +200,7 @@ export function SceneBuilder({
             {currentSegment ? (
               <video
                 ref={videoRef}
-                src={currentSegment.videoUrl}
+                src={resolveIpfsUrl(currentSegment.videoUrl)}
                 className="max-h-full max-w-full"
                 onLoadedMetadata={(e) => {
                   // Update duration when video loads

@@ -31,6 +31,7 @@ import {
   X,
 } from 'lucide-react';
 import type { EditingOperation, EditingModel, EditingResult } from '@/hooks/useVideoEditing';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface VideoEditingToolbarProps {
   videoUrl: string | null;
@@ -495,14 +496,14 @@ export function VideoEditingToolbar({
               <p className="text-xs text-green-400">Done! Processed with {lastResult.model}.</p>
               {lastResult.videoUrl && (
                 <video
-                  src={lastResult.videoUrl}
+                  src={resolveIpfsUrl(lastResult.videoUrl)}
                   controls
                   className="w-full mt-2 rounded max-h-48"
                 />
               )}
               {lastResult.imageUrl && (
                 <img
-                  src={lastResult.imageUrl}
+                  src={resolveIpfsUrl(lastResult.imageUrl)}
                   alt="Result"
                   className="w-full mt-2 rounded max-h-48 object-contain"
                 />

@@ -24,6 +24,7 @@ import {
   Cpu,
   Building2,
 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 const VALID_KINDS = [
   'person',
@@ -179,7 +180,7 @@ function WikiKindPage() {
                   </div>
                   {entity.imageUrl && (
                     <img
-                      src={entity.imageUrl}
+                      src={resolveIpfsUrl(entity.imageUrl)}
                       alt={entity.name}
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {

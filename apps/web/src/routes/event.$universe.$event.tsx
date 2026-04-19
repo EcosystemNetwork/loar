@@ -48,6 +48,7 @@ import {
 } from '@/components/segments/AddSegmentDialog';
 import type { VideoSegment, MultiSegmentEvent } from '@/types/segments';
 import { migrateLegacyEvent, generateSegmentId, sortSegments } from '@/types/segments';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 function EventPage() {
   const { universe: universeId, event: eventId } = useParams({ from: '/event/$universe/$event' });
@@ -590,7 +591,7 @@ function EventPage() {
                     <div className="w-32 h-20 bg-black rounded overflow-hidden flex-shrink-0">
                       {previousEventData.videoUrl ? (
                         <video
-                          src={previousEventData.videoUrl}
+                          src={resolveIpfsUrl(previousEventData.videoUrl)}
                           className="w-full h-full object-cover"
                           muted
                         />
@@ -637,7 +638,7 @@ function EventPage() {
                       <div className="w-32 h-20 bg-black rounded overflow-hidden flex-shrink-0">
                         {nextEventData[0].videoUrl ? (
                           <video
-                            src={nextEventData[0].videoUrl}
+                            src={resolveIpfsUrl(nextEventData[0].videoUrl)}
                             className="w-full h-full object-cover"
                             muted
                           />
@@ -673,7 +674,7 @@ function EventPage() {
                           <div className="w-20 h-14 bg-black rounded overflow-hidden flex-shrink-0">
                             {event.videoUrl ? (
                               <video
-                                src={event.videoUrl}
+                                src={resolveIpfsUrl(event.videoUrl)}
                                 className="w-full h-full object-cover"
                                 muted
                               />
@@ -780,7 +781,7 @@ function EventPage() {
                               {matchingCharacter?.image_url && (
                                 <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5">
                                   <img
-                                    src={matchingCharacter.image_url}
+                                    src={resolveIpfsUrl(matchingCharacter.image_url)}
                                     alt={element.name}
                                     className="w-full h-full object-cover"
                                   />

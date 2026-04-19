@@ -37,6 +37,7 @@ import { useChainId } from 'wagmi';
 import { getEvmAddresses } from '@/configs/addresses';
 import { licensingRegistryAbi } from '@loar/abis/generated';
 import { toast } from 'sonner';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/licensing/')({
   component: LicensingHubPage,
@@ -393,7 +394,7 @@ function MerchTab({
                   {item.imageUrl && (
                     <div className="aspect-square rounded-lg bg-muted overflow-hidden mb-2">
                       <img
-                        src={item.imageUrl}
+                        src={resolveIpfsUrl(item.imageUrl)}
                         alt={item.name}
                         className="w-full h-full object-cover"
                       />

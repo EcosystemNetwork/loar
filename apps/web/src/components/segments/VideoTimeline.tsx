@@ -27,6 +27,7 @@ import type { VideoSegment } from '@/types/segments';
 import { getEffectiveDuration } from '@/types/segments';
 import { VideoTrimmer } from './VideoTrimmer';
 import { cn } from '@/lib/utils';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface VideoTimelineProps {
   segments: VideoSegment[];
@@ -141,7 +142,7 @@ export function VideoTimeline({
             {currentSegment?.videoUrl ? (
               <video
                 ref={videoRef}
-                src={currentSegment.videoUrl}
+                src={resolveIpfsUrl(currentSegment.videoUrl)}
                 className="w-full h-full object-contain"
                 playsInline
               />

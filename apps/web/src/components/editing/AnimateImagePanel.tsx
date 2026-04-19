@@ -30,6 +30,7 @@ import {
   Footprints,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 type MotionPresetId = 'push_in' | 'orbit' | 'crash_zoom' | 'dolly' | 'walk_up';
 type Intensity = 'subtle' | 'standard' | 'pronounced';
@@ -268,7 +269,11 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
           <Badge variant="secondary" className="text-[9px] mb-1">
             Linked to source image
           </Badge>
-          <video src={animate.data.videoUrl} controls className="w-full rounded max-h-48" />
+          <video
+            src={resolveIpfsUrl(animate.data.videoUrl)}
+            controls
+            className="w-full rounded max-h-48"
+          />
         </Card>
       )}
     </div>

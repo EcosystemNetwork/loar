@@ -9,6 +9,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 import {
   Play,
@@ -910,7 +911,7 @@ function ContentCard({ item }: { item: any }) {
         {item.thumbnailUrl || item.mediaUrl ? (
           isVideo && item.mediaUrl ? (
             <video
-              src={item.mediaUrl}
+              src={resolveIpfsUrl(item.mediaUrl)}
               poster={item.thumbnailUrl || undefined}
               className="w-full h-full object-cover"
               muted
@@ -918,7 +919,7 @@ function ContentCard({ item }: { item: any }) {
             />
           ) : (
             <img
-              src={item.thumbnailUrl || item.mediaUrl}
+              src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
               alt=""
               className="w-full h-full object-cover"
             />

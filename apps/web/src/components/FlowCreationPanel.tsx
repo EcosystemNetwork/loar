@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dialog';
 import { trpcClient } from '@/utils/trpc';
 import { ModelSelector } from '@/components/ModelSelector';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -809,7 +810,7 @@ export function FlowCreationPanel({
                         className="flex items-center gap-2 px-2 py-1 rounded-md border bg-background text-sm"
                       >
                         <img
-                          src={char.image_url}
+                          src={resolveIpfsUrl(char.image_url)}
                           alt={char.character_name}
                           className="w-6 h-6 rounded-full object-cover"
                         />
@@ -1133,7 +1134,7 @@ export function FlowCreationPanel({
                                     {/* Character Image */}
                                     <div className="relative w-full h-full">
                                       <img
-                                        src={char.image_url}
+                                        src={resolveIpfsUrl(char.image_url)}
                                         alt={char.character_name}
                                         className={`w-full h-full object-cover transition-all ${
                                           isSelected

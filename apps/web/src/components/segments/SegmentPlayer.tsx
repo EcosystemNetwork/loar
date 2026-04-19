@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
 import { getEffectiveDuration } from '@/types/segments';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface SegmentPlayerProps {
   segments: VideoSegment[];
@@ -212,7 +213,7 @@ export function SegmentPlayer({
         <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
           <video
             ref={videoRef}
-            src={currentSegment.videoUrl}
+            src={resolveIpfsUrl(currentSegment.videoUrl)}
             onEnded={handleEnded}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleTimeUpdate}

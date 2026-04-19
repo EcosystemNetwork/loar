@@ -35,6 +35,7 @@ import {
   Coins,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -527,7 +528,11 @@ function HistoryItem({ item }: { item: any }) {
       {/* Thumbnail / icon */}
       <div className="flex-shrink-0 w-16 h-12 rounded bg-zinc-700 flex items-center justify-center overflow-hidden">
         {item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt=""
+            className="w-full h-full object-cover"
+          />
         ) : isLipSync ? (
           <Mic className="h-5 w-5 text-zinc-500" />
         ) : (

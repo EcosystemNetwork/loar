@@ -8,6 +8,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { trpcClient } from '@/utils/trpc';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -374,16 +375,24 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
         {/* Thumbnail */}
         <div className="relative aspect-video bg-muted">
           {item.thumbnailUrl ? (
-            <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl(item.thumbnailUrl)}
+              alt={item.title}
+              className="w-full h-full object-cover"
+            />
           ) : isVideo ? (
             <video
-              src={item.mediaUrl}
+              src={resolveIpfsUrl(item.mediaUrl)}
               className="w-full h-full object-cover"
               muted
               preload="metadata"
             />
           ) : (
-            <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl(item.mediaUrl)}
+              alt={item.title}
+              className="w-full h-full object-cover"
+            />
           )}
           {isVideo && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -5,6 +5,7 @@ import { Zap, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { WikiEntity } from './types';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface EventTimelineTabProps {
   universeAddress?: string;
@@ -112,7 +113,7 @@ export function EventTimelineTab({ universeAddress }: EventTimelineTabProps) {
                   </div>
                   {e.imageUrl && (
                     <img
-                      src={e.imageUrl}
+                      src={resolveIpfsUrl(e.imageUrl)}
                       alt=""
                       className="h-12 w-12 rounded object-cover flex-shrink-0"
                     />

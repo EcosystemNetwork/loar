@@ -54,6 +54,7 @@ import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVocab } from '@/hooks/use-vocab';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/shop/$universeId')({
   component: UniverseShopPage,
@@ -117,7 +118,7 @@ function UniverseShopPage() {
           <div className="w-16 h-16 rounded-2xl border-4 border-background bg-muted flex items-center justify-center overflow-hidden shadow-lg">
             {(universe as any)?.thumbnailUrl ? (
               <img
-                src={(universe as any).thumbnailUrl}
+                src={resolveIpfsUrl((universe as any).thumbnailUrl)}
                 alt=""
                 className="w-full h-full object-cover"
               />
@@ -470,7 +471,7 @@ function ShopListingCard({ listing }: { listing: any }) {
         <div className="aspect-square bg-muted flex items-center justify-center">
           {listing.thumbnailUrl ? (
             <img
-              src={listing.thumbnailUrl}
+              src={resolveIpfsUrl(listing.thumbnailUrl)}
               alt={listing.title}
               className="w-full h-full object-cover"
             />
@@ -594,7 +595,11 @@ function MerchCard({ item }: { item: any }) {
       <CardContent className="p-3">
         {item.imageUrl && (
           <div className="aspect-square rounded-lg bg-muted overflow-hidden mb-2">
-            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl(item.imageUrl)}
+              alt={item.name}
+              className="w-full h-full object-cover"
+            />
           </div>
         )}
         <p className="text-xs font-medium truncate">{item.name}</p>

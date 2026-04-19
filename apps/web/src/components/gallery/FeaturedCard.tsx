@@ -2,6 +2,7 @@
  * Featured Card — A single featured item with queued video loading.
  */
 import { useVideoLoad } from '@/hooks/useVideoLoad';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface FeaturedCardProps {
   item: {
@@ -39,7 +40,7 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
         />
       ) : (
         <img
-          src={item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg'}
+          src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg')}
           alt={item.title || 'Featured'}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { FlagDialog } from './FlagDialog';
 import type { WikiEntity } from './types';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   person: Users,
@@ -93,7 +94,7 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
             </div>
             {entity.imageUrl && (
               <img
-                src={entity.imageUrl}
+                src={resolveIpfsUrl(entity.imageUrl)}
                 alt={entity.name}
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => {

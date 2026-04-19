@@ -37,6 +37,7 @@ import {
   DEFAULT_STYLE_CONTROLS_VALUE,
   type StyleControlsValue,
 } from '@/components/StyleControls';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 type EntityKind =
   | 'person'
@@ -992,7 +993,7 @@ function EntityCreateForm() {
         <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
             <img
-              src={universeInfo.image_url}
+              src={resolveIpfsUrl(universeInfo.image_url)}
               alt=""
               className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
             />

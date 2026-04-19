@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { WikiEntity, EntityKind } from './types';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 const KINDS: EntityKind[] = [
   'person',
@@ -109,7 +110,7 @@ export function CreatorsTab() {
                 <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 flex items-center justify-center flex-shrink-0">
                   {p.avatarUrl ? (
                     <img
-                      src={p.avatarUrl}
+                      src={resolveIpfsUrl(p.avatarUrl)}
                       alt={p.displayName || p.username}
                       className="h-full w-full object-cover"
                     />

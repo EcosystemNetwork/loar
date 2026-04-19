@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface Props {
   universeId: string;
@@ -127,7 +128,7 @@ function TalentAgentCard({ uid }: { uid: string }) {
       <Card className="flex items-center gap-4 p-4 transition-colors hover:border-violet-500/50">
         {(agent as any).avatarUrl ? (
           <img
-            src={(agent as any).avatarUrl}
+            src={resolveIpfsUrl((agent as any).avatarUrl)}
             alt={(agent as any).displayName}
             className="h-10 w-10 rounded-full object-cover"
           />

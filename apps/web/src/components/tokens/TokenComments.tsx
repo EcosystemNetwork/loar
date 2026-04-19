@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ImagePlus,
 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface Comment {
   id: string;
@@ -266,7 +267,11 @@ function CommentItem({
           </div>
           <p className="text-sm break-words">{comment.text}</p>
           {comment.imageUrl && (
-            <img src={comment.imageUrl} alt="" className="mt-2 max-h-40 rounded-md object-cover" />
+            <img
+              src={resolveIpfsUrl(comment.imageUrl)}
+              alt=""
+              className="mt-2 max-h-40 rounded-md object-cover"
+            />
           )}
         </div>
       </div>

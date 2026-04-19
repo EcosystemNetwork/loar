@@ -69,6 +69,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
@@ -462,7 +463,7 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
                     >
                       {e.imageUrl ? (
                         <img
-                          src={e.imageUrl}
+                          src={resolveIpfsUrl(e.imageUrl)}
                           alt=""
                           className="w-5 h-5 rounded-full object-cover"
                           onError={(ev) => {
@@ -656,7 +657,7 @@ function ChildEntities({ entityId }: { entityId: string }) {
                   <Icon className="w-4 h-4 text-muted-foreground/40" />
                   {child.imageUrl && (
                     <img
-                      src={child.imageUrl}
+                      src={resolveIpfsUrl(child.imageUrl)}
                       alt=""
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {

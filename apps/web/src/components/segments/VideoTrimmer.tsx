@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Play, Pause, Scissors, RotateCcw, Check } from 'lucide-react';
 import type { VideoSegment } from '@/types/segments';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface VideoTrimmerProps {
   segment: VideoSegment;
@@ -211,7 +212,7 @@ export function VideoTrimmer({ segment, onTrimChange, onClose }: VideoTrimmerPro
         <div className="relative aspect-video bg-black rounded overflow-hidden max-h-48">
           <video
             ref={videoRef}
-            src={segment.videoUrl}
+            src={resolveIpfsUrl(segment.videoUrl)}
             className="w-full h-full object-contain"
             playsInline
             muted

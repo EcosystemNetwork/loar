@@ -38,6 +38,7 @@ import {
 import { useListingsBrowse } from '@/hooks/useListings';
 import { useTrending, usePlatformStats } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/market')({
   component: MarketPage,
@@ -179,7 +180,7 @@ function MarketPage() {
                     <div className="w-28 h-28 rounded-xl bg-muted flex items-center justify-center overflow-hidden mb-1.5">
                       {u.thumbnailUrl ? (
                         <img
-                          src={u.thumbnailUrl}
+                          src={resolveIpfsUrl(u.thumbnailUrl)}
                           alt={u.name}
                           className="w-full h-full object-cover"
                         />
@@ -243,7 +244,7 @@ function ListingCard({ listing }: { listing: any }) {
         <div className="aspect-square bg-muted flex items-center justify-center relative">
           {listing.thumbnailUrl ? (
             <img
-              src={listing.thumbnailUrl}
+              src={resolveIpfsUrl(listing.thumbnailUrl)}
               alt={listing.title}
               className="w-full h-full object-cover"
             />

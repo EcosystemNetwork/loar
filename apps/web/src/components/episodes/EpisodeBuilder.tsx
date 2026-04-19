@@ -32,6 +32,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export interface EpisodeClip {
   nodeId: string;
@@ -292,7 +293,7 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
                   {/* Thumbnail */}
                   <div className="w-16 h-9 bg-muted rounded overflow-hidden flex-shrink-0">
                     <video
-                      src={clip.videoUrl}
+                      src={resolveIpfsUrl(clip.videoUrl)}
                       className="w-full h-full object-cover"
                       muted
                       preload="metadata"
@@ -388,7 +389,7 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
                     >
                       <div className="w-12 h-7 bg-muted rounded overflow-hidden flex-shrink-0">
                         <video
-                          src={node.data.videoUrl}
+                          src={resolveIpfsUrl(node.data.videoUrl)}
                           className="w-full h-full object-cover"
                           muted
                           preload="metadata"
@@ -413,7 +414,7 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
               {previewIndex !== null && clips[previewIndex] ? (
                 <video
                   ref={videoRef}
-                  src={clips[previewIndex].videoUrl}
+                  src={resolveIpfsUrl(clips[previewIndex].videoUrl)}
                   className="w-full aspect-video"
                   onEnded={handleVideoEnded}
                   playsInline

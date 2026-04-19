@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/videos')({
   component: VideosPage,
@@ -395,7 +396,11 @@ function ShortCard({ item }: { item: any }) {
             poster={item.thumbnailUrl || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             <Play className="h-8 w-8" />
@@ -489,7 +494,11 @@ function LongCard({ item }: { item: any }) {
             poster={item.thumbnailUrl || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img
+            src={resolveIpfsUrl(item.thumbnailUrl)}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             <Clapperboard className="h-10 w-10" />

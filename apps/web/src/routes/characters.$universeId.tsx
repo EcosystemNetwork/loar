@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/characters/$universeId')({
   component: CharactersGalleryPage,
@@ -168,7 +169,7 @@ function CharacterCard({ character }: { character: any }) {
         <div className="aspect-[3/4] bg-muted relative">
           {character.imageUrl ? (
             <img
-              src={character.imageUrl}
+              src={resolveIpfsUrl(character.imageUrl)}
               alt={character.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"

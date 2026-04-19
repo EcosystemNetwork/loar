@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { LoarIcon } from '@/components/loar-icons';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface EventCreationSidebarProps {
   showVideoDialog: boolean;
@@ -542,7 +543,7 @@ export function EventCreationSidebar({
                         <div key={charId} className="bg-background p-2 rounded-md border">
                           <div className="flex items-center gap-2 mb-1">
                             <img
-                              src={char.image_url}
+                              src={resolveIpfsUrl(char.image_url)}
                               alt={char.character_name}
                               className="w-8 h-8 rounded-full object-cover"
                             />
@@ -582,7 +583,7 @@ export function EventCreationSidebar({
                         className="p-2 hover:bg-muted cursor-pointer flex items-center gap-2"
                       >
                         <img
-                          src={character.image_url}
+                          src={resolveIpfsUrl(character.image_url)}
                           alt={character.character_name}
                           className="w-8 h-8 rounded object-cover"
                         />
@@ -711,7 +712,7 @@ export function EventCreationSidebar({
                     <div className="space-y-3">
                       <div className="border rounded-lg p-3 bg-background">
                         <img
-                          src={generatedCharacter.imageUrl}
+                          src={resolveIpfsUrl(generatedCharacter.imageUrl)}
                           alt={generatedCharacter.name}
                           className="w-full h-auto object-contain rounded-lg mb-2 max-h-96"
                         />

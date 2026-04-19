@@ -16,6 +16,7 @@ import { Loader2, ShoppingCart, X, CheckCircle2, ExternalLink, Coins } from 'luc
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getExplorerTxUrl } from '@/configs/chains';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 // EpisodeNFT.mint ABI
 const EPISODE_NFT_MINT_ABI = [
@@ -169,7 +170,7 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
         {listing.imageUrl && (
           <div className="relative h-48 bg-muted">
             <img
-              src={listing.imageUrl}
+              src={resolveIpfsUrl(listing.imageUrl)}
               alt={listing.title}
               className="w-full h-full object-cover"
             />

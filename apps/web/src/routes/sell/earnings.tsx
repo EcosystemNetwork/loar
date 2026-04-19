@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSellerStats } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useVocab } from '@/hooks/use-vocab';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/sell/earnings')({
   component: SellerEarningsPage,
@@ -92,7 +93,7 @@ function SellerEarningsPage() {
                         <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                           {order.thumbnailUrl ? (
                             <img
-                              src={order.thumbnailUrl}
+                              src={resolveIpfsUrl(order.thumbnailUrl)}
                               alt=""
                               className="w-full h-full object-cover"
                             />

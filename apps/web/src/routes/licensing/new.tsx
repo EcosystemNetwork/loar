@@ -36,6 +36,7 @@ import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useChainId } from 'wagmi';
 import { getEvmAddresses } from '@/configs/addresses';
 import { licensingRegistryAbi } from '@loar/abis/generated';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/licensing/new')({
   beforeLoad: ({ context }) => {
@@ -366,7 +367,7 @@ export function CreateLicensePage() {
                     >
                       {u.image_url && (
                         <img
-                          src={u.image_url}
+                          src={resolveIpfsUrl(u.image_url)}
                           alt=""
                           className="w-8 h-8 rounded-lg object-cover shrink-0"
                         />

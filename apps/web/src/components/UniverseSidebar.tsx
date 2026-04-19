@@ -72,6 +72,7 @@ import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import type { UniverseData } from '@/types/universe';
 import { isBlockchainUniverse as checkBlockchain } from '@/types/universe';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface UniverseSidebarProps {
   finalUniverse: UniverseData | null;
@@ -884,7 +885,7 @@ function WikiEntitiesSection({ universeAddress }: { universeAddress?: string }) 
                           >
                             {entity.imageUrl ? (
                               <img
-                                src={entity.imageUrl}
+                                src={resolveIpfsUrl(entity.imageUrl)}
                                 alt={entity.name}
                                 className="h-6 w-6 rounded object-cover flex-shrink-0 border border-border"
                                 loading="lazy"

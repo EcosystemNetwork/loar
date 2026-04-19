@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface ScriptToEpisodeProps {
   universeId: string;
@@ -562,7 +563,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                       {/* Thumbnail for completed clips */}
                       {clip.status === 'completed' && clip.videoUrl && (
                         <video
-                          src={clip.videoUrl}
+                          src={resolveIpfsUrl(clip.videoUrl)}
                           className="h-10 w-16 rounded object-cover shrink-0"
                           muted
                           preload="metadata"

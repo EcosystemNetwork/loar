@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Globe, Loader2 } from 'lucide-react';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface Props {
   open: boolean;
@@ -86,7 +87,11 @@ export function ClaimToUniverseDialog({ open, onOpenChange, contentId, contentTi
                   }`}
                 >
                   {u.image_url ? (
-                    <img src={u.image_url} alt="" className="h-8 w-8 rounded object-cover" />
+                    <img
+                      src={resolveIpfsUrl(u.image_url)}
+                      alt=""
+                      className="h-8 w-8 rounded object-cover"
+                    />
                   ) : (
                     <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
                       <Globe className="h-4 w-4 text-muted-foreground" />
