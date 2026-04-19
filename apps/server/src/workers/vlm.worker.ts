@@ -14,6 +14,7 @@
 
 import { Worker, type Job } from 'bullmq';
 import { QUEUE_NAMES, type VlmJobData, type VlmJobResult } from '../lib/queue';
+import { withCostScope } from '../services/cost-tracker/scope';
 
 function getConnectionOpts() {
   const redisUrl = process.env.REDIS_URL;
@@ -28,7 +29,7 @@ function getConnectionOpts() {
   };
 }
 
-async function processVlm(job: Job<VlmJobData, VlmJobResult>): Promise<VlmJobResult> {
+async function processVlmBody(job: Job<VlmJobData, VlmJobResult>): Promise<VlmJobResult> {
   const { data } = job;
   const { db } = await import('../lib/firebase');
 
@@ -245,6 +246,24 @@ async function processVlm(job: Job<VlmJobData, VlmJobResult>): Promise<VlmJobRes
     );
     return { jobId: data.jobId, status: 'failed', error };
   }
+}
+
+/**
+ * Public worker entry — wraps processVlmBody in the attribution scope stored
+ * on the job so every provider call records cost against the originating
+ * user/apiKey/universe instead of 'system'.
+ */
+function processVlm(job: Job<VlmJobData, VlmJobResult>): Promise<VlmJobResult> {
+  const scope = job.data.scope;
+  const rootScope = {
+    userId: scope?.userId ?? job.data.creatorUid ?? null,
+    apiKeyId: scope?.apiKeyId ?? null,
+    aiAgentId: scope?.aiAgentId ?? null,
+    universeAddress: scope?.universeAddress ?? job.data.input.universeAddress ?? null,
+    route: scope?.route ?? `worker:vlm.${job.data.kind}`,
+    requestId: scope?.requestId ?? job.data.jobId,
+  };
+  return Promise.resolve(withCostScope(rootScope, () => processVlmBody(job)));
 }
 
 let worker: Worker<VlmJobData, VlmJobResult> | null = null;

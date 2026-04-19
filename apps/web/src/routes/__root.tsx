@@ -188,6 +188,9 @@ function RootComponent() {
               <Link to="/dmca" className="hover:text-foreground transition-colors">
                 DMCA
               </Link>
+              <Link to="/status" className="hover:text-foreground transition-colors">
+                Status
+              </Link>
             </div>
           </footer>
         </div>

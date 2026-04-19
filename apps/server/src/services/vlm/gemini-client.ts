@@ -17,6 +17,7 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import type { z } from 'zod';
 import { validateUploadUrl } from '../../lib/url-validator';
 import type { CostSummary, VlmModel } from './types';
+import { recordProviderCost } from '../cost-tracker';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
@@ -139,6 +140,19 @@ export async function callJson<T>(args: CallJsonArgs<T>): Promise<JsonResult<T>>
     (inputTokens / 1_000_000) * PRICE_USD_PER_1M_IN[args.model] +
     (outputTokens / 1_000_000) * PRICE_USD_PER_1M_OUT[args.model];
 
+  // Always record cost even on parse failure — the API call happened and we
+  // were billed. Scope is picked up from AsyncLocalStorage (set by tRPC/worker).
+  await recordProviderCost({
+    provider: 'gemini',
+    model: args.model,
+    kind: 'vlm',
+    costUsd,
+    inputTokens,
+    outputTokens,
+    tokensUsed,
+    extra: { label: args.label },
+  });
+
   const stripped = stripFences(text);
   let parsed: unknown;
   try {
@@ -191,6 +205,16 @@ export async function callText(args: {
   const costUsd =
     (inputTokens / 1_000_000) * PRICE_USD_PER_1M_IN[args.model] +
     (outputTokens / 1_000_000) * PRICE_USD_PER_1M_OUT[args.model];
+  await recordProviderCost({
+    provider: 'gemini',
+    model: args.model,
+    kind: 'vlm',
+    costUsd,
+    inputTokens,
+    outputTokens,
+    tokensUsed,
+    extra: { label: args.label },
+  });
   return {
     text,
     cost: { tokensUsed, inputTokens, outputTokens, costUsd, model: args.model },

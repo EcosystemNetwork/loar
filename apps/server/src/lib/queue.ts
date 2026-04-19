@@ -76,6 +76,16 @@ export interface VlmJobData {
   jobId: string;
   kind: VlmJobKind;
   creatorUid: string;
+  /** Attribution scope carried from the tRPC request into the worker so
+   *  provider cost is attributed to the originating user/apiKey/universe. */
+  scope?: {
+    userId: string | null;
+    apiKeyId?: string | null;
+    aiAgentId?: string | null;
+    universeAddress?: string | null;
+    route?: string | null;
+    requestId?: string | null;
+  };
   input: {
     assetType: 'video' | 'image' | 'audio';
     mediaUrl: string;

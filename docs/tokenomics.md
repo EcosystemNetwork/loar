@@ -61,7 +61,7 @@ New $LOAR can only be minted by addresses authorized as `minters` by the contrac
 - Affiliate payout distribution
 - Creator incentive programs
 
-All minting is subject to the permanent MAX_SUPPLY cap of 1 billion tokens. Since `totalMinted` never decreases, the initial distribution already accounts for the full supply -- additional minting is only possible if and when the initial holder or treasury burns tokens, and even then the cap remains enforced against cumulative issuance, not circulating supply.
+All minting is subject to the permanent MAX_SUPPLY cap of 1 billion tokens. Since `totalMinted` never decreases, the initial distribution already accounts for the full supply — a DAO-initiated burn lowers circulating supply but does **not** reopen minting headroom. The cap is enforced against cumulative issuance, not circulating supply. Burns are a one-way supply reduction, controlled exclusively by voluntary holder action (in practice: a DAO governance proposal calling `burn()` on treasury holdings).
 
 > [LEGAL REVIEW REQUIRED] Clarify whether additional minting authority constitutes a security risk and whether minter role assignments require governance approval.
 

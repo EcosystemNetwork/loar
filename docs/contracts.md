@@ -190,7 +190,7 @@ src/
 ├── SlopMarket.sol      # Secondary market
 ├── CollectiveTokenFactory.sol # Collective tokens
 ├── StructuralDeed.sol  # Structural deed NFTs
-├── LoarBurner.sol      # Token burn mechanism
+├── LoarBurner.sol      # Premium action fee collection (LP + treasury split; name is legacy, no supply destruction)
 └── RemixFees.sol       # Remix fee collection
 ```
 

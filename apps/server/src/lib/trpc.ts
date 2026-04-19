@@ -5,14 +5,33 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { getAddress } from 'viem';
 import type { Context } from './context';
+import { withCostScope } from '../services/cost-tracker/scope';
 
 export const t = initTRPC.context<Context>().create();
 
 export const router = t.router;
 
-export const publicProcedure = t.procedure;
+/**
+ * Cost-scope middleware — attaches (userId, apiKeyId, aiAgentId, route) to
+ * the async context so every provider call during this request auto-tags
+ * its ledger entry. Runs on every procedure via publicProcedure/protectedProcedure.
+ */
+const costScopeMiddleware = t.middleware(({ ctx, path, next }) => {
+  const u = ctx.user;
+  return withCostScope(
+    {
+      userId: u?.uid ?? null,
+      apiKeyId: u?.apiKeyId ?? null,
+      aiAgentId: u?.aiAgentId ?? null,
+      route: `trpc:${path}`,
+    },
+    () => next()
+  );
+});
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+export const publicProcedure = t.procedure.use(costScopeMiddleware);
+
+export const protectedProcedure = t.procedure.use(costScopeMiddleware).use(({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

@@ -10,15 +10,17 @@ import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 /// @title LoarBurner
-/// @notice WARNING: Despite the name, this contract does NOT burn $LOAR. It collects fees
-///         and redistributes to LP + treasury. See the execute/executeFor functions for
-///         the actual "premium action" behavior.
-/// @dev BURN-01: This contract should be renamed to PremiumActions or LoarFeeCollector in a
-///      future upgrade to avoid confusion. The "burn" terminology is a legacy misnomer.
-/// @notice Premium action fees — $LOAR is redirected to LP and DAO treasury.
-///         NO supply destruction. All $LOAR stays in the ecosystem.
+/// @notice Premium-action fee collector. The "burn" in the name is a UX/narrative term for
+///         "token leaves the user's wallet to perform a protocol action"; it is NOT supply
+///         destruction. Collected $LOAR is split between the liquidity pool and the DAO
+///         treasury. If the DAO later wants to destroy some of its treasury holdings, it
+///         can do so by governance proposal calling `loarToken.burn()` — the token is
+///         `ERC20Burnable`. This contract itself never calls `burn()`.
+/// @dev BURN-01: Contract/enum names (`LoarBurner`, `BurnAction`) are retained for upgrade
+///      safety; a rename is deferred to a post-launch UUPS upgrade because it would churn
+///      every importer and the Safe-timelock path.
 ///
-///         Burn actions (each configurable cost):
+///         Premium actions (`BurnAction` enum — historical name, no supply destruction):
 ///         - PRIORITY_GENERATION: Skip AI generation queue
 ///         - PERMANENT_CANON: Make a canon entry immutable (can't be overturned by vote)
 ///         - PREMIUM_PROFILE: Verified/premium creator badge
@@ -43,7 +45,7 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
     struct ActionConfig {
         uint256 cost;           // $LOAR cost for this action
         bool active;
-        uint256 totalBurned;    // lifetime $LOAR burned for this action
+        uint256 totalBurned;    // lifetime $LOAR collected for this action (field name is historical; no supply destruction — see contract header)
         uint256 totalCount;     // lifetime usage count
     }
 
