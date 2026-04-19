@@ -191,6 +191,19 @@ export async function publishToGallery(input: PublishGalleryInput): Promise<void
       outputKind,
       status: 'completed',
     });
+
+    // PostHog: creator "content published" funnel event. Together with
+    // generation:completed this powers the creator success funnel:
+    // signup → first generation → first published piece.
+    void import('./analytics').then(({ captureServerEvent }) =>
+      captureServerEvent('content:published', {
+        distinctId: resolvedInput.creatorUid,
+        contentId: ref.id,
+        outputKind,
+        universeId: resolvedInput.universeId ?? null,
+        generationModel: resolvedInput.generationModel ?? null,
+      })
+    );
   } catch (err: unknown) {
     console.error(`[gallery] publish failed (${input.generationId}):`, err);
   }

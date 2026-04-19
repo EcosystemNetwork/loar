@@ -11,6 +11,8 @@ import { Worker, type Job } from 'bullmq';
 import { QUEUE_NAMES, type GenerationJobData, type GenerationJobResult } from '../lib/queue';
 import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker';
 import { recordAiGeneration } from '../lib/metrics';
+import { withCostScope } from '../services/cost-tracker/scope';
+import { recordProviderCost } from '../services/cost-tracker';
 
 // ── Connection ─────────────────────────────────────────────────────────
 
@@ -30,7 +32,7 @@ function getConnectionOpts() {
 
 // ── Worker Logic ───────────────────────────────────────────────────────
 
-async function processGeneration(
+async function processGenerationBody(
   job: Job<GenerationJobData, GenerationJobResult>
 ): Promise<GenerationJobResult> {
   const { data } = job;
@@ -173,6 +175,19 @@ async function processGeneration(
 
       recordAiGeneration(model.provider, 'video', 'failure', latencyMs / 1000);
 
+      void import('../lib/analytics').then(({ captureServerEvent }) =>
+        captureServerEvent('generation:failed', {
+          distinctId: data.userId,
+          generationId: data.generationId,
+          provider: model.provider,
+          kind: 'video',
+          modelId: data.finalModelId,
+          latencyMs,
+          reason: 'provider_failed',
+          error: (result.error || 'Generation failed').slice(0, 200),
+        })
+      );
+
       return {
         generationId: data.generationId,
         status: 'failed',
@@ -214,6 +229,25 @@ async function processGeneration(
     }
 
     const finalMediaUrl = permanentUrl ?? result.videoUrl!;
+
+    // Record provider spend to the cost ledger. The admission layer already
+    // computed the per-job providerCostUsd from the model's rate card; we
+    // log it against the originating user + universe for margin tracking.
+    if (data.providerCostUsd > 0) {
+      await recordProviderCost({
+        provider: (model.provider as any) === 'bytedance' ? 'bytedance' : 'fal',
+        model: data.finalModelId,
+        kind: 'video_gen',
+        costUsd: data.providerCostUsd,
+        extra: {
+          generationId: data.generationId,
+          latencyMs,
+          creditsCharged: data.creditsCharged,
+          fiatPriceUsd: data.fiatPriceUsd,
+          loarPriceUsd: data.loarPriceUsd,
+        },
+      });
+    }
 
     await generationsCol.doc(data.generationId).update({
       status: 'completed',
@@ -361,6 +395,14 @@ async function processGeneration(
             jobId,
             kind: 'extract',
             creatorUid: data.userId.toLowerCase(),
+            scope: {
+              userId: data.userId.toLowerCase(),
+              apiKeyId: null,
+              aiAgentId: null,
+              universeAddress: data.input.universeId ?? null,
+              route: 'worker:generation-post-hook',
+              requestId: jobId,
+            },
             input: vlmInput,
           },
           { jobId }
@@ -373,6 +415,21 @@ async function processGeneration(
     await job.updateProgress(100);
 
     recordAiGeneration(model.provider, 'video', 'success', latencyMs / 1000);
+
+    // PostHog: generation:completed closes the creator-success funnel
+    // (signup → login → admitted → completed → published). Latency on the
+    // event lets us analyse slow-generation impact on retention.
+    void import('../lib/analytics').then(({ captureServerEvent }) =>
+      captureServerEvent('generation:completed', {
+        distinctId: data.userId,
+        generationId: data.generationId,
+        provider: model.provider,
+        kind: 'video',
+        modelId: data.finalModelId,
+        latencyMs,
+        creditsCharged: data.creditsCharged,
+      })
+    );
 
     return {
       generationId: data.generationId,
@@ -428,6 +485,19 @@ async function processGeneration(
 
     recordAiGeneration(model.provider, 'video', 'failure', latencyMs / 1000);
 
+    void import('../lib/analytics').then(({ captureServerEvent }) =>
+      captureServerEvent('generation:failed', {
+        distinctId: data.userId,
+        generationId: data.generationId,
+        provider: model.provider,
+        kind: 'video',
+        modelId: data.finalModelId,
+        latencyMs,
+        reason: 'exception',
+        error: (error instanceof Error ? error.message : 'Unknown error').slice(0, 200),
+      })
+    );
+
     return {
       generationId: data.generationId,
       status: 'failed',
@@ -452,6 +522,20 @@ export function startGenerationWorker(
   if (worker) return worker;
 
   const connection = getConnectionOpts();
+
+  // Wrap body in the attribution scope so any provider call during processing
+  // records against the originating user + universe, not 'system'.
+  const processGeneration = (job: Job<GenerationJobData, GenerationJobResult>) => {
+    const rootScope = {
+      userId: job.data.userId ?? null,
+      apiKeyId: null,
+      aiAgentId: null,
+      universeAddress: job.data.input?.universeId ?? null,
+      route: `worker:generation:${job.data.provider}`,
+      requestId: job.data.generationId,
+    };
+    return Promise.resolve(withCostScope(rootScope, () => processGenerationBody(job)));
+  };
 
   worker = new Worker<GenerationJobData, GenerationJobResult>(
     QUEUE_NAMES.GENERATION,
