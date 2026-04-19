@@ -77,6 +77,7 @@ async function deductCredits(uid: string, cost: number, operation: string): Prom
 
 async function refundCredits(uid: string, cost: number): Promise<void> {
   if (!db) return;
+  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
   try {
     await db
       .collection('userCredits')
@@ -86,9 +87,12 @@ async function refundCredits(uid: string, cost: number): Promise<void> {
         totalSpent: FieldValue.increment(-cost),
         updatedAt: new Date(),
       });
+    recordCreditsTx('refund', 'success');
   } catch (err) {
+    recordCreditsTx('refund', 'failure');
     console.error(`[editing refund] Failed to refund ${cost} to ${uid}:`, err);
   }
+  recordAiGeneration('fal', 'editing', 'failure');
 }
 
 const EDIT_OUTPUT_KIND: Record<EditingOperation, AssetOutputKind> = {

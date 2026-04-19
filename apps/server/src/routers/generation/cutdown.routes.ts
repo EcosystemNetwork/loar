@@ -57,18 +57,22 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
 
 async function refundCredits(userId: string, credits: number, cutdownId?: string): Promise<void> {
   const ref = userCreditsCol().doc(userId);
+  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
   try {
     await ref.update({
       balance: FieldValue.increment(credits),
       totalSpent: FieldValue.increment(-credits),
       updatedAt: new Date(),
     });
+    recordCreditsTx('refund', 'success');
   } catch (err) {
+    recordCreditsTx('refund', 'failure');
     console.error(
       `[cutdown] Failed to refund ${credits} credits for ${userId} (${cutdownId}):`,
       err
     );
   }
+  recordAiGeneration('fal', 'cutdown', 'failure');
 }
 
 // ── Aspect ratio helpers ─────────────────────────────────────────────────
