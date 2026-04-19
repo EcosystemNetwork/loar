@@ -220,6 +220,11 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 2_147_483_647);
 }
 
+// ⌘/Ctrl+Enter inside a textarea triggers the primary action of the form.
+function isSubmitShortcut(e: React.KeyboardEvent): boolean {
+  return e.key === 'Enter' && (e.metaKey || e.ctrlKey);
+}
+
 // Phase 2 — quick edit operations exposed inline on done image cards.
 // Each runs against an existing image URL and returns a new image URL,
 // which we treat as a fresh Generation card for consistent UX.
@@ -369,6 +374,9 @@ function SandboxPage() {
   const [cameraPreset, setCameraPreset] = useState<string>('');
   const [cameraIntensity, setCameraIntensity] = useState<CameraIntensity>('standard');
   const [videoAudioOn, setVideoAudioOn] = useState<boolean>(true);
+
+  // Drafts panel filter
+  const [draftFilter, setDraftFilter] = useState<'all' | GenKind>('all');
 
   // Voice / audio / talking-scene state
   const [voiceMode, setVoiceMode] = useState<'tts' | 'sfx'>('tts');
@@ -1077,6 +1085,14 @@ function SandboxPage() {
       setIsUploadingRef(true);
       try {
         const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+        // Pre-flight session check (matches DirectUpload) so a stale cookie
+        // surfaces a clean error instead of a cryptic 401 mid-upload.
+        const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
+        if (!meRes.ok || !(await meRes.json())?.authenticated) {
+          toast.error('Session expired — please sign in again');
+          setIsUploadingRef(false);
+          return;
+        }
         const fd = new FormData();
         fd.append('file', file);
         const res = await fetch(`${serverUrl}/api/upload`, {
@@ -1174,6 +1190,140 @@ function SandboxPage() {
   const activeCount = generations.filter((g) => g.status === 'generating').length;
   const hasDoneGens = generations.some((g) => g.status !== 'generating');
 
+  // ⌘/Ctrl+Enter triggers the primary action of the active tab.
+  const submitCurrent = useCallback(() => {
+    if (mode === 'image') {
+      if (!canGenerate) return;
+      const slots = checkConcurrency(variations);
+      if (slots === 0) return;
+      const finalPrompt = applyStylePreset(prompt, stylePreset);
+      const isStyleRef = referenceImage?.mode === 'style';
+      for (let i = 0; i < slots; i++) {
+        runImageGen(finalPrompt, {
+          imageSize,
+          imageModel,
+          negativePrompt: negativePrompt.trim() || undefined,
+          seed: variations > 1 && i > 0 ? null : seed,
+          styleRefImageUrl: isStyleRef ? referenceImage!.url : undefined,
+          stylePresetId: stylePreset ?? null,
+        });
+      }
+      if (isStyleRef) setReferenceImage(null);
+      setPrompt('');
+    } else if (mode === 'video') {
+      if (!canGenerate || videoNeedsImage) return;
+      if (checkConcurrency(1) === 0) return;
+      const finalPrompt = applyStylePreset(prompt, stylePreset);
+      const useAnimate = referenceImage?.mode === 'animate';
+      runVideoGen(finalPrompt, {
+        videoModel,
+        imageSize,
+        sourceImageUrl: useAnimate ? referenceImage!.url : undefined,
+        negativePrompt: negativePrompt.trim() || undefined,
+        stylePresetId: stylePreset ?? null,
+        durationSec: videoDuration,
+        resolution: videoResolution,
+        cameraPreset: cameraPreset || undefined,
+        cameraIntensity: cameraPreset ? cameraIntensity : undefined,
+        audioOn: videoAudioOn,
+      });
+      if (useAnimate) setReferenceImage(null);
+      setPrompt('');
+    } else if (mode === 'voice') {
+      if (!prompt.trim() || (voiceMode === 'tts' && !voiceId)) return;
+      if (checkConcurrency(1) === 0) return;
+      runVoiceGen(prompt, {
+        voiceId,
+        flavor: voiceMode,
+        sfxDurationSec: voiceMode === 'sfx' ? sfxDuration : undefined,
+      });
+      setPrompt('');
+    } else if (mode === 'audio') {
+      if (!prompt.trim()) return;
+      if (checkConcurrency(1) === 0) return;
+      runAudioGen(prompt, {
+        durationSec: audioDuration,
+        genre: audioGenre.trim() || undefined,
+      });
+      setPrompt('');
+    } else if (mode === '3d') {
+      const sourceImg = drafts?.find((d: any) => d.imageUrl)?.imageUrl ?? undefined;
+      if (threedMode === 'text' && !prompt.trim()) return;
+      if (threedMode === 'image' && !sourceImg) return;
+      if (checkConcurrency(1) === 0) return;
+      run3DGen(prompt, {
+        threedMode,
+        artStyle: threedArtStyle,
+        ...(threedMode === 'image' && sourceImg ? { imageUrl: sourceImg } : {}),
+      });
+      setPrompt('');
+    } else if (mode === 'talking') {
+      if (!referenceImage?.url || !talkingDialogue.trim() || !voiceId) return;
+      if (checkConcurrency(1) === 0) return;
+      runTalkingScene({
+        imageUrl: referenceImage.url,
+        dialogue: talkingDialogue,
+        voiceId,
+        motionPrompt: talkingMotion.trim() || undefined,
+        durationSec: talkingDuration,
+      });
+      setTalkingDialogue('');
+      setTalkingMotion('');
+      setReferenceImage(null);
+    }
+  }, [
+    mode,
+    canGenerate,
+    videoNeedsImage,
+    checkConcurrency,
+    variations,
+    prompt,
+    stylePreset,
+    referenceImage,
+    imageSize,
+    imageModel,
+    negativePrompt,
+    seed,
+    runImageGen,
+    runVideoGen,
+    videoModel,
+    videoDuration,
+    videoResolution,
+    cameraPreset,
+    cameraIntensity,
+    videoAudioOn,
+    voiceMode,
+    voiceId,
+    sfxDuration,
+    runVoiceGen,
+    audioDuration,
+    audioGenre,
+    runAudioGen,
+    threedMode,
+    threedArtStyle,
+    drafts,
+    run3DGen,
+    talkingDialogue,
+    talkingMotion,
+    talkingDuration,
+    runTalkingScene,
+  ]);
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (!active) return;
+      // Only fire when typing inside the sandbox form (textarea/input)
+      const tag = active.tagName.toLowerCase();
+      if (tag !== 'textarea' && tag !== 'input') return;
+      e.preventDefault();
+      submitCurrent();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [submitCurrent]);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -1192,8 +1342,12 @@ function SandboxPage() {
               )}
             </div>
             <p className="text-muted-foreground">
-              Queue up as many generations as you want — they run in parallel and auto-save to your
-              drafts.
+              Image, video, voice, audio, 3D, and lip-synced talking scenes — all queue in parallel
+              and auto-save to your drafts. Press{' '}
+              <kbd className="px-1 py-0.5 text-[10px] bg-muted rounded border border-border">
+                ⌘↵
+              </kbd>{' '}
+              in any prompt to fire.
             </p>
           </div>
           <Button
@@ -1759,22 +1913,29 @@ function SandboxPage() {
                   {voiceMode === 'tts' && (
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-medium text-muted-foreground">Voice</label>
-                      <Select value={voiceId} onValueChange={setVoiceId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Loading voices…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(voicesList ?? []).map((v: any) => {
-                            const id = v.voice_id || v.id;
-                            const label = v.name || id;
-                            return (
-                              <SelectItem key={id} value={id}>
-                                {label}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                      {Array.isArray(voicesList) && voicesList.length === 0 ? (
+                        <p className="text-[11px] text-destructive">
+                          No voices available — ElevenLabs is not configured on the server. Set
+                          ELEVENLABS_API_KEY to enable TTS.
+                        </p>
+                      ) : (
+                        <Select value={voiceId} onValueChange={setVoiceId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Loading voices…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(voicesList ?? []).map((v: any) => {
+                              const id = v.voice_id || v.id;
+                              const label = v.name || id;
+                              return (
+                                <SelectItem key={id} value={id}>
+                                  {label}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   )}
                   {voiceMode === 'sfx' && (
@@ -2006,21 +2167,27 @@ function SandboxPage() {
                   />
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-muted-foreground">Voice</label>
-                    <Select value={voiceId} onValueChange={setVoiceId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Loading voices…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(voicesList ?? []).map((v: any) => {
-                          const id = v.voice_id || v.id;
-                          return (
-                            <SelectItem key={id} value={id}>
-                              {v.name || id}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                    {Array.isArray(voicesList) && voicesList.length === 0 ? (
+                      <p className="text-[11px] text-destructive">
+                        No voices available — ElevenLabs is not configured on the server.
+                      </p>
+                    ) : (
+                      <Select value={voiceId} onValueChange={setVoiceId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Loading voices…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(voicesList ?? []).map((v: any) => {
+                            const id = v.voice_id || v.id;
+                            return (
+                              <SelectItem key={id} value={id}>
+                                {v.name || id}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <Input
                     value={talkingMotion}
@@ -2101,7 +2268,33 @@ function SandboxPage() {
 
             {/* Right: drafts */}
             <div className="flex flex-col gap-4">
-              <h2 className="text-lg font-semibold">Your Drafts</h2>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="text-lg font-semibold">Your Drafts</h2>
+                {drafts && drafts.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { id: 'all' as const, label: 'All' },
+                      { id: 'image' as const, label: 'Image' },
+                      { id: 'video' as const, label: 'Video' },
+                      { id: 'audio' as const, label: 'Audio' },
+                      { id: '3d-model' as const, label: '3D' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setDraftFilter(f.id)}
+                        className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                          draftFilter === f.id
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {!drafts || drafts.length === 0 ? (
                 <Card>
@@ -2113,29 +2306,54 @@ function SandboxPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {drafts.map((draft: any) => (
-                    <DraftCard
-                      key={draft.id}
-                      draft={draft}
-                      onDelete={() => delDraftMutation.mutate(draft.id)}
-                      onReuse={() => {
-                        setPrompt(draft.prompt);
-                        if (draft.model && VALID_VIDEO_MODELS.has(draft.model as VideoModel)) {
-                          setVideoModel(draft.model as VideoModel);
-                        }
-                        if (draft.imageUrl) {
-                          setReferenceImage({
-                            url: draft.imageUrl,
-                            prompt: draft.prompt,
-                            mode: draft.videoUrl ? 'animate' : 'style',
-                          });
-                        }
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                    />
-                  ))}
-                </div>
+                (() => {
+                  const filtered = (drafts as DraftData[]).filter(
+                    (d) => draftFilter === 'all' || inferDraftKind(d) === draftFilter
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <Card>
+                        <CardContent className="py-8 flex flex-col items-center gap-2 text-center">
+                          <Wand2 className="h-6 w-6 text-muted-foreground/40" />
+                          <p className="text-muted-foreground text-xs">
+                            No {draftFilter} drafts yet.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-2 gap-3">
+                      {filtered.map((draft) => (
+                        <DraftCard
+                          key={draft.id}
+                          draft={draft}
+                          onDelete={() => delDraftMutation.mutate(draft.id)}
+                          onReuse={() => {
+                            const kind = inferDraftKind(draft);
+                            // Switch to the right tab so the form matches the kind
+                            if (kind === 'audio') setMode('voice');
+                            else if (kind === '3d-model') setMode('3d');
+                            else if (kind === 'video') setMode('video');
+                            else setMode('image');
+                            setPrompt(draft.prompt);
+                            if (draft.model && VALID_VIDEO_MODELS.has(draft.model as VideoModel)) {
+                              setVideoModel(draft.model as VideoModel);
+                            }
+                            if (draft.imageUrl) {
+                              setReferenceImage({
+                                url: draft.imageUrl,
+                                prompt: draft.prompt,
+                                mode: draft.videoUrl ? 'animate' : 'style',
+                              });
+                            }
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()
               )}
             </div>
           </div>
@@ -2708,6 +2926,10 @@ interface DraftData {
   prompt: string;
   imageUrl: string | null;
   videoUrl: string | null;
+  audioUrl?: string | null;
+  modelUrl?: string | null;
+  thumbnailUrl?: string | null;
+  kind?: string | null;
   model: string | null;
   tags: string[];
   status: string;
@@ -2720,9 +2942,16 @@ interface DraftCardProps {
   onReuse: () => void;
 }
 
+function inferDraftKind(draft: DraftData): GenKind {
+  if (draft.kind === '3d' || draft.kind === '3d-model' || draft.modelUrl) return '3d-model';
+  if (draft.kind === 'audio' || draft.audioUrl) return 'audio';
+  if (draft.kind === 'video' || draft.videoUrl) return 'video';
+  return 'image';
+}
+
 function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
   const queryClient = useQueryClient();
-  const thumb = draft.videoUrl || draft.imageUrl;
+  const draftKind = inferDraftKind(draft);
   const isPromoted = draft.status === 'promoted';
 
   const [editing, setEditing] = useState(false);
@@ -2730,7 +2959,9 @@ function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
 
   const [showPromote, setShowPromote] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState('__gallery__');
-  const [classification, setClassification] = useState<'fan' | 'original' | 'licensed'>('original');
+  // Defaults match the safer auto-publish defaults the server uses (fan +
+  // unlisted) so users explicitly opt into a rights claim before promoting.
+  const [classification, setClassification] = useState<'fan' | 'original' | 'licensed'>('fan');
   const [visibility, setVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
 
   const { data: universesResult } = useQuery({
@@ -2773,36 +3004,59 @@ function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
     <Card className="overflow-hidden group relative">
       {/* Thumbnail */}
       <div className="aspect-video bg-muted relative">
-        {thumb ? (
-          draft.videoUrl ? (
-            <video
-              src={draft.videoUrl}
+        {draftKind === 'audio' ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/20 to-primary/5 px-3">
+            <Sparkles className="h-6 w-6 text-primary" />
+            {draft.audioUrl ? (
+              <audio src={draft.audioUrl} controls className="w-full" />
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Audio draft</span>
+            )}
+          </div>
+        ) : draftKind === '3d-model' ? (
+          draft.thumbnailUrl || draft.imageUrl ? (
+            <img
+              src={(draft.thumbnailUrl || draft.imageUrl)!}
+              alt={draft.title}
               className="w-full h-full object-cover"
-              muted
-              playsInline
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLVideoElement).play().catch(() => {});
-              }}
-              onMouseLeave={(e) => {
-                const v = e.currentTarget as HTMLVideoElement;
-                v.pause();
-                v.currentTime = 0;
-              }}
             />
           ) : (
-            <img src={draft.imageUrl!} alt={draft.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+              <Frame className="h-6 w-6 text-muted-foreground/40" />
+              <span className="text-[10px] text-muted-foreground">3D model</span>
+            </div>
           )
+        ) : draft.videoUrl ? (
+          <video
+            src={draft.videoUrl}
+            className="w-full h-full object-cover"
+            muted
+            playsInline
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLVideoElement).play().catch(() => {});
+            }}
+            onMouseLeave={(e) => {
+              const v = e.currentTarget as HTMLVideoElement;
+              v.pause();
+              v.currentTime = 0;
+            }}
+          />
+        ) : draft.imageUrl ? (
+          <img src={draft.imageUrl} alt={draft.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Wand2 className="h-6 w-6 text-muted-foreground/30" />
           </div>
         )}
 
-        {isPromoted && (
-          <div className="absolute top-2 left-2">
+        <div className="absolute top-2 left-2 flex gap-1">
+          {isPromoted && (
             <Badge className="bg-green-500/90 text-white border-0 text-[10px]">Promoted</Badge>
-          </div>
-        )}
+          )}
+          <Badge variant="secondary" className="text-[9px] capitalize">
+            {draftKind === '3d-model' ? '3D' : draftKind}
+          </Badge>
+        </div>
 
         {!showPromote && (
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
