@@ -23,3 +23,4 @@ playwright-report/
 .playwright-artifacts-*/
 # Media generation outputs — content goes to Pinata/Lighthouse/Firestore, not git.
 *-output/
+ingest-log.json
