@@ -419,6 +419,9 @@ export function useWalletAuth() {
   // Auto-trigger SIWE sign-in when wallet connects without an existing session.
   // Requires thirdwebAccount to be available so signIn has a signer.
   // Guards against infinite retry: stops after MAX_AUTO_SIGN_IN_ATTEMPTS failures.
+  // Uses a ref gate to prevent multiple concurrent signIn() calls from React
+  // re-renders firing the effect before the first async signIn() settles.
+  const autoSignInPendingRef = useRef(false);
   useEffect(() => {
     if (
       isConnected &&
@@ -427,10 +430,14 @@ export function useWalletAuth() {
       !storedAddress &&
       !isAuthenticating &&
       !rejectedRef.current &&
+      !autoSignInPendingRef.current &&
       signInFailCountRef.current < MAX_AUTO_SIGN_IN_ATTEMPTS &&
       autoSignedForRef.current !== address.toLowerCase()
     ) {
-      signIn();
+      autoSignInPendingRef.current = true;
+      signIn().finally(() => {
+        autoSignInPendingRef.current = false;
+      });
     }
   }, [isConnected, address, thirdwebAccount, storedAddress, isAuthenticating, signIn]);
 
