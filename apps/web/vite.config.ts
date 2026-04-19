@@ -3,6 +3,7 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { defineConfig, type Plugin, type Rollup } from 'vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 /**
  * Vite plugin that fails the build if browser code imports Node.js builtins
@@ -111,7 +112,19 @@ export default defineConfig({
     tailwindcss(),
     react(),
     tanstackRouter({}),
-  ],
+    // Bundle analyzer — only when BUNDLE_ANALYZE=1 so normal builds stay fast.
+    // Produces apps/web/dist/stats.html with a treemap of chunk sizes, gzip,
+    // and brotli. Open after build to see where the weight lives.
+    process.env.BUNDLE_ANALYZE === '1'
+      ? visualizer({
+          filename: 'dist/stats.html',
+          template: 'treemap',
+          gzipSize: true,
+          brotliSize: true,
+          open: false,
+        })
+      : null,
+  ].filter(Boolean) as Plugin[],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
