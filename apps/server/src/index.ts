@@ -335,13 +335,19 @@ app.post('/api/upload', async (c) => {
 // Strict rate limit: 3 requests per minute per IP to prevent mass-flagging abuse
 app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 3 }));
 app.post('/api/takedown', async (c) => {
+  // Enforces 17 U.S.C. § 512(c)(3)(A) statutory elements. See moderation
+  // router for the same schema applied to the tRPC path.
   const takedownSchema = z.object({
     contentId: z.string().min(1),
     claimantName: z.string().min(1).max(200),
     claimantEmail: z.string().email(),
+    claimantAddress: z.string().min(10).max(500), // § 512(c)(3)(A)(iv)
+    claimantPhone: z.string().min(7).max(30), // § 512(c)(3)(A)(iv)
     copyrightWork: z.string().min(1).max(500),
     explanation: z.string().min(20).max(5000),
-    swornStatement: z.literal(true),
+    goodFaith: z.literal(true), // § 512(c)(3)(A)(v)
+    swornStatement: z.literal(true), // § 512(c)(3)(A)(vi)
+    signature: z.string().min(2).max(200), // § 512(c)(3)(A)(i)
   });
 
   try {
@@ -357,7 +363,16 @@ app.post('/api/takedown', async (c) => {
         400
       );
     }
-    const { contentId, claimantName, claimantEmail, copyrightWork, explanation } = parsed.data;
+    const {
+      contentId,
+      claimantName,
+      claimantEmail,
+      claimantAddress,
+      claimantPhone,
+      copyrightWork,
+      explanation,
+      signature,
+    } = parsed.data;
 
     const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
     if (!fbAvail || !fireDb) {
@@ -387,8 +402,13 @@ app.post('/api/takedown', async (c) => {
       contentId,
       claimantName,
       claimantEmail,
+      claimantAddress,
+      claimantPhone,
       copyrightWork,
       explanation,
+      signature,
+      goodFaithAttested: true,
+      swornAttested: true,
       status: 'pending',
       createdAt: now.toISOString(),
     };
@@ -599,12 +619,29 @@ app.get('/api/takedown/:id/status', async (c) => {
   }
 });
 
-// Stricter rate limits for AI generation endpoints: 10 requests/min per IP per endpoint
-app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
-app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 10 }));
+// AI generation per-route rate limits — tiered by provider cost + latency so
+// expensive paths can't drain the worker queue or the provider's per-key QPS
+// budget. Per-IP + per-wallet buckets, plus a 200/day ceiling (in rate-limit.ts).
+//
+// Tuning notes:
+//  - Limits are per-minute. The 200/day wallet ceiling is shared across
+//    everything, so raising a single route's /min does not uncap overall spend.
+//  - Several routes below (studio, episodes, editing, lipsync, sceneAudio,
+//    cutdown, characterPipeline) were previously UNLIMITED beyond the global
+//    100/min IP — a hole in the abuse surface. Adding starter limits here;
+//    tune after observing real usage on the Board 2 Grafana panel.
+app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 3 })); // video ~$0.25, 2–5 min
+app.use('/trpc/studio.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // orchestrator — fans out
+app.use('/trpc/characterPipeline.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // full pipeline ~$0.34
+app.use('/trpc/episodes.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // generateFromScript is heavy
+app.use('/trpc/cutdown.*', aiRateLimiter({ windowMs: 60_000, max: 5 })); // video reframe, medium-heavy
+app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 5 })); // Meshy polling, ~$0.15
+app.use('/trpc/lipsync.*', aiRateLimiter({ windowMs: 60_000, max: 10 })); // medium
+app.use('/trpc/editing.*', aiRateLimiter({ windowMs: 60_000, max: 15 })); // inpaint/upscale, varies
+app.use('/trpc/sceneAudio.*', aiRateLimiter({ windowMs: 60_000, max: 10 })); // medium
+app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 20 })); // music gen ~15s
+app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 30 })); // TTS, short + cheap
+app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 30 })); // image gen ~$0.04, fast
 
 // ── Job status SSE (real-time generation progress) ───────────────────
 const { jobStatusRouter } = await import('./routes/job-status');
@@ -830,6 +867,14 @@ if (process.env.REDIS_URL) {
       startGenerationWorker(concurrency);
     })
     .catch((err) => console.warn('[worker] Failed to start generation worker:', err));
+
+  // VLM worker — only spins up when GOOGLE_API_KEY is present, since every
+  // kind of VLM job requires Gemini access. Opt out via VLM_WORKER_DISABLED=true.
+  if (process.env.GOOGLE_API_KEY && process.env.VLM_WORKER_DISABLED !== 'true') {
+    import('./workers/vlm.worker')
+      .then(({ startVlmWorker }) => startVlmWorker())
+      .catch((err) => console.warn('[vlm-worker] Failed to start VLM worker:', err));
+  }
 }
 
 // ── Graceful shutdown ──────────────────────────────────────────────────
@@ -850,6 +895,13 @@ async function gracefulShutdown(signal: string) {
       shutdownOps.push(stopGenerationWorker());
     } catch {
       // Optional shutdown step — module may not be loaded
+    }
+
+    try {
+      const { stopVlmWorker } = await import('./workers/vlm.worker');
+      shutdownOps.push(stopVlmWorker());
+    } catch {
+      // Optional — VLM worker may be disabled or not loaded
     }
 
     try {
