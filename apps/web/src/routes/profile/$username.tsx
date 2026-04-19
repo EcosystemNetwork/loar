@@ -66,7 +66,7 @@ const THEME_CLASSES: Record<string, string> = {
   minimal: 'font-mono',
   cinematic: 'bg-gradient-to-b from-background to-zinc-950',
   neon: '',
-  retro: 'font-serif',
+  retro: 'font-sans',
 };
 
 function ProfilePage() {
