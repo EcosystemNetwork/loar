@@ -14,6 +14,7 @@ import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
+import { Route as StatusRouteImport } from './routes/status'
 import { Route as StakingRouteImport } from './routes/staking'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as RelightRouteImport } from './routes/relight'
@@ -120,6 +121,11 @@ const SubscriptionsRoute = SubscriptionsRouteImport.update({
 const StudioControlledRoute = StudioControlledRouteImport.update({
   id: '/studio-controlled',
   path: '/studio-controlled',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatusRoute = StatusRouteImport.update({
+  id: '/status',
+  path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StakingRoute = StakingRouteImport.update({
@@ -556,6 +562,7 @@ export interface FileRoutesByFullPath {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
+  '/status': typeof StatusRoute
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
@@ -645,6 +652,7 @@ export interface FileRoutesByTo {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
+  '/status': typeof StatusRoute
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
@@ -735,6 +743,7 @@ export interface FileRoutesById {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/staking': typeof StakingRoute
+  '/status': typeof StatusRoute
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
@@ -826,6 +835,7 @@ export interface FileRouteTypes {
     | '/relight'
     | '/sandbox'
     | '/staking'
+    | '/status'
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
@@ -915,6 +925,7 @@ export interface FileRouteTypes {
     | '/relight'
     | '/sandbox'
     | '/staking'
+    | '/status'
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
@@ -1004,6 +1015,7 @@ export interface FileRouteTypes {
     | '/relight'
     | '/sandbox'
     | '/staking'
+    | '/status'
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
@@ -1094,6 +1106,7 @@ export interface RootRouteChildren {
   RelightRoute: typeof RelightRoute
   SandboxRoute: typeof SandboxRoute
   StakingRoute: typeof StakingRoute
+  StatusRoute: typeof StatusRoute
   StudioControlledRoute: typeof StudioControlledRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   TermsRoute: typeof TermsRoute
@@ -1189,6 +1202,13 @@ declare module '@tanstack/react-router' {
       path: '/studio-controlled'
       fullPath: '/studio-controlled'
       preLoaderRoute: typeof StudioControlledRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/status': {
+      id: '/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/staking': {
@@ -1835,6 +1855,7 @@ const rootRouteChildren: RootRouteChildren = {
   RelightRoute: RelightRoute,
   SandboxRoute: SandboxRoute,
   StakingRoute: StakingRoute,
+  StatusRoute: StatusRoute,
   StudioControlledRoute: StudioControlledRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   TermsRoute: TermsRoute,
