@@ -142,6 +142,7 @@ export class StorageManager {
     // Try providers in priority order until one succeeds
     let primaryResult: UploadResult | null = null;
     const results: UploadResult[] = [];
+    const primaryProvider = available[0];
 
     for (const provider of available) {
       const t0 = Date.now();
@@ -178,6 +179,13 @@ export class StorageManager {
           userId,
         });
 
+        // Prometheus: 'success' when primary provider took it, 'fallback'
+        // when we only succeeded on a lower-priority provider. The Grafana
+        // storage fallback rate panel keys on this distinction to detect
+        // primary-provider degradation before the circuit breaker trips.
+        const { recordStorageUpload } = await import('../../lib/metrics');
+        recordStorageUpload(provider.name, provider === primaryProvider ? 'success' : 'fallback');
+
         break;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -188,6 +196,8 @@ export class StorageManager {
     }
 
     if (!primaryResult) {
+      const { recordStorageUpload } = await import('../../lib/metrics');
+      recordStorageUpload('all', 'failure');
       const failedList = attempts
         .filter((a) => a.status === 'failed')
         .map((a) => `  ${a.provider}: ${a.error}`)

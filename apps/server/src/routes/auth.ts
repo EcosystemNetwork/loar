@@ -20,6 +20,7 @@ import {
   revokeToken,
   verifySessionToken,
 } from '../lib/siwe';
+import { recordAuthEvent } from '../lib/metrics';
 
 export const authRoutes = new Hono();
 
@@ -62,8 +63,10 @@ function getSessionToken(c: any): string | undefined {
 authRoutes.get('/nonce', async (c) => {
   try {
     const nonce = await generateNonce();
+    recordAuthEvent('nonce', 'success');
     return c.json({ nonce });
   } catch (err) {
+    recordAuthEvent('nonce', 'failure');
     console.error('Failed to generate nonce:', err);
     return c.json({ error: 'Failed to generate nonce' }, 500);
   }
@@ -116,6 +119,8 @@ authRoutes.post('/verify', async (c) => {
     // Decode expiry for client UI (not secret — just a timestamp)
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
 
+    recordAuthEvent('verify', 'success');
+
     // Return address + expiry (NOT the token) — client uses these for UI state only
     return c.json({
       address,
@@ -123,6 +128,7 @@ authRoutes.post('/verify', async (c) => {
       expiresAt: payload.exp * 1000,
     });
   } catch (err) {
+    recordAuthEvent('verify', 'failure');
     const message = err instanceof Error ? err.message : 'Verification failed';
     return c.json({ error: message }, 401);
   }
@@ -138,6 +144,7 @@ authRoutes.post('/refresh', async (c) => {
   try {
     const newToken = await refreshSessionToken(token);
     if (!newToken) {
+      recordAuthEvent('refresh', 'failure');
       clearSessionCookie(c);
       return c.json({ error: 'Session expired or invalid. Please sign in again.' }, 401);
     }
@@ -145,8 +152,10 @@ authRoutes.post('/refresh', async (c) => {
     setSessionCookie(c, newToken);
 
     const payload = JSON.parse(Buffer.from(newToken.split('.')[1], 'base64').toString());
+    recordAuthEvent('refresh', 'success');
     return c.json({ ok: true, expiresAt: payload.exp * 1000 });
   } catch {
+    recordAuthEvent('refresh', 'failure');
     clearSessionCookie(c);
     return c.json({ error: 'Refresh failed' }, 401);
   }
