@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import { validateUploadUrl } from '../lib/url-validator';
+import { recordProviderCost, assertProviderAllowed } from './cost-tracker';
 
 /**
  * Sanitize user-supplied text before interpolating into AI prompts.
@@ -37,6 +38,14 @@ function ensureGeminiKey() {
   if (!GOOGLE_API_KEY) {
     throw new Error('GOOGLE_API_KEY environment variable is required for Gemini features');
   }
+}
+
+async function ensureGeminiAllowed() {
+  if (!GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY environment variable is required for Gemini features');
+  }
+  // Cost-tracker admin controls: kill-switch + daily caps.
+  await assertProviderAllowed({ provider: 'gemini' });
 }
 
 function safeJsonParse<T>(text: string, label: string): T {
@@ -105,7 +114,7 @@ export async function generateWikiFromVideo(
     previousEvents?: Array<{ title: string; description: string }>;
   }
 ): Promise<VideoAnalysisResult> {
-  ensureGeminiKey();
+  await ensureGeminiAllowed();
   console.log(`🎬 Generating wiki for event ${eventData.eventId}`);
   console.log(`📝 Characters provided: ${eventData.characters?.length || 0}`);
   if (eventData.characters && eventData.characters.length > 0) {
@@ -305,6 +314,17 @@ Output valid JSON only. Be precise and factual.`;
     console.log(`📊 Tokens: ${tokensUsed} (in: ${inputTokens}, out: ${outputTokens})`);
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
+    await recordProviderCost({
+      provider: 'gemini',
+      model: 'gemini-2.5-pro',
+      kind: 'vlm',
+      costUsd,
+      inputTokens,
+      outputTokens,
+      tokensUsed,
+      extra: { label: 'wiki-from-video', eventId: eventData.eventId },
+    });
+
     return {
       wikiData,
       metadata: {
@@ -329,7 +349,7 @@ export async function analyzeCharacterImage(
   userDescription: string,
   characterName: string
 ): Promise<string> {
-  ensureGeminiKey();
+  await ensureGeminiAllowed();
   console.log(`🎨 Analyzing character image for: ${characterName}`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
@@ -399,6 +419,16 @@ Generate a detailed visual description in plain text (no JSON, no formatting).`;
     );
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
+    await recordProviderCost({
+      provider: 'gemini',
+      model: 'gemini-2.5-pro',
+      kind: 'vlm',
+      costUsd,
+      inputTokens,
+      outputTokens,
+      extra: { label: 'character-image-analysis', characterName },
+    });
+
     return description;
   } catch (error) {
     console.error('❌ Character analysis failed:', error);
@@ -413,7 +443,7 @@ export async function improveImagePrompt(
   userPrompt: string,
   characterContext?: Array<{ name: string; description: string }>
 ): Promise<string> {
-  ensureGeminiKey();
+  await ensureGeminiAllowed();
   console.log(`🎨 Improving image prompt with Gemini...`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
@@ -481,6 +511,16 @@ Generate the improved image prompt now:`;
     );
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
+    await recordProviderCost({
+      provider: 'gemini',
+      model: 'gemini-2.5-pro',
+      kind: 'llm',
+      costUsd,
+      inputTokens,
+      outputTokens,
+      extra: { label: 'image-prompt-improve' },
+    });
+
     return cleanPrompt;
   } catch (error) {
     console.error('❌ Image prompt improvement failed:', error);
@@ -500,7 +540,7 @@ export async function improveVideoPrompt(
     plot?: string;
   }
 ): Promise<string> {
-  ensureGeminiKey();
+  await ensureGeminiAllowed();
   console.log(`🎬 Improving video prompt with Gemini...`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
@@ -583,6 +623,16 @@ Generate the improved prompt now:`;
     );
     console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
 
+    await recordProviderCost({
+      provider: 'gemini',
+      model: 'gemini-2.5-pro',
+      kind: 'llm',
+      costUsd,
+      inputTokens,
+      outputTokens,
+      extra: { label: 'video-prompt-improve' },
+    });
+
     return cleanPrompt;
   } catch (error) {
     console.error('❌ Prompt improvement failed:', error);
@@ -599,7 +649,7 @@ export async function generateEntityLore(
   entityKind: string,
   description: string
 ): Promise<string> {
-  ensureGeminiKey();
+  await ensureGeminiAllowed();
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `You are a worldbuilding writer creating a concise wiki/lore card entry.
@@ -617,8 +667,22 @@ Write a compelling 2–4 paragraph wiki entry for this ${entityKind}. Include:
 Write in a neutral encyclopedic tone. No headers, no lists — flowing paragraphs only.`;
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const response = result.response;
+  const text = response.text();
   if (!text) throw new Error('Gemini returned empty lore card');
+  const usage = response.usageMetadata;
+  const inputTokens = usage?.promptTokenCount ?? 0;
+  const outputTokens = usage?.candidatesTokenCount ?? 0;
+  const costUsd = (inputTokens / 1_000_000) * 0.075 + (outputTokens / 1_000_000) * 0.3;
+  await recordProviderCost({
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    kind: 'llm',
+    costUsd,
+    inputTokens,
+    outputTokens,
+    extra: { label: 'entity-lore-card', entityKind },
+  });
   return text;
 }
 
@@ -645,7 +709,7 @@ export async function generateEntityProfile(
   entityKind: string,
   userHint: string
 ): Promise<{ description: string; metadata: Record<string, string> }> {
-  ensureGeminiKey();
+  await ensureGeminiAllowed();
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   const fields = METADATA_FIELDS_BY_KIND[entityKind] ?? [];
 
@@ -678,7 +742,21 @@ RULES:
 - Output valid JSON only. No markdown fences.`;
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
+  const response = result.response;
+  const text = response.text().trim();
+  const usage = response.usageMetadata;
+  const inputTokens = usage?.promptTokenCount ?? 0;
+  const outputTokens = usage?.candidatesTokenCount ?? 0;
+  const costUsd = (inputTokens / 1_000_000) * 0.075 + (outputTokens / 1_000_000) * 0.3;
+  await recordProviderCost({
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    kind: 'llm',
+    costUsd,
+    inputTokens,
+    outputTokens,
+    extra: { label: 'entity-profile', entityKind },
+  });
 
   const parsed = safeJsonParse<{ description?: string; metadata?: Record<string, any> }>(
     text,

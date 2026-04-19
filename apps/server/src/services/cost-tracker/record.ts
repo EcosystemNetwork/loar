@@ -117,6 +117,9 @@ export async function recordProviderCost(input: RecordProviderCostInput): Promis
   }> = [
     { scope: 'platform', key: 'all' },
     { scope: 'provider', key: `${input.provider}:${input.kind}` },
+    // Per-model scope (only when model is known) — powers the per-model
+    // admin table + cost-per-call efficiency view.
+    ...(input.model ? [{ scope: 'model', key: `${input.provider}:${input.model}` }] : []),
     { scope: 'user', key: scope.userId ?? 'anon' },
     ...(scope.apiKeyId ? [{ scope: 'apiKey', key: scope.apiKeyId }] : []),
     ...(scope.universeAddress ? [{ scope: 'universe', key: scope.universeAddress }] : []),

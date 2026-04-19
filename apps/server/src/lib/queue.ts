@@ -20,6 +20,7 @@ export const QUEUE_NAMES = {
   UPLOAD: 'upload',
   BACKGROUND: 'background',
   VLM: 'vlm',
+  WEBHOOK: 'webhook',
 } as const;
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -97,6 +98,26 @@ export interface VlmJobData {
   };
 }
 
+export interface WebhookJobData {
+  /** Owner of the job (used for attribution / rate limiting). */
+  ownerUid: string;
+  /** Destination URL — HTTPS required in production; validated at enqueue time. */
+  url: string;
+  /** Idempotency token echoed back so receivers can dedupe. */
+  clientToken?: string;
+  /** Terminal job state this webhook reports. */
+  event: 'job.completed' | 'job.failed' | 'job.cancelled';
+  /** Arbitrary body serialized as the webhook payload. */
+  payload: Record<string, unknown>;
+}
+
+export interface WebhookJobResult {
+  status: 'delivered' | 'failed';
+  statusCode?: number;
+  attempts: number;
+  error?: string;
+}
+
 export interface VlmJobResult {
   jobId: string;
   status: 'completed' | 'failed';
@@ -112,6 +133,7 @@ let generationQueue: Queue<GenerationJobData, GenerationJobResult> | null = null
 let uploadQueue: Queue<UploadJobData> | null = null;
 let backgroundQueue: Queue<BackgroundJobData> | null = null;
 let vlmQueue: Queue<VlmJobData, VlmJobResult> | null = null;
+let webhookQueue: Queue<WebhookJobData, WebhookJobResult> | null = null;
 let generationEvents: QueueEvents | null = null;
 let vlmEvents: QueueEvents | null = null;
 
@@ -212,6 +234,23 @@ export function getVlmEvents(): QueueEvents {
   return vlmEvents;
 }
 
+export function getWebhookQueue(): Queue<WebhookJobData, WebhookJobResult> {
+  if (!webhookQueue) {
+    const connection = getConnectionOpts();
+    webhookQueue = new Queue(QUEUE_NAMES.WEBHOOK, {
+      connection,
+      defaultJobOptions: {
+        // Exponential backoff: 1s → 4s → 16s → 64s → 256s (~4.5 min total)
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 1000 },
+        removeOnComplete: { age: 86400, count: 5000 },
+        removeOnFail: { age: 604800, count: 10000 },
+      },
+    });
+  }
+  return webhookQueue;
+}
+
 // ── Admission Control ──────────────────────────────────────────────────
 
 const MAX_CONCURRENT_GENERATIONS = parseInt(process.env.MAX_CONCURRENT_GENERATIONS || '50', 10);
@@ -281,6 +320,7 @@ export async function shutdownQueues(): Promise<void> {
   if (uploadQueue) closeOps.push(uploadQueue.close());
   if (backgroundQueue) closeOps.push(backgroundQueue.close());
   if (vlmQueue) closeOps.push(vlmQueue.close());
+  if (webhookQueue) closeOps.push(webhookQueue.close());
   if (generationEvents) closeOps.push(generationEvents.close());
   if (vlmEvents) closeOps.push(vlmEvents.close());
   await Promise.allSettled(closeOps);
@@ -288,6 +328,7 @@ export async function shutdownQueues(): Promise<void> {
   uploadQueue = null;
   backgroundQueue = null;
   vlmQueue = null;
+  webhookQueue = null;
   generationEvents = null;
   vlmEvents = null;
 }

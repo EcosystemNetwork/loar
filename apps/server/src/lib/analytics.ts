@@ -19,24 +19,28 @@
 const POSTHOG_KEY = process.env.POSTHOG_API_KEY;
 const POSTHOG_HOST = process.env.POSTHOG_HOST || 'https://us.i.posthog.com';
 
-let client: {
+type PosthogClient = {
   capture: (opts: {
     distinctId: string;
     event: string;
     properties?: Record<string, unknown>;
   }) => void;
   shutdown: () => Promise<void>;
-} | null = null;
-let initPromise: Promise<typeof client> | null = null;
+};
+type PosthogClientOrNull = PosthogClient | null;
 
-function getClient(): Promise<typeof client> {
+let client: PosthogClientOrNull = null;
+let initPromise: Promise<PosthogClientOrNull> | null = null;
+
+function getClient(): Promise<PosthogClientOrNull> {
   if (initPromise) return initPromise;
   if (!POSTHOG_KEY) {
-    initPromise = Promise.resolve<typeof client>(null);
-    return initPromise;
+    const p: Promise<PosthogClientOrNull> = Promise.resolve(null);
+    initPromise = p;
+    return p;
   }
 
-  initPromise = (async () => {
+  const p: Promise<PosthogClientOrNull> = (async () => {
     try {
       const modName = 'posthog-node';
       const mod = await import(/* @ts-ignore */ modName as any);
@@ -48,15 +52,15 @@ function getClient(): Promise<typeof client> {
         flushAt: 20,
         flushInterval: 10_000,
       });
-      client = instance as typeof client;
+      client = instance as PosthogClient;
       return client;
     } catch {
       // posthog-node not installed or failed to import — silent no-op.
       return null;
     }
   })();
-
-  return initPromise;
+  initPromise = p;
+  return p;
 }
 
 /**

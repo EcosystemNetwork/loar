@@ -16,10 +16,50 @@ pnpm --filter mcp dev
 
 ## Environment Variables
 
-| Variable          | Required | Default                 | Description                |
-| ----------------- | -------- | ----------------------- | -------------------------- |
-| `LOAR_API_KEY`    | Yes      | —                       | API key for authentication |
-| `LOAR_SERVER_URL` | No       | `http://localhost:3000` | LOAR server URL            |
+| Variable             | Required | Default                 | Description                                                     |
+| -------------------- | -------- | ----------------------- | --------------------------------------------------------------- |
+| `LOAR_API_KEY`       | Yes      | —                       | API key for authentication (prefix `loar_`).                    |
+| `LOAR_SERVER_URL`    | No       | `http://localhost:3000` | LOAR tRPC server URL.                                           |
+| `LOAR_MCP_TRANSPORT` | No       | `stdio`                 | `stdio` for local MCP hosts, `sse` for hosted HTTP deployments. |
+| `LOAR_MCP_PORT`      | No       | `3333`                  | Listen port (SSE mode only).                                    |
+| `LOAR_MCP_HOST`      | No       | `127.0.0.1`             | Bind host (SSE mode only). Use `0.0.0.0` for public listeners.  |
+
+## Transports
+
+### stdio (default)
+
+For Claude Desktop, Cursor, Claude Code, and any local MCP host. The agent
+spawns the process and communicates over stdin/stdout.
+
+```bash
+LOAR_API_KEY=loar_... npx @loar/mcp-server
+```
+
+### SSE (Server-Sent Events over HTTP)
+
+For hosted deployments (OpenClaw remote connector, Hermes Skills Hub, custom
+web agents). One MCP session per `GET /sse` request, routed by `sessionId`
+on subsequent POSTs.
+
+```bash
+LOAR_MCP_TRANSPORT=sse \
+LOAR_MCP_PORT=3333 \
+LOAR_MCP_HOST=0.0.0.0 \
+LOAR_API_KEY=loar_... \
+npx @loar/mcp-server
+```
+
+Endpoints:
+
+| Method + Path               | Purpose                                               |
+| --------------------------- | ----------------------------------------------------- |
+| `GET /sse`                  | Open a new MCP session (response is an SSE stream).   |
+| `POST /messages?sessionId=` | Send a JSON-RPC message to an existing session.       |
+| `GET /health`               | Liveness check — returns `{ ok, sessions, version }`. |
+
+> **Authentication model:** the `LOAR_API_KEY` in the server's environment
+> is used for ALL inbound sessions. Multi-tenant SSE (one key per end-user
+> via OAuth 2.1) is tracked in Week 4 of the MCP integration PRD.
 
 ## Claude Desktop Setup
 

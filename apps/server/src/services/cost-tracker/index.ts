@@ -40,3 +40,36 @@ export {
   platformMarginRatio,
   platformRevenueUsdTotal,
 } from './metrics';
+
+// Controls (kill-switches + per-scope caps)
+export {
+  getControls,
+  setControls,
+  invalidateControlsCache,
+  assertProviderAllowed,
+  ProviderPausedError,
+  CostCapExceededError,
+  DEFAULT_CONTROLS,
+} from './controls';
+export type { CostControls, AssertArgs } from './controls';
+
+// Alerts
+export {
+  runAlertSweep,
+  checkAndFireMarginAlert,
+  checkAndFirePlatformCapAlert,
+  listRecentAlerts,
+  acknowledgeAlert,
+} from './alerts';
+export type { CostAlert, AlertKind } from './alerts';
+
+// Trend + comparison + movers + by-model
+export { getPlatformTrend } from './trend';
+export type { TrendPoint } from './trend';
+export { getComparison } from './comparison';
+export type { Comparison } from './comparison';
+export { getTopMovers } from './top-movers';
+export type { Mover, Scope as MoverScope } from './top-movers';
+export { getByModel } from './by-model';
+export type { ModelRow } from './by-model';
+export { exportLedgerCsv } from './csv-export';

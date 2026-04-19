@@ -57,6 +57,8 @@ import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { TRPCError } from '@trpc/server';
 import { createAttachment } from '../media/media.handlers';
 
 // ── Types ─────────────────────────────────────────────────────────────

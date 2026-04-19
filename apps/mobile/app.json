@@ -15,9 +15,12 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "xyz.loartech.vault",
+      "bundleIdentifier": "fun.loar.vault",
       "infoPlist": {
-        "NSCameraUsageDescription": "Used for scanning QR codes to connect wallets",
+        "NSCameraUsageDescription": "Used for scanning QR codes to connect wallets.",
+        "NSPhotoLibraryUsageDescription": "Used to pick images for your profile and universe covers.",
+        "NSPhotoLibraryAddUsageDescription": "Used to save generated content to your photo library.",
+        "NSMicrophoneUsageDescription": "Used for voice-to-text prompts in the creator studio.",
         "LSApplicationQueriesSchemes": [
           "metamask",
           "trust",
@@ -32,7 +35,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "xyz.loartech.vault",
+      "package": "fun.loar.vault",
       "intentFilters": [
         {
           "action": "VIEW",

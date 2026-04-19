@@ -48,6 +48,7 @@ export const vlmRecapRouter = router({
           createdAt: new Date(),
         });
       }
-      return result;
+      // Cost details recorded in admin cost ledger only.
+      return { recap: result.recap };
     }),
 });

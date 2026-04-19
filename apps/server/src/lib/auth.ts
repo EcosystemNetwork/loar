@@ -9,7 +9,9 @@
  * Returns a normalized AuthUser for use in tRPC context.
  */
 import { verifySessionToken } from './siwe';
-import { verifyApiKey, type ApiKeyDoc } from './apiKeys';
+import { verifyApiKey, isMcpServerKey, type ApiKeyDoc } from './apiKeys';
+
+const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export interface AuthUser {
   uid: string;
@@ -21,6 +23,12 @@ export interface AuthUser {
   aiAgentId?: string;
   /** Permissions scoped to this API key (empty = full access via JWT) */
   apiKeyPermissions?: string[];
+  /**
+   * End-user wallet address passed through by an MCP relay. Only populated
+   * when the API key has the `mcp_server` scope AND the request includes
+   * a valid `X-Loar-End-User-Address` header. See docs/prd-mcp-integration.md §1.
+   */
+  endUserAddress?: string;
 }
 
 /**
@@ -36,11 +44,21 @@ export async function verifyAuth(headers: Headers, cookieToken?: string): Promis
   if (apiKey) {
     const result = await verifyApiKey(apiKey);
     if (result) {
+      // Honour X-Loar-End-User-Address ONLY when the key is an MCP relay.
+      // Direct API keys cannot impersonate a different end-user.
+      let endUserAddress: string | undefined;
+      if (isMcpServerKey(result.keyDoc.permissions)) {
+        const raw = headers.get('X-Loar-End-User-Address')?.trim();
+        if (raw && ETH_ADDRESS_RE.test(raw)) {
+          endUserAddress = raw.toLowerCase();
+        }
+      }
       return {
         ...result.user,
         apiKeyId: result.keyDoc.id,
         aiAgentId: result.keyDoc.aiAgentId || undefined,
         apiKeyPermissions: result.keyDoc.permissions,
+        endUserAddress,
       };
     }
     return null; // Invalid API key — don't fall through to JWT

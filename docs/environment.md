@@ -28,9 +28,12 @@ The indexer validates `PONDER_RPC_URL_2` at config load time and exits with an e
 
 LOAR uses **SIWE (Sign-In With Ethereum)** for authentication — wallet-based login with JWT sessions. Firebase Auth is **not used**.
 
-| Variable          | App    | Description                                        | Example           |
-| ----------------- | ------ | -------------------------------------------------- | ----------------- |
-| `SIWE_JWT_SECRET` | server | Secret for signing SIWE session JWTs (256-bit hex) | `a1b2c3d4e5f6...` |
+| Variable                   | App    | Description                                                                                                                                                          | Example               |
+| -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `SIWE_JWT_SECRET`          | server | Secret for signing SIWE session JWTs (256-bit hex)                                                                                                                   | `a1b2c3d4e5f6...`     |
+| `SIWE_JWT_SECRET_PREVIOUS` | server | Optional. Previous JWT secret during a 24h rotation grace window. `verifySessionToken()` tries the current secret then falls back to this one. Remove after JWT TTL. | `<prior secret>`      |
+| `SIWE_ALLOWED_DOMAINS`     | server | Optional comma-separated allowed domains for SIWE messages. Defaults to `CORS_ORIGIN`.                                                                               | `loar.fun,staging...` |
+| `SIWE_ALLOWED_CHAIN_IDS`   | server | Optional comma-separated chain IDs accepted in SIWE messages. Defaults to `8453,84532,11155111,31337` (Base, Base Sepolia, Sepolia, Anvil).                          | `8453,84532`          |
 
 ### Firebase (Firestore — data storage only)
 

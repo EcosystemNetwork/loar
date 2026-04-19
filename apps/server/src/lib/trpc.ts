@@ -6,6 +6,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import { getAddress } from 'viem';
 import type { Context } from './context';
 import { withCostScope } from '../services/cost-tracker/scope';
+import { hasScope, isMcpServerKey, trackApiKeyUsage } from './apiKeys';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -16,8 +17,23 @@ export const router = t.router;
  * the async context so every provider call during this request auto-tags
  * its ledger entry. Runs on every procedure via publicProcedure/protectedProcedure.
  */
-const costScopeMiddleware = t.middleware(({ ctx, path, next }) => {
+const costScopeMiddleware = t.middleware(async ({ ctx, path, next }) => {
   const u = ctx.user;
+  // Fire-and-forget usage record — only when the caller is using an API key.
+  // JWT / cookie sessions don't generate apiKeyUsage rows.
+  if (u?.apiKeyId) {
+    const keyType: 'mcp_server' | 'direct' = isMcpServerKey(u.apiKeyPermissions)
+      ? 'mcp_server'
+      : 'direct';
+    trackApiKeyUsage({
+      keyId: u.apiKeyId,
+      endpoint: `trpc:${path}`,
+      keyType,
+      endUserAddress: u.endUserAddress,
+    }).catch(() => {
+      /* already logged inside helper */
+    });
+  }
   return withCostScope(
     {
       userId: u?.uid ?? null,
@@ -94,9 +110,10 @@ export function requirePermission(permission: string) {
   return t.middleware(({ ctx, next }) => {
     // ctx.user is guaranteed non-null here (chained after protectedProcedure)
     const user = ctx.user as NonNullable<typeof ctx.user>;
-    const perms = (user as any).apiKeyPermissions as string[] | undefined;
-    // JWT users have no apiKeyPermissions → full access
-    if (perms && perms.length > 0 && !perms.includes(permission)) {
+    const perms = user.apiKeyPermissions;
+    // hasScope handles JWT users (no perms → pass), admin.all, and mcp_server
+    // inheritance of all non-admin scopes.
+    if (!hasScope(perms, permission)) {
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: `API key lacks required permission: ${permission}`,

@@ -57,6 +57,7 @@ import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery, buildGalleryDoc } from '../../lib/gallery-publish';
 import { recordAssetEventAsync } from '../../services/lineage';
 import { reserveClientToken } from '../../lib/jobIdempotency';
+import { enqueueWebhook, validateWebhookUrl } from '../../lib/webhooks';
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -132,6 +133,10 @@ export const generateInputSchema = z.object({
     .max(128)
     .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
     .optional(),
+
+  // Webhook delivery — signed POST fires on terminal job state transition.
+  // See docs/prd-mcp-integration.md §2 and apps/server/src/lib/webhooks.ts.
+  webhookUrl: z.string().url().max(2000).optional(),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -727,6 +732,17 @@ export const generationRouter = router({
       // Per-user throttle: minimum 2s between generation requests
       checkUserThrottle(ctx.user.uid);
 
+      // Validate webhookUrl early — fail before any billable work.
+      // See docs/prd-mcp-integration.md §2.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
       // Sanitize user-supplied prompt before any processing
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
@@ -884,12 +900,16 @@ export const generationRouter = router({
         entityId?: string;
         originalPrompt?: string;
         imageUrl?: string;
+        webhookUrl?: string;
+        clientToken?: string;
       } = {
         id: generationId,
         userId: ctx.user.uid,
         ...(input.entityId ? { entityId: input.entityId } : {}),
         ...(input.universeId ? { universeId: input.universeId } : {}),
         ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
+        ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+        ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         routingMode: input.routingMode,
         ...(requestedModelId ? { requestedModelId } : {}),
         finalModelId,
@@ -1133,6 +1153,24 @@ export const generationRouter = router({
                 console.error('[video] gallery publish failed:', err.message)
               );
 
+              if (validatedWebhookUrl) {
+                void enqueueWebhook({
+                  ownerUid: ctx.user.uid,
+                  url: validatedWebhookUrl,
+                  clientToken: input.clientToken,
+                  event: 'job.completed',
+                  payload: {
+                    jobId: generationId,
+                    kind: 'video' as const,
+                    status: 'completed',
+                    resultUrl: fallbackResult.videoUrl,
+                    modelUsed: fallbackResult.fallbackModelId,
+                    wasFallback: true,
+                    creditsCharged,
+                  },
+                });
+              }
+
               return {
                 generationId,
                 status: 'completed' as const,
@@ -1229,6 +1267,24 @@ export const generationRouter = router({
           status: 'completed',
         });
 
+        if (validatedWebhookUrl) {
+          void enqueueWebhook({
+            ownerUid: ctx.user.uid,
+            url: validatedWebhookUrl,
+            clientToken: input.clientToken,
+            event: 'job.completed',
+            payload: {
+              jobId: generationId,
+              kind: 'video' as const,
+              status: 'completed',
+              resultUrl: result.videoUrl,
+              modelUsed: finalModelId,
+              wasFallback: false,
+              creditsCharged,
+            },
+          });
+        }
+
         return {
           generationId,
           status: 'completed' as const,
@@ -1276,6 +1332,22 @@ export const generationRouter = router({
           completedAt: new Date(),
         });
 
+        if (validatedWebhookUrl) {
+          void enqueueWebhook({
+            ownerUid: ctx.user.uid,
+            url: validatedWebhookUrl,
+            clientToken: input.clientToken,
+            event: 'job.failed',
+            payload: {
+              jobId: generationId,
+              kind: 'video' as const,
+              status: 'failed',
+              errorMessage,
+              creditsRefunded: creditsCharged > 0,
+            },
+          });
+        }
+
         throw error;
       }
     }),
@@ -1290,6 +1362,113 @@ export const generationRouter = router({
       if (!doc.exists) return null;
       if (doc.data()?.userId !== ctx.user.uid) return null;
       return { id: doc.id, ...doc.data() };
+    }),
+
+  /**
+   * Normalized job status for MCP progress polling. See docs/prd-mcp-integration.md §5.
+   * Returns a stable shape across queued / running / completed / failed / cancelled
+   * so the MCP server can emit `notifications/progress` without knowing the
+   * underlying generation schema.
+   */
+  jobStatus: protectedProcedure
+    .input(z.object({ jobId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const doc = await generationsCol().doc(input.jobId).get();
+      if (!doc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Generation not found' });
+      }
+      const d = doc.data() as any;
+      if (d.userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the job owner' });
+      }
+      const status = (d.status ?? 'queued') as
+        | 'queued'
+        | 'running'
+        | 'completed'
+        | 'failed'
+        | 'cancelled';
+      return {
+        jobId: doc.id,
+        status,
+        progress: status === 'completed' ? 100 : status === 'failed' ? 100 : null,
+        message:
+          status === 'failed'
+            ? (d.failureReason ?? null)
+            : status === 'cancelled'
+              ? 'cancelled'
+              : null,
+        resultUrl: (d.permanentVideoUrl ?? d.videoUrl ?? null) as string | null,
+        errorCode: status === 'failed' ? 'UPSTREAM_TIMEOUT' : null,
+        createdAt: d.createdAt ?? null,
+        completedAt: d.completedAt ?? null,
+      };
+    }),
+
+  /**
+   * Cancel a generation job. Marks the Firestore record as cancelled and
+   * refunds any credits that haven't been consumed by completion. Called by
+   * the MCP server in response to `notifications/cancelled` from the agent.
+   */
+  cancel: protectedProcedure
+    .input(
+      z.object({
+        jobId: z.string().min(1),
+        reason: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ref = generationsCol().doc(input.jobId);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Generation not found' });
+      }
+      const d = doc.data() as any;
+      if (d.userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the job owner' });
+      }
+
+      // Terminal states can't be cancelled; return idempotent no-op.
+      const terminal = ['completed', 'failed', 'cancelled'];
+      if (terminal.includes(d.status)) {
+        return {
+          ok: true,
+          refunded: 0,
+          alreadyTerminal: true as const,
+          status: d.status as string,
+        };
+      }
+
+      const creditsToRefund = (d.creditsCharged ?? 0) as number;
+      let refunded = 0;
+      if (creditsToRefund > 0 && !d.creditsRefunded) {
+        try {
+          const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
+          await userCreditsRef.update({
+            balance: FieldValue.increment(creditsToRefund),
+            totalSpent: FieldValue.increment(-creditsToRefund),
+            updatedAt: new Date(),
+          });
+          refunded = creditsToRefund;
+        } catch (refundErr) {
+          logFailedRefund({
+            userId: ctx.user.uid,
+            credits: creditsToRefund,
+            source: 'generation.cancel',
+            generationId: input.jobId,
+            error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+          });
+        }
+      }
+
+      await ref.update({
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        cancelReason: input.reason ?? null,
+        creditsRefunded: refunded > 0 ? true : (d.creditsRefunded ?? false),
+        completedAt: new Date(),
+      });
+
+      return { ok: true, refunded, alreadyTerminal: false as const, status: 'cancelled' as const };
     }),
 
   /**

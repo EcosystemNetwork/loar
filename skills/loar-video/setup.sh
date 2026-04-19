@@ -142,9 +142,9 @@ cat <<EOF
 
 ${C_GREEN}${SKILL_NAME} ready.${C_RESET}
 
-Copy this into your MCP host config:
+Pick a transport:
 
-  ${C_DIM}# OpenClaw / Claude Desktop / Cursor / most MCP clients:${C_RESET}
+  ${C_DIM}# 1) stdio — Claude Desktop / Cursor / Claude Code / local MCP hosts${C_RESET}
   {
     "mcpServers": {
       "loar": {
@@ -158,13 +158,24 @@ Copy this into your MCP host config:
     }
   }
 
-  ${C_DIM}# Hosted SSE (no local Node process):${C_RESET}
+  ${C_DIM}# 2) Self-hosted SSE — run your own public MCP endpoint${C_RESET}
+  #
+  # Start the server:
+  #   LOAR_MCP_TRANSPORT=sse LOAR_MCP_HOST=0.0.0.0 LOAR_MCP_PORT=3333 \\
+  #     LOAR_SERVER_URL=$server_url LOAR_API_KEY=\$LOAR_API_KEY \\
+  #     npx @loar/mcp-server
+  #
+  # Then connect your agent to: http://<your-host>:3333/sse
   {
     "mcpServers": {
-      "loar": {
-        "url": "https://mcp.loar.fun/sse",
-        "oauth": true
-      }
+      "loar": { "url": "http://<your-host>:3333/sse" }
+    }
+  }
+
+  ${C_DIM}# 3) Hosted SSE (LOAR-operated, Week 4) — one-click OAuth${C_RESET}
+  {
+    "mcpServers": {
+      "loar": { "url": "https://mcp.loar.fun/sse", "oauth": true }
     }
   }
 

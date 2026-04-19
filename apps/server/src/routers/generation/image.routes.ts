@@ -54,6 +54,8 @@ import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { googleImagenService } from '../../services/google-imagen';
 import { recordAssetEventAsync } from '../../services/lineage';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import type { PromptRef } from '../../services/lineage/types';
 import {
   CONTROL_TYPES,
@@ -133,6 +135,17 @@ const generateSchema = z.object({
   qualityTarget: z.enum(['draft', 'standard', 'premium']).optional(),
   costBudget: z.enum(['low', 'medium', 'any']).optional(),
   latencyPreference: z.enum(['fast', 'balanced', 'quality']).optional(),
+
+  // Idempotency token — see docs/prd-mcp-integration.md §2.
+  clientToken: z
+    .string()
+    .min(16)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+    .optional(),
+
+  // Webhook delivery — signed POST on terminal state. See docs/prd-mcp-integration.md §2.
+  webhookUrl: webhookUrlSchema.optional(),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -562,6 +575,48 @@ export const imageRouter = router({
       }
 
       const genId = randomUUID();
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      // See docs/prd-mcp-integration.md §2. Prevents double-charge on retries.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'image.generate',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await imageGenerationsCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'completed' | 'failed',
+            imageUrls: (d.imageUrls ?? []) as string[],
+            seed: d.seed as number | undefined,
+            modelUsed: (d.finalModelId ?? d.model ?? null) as string | null,
+            modelDisplayName:
+              (d.finalModelId ? getImageModelById(d.finalModelId)?.displayName : null) ?? null,
+            routingMode: input.routingMode,
+            reasonCode: (d.routingReasonCode ??
+              'idempotent_replay') as ImageGenerationRecord['routingReasonCode'],
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            wasFallback: Boolean(d.wasFallback),
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl early — fail before any billable work.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
       const startTime = Date.now();
 
       // ── Validate image_to_image inputs ──────────────────────────────
@@ -651,11 +706,15 @@ export const imageRouter = router({
         moodboardEntityId?: string | null;
         styleStrength?: number | null;
         retexture?: boolean;
+        webhookUrl?: string;
+        clientToken?: string;
       };
       recordWithStyle.stylePackEntityId = appliedStylePackId;
       recordWithStyle.moodboardEntityId = appliedMoodboardId;
       recordWithStyle.styleStrength = appliedStyleStrength;
       recordWithStyle.retexture = input.retexture ?? false;
+      if (validatedWebhookUrl) recordWithStyle.webhookUrl = validatedWebhookUrl;
+      if (input.clientToken) recordWithStyle.clientToken = input.clientToken;
       await saveRecord(recordWithStyle);
 
       // ── Deduct credits ───────────────────────────────────────────────
@@ -739,10 +798,27 @@ export const imageRouter = router({
                 generationId: genId,
               }).catch((err) => console.error('[image] gallery publish failed:', err.message));
 
+              fireJobWebhook({
+                ownerUid: ctx.user.uid,
+                webhookUrl: validatedWebhookUrl,
+                clientToken: input.clientToken,
+                event: 'job.completed',
+                jobId: genId,
+                kind: 'image',
+                payload: {
+                  status: 'completed',
+                  imageUrls: fallback.imageUrls,
+                  modelUsed: fallback.fallbackModelId,
+                  wasFallback: true,
+                  creditsCharged: totalCredits,
+                },
+              });
+
               return {
                 generationId: genId,
                 status: 'completed' as const,
                 imageUrls: fallback.imageUrls,
+                seed: undefined as number | undefined,
                 modelUsed: fallback.fallbackModelId,
                 modelDisplayName:
                   getImageModelById(fallback.fallbackModelId)?.displayName ||
@@ -752,6 +828,7 @@ export const imageRouter = router({
                 creditsCharged: totalCredits,
                 fiatPriceUsd: totalFiat,
                 wasFallback: true,
+                idempotentReplay: false as const,
               };
             }
           }
@@ -871,6 +948,22 @@ export const imageRouter = router({
           });
         }
 
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: genId,
+          kind: 'image',
+          payload: {
+            status: 'completed',
+            imageUrls,
+            modelUsed: finalModelId,
+            wasFallback: false,
+            creditsCharged: totalCredits,
+          },
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
@@ -883,6 +976,7 @@ export const imageRouter = router({
           creditsCharged: totalCredits,
           fiatPriceUsd: totalFiat,
           wasFallback: false,
+          idempotentReplay: false as const,
         };
       } catch (error) {
         const latencyMs = Date.now() - startTime;
@@ -918,6 +1012,19 @@ export const imageRouter = router({
             completedAt: new Date(),
           });
         }
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: 'image',
+          payload: {
+            status: 'failed',
+            errorMessage,
+            creditsRefunded: !alreadyRefunded,
+          },
+        });
         throw error;
       }
     }),

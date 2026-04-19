@@ -27,19 +27,16 @@ export const vlmCopilotRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const { prompt, cost } = await improvePromptFromReferences(input);
-      const costUsd = cost.reduce((a, c) => a + c.costUsd, 0);
-      const tokensUsed = cost.reduce((a, c) => a + c.tokensUsed, 0);
-      return { prompt, costUsd, tokensUsed };
+      const { prompt } = await improvePromptFromReferences(input);
+      // Cost lives only in the admin ledger (admin.cost.*); not returned to callers.
+      return { prompt };
     }),
 
   extractStyleBible: protectedProcedure
     .input(z.object({ imageUrls: z.array(z.string().url()).min(1).max(8) }))
     .mutation(async ({ input }) => {
-      const { styleBible, cost } = await extractStyleBibleFromMoodboard(input);
-      const costUsd = cost.reduce((a, c) => a + c.costUsd, 0);
-      const tokensUsed = cost.reduce((a, c) => a + c.tokensUsed, 0);
-      return { styleBible, costUsd, tokensUsed };
+      const { styleBible } = await extractStyleBibleFromMoodboard(input);
+      return { styleBible };
     }),
 
   scoreOutput: protectedProcedure
@@ -53,9 +50,7 @@ export const vlmCopilotRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const { score, cost } = await scoreOutput(input);
-      const costUsd = cost.reduce((a, c) => a + c.costUsd, 0);
-      const tokensUsed = cost.reduce((a, c) => a + c.tokensUsed, 0);
-      return { score, costUsd, tokensUsed };
+      const { score } = await scoreOutput(input);
+      return { score };
     }),
 });

@@ -93,6 +93,20 @@ const envSchema = z.object({
   MESHY_API_KEY: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
 
+  // ── Cost tracker / margin monitoring (admin-only) ───────────────────────
+  /** Target gross margin (revenue - cost)/revenue. Default 0.30 (30%). */
+  COST_MARGIN_TARGET: z.string().default('0.30'),
+  /** Opt-in background alert sweep (margin + daily cap). Set on ONE replica. */
+  COST_ALERT_ENABLED: z.enum(['true', 'false']).optional(),
+  /** Sweep interval in ms (min 60_000). */
+  COST_ALERT_INTERVAL_MS: z.string().default('600000'),
+  /** Minimum minutes between repeat alerts for the same rule. */
+  COST_ALERT_COOLDOWN_MIN: z.string().default('30'),
+  /** Hard daily platform cost cap. When today's spend ≥ this, paid APIs fail. */
+  COST_DAILY_PLATFORM_CAP_USD: z.string().optional(),
+  /** Controls cache TTL (ms). Admin mutations invalidate immediately. */
+  COST_CONTROLS_CACHE_MS: z.string().default('30000'),
+
   // ── VLM subsystem (see docs/prd-vlm-subsystem.md) ───────────────────────
   VLM_WORKER_DISABLED: z.enum(['true', 'false']).optional(),
   VLM_WORKER_CONCURRENCY: z.string().default('3'),

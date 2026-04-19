@@ -486,6 +486,49 @@ const getCredits = {
         return client.query('credits.getBalance', {});
     },
 };
+// ── Job Control Tools (status polling + cancellation) ──────────────────
+const getJobStatus = {
+    name: 'loar_get_job_status',
+    description: 'Check normalized status of any async generation job (video, image, voice, 3D, or studio pack). Returns { jobId, kind, status, progress, resultUrl, errorCode }. Use once when the user asks "is it done?" — do NOT poll in a loop.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            jobId: {
+                type: 'string',
+                description: 'Job ID returned by any generation tool (generationId, jobId, etc.).',
+            },
+            kind: {
+                type: 'string',
+                description: 'Optional hint to skip cross-collection probes',
+                enum: ['video', 'image', 'voice', '3d', 'studio'],
+            },
+        },
+        required: ['jobId'],
+    },
+    handler: async (client, args) => {
+        return client.query('jobs.status', args);
+    },
+};
+const cancelGeneration = {
+    name: 'loar_cancel_generation',
+    description: 'Cancel an in-flight generation job (any kind: video, image, voice, 3D, studio pack) and refund unconsumed credits. Terminal jobs return an idempotent no-op. Use when the user says "cancel that".',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            jobId: { type: 'string', description: 'Job ID to cancel' },
+            kind: {
+                type: 'string',
+                description: 'Optional hint to skip cross-collection probes',
+                enum: ['video', 'image', 'voice', '3d', 'studio'],
+            },
+            reason: { type: 'string', description: 'Optional user-provided reason' },
+        },
+        required: ['jobId'],
+    },
+    handler: async (client, args) => {
+        return client.mutate('jobs.cancel', args);
+    },
+};
 // ── Export All Tools ───────────────────────────────────────────────────
 export const ALL_TOOLS = [
     // Entities
@@ -523,4 +566,7 @@ export const ALL_TOOLS = [
     recordEpisode,
     // Credits
     getCredits,
+    // Job control (polling + cancellation)
+    getJobStatus,
+    cancelGeneration,
 ];

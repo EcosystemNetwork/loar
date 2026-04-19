@@ -107,6 +107,8 @@ import { shotTemplatesRouter } from './shotTemplates/shotTemplates.routes';
 import { lineageRouter } from './lineage/lineage.routes';
 import { workflowsRouter } from './workflows/workflows.index';
 import { mcpRouter } from './mcp/mcp.routes';
+import { jobsRouter } from './jobs/jobs.routes';
+import { vlmRouter } from './vlm/vlm.index';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -314,6 +316,14 @@ export const appRouter = router({
   // ── MCP resources surface (agent navigation via loar:// URIs) ────────
   // See docs/prd-mcp-integration.md §5
   mcp: mcpRouter,
+
+  // ── Unified async-job status + cancel (all generation backends) ──────
+  // See docs/prd-mcp-integration.md §5 / B-2
+  jobs: jobsRouter,
+
+  // ── VLM subsystem (extract, proposals, canon, search, moderation, copilot, recap, governance) ─
+  // See docs/prd-vlm-subsystem.md
+  vlm: vlmRouter,
 });
 
 export type AppRouter = typeof appRouter;

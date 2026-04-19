@@ -34,6 +34,17 @@ import { validateUploadUrl } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { TRPCError } from '@trpc/server';
+
+// Idempotency token regex shared across voice procedures.
+const clientTokenSchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+  .optional();
 
 // ── Pricing — loaded from platform config (admin-configurable) ────────
 
@@ -219,11 +230,48 @@ export const voiceRouter = router({
         style: z.number().min(0).max(1).optional(),
         entityId: z.string().optional(),
         universeId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       input.text = sanitizePrompt(input.text);
       const genId = randomUUID();
+
+      // Validate webhookUrl early — fail before any billable work.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'voice.synthesize',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await voiceGenerationsCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            audioUrl: (d.audioUrl ?? null) as string | null,
+            modelId: (d.modelId ?? input.modelId) as string,
+            characterCount: (d.characterCount ?? input.text.length) as number,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
       const startTime = Date.now();
 
       const { fiatMargin, loarMargin } = await getMargins();
@@ -251,6 +299,8 @@ export const voiceRouter = router({
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       await deductCredits(ctx.user.uid, credits);
@@ -294,14 +344,31 @@ export const voiceRouter = router({
           category: 'sound',
         });
 
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: genId,
+          kind: 'voice',
+          payload: {
+            status: 'completed',
+            audioUrl,
+            modelId: input.modelId,
+            characterCount: input.text.length,
+            creditsCharged: credits,
+          },
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
-          audioUrl,
-          modelId: input.modelId,
+          audioUrl: audioUrl as string | null,
+          modelId: input.modelId as string,
           characterCount: input.text.length,
           creditsCharged: credits,
           fiatPriceUsd: fiatPrice,
+          idempotentReplay: false as const,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits, genId);
@@ -312,6 +379,19 @@ export const voiceRouter = router({
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: 'voice',
+          payload: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
         throw error;
       }
     }),
@@ -325,12 +405,47 @@ export const voiceRouter = router({
         text: z.string().min(1).max(500),
         durationSeconds: z.number().min(0.5).max(22).optional(),
         entityId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       input.text = sanitizePrompt(input.text);
-      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
+
+      // Validate webhookUrl early.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'voice.soundEffect',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await voiceGenerationsCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            audioUrl: (d.audioUrl ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      const { fiatMargin, loarMargin } = await getMargins();
       const credits = toCredits(SOUND_EFFECT_COST_USD, fiatMargin);
 
       await voiceGenerationsCol()
@@ -347,6 +462,8 @@ export const voiceRouter = router({
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       await deductCredits(ctx.user.uid, credits);
@@ -384,12 +501,27 @@ export const voiceRouter = router({
           category: 'sound',
         });
 
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: genId,
+          kind: 'voice',
+          payload: {
+            status: 'completed',
+            audioUrl,
+            creditsCharged: credits,
+          },
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
-          audioUrl,
+          audioUrl: audioUrl as string | null,
           creditsCharged: credits,
           fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD, fiatMargin),
+          idempotentReplay: false as const,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits, genId);
@@ -400,6 +532,19 @@ export const voiceRouter = router({
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: 'voice',
+          payload: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
         throw error;
       }
     }),

@@ -12,10 +12,12 @@ latency and throughput** measurements, not feature correctness.
 
 ## Scenarios
 
-| Script           | What it loads                                                                    | Default VUs | Duration |
-| ---------------- | -------------------------------------------------------------------------------- | ----------- | -------- |
-| `wiki-browse.js` | `/health`, `/` — the traffic pattern of an anonymous browser landing on the site | 1000        | 5m       |
-| `siwe-nonce.js`  | `GET /auth/nonce` — SIWE login cold start                                        | 200         | 2m       |
+| Script               | What it loads                                                                    | Default VUs | Duration |
+| -------------------- | -------------------------------------------------------------------------------- | ----------- | -------- |
+| `wiki-browse.js`     | `/health`, `/` — the traffic pattern of an anonymous browser landing on the site | 1000        | 5m       |
+| `siwe-nonce.js`      | `GET /auth/nonce` — SIWE login cold start                                        | 200         | 2m       |
+| `trpc-read-heavy.js` | `moderation.getContentStatus` + `/health` — logged-out gallery browsing          | 500 peak    | 5m 30s   |
+| `takedown-abuse.js`  | `POST /api/takedown` flood — proves per-IP + per-email rate limits survive       | 50          | 3m       |
 
 ## Run
 

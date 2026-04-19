@@ -17,7 +17,7 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import type { z } from 'zod';
 import { validateUploadUrl } from '../../lib/url-validator';
 import type { CostSummary, VlmModel } from './types';
-import { recordProviderCost } from '../cost-tracker';
+import { recordProviderCost, assertProviderAllowed } from '../cost-tracker';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
@@ -120,6 +120,8 @@ export interface JsonResult<T> {
 
 export async function callJson<T>(args: CallJsonArgs<T>): Promise<JsonResult<T>> {
   ensureKey();
+  // Admin kill-switch + cap preflight. Throws ProviderPausedError / CostCapExceededError.
+  await assertProviderAllowed({ provider: 'gemini' });
   const m = genAI.getGenerativeModel({
     model: args.model,
     ...(args.system ? { systemInstruction: args.system } : {}),
@@ -191,6 +193,7 @@ export async function callText(args: {
   label: string;
 }): Promise<{ text: string; cost: CostSummary }> {
   ensureKey();
+  await assertProviderAllowed({ provider: 'gemini' });
   const m = genAI.getGenerativeModel({ model: args.model });
   const parts: any[] = [];
   if (args.media) for (const mp of args.media) parts.push(mp);

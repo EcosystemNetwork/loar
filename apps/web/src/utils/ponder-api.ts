@@ -7,13 +7,46 @@
  */
 
 const PONDER_URL = import.meta.env.VITE_PONDER_URL || '';
+// Comma-separated failover URLs — tried in order on primary failure. A single
+// Ponder host is a single point of failure, so ops should run at least one
+// secondary replica pointing at the same chain + schema.
+const PONDER_FALLBACK_URLS = ((import.meta.env.VITE_PONDER_URL_FALLBACK as string) || '')
+  .split(',')
+  .map((s: string) => s.trim())
+  .filter(Boolean);
 
-/** Circuit breaker: skip requests when indexer is known offline. */
-let _offlineUntil = 0;
-const OFFLINE_COOLDOWN_MS = 60_000; // back off 60s after a connection failure
+// Per-URL circuit breaker state. When a host errors we mark it offline for
+// OFFLINE_COOLDOWN_MS and rotate to the next. If every host is offline, we
+// fall back to the safe empty result.
+const OFFLINE_COOLDOWN_MS = 60_000;
+const _offlineUntil = new Map<string, number>();
+
+function candidateUrls(): string[] {
+  const urls: string[] = [];
+  if (PONDER_URL) urls.push(PONDER_URL);
+  for (const u of PONDER_FALLBACK_URLS) urls.push(u);
+  return urls;
+}
+
+function firstHealthyUrl(): string | null {
+  const now = Date.now();
+  for (const u of candidateUrls()) {
+    const cooldown = _offlineUntil.get(u) ?? 0;
+    if (now >= cooldown) return u;
+  }
+  return null;
+}
+
+function markOffline(url: string) {
+  _offlineUntil.set(url, Date.now() + OFFLINE_COOLDOWN_MS);
+}
+
+function markHealthy(url: string) {
+  _offlineUntil.delete(url);
+}
 
 /** True when no indexer URL is configured or it points to localhost in production build */
-const _disabled = !PONDER_URL;
+const _disabled = candidateUrls().length === 0;
 
 /**
  * Deep proxy that returns safe defaults for any property access chain.
@@ -47,32 +80,64 @@ export async function ponderGql<T = any>(
     return EMPTY_RESULT as T;
   }
 
-  if (Date.now() < _offlineUntil) {
-    return EMPTY_RESULT as T;
+  // Walk candidates in priority order, skipping any in cooldown. If every
+  // host is unreachable we return EMPTY_RESULT instead of throwing so UI
+  // queries degrade gracefully.
+  const urls = candidateUrls();
+  for (const url of urls) {
+    const cooldown = _offlineUntil.get(url) ?? 0;
+    if (Date.now() < cooldown) continue;
+
+    let res: Response;
+    try {
+      res = await fetch(`${url}/graphql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables }),
+      });
+    } catch {
+      markOffline(url);
+      continue;
+    }
+
+    if (!res.ok) {
+      // Retry-able status codes (5xx, 429) → mark offline and rotate.
+      // 4xx is a client bug, not an ops issue — surface it.
+      if (res.status >= 500 || res.status === 429) {
+        markOffline(url);
+        continue;
+      }
+      throw new Error(`Ponder query failed: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+    if (json.errors?.length) {
+      throw new Error(json.errors[0].message);
+    }
+    markHealthy(url);
+    return json.data;
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${PONDER_URL}/graphql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, variables }),
-    });
-  } catch {
-    _offlineUntil = Date.now() + OFFLINE_COOLDOWN_MS;
-    return EMPTY_RESULT as T;
-  }
+  // No healthy host on this attempt — short-circuit subsequent callers for
+  // the cooldown duration.
+  return EMPTY_RESULT as T;
+}
 
-  // Indexer is reachable — reset circuit breaker
-  _offlineUntil = 0;
-
-  if (!res.ok) throw new Error(`Ponder query failed: ${res.statusText}`);
-
-  const json = await res.json();
-  if (json.errors?.length) {
-    throw new Error(json.errors[0].message);
-  }
-  return json.data;
+/** Exposed for `/status` and health checks. Primary URL and any fallbacks with state. */
+export function getIndexerHealth(): Array<{
+  url: string;
+  healthy: boolean;
+  cooldownMsRemaining: number;
+}> {
+  const now = Date.now();
+  return candidateUrls().map((url) => {
+    const cooldown = _offlineUntil.get(url) ?? 0;
+    return {
+      url,
+      healthy: now >= cooldown,
+      cooldownMsRemaining: Math.max(0, cooldown - now),
+    };
+  });
 }
 
 /** Default React Query options for all ponder queries. */

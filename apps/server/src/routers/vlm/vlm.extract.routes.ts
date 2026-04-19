@@ -11,6 +11,7 @@ import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 import { getVlmQueue } from '../../lib/queue';
 import { consumeRateLimit } from '../../middleware/rate-limit';
+import { getCostScope } from '../../services/cost-tracker';
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_COUNT = Math.max(
@@ -74,12 +75,21 @@ export const vlmExtractRouter = router({
         });
 
       const queue = getVlmQueue();
+      const scope = getCostScope();
       await queue.add(
         'extract',
         {
           jobId,
           kind: 'extract',
           creatorUid: ctx.user.uid.toLowerCase(),
+          scope: {
+            userId: scope.userId ?? ctx.user.uid.toLowerCase(),
+            apiKeyId: scope.apiKeyId ?? null,
+            aiAgentId: scope.aiAgentId ?? null,
+            universeAddress: input.universeAddress ?? null,
+            route: 'trpc:vlm.extract.start',
+            requestId: jobId,
+          },
           input: {
             assetType: input.assetType,
             mediaUrl: input.mediaUrl,
@@ -113,13 +123,13 @@ export const vlmExtractRouter = router({
       ) {
         throw new Error('Forbidden');
       }
+      // Cost details are admin-only; do not leak tokensUsed/costUsd to
+      // the job creator. Admins query admin.cost.* for the full picture.
       return {
         jobId: input.jobId,
         status: data.status,
         kind: data.kind,
         outputRef: data.outputRef ?? null,
-        tokensUsed: data.tokensUsed ?? 0,
-        costUsd: data.costUsd ?? 0,
         error: data.error ?? null,
         createdAt: data.createdAt ?? null,
         startedAt: data.startedAt ?? null,

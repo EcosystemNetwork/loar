@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { router, publicProcedure, protectedProcedure, adminProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 import { getVlmQueue } from '../../lib/queue';
+import { getCostScope } from '../../services/cost-tracker';
 
 export const vlmModerationRouter = router({
   riskScore: publicProcedure.input(z.object({ contentId: z.string() })).query(async ({ input }) => {
@@ -58,12 +59,21 @@ export const vlmModerationRouter = router({
           },
           createdAt: new Date(),
         });
+      const scope = getCostScope();
       await getVlmQueue().add(
         'extract',
         {
           jobId,
           kind: 'extract',
           creatorUid: ctx.user.uid.toLowerCase(),
+          scope: {
+            userId: scope.userId ?? ctx.user.uid.toLowerCase(),
+            apiKeyId: scope.apiKeyId ?? null,
+            aiAgentId: scope.aiAgentId ?? null,
+            universeAddress: null,
+            route: 'trpc:vlm.moderation.requeue',
+            requestId: jobId,
+          },
           input: {
             assetType: input.assetType,
             mediaUrl: input.mediaUrl,

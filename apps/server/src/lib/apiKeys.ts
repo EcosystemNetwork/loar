@@ -43,6 +43,11 @@ export const API_KEY_SCOPES = {
   // Write — collaboration
   'collab.propose': 'Propose collaborations',
 
+  // MCP relay meta-scope — inherits all non-admin scopes. Keys with this
+  // scope are treated as MCP servers relaying on behalf of an end-user.
+  // See docs/prd-mcp-integration.md §1.
+  mcp_server: 'MCP relay (inherits all non-admin scopes)',
+
   // Admin (should never be granted to external keys)
   'admin.all': 'Full admin access (internal only)',
 } as const;
@@ -61,11 +66,37 @@ export function validatePermissions(permissions: string[]): permissions is ApiKe
 /**
  * Check if a key has a specific permission scope.
  * Supports wildcard 'admin.all' which grants everything.
+ * `mcp_server` inherits every non-admin scope.
  */
 export function hasPermission(keyDoc: ApiKeyDoc, scope: ApiKeyScope): boolean {
-  if (keyDoc.permissions.includes('admin.all')) return true;
-  return keyDoc.permissions.includes(scope);
+  return hasScope(keyDoc.permissions, scope);
 }
+
+/**
+ * Stateless permission check used by the tRPC middleware. Accepts the
+ * raw permissions array from AuthUser.apiKeyPermissions — avoids
+ * passing the whole keyDoc through context.
+ *
+ * Inheritance rules:
+ *   - `admin.all`       grants every scope (internal keys only).
+ *   - `mcp_server`      grants every scope EXCEPT `admin.all`.
+ *   - anything else     only grants that exact scope.
+ */
+export function hasScope(perms: string[] | undefined | null, scope: string): boolean {
+  if (!perms || perms.length === 0) return true; // JWT / no-api-key → full access
+  if (perms.includes('admin.all')) return true;
+  if (perms.includes('mcp_server') && scope !== 'admin.all') return true;
+  return perms.includes(scope);
+}
+
+/** Returns true if this key is an MCP relay (receives higher rate limits, endUserAddress passthrough). */
+export function isMcpServerKey(perms: string[] | undefined | null): boolean {
+  return !!perms?.includes('mcp_server');
+}
+
+/** Default rate limits per-key-per-minute for mcp_server vs direct keys. */
+export const MCP_SERVER_RATE_LIMIT = 300;
+export const DIRECT_KEY_RATE_LIMIT = 60;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -91,6 +122,10 @@ export interface ApiKeyUsageDoc {
   endpoint: string;
   creditsUsed: number;
   timestamp: Date;
+  /** "mcp_server" for MCP relay keys, "direct" for everything else. */
+  keyType?: 'mcp_server' | 'direct';
+  /** End-user wallet address passed through by an MCP relay (see docs/prd-mcp-integration.md §1). */
+  endUserAddress?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -151,6 +186,11 @@ export async function generateApiKey(params: {
   const keyHash = hashKey(rawKey);
   const keyPrefix = rawKey.slice(0, 16);
 
+  // MCP-relay keys fan out many end-user requests and need a larger bucket.
+  const defaultRateLimit = isMcpServerKey(params.permissions)
+    ? MCP_SERVER_RATE_LIMIT
+    : DIRECT_KEY_RATE_LIMIT;
+
   const doc: Omit<ApiKeyDoc, 'id'> = {
     keyHash,
     keyPrefix,
@@ -158,7 +198,7 @@ export async function generateApiKey(params: {
     ownerUid: params.ownerUid,
     aiAgentId: params.aiAgentId || null,
     permissions: params.permissions,
-    rateLimitPerMinute: params.rateLimitPerMinute || 60,
+    rateLimitPerMinute: params.rateLimitPerMinute ?? defaultRateLimit,
     totalRequests: 0,
     lastUsedAt: null,
     status: 'active',
@@ -278,19 +318,27 @@ export async function getApiKeyUsage(
 
 /**
  * Track API key usage. Fire-and-forget.
+ *
+ * `keyType` is derived from the key's scopes by the caller. `endUserAddress`
+ * is populated only for MCP relays that forwarded `X-Loar-End-User-Address`.
  */
-export async function trackApiKeyUsage(
-  keyId: string,
-  endpoint: string,
-  creditsUsed: number = 0
-): Promise<void> {
+export async function trackApiKeyUsage(params: {
+  keyId: string;
+  endpoint: string;
+  creditsUsed?: number;
+  keyType?: 'mcp_server' | 'direct';
+  endUserAddress?: string;
+}): Promise<void> {
   try {
-    await apiKeyUsageCol().add({
-      apiKeyId: keyId,
-      endpoint,
-      creditsUsed,
+    const doc: Record<string, unknown> = {
+      apiKeyId: params.keyId,
+      endpoint: params.endpoint,
+      creditsUsed: params.creditsUsed ?? 0,
       timestamp: new Date(),
-    });
+    };
+    if (params.keyType) doc.keyType = params.keyType;
+    if (params.endUserAddress) doc.endUserAddress = params.endUserAddress;
+    await apiKeyUsageCol().add(doc);
   } catch (err) {
     console.error('Failed to track API key usage:', err);
   }

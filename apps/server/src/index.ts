@@ -111,6 +111,18 @@ app.route('/images', imageRouter);
 const { unstoppableRoutes } = await import('./routes/unstoppable');
 app.route('/api/ud', unstoppableRoutes);
 
+// Admin cost ledger CSV download (admin-address-gated). Lives outside tRPC
+// because tRPC batches JSON — CSV streaming is simpler as a plain REST route.
+const { adminCostRoutes } = await import('./routes/admin-cost');
+app.route('/api/admin/cost', adminCostRoutes);
+
+// Paymaster proxy (POST /api/paymaster/sponsor). Pluggable provider —
+// thirdweb / pimlico / biconomy based on env. Stricter rate limit because
+// each call translates to a vendor-side spend.
+app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20 }));
+const { paymasterRoutes } = await import('./routes/paymaster');
+app.route('/api/paymaster', paymasterRoutes);
+
 /** Detect MIME type from file magic bytes. Returns null if unrecognised. */
 function detectMimeFromMagic(header: Buffer): string | null {
   if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return 'image/jpeg';
@@ -315,9 +327,75 @@ app.post('/api/upload', async (c) => {
     const { getStorageManager } = await import('./services/storage');
     const manager = getStorageManager();
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Pre-upload: compute local perceptual hash for dedup / copyright lookup.
+    // CSAM vendor scan runs post-upload against the hosted URL (vendors need
+    // a fetch-able URL, and base64 payloads blow past their size limits).
+    let fingerprintHash: string | undefined;
+    if (clientMime.startsWith('image/') || clientMime.startsWith('video/')) {
+      try {
+        const { scanUpload } = await import('./services/fingerprint');
+        const verdict = await scanUpload({
+          url: '',
+          bytes: buffer,
+          mimeType: clientMime,
+          kind: clientMime.startsWith('video/') ? 'video' : 'image',
+        });
+        fingerprintHash = verdict.fingerprint?.hash;
+      } catch (err) {
+        console.warn('[upload] pre-upload fingerprint failed:', err);
+      }
+    }
+
     const manifest = await manager.upload(buffer, file.name, clientMime);
 
-    return c.json({ manifest });
+    // Post-upload CSAM scan — fire-and-forget with result written back to
+    // `content` collection by the moderation pipeline. We don't block the
+    // upload response on it; the content is held in `under_review` until
+    // the CSAM scan completes (see services/fingerprint/scan-hosted-job).
+    if (
+      (clientMime.startsWith('image/') || clientMime.startsWith('video/')) &&
+      manifest.uploads?.[0]?.url
+    ) {
+      const hostedUrl = manifest.uploads[0].url;
+      (async () => {
+        try {
+          const { scanHosted } = await import('./services/fingerprint');
+          const verdict = await scanHosted({
+            url: hostedUrl,
+            mimeType: clientMime,
+            kind: clientMime.startsWith('video/') ? 'video' : 'image',
+          });
+          if (verdict.block) {
+            console.error(
+              `[csam] BLOCKED upload by ${user.uid}: ${manifest.contentHash} — ${verdict.reason}`
+            );
+            // Caller writes a content doc later; moderation pipeline will
+            // look up by contentHash and force contentStatus='removed'.
+            const { db, firebaseAvailable } = await import('./lib/firebase');
+            if (firebaseAvailable && db) {
+              await db
+                .collection('csamHolds')
+                .doc(manifest.contentHash)
+                .set({
+                  contentHash: manifest.contentHash,
+                  uploaderUid: user.uid.toLowerCase(),
+                  vendor: verdict.csam?.vendor ?? 'unknown',
+                  vendorReferenceId: verdict.csam?.vendorReferenceId ?? null,
+                  createdAt: new Date().toISOString(),
+                });
+            }
+          }
+        } catch (err) {
+          console.warn('[csam] post-upload scan failed:', err);
+        }
+      })();
+    }
+
+    return c.json({
+      manifest,
+      ...(fingerprintHash ? { fingerprint: { algorithm: 'ahash', hash: fingerprintHash } } : {}),
+    });
   } catch (error) {
     console.error('Direct upload error:', error);
     return c.json(
@@ -875,6 +953,16 @@ if (process.env.REDIS_URL) {
       .then(({ startVlmWorker }) => startVlmWorker())
       .catch((err) => console.warn('[vlm-worker] Failed to start VLM worker:', err));
   }
+
+  // Webhook worker — delivers signed POSTs for MCP agent integration. Only
+  // starts when WEBHOOK_SIGNING_SECRET is configured; otherwise enqueue calls
+  // are silent no-ops and the worker would have nothing to sign.
+  // See docs/prd-mcp-integration.md §2.
+  if (process.env.WEBHOOK_SIGNING_SECRET) {
+    import('./workers/webhook.worker')
+      .then(({ startWebhookWorker }) => startWebhookWorker())
+      .catch((err) => console.warn('[webhook-worker] Failed to start webhook worker:', err));
+  }
 }
 
 // ── Graceful shutdown ──────────────────────────────────────────────────
@@ -902,6 +990,13 @@ async function gracefulShutdown(signal: string) {
       shutdownOps.push(stopVlmWorker());
     } catch {
       // Optional — VLM worker may be disabled or not loaded
+    }
+
+    try {
+      const { stopWebhookWorker } = await import('./workers/webhook.worker');
+      shutdownOps.push(stopWebhookWorker());
+    } catch {
+      // Optional — webhook worker only starts when WEBHOOK_SIGNING_SECRET set
     }
 
     try {
@@ -949,6 +1044,12 @@ import('./jobs/abuse-detect')
 import('./jobs/dmca-putback')
   .then(({ startDmcaPutbackJob }) => startDmcaPutbackJob())
   .catch((err) => console.warn('[dmca-putback] failed to start:', err));
+
+// Cost / margin alert sweep (opt-in via COST_ALERT_ENABLED=true). Same
+// one-replica rule as the other background jobs.
+import('./jobs/cost-alerts')
+  .then(({ startCostAlertJob }) => startCostAlertJob())
+  .catch((err) => console.warn('[cost-alerts] failed to start:', err));
 
 const port = env.PORT;
 

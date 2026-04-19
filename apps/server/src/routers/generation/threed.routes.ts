@@ -33,6 +33,16 @@ import type { MeshyTaskOutput } from '../../services/meshy';
 
 import { getPlatformConfig } from '../../services/platformConfig';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { TRPCError } from '@trpc/server';
+
+const clientTokenSchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+  .optional();
 
 const LOAR_TO_USD = 0.01;
 
@@ -209,6 +219,8 @@ async function completeThreeDTask(opts: {
   generationType: string;
   credits: number;
   timeoutMs: number;
+  webhookUrl?: string;
+  clientToken?: string;
 }) {
   try {
     const task = await meshyService.waitForTask(
@@ -236,6 +248,23 @@ async function completeThreeDTask(opts: {
       thumbnailUrl: task.thumbnailUrl,
       type: opts.generationType,
     });
+
+    fireJobWebhook({
+      ownerUid: opts.userId,
+      webhookUrl: opts.webhookUrl,
+      clientToken: opts.clientToken,
+      event: 'job.completed',
+      jobId: opts.genId,
+      kind: '3d',
+      payload: {
+        status: 'completed',
+        modelUrls: task.modelUrls ?? null,
+        thumbnailUrl: task.thumbnailUrl ?? null,
+        videoUrl: task.videoUrl ?? null,
+        generationType: opts.generationType,
+        creditsCharged: opts.credits,
+      },
+    });
   } catch (error) {
     await refundCredits(opts.userId, opts.credits, opts.genId);
     await threeDGenCol()
@@ -247,6 +276,19 @@ async function completeThreeDTask(opts: {
         completedAt: new Date(),
       });
     console.error(`3D generation ${opts.genId} failed:`, error);
+    fireJobWebhook({
+      ownerUid: opts.userId,
+      webhookUrl: opts.webhookUrl,
+      clientToken: opts.clientToken,
+      event: 'job.failed',
+      jobId: opts.genId,
+      kind: '3d',
+      payload: {
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        creditsRefunded: true,
+      },
+    });
   }
 }
 
@@ -268,13 +310,48 @@ export const threedRouter = router({
         targetPolycount: z.number().optional(),
         entityId: z.string().optional(),
         universeId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
-      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
+
+      // Validate webhookUrl early.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'threed.textTo3DPreview',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await threeDGenCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            meshyTaskId: (d.meshyTaskId ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      const { fiatMargin, loarMargin } = await getMargins();
       const cost = COSTS.text_preview;
       const credits = toCredits(cost, fiatMargin);
 
@@ -294,6 +371,8 @@ export const threedRouter = router({
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       await deductCredits(ctx.user.uid, credits);
@@ -311,7 +390,8 @@ export const threedRouter = router({
 
         await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
 
-        // Fire-and-forget: complete in background, client polls via getTask
+        // Fire-and-forget: complete in background, client polls via getTask.
+        // Webhook fires from completeThreeDTask on terminal state.
         completeThreeDTask({
           genId,
           userId: ctx.user.uid,
@@ -320,15 +400,18 @@ export const threedRouter = router({
           meshyTaskType: 'text-to-3d',
           generationType: 'text_preview',
           credits,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
           timeoutMs: 10 * 60 * 1000,
         }).catch((err) => console.error(`Background 3D preview ${genId} error:`, err));
 
         return {
           generationId: genId,
           status: 'running' as const,
-          meshyTaskId: taskId,
+          meshyTaskId: taskId as string | null,
           creditsCharged: credits,
           fiatPriceUsd: withFiat(cost, fiatMargin),
+          idempotentReplay: false as const,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits, genId);
@@ -340,6 +423,19 @@ export const threedRouter = router({
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: '3d',
+          payload: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
         throw error;
       }
     }),
@@ -442,11 +538,46 @@ export const threedRouter = router({
         targetPolycount: z.number().optional(),
         entityId: z.string().optional(),
         universeId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { fiatMargin, loarMargin } = await getMargins();
       const genId = randomUUID();
+
+      // Validate webhookUrl early.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
+      // ── Idempotency (clientToken) ───────────────────────────────────
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'threed.imageTo3D',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await threeDGenCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            meshyTaskId: (d.meshyTaskId ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      const { fiatMargin, loarMargin } = await getMargins();
       const cost = COSTS.image_to_3d;
       const credits = toCredits(cost, fiatMargin);
       const isMulti = input.imageUrls.length > 1;
@@ -466,6 +597,8 @@ export const threedRouter = router({
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       await deductCredits(ctx.user.uid, credits);
@@ -501,15 +634,18 @@ export const threedRouter = router({
           meshyTaskType: 'image-to-3d',
           generationType: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
           credits,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
           timeoutMs: 15 * 60 * 1000,
         }).catch((err) => console.error(`Background 3D image-to-3d ${genId} error:`, err));
 
         return {
           generationId: genId,
           status: 'running' as const,
-          meshyTaskId: taskId,
+          meshyTaskId: taskId as string | null,
           creditsCharged: credits,
           fiatPriceUsd: withFiat(cost, fiatMargin),
+          idempotentReplay: false as const,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits, genId);
@@ -521,6 +657,19 @@ export const threedRouter = router({
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: '3d',
+          payload: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
         throw error;
       }
     }),
