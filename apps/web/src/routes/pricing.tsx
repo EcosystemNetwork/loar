@@ -10,6 +10,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useActiveAccount } from 'thirdweb/react';
+import { useChainId } from 'wagmi';
+import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 import { Button } from '@/components/ui/button';
 import {
   Check,
@@ -75,6 +77,7 @@ function PricingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useWalletAuth();
   const thirdwebAccount = useActiveAccount();
+  const walletChainId = useChainId();
   const queryClient = useQueryClient();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [subscribingTier, setSubscribingTier] = useState<string | null>(null);
@@ -109,28 +112,31 @@ function PricingPage() {
       const { sendTransaction } = await import('thirdweb');
       const { prepareTransaction } = await import('thirdweb');
 
-      const loarAddress = import.meta.env.VITE_LOAR_TOKEN_ADDRESS;
-      const treasuryAddress = import.meta.env.VITE_TREASURY_ADDRESS;
-      if (!loarAddress || !treasuryAddress) {
-        throw new Error('$LOAR token or treasury address not configured');
+      const chainId = walletChainId || Number(import.meta.env.VITE_CHAIN_ID ?? 84532);
+      const loarAddress = getEvmAddresses(chainId)?.loarToken;
+      const treasuryAddress = import.meta.env.VITE_TREASURY_ADDRESS as `0x${string}` | undefined;
+      if (!loarAddress || isZeroAddress(loarAddress)) {
+        throw new Error(`$LOAR token not deployed on chain ${chainId}`);
+      }
+      if (!treasuryAddress) {
+        throw new Error('Treasury address not configured');
       }
 
       // Encode ERC20 transfer call
       const data = encodeFunctionData({
         abi: ERC20_TRANSFER_ABI,
         functionName: 'transfer',
-        args: [treasuryAddress as `0x${string}`, pu(totalLoarForPeriod.toString(), 18)],
+        args: [treasuryAddress, pu(totalLoarForPeriod.toString(), 18)],
       });
 
       // Send the ERC20 transfer via thirdweb
       const { thirdwebClient } = await import('@/lib/thirdweb');
       const { defineChain } = await import('thirdweb');
-      const chainId = Number(import.meta.env.VITE_CHAIN_ID ?? 84532);
 
       const tx = prepareTransaction({
         client: thirdwebClient,
         chain: defineChain(chainId),
-        to: loarAddress as `0x${string}`,
+        to: loarAddress,
         data,
       });
 

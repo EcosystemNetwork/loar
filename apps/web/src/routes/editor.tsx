@@ -30,6 +30,8 @@ import {
 import { useVideoEditing } from '@/hooks/useVideoEditing';
 import { VideoEditingToolbar } from '@/components/editing/VideoEditingToolbar';
 import { InpaintCanvas } from '@/components/editing/InpaintCanvas';
+import { AnimateImagePanel } from '@/components/editing/AnimateImagePanel';
+import { TalkingScenePanel } from '@/components/editing/TalkingScenePanel';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -264,6 +266,12 @@ function EditorPage() {
               <TabsTrigger value="tools" className="text-xs flex-1">
                 Tools
               </TabsTrigger>
+              <TabsTrigger value="animate" className="text-xs flex-1">
+                Animate
+              </TabsTrigger>
+              <TabsTrigger value="talking" className="text-xs flex-1">
+                Talking
+              </TabsTrigger>
               <TabsTrigger value="input" className="text-xs flex-1">
                 Input
               </TabsTrigger>
@@ -271,6 +279,28 @@ function EditorPage() {
                 History
               </TabsTrigger>
             </TabsList>
+
+            {/* Animate Tab — PRD 8 image-to-video flow */}
+            <TabsContent value="animate" className="flex-1 p-4 m-0 overflow-y-auto">
+              <AnimateImagePanel
+                imageUrl={imageUrl}
+                onComplete={(url) => {
+                  setVideoUrl(url);
+                  setActiveTab('tools');
+                }}
+              />
+            </TabsContent>
+
+            {/* Talking Scene Tab — PRD 8 portrait + dialogue flow */}
+            <TabsContent value="talking" className="flex-1 p-4 m-0 overflow-y-auto">
+              <TalkingScenePanel
+                imageUrl={imageUrl}
+                onComplete={(url) => {
+                  setVideoUrl(url);
+                  setActiveTab('tools');
+                }}
+              />
+            </TabsContent>
 
             {/* Tools Tab */}
             <TabsContent value="tools" className="flex-1 p-4 space-y-4 m-0">

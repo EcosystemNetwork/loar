@@ -37,7 +37,8 @@ const envSchema = z.object({
   VITE_PINATA_GATEWAY_TOKEN: optionalString,
 
   // ── Blockchain (public addresses) ─────────────────────────────────────────
-  VITE_LOAR_TOKEN_ADDRESS: optionalAddress,
+  // $LOAR token + faucet addresses come from `configs/addresses.ts` per-chain.
+  // Treasury is a chain-independent EOA so we keep it as an env var.
   VITE_TREASURY_ADDRESS: optionalAddress,
 
   // ── Admin (comma-separated public addresses) ───────────────────────────────
@@ -79,11 +80,7 @@ export function validateWebEnv(): WebEnv {
 
   // Warn about unset optional vars that affect features
   if (result.success) {
-    const featureVars = [
-      'VITE_PONDER_URL',
-      'VITE_LOAR_TOKEN_ADDRESS',
-      'VITE_TREASURY_ADDRESS',
-    ] as const;
+    const featureVars = ['VITE_PONDER_URL', 'VITE_TREASURY_ADDRESS'] as const;
     const unset = featureVars.filter((k) => !result.data[k]);
     if (unset.length > 0) {
       console.info(

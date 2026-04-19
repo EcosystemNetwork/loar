@@ -21,6 +21,9 @@ export const ENTITY_KINDS = [
   'vehicle',
   'technology',
   'organization',
+  // Visual-language kinds — PRD 5
+  'moodboard',
+  'style_pack',
   // Structural/ontology kinds
   'timeline',
   'reality',
@@ -44,6 +47,8 @@ export const CREATOR_KINDS: EntityKind[] = [
   'vehicle',
   'technology',
   'organization',
+  'moodboard',
+  'style_pack',
 ];
 
 /** Top-level structural kinds shown as first-class in the universe editor. */
@@ -64,6 +69,8 @@ export const ENTITY_LABELS: Record<EntityKind, string> = {
   vehicle: 'Vehicle',
   technology: 'Technology',
   organization: 'Organization',
+  moodboard: 'Moodboard',
+  style_pack: 'Style Pack',
   timeline: 'Timeline',
   reality: 'Reality',
   dimension: 'Dimension',
@@ -84,6 +91,8 @@ export const ENTITY_ACTIONS: Record<EntityKind, string> = {
   vehicle: 'Create Vehicle',
   technology: 'Create Technology',
   organization: 'Create Organization',
+  moodboard: 'Build Moodboard',
+  style_pack: 'Create Style Pack',
   timeline: 'Add Timeline',
   reality: 'Create Alternate Reality',
   dimension: 'Open New Dimension',
@@ -157,7 +166,7 @@ export function useCreateEntity(universeAddress?: string) {
       parentId?: string | null;
       nodeIds?: number[];
       imageUrl?: string | null;
-      metadata?: Record<string, string | number | boolean | null>;
+      metadata?: Record<string, unknown>;
       monetized?: boolean;
       rightsDeclaration?: RightsDeclaration | null;
     }) =>
@@ -183,7 +192,7 @@ export function useUpdateEntity(universeAddress?: string) {
       parentId?: string | null;
       nodeIds?: number[];
       imageUrl?: string | null;
-      metadata?: Record<string, string | number | boolean | null>;
+      metadata?: Record<string, unknown>;
       monetized?: boolean;
       rightsDeclaration?: RightsDeclaration | null;
     }) =>

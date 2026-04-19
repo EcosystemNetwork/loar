@@ -42,30 +42,31 @@ export async function getMonthlySpend(uid: string): Promise<number> {
     return 0;
   }
 
-  const since = new Date(now - WINDOW_MS).toISOString();
+  // `createdAt` is written as `new Date()` and serialises to a Firestore
+  // Timestamp; comparing against an ISO string never matches (Timestamp <
+  // String in Firestore's type ordering), so the query must pass a Date.
+  const since = new Date(now - WINDOW_MS);
   let total = 0;
 
-  try {
-    // Uses the existing (uid ASC, createdAt DESC) composite index.
-    // Filter by `type == 'spend'` in memory — a normal user has ≤100 rows in
-    // a 30-day window; adding a new composite index just for this is a waste.
-    const snap = await db
-      .collection('creditTransactions')
-      .where('uid', '==', uid)
-      .where('createdAt', '>=', since)
-      .get();
+  // Uses the existing (uid ASC, createdAt DESC) composite index.
+  // Filter by `type == 'spend'` in memory — a normal user has ≤100 rows in
+  // a 30-day window; adding a new composite index just for this is a waste.
+  // No try/catch wrapper: a Firestore read failure must NOT silently disable
+  // the spend cap. Bubble the error so the request 500s and the operator
+  // sees it; flip the kill switch in /admin/ops if a wider outage requires it.
+  const snap = await db
+    .collection('creditTransactions')
+    .where('uid', '==', uid)
+    .where('createdAt', '>=', since)
+    .get();
 
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      if (data?.type !== 'spend') continue;
-      const c = data.credits;
-      // Spend rows store credits as a negative number (see deductCredits
-      // implementations). Normalise to the absolute magnitude spent.
-      if (typeof c === 'number') total += Math.abs(c);
-    }
-  } catch {
-    // Index missing or other read failure → fail open rather than block users.
-    return 0;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data?.type !== 'spend') continue;
+    const c = data.credits;
+    // Spend rows store credits as a negative number (see deductCredits
+    // implementations). Normalise to the absolute magnitude spent.
+    if (typeof c === 'number') total += Math.abs(c);
   }
 
   spendCache.set(uid, { totalCredits: total, computedAt: now });

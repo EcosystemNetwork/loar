@@ -15,6 +15,9 @@ import {
   Sparkles,
   Upload,
   Globe,
+  Wand2,
+  Sun,
+  Layers,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { formatEther } from 'viem';
@@ -66,6 +69,9 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
   const isOrphan = !content.universeId;
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
   const isAIGenerated = content.mediaType?.startsWith('ai-');
+  const isImage = !isVideo && (content.mediaUrl || content.imageUrl);
+  const editSource = content.mediaUrl || content.imageUrl;
+  const canEdit = Boolean(editSource) && (isImage || isVideo);
   const {
     videoRef,
     ready: videoReady,
@@ -155,6 +161,52 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
             </span>
           )}
         </div>
+
+        {/* Edit (inpaint) + Relight CTAs — visible on hover */}
+        {canEdit && editSource && isAuthenticated && (
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Link
+              to="/edit/inpaint"
+              search={{ src: editSource, sourceGenerationId: content.id }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              className="bg-black/60 hover:bg-black/80 text-white text-[11px] px-2 py-1 rounded flex items-center gap-1"
+              title={
+                isVideo
+                  ? 'Capture a frame, then inpaint/remove/replace/fill'
+                  : 'Inpaint, remove, replace, or fill'
+              }
+            >
+              <Wand2 className="h-3 w-3" />
+              Edit
+            </Link>
+            {isImage && (
+              <Link
+                to="/relight"
+                search={{
+                  image: editSource,
+                  generation: content.id,
+                  ...(content.universeId ? { universe: content.universeId } : {}),
+                }}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                className="bg-black/60 hover:bg-black/80 text-white text-[11px] px-2 py-1 rounded flex items-center gap-1"
+                title="Relight, time-shift, swap backdrop, or color mood"
+              >
+                <Sun className="h-3 w-3" />
+                Relight
+              </Link>
+            )}
+            <Link
+              to="/studio/edit/$assetId"
+              params={{ assetId: content.id }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              className="bg-primary/70 hover:bg-primary/90 text-white text-[11px] px-2 py-1 rounded flex items-center gap-1"
+              title="Open versioned Edit Canvas (owners only)"
+            >
+              <Layers className="h-3 w-3" />
+              Studio
+            </Link>
+          </div>
+        )}
       </div>
 
       <CardContent className="p-3 space-y-2">

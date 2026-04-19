@@ -79,6 +79,10 @@ service cloud.firestore {
     match /creditTransactions/{txId}       { allow read, write: if false; }
     match /apiKeys/{keyId}                 { allow read, write: if false; }
 
+    // Asset lineage — all reads go through the lineage tRPC router so
+    // owner-only aggregates stay gated on the server (PRD 10).
+    match /assetEvents/{eventId}           { allow read, write: if false; }
+
     // ── Server-only collections (no client access) ──────────────────
     // These are explicitly denied by the default rule above, listed here
     // for documentation purposes:

@@ -10,7 +10,14 @@
  */
 import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
-import { ENTITY_KINDS, CREATOR_KINDS, ENTITY_RELATION_TYPES } from './entities.types';
+import {
+  ENTITY_KINDS,
+  CREATOR_KINDS,
+  ENTITY_RELATION_TYPES,
+  REFERENCE_SLOTS,
+  IDENTITY_LOCKS,
+  MAX_REFS_PER_SLOT,
+} from './entities.types';
 import {
   createEntity,
   getEntity,
@@ -30,6 +37,11 @@ import {
   getEntityRelations,
   getUniverseRelations,
 } from './entities.handlers';
+import {
+  setReferenceBundle,
+  clearReferenceBundle,
+  resolveReferenceBundle,
+} from './entities.reference-bundle';
 import { geminiService } from '../../services/gemini';
 import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
@@ -51,9 +63,11 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z
-          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-          .optional(),
+        // Values are intentionally `unknown` — visual-language kinds
+        // (moodboard, style_pack) store arrays (referenceImages, tags,
+        // styleKeywords) and numbers (defaultStrength). The Entity
+        // interface already types metadata as Record<string, unknown>.
+        metadata: z.record(z.string(), z.any()).optional(),
         monetized: z.boolean().default(false),
         rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
         unstoppableDomain: z.string().max(100).nullish(),
@@ -180,9 +194,11 @@ export const entitiesRouter = router({
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
-        metadata: z
-          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-          .optional(),
+        // Values are intentionally `unknown` — visual-language kinds
+        // (moodboard, style_pack) store arrays (referenceImages, tags,
+        // styleKeywords) and numbers (defaultStrength). The Entity
+        // interface already types metadata as Record<string, unknown>.
+        metadata: z.record(z.string(), z.any()).optional(),
         monetized: z.boolean().optional(),
         rightsDeclaration: z.enum(['original', 'licensed']).nullish(),
         unstoppableDomain: z.string().max(100).nullish(),
@@ -446,6 +462,68 @@ export const entitiesRouter = router({
 
       const profile = await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
       return profile;
+    }),
+
+  // ── Reference Bundles (Character Identity Lock + Multi-Reference Editing) ──
+
+  /**
+   * Get an entity's reference bundle, optionally merging ancestor bundles.
+   * Returns null if neither the entity nor any ancestor has a bundle set.
+   */
+  getReferenceBundle: publicProcedure
+    .input(
+      z.object({
+        entityId: z.string().min(1),
+        /** Walk the parentId chain and merge inherited slots/locks. Defaults true. */
+        includeInherited: z.boolean().default(true),
+      })
+    )
+    .query(async ({ input }) => {
+      const resolved = await resolveReferenceBundle(input.entityId, {
+        includeInherited: input.includeInherited,
+      });
+      return { bundle: resolved };
+    }),
+
+  /** Set (replace) the reference bundle on an entity. Owner-only. */
+  setReferenceBundle: protectedProcedure
+    .use(requirePermission('entities.update'))
+    .input(
+      z.object({
+        entityId: z.string().min(1),
+        slots: z
+          .record(z.enum(REFERENCE_SLOTS), z.array(z.string().url()).max(MAX_REFS_PER_SLOT))
+          .optional(),
+        locks: z.record(z.enum(IDENTITY_LOCKS), z.boolean()).optional(),
+        identityStrength: z.number().min(0).max(1).default(0.7),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can edit its reference bundle');
+      }
+      const bundle = await setReferenceBundle(input.entityId, {
+        slots: input.slots ?? {},
+        locks: input.locks ?? {},
+        identityStrength: input.identityStrength,
+      });
+      return { success: true, bundle };
+    }),
+
+  /** Clear the reference bundle on an entity. Owner-only. */
+  clearReferenceBundle: protectedProcedure
+    .use(requirePermission('entities.update'))
+    .input(z.object({ entityId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can edit its reference bundle');
+      }
+      await clearReferenceBundle(input.entityId);
+      return { success: true };
     }),
 });
 

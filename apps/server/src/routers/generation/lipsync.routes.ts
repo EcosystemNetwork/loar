@@ -25,6 +25,8 @@ import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { emitActivity } from '../../services/activity';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { publishToGallery } from '../../lib/gallery-publish';
+import { extractVideoThumbnail } from '../../services/video-thumbnail';
 
 // ── Credit costs ────────────────────────────────────────────────────
 
@@ -151,6 +153,11 @@ export const lipsyncRouter = router({
         audioUrl: z.string().url(),
         model: z.enum(['fal-ai/lipsync', 'fal-ai/sadtalker']).optional(),
         entityId: z.string().optional(),
+        /** Lineage: upstream generation IDs for the source video and audio. */
+        sourceVideoGenerationId: z.string().optional(),
+        sourceAudioGenerationId: z.string().optional(),
+        /** When false, caller will publish manually (e.g. talking-scene combo). */
+        autoPublish: z.boolean().default(true),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -169,6 +176,8 @@ export const lipsyncRouter = router({
           model: input.model || 'fal-ai/lipsync',
           videoUrl: input.videoUrl,
           audioUrl: input.audioUrl,
+          sourceVideoGenerationId: input.sourceVideoGenerationId || null,
+          sourceAudioGenerationId: input.sourceAudioGenerationId || null,
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
@@ -214,6 +223,28 @@ export const lipsyncRouter = router({
           latencyMs,
           completedAt: new Date(),
         });
+
+        // Auto-publish to gallery — every clip auto-appears (per project policy)
+        if (input.autoPublish) {
+          try {
+            const thumbnailUrl = await extractVideoThumbnail(permanentUrl, genId);
+            await publishToGallery({
+              creatorUid: ctx.user.uid,
+              mediaUrl: permanentUrl,
+              thumbnailUrl,
+              mediaType: 'ai-video',
+              title: 'Lip-Synced Clip',
+              description: 'AI lip-sync of source video with synthesized audio',
+              generationId: genId,
+              generationModel: input.model || 'fal-ai/lipsync',
+              parentGenerationId: input.sourceVideoGenerationId || null,
+              sourceVideoGenerationId: input.sourceVideoGenerationId || null,
+              sourceAudioGenerationId: input.sourceAudioGenerationId || null,
+            });
+          } catch (err) {
+            console.error('[lipsync] gallery publish failed:', err);
+          }
+        }
 
         return {
           generationId: genId,

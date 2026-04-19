@@ -53,6 +53,15 @@ import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { googleImagenService } from '../../services/google-imagen';
+import { recordAssetEventAsync } from '../../services/lineage';
+import type { PromptRef } from '../../services/lineage/types';
+import {
+  CONTROL_TYPES,
+  buildControlPreamble,
+  applyAnglePreset,
+  type ControlInput,
+} from '../../services/scene-controls/controlled-gen';
+import { composeStyle, applyStyleToPrompt } from '../../services/style-pack';
 
 // ── Collections ───────────────────────────────────────────────────────
 
@@ -95,6 +104,31 @@ const generateSchema = z.object({
   entityId: z.string().optional(),
   universeId: z.string().optional(),
   useWikiContext: z.boolean().default(true),
+
+  // Reference bundle (Feature 6 — Character Identity Lock + Multi-Reference Editing)
+  /** Pull reference slots + locks from this entity (and its parent chain). */
+  referenceBundleEntityId: z.string().optional(),
+  /** Respect the entity's reference bundle. Defaults to true when the ID is set. */
+  useReferenceBundle: z.boolean().default(true),
+
+  // Style packs + moodboards (PRD 5 — Retexture, Restyle, Moodboards, House Style Packs)
+  /** Entity ID of a style_pack to merge into the prompt. */
+  stylePackEntityId: z.string().optional(),
+  /** Entity ID of a moodboard to merge into the prompt. */
+  moodboardEntityId: z.string().optional(),
+  /** 0..1 — how much the style pack should dominate the result. Default 0.7. */
+  styleStrength: z.number().min(0).max(1).optional(),
+  /**
+   * Retexture mode keeps composition and swaps the look. Requires imageUrls
+   * (forces task = image_to_image) and a stylePackEntityId.
+   */
+  retexture: z.boolean().default(false),
+  /**
+   * When true (default), a universe with a canon style pack auto-applies it
+   * even if no stylePackEntityId was passed. Fan creators can set this to
+   * false to ignore canon and generate an alternate style.
+   */
+  respectCanonStyle: z.boolean().default(true),
 
   qualityTarget: z.enum(['draft', 'standard', 'premium']).optional(),
   costBudget: z.enum(['low', 'medium', 'any']).optional(),
@@ -438,6 +472,95 @@ export const imageRouter = router({
         }
       }
 
+      // ── Style pack + moodboard composition (PRD 5) ───────────────────
+      // Applied BEFORE reference bundle so identity-lock references retain
+      // priority in the final imageUrls list. Retexture mode forces
+      // image_to_image and requires both a source image and a style pack.
+      let appliedStylePackId: string | null = null;
+      let appliedMoodboardId: string | null = null;
+      let appliedStyleStrength: number | null = null;
+      try {
+        const composition = await composeStyle({
+          stylePackEntityId: input.stylePackEntityId,
+          moodboardEntityId: input.moodboardEntityId,
+          styleStrength: input.styleStrength,
+          universeId: input.respectCanonStyle ? (input.universeId ?? null) : null,
+        });
+        if (composition.stylePrefix || composition.negativeAddendum) {
+          const merged = applyStyleToPrompt(input.prompt, input.negativePrompt, composition);
+          input.prompt = merged.prompt;
+          input.negativePrompt = merged.negativePrompt;
+        }
+        // Moodboard + style pack references seed the img2img input list. The
+        // reference bundle below may append more on top.
+        if (composition.referenceImages.length > 0) {
+          const existing = new Set(input.imageUrls ?? []);
+          const merged = [...(input.imageUrls ?? [])];
+          for (const url of composition.referenceImages) {
+            if (!existing.has(url)) {
+              merged.push(url);
+              existing.add(url);
+            }
+          }
+          input.imageUrls = merged;
+        }
+        appliedStylePackId = composition.appliedStylePackEntityId;
+        appliedMoodboardId = composition.appliedMoodboardEntityId;
+        appliedStyleStrength = composition.strength;
+      } catch (err) {
+        // Non-fatal — generation continues without style composition.
+        console.warn('[image] Style composition failed:', err);
+      }
+
+      // Retexture mode: require a source image and a style pack, then force
+      // img2img so the model preserves composition while swapping look.
+      if (input.retexture) {
+        if (!input.imageUrls || input.imageUrls.length === 0) {
+          throw new Error('Retexture requires at least one source image (imageUrls)');
+        }
+        if (!appliedStylePackId) {
+          throw new Error(
+            'Retexture requires a style pack — pass stylePackEntityId or set a canon style on the universe'
+          );
+        }
+        input.task = 'image_to_image';
+      }
+
+      // ── Reference bundle resolution (Feature 6) ──────────────────────
+      // Resolves slots + locks from the target entity and its parent chain.
+      // Reference URLs become image_to_image inputs (ahead of any the caller
+      // supplied); lock hints are appended to the prompt so providers without
+      // native identity-lock controls still see them.
+      const bundleTargetIdImg =
+        (input.useReferenceBundle ?? true) && (input.referenceBundleEntityId || input.entityId);
+      if (bundleTargetIdImg) {
+        try {
+          const { resolveReferenceBundle, flattenReferenceUrls, buildLockPromptSuffix } =
+            await import('../entities/entities.reference-bundle');
+          const bundle = await resolveReferenceBundle(bundleTargetIdImg);
+          if (bundle) {
+            const bundleUrls = flattenReferenceUrls(bundle, 4);
+            if (bundleUrls.length > 0) {
+              const existing = new Set(input.imageUrls ?? []);
+              const merged = [...(input.imageUrls ?? [])];
+              for (const url of bundleUrls) {
+                if (!existing.has(url)) {
+                  merged.push(url);
+                  existing.add(url);
+                }
+              }
+              input.imageUrls = merged;
+              if (input.task === 'text_to_image') input.task = 'image_to_image';
+            }
+            const lockSuffix = buildLockPromptSuffix(bundle);
+            if (lockSuffix) input.prompt = `${input.prompt}. ${lockSuffix}`;
+          }
+        } catch (err) {
+          console.warn('[image] Reference bundle resolution failed:', err);
+          // Non-fatal — generation continues without the bundle
+        }
+      }
+
       const genId = randomUUID();
       const startTime = Date.now();
 
@@ -520,7 +643,20 @@ export const imageRouter = router({
         routingReasonCode: reasonCode,
         createdAt: new Date(),
       };
-      await saveRecord(record);
+      // Style pack / moodboard provenance (PRD 5). Not typed on
+      // ImageGenerationRecord yet — cast to record-with-extras so Firestore
+      // persists them alongside the typed fields.
+      const recordWithStyle = record as ImageGenerationRecord & {
+        stylePackEntityId?: string | null;
+        moodboardEntityId?: string | null;
+        styleStrength?: number | null;
+        retexture?: boolean;
+      };
+      recordWithStyle.stylePackEntityId = appliedStylePackId;
+      recordWithStyle.moodboardEntityId = appliedMoodboardId;
+      recordWithStyle.styleStrength = appliedStyleStrength;
+      recordWithStyle.retexture = input.retexture ?? false;
+      await saveRecord(recordWithStyle);
 
       // ── Deduct credits ───────────────────────────────────────────────
       if (!db) {
@@ -708,6 +844,33 @@ export const imageRouter = router({
           prompt: input.prompt,
         }).catch((err) => console.error('[image] storage persist failed:', err.message));
 
+        // PRD 10: generate lineage event
+        {
+          const promptRefs: PromptRef[] = (input.imageUrls ?? []).map((url) => ({
+            kind: 'image',
+            url,
+          }));
+          recordAssetEventAsync({
+            assetId: genId,
+            parentAssetId: null,
+            kind: 'generate',
+            tool: finalModelId,
+            step: input.task === 'image_to_image' ? 'image_to_image' : 'text_to_image',
+            prompt: input.prompt,
+            promptRefs,
+            modelId: finalModelId,
+            modelProvider: model.provider,
+            creditCost: totalCredits,
+            latencyMs,
+            creatorUid: ctx.user.uid,
+            creatorAddress: ctx.user.address ?? null,
+            universeId: input.universeId ?? null,
+            outputUrl: imageUrls[0] ?? null,
+            outputKind: 'image',
+            status: 'completed',
+          });
+        }
+
         return {
           generationId: genId,
           status: 'completed' as const,
@@ -756,6 +919,289 @@ export const imageRouter = router({
           });
         }
         throw error;
+      }
+    }),
+
+  // ── Controlled generation (PRD 7) ────────────────────────────────────
+  //
+  // Multi-reference conditioning using guide images (pose, scribble, depth,
+  // style, subject, previous-shot) plus optional angle preset. Pinned to
+  // the Google nano-banana-pro-preview model which natively accepts
+  // interleaved text + image parts via generateContent.
+  generateControlled: protectedProcedure
+    .use(requirePermission('generation.image'))
+    .input(
+      z.object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        negativePrompt: z.string().optional(),
+        imageSize: imageSizeSchema.default('square_hd'),
+        numImages: z.number().min(1).max(4).default(1),
+        anglePreset: z.string().nullable().default(null),
+        controls: z
+          .array(
+            z.object({
+              controlType: z.enum(CONTROL_TYPES),
+              guideImageUrl: z.string().url(),
+              strength: z.number().min(0).max(1),
+            })
+          )
+          .min(1, 'At least one control reference is required')
+          .max(8),
+        entityId: z.string().optional(),
+        universeId: z.string().optional(),
+        useWikiContext: z.boolean().default(true),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      input.prompt = sanitizePrompt(input.prompt);
+      if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
+
+      // Wiki context injection (same as image.generate)
+      if (input.useWikiContext && (input.universeId || input.entityId)) {
+        try {
+          const wikiContext = await buildGenerationContext({
+            universeId: input.universeId,
+            entityId: input.entityId,
+          });
+          if (wikiContext) {
+            input.prompt = `${wikiContext}\n\n${input.prompt}`;
+          }
+        } catch (err) {
+          console.warn('[image] Wiki context fetch failed:', err);
+        }
+      }
+
+      const genId = randomUUID();
+      const startTime = Date.now();
+
+      // Pin to the Google nano-banana-2 model
+      const model = getImageModelById('nano-banana-2');
+      if (!model) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Controlled generation model is not registered',
+        });
+      }
+      if (!googleImagenService.isConfigured()) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'GOOGLE_API_KEY is not configured',
+        });
+      }
+
+      const totalCredits = model.creditCostPerImage * input.numImages;
+      const totalFiat = model.fiatPriceUsd * input.numImages;
+      const totalLoar = model.loarPriceUsd * input.numImages;
+      const totalProvider = model.providerCostUsd * input.numImages;
+
+      // Save initial record
+      const record: ImageGenerationRecord = {
+        id: genId,
+        userId: ctx.user.uid,
+        entityId: input.entityId,
+        universeId: input.universeId,
+        routingMode: 'manual',
+        requestedModelId: model.id,
+        finalModelId: model.id,
+        provider: model.provider,
+        status: 'queued',
+        prompt: input.prompt,
+        negativePrompt: input.negativePrompt,
+        task: 'image_to_image',
+        imageSize: input.imageSize,
+        numImages: input.numImages,
+        providerCostUsd: totalProvider,
+        fiatPriceUsd: totalFiat,
+        loarPriceUsd: totalLoar,
+        creditsCharged: totalCredits,
+        marginUsd: totalFiat - totalProvider,
+        routingReasonCode: 'manual_user_selection',
+        createdAt: new Date(),
+      };
+      await saveRecord(record);
+
+      // Deduct credits
+      if (!db) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Server storage is not configured — cannot deduct credits',
+        });
+      }
+      const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
+      let insufficientCredits = false;
+      try {
+        await db.runTransaction(async (tx) => {
+          const doc = await tx.get(userCreditsRef);
+          const balance = doc.exists ? doc.data()?.balance || 0 : 0;
+          if (balance < totalCredits) {
+            insufficientCredits = true;
+            throw new Error(`Insufficient credits. Need ${totalCredits}, have ${balance}.`);
+          }
+          tx.update(userCreditsRef, {
+            balance: balance - totalCredits,
+            totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
+            updatedAt: new Date(),
+          });
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Credit deduction failed';
+        await imageGenerationsCol()
+          .doc(genId)
+          .update({ status: 'failed', failureReason: message, completedAt: new Date() });
+        if (insufficientCredits) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+
+      try {
+        await imageGenerationsCol().doc(genId).update({ status: 'running' });
+
+        // Fetch guide images concurrently → base64
+        const controls: ControlInput[] = input.controls.map((c) => ({
+          controlType: c.controlType,
+          guideImageUrl: c.guideImageUrl,
+          strength: c.strength,
+        }));
+
+        const inputImages = await Promise.all(
+          controls.map(async (c) => {
+            const res = await fetch(c.guideImageUrl);
+            if (!res.ok) {
+              throw new Error(
+                `Failed to fetch guide image ${c.guideImageUrl}: ${res.status} ${res.statusText}`
+              );
+            }
+            const mimeType = res.headers.get('content-type') || 'image/png';
+            const buf = Buffer.from(await res.arrayBuffer());
+            return { base64: buf.toString('base64'), mimeType };
+          })
+        );
+
+        // Build final prompt: preamble + angle preset + user prompt
+        const preamble = buildControlPreamble(controls);
+        const anglePrompt = applyAnglePreset(input.prompt, input.anglePreset);
+        const finalPrompt = preamble ? `${preamble}\n\n${anglePrompt}` : anglePrompt;
+
+        const result = await googleImagenService.generate({
+          prompt: finalPrompt,
+          negativePrompt: input.negativePrompt,
+          numberOfImages: input.numImages,
+          aspectRatio: imageSizeToAspectRatio(input.imageSize),
+          model: 'nano-banana-pro-preview',
+          inputImages,
+        });
+
+        // Persist images through storage manager
+        const manager = getStorageManager();
+        const imageUrls: string[] = [];
+        for (let i = 0; i < result.images.length; i++) {
+          const img = result.images[i];
+          const filename = `controlled-${genId}-${i}.png`;
+          const buf = Buffer.from(img.base64, 'base64');
+          const signed = await signWithProvenance(buf, filename, {
+            model: 'nano-banana-pro-preview',
+            prompt: finalPrompt,
+            generatedAt: new Date().toISOString(),
+            mimeType: img.mimeType || 'image/png',
+          });
+          const manifest = await manager.upload(
+            signed,
+            filename,
+            img.mimeType || 'image/png',
+            ctx.user.uid
+          );
+          const url = manifest.uploads[0]?.url;
+          if (url) imageUrls.push(url);
+        }
+
+        if (imageUrls.length === 0) {
+          throw new Error('Google returned no images (storage upload failed)');
+        }
+
+        markImageProviderHealthy('google');
+        const latencyMs = Date.now() - startTime;
+
+        await imageGenerationsCol().doc(genId).update({
+          status: 'completed',
+          imageUrls,
+          latencyMs,
+          completedAt: new Date(),
+          controls: input.controls,
+          anglePreset: input.anglePreset,
+        });
+
+        // Auto-attach to entity and publish to gallery (same as image.generate)
+        autoAttachImages({
+          creator: ctx.user.uid,
+          entityId: input.entityId,
+          generationId: genId,
+          imageUrls,
+          prompt: input.prompt,
+        }).catch((err) => console.error('[controlled] attach failed:', err.message));
+
+        autoPublishToGallery({
+          creatorUid: ctx.user.uid,
+          imageUrls,
+          prompt: input.prompt,
+          model: model.id,
+          universeId: input.universeId,
+          generationId: genId,
+        }).catch((err) => console.error('[controlled] gallery publish failed:', err.message));
+
+        try {
+          trackQuests(ctx.user.uid, [
+            { questId: 'first_image_generation' },
+            { questId: 'daily_generation' },
+          ]);
+        } catch (err) {
+          console.error('[controlled] quest tracking failed:', err);
+        }
+
+        return {
+          generationId: genId,
+          status: 'completed' as const,
+          imageUrls,
+          modelUsed: model.id,
+          modelDisplayName: model.displayName,
+          creditsCharged: totalCredits,
+          fiatPriceUsd: totalFiat,
+        };
+      } catch (error) {
+        const latencyMs = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        markImageProviderUnhealthy('google');
+
+        // Refund
+        try {
+          await userCreditsRef.update({
+            balance: FieldValue.increment(totalCredits),
+            totalSpent: FieldValue.increment(-totalCredits),
+            updatedAt: new Date(),
+          });
+        } catch (refundErr) {
+          console.error(`CRITICAL: controlled-gen refund failed for ${ctx.user.uid}:`, refundErr);
+          logFailedRefund({
+            userId: ctx.user.uid,
+            credits: totalCredits,
+            source: 'image.generateControlled',
+            generationId: genId,
+            error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+          });
+        }
+
+        await imageGenerationsCol().doc(genId).update({
+          status: 'failed',
+          creditsRefunded: true,
+          failureReason: errorMessage,
+          latencyMs,
+          completedAt: new Date(),
+        });
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: errorMessage,
+        });
       }
     }),
 

@@ -168,6 +168,24 @@ export const EDITING_MODELS: EditingModelConfig[] = [
     tags: ['inpaint', 'edit', 'region', 'replace'],
     bestFor: 'Replace objects or areas in video frames',
   },
+  {
+    id: 'inpaint-eraser',
+    operation: 'inpaint',
+    provider: 'fal',
+    displayName: 'LAMA Object Eraser',
+    shortDescription: 'Prompt-free clean object removal (no new content synthesized)',
+    falModelId: 'fal-ai/lama',
+    tier: 'fast',
+    providerCostUsd: 0.005,
+    fiatPriceUsd: withFiatMargin(0.005),
+    loarPriceUsd: withLoarMargin(0.005),
+    creditCost: usdToLoar(withFiatMargin(0.005)),
+    isEnabled: true,
+    supportsVideo: false,
+    supportsImage: true,
+    tags: ['inpaint', 'erase', 'remove', 'lama', 'cleanup'],
+    bestFor: 'Cleanly erase an object and fill with plausible surrounding texture',
+  },
 
   // ── Background Removal ───────────────────────────────────────────────
   {
@@ -187,6 +205,27 @@ export const EDITING_MODELS: EditingModelConfig[] = [
     supportsImage: true,
     tags: ['background', 'remove', 'mask', 'segment'],
     bestFor: 'Clean background removal for compositing',
+  },
+
+  // ── Relight (image — preserve subject, change lighting/backdrop/mood) ──
+  {
+    id: 'relight-nano-banana',
+    operation: 'relight',
+    provider: 'fal',
+    displayName: 'Nano Banana Relight',
+    shortDescription:
+      'Change lighting, time of day, backdrop, or color mood while preserving subject identity',
+    falModelId: 'fal-ai/nano-banana/edit',
+    tier: 'standard',
+    providerCostUsd: 0.04,
+    fiatPriceUsd: withFiatMargin(0.04),
+    loarPriceUsd: withLoarMargin(0.04),
+    creditCost: usdToLoar(withFiatMargin(0.04)),
+    isEnabled: true,
+    supportsVideo: false,
+    supportsImage: true,
+    tags: ['relight', 'backdrop', 'time-of-day', 'color-mood', 'subject-preserve'],
+    bestFor: 'Same character/scene, new lighting and atmosphere — trailers, ads, episode beats',
   },
 
   // ── Video Extension ──────────────────────────────────────────────────

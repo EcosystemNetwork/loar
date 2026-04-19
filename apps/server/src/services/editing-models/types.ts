@@ -11,7 +11,8 @@ export type EditingOperation =
   | 'restyle'
   | 'inpaint'
   | 'remove_bg'
-  | 'extend';
+  | 'extend'
+  | 'relight';
 
 export type EditingTier = 'fast' | 'standard' | 'quality';
 
@@ -40,6 +41,8 @@ export interface EditingModelConfig {
   bestFor: string;
 }
 
+export type InpaintMode = 'replace' | 'remove' | 'add' | 'fix';
+
 export interface EditingJobRecord {
   id: string;
   userId: string;
@@ -49,7 +52,12 @@ export interface EditingJobRecord {
   inputUrl: string;
   outputUrl?: string;
   prompt?: string;
+  negativePrompt?: string;
   maskUrl?: string;
+  /** Inpaint action mode — only applies when operation === 'inpaint' */
+  mode?: InpaintMode;
+  /** Seed used for generation (for reproducibility) */
+  seed?: number;
   providerCostUsd: number;
   creditsCharged: number;
   latencyMs?: number;
@@ -58,4 +66,14 @@ export interface EditingJobRecord {
   completedAt?: Date;
   /** Source generation ID if editing from a previous generation */
   sourceGenerationId?: string;
+  /** Gallery content doc ID created by publishToGallery (if any) */
+  galleryContentId?: string;
+  /** Source media attachment ID — set when relight chains a new variant */
+  sourceAttachmentId?: string;
+  /** Preset IDs that were composed into the relight prompt */
+  presetIds?: string[];
+  /** Tone pack ID applied during relight (if any) */
+  tonePackId?: string;
+  /** Universe address scoped to this job (for tone pack application) */
+  universeAddress?: string;
 }

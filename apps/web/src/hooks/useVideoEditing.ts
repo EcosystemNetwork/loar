@@ -17,6 +17,8 @@ export type EditingOperation =
   | 'remove_bg'
   | 'extend';
 
+export type InpaintMode = 'replace' | 'remove' | 'add' | 'fix';
+
 export interface EditingModel {
   id: string;
   operation: EditingOperation;
@@ -117,11 +119,21 @@ export function useVideoEditing() {
     mutationFn: (input: {
       imageUrl: string;
       maskUrl: string;
-      prompt: string;
+      prompt?: string;
+      mode?: InpaintMode;
       modelId?: string;
       negativePrompt?: string;
+      seed?: number;
+      strength?: number;
+      guidanceScale?: number;
       sourceGenerationId?: string;
-    }) => trpcClient.editing.inpaint.mutate(input),
+      universeId?: string;
+      publishToGallery?: boolean;
+    }) =>
+      trpcClient.editing.inpaint.mutate({
+        ...input,
+        prompt: input.prompt ?? '',
+      }),
     onMutate: () => setActiveOperation('inpaint'),
     onSuccess: (data) => {
       setLastResult({ jobId: data.jobId, imageUrl: data.imageUrl, model: data.model });

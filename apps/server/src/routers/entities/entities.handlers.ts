@@ -117,6 +117,7 @@ export async function createEntity(
     monetized,
     rightsDeclaration: monetized ? input.rightsDeclaration! : null,
     unstoppableDomain: input.unstoppableDomain ?? null,
+    referenceBundle: null,
     createdAt: now,
     updatedAt: now,
   };

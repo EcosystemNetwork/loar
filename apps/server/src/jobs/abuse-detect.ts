@@ -64,7 +64,11 @@ export async function detectAbuseOnce(
   }
 
   const config: AbuseDetectConfig = { ...DEFAULT_CONFIG, ...cfg };
-  const cutoff = new Date(Date.now() - DAY_MS).toISOString();
+  // `creditTransactions.createdAt` is a Firestore Timestamp (writers pass
+  // `new Date()`); comparing against an ISO string never matches.
+  const cutoff = new Date(Date.now() - DAY_MS);
+  // `abuseFlags.lastDetectedAt` is written as an ISO string (see line 133),
+  // so string-vs-string comparison here is correct.
   const cooldownCutoff = new Date(Date.now() - config.cooldownMs).toISOString();
 
   // Recently-active wallets — userCredits is the cheapest list because

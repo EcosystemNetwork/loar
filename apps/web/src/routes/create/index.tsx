@@ -27,6 +27,8 @@ import {
   Hexagon,
   Castle,
   Crown,
+  Palette,
+  Images,
 } from 'lucide-react';
 
 interface EntityTypeCard {
@@ -114,6 +116,22 @@ const ENTITY_TYPES: EntityTypeCard[] = [
     description: 'Inventions, magical systems, devices, artifacts of power.',
     icon: Cpu,
     color: 'from-sky-500/20 to-blue-500/20 border-sky-500/30',
+  },
+  // Visual-language kinds — PRD 5 (Retexture, Moodboards, House Style Packs)
+  {
+    kind: 'moodboard',
+    label: 'Moodboard',
+    description: 'Curate reference images and tags that describe a universe aesthetic.',
+    icon: Images,
+    color: 'from-pink-500/20 to-rose-500/20 border-pink-500/30',
+  },
+  {
+    kind: 'style_pack',
+    label: 'Style Pack',
+    description:
+      'Save a reusable look — anime, gritty sci-fi, clay, painterly, VHS — for retexture.',
+    icon: Palette,
+    color: 'from-fuchsia-500/20 to-purple-500/20 border-fuchsia-500/30',
   },
   // Structural / ontology kinds
   {

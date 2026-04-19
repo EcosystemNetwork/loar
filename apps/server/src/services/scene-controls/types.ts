@@ -86,6 +86,18 @@ export const CAMERA_PRESETS = {
     category: 'push',
     description: 'Extremely fast horizontal pan to the right',
   },
+
+  // PRD 8 motion presets
+  crash_zoom: {
+    label: 'Crash Zoom',
+    category: 'dolly',
+    description: 'Aggressive snap-zoom toward subject — comedic / shock framing',
+  },
+  walk_up: {
+    label: 'Walk Up',
+    category: 'dolly',
+    description: 'Camera walks toward subject at human pace — POV approach',
+  },
 } as const;
 
 export type CameraPresetId = keyof typeof CAMERA_PRESETS;

@@ -62,6 +62,8 @@ import { voiceRouter } from './generation/voice.routes';
 import { threedRouter } from './generation/threed.routes';
 import { audioRouter } from './generation/audio.routes';
 import { editingRouter } from './generation/editing.routes';
+import { editJobsRouter } from './editJobs/editJobs.index';
+import { outpaintRouter } from './generation/outpaint.routes';
 import { characterPipelineRouter } from './generation/character-pipeline.routes';
 import { collaborationRouter } from './collaboration/collaboration.routes';
 import { studioRouter } from './studio/studio.routes';
@@ -95,9 +97,14 @@ import { notificationsRouter } from './notifications/notifications.routes';
 import { lipsyncRouter } from './generation/lipsync.routes';
 import { cutdownRouter } from './generation/cutdown.routes';
 import { sceneAudioRouter } from './generation/sceneAudio.routes';
+import { talkingSceneRouter } from './generation/talking-scene.routes';
 import { universeStyleRouter } from './universeStyle/universeStyle.routes';
+import { universeTonePacksRouter } from './universeStyle/tonePacks.routes';
 import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.routes';
 import { episodesRouter } from './episodes/episodes.routes';
+import { shotTemplatesRouter } from './shotTemplates/shotTemplates.routes';
+import { lineageRouter } from './lineage/lineage.routes';
+import { workflowsRouter } from './workflows/workflows.index';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -184,10 +191,13 @@ export const appRouter = router({
   threed: threedRouter,
   characterPipeline: characterPipelineRouter,
   editing: editingRouter,
+  editJobs: editJobsRouter,
+  outpaint: outpaintRouter,
   lora: loraRouter,
   lipsync: lipsyncRouter,
   cutdown: cutdownRouter,
   sceneAudio: sceneAudioRouter,
+  talkingScene: talkingSceneRouter,
 
   // ── Studio OS ────────────────────────────────────────────────────────
   studio: studioRouter,
@@ -254,6 +264,9 @@ export const appRouter = router({
   aiPipelines: aiPipelinesRouter,
   apiKeys: apiKeysRouter,
 
+  // ── Node Workflow Builder (PRD 9: visual DAG editor for generation pipelines) ─
+  workflows: workflowsRouter,
+
   // ── Pricing ────────────────────────────────────────────────────────
   pricing: pricingRouter,
 
@@ -281,12 +294,19 @@ export const appRouter = router({
 
   // ── Universe Style Locking ─────────────────────────────────────────
   universeStyle: universeStyleRouter,
+  universeTonePacks: universeTonePacksRouter,
 
   // ── Revenue Dashboard (creator analytics) ──────────────────────────
   revenueDashboard: revenueDashboardRouter,
 
   // ── Episodes (clip arrangement + export) ──────────────────────────
   episodes: episodesRouter,
+
+  // ── Shot Templates (PRD 7: pose/composition/angle control) ────────
+  shotTemplates: shotTemplatesRouter,
+
+  // ── Asset Lineage, Rights, Credits, Analytics (PRD 10) ─────────────
+  lineage: lineageRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -15,7 +15,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
-import { Shield, EyeOff, Eye, Loader2, Search } from 'lucide-react';
+import { Shield, EyeOff, Eye, Loader2, Search, Trash2 } from 'lucide-react';
 
 export const Route = createFileRoute('/admin/universes')({
   beforeLoad: ({ context }) => {
@@ -52,6 +52,18 @@ function AdminUniversesDashboard() {
     },
     onError: (err: unknown) => {
       toast.error(err instanceof Error ? err.message : 'Failed to update universe');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (vars: { universeId: string; reason?: string }) =>
+      trpcClient.universes.adminDelete.mutate(vars),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-universes'] });
+      toast.success('Universe permanently deleted');
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete universe');
     },
   });
 
@@ -181,35 +193,57 @@ function AdminUniversesDashboard() {
                     </p>
                   ) : null}
                 </div>
-                {u.isHidden ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setHiddenMutation.mutate({ universeId: u.id, isHidden: false })}
-                    disabled={setHiddenMutation.isPending}
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Restore
-                  </Button>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {u.isHidden ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setHiddenMutation.mutate({ universeId: u.id, isHidden: false })
+                      }
+                      disabled={setHiddenMutation.isPending || deleteMutation.isPending}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      Restore
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Hide "${u.name ?? u.id}"? It will be removed from public lists. Its gallery content will stay visible.`
+                          )
+                        ) {
+                          setHiddenMutation.mutate({ universeId: u.id, isHidden: true });
+                        }
+                      }}
+                      disabled={setHiddenMutation.isPending || deleteMutation.isPending}
+                    >
+                      <EyeOff className="h-3 w-3 mr-1" />
+                      Hide
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="destructive"
                     onClick={() => {
-                      if (
-                        confirm(
-                          `Hide "${u.name ?? u.id}"? It will be removed from public lists. Its gallery content will stay visible.`
-                        )
-                      ) {
-                        setHiddenMutation.mutate({ universeId: u.id, isHidden: true });
-                      }
+                      const label = u.name ?? u.id;
+                      const typed = prompt(
+                        `PERMANENTLY DELETE "${label}"?\n\nThis removes the universe from every listing and cannot be undone. The on-chain contract is not affected, and existing gallery content keeps its reference.\n\nType DELETE to confirm:`
+                      );
+                      if (typed !== 'DELETE') return;
+                      const reason = prompt('Reason (optional, saved to audit log):') ?? undefined;
+                      deleteMutation.mutate({ universeId: u.id, reason });
                     }}
-                    disabled={setHiddenMutation.isPending}
+                    disabled={setHiddenMutation.isPending || deleteMutation.isPending}
+                    title="Permanently delete this universe"
                   >
-                    <EyeOff className="h-3 w-3 mr-1" />
-                    Hide
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
                   </Button>
-                )}
+                </div>
               </CardContent>
             </Card>
           ))}

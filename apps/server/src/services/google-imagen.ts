@@ -24,6 +24,13 @@ export type GoogleImageModel =
 
 export type ImagenAspectRatio = '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
 
+export interface ImagenInputImage {
+  /** Base64-encoded image bytes (no data URL prefix) */
+  base64: string;
+  /** MIME type: image/png or image/jpeg */
+  mimeType: string;
+}
+
 export interface ImagenGenerateOptions {
   prompt: string;
   negativePrompt?: string;
@@ -35,6 +42,11 @@ export interface ImagenGenerateOptions {
   safetyFilterLevel?: string;
   /** Person generation: DONT_ALLOW, ALLOW_ADULT, ALLOW_ALL */
   personGeneration?: string;
+  /**
+   * Optional input images for image-to-image / outpainting / reframing on the
+   * Gemini endpoint (nano-banana-pro-preview). Ignored by the predict endpoint.
+   */
+  inputImages?: ImagenInputImage[];
 }
 
 export interface ImagenImage {
@@ -90,12 +102,14 @@ class GoogleImagenService {
   ): Promise<ImagenResult> {
     const url = `${API_BASE}/models/${model}:generateContent?key=${this.apiKey}`;
 
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+    for (const img of options.inputImages ?? []) {
+      parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+    }
+    parts.push({ text: options.prompt });
+
     const requestBody = {
-      contents: [
-        {
-          parts: [{ text: options.prompt }],
-        },
-      ],
+      contents: [{ parts }],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
       },

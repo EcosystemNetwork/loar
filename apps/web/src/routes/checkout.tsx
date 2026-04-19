@@ -16,10 +16,11 @@ import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
+import { useChainId } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { useVocab } from '@/hooks/use-vocab';
+import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 
-const LOAR_TOKEN_ADDRESS = import.meta.env.VITE_LOAR_TOKEN_ADDRESS as Address | undefined;
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
 const ERC20_ABI = [
@@ -59,6 +60,9 @@ function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
+  const chainId = useChainId();
+  const LOAR_TOKEN_ADDRESS = getEvmAddresses(chainId)?.loarToken;
+  const hasLoarToken = !!LOAR_TOKEN_ADDRESS && !isZeroAddress(LOAR_TOKEN_ADDRESS);
 
   const { listingId, productType, title, price, currency } = search;
 
@@ -100,7 +104,7 @@ function CheckoutPage() {
         // On-chain payment for paid subscription tiers
         const subPrice = parseFloat(displayPrice);
         if (subPrice > 0) {
-          if (displayCurrency === 'LOAR' && LOAR_TOKEN_ADDRESS) {
+          if (displayCurrency === 'LOAR' && hasLoarToken && LOAR_TOKEN_ADDRESS) {
             const recipient = TREASURY_ADDRESS;
             if (!recipient) {
               toast.error('Treasury address not configured');
@@ -147,8 +151,8 @@ function CheckoutPage() {
 
       // For $LOAR listings, transfer tokens on-chain before recording the order
       if (displayCurrency === 'LOAR' && displayPrice !== '0' && !isFree) {
-        if (!LOAR_TOKEN_ADDRESS) {
-          toast.error('$LOAR token address not configured');
+        if (!hasLoarToken || !LOAR_TOKEN_ADDRESS) {
+          toast.error('$LOAR token is not deployed on this chain');
           return;
         }
         const recipient =

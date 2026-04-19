@@ -24,8 +24,12 @@ import {
   getDefaultModelForOperation,
   type EditingJobRecord,
   type EditingOperation,
+  type InpaintMode,
 } from '../../services/editing-models';
 import { FieldValue } from 'firebase-admin/firestore';
+import { publishToGallery } from '../../lib/gallery-publish';
+import { recordAssetEventAsync } from '../../services/lineage';
+import type { AssetEventStep, AssetOutputKind } from '../../services/lineage/types';
 
 // ── Collections ─────────────────────────────────────────────────────────
 
@@ -87,10 +91,43 @@ async function refundCredits(uid: string, cost: number): Promise<void> {
   }
 }
 
+const EDIT_OUTPUT_KIND: Record<EditingOperation, AssetOutputKind> = {
+  upscale: 'image',
+  interpolate: 'video',
+  restyle: 'video',
+  inpaint: 'image',
+  remove_bg: 'image',
+  extend: 'video',
+  relight: 'image',
+};
+
 async function saveJobRecord(record: EditingJobRecord): Promise<void> {
   await editingJobsCol()
     .doc(record.id)
     .set({ ...record, createdAt: record.createdAt, completedAt: record.completedAt || null });
+
+  // PRD 10: lineage event for this edit step.
+  const promptRefs: Array<{ kind: 'image' | 'mask'; url: string }> = [];
+  if (record.inputUrl) promptRefs.push({ kind: 'image', url: record.inputUrl });
+  if ((record as any).maskUrl) promptRefs.push({ kind: 'mask', url: (record as any).maskUrl });
+
+  recordAssetEventAsync({
+    assetId: record.id,
+    parentAssetId: record.sourceGenerationId ?? record.sourceAttachmentId ?? null,
+    kind: 'edit',
+    tool: record.modelId,
+    step: record.operation as AssetEventStep,
+    prompt: record.prompt ?? null,
+    promptRefs,
+    modelId: record.modelId,
+    creditCost: record.creditsCharged ?? 0,
+    latencyMs: record.latencyMs ?? null,
+    creatorUid: record.userId,
+    universeAddress: record.universeAddress?.toLowerCase() ?? null,
+    outputUrl: record.outputUrl ?? null,
+    outputKind: EDIT_OUTPUT_KIND[record.operation],
+    status: record.status === 'completed' ? 'completed' : 'failed',
+  });
 }
 
 // ── Throttle ────────────────────────────────────────────────────────────
@@ -125,7 +162,54 @@ const operationSchema = z.enum([
   'inpaint',
   'remove_bg',
   'extend',
+  'relight',
 ]);
+
+const inpaintModeSchema = z.enum(['replace', 'remove', 'add', 'fix']);
+
+// Negative prompt that always applies to remove/replace/fix actions — blocks the
+// common artifacts users hit when Flux tries to re-paint a region that should be
+// blank or should match surrounding texture.
+const UNIVERSAL_NEGATIVE_PROMPT =
+  'blurry, low quality, watermark, jpeg artifacts, extra limbs, deformed, seams, halo';
+
+function composeInpaintPrompt(
+  mode: InpaintMode,
+  userPrompt: string
+): { prompt: string; negativePrompt: string } {
+  const trimmed = userPrompt.trim();
+  switch (mode) {
+    case 'remove':
+      // Flux inpaint can't truly "erase" — describing the clean plate forces a
+      // seamless fill that matches surrounding context.
+      return {
+        prompt: trimmed
+          ? `clean background, seamless fill matching surroundings, ${trimmed}, photorealistic, no object, empty space`
+          : 'clean background, seamless fill matching surroundings, photorealistic, no object, empty space',
+        negativePrompt: `${UNIVERSAL_NEGATIVE_PROMPT}, any object, figure, text, logo, character`,
+      };
+    case 'add':
+      return {
+        prompt: trimmed
+          ? `${trimmed}, seamlessly integrated, matching lighting and perspective, photorealistic detail`
+          : 'new object, seamlessly integrated, matching lighting and perspective',
+        negativePrompt: UNIVERSAL_NEGATIVE_PROMPT,
+      };
+    case 'fix':
+      return {
+        prompt: trimmed
+          ? `${trimmed}, highly detailed, anatomically correct, sharp focus, high quality`
+          : 'highly detailed, anatomically correct, sharp focus, high quality, natural proportions',
+        negativePrompt: `${UNIVERSAL_NEGATIVE_PROMPT}, malformed, mutated, bad anatomy, bad hands, extra fingers, fused fingers, disfigured`,
+      };
+    case 'replace':
+    default:
+      return {
+        prompt: trimmed,
+        negativePrompt: UNIVERSAL_NEGATIVE_PROMPT,
+      };
+  }
+}
 
 // ── Router ──────────────────────────────────────────────────────────────
 
@@ -411,6 +495,26 @@ export const editingRouter = router({
       };
       saveJobRecord(record).catch(console.error);
 
+      // Auto-publish derivative clip to gallery with source-video lineage
+      try {
+        const { extractVideoThumbnail } = await import('../../services/video-thumbnail');
+        const thumbnailUrl = await extractVideoThumbnail(result.videoUrl, jobId);
+        await publishToGallery({
+          creatorUid: ctx.user.uid,
+          mediaUrl: result.videoUrl,
+          thumbnailUrl,
+          mediaType: 'ai-video',
+          title: input.prompt.slice(0, 80) || 'Restyled Clip',
+          description: input.prompt,
+          generationId: jobId,
+          generationModel: model.id,
+          parentGenerationId: input.sourceGenerationId || null,
+          sourceVideoGenerationId: input.sourceGenerationId || null,
+        });
+      } catch (err) {
+        console.error('[restyle] gallery publish failed:', err);
+      }
+
       return { jobId, videoUrl: result.videoUrl, model: model.displayName };
     }),
 
@@ -421,10 +525,17 @@ export const editingRouter = router({
       z.object({
         imageUrl: z.string().url(),
         maskUrl: z.string().url(),
-        prompt: z.string().min(1, 'Describe what to fill in'),
+        prompt: z.string().default(''),
+        mode: inpaintModeSchema.default('replace'),
         modelId: z.string().default('inpaint-flux'),
         negativePrompt: z.string().optional(),
+        seed: z.number().int().optional(),
+        strength: z.number().min(0).max(1).optional(),
+        guidanceScale: z.number().min(1).max(20).optional(),
         sourceGenerationId: z.string().optional(),
+        universeId: z.string().optional(),
+        /** If true, result is auto-published to the user's gallery */
+        publishToGallery: z.boolean().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -435,17 +546,52 @@ export const editingRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid inpaint model' });
       }
 
+      // Eraser models (lama-style) don't take prompts — they just fill the mask
+      // with plausible surrounding texture. Detected via the 'erase' tag.
+      const isEraser = model.tags.includes('erase');
+
+      // Replace/Add require a prompt unless using a prompt-free eraser model
+      if (!isEraser && input.mode === 'replace' && !input.prompt.trim()) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Replace mode requires a prompt describing what to fill in.',
+        });
+      }
+      if (!isEraser && input.mode === 'add' && !input.prompt.trim()) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Add mode requires a prompt describing what to add.',
+        });
+      }
+
+      const { prompt: composedPrompt, negativePrompt: composedNegative } = composeInpaintPrompt(
+        input.mode,
+        input.prompt
+      );
+      const finalNegative = input.negativePrompt
+        ? `${composedNegative}, ${input.negativePrompt}`
+        : composedNegative;
+
       const jobId = randomUUID();
       await deductCredits(ctx.user.uid, model.creditCost, 'inpaint');
 
       const startTime = Date.now();
-      const result = await falService.inpaintImage({
-        imageUrl: input.imageUrl,
-        maskUrl: input.maskUrl,
-        prompt: input.prompt,
-        model: model.falModelId,
-        negativePrompt: input.negativePrompt,
-      });
+      const result = isEraser
+        ? await falService.eraseRegion({
+            imageUrl: input.imageUrl,
+            maskUrl: input.maskUrl,
+            model: model.falModelId,
+          })
+        : await falService.inpaintImage({
+            imageUrl: input.imageUrl,
+            maskUrl: input.maskUrl,
+            prompt: composedPrompt,
+            model: model.falModelId,
+            negativePrompt: finalNegative,
+            seed: input.seed,
+            strength: input.strength,
+            guidanceScale: input.guidanceScale,
+          });
 
       if (result.status === 'failed' || !result.imageUrl) {
         await refundCredits(ctx.user.uid, model.creditCost);
@@ -458,6 +604,9 @@ export const editingRouter = router({
           inputUrl: input.imageUrl,
           maskUrl: input.maskUrl,
           prompt: input.prompt,
+          negativePrompt: input.negativePrompt,
+          mode: input.mode,
+          seed: input.seed,
           providerCostUsd: 0,
           creditsCharged: 0,
           failureReason: result.error || 'Inpaint failed',
@@ -482,6 +631,9 @@ export const editingRouter = router({
         outputUrl: result.imageUrl,
         maskUrl: input.maskUrl,
         prompt: input.prompt,
+        negativePrompt: input.negativePrompt,
+        mode: input.mode,
+        seed: result.seed,
         providerCostUsd: model.providerCostUsd,
         creditsCharged: model.creditCost,
         latencyMs: Date.now() - startTime,
@@ -489,9 +641,50 @@ export const editingRouter = router({
         completedAt: new Date(),
         sourceGenerationId: input.sourceGenerationId,
       };
+
+      // Gallery auto-publish — per product rule, every generated image must
+      // appear in the user's gallery without a manual promote step.
+      if (input.publishToGallery) {
+        try {
+          const modeLabels: Record<InpaintMode, string> = {
+            replace: 'Replaced region',
+            remove: 'Removed object',
+            add: 'Added content',
+            fix: 'Fixed details',
+          };
+          const title = input.prompt.trim()
+            ? `${modeLabels[input.mode]}: ${input.prompt.trim().slice(0, 60)}`
+            : modeLabels[input.mode];
+
+          await publishToGallery({
+            creatorUid: ctx.user.uid,
+            mediaUrl: result.imageUrl,
+            mediaType: 'ai-image',
+            title,
+            description: `Inpaint (${input.mode}) via ${model.displayName}${
+              input.prompt.trim() ? ` — "${input.prompt.trim()}"` : ''
+            }`,
+            generationId: jobId,
+            generationModel: model.displayName,
+            universeId: input.universeId ?? null,
+            tags: ['inpaint', input.mode, 'edit'],
+          });
+          record.galleryContentId = jobId;
+        } catch (err) {
+          // Gallery publish is best-effort — don't fail the whole request.
+          console.warn('[inpaint] publishToGallery failed:', err);
+        }
+      }
+
       saveJobRecord(record).catch(console.error);
 
-      return { jobId, imageUrl: result.imageUrl, model: model.displayName };
+      return {
+        jobId,
+        imageUrl: result.imageUrl,
+        model: model.displayName,
+        seed: result.seed,
+        mode: input.mode,
+      };
     }),
 
   // ── Background Removal ──────────────────────────────────────────────
@@ -636,6 +829,237 @@ export const editingRouter = router({
       saveJobRecord(record).catch(console.error);
 
       return { jobId, videoUrl: result.videoUrl, model: model.displayName };
+    }),
+
+  // ── Relight (lighting / time-of-day / backdrop / color mood) ────────
+
+  /** List the canonical relight presets grouped by kind. */
+  relightPresets: protectedProcedure.query(async () => {
+    const { LIGHTING_PRESETS, TIME_OF_DAY_PRESETS, BACKDROP_PRESETS, MOOD_PRESETS } =
+      await import('../../services/relight/presets');
+    const strip = (p: { id: string; kind: string; label: string; description: string }) => ({
+      id: p.id,
+      kind: p.kind,
+      label: p.label,
+      description: p.description,
+    });
+    return {
+      lighting: LIGHTING_PRESETS.map(strip),
+      time: TIME_OF_DAY_PRESETS.map(strip),
+      backdrop: BACKDROP_PRESETS.map(strip),
+      mood: MOOD_PRESETS.map(strip),
+    };
+  }),
+
+  relight: protectedProcedure
+    .input(
+      z
+        .object({
+          imageUrl: z.string().url(),
+          presetIds: z.array(z.string()).max(8).default([]),
+          freeText: z.string().max(500).optional(),
+          tonePackId: z.string().optional(),
+          universeAddress: z.string().optional(),
+          modelId: z.string().default('relight-nano-banana'),
+          numImages: z.number().int().min(1).max(4).default(1),
+          publishToGallery: z.boolean().default(true),
+          sourceGenerationId: z.string().optional(),
+          sourceAttachmentId: z.string().optional(),
+        })
+        .refine((v) => v.presetIds.length > 0 || (v.freeText && v.freeText.trim().length > 0), {
+          message: 'Pick at least one preset or describe the relight in free text',
+          path: ['presetIds'],
+        })
+    )
+    .mutation(async ({ ctx, input }) => {
+      checkEditThrottle(ctx.user.uid);
+
+      const model = getEditingModelById(input.modelId);
+      if (!model || model.operation !== 'relight') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid relight model' });
+      }
+
+      // Resolve tone pack (if requested) — soft-fail if unreadable; the relight
+      // still works without a house look applied.
+      let tonePack: {
+        presetIds?: string[];
+        customPromptFragment?: string;
+        customNegativeFragment?: string;
+      } | null = null;
+      if (input.tonePackId) {
+        try {
+          if (!db) throw new Error('Firebase not configured');
+          const packDoc = await db.collection('universeTonePacks').doc(input.tonePackId).get();
+          if (packDoc.exists) {
+            const data = packDoc.data()!;
+            tonePack = {
+              presetIds: Array.isArray(data.presetIds) ? data.presetIds : [],
+              customPromptFragment: data.customPromptFragment,
+              customNegativeFragment: data.customNegativeFragment,
+            };
+          }
+        } catch (err) {
+          console.warn('[relight] Failed to load tone pack', input.tonePackId, err);
+        }
+      }
+
+      const { composeRelightPrompt } = await import('../../services/relight/presets');
+      const composed = composeRelightPrompt({
+        presetIds: input.presetIds,
+        freeText: input.freeText,
+        tonePack,
+      });
+
+      if (!composed.prompt.trim()) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Could not compose a relight prompt — pick at least one valid preset.',
+        });
+      }
+
+      const totalCost = model.creditCost * input.numImages;
+      const jobId = randomUUID();
+      await deductCredits(ctx.user.uid, totalCost, 'relight');
+
+      const startTime = Date.now();
+      const result = await falService.editImage({
+        prompt: composed.prompt,
+        imageUrls: [input.imageUrl],
+        numImages: input.numImages,
+        negativePrompt: composed.negativePrompt || undefined,
+      });
+
+      if (result.status === 'failed' || !result.imageUrl) {
+        await refundCredits(ctx.user.uid, totalCost);
+        const failedRecord: EditingJobRecord = {
+          id: jobId,
+          userId: ctx.user.uid,
+          operation: 'relight',
+          modelId: model.id,
+          status: 'failed',
+          inputUrl: input.imageUrl,
+          prompt: composed.prompt,
+          negativePrompt: composed.negativePrompt,
+          providerCostUsd: 0,
+          creditsCharged: 0,
+          failureReason: result.error || 'Relight failed',
+          createdAt: new Date(),
+          completedAt: new Date(),
+          sourceGenerationId: input.sourceGenerationId,
+          sourceAttachmentId: input.sourceAttachmentId,
+          presetIds: composed.appliedPresetIds,
+          tonePackId: input.tonePackId,
+          universeAddress: input.universeAddress,
+        };
+        saveJobRecord(failedRecord).catch(console.error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: result.error || 'Relight failed',
+        });
+      }
+
+      const outputs = (result.images ?? [{ url: result.imageUrl }]).map((img) => img.url);
+
+      const record: EditingJobRecord = {
+        id: jobId,
+        userId: ctx.user.uid,
+        operation: 'relight',
+        modelId: model.id,
+        status: 'completed',
+        inputUrl: input.imageUrl,
+        outputUrl: outputs[0],
+        prompt: composed.prompt,
+        negativePrompt: composed.negativePrompt,
+        providerCostUsd: model.providerCostUsd * input.numImages,
+        creditsCharged: totalCost,
+        latencyMs: Date.now() - startTime,
+        seed: result.seed,
+        createdAt: new Date(),
+        completedAt: new Date(),
+        sourceGenerationId: input.sourceGenerationId,
+        sourceAttachmentId: input.sourceAttachmentId,
+        presetIds: composed.appliedPresetIds,
+        tonePackId: input.tonePackId,
+        universeAddress: input.universeAddress,
+      };
+      saveJobRecord(record).catch(console.error);
+
+      // Auto-publish each output to the public gallery so it joins the
+      // creator's portfolio without a manual step. Best-effort — failure
+      // here does NOT fail the relight call.
+      if (input.publishToGallery) {
+        const presetTags = composed.appliedPresetIds.map((p) => `relight:${p}`);
+        for (const outUrl of outputs) {
+          publishToGallery({
+            creatorUid: ctx.user.uid,
+            mediaUrl: outUrl,
+            mediaType: 'ai-image',
+            title: `Relight — ${composed.appliedPresetIds.slice(0, 2).join(', ') || 'custom'}`,
+            description: composed.prompt.slice(0, 240),
+            universeId: input.universeAddress ?? null,
+            generationId: jobId,
+            generationModel: model.displayName,
+            tags: ['relight', ...presetTags],
+          }).catch((err) => console.error(`[relight] gallery publish failed for ${jobId}:`, err));
+        }
+      }
+
+      // If the source was a tracked media attachment, chain new variants so
+      // the entity / universe sees them grouped under the original.
+      if (input.sourceAttachmentId && db) {
+        try {
+          const { createAttachment, getNextVersion } =
+            await import('../../routers/media/media.handlers');
+          const sourceDoc = await db
+            .collection('mediaAttachments')
+            .doc(input.sourceAttachmentId)
+            .get();
+          if (sourceDoc.exists && ctx.user.address) {
+            const src = sourceDoc.data()!;
+            const variantLabel =
+              composed.appliedPresetIds.slice(0, 2).join(' + ') ||
+              (input.freeText ? input.freeText.slice(0, 40) : 'Relight');
+            for (const outUrl of outputs) {
+              const version = await getNextVersion(
+                src.targetType,
+                src.targetId,
+                src.category ?? 'image',
+                input.sourceAttachmentId
+              );
+              await createAttachment(ctx.user.address, {
+                contentHash: '', // unknown — gallery rehost computes its own
+                originalFilename: `${jobId}.png`,
+                mimeType: 'image/png',
+                size: 0,
+                url: outUrl,
+                targetType: src.targetType,
+                targetId: src.targetId,
+                targetName: src.targetName ?? '',
+                category: src.category ?? 'image',
+                label: `${src.label ?? 'Image'} — ${variantLabel}`,
+                subCategory: src.subCategory ?? null,
+                version,
+                variantOf: input.sourceAttachmentId,
+                variantLabel,
+                sortOrder: src.sortOrder ?? 0,
+                generationId: jobId,
+              });
+            }
+          }
+        } catch (err) {
+          console.error(`[relight] variant chain failed for ${jobId}:`, err);
+        }
+      }
+
+      return {
+        jobId,
+        imageUrl: outputs[0],
+        images: outputs,
+        appliedPresetIds: composed.appliedPresetIds,
+        prompt: composed.prompt,
+        creditsCharged: totalCost,
+        model: model.displayName,
+      };
     }),
 
   // ── History ─────────────────────────────────────────────────────────

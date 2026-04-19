@@ -27,6 +27,9 @@ export const ENTITY_KINDS = [
   'vehicle',
   'technology',
   'organization',
+  // Visual-language kinds — PRD 5 (Retexture, Moodboards, House Style Packs)
+  'moodboard',
+  'style_pack',
   // Structural/ontology kinds
   'timeline',
   'reality',
@@ -50,6 +53,8 @@ export const CREATOR_KINDS: EntityKind[] = [
   'vehicle',
   'technology',
   'organization',
+  'moodboard',
+  'style_pack',
 ];
 
 /** Advanced structural kinds for universe ontology. */
@@ -83,6 +88,9 @@ export const VALID_PARENTS: Record<EntityKind, (EntityKind | null)[]> = {
   vehicle: [null, ...STRUCTURAL_KINDS, ...CREATOR_KINDS],
   technology: [null, ...STRUCTURAL_KINDS, ...CREATOR_KINDS],
   organization: [null, ...STRUCTURAL_KINDS, ...CREATOR_KINDS],
+  // Visual-language kinds — live at the universe level, no structural parent
+  moodboard: [null],
+  style_pack: [null],
   // Structural kinds — follow ontology hierarchy
   timeline: [null],
   reality: [null, 'timeline'],
@@ -104,6 +112,8 @@ export const KIND_LABELS: Record<EntityKind, string> = {
   vehicle: 'Vehicle',
   technology: 'Technology',
   organization: 'Organization',
+  moodboard: 'Moodboard',
+  style_pack: 'Style Pack',
   timeline: 'Timeline',
   reality: 'Reality',
   dimension: 'Dimension',
@@ -124,6 +134,8 @@ export const KIND_PLURAL_LABELS: Record<EntityKind, string> = {
   vehicle: 'Vehicles',
   technology: 'Technology',
   organization: 'Organizations',
+  moodboard: 'Moodboards',
+  style_pack: 'Style Packs',
   timeline: 'Timelines',
   reality: 'Realities',
   dimension: 'Dimensions',
@@ -134,6 +146,60 @@ export const KIND_PLURAL_LABELS: Record<EntityKind, string> = {
 
 /** Rights declaration for monetized entities. */
 export type RightsDeclaration = 'original' | 'licensed';
+
+// ── Reference Bundle (Character Identity Lock + Multi-Reference Editing) ──
+
+/**
+ * Reference slots for identity conditioning. Each slot holds one or more
+ * reference image URLs that image/video generators consume to keep a subject
+ * on-model across edits and generations.
+ */
+export const REFERENCE_SLOTS = ['character', 'outfit', 'prop', 'environment', 'style'] as const;
+export type ReferenceSlot = (typeof REFERENCE_SLOTS)[number];
+
+export const REFERENCE_SLOT_LABELS: Record<ReferenceSlot, string> = {
+  character: 'Character',
+  outfit: 'Outfit',
+  prop: 'Prop',
+  environment: 'Environment',
+  style: 'Style',
+};
+
+/** Lock toggles that constrain which attributes must be preserved in outputs. */
+export const IDENTITY_LOCKS = ['face', 'costume', 'colors', 'silhouette'] as const;
+export type IdentityLock = (typeof IDENTITY_LOCKS)[number];
+
+export const IDENTITY_LOCK_LABELS: Record<IdentityLock, string> = {
+  face: 'Lock Face',
+  costume: 'Lock Costume',
+  colors: 'Lock Colors',
+  silhouette: 'Lock Silhouette',
+};
+
+/** Maximum refs per slot — provider-agnostic ceiling. */
+export const MAX_REFS_PER_SLOT = 3;
+
+/**
+ * Reference bundle attached to an entity. Child entities inherit from their
+ * parent chain; explicit slot values on the child override inherited ones.
+ */
+export interface ReferenceBundle {
+  /** Per-slot reference image URLs (already uploaded to LOAR storage). */
+  slots: Partial<Record<ReferenceSlot, string[]>>;
+  /** Which attributes must be preserved verbatim in outputs. */
+  locks: Partial<Record<IdentityLock, boolean>>;
+  /** Weighting for reference conditioning. 0..1. */
+  identityStrength: number;
+  updatedAt: Date;
+}
+
+/** Empty bundle used as a starting point client-side. */
+export const EMPTY_REFERENCE_BUNDLE: ReferenceBundle = {
+  slots: {},
+  locks: {},
+  identityStrength: 0.7,
+  updatedAt: new Date(0),
+};
 
 /** Firestore document shape for a narrative entity. */
 export interface Entity {
@@ -154,6 +220,8 @@ export interface Entity {
   rightsDeclaration: RightsDeclaration | null;
   /** Optional Unstoppable Domains name (e.g. "mycharacter.crypto"). */
   unstoppableDomain: string | null;
+  /** Reference bundle for identity lock + multi-reference editing. */
+  referenceBundle: ReferenceBundle | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -245,6 +313,47 @@ export const INVERSE_RELATIONS: Partial<Record<EntityRelationType, string>> = {
   rules: 'Ruled By',
   uses: 'Used By',
 };
+
+/**
+ * Reference image stored on a moodboard or style pack.
+ * `url` is the final public URL (Pinata/IPFS); `contentHash` is the SHA-256
+ * canonical content hash from the storage manager.
+ */
+export interface StyleReferenceImage {
+  url: string;
+  contentHash?: string;
+  note?: string;
+}
+
+/** Expected metadata shape for a moodboard entity. */
+export interface MoodboardMetadata {
+  /** Ordered list of reference images curated into this moodboard. */
+  referenceImages?: StyleReferenceImage[];
+  /** Free-form tags — "neon", "overcast", "low-contrast", etc. */
+  tags?: string[];
+  /** Short paragraph describing the intended feel. */
+  notes?: string;
+}
+
+/** Expected metadata shape for a style_pack entity. */
+export interface StylePackMetadata {
+  /**
+   * Named preset this pack is built on — anime, gritty-scifi, graphic-novel,
+   * clay, painterly, vhs, etc. Free-form string; the UI surfaces common ones
+   * via a datalist.
+   */
+  basePreset?: string;
+  /** Style prompt fragment prepended when this pack is active. */
+  stylePrompt?: string;
+  /** Negative prompt fragment merged when this pack is active. */
+  negativePrompt?: string;
+  /** Short keywords describing the pack — "ink lines", "rim light". */
+  styleKeywords?: string[];
+  /** Reference images that communicate the pack's look. */
+  referenceImages?: StyleReferenceImage[];
+  /** Default 0..1 strength applied when a creator picks this pack. */
+  defaultStrength?: number;
+}
 
 /** Firestore document for an entity relationship. */
 export interface EntityRelation {

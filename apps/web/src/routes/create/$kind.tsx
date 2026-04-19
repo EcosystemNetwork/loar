@@ -32,6 +32,11 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { ModelSelector } from '@/components/ModelSelector';
+import {
+  StyleControls,
+  DEFAULT_STYLE_CONTROLS_VALUE,
+  type StyleControlsValue,
+} from '@/components/StyleControls';
 
 type EntityKind =
   | 'person'
@@ -44,6 +49,8 @@ type EntityKind =
   | 'vehicle'
   | 'technology'
   | 'organization'
+  | 'moodboard'
+  | 'style_pack'
   | 'timeline'
   | 'reality'
   | 'dimension'
@@ -62,6 +69,8 @@ const VALID_KINDS: EntityKind[] = [
   'vehicle',
   'technology',
   'organization',
+  'moodboard',
+  'style_pack',
   'timeline',
   'reality',
   'dimension',
@@ -420,6 +429,74 @@ const FIELDS_BY_KIND: Record<EntityKind, FieldDef[]> = {
       metadataKey: true,
     },
   ],
+  // ── Visual-language kinds — PRD 5 ──────────────────────────────────
+  moodboard: [
+    {
+      key: 'referenceImages',
+      label: 'Reference Image URLs',
+      placeholder: 'One URL per line — drop in Pinterest, Unsplash, IPFS, or LOAR upload URLs...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'tags',
+      label: 'Tags',
+      placeholder: 'neon, overcast, low-contrast, wet streets',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'notes',
+      label: 'Notes on the Mood',
+      placeholder: 'What feel should generators pull from this board?',
+      type: 'textarea',
+      metadataKey: true,
+    },
+  ],
+  style_pack: [
+    {
+      key: 'basePreset',
+      label: 'Base Preset',
+      placeholder: 'anime, gritty-scifi, graphic-novel, clay, painterly, vhs...',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'stylePrompt',
+      label: 'Style Prompt',
+      placeholder: 'e.g. hand-drawn ink linework, heavy shadow, muted palette, grainy film texture',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'negativePrompt',
+      label: 'Negative Prompt',
+      placeholder: 'what this look avoids — smooth render, photoreal, 3D...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'styleKeywords',
+      label: 'Style Keywords',
+      placeholder: 'ink lines, rim light, matte colors',
+      type: 'input',
+      metadataKey: true,
+    },
+    {
+      key: 'referenceImages',
+      label: 'Reference Image URLs',
+      placeholder: 'One URL per line — images that define this pack',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'defaultStrength',
+      label: 'Default Strength (0.0 – 1.0)',
+      placeholder: '0.7',
+      type: 'input',
+      metadataKey: true,
+    },
+  ],
   organization: [
     {
       key: 'orgType',
@@ -665,6 +742,8 @@ const KIND_LABELS: Record<EntityKind, string> = {
   vehicle: 'Vehicle',
   technology: 'Technology',
   organization: 'Organization',
+  moodboard: 'Moodboard',
+  style_pack: 'Style Pack',
   timeline: 'Timeline',
   reality: 'Reality',
   dimension: 'Dimension',
@@ -712,6 +791,9 @@ function EntityCreateForm() {
   const [generatingMusic, setGeneratingMusic] = useState(false);
   const [generatingArt, setGeneratingArt] = useState(false);
   const [unstoppableDomain, setUnstoppableDomain] = useState('');
+  const [styleControls, setStyleControls] = useState<StyleControlsValue>(
+    DEFAULT_STYLE_CONTROLS_VALUE
+  );
 
   const handleGenerateAI = async () => {
     if (!name.trim()) {
@@ -787,6 +869,36 @@ function EntityCreateForm() {
         }
       }
 
+      // Visual-language kinds store structured metadata rather than raw strings.
+      // Convert newline-separated URL lists to StyleReferenceImage[] and
+      // comma-separated keywords to string[].
+      if (typedKind === 'moodboard' || typedKind === 'style_pack') {
+        if (typeof metadata.referenceImages === 'string') {
+          metadata.referenceImages = (metadata.referenceImages as string)
+            .split(/\r?\n/)
+            .map((url) => url.trim())
+            .filter((url) => url.length > 0)
+            .map((url) => ({ url }));
+        }
+        if (typedKind === 'moodboard' && typeof metadata.tags === 'string') {
+          metadata.tags = (metadata.tags as string)
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean);
+        }
+        if (typedKind === 'style_pack' && typeof metadata.styleKeywords === 'string') {
+          metadata.styleKeywords = (metadata.styleKeywords as string)
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean);
+        }
+        if (typedKind === 'style_pack' && typeof metadata.defaultStrength === 'string') {
+          const parsed = Number(metadata.defaultStrength);
+          metadata.defaultStrength =
+            Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 0.7;
+        }
+      }
+
       if (monetized && !rightsDeclaration) {
         toast.error('Select a rights declaration for monetized entities');
         setSaving(false);
@@ -798,7 +910,7 @@ function EntityCreateForm() {
         description,
         kind: typedKind,
         imageUrl: imageUrl || null,
-        metadata: metadata as Record<string, string | number | boolean | null>,
+        metadata,
         monetized,
         rightsDeclaration: monetized ? rightsDeclaration : null,
         unstoppableDomain: unstoppableDomain.trim() || null,
@@ -819,6 +931,12 @@ function EntityCreateForm() {
             routingMode: artworkModel ? 'manual' : 'auto',
             ...(artworkModel ? { selectedModelId: artworkModel } : {}),
             entityId: result.id,
+            universeId: universeAddress || undefined,
+            stylePackEntityId: styleControls.stylePackEntityId ?? undefined,
+            moodboardEntityId: styleControls.moodboardEntityId ?? undefined,
+            styleStrength: styleControls.styleStrength,
+            retexture: styleControls.retexture,
+            respectCanonStyle: styleControls.respectCanonStyle,
           });
           if (artResult.status === 'completed' && artResult.imageUrls?.[0]) {
             await trpcClient.entities.update.mutate({
@@ -1154,6 +1272,13 @@ function EntityCreateForm() {
                 onChange={setArtworkModel}
                 label="Image model"
                 task="text_to_image"
+              />
+              <StyleControls
+                value={styleControls}
+                onChange={setStyleControls}
+                universeAddress={universeAddress || null}
+                creatorAddress={address ?? null}
+                hasSourceImage={false}
               />
               {name.trim() && !artworkPrompt.trim() && (
                 <Button

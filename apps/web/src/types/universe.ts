@@ -28,6 +28,9 @@ export interface UniverseData {
 
   /** Access model */
   accessModel?: 'open' | 'subscription' | 'token_gate' | 'both';
+
+  /** Label distinguishing sandbox/play universes from revenue-bearing ones. */
+  universeType?: 'fun' | 'monetized';
 }
 
 /** Check whether a universe has an on-chain contract address */

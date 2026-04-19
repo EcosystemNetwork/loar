@@ -431,6 +431,7 @@ function UniverseTimelineEditorInner() {
               tokenAddress: d.tokenAddress,
               governanceAddress: d.governanceAddress,
               isDefault: false,
+              universeType: (d.universeType as 'fun' | 'monetized') ?? 'monetized',
             };
           }
         } catch {

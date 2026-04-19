@@ -1,5 +1,7 @@
 import { db } from './firebase';
 import { triggerContentThumbnailAsync } from '../services/content-cover-image';
+import { recordAssetEventAsync } from '../services/lineage';
+import type { AssetOutputKind } from '../services/lineage/types';
 
 export type GalleryMediaType = 'image' | 'ai-image' | 'video' | 'ai-video' | 'audio' | '3d';
 
@@ -15,6 +17,11 @@ export interface PublishGalleryInput {
   generationModel: string;
   tags?: string[];
   createdAt?: Date;
+  /** Lineage refs — set when this clip is derived from another generation. */
+  parentGenerationId?: string | null;
+  sourceImageUrl?: string | null;
+  sourceVideoGenerationId?: string | null;
+  sourceAudioGenerationId?: string | null;
 }
 
 /**
@@ -118,6 +125,14 @@ export function buildGalleryDoc(
     reviewStatus: 'not_required',
     generationId: input.generationId,
     generationModel: input.generationModel,
+    ...(input.parentGenerationId ? { parentGenerationId: input.parentGenerationId } : {}),
+    ...(input.sourceImageUrl ? { sourceImageUrl: input.sourceImageUrl } : {}),
+    ...(input.sourceVideoGenerationId
+      ? { sourceVideoGenerationId: input.sourceVideoGenerationId }
+      : {}),
+    ...(input.sourceAudioGenerationId
+      ? { sourceAudioGenerationId: input.sourceAudioGenerationId }
+      : {}),
     ...(extra?.contentHash ? { storageContentHash: extra.contentHash } : {}),
   };
 }
@@ -140,6 +155,42 @@ export async function publishToGallery(input: PublishGalleryInput): Promise<void
         creatorUid: resolvedInput.creatorUid,
       });
     }
+
+    // PRD 10: lineage event for the publish step. Parent = the generation
+    // (or another generation we were derived from) so the asset family tree
+    // walks generate → publish.
+    const outputKind: AssetOutputKind = resolvedInput.mediaType.includes('image')
+      ? 'image'
+      : resolvedInput.mediaType === 'audio'
+        ? 'audio'
+        : resolvedInput.mediaType === '3d'
+          ? '3d'
+          : 'video';
+    const parentAssetId =
+      resolvedInput.parentGenerationId ??
+      resolvedInput.sourceVideoGenerationId ??
+      resolvedInput.sourceAudioGenerationId ??
+      resolvedInput.generationId ??
+      null;
+
+    recordAssetEventAsync({
+      assetId: ref.id,
+      parentAssetId,
+      kind: 'publish',
+      tool: resolvedInput.generationModel || 'gallery',
+      step: 'publish',
+      prompt: resolvedInput.description || null,
+      promptRefs: [],
+      modelId: resolvedInput.generationModel || null,
+      creditCost: 0,
+      latencyMs: null,
+      creatorUid: resolvedInput.creatorUid,
+      universeId: resolvedInput.universeId ?? null,
+      rightsClass: 'original',
+      outputUrl: resolvedInput.mediaUrl,
+      outputKind,
+      status: 'completed',
+    });
   } catch (err: unknown) {
     console.error(`[gallery] publish failed (${input.generationId}):`, err);
   }
