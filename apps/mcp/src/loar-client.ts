@@ -35,15 +35,36 @@ function classifyHttpError(status: number, body: string): string {
 export interface LoarClientConfig {
   serverUrl: string;
   apiKey: string;
+  /**
+   * Optional end-user wallet address. Sent as `X-Loar-End-User-Address` on
+   * every request. LOAR server only honors this header when the API key
+   * carries the `mcp_server` scope (SSRF/impersonation guard — see
+   * apps/server/src/lib/auth.ts). Used by the hosted MCP gateway to
+   * attribute calls back to the authenticated OAuth session subject.
+   */
+  endUserAddress?: string;
 }
 
 export class LoarClient {
   private serverUrl: string;
   private apiKey: string;
+  private endUserAddress?: string;
 
   constructor(config: LoarClientConfig) {
     this.serverUrl = config.serverUrl.replace(/\/$/, '');
     this.apiKey = config.apiKey;
+    this.endUserAddress = config.endUserAddress;
+  }
+
+  private authHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${this.apiKey}`,
+    };
+    if (this.endUserAddress) {
+      headers['X-Loar-End-User-Address'] = this.endUserAddress;
+    }
+    return headers;
   }
 
   /**
@@ -57,10 +78,7 @@ export class LoarClient {
 
     const res = await fetch(url.toString(), {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+      headers: this.authHeaders(),
     });
 
     if (!res.ok) {
@@ -80,10 +98,7 @@ export class LoarClient {
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+      headers: this.authHeaders(),
       body: JSON.stringify(input),
     });
 

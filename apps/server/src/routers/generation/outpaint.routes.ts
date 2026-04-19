@@ -268,8 +268,10 @@ export const outpaintRouter = router({
           const d = existing.exists ? (existing.data() as any) : {};
           return {
             jobId: reservation.existing.jobId,
-            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
-            imageUrl: (d.imageUrl ?? d.outputUrl ?? null) as string | null,
+            status: 'completed' as const,
+            imageUrl: (d.outputImageUrl ?? d.imageUrl ?? null) as string | null,
+            provider: (d.provider ?? 'unknown') as string,
+            targetAspect: (d.targetAspect ?? input.targetAspect) as typeof input.targetAspect,
             creditsCharged: (d.creditsCharged ?? 0) as number,
             idempotentReplay: true as const,
           };

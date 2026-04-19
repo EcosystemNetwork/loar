@@ -39,9 +39,21 @@ function classifyHttpError(status, body) {
 export class LoarClient {
     serverUrl;
     apiKey;
+    endUserAddress;
     constructor(config) {
         this.serverUrl = config.serverUrl.replace(/\/$/, '');
         this.apiKey = config.apiKey;
+        this.endUserAddress = config.endUserAddress;
+    }
+    authHeaders() {
+        const headers = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+        };
+        if (this.endUserAddress) {
+            headers['X-Loar-End-User-Address'] = this.endUserAddress;
+        }
+        return headers;
     }
     /**
      * Call a tRPC query endpoint
@@ -53,10 +65,7 @@ export class LoarClient {
         }
         const res = await fetch(url.toString(), {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.apiKey}`,
-            },
+            headers: this.authHeaders(),
         });
         if (!res.ok) {
             const body = await res.text();
@@ -72,10 +81,7 @@ export class LoarClient {
         const url = `${this.serverUrl}/trpc/${path}`;
         const res = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.apiKey}`,
-            },
+            headers: this.authHeaders(),
             body: JSON.stringify(input),
         });
         if (!res.ok) {

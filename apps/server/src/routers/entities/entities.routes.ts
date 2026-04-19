@@ -42,6 +42,12 @@ import {
   clearReferenceBundle,
   resolveReferenceBundle,
 } from './entities.reference-bundle';
+import {
+  getVisualDescriptor,
+  pinReferenceAsset,
+  revertVisualDescriptor,
+  getDescriptorHistory,
+} from './entities.visual-descriptor';
 import { geminiService } from '../../services/gemini';
 import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
@@ -525,6 +531,73 @@ export const entitiesRouter = router({
       await clearReferenceBundle(input.entityId);
       return { success: true };
     }),
+
+  // ── Visual Descriptor (VLM canonical visual memory) ────────────────
+  // See docs/prd-vlm-subsystem.md §12.1. Writes are driven by the VLM
+  // pipeline (`vlm.proposals.accept`, `vlm.copilot.refreshVisualDescriptor`);
+  // routes here cover reads + creator-managed actions (pin / revert).
+
+  visualDescriptor: router({
+    /** Read the current descriptor for an entity. Public. */
+    get: publicProcedure
+      .input(z.object({ entityId: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const descriptor = await getVisualDescriptor(input.entityId);
+        return { descriptor };
+      }),
+
+    /** List archived descriptor versions, newest first. Public. */
+    history: publicProcedure
+      .input(
+        z.object({
+          entityId: z.string().min(1),
+          limit: z.number().int().positive().max(100).default(20),
+        })
+      )
+      .query(async ({ input }) => {
+        const history = await getDescriptorHistory(input.entityId, input.limit);
+        return { history };
+      }),
+
+    /** Pin or unpin a reference asset so VLM auto-refresh cannot displace it. */
+    pinAsset: protectedProcedure
+      .use(requirePermission('entities.update'))
+      .input(
+        z.object({
+          entityId: z.string().min(1),
+          cid: z.string().min(1),
+          pinned: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const existing = await getEntity(input.entityId);
+        if (!existing) throw new Error('Entity not found');
+        if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+          throw new Error('Forbidden: only the entity creator can pin reference assets');
+        }
+        const descriptor = await pinReferenceAsset(input.entityId, input.cid, input.pinned);
+        return { success: true, descriptor };
+      }),
+
+    /** Revert to a prior descriptor version. Creator-only. */
+    revert: protectedProcedure
+      .use(requirePermission('entities.update'))
+      .input(
+        z.object({
+          entityId: z.string().min(1),
+          version: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const existing = await getEntity(input.entityId);
+        if (!existing) throw new Error('Entity not found');
+        if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+          throw new Error('Forbidden: only the entity creator can revert descriptor versions');
+        }
+        const descriptor = await revertVisualDescriptor(input.entityId, input.version);
+        return { success: true, descriptor };
+      }),
+  }),
 });
 
 export type EntitiesRouter = typeof entitiesRouter;

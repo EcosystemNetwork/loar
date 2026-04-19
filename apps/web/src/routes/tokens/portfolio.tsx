@@ -5,7 +5,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import { useTokenListData, timeAgo } from '@/hooks/useTokens';
+import { useTokenListData, useMySwapHistory, formatEth, timeAgo } from '@/hooks/useTokens';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ExternalLink,
+  Repeat,
 } from 'lucide-react';
+import { getExplorerTxUrl } from '@/configs/chains';
+import { useChainId } from 'wagmi';
 import { useMemo } from 'react';
 
 export const Route = createFileRoute('/tokens/portfolio')({
@@ -29,7 +32,9 @@ export const Route = createFileRoute('/tokens/portfolio')({
 
 function PortfolioPage() {
   const { address } = useAccount();
+  const chainId = useChainId();
   const { data: allTokens } = useTokenListData();
+  const { data: mySwaps, isLoading: swapsLoading } = useMySwapHistory(address, 50);
 
   const { data: portfolio, isLoading } = useQuery({
     queryKey: ['token-portfolio'],
@@ -311,6 +316,91 @@ function PortfolioPage() {
               </Link>
             ))}
           </div>
+        )}
+
+        {/* ── Swap History ──────────────────────────────────────────── */}
+        <h2 className="text-lg font-semibold mb-4 mt-10 flex items-center gap-2">
+          <Repeat className="h-5 w-5" />
+          Swap history
+        </h2>
+        {swapsLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !mySwaps?.length ? (
+          <Card>
+            <CardContent className="text-center py-10 text-sm text-muted-foreground">
+              No on-chain swaps yet from this wallet.
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-6 gap-2 text-[10px] text-muted-foreground font-semibold uppercase px-4 py-2 border-b">
+                <span>Type</span>
+                <span>Amount0</span>
+                <span>Amount1</span>
+                <span>Pool</span>
+                <span>Time</span>
+                <span className="text-right">Tx</span>
+              </div>
+              <div className="divide-y divide-border">
+                {mySwaps.map((swap) => {
+                  const isBuy = BigInt(swap.amount0) > 0n;
+                  const txHash = swap.id.split('-')[0] as `0x${string}` | undefined;
+                  const explorerUrl = txHash ? getExplorerTxUrl(chainId, txHash) : null;
+                  return (
+                    <div
+                      key={swap.id}
+                      className="grid grid-cols-6 gap-2 items-center text-xs px-4 py-2 hover:bg-muted/30"
+                    >
+                      <Badge
+                        variant={isBuy ? 'default' : 'destructive'}
+                        className="text-[10px] w-fit px-1.5 py-0"
+                      >
+                        {isBuy ? 'BUY' : 'SELL'}
+                      </Badge>
+                      <span
+                        className={`font-mono text-[10px] ${
+                          BigInt(swap.amount0) > 0n ? 'text-green-500' : 'text-red-500'
+                        }`}
+                      >
+                        {formatEth(swap.amount0)}
+                      </span>
+                      <span
+                        className={`font-mono text-[10px] ${
+                          BigInt(swap.amount1) > 0n ? 'text-green-500' : 'text-red-500'
+                        }`}
+                      >
+                        {formatEth(swap.amount1)}
+                      </span>
+                      <span className="font-mono text-[10px] truncate">
+                        {swap.poolId.slice(0, 10)}…
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {timeAgo(swap.timestamp)}
+                      </span>
+                      <div className="text-right">
+                        {explorerUrl ? (
+                          <a
+                            href={explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline inline-flex items-center gap-0.5 text-[10px]"
+                          >
+                            View
+                            <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px]">—</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

@@ -23,6 +23,8 @@ import {
   Star,
   Shield,
   UserCheck,
+  Filter,
+  Calendar,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/analytics/$universeId')({
@@ -92,6 +94,8 @@ function ListSkeleton({ rows = 5 }: { rows?: number }) {
 function AnalyticsDashboardPage() {
   const { universeId } = Route.useParams();
   const [isExporting, setIsExporting] = useState(false);
+  const [funnelDays, setFunnelDays] = useState<30 | 90 | 180>(90);
+  const [cohortWeeks, setCohortWeeks] = useState<4 | 6 | 8>(6);
 
   // --- Data queries ---
 
@@ -122,6 +126,26 @@ function AnalyticsDashboardPage() {
   } = useQuery({
     queryKey: ['recent-activity', universeId],
     queryFn: () => trpcClient.analytics.getRecentActivity.query({ universeId, limit: 20 }),
+    enabled: !!universeId,
+  });
+
+  const {
+    data: funnel,
+    isLoading: funnelLoading,
+    error: funnelError,
+  } = useQuery({
+    queryKey: ['funnel', universeId, funnelDays],
+    queryFn: () => trpcClient.analytics.getFunnel.query({ universeId, daysAgo: funnelDays }),
+    enabled: !!universeId,
+  });
+
+  const {
+    data: cohorts,
+    isLoading: cohortsLoading,
+    error: cohortsError,
+  } = useQuery({
+    queryKey: ['cohorts', universeId, cohortWeeks],
+    queryFn: () => trpcClient.analytics.getCohorts.query({ universeId, weeks: cohortWeeks }),
     enabled: !!universeId,
   });
 
@@ -293,6 +317,80 @@ function AnalyticsDashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Subscriber Funnel */}
+        <Card className="bg-zinc-900 border-zinc-800 lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-amber-400" />
+                Conversion Funnel
+              </div>
+              <div className="flex gap-1">
+                {([30, 90, 180] as const).map((d) => (
+                  <Button
+                    key={d}
+                    size="sm"
+                    variant={funnelDays === d ? 'default' : 'outline'}
+                    onClick={() => setFunnelDays(d)}
+                    className="h-7 text-xs px-2 border-zinc-700"
+                  >
+                    {d}d
+                  </Button>
+                ))}
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {funnelError && <ErrorBanner message="Failed to load funnel data." />}
+            {funnelLoading ? (
+              <ListSkeleton rows={3} />
+            ) : !funnel || funnel.stages.every((s: any) => s.count === 0) ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Not enough activity in the last {funnelDays} days to build a funnel.
+              </p>
+            ) : (
+              <FunnelStages funnel={funnel as any} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Cohort Retention */}
+        <Card className="bg-zinc-900 border-zinc-800 lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-blue-400" />
+                Weekly Cohort Retention
+              </div>
+              <div className="flex gap-1">
+                {([4, 6, 8] as const).map((w) => (
+                  <Button
+                    key={w}
+                    size="sm"
+                    variant={cohortWeeks === w ? 'default' : 'outline'}
+                    onClick={() => setCohortWeeks(w)}
+                    className="h-7 text-xs px-2 border-zinc-700"
+                  >
+                    {w}w
+                  </Button>
+                ))}
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {cohortsError && <ErrorBanner message="Failed to load cohort data." />}
+            {cohortsLoading ? (
+              <ListSkeleton rows={4} />
+            ) : !cohorts || (cohorts as any).cohorts.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                No cohort data for the last {cohortWeeks} weeks.
+              </p>
+            ) : (
+              <CohortTable cohorts={(cohorts as any).cohorts} weeks={cohortWeeks} />
+            )}
+          </CardContent>
+        </Card>
+
         {/* Recent Activity */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-3">
@@ -346,5 +444,124 @@ function AnalyticsDashboardPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Funnel
+// ---------------------------------------------------------------------------
+
+interface FunnelData {
+  daysAgo: number;
+  stages: { key: string; label: string; count: number; conversionFromPrev: number | null }[];
+  rawViewedWallets: number;
+  rawEngagedWallets: number;
+  rawMintedWallets: number;
+}
+
+function FunnelStages({ funnel }: { funnel: FunnelData }) {
+  const maxCount = Math.max(...funnel.stages.map((s) => s.count), 1);
+  return (
+    <div className="space-y-2">
+      {funnel.stages.map((stage, i) => {
+        const pct = (stage.count / maxCount) * 100;
+        const convPct =
+          stage.conversionFromPrev != null ? (stage.conversionFromPrev * 100).toFixed(1) : null;
+        return (
+          <div key={stage.key} className="flex items-center gap-3">
+            <span className="text-xs font-mono text-zinc-500 w-6">{i + 1}</span>
+            <div className="flex-1">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-medium">{stage.label}</span>
+                <div className="flex items-center gap-3">
+                  {convPct !== null && (
+                    <span className="text-zinc-500">
+                      → <span className="text-amber-400 font-mono">{convPct}%</span>
+                    </span>
+                  )}
+                  <span className="font-mono text-zinc-300">
+                    {stage.count.toLocaleString()} wallets
+                  </span>
+                </div>
+              </div>
+              <div className="h-6 bg-zinc-950 rounded overflow-hidden border border-zinc-800">
+                <div
+                  className={`h-full transition-all ${
+                    i === 0 ? 'bg-blue-500/60' : i === 1 ? 'bg-violet-500/60' : 'bg-emerald-500/60'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div className="pt-2 mt-2 border-t border-zinc-800 flex items-center justify-between text-[10px] text-zinc-500">
+        <span>
+          Unique raw wallets — views {funnel.rawViewedWallets}, engage {funnel.rawEngagedWallets},
+          mints {funnel.rawMintedWallets}
+        </span>
+        <span>Last {funnel.daysAgo} days</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cohort table
+// ---------------------------------------------------------------------------
+
+interface Cohort {
+  cohortWeek: string;
+  size: number;
+  retention: { weekOffset: number; count: number; rate: number }[];
+}
+
+function CohortTable({ cohorts, weeks }: { cohorts: Cohort[]; weeks: number }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-zinc-500 border-b border-zinc-800">
+            <th className="py-2 pr-3 font-semibold">Cohort</th>
+            <th className="py-2 pr-3 font-semibold text-right">Size</th>
+            {Array.from({ length: weeks }).map((_, i) => (
+              <th key={i} className="py-2 px-2 font-semibold text-center">
+                W{i}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cohorts.map((c) => (
+            <tr key={c.cohortWeek} className="border-b border-zinc-900">
+              <td className="py-2 pr-3 font-mono text-zinc-300">{c.cohortWeek}</td>
+              <td className="py-2 pr-3 font-mono text-right">{c.size}</td>
+              {c.retention.map((r) => (
+                <td key={r.weekOffset} className="py-2 px-2 text-center">
+                  <RetentionCell rate={r.rate} count={r.count} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RetentionCell({ rate, count }: { rate: number; count: number }) {
+  if (count === 0) return <span className="text-zinc-700">—</span>;
+  // Color scale: 0% → zinc, 100% → emerald
+  const intensity = Math.min(Math.max(rate, 0), 1);
+  const bg = `rgba(16, 185, 129, ${(intensity * 0.55).toFixed(2)})`;
+  return (
+    <span
+      className="inline-block rounded px-1.5 py-0.5 font-mono text-[10px]"
+      style={{ backgroundColor: bg, color: intensity > 0.3 ? '#fff' : '#d4d4d8' }}
+      title={`${count} wallets returned`}
+    >
+      {(rate * 100).toFixed(0)}%
+    </span>
   );
 }

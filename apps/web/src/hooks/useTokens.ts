@@ -143,6 +143,41 @@ export function useSwapHistory(poolId: string | undefined, limit = 50) {
   });
 }
 
+// ─── Swap history for a specific user (across all pools) ──────────────
+
+export function useMySwapHistory(address: string | undefined, limit = 50) {
+  return useQuery({
+    queryKey: ['my-swap-history', address, limit],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        swaps: { items: Swap[] };
+      }>(
+        `query ($sender: String!, $limit: Int!) {
+          swaps(where: { sender: $sender }, orderBy: "timestamp", orderDirection: "desc", limit: $limit) {
+            items {
+              id
+              poolId
+              sender
+              amount0
+              amount1
+              sqrtPriceX96
+              liquidity
+              tick
+              timestamp
+              blockNumber
+            }
+          }
+        }`,
+        { sender: address!.toLowerCase(), limit }
+      );
+      return data.swaps.items;
+    },
+    enabled: !!address,
+    ...ponderQueryDefaults,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
+  });
+}
+
 // ─── Token holders ─────────────────────────────────────────────────────
 
 export function useTokenHolders(tokenAddress: string | undefined) {

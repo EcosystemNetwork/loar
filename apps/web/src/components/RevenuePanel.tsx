@@ -30,7 +30,9 @@ import {
   Megaphone,
   ShoppingBag,
   BarChart3,
+  Layers,
 } from 'lucide-react';
+import { BatchMintEpisodesDialog } from '@/components/BatchMintEpisodesDialog';
 import {
   useEpisodeNFTs,
   useCreateEpisodeListing,
@@ -164,15 +166,28 @@ function NFTTab({ universeId }: { universeId: string }) {
   const { data: episodes } = useEpisodeNFTs(universeId);
   const createListing = useCreateEpisodeListing();
   const [showForm, setShowForm] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Own Episodes</h3>
-        <Button size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : 'Create Listing'}
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1" onClick={() => setBatchOpen(true)}>
+            <Layers className="h-3.5 w-3.5" />
+            Batch
+          </Button>
+          <Button size="sm" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : 'Create Listing'}
+          </Button>
+        </div>
       </div>
+
+      <BatchMintEpisodesDialog
+        universeId={universeId}
+        open={batchOpen}
+        onOpenChange={setBatchOpen}
+      />
 
       {showForm && (
         <Card>

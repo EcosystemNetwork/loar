@@ -38,6 +38,11 @@ import {
 import { LoarApiError, LoarClient } from './loar-client.js';
 import { ALL_TOOLS } from './tools.js';
 
+// Public surface — consumed by @loar/mcp-gateway for hosted SSE deployments.
+// Everything else in this module is the stdio/SSE entry point.
+export { LoarClient, LoarApiError } from './loar-client.js';
+export { ALL_TOOLS } from './tools.js';
+
 // ── Configuration ──────────────────────────────────────────────────────
 
 const LOAR_SERVER_URL = process.env.LOAR_SERVER_URL || 'http://localhost:3000';
@@ -219,7 +224,7 @@ async function pollAndStream(
 //   register a competing handler. For agent-visible cancellation, use the
 //   `loar_cancel_generation` tool — see skills/loar-video/SKILL.md Example 10.
 
-function setupHandlers(server: Server, client: LoarClient) {
+export function setupHandlers(server: Server, client: LoarClient) {
   // ── List Tools ──────────────────────────────────────────────────────
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
@@ -348,7 +353,7 @@ function setupHandlers(server: Server, client: LoarClient) {
   });
 }
 
-function createServer(): Server {
+export function createServer(): Server {
   return new Server(
     {
       name: 'loar',

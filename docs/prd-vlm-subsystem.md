@@ -38,6 +38,7 @@ Without this layer, the entity graph, governance, and canon marketplace remain h
 | 3     | Moderation risk scoring (copyright/NSFW/watermark/IP-similarity) | implemented                                     |
 | 4     | Multimodal search (tags, captions, optional embeddings)          | implemented (tags+captions; embeddings flagged) |
 | 5     | Generation copilot + trailer/recap/chapter generator             | implemented                                     |
+| 5b    | Wiki-conditioned generation (entity refs → shot conditioning)    | drafted, premium-gated                          |
 | 6     | Governance assist — draft canon proposals from media             | implemented                                     |
 | 7     | Editing graph primitives + continuous-film autoplay              | feature-flagged (`VLM_CONTINUOUS_FILM=true`)    |
 
@@ -286,31 +287,33 @@ All VLM writes are **append-only where possible**; mutations to `entities/` happ
 
 All under `vlm.*` in the app router, registered in `apps/server/src/routers/index.ts`.
 
-| Path                            | Kind               | Purpose                                                   |
-| ------------------------------- | ------------------ | --------------------------------------------------------- |
-| `vlm.extract.start`             | protected mutation | Enqueue an extraction job on a media URL                  |
-| `vlm.extract.status`            | protected query    | Poll job status + output ref                              |
-| `vlm.extract.get`               | protected query    | Fetch full extraction by id                               |
-| `vlm.proposals.list`            | protected query    | List entity proposals for an extraction                   |
-| `vlm.proposals.accept`          | protected mutation | Accept → creates real entity via `createEntity`           |
-| `vlm.proposals.reject`          | protected mutation | Reject proposal                                           |
-| `vlm.proposals.merge`           | protected mutation | Merge proposal into existing entity                       |
-| `vlm.canon.check`               | protected mutation | Run consistency check against universe                    |
-| `vlm.canon.getConflicts`        | public query       | Read latest conflicts for a target                        |
-| `vlm.search.query`              | public query       | Text search over `sceneIndex` + `vlmExtractions`          |
-| `vlm.moderation.riskScore`      | public query       | Read risk for a contentId (used by client to show badges) |
-| `vlm.moderation.requeue`        | admin mutation     | Force re-scoring                                          |
-| `vlm.copilot.improvePrompt`     | protected mutation | Reference images → better prompt                          |
-| `vlm.copilot.scoreOutput`       | protected mutation | Score a generated asset against intent                    |
-| `vlm.copilot.extractStyleBible` | protected mutation | Moodboard → structured style pack metadata                |
-| `vlm.recap.chapters`            | protected mutation | Chapter markers for an asset                              |
-| `vlm.recap.trailer`             | protected mutation | Cut suggestions + pitch text                              |
-| `vlm.recap.seo`                 | protected mutation | Title + description + thumbnail suggestions               |
-| `vlm.governance.draftProposal`  | protected mutation | Draft a canon proposal from an extraction                 |
+| Path                            | Kind               | Purpose                                                    |
+| ------------------------------- | ------------------ | ---------------------------------------------------------- |
+| `vlm.extract.start`             | protected mutation | Enqueue an extraction job on a media URL                   |
+| `vlm.extract.status`            | protected query    | Poll job status + output ref                               |
+| `vlm.extract.get`               | protected query    | Fetch full extraction by id                                |
+| `vlm.proposals.list`            | protected query    | List entity proposals for an extraction                    |
+| `vlm.proposals.accept`          | protected mutation | Accept → creates real entity via `createEntity`            |
+| `vlm.proposals.reject`          | protected mutation | Reject proposal                                            |
+| `vlm.proposals.merge`           | protected mutation | Merge proposal into existing entity                        |
+| `vlm.canon.check`               | protected mutation | Run consistency check against universe                     |
+| `vlm.canon.getConflicts`        | public query       | Read latest conflicts for a target                         |
+| `vlm.search.query`              | public query       | Text search over `sceneIndex` + `vlmExtractions`           |
+| `vlm.moderation.riskScore`      | public query       | Read risk for a contentId (used by client to show badges)  |
+| `vlm.moderation.requeue`        | admin mutation     | Force re-scoring                                           |
+| `vlm.copilot.improvePrompt`     | protected mutation | Reference images → better prompt                           |
+| `vlm.copilot.scoreOutput`       | protected mutation | Score a generated asset against intent                     |
+| `vlm.copilot.scoreLipSync`      | protected mutation | VLM-verify phoneme↔viseme alignment on talking-scene video |
+| `vlm.copilot.extractStyleBible` | protected mutation | Moodboard → structured style pack metadata                 |
+| `vlm.recap.chapters`            | protected mutation | Chapter markers for an asset                               |
+| `vlm.recap.trailer`             | protected mutation | Cut suggestions + pitch text                               |
+| `vlm.recap.seo`                 | protected mutation | Title + description + thumbnail suggestions                |
+| `vlm.governance.draftProposal`  | protected mutation | Draft a canon proposal from an extraction                  |
 
 ## 7. Integration hooks
 
 - **Post-generation**: the existing `generation.worker.ts` enqueues a `vlm.extract` job on success (best-effort, non-blocking). Extraction populates `sceneIndex` + `vlmRiskScores` automatically for every new asset.
+- **Post-talking-scene**: on `talkingScene.create` completion, the worker additionally enqueues `vlm.copilot.scoreLipSync` with the audio track + video. The VLM rates phoneme-to-viseme alignment (score `lipSyncScore` 0..1) and flags ranges where mouth movements drift from the driving audio. Scores below `VLM_LIPSYNC_MIN_SCORE` (default 0.65) surface a "lip-sync warning" badge in the gallery and are eligible for one automatic re-dispatch with a tighter audio-conditioning seed before asking the creator. Continuous-mode runs (§13) treat lip-sync score as a required judge input for any dialogue shot.
 - **Post-upload**: `/api/upload` (Hono) enqueues the same job for user uploads.
 - **Pre-publish**: `content.create` / `marketplace.submit` call `vlm.canon.check` when `universeAddress` is set. Conflicts are displayed non-blocking; admins may configure `CANON_BLOCK_ON_HIGH=true` to hard-block `severity=block`.
 - **Pre-mint**: `marketplace.mintEpisode` reads latest `vlmRiskScores/{contentId}` — `high` risk requires admin review (consistent with `assertContentOperable`).
@@ -354,16 +357,145 @@ All under `vlm.*` in the app router, registered in `apps/server/src/routers/inde
 
 Exported via the existing `/metrics` Prometheus endpoint.
 
-## 12. Phase 7 — editing + continuous film (feature-flagged)
+## 12. Phase 5b — Wiki-conditioned generation (retrieval-augmented shots)
 
-Feature-flagged behind `VLM_CONTINUOUS_FILM=true` because it needs budget + human checkpoints to stay stable. Building blocks once flag is on:
+Phases 1–5 push media → canon (extraction, proposals, conflicts, risk, recaps). Phase 5b adds the reverse flow: **canon → media**. Wiki entities become persistent visual memory that conditions new generations, so characters, locations, and objects stay consistent across scenes. This is the spine of LOAR's long-form positioning and ships behind the paid (Studio) tier — see `memory/project_vlm_continuity_premium.md`.
 
-- **Editing nodes**: extend `workflows/` with VLM-planner + VLM-judge nodes. Planner turns "make it moodier" into a generation DAG; judge scores outputs.
-- **Universe autoplay**: daemon (one-replica opt-in, like `ABUSE_DETECT_ENABLED`) that reads a universe's state, drafts the next scene via `vlm.governance.draftProposal`, waits for human/votetimer, then enqueues generation.
-- **Character lifecycle state**: new `characterState/{entityId}` collection persists goals / relationships / memory. VLM reads it before drafting.
-- **Kill switches**: `VLM_AUTOPLAY_MAX_PER_DAY`, `VLM_AUTOPLAY_BUDGET_USD`, `VLM_AUTOPLAY_REQUIRE_VOTE=true`.
+### 12.1 Entity `visualDescriptor`
 
-## 13. Rollout sequence
+Every `person`, `place`, `thing`, `species`, `vehicle`, `technology`, and `faction` entity gains an optional `visualDescriptor` field, maintained by the VLM layer:
+
+```ts
+interface EntityVisualDescriptor {
+  version: number; // bumped on each canon-accepted update
+  canonicalDescription: string; // VLM-authored paragraph for prompt injection
+  attributes: Record<string, string | string[]>; // structured features, kind-specific
+  referenceAssets: Array<{
+    cid: string; // Pinata / Lighthouse CID
+    mediaUrl: string; // gateway URL at time of write
+    sourceContentId?: string;
+    sourceSceneIndex?: number;
+    role: 'identity' | 'outfit' | 'location' | 'prop' | 'emblem';
+    priority: number; // higher = preferred for conditioning
+    pinnedByCreator?: boolean; // protects against VLM auto-displacement
+  }>;
+  lastUpdatedBy: 'vlm' | 'creator' | 'admin';
+  updatedAt: Date;
+  sourceExtractionId?: string;
+}
+```
+
+Written in two paths:
+
+- **Proposal accept** — `vlm.proposals.accept` derives an initial `visualDescriptor` from the extraction's scene subjects + best keyframe.
+- **Canon refresh** — subsequent extractions that pass canon check enqueue `vlm.copilot.refreshVisualDescriptor`, which merges evidence from new scenes. Previous versions persist in `entityDescriptorHistory/{entityId}/{version}` so creators can revert.
+
+### 12.2 `entityRefs` on generation endpoints
+
+Generation routes (`generation.image.create`, `generation.video.create`, `talkingScene.create`, outpaint) accept optional `entityRefs: string[]` of entity IDs. On enqueue the generation worker:
+
+1. Loads each entity + its current `visualDescriptor`.
+2. Composes the final prompt: user prompt + serialized `canonicalDescription`s, budgeted by token count.
+3. Selects top-priority `referenceAssets` (hard cap 4 per generation) and passes them to the model as reference inputs (Imagen reference input, runway image_to_video, or IP-Adapter where supported).
+4. Writes `entityRefs[]` + per-entity descriptor `version` onto the resulting `galleryItem` for lineage and reproducibility.
+
+Rights checks (`assertContentOperable`) remain authoritative — retrieval does **not** bypass classification gates for `licensed` / `fan` entities.
+
+### 12.3 Entity tagger + coverage surfaces
+
+`components/editor/EntityTagger.tsx` — typeahead over `entities/` scoped to the active universe. Returns chips that attach to the generation request. `@` opens the picker inline. For universes with many entities, server-side `vlm.copilot.suggestEntityRefs` proposes likely subjects from the prompt text.
+
+`entityRefs` retrieval is **not tab-specific** — any surface that enqueues a generation can pass them. Phase 5b mounts `EntityTagger` (and wires the routes) in every generation entry point so creators get the same continuity guarantees everywhere:
+
+| Surface                  | Path(s)                               | Notes                                                                   |
+| ------------------------ | ------------------------------------- | ----------------------------------------------------------------------- |
+| Editor — Animate tab     | `apps/web/src/routes/editor/*`        | Standard entry point; tagger next to prompt textarea                    |
+| Editor — Talking tab     | same                                  | Tagger + auto-`scoreLipSync` on completion                              |
+| Sandbox                  | `apps/web/src/routes/sandbox/*`       | Free-form experiments — tagger available; paid-tier gate same as editor |
+| Universe editor          | `apps/web/src/routes/universe/*/edit` | Worldbuilding + shot generation against the active universe's entities  |
+| Continuous-mode autoplay | Phase 7 (§13)                         | Planner selects `entityRefs` automatically from universe state          |
+| Mobile — create tab      | `apps/mobile/src/...`                 | Ships after web lands; reuses same tRPC routes                          |
+
+Every surface calls the same `generation.*` routes with `entityRefs`; the server resolves descriptors, injects conditioning, and writes lineage identically. No surface should fork the retrieval path.
+
+### 12.4 Router additions
+
+| Path                                  | Kind               | Purpose                                                                   |
+| ------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
+| `vlm.copilot.refreshVisualDescriptor` | protected mutation | Rebuild an entity's `visualDescriptor` from accumulated canon extractions |
+| `vlm.copilot.suggestEntityRefs`       | protected mutation | Given a prompt + universe, suggest entities likely present in the shot    |
+| `entities.visualDescriptor.get`       | public query       | Read current descriptor (for wiki detail page)                            |
+| `entities.visualDescriptor.pinAsset`  | protected mutation | Creator pins a reference asset so VLM can't auto-displace it              |
+| `entities.visualDescriptor.revert`    | protected mutation | Revert to a prior descriptor version from `entityDescriptorHistory`       |
+
+### 12.5 Premium gating
+
+`entityRefs` retrieval is gated by the Studio tier per `project_vlm_continuity_premium.md`. Free tier: field silently ignored with a UI hint ("unlock cross-scene continuity"). Gate sits in `generation.worker.ts` pre-dispatch so no billable conditioning work happens for free-tier jobs. A 2-entity / 30-second taste may be allowed on free tier for shareable demos — tunable via `VLM_FREE_TIER_ENTITY_CAP` and `VLM_FREE_TIER_DURATION_CAP_SEC`.
+
+### 12.6 Feedback loop
+
+Phase 1 already writes every generation to `vlmExtractions/` + `sceneIndex/`. Phase 5b closes the loop:
+
+1. Post-generation extraction runs as today.
+2. If the extraction passes canon check and an entity accumulates ≥ `VLM_DESCRIPTOR_REFRESH_THRESHOLD` (default 3) new evidence scenes since its last descriptor version, the worker enqueues `refreshVisualDescriptor`.
+3. The VLM selects best new reference frames, merges structured attributes, bumps `version`, and archives the prior version.
+4. Creators see a "Canon updated" banner on the entity page; creator-pinned assets are never displaced.
+
+### 12.7 Risks + mitigations
+
+| Risk                                             | Mitigation                                                                          |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Reference images bloat prompt and degrade output | Hard cap of 4 reference assets per generation, priority-selected                    |
+| Wrong entity suggested / tagged by user          | `sourceExtractionId` on descriptor + version history enables revert                 |
+| Descriptor drift after many auto-refreshes       | Creator-pinned reference assets cannot be displaced by VLM without explicit accept  |
+| Licensed/fan-classified entities used as refs    | `assertContentOperable` stays authoritative — rights lanes enforced pre-dispatch    |
+| Model API doesn't support reference inputs       | Fall back to textual-only conditioning (canonical description in prompt)            |
+| Per-generation retrieval latency                 | Cache resolved descriptors + pre-signed reference URLs per job; no extra round trip |
+
+## 13. Phase 7 — editing + continuous film (feature-flagged)
+
+**North-star:** a creator (or a universe's community) can generate a **5, 10, 20, 30, or 60-minute fully-consistent AI film** in one session — characters, locations, props, wardrobe, lighting, and story beats all stay on-model scene-to-scene. Continuous mode is the delivery vehicle; Phase 5b (wiki-conditioned generation) is its spine. Phase 7 is feature-flagged behind `VLM_CONTINUOUS_FILM=true` because it needs budget + human checkpoints to stay stable.
+
+### 13.1 Hard dependencies
+
+Continuous mode **must** route every generated scene through the VLM retrieval pipeline. It cannot bypass it. Specifically:
+
+1. Every auto-planned scene is dispatched via the same `entityRefs` path that manual generations use (Phase 5b §12.2). No direct-to-model shortcut.
+2. The VLM-planner node selects relevant `entityRefs` from the universe's current state (characters present in the beat, location, key props) before enqueuing generation.
+3. The VLM-judge node scores each completed scene against: (a) the `visualDescriptor` of every tagged entity, (b) the previous scene's `sceneIndex` for narrative continuity, (c) story-beat adherence from the plan.
+4. Scenes failing judge-score thresholds are re-dispatched (up to `VLM_CONTINUOUS_REDISPATCH_MAX`, default 2) before escalating to human review.
+
+### 13.2 Building blocks
+
+- **Editing nodes**: extend `workflows/` with `vlm-planner` + `vlm-judge` nodes. Planner turns "make it moodier" or "next beat" into a generation DAG with entity refs attached; judge scores outputs and may trigger re-dispatch.
+- **Universe autoplay**: daemon (one-replica opt-in, like `ABUSE_DETECT_ENABLED`) reads a universe's state, drafts the next scene via `vlm.governance.draftProposal`, waits for human or vote-timer approval, then enqueues generation through the entity-ref pipeline.
+- **Character lifecycle state**: new `characterState/{entityId}` collection persists goals / relationships / memory / location / current outfit. VLM-planner reads it to know who to place where; VLM-extractor writes back state deltas after each scene.
+- **Continuity ledger**: new `continuityLedger/{universeAddress}/shots/{shotId}` append-only log of every generated shot, its `entityRefs`, `visualDescriptor.version` per ref, VLM-judge score, and links to prior + next shots. The film is a traversal of this ledger.
+- **Kill switches**: `VLM_AUTOPLAY_MAX_PER_DAY`, `VLM_AUTOPLAY_BUDGET_USD`, `VLM_AUTOPLAY_REQUIRE_VOTE=true`, `VLM_CONTINUOUS_REDISPATCH_MAX`.
+
+### 13.3 Duration milestones
+
+Phase 7 is shipped as graduated duration targets, each gated by VLM-judge aggregate consistency score (mean across all shots) ≥ threshold on a canary universe before unlocking the next.
+
+| Milestone | Target duration | Minimum shots | Consistency-score gate | Notes                                                                     |
+| --------- | --------------- | ------------- | ---------------------- | ------------------------------------------------------------------------- |
+| M1        | 5 min           | ~60           | ≥ 0.80                 | Single location, single scene, 2–3 tagged entities — baseline proof       |
+| M2        | 10 min          | ~120          | ≥ 0.80                 | Two locations, 3–5 entities, one costume change allowed                   |
+| M3        | 20 min          | ~240          | ≥ 0.78                 | Multi-location + faction insignia consistency; time-of-day transitions    |
+| M4        | 30 min          | ~360          | ≥ 0.76                 | Subplot branching — VLM-judge must hold secondary entity memory stable    |
+| M5        | 60 min          | ~720          | ≥ 0.74                 | Full feature-length — ensemble cast, act structure, payoff to Act I setup |
+
+Each milestone unlocks the next only after: (a) 3 canary films at target duration passing the score gate, (b) ≤ 5% human re-dispatch rate, (c) cost-per-minute within budget envelope.
+
+### 13.4 Budget envelope
+
+Feature-length runs are expensive — autoplay has two cost dimensions: generation tokens (model inference) + VLM tokens (planner + judge + extractor per shot). Envelope tracked per run:
+
+- Per-shot VLM overhead target: ≤ $0.08 (planner + judge + post-extract using Flash where possible).
+- Per-minute film cost ceiling (soft): starts at $8/min for M1, targets $4/min by M5 via caching + Flash routing.
+- Hard cap per run: `VLM_AUTOPLAY_BUDGET_USD` — run halts and surfaces for review if exceeded.
+
+## 14. Rollout sequence
 
 1. Ship foundation (queue, worker, service layer, env) — no user-visible change.
 2. Turn on `vlm.extract` from the generation worker — populates `sceneIndex` and `vlmRiskScores` silently for ~1 week to build the corpus.
@@ -372,9 +504,10 @@ Feature-flagged behind `VLM_CONTINUOUS_FILM=true` because it needs budget + huma
 5. Ship multimodal search page (requires corpus built in step 2).
 6. Ship copilot + recap.
 7. Ship governance assist (wire into existing governance router).
-8. Flag on Phase 7 for pilot universes.
+8. Ship Phase 5b: `visualDescriptor` schema → `entityRefs` on generation routes → editor `EntityTagger` → feedback-loop refresh. Gate to Studio tier.
+9. Flag on Phase 7 for pilot universes.
 
-## 14. Risks + mitigations
+## 15. Risks + mitigations
 
 | Risk                                             | Mitigation                                                                                             |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
@@ -385,7 +518,7 @@ Feature-flagged behind `VLM_CONTINUOUS_FILM=true` because it needs budget + huma
 | Gemini outage                                    | Job retries (BullMQ). Extractions are best-effort; base flows keep working.                            |
 | Schema drift between VLM output and entity model | Zod-validated output in `services/vlm/schemas.ts`; failures go to dead-letter with raw text preserved. |
 
-## 15. Open questions (tracked separately, not launch blockers)
+## 16. Open questions (tracked separately, not launch blockers)
 
 - Should we ship embeddings-based search as default, or keep it behind `VLM_EMBEDDINGS=true`? Cost/value TBD from phase 4 corpus data.
 - Do we want cross-model ensemble scoring for high-stakes canon checks (Gemini + OpenAI)? Cost is 2–3× — keep flagged until we see canon-validator false-positive rate.

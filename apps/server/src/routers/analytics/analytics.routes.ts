@@ -265,6 +265,240 @@ export const analyticsRouter = router({
       return results;
     }),
 
+  // ---- Funnel (wallet-based) ----
+  //
+  // 3-stage wallet funnel, joined across collections:
+  //   1. Viewed   — distinct `viewerAddress` in episodeViews
+  //   2. Engaged  — wallets from step 1 that also produced an engagement event
+  //   3. Minted   — wallets from step 1 that also minted an NFT for this universe
+  //
+  // Queries are bounded by `daysAgo` (default 90) to keep Firestore usage
+  // predictable for creators with heavy traffic.
+  getFunnel: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        daysAgo: z.number().min(1).max(365).default(90),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      if (!db) throw new Error('Firebase is not configured');
+
+      // Authorise: only the creator can see funnels.
+      const universeDoc = await db.collection('cinematicUniverses').doc(input.universeId).get();
+      if (universeDoc.exists) {
+        const udata = universeDoc.data();
+        if (
+          udata?.creatorUid !== ctx.user.uid &&
+          udata?.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()
+        ) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only the universe creator can view funnel analytics',
+          });
+        }
+      }
+
+      const since = new Date(Date.now() - input.daysAgo * 24 * 60 * 60 * 1000);
+
+      // Stage 1 + 2: views and engagement for this universe in range
+      const [viewsSnap, engagementSnap, episodesSnap] = await Promise.all([
+        viewsCol().where('universeId', '==', input.universeId).where('viewedAt', '>=', since).get(),
+        engagementCol()
+          .where('universeId', '==', input.universeId)
+          .where('createdAt', '>=', since)
+          .get(),
+        db.collection('episodes').where('universeId', '==', input.universeId).get(),
+      ]);
+
+      const viewedWallets = new Set<string>();
+      for (const doc of viewsSnap.docs) {
+        const addr = (doc.data().viewerAddress as string | undefined)?.toLowerCase();
+        if (addr) viewedWallets.add(addr);
+      }
+
+      const engagedWallets = new Set<string>();
+      for (const doc of engagementSnap.docs) {
+        const addr = (doc.data().userAddress as string | undefined)?.toLowerCase();
+        if (addr) engagedWallets.add(addr);
+      }
+
+      // Stage 3: mints. episode IDs for this universe → nftMints lookup.
+      // Firestore `in` is limited to 30 values; chunk the episode ids.
+      const episodeIds = episodesSnap.docs.map((d) => d.id);
+      const mintedWallets = new Set<string>();
+      if (episodeIds.length > 0) {
+        const nftMints = db.collection('nftMints');
+        for (let i = 0; i < episodeIds.length; i += 30) {
+          const chunk = episodeIds.slice(i, i + 30);
+          const mintsSnap = await nftMints
+            .where('episodeId', 'in', chunk)
+            .where('mintedAt', '>=', since)
+            .get();
+          for (const doc of mintsSnap.docs) {
+            const addr = (doc.data().buyerAddress as string | undefined)?.toLowerCase();
+            if (addr) mintedWallets.add(addr);
+          }
+        }
+      }
+
+      // Intersections with viewedWallets (true funnel progression)
+      const engagedFromViewed = new Set<string>();
+      for (const w of engagedWallets) if (viewedWallets.has(w)) engagedFromViewed.add(w);
+
+      const mintedFromEngaged = new Set<string>();
+      for (const w of mintedWallets) if (engagedFromViewed.has(w)) mintedFromEngaged.add(w);
+
+      const viewed = viewedWallets.size;
+      const engaged = engagedFromViewed.size;
+      const minted = mintedFromEngaged.size;
+
+      return {
+        daysAgo: input.daysAgo,
+        since: since.toISOString(),
+        stages: [
+          {
+            key: 'viewed',
+            label: 'Viewed',
+            count: viewed,
+            conversionFromPrev: null as number | null,
+          },
+          {
+            key: 'engaged',
+            label: 'Engaged',
+            count: engaged,
+            conversionFromPrev: viewed > 0 ? engaged / viewed : null,
+          },
+          {
+            key: 'minted',
+            label: 'Minted',
+            count: minted,
+            conversionFromPrev: engaged > 0 ? minted / engaged : null,
+          },
+        ],
+        // Raw counts for extra context
+        rawViewedWallets: viewed,
+        rawEngagedWallets: engagedWallets.size,
+        rawMintedWallets: mintedWallets.size,
+      };
+    }),
+
+  // ---- Cohort Retention ----
+  //
+  // Group wallets by ISO week of first view, then track how many wallets
+  // come back in each subsequent week. Output is a Mon-aligned weekly matrix
+  // capped at `weeks` (default 6). A viewer "returned" in week N+k if they
+  // recorded any view event in that week.
+  getCohorts: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        weeks: z.number().min(2).max(12).default(6),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      if (!db) throw new Error('Firebase is not configured');
+
+      const universeDoc = await db.collection('cinematicUniverses').doc(input.universeId).get();
+      if (universeDoc.exists) {
+        const udata = universeDoc.data();
+        if (
+          udata?.creatorUid !== ctx.user.uid &&
+          udata?.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()
+        ) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only the universe creator can view cohort analytics',
+          });
+        }
+      }
+
+      const now = new Date();
+      const since = new Date(now.getTime() - input.weeks * 7 * 24 * 60 * 60 * 1000);
+
+      const viewsSnap = await viewsCol()
+        .where('universeId', '==', input.universeId)
+        .where('viewedAt', '>=', since)
+        .orderBy('viewedAt', 'asc')
+        .get();
+
+      // weekStart(Date) → Monday 00:00 UTC of that week, as epoch ms
+      function weekStart(d: Date): number {
+        const day = d.getUTCDay(); // 0=Sun..6=Sat
+        const mondayOffset = (day + 6) % 7; // days since Monday
+        const mondayUtc = Date.UTC(
+          d.getUTCFullYear(),
+          d.getUTCMonth(),
+          d.getUTCDate() - mondayOffset
+        );
+        return mondayUtc;
+      }
+      function weekLabel(ms: number): string {
+        const d = new Date(ms);
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      }
+
+      // wallet → sorted array of distinct week starts they had activity in
+      const walletWeeks = new Map<string, Set<number>>();
+      for (const doc of viewsSnap.docs) {
+        const data = doc.data();
+        const addr = (data.viewerAddress as string | undefined)?.toLowerCase();
+        if (!addr) continue;
+        const viewedAt: Date | undefined = data.viewedAt?.toDate?.() ?? data.viewedAt;
+        if (!viewedAt) continue;
+        const ws = weekStart(viewedAt instanceof Date ? viewedAt : new Date(viewedAt));
+        if (!walletWeeks.has(addr)) walletWeeks.set(addr, new Set());
+        walletWeeks.get(addr)!.add(ws);
+      }
+
+      // Build cohorts keyed by wallet's first-seen week
+      const cohorts = new Map<
+        number,
+        { wallets: Set<string>; retention: Map<number, Set<string>> }
+      >();
+      for (const [addr, weekSet] of walletWeeks) {
+        const sorted = [...weekSet].sort((a, b) => a - b);
+        const firstWeek = sorted[0];
+        if (!cohorts.has(firstWeek)) {
+          cohorts.set(firstWeek, { wallets: new Set(), retention: new Map() });
+        }
+        const cohort = cohorts.get(firstWeek)!;
+        cohort.wallets.add(addr);
+        for (const w of sorted) {
+          const offset = Math.round((w - firstWeek) / (7 * 24 * 60 * 60 * 1000));
+          if (offset < input.weeks) {
+            if (!cohort.retention.has(offset)) cohort.retention.set(offset, new Set());
+            cohort.retention.get(offset)!.add(addr);
+          }
+        }
+      }
+
+      const sortedCohorts = [...cohorts.entries()].sort((a, b) => a[0] - b[0]);
+      const results = sortedCohorts.map(([weekMs, data]) => {
+        const size = data.wallets.size;
+        const retention: { weekOffset: number; count: number; rate: number }[] = [];
+        for (let i = 0; i < input.weeks; i++) {
+          const count = data.retention.get(i)?.size ?? 0;
+          retention.push({
+            weekOffset: i,
+            count,
+            rate: size > 0 ? count / size : 0,
+          });
+        }
+        return {
+          cohortWeek: weekLabel(weekMs),
+          size,
+          retention,
+        };
+      });
+
+      return {
+        weeks: input.weeks,
+        since: since.toISOString(),
+        cohorts: results,
+      };
+    }),
+
   // ---- Platform-wide Stats ----
 
   getPlatformStats: publicProcedure.query(async () => {

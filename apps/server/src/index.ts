@@ -116,6 +116,11 @@ app.route('/api/ud', unstoppableRoutes);
 const { adminCostRoutes } = await import('./routes/admin-cost');
 app.route('/api/admin/cost', adminCostRoutes);
 
+// MCP Gateway service endpoints — called by apps/mcp-gateway for per-session
+// key minting. Service-key gated (not user-accessible).
+const { mcpGatewayRoutes } = await import('./routes/mcp-gateway');
+app.route('/api', mcpGatewayRoutes);
+
 // Paymaster proxy (POST /api/paymaster/sponsor). Pluggable provider —
 // thirdweb / pimlico / biconomy based on env. Stricter rate limit because
 // each call translates to a vendor-side spend.

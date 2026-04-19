@@ -32,6 +32,10 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListResourcesRequestSchema, ListToolsRequestSchema, ReadResourceRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import { LoarApiError, LoarClient } from './loar-client.js';
 import { ALL_TOOLS } from './tools.js';
+// Public surface — consumed by @loar/mcp-gateway for hosted SSE deployments.
+// Everything else in this module is the stdio/SSE entry point.
+export { LoarClient, LoarApiError } from './loar-client.js';
+export { ALL_TOOLS } from './tools.js';
 // ── Configuration ──────────────────────────────────────────────────────
 const LOAR_SERVER_URL = process.env.LOAR_SERVER_URL || 'http://localhost:3000';
 const LOAR_API_KEY = process.env.LOAR_API_KEY;
@@ -165,7 +169,7 @@ async function pollAndStream(server, client, jobId, progressToken, signal) {
 //   handler that aborts the in-flight request's AbortSignal. We do NOT
 //   register a competing handler. For agent-visible cancellation, use the
 //   `loar_cancel_generation` tool — see skills/loar-video/SKILL.md Example 10.
-function setupHandlers(server, client) {
+export function setupHandlers(server, client) {
     // ── List Tools ──────────────────────────────────────────────────────
     server.setRequestHandler(ListToolsRequestSchema, async () => {
         return {
@@ -263,7 +267,7 @@ function setupHandlers(server, client) {
         }
     });
 }
-function createServer() {
+export function createServer() {
     return new Server({
         name: 'loar',
         version: '0.2.0',

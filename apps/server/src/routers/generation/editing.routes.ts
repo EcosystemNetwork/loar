@@ -471,7 +471,7 @@ export const editingRouter = router({
           const d = existing.exists ? (existing.data() as any) : {};
           return {
             jobId: reservation.existing.jobId,
-            videoUrl: (d.outputUrl ?? null) as string | null,
+            videoUrl: (d.outputUrl ?? undefined) as string | undefined,
             model: model.displayName,
             idempotentReplay: true as const,
           };
@@ -598,7 +598,7 @@ export const editingRouter = router({
 
       return {
         jobId,
-        videoUrl: result.videoUrl as string | null,
+        videoUrl: result.videoUrl as string | undefined,
         model: model.displayName,
         idempotentReplay: false as const,
       };

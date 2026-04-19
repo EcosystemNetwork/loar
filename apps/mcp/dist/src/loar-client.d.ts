@@ -14,11 +14,21 @@ export declare class LoarApiError extends Error {
 export interface LoarClientConfig {
     serverUrl: string;
     apiKey: string;
+    /**
+     * Optional end-user wallet address. Sent as `X-Loar-End-User-Address` on
+     * every request. LOAR server only honors this header when the API key
+     * carries the `mcp_server` scope (SSRF/impersonation guard — see
+     * apps/server/src/lib/auth.ts). Used by the hosted MCP gateway to
+     * attribute calls back to the authenticated OAuth session subject.
+     */
+    endUserAddress?: string;
 }
 export declare class LoarClient {
     private serverUrl;
     private apiKey;
+    private endUserAddress?;
     constructor(config: LoarClientConfig);
+    private authHeaders;
     /**
      * Call a tRPC query endpoint
      */

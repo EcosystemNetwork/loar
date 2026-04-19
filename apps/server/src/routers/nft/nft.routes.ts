@@ -215,6 +215,60 @@ export const nftRouter = router({
       return { id: ref.id, ...episodeData };
     }),
 
+  /**
+   * Batch-create multiple episode listings in one round-trip. Uses a single
+   * Firestore batch write for atomicity — either all listings are created or
+   * none are, preventing half-finished drops.
+   */
+  batchCreateEpisodeListing: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        episodes: z
+          .array(
+            z.object({
+              nodeId: z.number(),
+              contentHash: z.string(),
+              title: z.string().min(1).max(200),
+              description: z.string().max(2000).default(''),
+              mediaUrl: z.string().url(),
+              thumbnailUrl: z.string().url().optional(),
+              mintPrice: z.string(),
+              maxSupply: z.number().default(0),
+              royaltyBps: z.number().default(500),
+              metadataURI: z.string(),
+            })
+          )
+          .min(1)
+          .max(50),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (!db) throw new Error('Firebase is not configured');
+
+      const batch = db.batch();
+      const now = new Date();
+      const created: { id: string; nodeId: number; title: string }[] = [];
+
+      for (const ep of input.episodes) {
+        const ref = episodesCol().doc();
+        batch.set(ref, {
+          ...ep,
+          universeId: input.universeId,
+          creatorUid: ctx.user.uid,
+          creatorAddress: ctx.user.address || null,
+          minted: 0,
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created.push({ id: ref.id, nodeId: ep.nodeId, title: ep.title });
+      }
+
+      await batch.commit();
+      return { ok: true, count: created.length, created };
+    }),
+
   recordMint: protectedProcedure
     .input(
       z.object({

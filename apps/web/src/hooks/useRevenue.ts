@@ -24,6 +24,15 @@ export function useCreateEpisodeListing() {
   });
 }
 
+export function useBatchCreateEpisodeListings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.nft.batchCreateEpisodeListing.mutate>[0]) =>
+      trpcClient.nft.batchCreateEpisodeListing.mutate(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['episode-nfts'] }),
+  });
+}
+
 export function useMyNFTs() {
   return useQuery({
     queryKey: ['my-nfts'],

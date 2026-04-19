@@ -201,6 +201,66 @@ export const EMPTY_REFERENCE_BUNDLE: ReferenceBundle = {
   updatedAt: new Date(0),
 };
 
+// ── Visual Descriptor (VLM canonical visual memory — PRD VLM subsystem §12) ──
+
+/**
+ * Role a reference asset plays in describing an entity's canonical look.
+ * Used by the generation pipeline to select the right conditioning input.
+ */
+export const DESCRIPTOR_REFERENCE_ROLES = [
+  'identity',
+  'outfit',
+  'location',
+  'prop',
+  'emblem',
+] as const;
+export type DescriptorReferenceRole = (typeof DESCRIPTOR_REFERENCE_ROLES)[number];
+
+/** Hard cap on reference assets stored on a descriptor (matches PRD §12.1). */
+export const MAX_DESCRIPTOR_REFERENCES = 8;
+
+/**
+ * A single reference asset carried on a descriptor — a canonical frame / pose
+ * / emblem used as image conditioning for future generations.
+ */
+export interface DescriptorReferenceAsset {
+  /** Content-addressed ID (Pinata/Lighthouse). */
+  cid: string;
+  /** Gateway URL at time of write. */
+  mediaUrl: string;
+  /** Source content (gallery item) this frame was extracted from. */
+  sourceContentId?: string;
+  /** Scene index within the source, when applicable. */
+  sourceSceneIndex?: number;
+  /** What this asset contributes to the descriptor. */
+  role: DescriptorReferenceRole;
+  /** Higher priority = preferred for conditioning when the cap is hit. */
+  priority: number;
+  /** Creator-pinned assets cannot be displaced by VLM auto-refresh. */
+  pinnedByCreator?: boolean;
+}
+
+/**
+ * VLM-maintained canonical visual record for an entity. Written initially when
+ * an entity proposal is accepted and refreshed as new canon extractions
+ * accumulate evidence. Prior versions archive to the `descriptorHistory`
+ * subcollection so creators can revert.
+ */
+export interface EntityVisualDescriptor {
+  /** Monotonically increasing; bumped on every accepted change. */
+  version: number;
+  /** Paragraph-form description injected into generation prompts. */
+  canonicalDescription: string;
+  /** Structured features (kind-specific keys). */
+  attributes: Record<string, string | string[]>;
+  /** Pinned reference frames passed to the model as image conditioning. */
+  referenceAssets: DescriptorReferenceAsset[];
+  lastUpdatedBy: 'vlm' | 'creator' | 'admin';
+  updatedAt: Date;
+  /** Extraction that produced this version, when written by the VLM pipeline. */
+  sourceExtractionId?: string;
+}
+
 /** Firestore document shape for a narrative entity. */
 export interface Entity {
   id: string;
@@ -222,6 +282,8 @@ export interface Entity {
   unstoppableDomain: string | null;
   /** Reference bundle for identity lock + multi-reference editing. */
   referenceBundle: ReferenceBundle | null;
+  /** VLM-maintained canonical visual memory — see PRD VLM subsystem §12. */
+  visualDescriptor: EntityVisualDescriptor | null;
   createdAt: Date;
   updatedAt: Date;
 }

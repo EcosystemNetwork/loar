@@ -29,18 +29,17 @@
  *   POST /messages?sessionId=                      — routes JSON-RPC to session
  *   GET  /health                                   — { ok, sessions }
  *
- * This is SCAFFOLDING — the Redis store, SIWE callback wiring, and actual
- * MCP session plumbing are stubs. Deploy requires:
- *   - DNS: mcp.loar.fun → this app's hosting target
- *   - TLS: Railway/Fly handle this automatically on custom domains
- *   - Env: OAUTH_ISSUER, OAUTH_JWT_SECRET, REDIS_URL, LOAR_SERVER_URL
- *   - LOAR server: `/auth/siwe-oauth-return` callback handler + session-to-key mint endpoint
+ * Env:
+ *   PORT, HOST, OAUTH_ISSUER, OAUTH_JWT_SECRET, LOAR_SERVER_URL,
+ *   LOAR_WEB_URL, REDIS_URL (optional), MCP_GATEWAY_SERVICE_KEY
  *
- * See docs/mcp-hosted-sse-deploy.md for the full runbook.
+ * See docs/mcp-hosted-sse-deploy.md for the full deploy runbook.
  */
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { URL } from 'node:url';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { createServer as createMcpServer, setupHandlers, LoarClient, } from '@loar/mcp-server';
 import { sessionStore } from './sessionStore.js';
 import { issueAccessToken, verifyAccessToken } from './tokens.js';
 import { authorizationServerMetadata, protectedResourceMetadata } from './metadata.js';
@@ -50,10 +49,19 @@ const HOST = process.env.HOST || '0.0.0.0';
 const ISSUER = process.env.OAUTH_ISSUER || `http://${HOST}:${PORT}`;
 const LOAR_SERVER_URL = process.env.LOAR_SERVER_URL || 'http://localhost:3000';
 const LOAR_WEB_URL = process.env.LOAR_WEB_URL || 'http://localhost:5173';
+const SERVICE_KEY = process.env.MCP_GATEWAY_SERVICE_KEY;
 if (!process.env.OAUTH_JWT_SECRET) {
     console.error('ERROR: OAUTH_JWT_SECRET is required (openssl rand -hex 32)');
     process.exit(1);
 }
+if (!SERVICE_KEY) {
+    console.error('ERROR: MCP_GATEWAY_SERVICE_KEY is required (openssl rand -hex 32)');
+    console.error('       Same value must be configured in apps/server so the key-mint');
+    console.error('       procedure accepts our inbound requests.');
+    process.exit(1);
+}
+// ── Active MCP transports (in-memory — SSE streams cannot be serialized) ──
+const transports = new Map();
 // ── HTTP Router ────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
     let url;
@@ -79,39 +87,35 @@ const server = http.createServer(async (req, res) => {
                 .end(JSON.stringify(protectedResourceMetadata(ISSUER)));
             return;
         }
-        // Authorization endpoint — starts the login dance
         if (req.method === 'GET' && url.pathname === '/authorize') {
             return handleAuthorize(req, res, url);
         }
-        // Callback — LOAR web redirects here after SIWE completes
         if (req.method === 'GET' && url.pathname === '/callback') {
             return handleCallback(req, res, url);
         }
-        // Token endpoint — authz code / refresh token exchange
         if (req.method === 'POST' && url.pathname === '/token') {
             return handleToken(req, res);
         }
-        // MCP SSE endpoint — requires Bearer access token
         if (req.method === 'GET' && url.pathname === '/sse') {
             return handleSse(req, res);
         }
-        // MCP message relay
         if (req.method === 'POST' && url.pathname === '/messages') {
             return handleMessages(req, res, url);
         }
-        // Health
         if (req.method === 'GET' && url.pathname === '/health') {
             res
                 .writeHead(200, { 'Content-Type': 'application/json' })
                 .end(JSON.stringify({
                 ok: true,
-                sessions: sessionStore.activeSessionCount(),
+                sessions: transports.size,
                 issuer: ISSUER,
                 version: '0.1.0',
             }));
             return;
         }
-        res.writeHead(404, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'not_found', path: url.pathname }));
+        res
+            .writeHead(404, { 'Content-Type': 'application/json' })
+            .end(JSON.stringify({ error: 'not_found', path: url.pathname }));
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -124,15 +128,7 @@ const server = http.createServer(async (req, res) => {
     }
 });
 // ── Authorize ──────────────────────────────────────────────────────────
-//
-// Per OAuth 2.1 + PKCE, the agent client redirects the user here with:
-//   client_id, redirect_uri, response_type=code, scope,
-//   code_challenge, code_challenge_method=S256, state
-//
-// We store the PKCE challenge + redirect_uri keyed by a short-lived authz
-// code and then redirect the user to LOAR web's SIWE login page. On return
-// (via /callback) we issue the code back to the agent's redirect_uri.
-function handleAuthorize(req, res, url) {
+async function handleAuthorize(req, res, url) {
     const params = url.searchParams;
     const clientId = params.get('client_id');
     const redirectUri = params.get('redirect_uri');
@@ -147,9 +143,8 @@ function handleAuthorize(req, res, url) {
     if (!codeChallenge || codeChallengeMethod !== 'S256') {
         return oauthError(res, 'invalid_request', 'PKCE S256 code_challenge required');
     }
-    // Persist the pending authorization.
     const authzCode = `authz_${crypto.randomBytes(24).toString('hex')}`;
-    sessionStore.savePendingAuthorization(authzCode, {
+    await sessionStore.savePendingAuthorization(authzCode, {
         clientId,
         redirectUri,
         codeChallenge,
@@ -157,21 +152,12 @@ function handleAuthorize(req, res, url) {
         state,
         createdAt: Date.now(),
     });
-    // Redirect to LOAR web SIWE. The LOAR web app will sign-in and then
-    // redirect to /callback?authz=<code>&address=0x...&sig=...  which
-    // completes the handshake.
     const siweUrl = new URL(`${LOAR_WEB_URL}/oauth/siwe`);
     siweUrl.searchParams.set('authz', authzCode);
     siweUrl.searchParams.set('return_to', `${ISSUER}/callback`);
     res.writeHead(302, { Location: siweUrl.toString() }).end();
 }
 // ── Callback ───────────────────────────────────────────────────────────
-//
-// LOAR web posts the signed SIWE payload back to us via a fragment-free
-// GET redirect (params in query string). We verify the signature by
-// calling LOAR's server-side /auth/siwe/verify endpoint (already exists),
-// extract the wallet address, and redirect the agent client back to its
-// original redirect_uri with the authz code.
 async function handleCallback(req, res, url) {
     const authzCode = url.searchParams.get('authz');
     const address = url.searchParams.get('address');
@@ -180,24 +166,44 @@ async function handleCallback(req, res, url) {
     if (!authzCode || !address || !signature || !message) {
         return oauthError(res, 'invalid_request', 'missing authz/address/signature/message');
     }
-    const pending = sessionStore.consumePendingAuthorization(authzCode);
+    const pending = await sessionStore.consumePendingAuthorization(authzCode);
     if (!pending) {
         return oauthError(res, 'invalid_grant', 'authz code expired or unknown');
     }
-    // Verify the SIWE signature upstream. (Stub — wire to apps/server SIWE verify.)
-    // const verifyRes = await fetch(`${LOAR_SERVER_URL}/auth/siwe/verify`, {...});
-    // if (!verifyRes.ok) return oauthError(res, 'access_denied', 'SIWE verification failed');
-    //
-    // For scaffold purposes we assume the SIWE payload is valid. Production
-    // must call the verify endpoint before binding the session to a wallet.
-    // Bind the authz code → wallet address so /token can exchange it.
-    sessionStore.bindAuthorizationToWallet(authzCode, address, {
+    // Verify the SIWE signature via the upstream LOAR server. LOAR's
+    // /auth/verify endpoint returns { address, expiresAt } on success and
+    // sets an httpOnly cookie as a side-effect (cookie is harmless — the
+    // user may also be signing into LOAR on the browser as a side-effect).
+    let verifiedAddress = address.toLowerCase();
+    try {
+        const verifyRes = await fetch(`${LOAR_SERVER_URL}/auth/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, signature }),
+        });
+        if (!verifyRes.ok) {
+            const body = await verifyRes.text().catch(() => '');
+            console.error(`[gateway] SIWE verify failed (${verifyRes.status}): ${body}`);
+            return oauthError(res, 'access_denied', 'SIWE verification failed');
+        }
+        const data = (await verifyRes.json());
+        if (data.address && data.address.toLowerCase() !== verifiedAddress) {
+            // The signature resolved to a different address than the one the web
+            // page claimed. Trust the server's recovered address.
+            verifiedAddress = data.address.toLowerCase();
+        }
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[gateway] SIWE verify error: ${msg}`);
+        return oauthError(res, 'server_error', 'could not reach upstream SIWE verify');
+    }
+    await sessionStore.bindAuthorizationToWallet(authzCode, verifiedAddress, {
         clientId: pending.clientId,
         redirectUri: pending.redirectUri,
         codeChallenge: pending.codeChallenge,
         scope: pending.scope,
     });
-    // Return to the agent client's redirect_uri with the authz code + state.
     const target = new URL(pending.redirectUri);
     target.searchParams.set('code', authzCode);
     if (pending.state)
@@ -205,12 +211,6 @@ async function handleCallback(req, res, url) {
     res.writeHead(302, { Location: target.toString() }).end();
 }
 // ── Token ──────────────────────────────────────────────────────────────
-//
-// Exchanges an authz code (+ PKCE code_verifier) for a short-lived access
-// token. The access token is an opaque JWT signed by OAUTH_JWT_SECRET
-// carrying { sub: walletAddress, scope: 'mcp_server' }. When the agent
-// opens /sse with Bearer <token>, we verify, look up (or mint) a
-// per-wallet loar_* API key, and open an MCP session on their behalf.
 async function handleToken(req, res) {
     const body = await readBody(req);
     const params = new URLSearchParams(body);
@@ -225,93 +225,164 @@ async function handleToken(req, res) {
     if (!code || !codeVerifier || !redirectUri || !clientId) {
         return oauthError(res, 'invalid_request', 'missing code, code_verifier, redirect_uri, or client_id');
     }
-    const bound = sessionStore.consumeBoundAuthorization(code);
+    const bound = await sessionStore.consumeBoundAuthorization(code);
     if (!bound) {
         return oauthError(res, 'invalid_grant', 'authz code unknown or already redeemed');
     }
     if (bound.clientId !== clientId || bound.redirectUri !== redirectUri) {
         return oauthError(res, 'invalid_grant', 'client_id/redirect_uri mismatch');
     }
-    // PKCE check.
-    const computedChallenge = crypto
-        .createHash('sha256')
-        .update(codeVerifier)
-        .digest('base64url');
+    const computedChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
     if (computedChallenge !== bound.codeChallenge) {
         return oauthError(res, 'invalid_grant', 'PKCE verifier mismatch');
     }
-    // Mint access token.
     const accessToken = await issueAccessToken({
         sub: bound.walletAddress,
         scope: bound.scope || 'mcp_server',
         aud: ISSUER,
     });
     res
-        .writeHead(200, {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-    })
+        .writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         .end(JSON.stringify({
         access_token: accessToken,
         token_type: 'Bearer',
-        expires_in: 60 * 60, // 1 hour
+        expires_in: 60 * 60,
         scope: bound.scope || 'mcp_server',
     }));
 }
+// ── Key minting (per-wallet MCP-scoped loar_* key) ─────────────────────
+/**
+ * Call LOAR's privileged key-mint procedure. The gateway authenticates
+ * with `MCP_GATEWAY_SERVICE_KEY` (shared secret, validated server-side
+ * against an env var of the same name). Result is cached per-wallet.
+ */
+async function mintKeyForWallet(walletAddress) {
+    const cached = await sessionStore.getCachedApiKey(walletAddress);
+    if (cached)
+        return cached;
+    const res = await fetch(`${LOAR_SERVER_URL}/api/internal/mint-mcp-key`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Gateway-Service-Key': SERVICE_KEY,
+        },
+        body: JSON.stringify({ walletAddress }),
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`key-mint failed (${res.status}): ${body}`);
+    }
+    const json = (await res.json());
+    const rawKey = json.result?.data?.rawKey;
+    if (!rawKey)
+        throw new Error('key-mint returned no rawKey');
+    // Cache for 30 days (matching the server-side TTL).
+    await sessionStore.cacheApiKey(walletAddress, rawKey, 30 * 24 * 60 * 60 * 1000);
+    return rawKey;
+}
 // ── SSE ────────────────────────────────────────────────────────────────
-//
-// Verifies the Bearer access token, then opens an MCP session forwarded
-// to the LOAR server. Per-wallet API keys (minted on first use) live in
-// the session store so we don't round-trip to LOAR on every session.
 async function handleSse(req, res) {
     const auth = req.headers.authorization ?? '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     if (!token) {
-        res.writeHead(401, { 'WWW-Authenticate': 'Bearer realm="mcp.loar.fun"' }).end();
+        res
+            .writeHead(401, {
+            'Content-Type': 'application/json',
+            'WWW-Authenticate': `Bearer realm="${ISSUER}", error="invalid_token"`,
+        })
+            .end(JSON.stringify({ error: 'invalid_token', error_description: 'Bearer token required' }));
         return;
     }
     const payload = await verifyAccessToken(token).catch(() => null);
     if (!payload?.sub) {
-        res.writeHead(401, { 'WWW-Authenticate': 'Bearer error="invalid_token"' }).end();
+        res
+            .writeHead(401, {
+            'Content-Type': 'application/json',
+            'WWW-Authenticate': `Bearer realm="${ISSUER}", error="invalid_token"`,
+        })
+            .end(JSON.stringify({ error: 'invalid_token' }));
         return;
     }
-    // Look up / mint a per-wallet MCP-scoped loar_* key. Stub — production
-    // wires to `apps/server` tRPC `apiKeys.create({ permissions: ['mcp_server'] })`
-    // as a privileged gateway-service call. The gateway must authenticate to
-    // LOAR with a service-level admin key so it can mint user-scoped keys.
-    // const apiKey = await mintKeyForWallet(payload.sub);
-    const apiKey = process.env.LOAR_API_KEY; // SCAFFOLD — single shared key
-    if (!apiKey) {
-        res.writeHead(503).end('Gateway not configured (LOAR_API_KEY missing)');
+    const walletAddress = payload.sub.toLowerCase();
+    let apiKey;
+    try {
+        apiKey = await mintKeyForWallet(walletAddress);
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[gateway] key-mint failed for ${walletAddress}: ${msg}`);
+        res
+            .writeHead(503, { 'Content-Type': 'application/json' })
+            .end(JSON.stringify({ error: 'gateway_dependency_failed', message: msg }));
         return;
     }
-    // Spawn an MCP session bound to this wallet. Actual MCP Server construction
-    // is delegated to `@loar/mcp-server` — the gateway imports and runs it
-    // in-process, pointed at the LOAR tRPC server with X-Loar-End-User-Address
-    // = payload.sub. Scaffold only.
-    sessionStore.openSession({
-        walletAddress: payload.sub,
-        response: res,
-        onClose: () => {
-            console.error(`[gateway] SSE session closed for ${payload.sub}`);
-        },
+    // Spin up a dedicated MCP server instance for this session, pointed at
+    // the upstream LOAR server with the per-wallet key + end-user passthrough.
+    const client = new LoarClient({
+        serverUrl: LOAR_SERVER_URL,
+        apiKey,
+        endUserAddress: walletAddress,
     });
+    const mcpServer = createMcpServer();
+    setupHandlers(mcpServer, client);
+    const transport = new SSEServerTransport('/messages', res);
+    try {
+        await mcpServer.connect(transport);
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[gateway] mcp connect failed for ${walletAddress}: ${msg}`);
+        if (!res.headersSent)
+            res.writeHead(500).end('mcp connect failed');
+        return;
+    }
+    const close = async () => {
+        if (!transports.delete(transport.sessionId))
+            return;
+        try {
+            await transport.close();
+        }
+        catch {
+            /* best effort */
+        }
+        try {
+            await mcpServer.close();
+        }
+        catch {
+            /* best effort */
+        }
+        console.error(`[gateway] session closed: ${transport.sessionId} wallet=${walletAddress} active=${transports.size}`);
+    };
+    transports.set(transport.sessionId, { transport, walletAddress, close });
+    console.error(`[gateway] session opened: ${transport.sessionId} wallet=${walletAddress} active=${transports.size}`);
+    req.on('close', close);
+    transport.onclose = close;
 }
 // ── Messages ───────────────────────────────────────────────────────────
 async function handleMessages(req, res, url) {
     const sessionId = url.searchParams.get('sessionId');
     if (!sessionId) {
-        res.writeHead(400).end('sessionId required');
+        res
+            .writeHead(400, { 'Content-Type': 'application/json' })
+            .end(JSON.stringify({ error: 'missing sessionId' }));
         return;
     }
-    const session = sessionStore.getSession(sessionId);
-    if (!session) {
-        res.writeHead(404).end('unknown sessionId');
+    const entry = transports.get(sessionId);
+    if (!entry) {
+        res
+            .writeHead(404, { 'Content-Type': 'application/json' })
+            .end(JSON.stringify({ error: 'unknown sessionId' }));
         return;
     }
-    // Body is JSON-RPC — forward to the session's MCP transport.
-    // Scaffold — production: await session.transport.handlePostMessage(req, res);
-    res.writeHead(501).end('not implemented — see docs/mcp-hosted-sse-deploy.md');
+    try {
+        await entry.transport.handlePostMessage(req, res);
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[gateway] handlePostMessage failed (${sessionId}): ${msg}`);
+        if (!res.headersSent)
+            res.writeHead(500).end(msg);
+    }
 }
 // ── Helpers ────────────────────────────────────────────────────────────
 function oauthError(res, code, description) {
@@ -329,11 +400,16 @@ async function readBody(req) {
 }
 // ── Start ──────────────────────────────────────────────────────────────
 server.listen(PORT, HOST, () => {
-    console.error(`LOAR MCP Gateway v0.1.0 (scaffold) listening on http://${HOST}:${PORT}`);
+    console.error(`LOAR MCP Gateway v0.1.0 listening on http://${HOST}:${PORT}`);
     console.error(`  Issuer: ${ISSUER}`);
     console.error(`  Upstream LOAR server: ${LOAR_SERVER_URL}`);
     console.error(`  OAuth metadata: ${ISSUER}/.well-known/oauth-authorization-server`);
     console.error(`  Health: ${ISSUER}/health`);
 });
-process.on('SIGTERM', () => server.close(() => process.exit(0)));
-process.on('SIGINT', () => server.close(() => process.exit(0)));
+async function shutdown(signal) {
+    console.error(`[gateway] ${signal} — draining ${transports.size} session(s)…`);
+    await Promise.allSettled([...transports.values()].map((e) => e.close()));
+    server.close(() => process.exit(0));
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -11,6 +11,7 @@ import { router, protectedProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 import { createEntity } from '../entities/entities.handlers';
 import { ENTITY_KINDS } from '../entities/entities.types';
+import { writeVisualDescriptor } from '../entities/entities.visual-descriptor';
 
 const kindEnum = z.enum(ENTITY_KINDS as unknown as [string, ...string[]]);
 
@@ -98,6 +99,41 @@ export const vlmProposalsRouter = router({
         },
         ctx.user.uid.toLowerCase()
       );
+
+      // Seed the canonical visualDescriptor (v1) from the proposal so
+      // Phase 5b retrieval has something to condition with immediately.
+      // Reference assets are intentionally empty — CIDs aren't known from
+      // the proposal record; §12.6 refresh fills them as canon accumulates.
+      // Best-effort: never block the accept on descriptor seeding.
+      const acceptedName = input.overrides.name ?? p.name;
+      const acceptedDescription = input.overrides.description ?? p.description;
+      const seedAttributes: Record<string, string | string[]> = {};
+      const seedSource = {
+        ...(p.metadata ?? {}),
+        ...(input.overrides.metadata ?? {}),
+      };
+      for (const [k, v] of Object.entries(seedSource)) {
+        if (k.startsWith('_')) continue; // skip provenance / internal keys
+        if (typeof v === 'string') seedAttributes[k] = v;
+        else if (Array.isArray(v) && v.every((x) => typeof x === 'string')) {
+          seedAttributes[k] = v as string[];
+        }
+      }
+      try {
+        await writeVisualDescriptor(id, {
+          canonicalDescription: `${acceptedName}. ${acceptedDescription ?? ''}`.trim(),
+          attributes: seedAttributes,
+          referenceAssets: [],
+          lastUpdatedBy: 'vlm',
+          sourceExtractionId: p.extractionId,
+        });
+      } catch (err) {
+        // Non-fatal — accept still succeeds; refresh loop can seed later.
+        console.warn(
+          `[vlm.proposals.accept] failed to seed visualDescriptor for ${id}:`,
+          err instanceof Error ? err.message : String(err)
+        );
+      }
 
       await ref.update({
         status: 'accepted',

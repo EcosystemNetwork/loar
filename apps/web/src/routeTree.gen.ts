@@ -65,6 +65,7 @@ import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
 import { Route as ProductIdRouteImport } from './routes/product/$id'
 import { Route as PlayUniverseIdRouteImport } from './routes/play/$universeId'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
+import { Route as OauthSiweRouteImport } from './routes/oauth/siwe'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as LicensingNewRouteImport } from './routes/licensing/new'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
@@ -74,6 +75,7 @@ import { Route as EditInpaintRouteImport } from './routes/edit.inpaint'
 import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CollabsNewRouteImport } from './routes/collabs/new'
+import { Route as CharactersUniverseIdRouteImport } from './routes/characters.$universeId'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
 import { Route as BountiesMineRouteImport } from './routes/bounties/mine'
 import { Route as BountiesBountyIdRouteImport } from './routes/bounties/$bountyId'
@@ -86,6 +88,7 @@ import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$s
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
+import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
 import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
 import { Route as WorkflowsIdRunsRouteImport } from './routes/workflows/$id.runs'
@@ -383,6 +386,11 @@ const OrderIdRoute = OrderIdRouteImport.update({
   path: '/order/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthSiweRoute = OauthSiweRouteImport.update({
+  id: '/oauth/siwe',
+  path: '/oauth/siwe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LineageAssetIdRoute = LineageAssetIdRouteImport.update({
   id: '/lineage/$assetId',
   path: '/lineage/$assetId',
@@ -426,6 +434,11 @@ const CreateKindRoute = CreateKindRouteImport.update({
 const CollabsNewRoute = CollabsNewRouteImport.update({
   id: '/collabs/new',
   path: '/collabs/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CharactersUniverseIdRoute = CharactersUniverseIdRouteImport.update({
+  id: '/characters/$universeId',
+  path: '/characters/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
@@ -486,6 +499,11 @@ const AdminOpsRoute = AdminOpsRouteImport.update({
 const AdminModerationRoute = AdminModerationRouteImport.update({
   id: '/admin/moderation',
   path: '/admin/moderation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMcpUsageRoute = AdminMcpUsageRouteImport.update({
+  id: '/admin/mcp-usage',
+  path: '/admin/mcp-usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminCostRoute = AdminCostRouteImport.update({
@@ -601,6 +619,7 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
@@ -613,6 +632,7 @@ export interface FileRoutesByFullPath {
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
   '/dashboard/revenue': typeof DashboardRevenueRoute
@@ -622,6 +642,7 @@ export interface FileRoutesByFullPath {
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -696,6 +717,7 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
@@ -708,6 +730,7 @@ export interface FileRoutesByTo {
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
   '/dashboard/revenue': typeof DashboardRevenueRoute
@@ -717,6 +740,7 @@ export interface FileRoutesByTo {
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -792,6 +816,7 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
@@ -804,6 +829,7 @@ export interface FileRoutesById {
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/collabs/new': typeof CollabsNewRoute
   '/create/$kind': typeof CreateKindRoute
   '/dashboard/revenue': typeof DashboardRevenueRoute
@@ -813,6 +839,7 @@ export interface FileRoutesById {
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/licensing/new': typeof LicensingNewRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
   '/product/$id': typeof ProductIdRoute
@@ -889,6 +916,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/admin/cost'
+    | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
     | '/admin/universes'
@@ -901,6 +929,7 @@ export interface FileRouteTypes {
     | '/bounties/$bountyId'
     | '/bounties/mine'
     | '/canon/$universeId'
+    | '/characters/$universeId'
     | '/collabs/new'
     | '/create/$kind'
     | '/dashboard/revenue'
@@ -910,6 +939,7 @@ export interface FileRouteTypes {
     | '/governance/$universeId'
     | '/licensing/new'
     | '/lineage/$assetId'
+    | '/oauth/siwe'
     | '/order/$id'
     | '/play/$universeId'
     | '/product/$id'
@@ -984,6 +1014,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/admin/cost'
+    | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
     | '/admin/universes'
@@ -996,6 +1027,7 @@ export interface FileRouteTypes {
     | '/bounties/$bountyId'
     | '/bounties/mine'
     | '/canon/$universeId'
+    | '/characters/$universeId'
     | '/collabs/new'
     | '/create/$kind'
     | '/dashboard/revenue'
@@ -1005,6 +1037,7 @@ export interface FileRouteTypes {
     | '/governance/$universeId'
     | '/licensing/new'
     | '/lineage/$assetId'
+    | '/oauth/siwe'
     | '/order/$id'
     | '/play/$universeId'
     | '/product/$id'
@@ -1079,6 +1112,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/admin/cost'
+    | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
     | '/admin/universes'
@@ -1091,6 +1125,7 @@ export interface FileRouteTypes {
     | '/bounties/$bountyId'
     | '/bounties/mine'
     | '/canon/$universeId'
+    | '/characters/$universeId'
     | '/collabs/new'
     | '/create/$kind'
     | '/dashboard/revenue'
@@ -1100,6 +1135,7 @@ export interface FileRouteTypes {
     | '/governance/$universeId'
     | '/licensing/new'
     | '/lineage/$assetId'
+    | '/oauth/siwe'
     | '/order/$id'
     | '/play/$universeId'
     | '/product/$id'
@@ -1175,6 +1211,7 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
   AdminCostRoute: typeof AdminCostRoute
+  AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
   AdminOpsRoute: typeof AdminOpsRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
@@ -1187,6 +1224,7 @@ export interface RootRouteChildren {
   BountiesBountyIdRoute: typeof BountiesBountyIdRoute
   BountiesMineRoute: typeof BountiesMineRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
+  CharactersUniverseIdRoute: typeof CharactersUniverseIdRoute
   CollabsNewRoute: typeof CollabsNewRoute
   CreateKindRoute: typeof CreateKindRoute
   EditInpaintRoute: typeof EditInpaintRoute
@@ -1195,6 +1233,7 @@ export interface RootRouteChildren {
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
   LicensingNewRoute: typeof LicensingNewRoute
   LineageAssetIdRoute: typeof LineageAssetIdRoute
+  OauthSiweRoute: typeof OauthSiweRoute
   OrderIdRoute: typeof OrderIdRoute
   PlayUniverseIdRoute: typeof PlayUniverseIdRoute
   ProductIdRoute: typeof ProductIdRoute
@@ -1626,6 +1665,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/siwe': {
+      id: '/oauth/siwe'
+      path: '/oauth/siwe'
+      fullPath: '/oauth/siwe'
+      preLoaderRoute: typeof OauthSiweRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lineage/$assetId': {
       id: '/lineage/$assetId'
       path: '/lineage/$assetId'
@@ -1687,6 +1733,13 @@ declare module '@tanstack/react-router' {
       path: '/collabs/new'
       fullPath: '/collabs/new'
       preLoaderRoute: typeof CollabsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/characters/$universeId': {
+      id: '/characters/$universeId'
+      path: '/characters/$universeId'
+      fullPath: '/characters/$universeId'
+      preLoaderRoute: typeof CharactersUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/canon/$universeId': {
@@ -1771,6 +1824,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/moderation'
       fullPath: '/admin/moderation'
       preLoaderRoute: typeof AdminModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/mcp-usage': {
+      id: '/admin/mcp-usage'
+      path: '/admin/mcp-usage'
+      fullPath: '/admin/mcp-usage'
+      preLoaderRoute: typeof AdminMcpUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/cost': {
@@ -1964,6 +2024,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
   AdminCostRoute: AdminCostRoute,
+  AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,
   AdminOpsRoute: AdminOpsRoute,
   AdminUniversesRoute: AdminUniversesRoute,
@@ -1976,6 +2037,7 @@ const rootRouteChildren: RootRouteChildren = {
   BountiesBountyIdRoute: BountiesBountyIdRoute,
   BountiesMineRoute: BountiesMineRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
+  CharactersUniverseIdRoute: CharactersUniverseIdRoute,
   CollabsNewRoute: CollabsNewRoute,
   CreateKindRoute: CreateKindRoute,
   EditInpaintRoute: EditInpaintRoute,
@@ -1984,6 +2046,7 @@ const rootRouteChildren: RootRouteChildren = {
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
   LicensingNewRoute: LicensingNewRoute,
   LineageAssetIdRoute: LineageAssetIdRoute,
+  OauthSiweRoute: OauthSiweRoute,
   OrderIdRoute: OrderIdRoute,
   PlayUniverseIdRoute: PlayUniverseIdRoute,
   ProductIdRoute: ProductIdRoute,

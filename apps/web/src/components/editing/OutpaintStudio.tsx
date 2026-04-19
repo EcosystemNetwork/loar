@@ -176,7 +176,7 @@ export function OutpaintStudio({
       toast.success(`Reframed to ${data.targetAspect}`, {
         description: `${data.creditsCharged} credits · ${data.provider}`,
       });
-      onResult?.(data.imageUrl);
+      if (data.imageUrl) onResult?.(data.imageUrl);
       queryClient.invalidateQueries({ queryKey: ['gallery'] });
       queryClient.invalidateQueries({ queryKey: ['userCredits'] });
     },

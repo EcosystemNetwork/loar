@@ -11,9 +11,10 @@
  * the secret is deployed to both via the same channel.
  */
 import { SignJWT, jwtVerify } from 'jose';
-const SECRET = new TextEncoder().encode(process.env.OAUTH_JWT_SECRET ?? (() => {
-    throw new Error('OAUTH_JWT_SECRET is required');
-})());
+const SECRET = new TextEncoder().encode(process.env.OAUTH_JWT_SECRET ??
+    (() => {
+        throw new Error('OAUTH_JWT_SECRET is required');
+    })());
 const ACCESS_TOKEN_TTL = '1h';
 export async function issueAccessToken(payload) {
     return new SignJWT({ scope: payload.scope })

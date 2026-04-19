@@ -29,13 +29,17 @@ import {
   Paintbrush,
   Sparkles,
   FolderOpen,
+  Eye,
+  Users,
+  Vote,
 } from 'lucide-react';
+import { formatEther } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
-import { useCreditBalance, useMyNFTs } from '@/hooks/useRevenue';
+import { useCreditBalance, useMyNFTs, useUniverseMetrics } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
@@ -529,80 +533,170 @@ function UniverseGrid({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {universes.map((universe: any) => (
-        <Card
-          key={universe.id}
-          className="cursor-pointer hover:border-primary/40 transition-all group overflow-hidden"
-          onClick={() => onSelect(universe.id)}
-        >
-          <CardContent className="p-0">
-            <div className="h-32 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 relative">
-              {(universe.image_url || universe.imageUrl) && (
-                <img
-                  src={universe.image_url || universe.imageUrl}
-                  alt={universe.name}
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute bottom-2 left-2 right-2">
-                <h3 className="text-white font-semibold text-sm truncate drop-shadow">
-                  {universe.name}
-                </h3>
-              </div>
-              <div className="absolute top-2 right-2 flex gap-1">
-                {universe.tokenAddress &&
-                universe.tokenAddress !== '0x0000000000000000000000000000000000000000' ? (
-                  <Badge className="bg-green-600/80 text-white border-0 text-[9px] px-1.5 py-0">
-                    Token Live
-                  </Badge>
-                ) : (
-                  <Badge className="bg-zinc-600/80 text-white border-0 text-[9px] px-1.5 py-0">
-                    No Token
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="p-3">
-              <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                {universe.description || 'Explore this narrative universe'}
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">
-                  {universe.createdAt ? new Date(universe.createdAt).toLocaleDateString() : ''}
-                </span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {(!universe.tokenAddress ||
-                    universe.tokenAddress === '0x0000000000000000000000000000000000000000') && (
-                    <RouterLink
-                      to="/universe/$id/deploy-token"
-                      params={{ id: (universe.address || universe.id).toLowerCase() }}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                    >
-                      <Button size="sm" variant="outline" className="text-[10px] h-6 px-2 gap-1">
-                        <Rocket className="h-2.5 w-2.5" />
-                        Launch Token
-                      </Button>
-                    </RouterLink>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelect(universe.id);
-                    }}
-                  >
-                    <Play className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
       ))}
     </div>
   );
+}
+
+function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+  const { data: metrics } = useUniverseMetrics(universe.id);
+
+  const m = (metrics as any) ?? null;
+  const views = m?.totalViews ?? 0;
+  const mints = m?.totalMints ?? 0;
+  const subscribers = m?.totalSubscribers ?? 0;
+  const votes = m?.totalVotes ?? 0;
+  let revenueEth = '0';
+  try {
+    revenueEth = m?.totalRevenue ? Number(formatEther(BigInt(m.totalRevenue))).toFixed(3) : '0';
+  } catch {
+    revenueEth = '0';
+  }
+  const hasAnyActivity = views > 0 || mints > 0 || subscribers > 0 || votes > 0;
+
+  return (
+    <Card
+      className="cursor-pointer hover:border-primary/40 transition-all group overflow-hidden"
+      onClick={() => onSelect(universe.id)}
+    >
+      <CardContent className="p-0">
+        <div className="h-32 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 relative">
+          {(universe.image_url || universe.imageUrl) && (
+            <img
+              src={universe.image_url || universe.imageUrl}
+              alt={universe.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <div className="absolute bottom-2 left-2 right-2">
+            <h3 className="text-white font-semibold text-sm truncate drop-shadow">
+              {universe.name}
+            </h3>
+          </div>
+          <div className="absolute top-2 right-2 flex gap-1">
+            {universe.tokenAddress &&
+            universe.tokenAddress !== '0x0000000000000000000000000000000000000000' ? (
+              <Badge className="bg-green-600/80 text-white border-0 text-[9px] px-1.5 py-0">
+                Token Live
+              </Badge>
+            ) : (
+              <Badge className="bg-zinc-600/80 text-white border-0 text-[9px] px-1.5 py-0">
+                No Token
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="p-3">
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+            {universe.description || 'Explore this narrative universe'}
+          </p>
+
+          {/* Per-universe analytics breakdown */}
+          <div className="grid grid-cols-4 gap-1 mb-3">
+            <MetricChip
+              icon={<Eye className="h-2.5 w-2.5" />}
+              label="views"
+              value={formatCount(views)}
+            />
+            <MetricChip
+              icon={<Film className="h-2.5 w-2.5" />}
+              label="mints"
+              value={formatCount(mints)}
+            />
+            <MetricChip
+              icon={<Users className="h-2.5 w-2.5" />}
+              label="subs"
+              value={formatCount(subscribers)}
+            />
+            <MetricChip
+              icon={<Vote className="h-2.5 w-2.5" />}
+              label="votes"
+              value={formatCount(votes)}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-3">
+            <span className="flex items-center gap-1">
+              <Coins className="h-2.5 w-2.5" />
+              {hasAnyActivity ? `${revenueEth} ETH` : 'No activity yet'}
+            </span>
+            <RouterLink
+              to="/analytics/$universeId"
+              params={{ universeId: universe.id }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              className="text-primary hover:underline flex items-center gap-0.5"
+            >
+              Details
+              <ArrowUpRight className="h-2.5 w-2.5" />
+            </RouterLink>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">
+              {universe.createdAt ? new Date(universe.createdAt).toLocaleDateString() : ''}
+            </span>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {(!universe.tokenAddress ||
+                universe.tokenAddress === '0x0000000000000000000000000000000000000000') && (
+                <RouterLink
+                  to="/universe/$id/deploy-token"
+                  params={{ id: (universe.address || universe.id).toLowerCase() }}
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                >
+                  <Button size="sm" variant="outline" className="text-[10px] h-6 px-2 gap-1">
+                    <Rocket className="h-2.5 w-2.5" />
+                    Launch Token
+                  </Button>
+                </RouterLink>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(universe.id);
+                }}
+              >
+                <Play className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MetricChip({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div
+      className="flex flex-col items-center rounded-md bg-muted/40 px-1 py-1"
+      title={`${value} ${label}`}
+    >
+      <div className="flex items-center gap-0.5 text-muted-foreground">
+        {icon}
+        <span className="text-[9px] uppercase tracking-wider">{label}</span>
+      </div>
+      <span className="font-mono text-xs font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function formatCount(n: number): string {
+  if (!Number.isFinite(n)) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toString();
 }
 
 // ─── Quick Action Button ────────────────────────────────────────────
