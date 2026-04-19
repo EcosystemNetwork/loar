@@ -31,6 +31,15 @@ import { publishToGallery } from '../../lib/gallery-publish';
 import { extractVideoThumbnail } from '../../services/video-thumbnail';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+
+const clientTokenSchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+  .optional();
 
 // ── Pricing ─────────────────────────────────────────────────────────────
 //
@@ -234,12 +243,50 @@ export const talkingSceneRouter = router({
         durationSec: z.number().min(3).max(10).default(6),
         entityId: z.string().optional(),
         universeId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const dialogue = sanitizePrompt(input.dialogue);
       const motionPrompt = input.motionPrompt ? sanitizePrompt(input.motionPrompt) : '';
       const sceneId = randomUUID();
+
+      // Idempotency check before credit deduction — talking scenes are
+      // expensive (TTS + i2v + lipsync stages).
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: sceneId,
+          procedure: 'talkingScene.create',
+        });
+        if (reservation?.existing) {
+          const existing = await talkingScenesCol().doc(reservation.existing.jobId).get();
+          const d = existing.exists ? (existing.data() as any) : {};
+          return {
+            sceneId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as string,
+            videoUrl: (d.finalVideoUrl ?? null) as string | null,
+            ttsGenerationId: (d.ttsGenerationId ?? null) as string | null,
+            imageToVideoGenerationId: (d.imageToVideoGenerationId ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            latencyMs: (d.latencyMs ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
       const startTime = Date.now();
 
       const ttsCredits = estimateTtsCredits(dialogue);
@@ -261,6 +308,8 @@ export const talkingSceneRouter = router({
           creditsCharged: totalCredits,
           status: 'queued',
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       await deductCredits(ctx.user.uid, totalCredits);
@@ -341,14 +390,33 @@ export const talkingSceneRouter = router({
           completedAt: new Date(),
         });
 
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: sceneId,
+          kind: 'video',
+          payload: {
+            operation: 'talkingScene',
+            status: 'completed',
+            resultUrl: finalUrl,
+            ttsGenerationId: ttsGenId,
+            imageToVideoGenerationId: i2vGenId,
+            creditsCharged: totalCredits,
+            latencyMs,
+          },
+        });
+
         return {
           sceneId,
           status: 'completed' as const,
-          videoUrl: finalUrl,
-          ttsGenerationId: ttsGenId,
-          imageToVideoGenerationId: i2vGenId,
+          videoUrl: finalUrl as string | null,
+          ttsGenerationId: ttsGenId as string | null,
+          imageToVideoGenerationId: i2vGenId as string | null,
           creditsCharged: totalCredits,
           latencyMs,
+          idempotentReplay: false as const,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, totalCredits, sceneId);
@@ -359,6 +427,20 @@ export const talkingSceneRouter = router({
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: sceneId,
+          kind: 'video',
+          payload: {
+            operation: 'talkingScene',
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
         throw error instanceof TRPCError
           ? error
           : new TRPCError({

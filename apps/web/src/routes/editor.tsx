@@ -26,12 +26,14 @@ import {
   Layers,
   ChevronLeft,
   Camera,
+  Mic,
 } from 'lucide-react';
 import { useVideoEditing } from '@/hooks/useVideoEditing';
 import { VideoEditingToolbar } from '@/components/editing/VideoEditingToolbar';
 import { InpaintCanvas } from '@/components/editing/InpaintCanvas';
 import { AnimateImagePanel } from '@/components/editing/AnimateImagePanel';
 import { TalkingScenePanel } from '@/components/editing/TalkingScenePanel';
+import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -40,6 +42,7 @@ export const Route = createFileRoute('/editor')({
   validateSearch: (search: Record<string, unknown>) => ({
     video: (search.video as string) || undefined,
     image: (search.image as string) || undefined,
+    audio: (search.audio as string) || undefined,
   }),
   beforeLoad: ({ context }) => {
     if (!context.hasSession()) {
@@ -50,9 +53,10 @@ export const Route = createFileRoute('/editor')({
 });
 
 function EditorPage() {
-  const { video: initialVideo, image: initialImage } = Route.useSearch();
+  const { video: initialVideo, image: initialImage, audio: initialAudio } = Route.useSearch();
   const [videoUrl, setVideoUrl] = useState<string | null>(initialVideo || null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialImage || null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(initialAudio || null);
   const [inputMode, setInputMode] = useState<'url' | 'upload'>('url');
   const [urlInput, setUrlInput] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -75,16 +79,25 @@ function EditorPage() {
     if (!urlInput.trim()) return;
     const url = urlInput.trim();
 
-    // Detect if video or image
+    // Detect if video, audio, or image
+    const lc = url.toLowerCase();
     const videoExtensions = ['.mp4', '.webm', '.mov', '.avi'];
-    const isVideo = videoExtensions.some((ext) => url.toLowerCase().includes(ext));
+    const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.flac'];
+    const isVideo = videoExtensions.some((ext) => lc.includes(ext));
+    const isAudio = audioExtensions.some((ext) => lc.includes(ext));
 
     if (isVideo) {
       setVideoUrl(url);
       setImageUrl(null);
+      setAudioUrl(null);
+    } else if (isAudio) {
+      setAudioUrl(url);
+      setVideoUrl(null);
+      setImageUrl(null);
     } else {
       setImageUrl(url);
       setVideoUrl(null);
+      setAudioUrl(null);
     }
     toast.success('Media loaded');
   }, [urlInput]);
@@ -97,9 +110,15 @@ function EditorPage() {
     if (file.type.startsWith('video/')) {
       setVideoUrl(url);
       setImageUrl(null);
+      setAudioUrl(null);
     } else if (file.type.startsWith('image/')) {
       setImageUrl(url);
       setVideoUrl(null);
+      setAudioUrl(null);
+    } else if (file.type.startsWith('audio/')) {
+      setAudioUrl(url);
+      setVideoUrl(null);
+      setImageUrl(null);
     }
     toast.success(`Loaded ${file.name}`);
   }, []);
@@ -138,7 +157,7 @@ function EditorPage() {
     }
   }, [editing.lastResult]);
 
-  const hasMedia = videoUrl || imageUrl;
+  const hasMedia = videoUrl || imageUrl || audioUrl;
 
   return (
     <div className="min-h-screen bg-background">
@@ -170,10 +189,10 @@ function EditorPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Load a video or image to start editing
+                    Load a video, image, or audio clip to start editing
                   </p>
                   <p className="text-xs text-muted-foreground/60 mt-1">
-                    Supports MP4, WebM, JPG, PNG
+                    Supports MP4, WebM, JPG, PNG, MP3, WAV
                   </p>
                 </div>
                 <div className="flex gap-2 justify-center">
@@ -218,6 +237,16 @@ function EditorPage() {
                 alt="Preview"
                 className="max-w-full max-h-full rounded object-contain"
               />
+            ) : audioUrl ? (
+              <div className="flex flex-col items-center gap-4 p-8">
+                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mic className="w-10 h-10 text-primary" />
+                </div>
+                <audio src={audioUrl} controls className="w-96 max-w-full" />
+                <p className="text-xs text-muted-foreground">
+                  Open the Voice tab to swap or apply effect presets
+                </p>
+              </div>
             ) : null}
           </div>
 
@@ -272,6 +301,9 @@ function EditorPage() {
               <TabsTrigger value="talking" className="text-xs flex-1">
                 Talking
               </TabsTrigger>
+              <TabsTrigger value="voice" className="text-xs flex-1">
+                Voice
+              </TabsTrigger>
               <TabsTrigger value="input" className="text-xs flex-1">
                 Input
               </TabsTrigger>
@@ -298,6 +330,17 @@ function EditorPage() {
                 onComplete={(url) => {
                   setVideoUrl(url);
                   setActiveTab('tools');
+                }}
+              />
+            </TabsContent>
+
+            {/* Voice Tab — swap voice / apply effect preset on audio */}
+            <TabsContent value="voice" className="flex-1 p-4 m-0 overflow-y-auto">
+              <VoiceModifyPanel
+                audioUrl={audioUrl}
+                onComplete={(newUrl) => {
+                  setAudioUrl(newUrl);
+                  toast.success('Voice modified — preview updated');
                 }}
               />
             </TabsContent>
@@ -330,7 +373,7 @@ function EditorPage() {
                   <Input
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://example.com/video.mp4"
+                    placeholder="https://example.com/video.mp4 or audio.mp3"
                     className="h-8 text-xs"
                     onKeyDown={(e) => e.key === 'Enter' && handleLoadUrl()}
                   />
@@ -354,7 +397,7 @@ function EditorPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="video/*,image/*"
+                  accept="video/*,image/*,audio/*"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -366,7 +409,7 @@ function EditorPage() {
                   <div className="text-center">
                     <Upload className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">
-                      Drop or click to upload video/image
+                      Drop or click to upload video / image / audio
                     </span>
                   </div>
                 </Button>
@@ -377,12 +420,16 @@ function EditorPage() {
                   <div className="flex items-center gap-2">
                     {videoUrl ? (
                       <Film className="w-4 h-4 text-purple-400" />
+                    ) : audioUrl ? (
+                      <Mic className="w-4 h-4 text-green-400" />
                     ) : (
                       <Image className="w-4 h-4 text-blue-400" />
                     )}
-                    <span className="text-xs truncate flex-1">{videoUrl || imageUrl}</span>
+                    <span className="text-xs truncate flex-1">
+                      {videoUrl || audioUrl || imageUrl}
+                    </span>
                     <Badge variant="secondary" className="text-[9px]">
-                      {videoUrl ? 'Video' : 'Image'}
+                      {videoUrl ? 'Video' : audioUrl ? 'Audio' : 'Image'}
                     </Badge>
                   </div>
                 </Card>
@@ -461,7 +508,7 @@ function EditorPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="video/*,image/*"
+        accept="video/*,image/*,audio/*"
         onChange={handleFileUpload}
         className="hidden"
       />

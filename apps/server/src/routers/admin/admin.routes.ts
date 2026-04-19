@@ -18,6 +18,7 @@ import {
 } from '../../services/platformConfig';
 import { sendSlackAlert } from '../../lib/slack';
 import { adminCostRouter } from './cost.routes';
+import { adminMcpUsageRouter } from './mcpUsage.routes';
 
 // Kill-switch fields that warrant a Slack alert when flipped.
 const ALERT_FIELDS = [
@@ -75,6 +76,10 @@ const configPatchSchema = z.object({
 export const adminRouter = router({
   // ── Cost & margin visibility (all paid provider calls) ───────────
   cost: adminCostRouter,
+
+  // ── MCP agent integration observability ──────────────────────────
+  // See docs/prd-mcp-integration.md §3
+  mcpUsage: adminMcpUsageRouter,
 
   // ── Read current config ───────────────────────────────────────────
 

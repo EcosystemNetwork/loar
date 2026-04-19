@@ -18,6 +18,11 @@ import {
   Wand2,
   Sun,
   Layers,
+  Music,
+  Box,
+  GitBranch,
+  Shield,
+  Users,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { formatEther } from 'viem';
@@ -34,12 +39,18 @@ interface ContentCardProps {
     imageUrl?: string;
     mediaUrl?: string;
     mediaType?: string;
+    classification?: 'original' | 'fan' | 'licensed' | string;
     creatorUid?: string;
     creatorAddress?: string;
     views?: number;
     likes?: number;
     universeId?: string;
     contentHash?: string;
+    // Lineage — set when this clip is derived from another generation.
+    parentGenerationId?: string | null;
+    sourceImageUrl?: string | null;
+    sourceVideoGenerationId?: string | null;
+    sourceAudioGenerationId?: string | null;
     licensing?: {
       buyPrice?: string;
       rentPricePerDay?: string;
@@ -68,10 +79,19 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
   const { isAuthenticated } = useWalletAuth();
   const isOrphan = !content.universeId;
   const isVideo = content.mediaType === 'video' || content.mediaType === 'ai-video';
+  const isAudio = content.mediaType === 'audio';
+  const is3D = content.mediaType === '3d';
   const isAIGenerated = content.mediaType?.startsWith('ai-');
-  const isImage = !isVideo && (content.mediaUrl || content.imageUrl);
+  const isImage = !isVideo && !isAudio && !is3D && (content.mediaUrl || content.imageUrl);
   const editSource = content.mediaUrl || content.imageUrl;
   const canEdit = Boolean(editSource) && (isImage || isVideo);
+  const hasLineage = Boolean(
+    content.parentGenerationId ||
+    content.sourceImageUrl ||
+    content.sourceVideoGenerationId ||
+    content.sourceAudioGenerationId
+  );
+  const classification = content.classification ?? 'original';
   const {
     videoRef,
     ready: videoReady,
@@ -121,6 +141,29 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
               </div>
             )}
           </>
+        ) : isAudio ? (
+          // Audio has no visual preview — render a waveform-style placeholder
+          // and expose the mp3 on click via the parent onClick handler.
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-500/20 to-cyan-500/20">
+            <Music className="h-10 w-10 text-foreground/60" />
+          </div>
+        ) : is3D ? (
+          // 3D: prefer Meshy's rendered thumbnail; fall back to a cube glyph.
+          content.thumbnailUrl ? (
+            <img
+              src={content.thumbnailUrl}
+              alt={content.title || '3D model'}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-rose-500/20">
+              <Box className="h-10 w-10 text-foreground/60" />
+            </div>
+          )
         ) : (
           <img
             src={thumbnail}
@@ -138,7 +181,29 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
             className={`absolute top-2 left-2 text-xs gap-1 ${isAIGenerated ? 'bg-violet-500/80 text-white border-violet-400/50' : ''}`}
           >
             {isAIGenerated ? <Sparkles className="h-3 w-3" /> : <Upload className="h-3 w-3" />}
-            {isVideo ? 'Video' : 'Image'}
+            {isVideo ? 'Video' : is3D ? '3D' : isAudio ? 'Audio' : 'Image'}
+          </Badge>
+        )}
+        {/* Rights classification badge — `original` is the default and implied,
+            so we only surface `fan` (derivative) and `licensed` to avoid noise. */}
+        {classification === 'fan' && (
+          <Badge
+            variant="secondary"
+            className="absolute top-2 left-[72px] text-xs gap-1 bg-amber-500/80 text-white border-amber-400/50"
+            title="Fan / derivative — uses third-party IP"
+          >
+            <Users className="h-3 w-3" />
+            Fan
+          </Badge>
+        )}
+        {classification === 'licensed' && (
+          <Badge
+            variant="secondary"
+            className="absolute top-2 left-[72px] text-xs gap-1 bg-sky-500/80 text-white border-sky-400/50"
+            title="Licensed — used under grant"
+          >
+            <Shield className="h-3 w-3" />
+            Licensed
           </Badge>
         )}
         {isVideo && (
@@ -222,6 +287,23 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           >
             by {content.creatorAddress.slice(0, 6)}...{content.creatorAddress.slice(-4)}
           </Link>
+        )}
+
+        {/* Lineage chip — derived from a prior generation/source asset. */}
+        {hasLineage && (
+          <div
+            className="flex items-center gap-1 text-[11px] text-muted-foreground"
+            title={
+              content.parentGenerationId
+                ? `Derived from generation ${content.parentGenerationId}`
+                : content.sourceImageUrl
+                  ? 'Derived from an uploaded image'
+                  : 'Derived from a prior generation'
+            }
+          >
+            <GitBranch className="h-3 w-3" />
+            <span className="truncate">Derived</span>
+          </div>
         )}
 
         {/* Claim CTA — only for orphan content, only for authed users */}

@@ -5,6 +5,15 @@ import type { AssetOutputKind } from '../services/lineage/types';
 
 export type GalleryMediaType = 'image' | 'ai-image' | 'video' | 'ai-video' | 'audio' | '3d';
 
+/**
+ * PRD-rights classification. `original` = creator's own IP, `fan` = fan art /
+ * derivative of a third-party work, `licensed` = used under a bought/granted
+ * license. Callers that know they're generating derivative content (e.g.
+ * character-pipeline from a reference image the user uploaded) should pass
+ * the appropriate value; everything else defaults to `original`.
+ */
+export type GalleryClassification = 'original' | 'fan' | 'licensed';
+
 export interface PublishGalleryInput {
   creatorUid: string;
   mediaUrl: string;
@@ -17,6 +26,7 @@ export interface PublishGalleryInput {
   generationModel: string;
   tags?: string[];
   createdAt?: Date;
+  classification?: GalleryClassification;
   /** Lineage refs — set when this clip is derived from another generation. */
   parentGenerationId?: string | null;
   sourceImageUrl?: string | null;
@@ -59,42 +69,49 @@ function extOf(mediaType: GalleryMediaType, fallbackUrl: string): string {
   return 'mp4';
 }
 
-function mimeFor(mediaType: GalleryMediaType, ext: string): string {
-  if (mediaType.includes('image')) return `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-  if (mediaType === 'audio') return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
-  if (mediaType === '3d') return 'model/gltf-binary';
-  return `video/${ext === 'mov' ? 'quicktime' : ext}`;
-}
-
 /**
  * Downloads a remote URL and rehosts it via the shared StorageManager so
- * the gallery doc holds a permanent Pinata/Lighthouse URL. Returns the
- * original URL on any failure — a broken-but-temporary URL is strictly
- * better than a failed publish.
+ * the gallery doc holds a permanent Pinata/Lighthouse URL.
+ *
+ * Retries the rehost up to {@link REHOST_ATTEMPTS} times with exponential
+ * backoff before giving up — the first attempt often fails because the
+ * provider CDN hasn't propagated the freshly-generated asset yet (5xx /
+ * 404). Falling through to the ephemeral URL is the absolute last resort
+ * because those links 403 once the signature expires.
  */
+const REHOST_ATTEMPTS = 3;
+const REHOST_BASE_DELAY_MS = 500;
+
 async function rehostIfEphemeral(
   input: PublishGalleryInput
 ): Promise<{ mediaUrl: string; contentHash?: string }> {
   if (!isEphemeralUrl(input.mediaUrl)) {
     return { mediaUrl: input.mediaUrl };
   }
-  try {
-    const { getStorageManager } = await import('../services/storage');
-    const manager = getStorageManager();
-    const ext = extOf(input.mediaType, input.mediaUrl);
-    const mime = mimeFor(input.mediaType, ext);
-    const filename = `${input.generationId || 'gallery'}.${ext}`;
-    const manifest = await manager.uploadFromUrl(input.mediaUrl, filename, input.creatorUid);
-    const permanent = manifest.uploads[0]?.url;
-    if (!permanent) return { mediaUrl: input.mediaUrl };
-    return { mediaUrl: permanent, contentHash: manifest.contentHash };
-  } catch (err) {
-    console.error(
-      `[gallery] rehost failed for ${input.mediaUrl.slice(0, 80)} — publishing ephemeral:`,
-      err
-    );
-    return { mediaUrl: input.mediaUrl };
+  const ext = extOf(input.mediaType, input.mediaUrl);
+  const filename = `${input.generationId || 'gallery'}.${ext}`;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= REHOST_ATTEMPTS; attempt++) {
+    try {
+      const { getStorageManager } = await import('../services/storage');
+      const manager = getStorageManager();
+      const manifest = await manager.uploadFromUrl(input.mediaUrl, filename, input.creatorUid);
+      const permanent = manifest.uploads[0]?.url;
+      if (permanent) return { mediaUrl: permanent, contentHash: manifest.contentHash };
+      lastErr = new Error('storage manager returned no permanent URL');
+    } catch (err) {
+      lastErr = err;
+    }
+    if (attempt < REHOST_ATTEMPTS) {
+      const delay = REHOST_BASE_DELAY_MS * 2 ** (attempt - 1);
+      await new Promise((r) => setTimeout(r, delay));
+    }
   }
+  console.error(
+    `[gallery] rehost failed after ${REHOST_ATTEMPTS} attempts for ${input.mediaUrl.slice(0, 80)} — publishing ephemeral URL:`,
+    lastErr
+  );
+  return { mediaUrl: input.mediaUrl };
 }
 
 export function buildGalleryDoc(
@@ -102,19 +119,20 @@ export function buildGalleryDoc(
   extra?: { contentHash?: string }
 ): Record<string, unknown> {
   const now = input.createdAt ?? new Date();
+  const classification: GalleryClassification = input.classification ?? 'original';
   return {
     title: input.title.slice(0, 100) || 'Generated',
     description: input.description,
     mediaUrl: input.mediaUrl,
     thumbnailUrl: input.thumbnailUrl ?? null,
     mediaType: input.mediaType,
-    classification: 'original',
+    classification,
     contentStatus: 'active',
     tags: input.tags ?? [],
     ipDeclaration: {
-      isOriginal: true,
-      usesCopyrightedMaterial: false,
-      license: 'all-rights-reserved',
+      isOriginal: classification === 'original',
+      usesCopyrightedMaterial: classification !== 'original',
+      license: classification === 'licensed' ? 'licensed' : 'all-rights-reserved',
     },
     visibility: 'public',
     creatorUid: input.creatorUid,
@@ -138,13 +156,86 @@ export function buildGalleryDoc(
   };
 }
 
+/**
+ * Enqueue a VLM moderation scan for a freshly-published content doc. Gated by
+ * `VLM_MODERATION_ON_GENERATION=true` and only applies to visual media (image
+ * / video) — Gemini can't score audio or GLB files. Non-blocking; a failed
+ * enqueue must not take down a publish.
+ */
+async function enqueueVlmScanAsync(opts: {
+  contentId: string;
+  mediaUrl: string;
+  mediaType: GalleryMediaType;
+  creatorUid: string;
+  generationId: string;
+  universeId: string | null;
+}): Promise<void> {
+  if (process.env.VLM_MODERATION_ON_GENERATION !== 'true') return;
+  const assetType: 'image' | 'video' | null = opts.mediaType.includes('image')
+    ? 'image'
+    : opts.mediaType.includes('video')
+      ? 'video'
+      : null;
+  if (!assetType) return;
+  try {
+    const [{ getVlmQueue }, { randomUUID }] = await Promise.all([
+      import('./queue'),
+      import('node:crypto'),
+    ]);
+    const jobId = `vlm_${randomUUID()}`;
+    await getVlmQueue().add(
+      'extract',
+      {
+        jobId,
+        kind: 'extract',
+        creatorUid: opts.creatorUid.toLowerCase(),
+        input: {
+          assetType,
+          mediaUrl: opts.mediaUrl,
+          contentId: opts.contentId,
+          generationId: opts.generationId,
+          universeAddress: opts.universeId,
+        },
+      },
+      { jobId }
+    );
+  } catch (err) {
+    console.warn(`[gallery] VLM scan enqueue failed for ${opts.contentId}:`, err);
+  }
+}
+
+/**
+ * Gemini Flash auto-tagging. Env-gated because every publish adds a small
+ * Gemini cost (~$0.0001–0.001). Merges with user-supplied tags; on failure
+ * returns the original list so a broken VLM never blocks a publish.
+ */
+async function maybeAutoTag(input: PublishGalleryInput): Promise<string[]> {
+  const userTags = input.tags ?? [];
+  if (process.env.VLM_AUTOTAG_ON_PUBLISH !== 'true') return userTags;
+  if (!input.mediaType.includes('image') && !input.mediaType.includes('video')) return userTags;
+  try {
+    const [{ autoTagContent, mergeTags }] = await Promise.all([import('../services/vlm/auto-tag')]);
+    const auto = await autoTagContent({
+      mediaUrl: input.mediaUrl,
+      mediaType: input.mediaType,
+      title: input.title,
+      description: input.description,
+    });
+    return mergeTags(userTags, auto);
+  } catch (err) {
+    console.warn('[gallery] auto-tag failed, using user tags only:', err);
+    return userTags;
+  }
+}
+
 export async function publishToGallery(input: PublishGalleryInput): Promise<void> {
   if (!db) return;
 
   // Rehost ephemeral URLs before writing so the gallery never stores a URL
   // that will 403 once the provider's signature expires.
   const { mediaUrl, contentHash } = await rehostIfEphemeral(input);
-  const resolvedInput: PublishGalleryInput = { ...input, mediaUrl };
+  const tags = await maybeAutoTag({ ...input, mediaUrl });
+  const resolvedInput: PublishGalleryInput = { ...input, mediaUrl, tags };
 
   try {
     const ref = await db.collection('content').add(buildGalleryDoc(resolvedInput, { contentHash }));
@@ -187,7 +278,7 @@ export async function publishToGallery(input: PublishGalleryInput): Promise<void
       latencyMs: null,
       creatorUid: resolvedInput.creatorUid,
       universeId: resolvedInput.universeId ?? null,
-      rightsClass: 'original',
+      rightsClass: resolvedInput.classification ?? 'original',
       outputUrl: resolvedInput.mediaUrl,
       outputKind,
       status: 'completed',
@@ -205,6 +296,18 @@ export async function publishToGallery(input: PublishGalleryInput): Promise<void
         generationModel: resolvedInput.generationModel ?? null,
       })
     );
+
+    // PRD 10: every visual publish gets a VLM moderation scan so reviewers
+    // see a risk score alongside the content. No-op for audio / 3D, and
+    // env-gated so the ~$0.001/scan cost is opt-in before mainnet.
+    void enqueueVlmScanAsync({
+      contentId: ref.id,
+      mediaUrl: resolvedInput.mediaUrl,
+      mediaType: resolvedInput.mediaType,
+      creatorUid: resolvedInput.creatorUid,
+      generationId: resolvedInput.generationId,
+      universeId: resolvedInput.universeId ?? null,
+    });
   } catch (err: unknown) {
     console.error(`[gallery] publish failed (${input.generationId}):`, err);
   }

@@ -28,6 +28,9 @@ import { getStorageManager } from '../../services/storage';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { TRPCError } from '@trpc/server';
 
 // ── Collections ──────────────────────────────────────────────────────
 
@@ -139,6 +142,8 @@ async function executePipeline(opts: {
   texturePrompt: string;
   credits: number;
   universeAddress?: string | null;
+  webhookUrl?: string;
+  clientToken?: string;
 }) {
   const {
     pipelineId,
@@ -151,6 +156,8 @@ async function executePipeline(opts: {
     texturePrompt,
     credits,
     universeAddress,
+    webhookUrl,
+    clientToken,
   } = opts;
 
   try {
@@ -386,6 +393,8 @@ async function executePipeline(opts: {
         generationId: `${pipelineId}:textured`,
         generationModel: 'meshy-text-to-texture',
         tags: ['character', '3d', 'textured', artStyle],
+        parentGenerationId: `${pipelineId}:2d`,
+        sourceImageUrl: imageUrl,
       });
     }
 
@@ -403,6 +412,7 @@ async function executePipeline(opts: {
         generationId: `${pipelineId}:turntable`,
         generationModel: 'meshy-text-to-texture',
         tags: ['character', '3d', 'turntable', artStyle],
+        parentGenerationId: `${pipelineId}:textured`,
       });
     }
 
@@ -417,6 +427,25 @@ async function executePipeline(opts: {
     });
 
     console.log(`[pipeline ${pipelineId}] Pipeline complete!`);
+
+    fireJobWebhook({
+      ownerUid: userId,
+      webhookUrl,
+      clientToken,
+      event: 'job.completed',
+      jobId: pipelineId,
+      kind: '3d',
+      payload: {
+        operation: 'characterPipeline',
+        status: 'completed',
+        entityId,
+        entityName,
+        texturedModelUrls: textureTask.modelUrls ?? null,
+        texturedThumbnailUrl: textureTask.thumbnailUrl ?? null,
+        texturedVideoUrl: textureTask.videoUrl ?? null,
+        creditsCharged: credits,
+      },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[pipeline ${pipelineId}] Failed:`, error);
@@ -429,6 +458,21 @@ async function executePipeline(opts: {
       failureReason: errorMessage,
       completedAt: new Date(),
     }).catch(() => {});
+
+    fireJobWebhook({
+      ownerUid: userId,
+      webhookUrl,
+      clientToken,
+      event: 'job.failed',
+      jobId: pipelineId,
+      kind: '3d',
+      payload: {
+        operation: 'characterPipeline',
+        status: 'failed',
+        errorMessage,
+        creditsRefunded: true,
+      },
+    });
   }
 }
 
@@ -464,6 +508,15 @@ export const characterPipelineRouter = router({
         // 3D texturing
         artStyle: artStyleSchema,
         texturePrompt: z.string().max(1000).optional(),
+
+        // Idempotency + webhook
+        clientToken: z
+          .string()
+          .min(16)
+          .max(128)
+          .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+          .optional(),
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -477,6 +530,38 @@ export const characterPipelineRouter = router({
 
       const pipelineId = randomUUID();
       const totalCredits = toCredits(TOTAL_PIPELINE_COST);
+
+      // Idempotency — pipeline is ~600s + expensive, retry safety is important.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: pipelineId,
+          procedure: 'characterPipeline.launch',
+        });
+        if (reservation?.existing) {
+          const existing = await pipelinesCol().doc(reservation.existing.jobId).get();
+          const d = existing.exists ? (existing.data() as any) : {};
+          return {
+            pipelineId: reservation.existing.jobId,
+            entityId: (d.entityId ?? null) as string | null,
+            status: (d.status ?? 'running') as 'queued' | 'running' | 'completed' | 'failed',
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            estimatedSteps: [] as any[],
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
 
       // ── Create entity ──────────────────────────────────────────────
       const { id: entityId, data: entity } = await createEntity(
@@ -508,12 +593,15 @@ export const characterPipelineRouter = router({
           stepProgress: 'Starting character pipeline...',
           createdAt: new Date(),
           updatedAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       // ── Deduct credits ─────────────────────────────────────────────
       await deductCredits(ctx.user.uid, totalCredits);
 
       // ── Launch pipeline in background ──────────────────────────────
+      // Webhook fires from inside executePipeline on terminal state.
       executePipeline({
         pipelineId,
         userId: ctx.user.uid,
@@ -525,13 +613,15 @@ export const characterPipelineRouter = router({
         texturePrompt: input.texturePrompt || '',
         credits: totalCredits,
         universeAddress: input.universeAddress || null,
+        webhookUrl: validatedWebhookUrl,
+        clientToken: input.clientToken,
       }).catch((err) =>
         console.error(`[pipeline] Background pipeline ${pipelineId} unhandled:`, err)
       );
 
       return {
         pipelineId,
-        entityId,
+        entityId: entityId as string | null,
         status: 'running' as const,
         creditsCharged: totalCredits,
         estimatedSteps: [
@@ -543,6 +633,7 @@ export const characterPipelineRouter = router({
           { step: 'meshy_3d', label: 'Convert to 3D model (Meshy)', estimateSeconds: 300 },
           { step: 'meshy_texture', label: 'Apply AI textures (Meshy)', estimateSeconds: 300 },
         ],
+        idempotentReplay: false as const,
       };
     }),
 

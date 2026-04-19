@@ -15,6 +15,11 @@ export const sentryEnabled = Boolean(dsn);
 // Session replay captures user interactions — gated behind explicit 'all'
 // consent per GDPR/ePrivacy. Error reporting itself is considered essential
 // (required to keep the service running) and stays enabled.
+// When consent is given at page load we attach the replay integration here;
+// when consent is given later via the banner, CookieConsent uses
+// `Sentry.addIntegration(Sentry.replayIntegration(...))` to attach it at
+// runtime without a disruptive reload. Sample rates are always set so the
+// runtime-added integration picks them up immediately.
 const consent =
   typeof window !== 'undefined' ? window.localStorage.getItem('loar_consent_v1') : null;
 const replayAllowed = consent === 'all';
@@ -36,8 +41,8 @@ if (dsn) {
         : []),
     ],
     tracesSampleRate: isProduction ? 0.1 : 1.0,
-    replaysSessionSampleRate: replayAllowed && isProduction ? 0.1 : 0,
-    replaysOnErrorSampleRate: replayAllowed ? 1.0 : 0,
+    replaysSessionSampleRate: isProduction ? 0.1 : 0,
+    replaysOnErrorSampleRate: 1.0,
     ignoreErrors: [
       'ResizeObserver loop limit exceeded',
       'ResizeObserver loop completed with undelivered notifications',

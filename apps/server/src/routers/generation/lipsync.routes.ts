@@ -27,6 +27,16 @@ import { emitActivity } from '../../services/activity';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { extractVideoThumbnail } from '../../services/video-thumbnail';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { TRPCError } from '@trpc/server';
+
+const clientTokenSchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+  .optional();
 
 // ── Credit costs ────────────────────────────────────────────────────
 
@@ -162,10 +172,44 @@ export const lipsyncRouter = router({
         sourceAudioGenerationId: z.string().optional(),
         /** When false, caller will publish manually (e.g. talking-scene combo). */
         autoPublish: z.boolean().default(true),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const genId = randomUUID();
+
+      // Idempotency check before any credit deduction.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'lipsync.sync',
+        });
+        if (reservation?.existing) {
+          const existing = await lipsyncGenerationsCol().doc(reservation.existing.jobId).get();
+          const d = existing.exists ? (existing.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            videoUrl: (d.resultVideoUrl ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl early.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
       const startTime = Date.now();
       const credits = LIPSYNC_CREDITS;
 
@@ -185,6 +229,8 @@ export const lipsyncRouter = router({
           creditsCharged: credits,
           status: 'queued',
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       await deductCredits(ctx.user.uid, credits);
@@ -250,11 +296,28 @@ export const lipsyncRouter = router({
           }
         }
 
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: genId,
+          kind: 'video',
+          payload: {
+            operation: 'lipsync',
+            status: 'completed',
+            resultUrl: permanentUrl,
+            modelUsed: input.model || 'fal-ai/lipsync',
+            creditsCharged: credits,
+          },
+        });
+
         return {
           generationId: genId,
           status: 'completed' as const,
-          videoUrl: permanentUrl,
+          videoUrl: permanentUrl as string | null,
           creditsCharged: credits,
+          idempotentReplay: false as const,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits, genId);
@@ -265,6 +328,20 @@ export const lipsyncRouter = router({
             failureReason: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: 'video',
+          payload: {
+            operation: 'lipsync',
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
         throw error;
       }
     }),

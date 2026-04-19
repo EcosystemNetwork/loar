@@ -45,6 +45,42 @@ const HIDDEN_STATUSES = ['flagged', 'under_review', 'hidden', 'removed'] as cons
 const isVisible = (status: unknown): boolean =>
   !status || !HIDDEN_STATUSES.includes(status as (typeof HIDDEN_STATUSES)[number]);
 
+/**
+ * Single DTO shape for every public read of a gallery content doc. Keeps
+ * browse / trending / featured / portfolio shaped identically so the client
+ * can assume lineage + classification + moderation fields everywhere.
+ */
+function serializeGalleryItem(
+  d: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot
+) {
+  const data = d.data() ?? {};
+  return {
+    id: d.id,
+    title: data.title || 'Untitled',
+    description: data.description || '',
+    mediaUrl: data.mediaUrl || null,
+    thumbnailUrl: data.thumbnailUrl || null,
+    mediaType: data.mediaType || 'image',
+    classification: data.classification || 'original',
+    tags: data.tags || [],
+    creatorUid: data.creatorUid || null,
+    creatorAddress: data.creatorAddress || null,
+    universeId: data.universeId || null,
+    contentHash: data.contentHash || null,
+    generationId: data.generationId || null,
+    generationModel: data.generationModel || null,
+    views: data.views || 0,
+    likes: data.likes || 0,
+    visibility: data.visibility || 'public',
+    createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
+    // Lineage refs — clients render "derived from" links / family tree.
+    parentGenerationId: data.parentGenerationId || null,
+    sourceImageUrl: data.sourceImageUrl || null,
+    sourceVideoGenerationId: data.sourceVideoGenerationId || null,
+    sourceAudioGenerationId: data.sourceAudioGenerationId || null,
+  };
+}
+
 export const galleryRouter = router({
   /** Browse content with filters */
   browse: publicProcedure
@@ -123,28 +159,7 @@ export const galleryRouter = router({
 
       const items = snapshot.docs
         .filter((d) => isVisible(d.data().contentStatus))
-        .map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            title: data.title || 'Untitled',
-            description: data.description || '',
-            mediaUrl: data.mediaUrl || null,
-            thumbnailUrl: data.thumbnailUrl || null,
-            mediaType: data.mediaType || 'image',
-            classification: data.classification || 'fan',
-            tags: data.tags || [],
-            creatorUid: data.creatorUid || null,
-            creatorAddress: data.creatorAddress || null,
-            universeId: data.universeId || null,
-            contentHash: data.contentHash || null,
-            generationId: data.generationId || null,
-            views: data.views || 0,
-            likes: data.likes || 0,
-            visibility: data.visibility || 'public',
-            createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-          };
-        });
+        .map(serializeGalleryItem);
 
       // Enrich with licensing data if available
       const contentHashes = items.map((i: any) => i.contentHash).filter(Boolean);
@@ -202,22 +217,7 @@ export const galleryRouter = router({
 
       return snapshot.docs
         .filter((d) => isVisible(d.data().contentStatus))
-        .map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            title: data.title || 'Untitled',
-            description: data.description || '',
-            mediaUrl: data.mediaUrl || null,
-            thumbnailUrl: data.thumbnailUrl || null,
-            mediaType: data.mediaType || 'image',
-            creatorUid: data.creatorUid || null,
-            creatorAddress: data.creatorAddress || null,
-            views: data.views || 0,
-            likes: data.likes || 0,
-            createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-          };
-        });
+        .map(serializeGalleryItem);
     }),
 
   /** Get admin-curated featured content for a universe */
@@ -243,21 +243,7 @@ export const galleryRouter = router({
 
     return contentDocs
       .filter((d) => d.exists && isVisible(d.data()?.contentStatus))
-      .map((d) => {
-        const data = d.data()!;
-        return {
-          id: d.id,
-          title: data.title || 'Untitled',
-          description: data.description || '',
-          mediaUrl: data.mediaUrl || null,
-          thumbnailUrl: data.thumbnailUrl || null,
-          mediaType: data.mediaType || 'image',
-          creatorUid: data.creatorUid || null,
-          views: data.views || 0,
-          likes: data.likes || 0,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-        };
-      });
+      .map(serializeGalleryItem);
   }),
 
   /** Set featured content for a universe (admin only) */
@@ -324,22 +310,7 @@ export const galleryRouter = router({
 
       const content = contentSnapshot.docs
         .filter((d) => isVisible(d.data().contentStatus))
-        .map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            title: data.title || 'Untitled',
-            description: data.description || '',
-            mediaUrl: data.mediaUrl || null,
-            thumbnailUrl: data.thumbnailUrl || null,
-            mediaType: data.mediaType || 'image',
-            classification: data.classification || 'fan',
-            tags: data.tags || [],
-            views: data.views || 0,
-            likes: data.likes || 0,
-            createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? null,
-          };
-        });
+        .map(serializeGalleryItem);
 
       // Aggregate stats — across the visible set only, so hidden content
       // doesn't inflate a creator's public view/like counts.

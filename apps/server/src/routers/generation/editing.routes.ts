@@ -30,6 +30,16 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { recordAssetEventAsync } from '../../services/lineage';
 import type { AssetEventStep, AssetOutputKind } from '../../services/lineage/types';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+
+// Shared idempotency + webhook schema fragments for this router's mutations.
+const clientTokenSchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+  .optional();
 
 // ── Collections ─────────────────────────────────────────────────────────
 
@@ -436,17 +446,49 @@ export const editingRouter = router({
         strength: z.number().min(0).max(1).default(0.65),
         negativePrompt: z.string().optional(),
         sourceGenerationId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      checkEditThrottle(ctx.user.uid);
-
       const model = getEditingModelById(input.modelId);
       if (!model || model.operation !== 'restyle') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid restyle model' });
       }
 
       const jobId = randomUUID();
+
+      // Idempotency — before any credit deduction.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId,
+          procedure: 'editing.restyle',
+        });
+        if (reservation?.existing) {
+          const existing = await editingJobsCol().doc(reservation.existing.jobId).get();
+          const d = existing.exists ? (existing.data() as any) : {};
+          return {
+            jobId: reservation.existing.jobId,
+            videoUrl: (d.outputUrl ?? null) as string | null,
+            model: model.displayName,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl early.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
+      checkEditThrottle(ctx.user.uid);
       await deductCredits(ctx.user.uid, model.creditCost, 'restyle');
 
       const startTime = Date.now();
@@ -460,7 +502,7 @@ export const editingRouter = router({
 
       if (result.status === 'failed' || !result.videoUrl) {
         await refundCredits(ctx.user.uid, model.creditCost);
-        const record: EditingJobRecord = {
+        const record: EditingJobRecord & { webhookUrl?: string; clientToken?: string } = {
           id: jobId,
           userId: ctx.user.uid,
           operation: 'restyle',
@@ -474,15 +516,31 @@ export const editingRouter = router({
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         };
         saveJobRecord(record).catch(console.error);
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId,
+          kind: 'video',
+          payload: {
+            operation: 'restyle',
+            status: 'failed',
+            errorMessage: result.error || 'Restyle failed',
+            creditsRefunded: true,
+          },
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: result.error || 'Restyle failed',
         });
       }
 
-      const record: EditingJobRecord = {
+      const record: EditingJobRecord & { webhookUrl?: string; clientToken?: string } = {
         id: jobId,
         userId: ctx.user.uid,
         operation: 'restyle',
@@ -497,6 +555,8 @@ export const editingRouter = router({
         createdAt: new Date(),
         completedAt: new Date(),
         sourceGenerationId: input.sourceGenerationId,
+        ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+        ...(input.clientToken ? { clientToken: input.clientToken } : {}),
       };
       saveJobRecord(record).catch(console.error);
 
@@ -520,7 +580,28 @@ export const editingRouter = router({
         console.error('[restyle] gallery publish failed:', err);
       }
 
-      return { jobId, videoUrl: result.videoUrl, model: model.displayName };
+      fireJobWebhook({
+        ownerUid: ctx.user.uid,
+        webhookUrl: validatedWebhookUrl,
+        clientToken: input.clientToken,
+        event: 'job.completed',
+        jobId,
+        kind: 'video',
+        payload: {
+          operation: 'restyle',
+          status: 'completed',
+          resultUrl: result.videoUrl,
+          modelUsed: model.id,
+          creditsCharged: model.creditCost,
+        },
+      });
+
+      return {
+        jobId,
+        videoUrl: result.videoUrl as string | null,
+        model: model.displayName,
+        idempotentReplay: false as const,
+      };
     }),
 
   // ── Inpainting ──────────────────────────────────────────────────────

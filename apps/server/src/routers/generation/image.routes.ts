@@ -438,6 +438,10 @@ function autoPublishToGallery(opts: {
   model: string;
   universeId?: string;
   generationId: string;
+  /** Source image this was derived from (edit/img2img/controlled). */
+  sourceImageUrl?: string;
+  /** Parent generation id when the source itself came from a prior generation. */
+  parentGenerationId?: string;
 }): Promise<void> {
   return Promise.all(
     opts.imageUrls.map((url, i) =>
@@ -451,6 +455,8 @@ function autoPublishToGallery(opts: {
         universeId: opts.universeId ?? null,
         generationId: opts.imageUrls.length > 1 ? `${opts.generationId}:${i}` : opts.generationId,
         generationModel: opts.model,
+        sourceImageUrl: opts.sourceImageUrl ?? null,
+        parentGenerationId: opts.parentGenerationId ?? null,
       })
     )
   ).then(() => undefined);
@@ -1658,6 +1664,7 @@ export const imageRouter = router({
           prompt: input.prompt,
           model: 'fal-ai/nano-banana/edit',
           generationId: editGenId,
+          sourceImageUrl: input.imageUrls[0],
         }).catch((err) => console.error('[legacy edit] gallery publish failed:', err.message));
         persistImagesToStorage({
           generationId: editGenId,
@@ -1749,6 +1756,7 @@ export const imageRouter = router({
           prompt: input.prompt,
           model: 'fal-ai/nano-banana/edit',
           generationId: i2iGenId,
+          sourceImageUrl: input.imageUrls[0],
         }).catch((err) => console.error('[legacy i2i] gallery publish failed:', err.message));
         persistImagesToStorage({
           generationId: i2iGenId,

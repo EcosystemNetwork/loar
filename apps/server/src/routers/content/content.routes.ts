@@ -1,9 +1,10 @@
 /**
  * Content Router
  *
- * Manages user-created content (videos, images) with classification:
- * - "fun": Non-monetized, can use copyrighted/fan materials
- * - "monetized": Commercial use, strict IP protection rules
+ * Manages user-created content (videos, images) with three-lane rights classification:
+ * - "fan": Non-commercial / derivative. May use third-party IP. Cannot be monetized.
+ * - "original": Creator-owned. Must be the creator's original work. Eligible for all revenue flows.
+ * - "licensed": Used under a licensing grant. Requires `licensingProof` and `reviewStatus`.
  */
 import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
@@ -431,6 +432,7 @@ export const contentRouter = router({
               mediaType: data.mediaType,
               format: (data.format as 'short' | 'long') || null,
               classification: data.classification,
+              reviewStatus: data.reviewStatus || null,
               tags: data.tags || [],
               creatorUid: data.creatorUid,
               generationId: data.generationId || null,

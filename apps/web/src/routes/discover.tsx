@@ -48,7 +48,9 @@ export const Route = createFileRoute('/discover')({
 function DiscoverPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('universes');
-  const [contentFilter, setContentFilter] = useState<'all' | 'fan' | 'monetized'>('all');
+  const [contentFilter, setContentFilter] = useState<'all' | 'fan' | 'original' | 'licensed'>(
+    'all'
+  );
   const [mediaFilter, setMediaFilter] = useState<string | undefined>();
 
   const {
@@ -72,8 +74,7 @@ function DiscoverPage() {
     queryFn: () =>
       trpcClient.content.feed.query({
         search: search || undefined,
-        classification:
-          contentFilter === 'all' || contentFilter === 'monetized' ? undefined : contentFilter,
+        classification: contentFilter === 'all' ? undefined : contentFilter,
         mediaType: mediaFilter as any,
         limit: 30,
       }),
@@ -187,17 +188,23 @@ function DiscoverPage() {
             {/* Content sub-filters */}
             {activeTab === 'content' && (
               <div className="flex gap-2 flex-wrap">
-                {(['all', 'fan', 'monetized'] as const).map((f) => (
+                {(
+                  [
+                    { value: 'all', label: 'All', icon: Grid3X3 },
+                    { value: 'fan', label: 'Fan', icon: Sparkles },
+                    { value: 'original', label: 'Original', icon: DollarSign },
+                    { value: 'licensed', label: 'Licensed', icon: Lock },
+                  ] as const
+                ).map((opt) => (
                   <Button
-                    key={f}
-                    variant={contentFilter === f ? 'default' : 'outline'}
+                    key={opt.value}
+                    variant={contentFilter === opt.value ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setContentFilter(f)}
+                    onClick={() => setContentFilter(opt.value)}
                     className="gap-1"
                   >
-                    {f === 'fan' && <Sparkles className="h-3 w-3" />}
-                    {f === 'monetized' && <DollarSign className="h-3 w-3" />}
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                    <opt.icon className="h-3 w-3" />
+                    {opt.label}
                   </Button>
                 ))}
                 <div className="w-px bg-border mx-1" />
@@ -1192,20 +1199,15 @@ function ContentFeedCard({ item }: { item: any }) {
               </div>
             )}
             <div className="absolute top-2 right-2">
-              <Badge
-                variant={item.classification === 'monetized' ? 'default' : 'secondary'}
-                className="text-xs"
-              >
-                {item.classification === 'monetized' ? (
-                  <>
-                    <DollarSign className="h-3 w-3 mr-0.5" /> Monetized
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3 w-3 mr-0.5" /> Fun
-                  </>
-                )}
-              </Badge>
+              <ContentLaneBadge
+                classification={
+                  item.classification === 'fan' || item.classification === 'licensed'
+                    ? item.classification
+                    : 'original'
+                }
+                reviewStatus={item.reviewStatus}
+                size="sm"
+              />
             </div>
             <div className="absolute bottom-2 left-2">
               <Badge variant="outline" className="text-xs bg-black/40 text-white border-0">

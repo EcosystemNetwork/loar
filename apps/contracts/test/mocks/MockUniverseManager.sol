@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
 /// @notice Minimal mock that supports ownerOf for registerUniverse lookups

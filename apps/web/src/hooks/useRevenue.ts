@@ -108,6 +108,30 @@ export function useCanon(universeId: string) {
   });
 }
 
+export function useFinalizeCanon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.marketplace.finalize.mutate>[0]) =>
+      trpcClient.marketplace.finalize.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['canon-submissions'] });
+      qc.invalidateQueries({ queryKey: ['canon'] });
+    },
+  });
+}
+
+export function useLicenseCanon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.marketplace.licenseCanon.mutate>[0]) =>
+      trpcClient.marketplace.licenseCanon.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['canon'] });
+      qc.invalidateQueries({ queryKey: ['canon-submissions'] });
+    },
+  });
+}
+
 // ---- Credits ----
 
 export function useCreditBalance() {

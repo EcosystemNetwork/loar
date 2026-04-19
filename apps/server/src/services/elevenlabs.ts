@@ -20,6 +20,8 @@ export type ElevenLabsVoiceModel =
   | 'eleven_turbo_v2'
   | 'eleven_v3';
 
+export type ElevenLabsStsModel = 'eleven_multilingual_sts_v2' | 'eleven_english_sts_v2';
+
 export interface TTSOptions {
   text: string;
   voiceId: string; // ElevenLabs voice ID
@@ -45,6 +47,23 @@ export interface VoiceDesignOptions {
   age?: 'young' | 'middle_aged' | 'old';
   accent?: string;
   accentStrength?: number; // 0.3–2.0
+}
+
+export interface VoiceChangerOptions {
+  audioBuffer: Buffer;
+  voiceId: string;
+  modelId?: ElevenLabsStsModel;
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  useSpeakerBoost?: boolean;
+  removeBackgroundNoise?: boolean;
+  outputFormat?: 'mp3_44100_128' | 'mp3_44100_64' | 'pcm_16000' | 'pcm_22050' | 'pcm_24000';
+}
+
+export interface VoiceChangerResult {
+  audioBuffer: Buffer;
+  contentType: string;
 }
 
 export interface InstantCloneOptions {
@@ -152,6 +171,60 @@ class ElevenLabsService {
     );
 
     return { audioBuffer: buffer, contentType, characterCount: text.length };
+  }
+
+  // ── Speech to Speech (Voice Changer) ──────────────────────────────────
+
+  async voiceChanger(options: VoiceChangerOptions): Promise<VoiceChangerResult> {
+    if (!this.apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+
+    const {
+      audioBuffer,
+      voiceId,
+      modelId = 'eleven_multilingual_sts_v2',
+      stability = 0.5,
+      similarityBoost = 0.75,
+      style = 0,
+      useSpeakerBoost = true,
+      removeBackgroundNoise = false,
+      outputFormat = 'mp3_44100_128',
+    } = options;
+
+    const formData = new FormData();
+    formData.append(
+      'audio',
+      new Blob([new Uint8Array(audioBuffer)], { type: 'audio/mpeg' }),
+      'input.mp3'
+    );
+    formData.append('model_id', modelId);
+    formData.append('remove_background_noise', String(removeBackgroundNoise));
+    formData.append(
+      'voice_settings',
+      JSON.stringify({
+        stability,
+        similarity_boost: similarityBoost,
+        style,
+        use_speaker_boost: useSpeakerBoost,
+      })
+    );
+
+    const response = await fetch(
+      `${BASE_URL}/speech-to-speech/${voiceId}?output_format=${outputFormat}`,
+      {
+        method: 'POST',
+        headers: { 'xi-api-key': this.apiKey },
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs voice changer error ${response.status}: ${text}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'audio/mpeg';
+    const arrayBuffer = await response.arrayBuffer();
+    return { audioBuffer: Buffer.from(arrayBuffer), contentType };
   }
 
   // ── Sound Effects ─────────────────────────────────────────────────────

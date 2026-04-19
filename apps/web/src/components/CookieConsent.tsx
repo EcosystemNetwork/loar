@@ -41,9 +41,17 @@ export function CookieConsent() {
   const choose = (next: ConsentLevel) => {
     writeConsent(next);
     setLevel(next);
-    // Reload so Sentry re-inits with the correct integrations. Cheaper than
-    // trying to hot-swap integrations on an already-running Sentry client.
-    if (next === 'all') window.location.reload();
+    if (next === 'all') {
+      // Attach Sentry Session Replay at runtime rather than reloading — a reload
+      // aborts in-flight SIWE handshakes (nonce fetched, signature pending).
+      void import('@sentry/react').then((Sentry) => {
+        const client = Sentry.getClient();
+        if (!client || client.getIntegrationByName?.('Replay')) return;
+        Sentry.addIntegration(
+          Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false })
+        );
+      });
+    }
   };
 
   return (

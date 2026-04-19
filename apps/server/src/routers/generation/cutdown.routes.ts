@@ -17,6 +17,15 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { trackQuests } from '../../services/quest-tracker';
 import { emitActivity } from '../../services/activity';
 import { TRPCError } from '@trpc/server';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+
+const clientTokenSchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+  .optional();
 
 // ── Firestore helpers ────────────────────────────────────────────────────
 
@@ -250,12 +259,49 @@ export const cutdownRouter = router({
         addCaptions: z.boolean().default(true),
         captionStyle: z.enum(['default', 'bold', 'minimal', 'karaoke']).default('default'),
         title: z.string().max(200).optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const cutdownId = randomUUID();
       const userId = ctx.user.uid;
       const now = new Date();
+
+      // Idempotency check.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: userId,
+          clientToken: input.clientToken,
+          jobId: cutdownId,
+          procedure: 'cutdown.generate',
+        });
+        if (reservation?.existing) {
+          const existing = await cutdownsCol().doc(reservation.existing.jobId).get();
+          const d = existing.exists ? (existing.data() as any) : {};
+          return {
+            cutdownId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'processing' | 'completed' | 'failed',
+            sourceVideoUrl: input.sourceVideoUrl,
+            segments: (d.segments ?? []) as any[],
+            cropParams: (d.cropParams ?? null) as any,
+            captions: d.captions as any,
+            totalDurationSec: (d.totalDurationSec ?? 0) as number,
+            creditsCharged: (d.creditsCharged ?? CUTDOWN_COST) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
 
       // 1. Save initial record
       await cutdownsCol()
@@ -276,6 +322,8 @@ export const cutdownRouter = router({
           creditsCharged: CUTDOWN_COST,
           createdAt: now,
           updatedAt: now,
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       // 2. Deduct credits
@@ -348,6 +396,23 @@ export const cutdownRouter = router({
           },
         }).catch(() => {}); // swallow
 
+        fireJobWebhook({
+          ownerUid: userId,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: cutdownId,
+          kind: 'video',
+          payload: {
+            operation: 'cutdown',
+            status: 'completed',
+            sourceVideoUrl: input.sourceVideoUrl,
+            totalDurationSec,
+            segmentCount: segments.length,
+            creditsCharged: CUTDOWN_COST,
+          },
+        });
+
         return {
           cutdownId,
           status: 'completed' as const,
@@ -357,6 +422,7 @@ export const cutdownRouter = router({
           captions: captions ?? undefined,
           totalDurationSec,
           creditsCharged: CUTDOWN_COST,
+          idempotentReplay: false as const,
         };
       } catch (err) {
         // Pipeline failed — refund credits and mark failed
@@ -368,6 +434,20 @@ export const cutdownRouter = router({
             error: (err as Error).message,
             updatedAt: new Date(),
           });
+        fireJobWebhook({
+          ownerUid: userId,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: cutdownId,
+          kind: 'video',
+          payload: {
+            operation: 'cutdown',
+            status: 'failed',
+            errorMessage: (err as Error).message,
+            creditsRefunded: true,
+          },
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: `Cutdown generation failed: ${(err as Error).message}`,

@@ -49,8 +49,11 @@ import {
   Eraser,
   Sun,
   Frame,
+  Mic,
 } from 'lucide-react';
 import { ModelSelector } from '@/components/ModelSelector';
+import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export const Route = createFileRoute('/sandbox')({
   component: SandboxPage,
@@ -1064,6 +1067,26 @@ function SandboxPage() {
       duration: 3000,
     });
   }, []);
+
+  const handleVoiceModified = useCallback(
+    (source: Generation, newAudioUrl: string, _newGenerationId: string, presetLabel: string) => {
+      const id = makeId();
+      const newGen: Generation = {
+        id,
+        kind: 'audio',
+        prompt: `Modified (${presetLabel}) — ${source.prompt}`.slice(0, 280),
+        status: 'done',
+        imageSize: 'square_hd',
+        aspectRatio: '1:1',
+        audioFlavor: source.audioFlavor ?? 'tts',
+        audioUrl: newAudioUrl,
+        createdAt: Date.now(),
+      };
+      setGenerations((prev) => [newGen, ...prev]);
+      autoSaveDraft(newGen);
+    },
+    [autoSaveDraft]
+  );
 
   // Upload a local file. Images become reference images for the next gen;
   // videos land directly in the queue as 'imported' done cards so users can
@@ -2260,6 +2283,9 @@ function SandboxPage() {
                       onUseAsStyleRef={() => handleUseAsStyleRef(g)}
                       onEditOp={(op, opts) => runEditOp(g, op, opts)}
                       onRetryDraftSave={() => retryDraftSave(g)}
+                      onVoiceModified={(newUrl, newId, label) =>
+                        handleVoiceModified(g, newUrl, newId, label)
+                      }
                     />
                   ))}
                 </div>
@@ -2387,6 +2413,7 @@ interface GenerationCardProps {
     }
   ) => void;
   onRetryDraftSave: () => void;
+  onVoiceModified: (newAudioUrl: string, newGenerationId: string, presetLabel: string) => void;
 }
 
 type EditPanel = null | 'menu' | 'relight' | 'outpaint' | 'restyle' | 'extend';
@@ -2399,9 +2426,11 @@ function GenerationCard({
   onUseAsStyleRef,
   onEditOp,
   onRetryDraftSave,
+  onVoiceModified,
 }: GenerationCardProps) {
   const retriesLeft = MAX_RETRIES_PER_GEN - (gen.retryCount ?? 0);
   const [editPanel, setEditPanel] = useState<EditPanel>(null);
+  const [voiceModifyOpen, setVoiceModifyOpen] = useState(false);
   const [relightPresets, setRelightPresets] = useState<string[]>([]);
   const [relightFree, setRelightFree] = useState('');
   const [outpaintAspect, setOutpaintAspect] = useState<OutpaintAspect>('16:9');
@@ -2576,6 +2605,18 @@ function GenerationCard({
             >
               <Wand2 className="h-3 w-3 mr-1" />
               Edit
+            </Button>
+          )}
+          {gen.status === 'done' && gen.kind === 'audio' && gen.audioUrl && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setVoiceModifyOpen(true)}
+              title="Swap voice or apply an effect preset"
+            >
+              <Mic className="h-3 w-3 mr-1" />
+              Modify voice
             </Button>
           )}
           {gen.status === 'failed' && retriesLeft > 0 && (
@@ -2914,6 +2955,22 @@ function GenerationCard({
           </div>
         )}
       </CardContent>
+
+      <Dialog open={voiceModifyOpen} onOpenChange={setVoiceModifyOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modify voice</DialogTitle>
+          </DialogHeader>
+          <VoiceModifyPanel
+            audioUrl={gen.audioUrl ?? null}
+            parentGenerationId={gen.id}
+            onComplete={(newUrl, newId, label) => {
+              onVoiceModified(newUrl, newId, label);
+              setVoiceModifyOpen(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

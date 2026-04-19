@@ -28,6 +28,8 @@ import { signWithProvenance } from '../../services/provenance';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { getImageModelById } from '../../services/image-models';
 
 // ── Schemas ────────────────────────────────────────────────────────────
@@ -49,6 +51,13 @@ const expandSchema = z.object({
   negativePrompt: z.string().max(500).optional(),
   universeId: z.string().optional(),
   entityId: z.string().optional(),
+  clientToken: z
+    .string()
+    .min(16)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+    .optional(),
+  webhookUrl: webhookUrlSchema.optional(),
 });
 
 type ExpandInput = z.infer<typeof expandSchema>;
@@ -245,6 +254,38 @@ export const outpaintRouter = router({
       const model = resolveModel();
       const cost = model.creditCostPerImage;
       const jobId = randomUUID();
+
+      // Idempotency check before any credit deduction.
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId,
+          procedure: 'outpaint.expand',
+        });
+        if (reservation?.existing) {
+          const existing = await outpaintJobsCol().doc(reservation.existing.jobId).get();
+          const d = existing.exists ? (existing.data() as any) : {};
+          return {
+            jobId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            imageUrl: (d.imageUrl ?? d.outputUrl ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      // Validate webhookUrl.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
       const startTime = Date.now();
 
       // ── Persist initial record ────────────────────────────────────────
@@ -269,6 +310,8 @@ export const outpaintRouter = router({
           providerCostUsd: model.providerCostUsd,
           fiatPriceUsd: model.fiatPriceUsd,
           createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
       // ── Deduct credits (atomic) ───────────────────────────────────────
@@ -372,15 +415,34 @@ export const outpaintRouter = router({
           generationId: jobId,
           generationModel: `outpaint:${result.provider}`,
           tags: ['outpaint', 'reframe', input.targetAspect, input.mode],
+          sourceImageUrl: input.sourceImageUrl,
         }).catch((err) => console.error('[outpaint] gallery publish failed:', err?.message || err));
+
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId,
+          kind: 'image',
+          payload: {
+            operation: 'outpaint',
+            status: 'completed',
+            resultUrl: result.imageUrl,
+            provider: result.provider,
+            targetAspect: input.targetAspect,
+            creditsCharged: cost,
+          },
+        });
 
         return {
           jobId,
           status: 'completed' as const,
-          imageUrl: result.imageUrl,
+          imageUrl: result.imageUrl as string | null,
           provider: result.provider,
           targetAspect: input.targetAspect,
           creditsCharged: cost,
+          idempotentReplay: false as const,
         };
       } catch (error) {
         // Blanket catch: refund if we haven't already
@@ -413,6 +475,20 @@ export const outpaintRouter = router({
             completedAt: new Date(),
           });
         }
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId,
+          kind: 'image',
+          payload: {
+            operation: 'outpaint',
+            status: 'failed',
+            errorMessage,
+            creditsRefunded: !alreadyRefunded,
+          },
+        });
         throw error;
       }
     }),

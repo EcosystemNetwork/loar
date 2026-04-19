@@ -10,6 +10,8 @@ import { db } from '../../lib/firebase';
 import { TRPCError } from '@trpc/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { reserveClientToken } from '../../lib/jobIdempotency';
+import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 
 const loraModelsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -38,9 +40,55 @@ export const loraRouter = router({
           .max(30)
           .regex(/^[a-zA-Z0-9_]+$/, 'Trigger word must be alphanumeric')
           .default('LOARCHAR'),
+        clientToken: z
+          .string()
+          .min(16)
+          .max(128)
+          .regex(/^[A-Za-z0-9_-]+$/, 'clientToken must match [A-Za-z0-9_-]{16,128}')
+          .optional(),
+        webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Idempotency — training is expensive (75 credits + long-running), so
+      // retry safety matters. Reserve the slot BEFORE credit deduction.
+      const plannedJobId = `planned-${ctx.user.uid}-${Date.now()}`;
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: plannedJobId,
+          procedure: 'lora.startTraining',
+        });
+        if (reservation?.existing) {
+          // Look up the model created by the original call.
+          const existingSnap = await loraModelsCol()
+            .where('creatorUid', '==', ctx.user.uid)
+            .where('triggerWord', '==', input.triggerWord)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+          if (!existingSnap.empty) {
+            const d = existingSnap.docs[0].data() as any;
+            return {
+              modelId: existingSnap.docs[0].id,
+              status: (d.status ?? 'training') as string,
+              idempotentReplay: true as const,
+            };
+          }
+        }
+      }
+
+      // Validate webhookUrl.
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
       // Deduct credits transactionally BEFORE calling FAL
       const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
       await db!.runTransaction(async (tx) => {
@@ -69,6 +117,8 @@ export const loraRouter = router({
         triggerWord: input.triggerWord,
         trainingStartedAt: new Date(),
         createdAt: new Date(),
+        ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+        ...(input.clientToken ? { clientToken: input.clientToken } : {}),
       });
 
       // Kick off training via FAL
@@ -107,7 +157,15 @@ export const loraRouter = router({
           createdAt: new Date(),
         });
 
-        return { modelId: modelRef.id, status: 'training' };
+        // Training submitted — fire job.completed when the worker finishes,
+        // but for now treat submission-success as an advisory "job.completed"
+        // for startTraining. (Full lifecycle requires a poller — tracked in
+        // backlog.)
+        return {
+          modelId: modelRef.id,
+          status: 'training' as const,
+          idempotentReplay: false as const,
+        };
       } catch (err) {
         // Refund credits atomically on failure
         await userCreditsRef.update({
@@ -117,6 +175,20 @@ export const loraRouter = router({
         });
         // Mark as failed
         await modelRef.update({ status: 'failed', error: (err as Error).message });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: modelRef.id,
+          kind: 'image',
+          payload: {
+            operation: 'lora.training',
+            status: 'failed',
+            errorMessage: (err as Error).message,
+            creditsRefunded: true,
+          },
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: `Training failed to start: ${(err as Error).message}`,

@@ -19,6 +19,8 @@ import {
   Send,
   BookOpen,
   Trophy,
+  ShieldCheck,
+  FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,16 +36,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCanonSubmissions, useSubmitCanon, useVoteCanon, useCanon } from '@/hooks/useRevenue';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  useCanonSubmissions,
+  useSubmitCanon,
+  useVoteCanon,
+  useCanon,
+  useFinalizeCanon,
+  useLicenseCanon,
+} from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useVocab } from '@/hooks/use-vocab';
 import { useUniverseAddresses } from '@/hooks/useUniverseAddresses';
 import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useReadContract } from 'wagmi';
-import { governanceErc20Abi } from '@loar/abis/generated';
-import { formatEther } from 'viem';
+import { useReadContract, useWriteContract, useChainId, usePublicClient } from 'wagmi';
+import { canonMarketplaceAbi, governanceErc20Abi } from '@loar/abis/generated';
+import { CanonMarketplace } from '@loar/abis/addresses';
+import { formatEther, parseEther } from 'viem';
 
 export const Route = createFileRoute('/canon/$universeId')({
   component: CanonPage,

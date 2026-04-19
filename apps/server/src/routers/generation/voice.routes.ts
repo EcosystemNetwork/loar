@@ -64,6 +64,7 @@ const CHAR_COST: Record<ElevenLabsVoiceModel, number> = {
 const SOUND_EFFECT_COST_USD = 0.08;
 const VOICE_DESIGN_COST_USD = 0.08;
 const INSTANT_CLONE_COST_USD = 0.09;
+const VOICE_MODIFY_COST_USD = 0.08;
 
 async function getMargins() {
   const cfg = await getPlatformConfig();
@@ -740,6 +741,201 @@ export const voiceRouter = router({
       }
     }),
 
+  // ── Voice modify (swap + effect) ──────────────────────────────────────
+
+  modify: protectedProcedure
+    .use(requirePermission('generation.voice'))
+    .input(
+      z.object({
+        audioUrl: z.string().url(),
+        targetVoiceId: z.string().min(1),
+        modelId: z
+          .enum(['eleven_multilingual_sts_v2', 'eleven_english_sts_v2'])
+          .default('eleven_multilingual_sts_v2'),
+        stability: z.number().min(0).max(1).optional(),
+        similarityBoost: z.number().min(0).max(1).optional(),
+        style: z.number().min(0).max(1).optional(),
+        removeBackgroundNoise: z.boolean().optional(),
+        presetId: z.string().optional(), // for analytics: which Effects preset was picked
+        entityId: z.string().optional(),
+        universeId: z.string().optional(),
+        parentGenerationId: z.string().optional(),
+        clientToken: clientTokenSchema,
+        webhookUrl: webhookUrlSchema.optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const genId = randomUUID();
+
+      let validatedWebhookUrl: string | undefined;
+      if (input.webhookUrl) {
+        const check = validateWebhookUrl(input.webhookUrl);
+        if (!check.ok) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: check.reason });
+        }
+        validatedWebhookUrl = check.url;
+      }
+
+      if (input.clientToken) {
+        const reservation = await reserveClientToken({
+          ownerUid: ctx.user.uid,
+          clientToken: input.clientToken,
+          jobId: genId,
+          procedure: 'voice.modify',
+        });
+        if (reservation?.existing) {
+          const existingSnap = await voiceGenerationsCol().doc(reservation.existing.jobId).get();
+          const d = existingSnap.exists ? (existingSnap.data() as any) : {};
+          return {
+            generationId: reservation.existing.jobId,
+            status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            audioUrl: (d.audioUrl ?? null) as string | null,
+            creditsCharged: (d.creditsCharged ?? 0) as number,
+            fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
+            idempotentReplay: true as const,
+          };
+        }
+      }
+
+      const startTime = Date.now();
+      const { fiatMargin, loarMargin } = await getMargins();
+      const credits = toCredits(VOICE_MODIFY_COST_USD, fiatMargin);
+
+      await voiceGenerationsCol()
+        .doc(genId)
+        .set({
+          id: genId,
+          userId: ctx.user.uid,
+          entityId: input.entityId || null,
+          universeId: input.universeId || null,
+          type: 'voice_modify',
+          modelId: input.modelId,
+          voiceId: input.targetVoiceId,
+          sourceAudioUrl: input.audioUrl,
+          parentGenerationId: input.parentGenerationId || null,
+          presetId: input.presetId || null,
+          providerCostUsd: VOICE_MODIFY_COST_USD,
+          fiatPriceUsd: withFiat(VOICE_MODIFY_COST_USD, fiatMargin),
+          loarPriceUsd: withLoar(VOICE_MODIFY_COST_USD, loarMargin),
+          creditsCharged: credits,
+          status: 'queued',
+          createdAt: new Date(),
+          ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+          ...(input.clientToken ? { clientToken: input.clientToken } : {}),
+        });
+
+      await deductCredits(ctx.user.uid, credits);
+
+      try {
+        await voiceGenerationsCol().doc(genId).update({ status: 'running' });
+
+        // Fetch source audio (SSRF-validated + timed out)
+        await validateUploadUrl(input.audioUrl);
+        const sourceRes = await fetchWithTimeout(input.audioUrl);
+        if (!sourceRes.ok) {
+          throw new Error(`Failed to fetch source audio from ${input.audioUrl}`);
+        }
+        const sourceBuffer = Buffer.from(await sourceRes.arrayBuffer());
+        if (sourceBuffer.length === 0) {
+          throw new Error('Source audio is empty');
+        }
+
+        const result = await elevenLabsService.voiceChanger({
+          audioBuffer: sourceBuffer,
+          voiceId: input.targetVoiceId,
+          modelId: input.modelId,
+          stability: input.stability,
+          similarityBoost: input.similarityBoost,
+          style: input.style,
+          removeBackgroundNoise: input.removeBackgroundNoise,
+        });
+
+        if (!result.audioBuffer || result.audioBuffer.length === 0) {
+          throw new Error('Provider returned empty audio — voice modify failed silently');
+        }
+
+        const filename = `voice-modify-${genId}.mp3`;
+        const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
+        const latencyMs = Date.now() - startTime;
+
+        await voiceGenerationsCol().doc(genId).update({
+          status: 'completed',
+          audioUrl,
+          latencyMs,
+          completedAt: new Date(),
+        });
+
+        autoAttachAudio({
+          creator: ctx.user.uid,
+          entityId: input.entityId,
+          generationId: genId,
+          audioUrl,
+          label: `Voice modify — ${input.presetId || input.targetVoiceId.slice(0, 8)}`,
+          category: 'sound',
+        });
+
+        void publishToGallery({
+          creatorUid: ctx.user.uid,
+          mediaUrl: audioUrl,
+          mediaType: 'audio',
+          title: input.presetId ? `Voice: ${input.presetId}` : `Voice modify`,
+          description: input.presetId || '',
+          universeId: input.universeId || null,
+          generationId: genId,
+          generationModel: `elevenlabs:${input.modelId}`,
+          tags: ['voice-modify', ...(input.presetId ? [input.presetId] : [])],
+        });
+
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.completed',
+          jobId: genId,
+          kind: 'voice',
+          payload: {
+            status: 'completed',
+            audioUrl,
+            modelId: input.modelId,
+            creditsCharged: credits,
+          },
+        });
+
+        return {
+          generationId: genId,
+          status: 'completed' as const,
+          audioUrl: audioUrl as string | null,
+          modelId: input.modelId as string,
+          creditsCharged: credits,
+          fiatPriceUsd: withFiat(VOICE_MODIFY_COST_USD, fiatMargin),
+          idempotentReplay: false as const,
+        };
+      } catch (error) {
+        await refundCredits(ctx.user.uid, credits, genId);
+        await voiceGenerationsCol()
+          .doc(genId)
+          .update({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            completedAt: new Date(),
+          });
+        fireJobWebhook({
+          ownerUid: ctx.user.uid,
+          webhookUrl: validatedWebhookUrl,
+          clientToken: input.clientToken,
+          event: 'job.failed',
+          jobId: genId,
+          kind: 'voice',
+          payload: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            creditsRefunded: true,
+          },
+        });
+        throw error;
+      }
+    }),
+
   // ── Browse voices ─────────────────────────────────────────────────────
 
   listVoices: publicProcedure.query(async () => {
@@ -752,7 +948,7 @@ export const voiceRouter = router({
   estimateCost: publicProcedure
     .input(
       z.object({
-        type: z.enum(['tts', 'sound_effect', 'voice_design', 'instant_clone']),
+        type: z.enum(['tts', 'sound_effect', 'voice_design', 'instant_clone', 'voice_modify']),
         characterCount: z.number().min(1).optional(), // for TTS
         modelId: voiceModelSchema.optional(),
       })
@@ -776,6 +972,9 @@ export const voiceRouter = router({
           break;
         case 'instant_clone':
           providerCost = INSTANT_CLONE_COST_USD;
+          break;
+        case 'voice_modify':
+          providerCost = VOICE_MODIFY_COST_USD;
           break;
       }
 

@@ -20,6 +20,10 @@ The `UniverseManager` contract inherits OpenZeppelin `Ownable`. The **deployer w
 | `setWeth(address)`                        | Changes the WETH address (locked after first universe creation)                       | One-time; cannot be changed after any universe exists      |
 | `setBondingCurveHalted(universeId, bool)` | Emergency halt/resume trading on a universe's bonding curve                           | Owner can freeze trading on any pre-graduation universe    |
 | `setDeprecated(bool)`                     | Disables new universe creation                                                        | Owner can freeze new mints (existing universes still work) |
+| `setMetadataRenderer(address)`            | Swaps the contract used to render universe NFT `tokenURI`                             | Owner can replace renderer until `lockMetadataRenderer()`  |
+| `lockMetadataRenderer()`                  | One-way switch — permanently freezes the metadata renderer                            | Irreversible; after this, renderer is immutable forever    |
+| `setUniverseFactory(address)`             | Sets the factory contract used to deploy new `Universe` instances                     | Owner can swap to a malicious factory before next mint     |
+| `setIdentityNft(address)`                 | Sets the IdentityNFT contract used to mint per-universe identity tokens               | Owner can redirect identity issuance                       |
 
 ### What the owner CANNOT do
 
@@ -28,6 +32,7 @@ The `UniverseManager` contract inherits OpenZeppelin `Ownable`. The **deployer w
 - **Mint universe tokens.** Token deployment requires the universe NFT owner to call `deployUniverseToken`. The manager owner cannot deploy tokens on behalf of a universe.
 - **Move LP-locked tokens.** Once liquidity is placed via the locker at graduation, neither the manager owner nor the universe admin can withdraw it (locked by the locker contract).
 - **Change WETH after first universe.** `setWeth` reverts once `latestId > 0`.
+- **Replace the metadata renderer after locking.** Once `lockMetadataRenderer()` is called, `setMetadataRenderer` reverts permanently — render logic for all existing and future universe NFTs becomes immutable.
 
 ### LP Seed Flow
 

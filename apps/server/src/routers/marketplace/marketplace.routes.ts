@@ -51,6 +51,8 @@ export const marketplaceRouter = router({
         metadataURI: z.string(),
         mediaUrl: z.string().optional(),
         submissionFeeTxHash: z.string().optional(),
+        /** On-chain uint256 submission id returned by CanonMarketplace.submit(). Enables on-chain finalize/license. */
+        onChainSubmissionId: z.string().optional(),
         onBehalfOfUid: z.string().optional(),
       })
     )
@@ -61,6 +63,7 @@ export const marketplaceRouter = router({
 
         const submission = {
           ...submitInput,
+          onChainSubmissionId: submitInput.onChainSubmissionId ?? null,
           creatorUid: actingUid,
           creatorAddress: ctx.user.address || null,
           status: 'VOTING' as const,
@@ -161,7 +164,13 @@ export const marketplaceRouter = router({
     }),
 
   finalize: protectedProcedure
-    .input(z.object({ submissionId: z.string() }))
+    .input(
+      z.object({
+        submissionId: z.string(),
+        /** On-chain tx hash for CanonMarketplace.finalize() — stored for audit when present. */
+        txHash: z.string().optional(),
+      })
+    )
     .mutation(async ({ input }) => {
       const ref = submissionsCol().doc(input.submissionId);
       const doc = await ref.get();
@@ -177,6 +186,7 @@ export const marketplaceRouter = router({
       await ref.update({
         status: accepted ? 'ACCEPTED' : 'REJECTED',
         finalizedAt: now,
+        finalizeTxHash: input.txHash || null,
         updatedAt: now,
       });
 

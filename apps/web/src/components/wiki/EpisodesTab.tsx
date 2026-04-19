@@ -78,7 +78,7 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
           {sorted.length} episode{sorted.length !== 1 ? 's' : ''}
           {!universeAddress && ' across all universes'}
         </p>
-        <Link to="/editor" search={{ video: undefined, image: undefined }}>
+        <Link to="/editor" search={{ video: undefined, image: undefined, audio: undefined }}>
           <Button size="sm" variant="outline">
             <Plus className="h-4 w-4 mr-1" />
             New Episode
@@ -95,7 +95,7 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
           <p className="text-xs mb-4">
             Build episodes from your timeline clips, or generate a full episode from a script.
           </p>
-          <Link to="/editor" search={{ video: undefined, image: undefined }}>
+          <Link to="/editor" search={{ video: undefined, image: undefined, audio: undefined }}>
             <Button variant="outline">Open Episode Builder</Button>
           </Link>
         </div>

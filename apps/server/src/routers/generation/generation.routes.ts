@@ -332,6 +332,10 @@ async function autoPublishVideoToGallery(opts: {
   universeId?: string;
   generationId: string;
   thumbnailUrl?: string;
+  /** For image-to-video paths — the user's reference image becomes the lineage
+   *  parent so the gallery can render "derived from <image>". Undefined for T2V. */
+  sourceImageUrl?: string;
+  sourceVideoGenerationId?: string;
 }): Promise<void> {
   // Prefer the permanent IPFS URL if the async persist already completed —
   // avoids a race where the gallery keeps an ephemeral URL forever.
@@ -357,6 +361,8 @@ async function autoPublishVideoToGallery(opts: {
     universeId: opts.universeId ?? null,
     generationId: opts.generationId,
     generationModel: opts.model,
+    sourceImageUrl: opts.sourceImageUrl ?? null,
+    sourceVideoGenerationId: opts.sourceVideoGenerationId ?? null,
   });
 }
 
@@ -1148,6 +1154,7 @@ export const generationRouter = router({
                 model: fallbackResult.fallbackModelId,
                 universeId: input.universeId,
                 thumbnailUrl: input.imageUrl,
+                sourceImageUrl: input.imageUrl,
                 generationId,
               }).catch((err: Error) =>
                 console.error('[video] gallery publish failed:', err.message)
@@ -1242,6 +1249,7 @@ export const generationRouter = router({
           universeId: input.universeId,
           generationId,
           thumbnailUrl: input.imageUrl,
+          sourceImageUrl: input.imageUrl,
         }).catch((err) => console.error('[video] gallery publish failed:', err.message));
 
         // PRD 10: generate lineage event
@@ -1990,6 +1998,7 @@ export const generationRouter = router({
           universeId: input.universeId,
           generationId: legacyGenId,
           thumbnailUrl: input.imageUrl,
+          sourceImageUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy video] gallery publish failed:', err.message)
         );
@@ -2057,6 +2066,7 @@ export const generationRouter = router({
           universeId: input.universeId,
           generationId: veo3GenId,
           thumbnailUrl: input.imageUrl,
+          sourceImageUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy veo3] gallery publish failed:', err.message)
         );
@@ -2127,6 +2137,7 @@ export const generationRouter = router({
           universeId: input.universeId,
           generationId: klingGenId,
           thumbnailUrl: input.imageUrl,
+          sourceImageUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy kling] gallery publish failed:', err.message)
         );
@@ -2197,6 +2208,7 @@ export const generationRouter = router({
           universeId: input.universeId,
           generationId: wan25GenId,
           thumbnailUrl: input.imageUrl,
+          sourceImageUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy wan25] gallery publish failed:', err.message)
         );
@@ -2265,6 +2277,7 @@ export const generationRouter = router({
           universeId: input.universeId,
           generationId: soraGenId,
           thumbnailUrl: input.imageUrl,
+          sourceImageUrl: input.imageUrl,
         }).catch((err: Error) =>
           console.error('[legacy sora] gallery publish failed:', err.message)
         );
