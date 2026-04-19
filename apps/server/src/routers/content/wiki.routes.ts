@@ -304,4 +304,22 @@ export const wikiRouter = router({
         throw wrapError(error, 'Prompt improvement failed');
       }
     }),
+
+  /** Improve a user's image prompt using Gemini. */
+  improveImagePrompt: protectedProcedure
+    .input(
+      z.object({
+        userPrompt: z.string().min(1, 'Prompt is required'),
+        characterContext: z
+          .array(z.object({ name: z.string(), description: z.string() }))
+          .optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await geminiService.improveImagePrompt(input.userPrompt, input.characterContext);
+      } catch (error) {
+        throw wrapError(error, 'Prompt improvement failed');
+      }
+    }),
 });
