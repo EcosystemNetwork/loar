@@ -45,6 +45,16 @@ const configPatchSchema = z.object({
 
   affiliateReferrerLoar: z.number().min(0).optional(),
   affiliateNewUserLoar: z.number().min(0).optional(),
+
+  // Feature kill switches — flip to false to instantly stop the matching path.
+  generationEnabled: z.boolean().optional(),
+  mintingEnabled: z.boolean().optional(),
+  purchaseEnabled: z.boolean().optional(),
+  registrationEnabled: z.boolean().optional(),
+
+  // Per-wallet monthly spend cap (measured in credits across a rolling 30 days).
+  monthlySpendCapEnabled: z.boolean().optional(),
+  monthlySpendCapCredits: z.number().int().min(0).max(1_000_000).optional(),
 });
 
 // ── Router ────────────────────────────────────────────────────────────────

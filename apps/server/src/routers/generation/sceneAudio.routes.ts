@@ -86,6 +86,8 @@ const userCreditsCol = () => {
 
 async function deductCredits(userId: string, credits: number): Promise<void> {
   if (!db) throw new Error('Firebase is not configured');
+  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+  await assertGenerationAllowed(userId, credits);
   const ref = userCreditsCol().doc(userId);
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);

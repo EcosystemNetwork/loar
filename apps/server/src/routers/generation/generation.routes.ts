@@ -425,6 +425,11 @@ const LEGACY_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as co
 /** Deduct credits from user balance. Throws if insufficient. */
 async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
   if (!db) return;
+
+  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+  const { invalidateSpendCache } = await import('../../services/spend-cap');
+  await assertGenerationAllowed(uid, cost);
+
   const userRef = db.collection('userCredits').doc(uid);
 
   await db.runTransaction(async (transaction) => {
@@ -454,6 +459,10 @@ async function deductCredits(uid: string, cost: number, generationType: string):
       createdAt: new Date(),
     });
   });
+
+  // Invalidate spend-cache so the next assertSpendAllowed reflects this charge
+  // within the 30s window that normally uses cached totals.
+  invalidateSpendCache(uid);
 }
 
 /** Refund credits on generation failure. Best-effort — never throws. */

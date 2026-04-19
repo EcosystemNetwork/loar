@@ -38,6 +38,8 @@ const editingJobsCol = () => {
 
 async function deductCredits(uid: string, cost: number, operation: string): Promise<void> {
   if (!db) return;
+  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+  await assertGenerationAllowed(uid, cost);
   const userRef = db.collection('userCredits').doc(uid);
 
   await db.runTransaction(async (transaction) => {

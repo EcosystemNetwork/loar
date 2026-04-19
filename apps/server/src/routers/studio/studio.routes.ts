@@ -136,6 +136,8 @@ const studioJobsCol = () => {
 // ── Credit helpers ────────────────────────────────────────────────────
 
 async function deductCredits(userId: string, credits: number): Promise<void> {
+  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+  await assertGenerationAllowed(userId, credits);
   const ref = db.collection('userCredits').doc(userId);
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);

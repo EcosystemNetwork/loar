@@ -72,6 +72,7 @@ import { Route as AgentsUidRouteImport } from './routes/agents/$uid'
 import { Route as AdsNewRouteImport } from './routes/ads/new'
 import { Route as AdsSlotIdRouteImport } from './routes/ads/$slotId'
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
+import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdsSeedsIndexRouteImport } from './routes/ads/seeds/index'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
@@ -400,6 +401,11 @@ const AdminUniversesRoute = AdminUniversesRouteImport.update({
   path: '/admin/universes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminOpsRoute = AdminOpsRouteImport.update({
+  id: '/admin/ops',
+  path: '/admin/ops',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminModerationRoute = AdminModerationRouteImport.update({
   id: '/admin/moderation',
   path: '/admin/moderation',
@@ -488,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
@@ -565,6 +572,7 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
@@ -643,6 +651,7 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/ads/$slotId': typeof AdsSlotIdRoute
   '/ads/new': typeof AdsNewRoute
@@ -722,6 +731,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/admin/moderation'
+    | '/admin/ops'
     | '/admin/universes'
     | '/ads/$slotId'
     | '/ads/new'
@@ -799,6 +809,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/admin/moderation'
+    | '/admin/ops'
     | '/admin/universes'
     | '/ads/$slotId'
     | '/ads/new'
@@ -876,6 +887,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/admin/moderation'
+    | '/admin/ops'
     | '/admin/universes'
     | '/ads/$slotId'
     | '/ads/new'
@@ -954,6 +966,7 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
   AdminModerationRoute: typeof AdminModerationRoute
+  AdminOpsRoute: typeof AdminOpsRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
   AdsSlotIdRoute: typeof AdsSlotIdRoute
   AdsNewRoute: typeof AdsNewRoute
@@ -1444,6 +1457,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUniversesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/ops': {
+      id: '/admin/ops'
+      path: '/admin/ops'
+      fullPath: '/admin/ops'
+      preLoaderRoute: typeof AdminOpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/moderation': {
       id: '/admin/moderation'
       path: '/admin/moderation'
@@ -1586,6 +1606,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
   AdminModerationRoute: AdminModerationRoute,
+  AdminOpsRoute: AdminOpsRoute,
   AdminUniversesRoute: AdminUniversesRoute,
   AdsSlotIdRoute: AdsSlotIdRoute,
   AdsNewRoute: AdsNewRoute,
