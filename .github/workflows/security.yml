@@ -38,6 +38,9 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install Soldeer dependencies
+        run: forge soldeer install
+
       - name: Forge build (required for Slither)
         run: forge build
 
@@ -121,6 +124,9 @@ jobs:
           submodules: recursive
 
       - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Soldeer dependencies
+        run: forge soldeer install
 
       - name: Forge build
         run: forge build

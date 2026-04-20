@@ -11,12 +11,32 @@
 import { db } from 'ponder:api';
 import schema from 'ponder:schema';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { graphql } from 'ponder';
 import { getAddress } from 'viem';
 import { eq } from 'ponder';
 import { universe, node, proposal, token, vote } from 'ponder:schema';
 
 const app = new Hono();
+
+// CORS — mirror apps/server: comma-separated allowlist via CORS_ORIGIN.
+// Browser clients (loar.fun) need this to fetch /graphql and REST endpoints.
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  '/*',
+  cors({
+    origin: (origin) => {
+      if (!origin) return null;
+      return allowedOrigins.includes(origin) ? origin : null;
+    },
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 // ── Query limits to prevent DoS ──────────────────────────────────────
 const DEFAULT_LIMIT = 100;

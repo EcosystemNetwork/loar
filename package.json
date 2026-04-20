@@ -43,5 +43,23 @@
     "tsx": "^4.19.2",
     "turbo": "^2.5.4"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "protobufjs@<7.5.5": ">=7.5.5",
+      "@hono/node-server@<1.19.10": ">=1.19.10",
+      "@modelcontextprotocol/sdk@<1.25.2": ">=1.25.2",
+      "@xmldom/xmldom@<0.8.12": ">=0.8.12",
+      "defu@<6.1.5": ">=6.1.5",
+      "drizzle-orm@<0.45.2": ">=0.45.2",
+      "kysely@<0.28.12": ">=0.28.12",
+      "tar@<7.5.10": ">=7.5.10",
+      "vite@<6.4.2": ">=6.4.2"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-r5fr-rjxr-66jc"
+      ]
+    }
+  }
 }
