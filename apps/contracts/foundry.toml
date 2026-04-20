@@ -27,6 +27,7 @@ base = { key = "${VERIFICATION_KEY_8453}", url = "https://api.basescan.org/api" 
 [dependencies]
 forge-std = "1.10.0"
 "@openzeppelin-contracts" = "5.0.2"
+"@openzeppelin-contracts-upgradeable" = "5.0.2"
 solady = "0.1.26"
 uniswap-v4-core = { version = "4", git = "https://github.com/Uniswap/v4-core.git", rev = "d153b048868a60c2403a3ef5b2301bb247884d46" }
 uniswap-v4-periphery = "60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5"

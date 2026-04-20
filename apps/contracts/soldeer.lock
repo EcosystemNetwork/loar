@@ -6,6 +6,13 @@ checksum = "8bc4f0acc7c187771b878d46f7de4bfad1acad2eb5d096d9d05d34035853f5c3"
 integrity = "55881f6114aa36158566ef52b486d9d96b217c3e47d0e24bbd4994a8cfb5ee7c"
 
 [[dependencies]]
+name = "@openzeppelin-contracts-upgradeable"
+version = "5.0.2"
+url = "https://soldeer-revisions.s3.amazonaws.com/@openzeppelin-contracts-upgradeable/5_0_2_14-03-2024_06:12:07_contracts-upgradeable.zip"
+checksum = "fb3f8db8541fc01636f91b0e7d9dd6f450f1bf7e2b4a17e96caf6e779ace8f5b"
+integrity = "4bded842e12902cca59a500494d26586b3baea76b59150fd4e2b1d29078a2e71"
+
+[[dependencies]]
 name = "forge-std"
 version = "1.10.0"
 url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_10_0_02-08-2025_06:50:35_forge-std-1.10.zip"
@@ -36,9 +43,8 @@ integrity = "0557449748fa1d64e1e0caa3928c16a06932a16f16bc14cb37023526ed5228cc"
 [[dependencies]]
 name = "uniswap-v4-core"
 version = "4"
-url = "https://soldeer-revisions.s3.amazonaws.com/uniswap-v4-core/4_28-02-2025_23:27:23_uniswap-v4-core-4.zip"
-checksum = "cd91c1b34ad73028bddaeb9fd676a957962f7e4ab671998f4439aa1f474010c8"
-integrity = "859f1409f40b591e2cf337d02591d4ec53013631d2e958a9f03b84af88410abb"
+git = "https://github.com/Uniswap/v4-core.git"
+rev = "d153b048868a60c2403a3ef5b2301bb247884d46"
 
 [[dependencies]]
 name = "uniswap-v4-periphery"
