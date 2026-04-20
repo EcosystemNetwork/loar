@@ -71,6 +71,18 @@ import {
 } from '@/components/ui/select';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
+// Firestore Timestamps serialize to {_seconds, _nanoseconds} over JSON, which
+// `new Date(...)` can't parse. Accept both the serialized shape and native
+// Date/number/string representations.
+function formatEntityDate(v: unknown): string {
+  if (!v) return '—';
+  const d =
+    typeof v === 'object' && v !== null && '_seconds' in v
+      ? new Date((v as { _seconds: number })._seconds * 1000)
+      : new Date(v as string | number | Date);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+}
+
 const KIND_LABELS: Record<string, string> = {
   person: 'Person',
   place: 'Place',
@@ -936,7 +948,7 @@ function EntityPage() {
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span>{new Date(entity.createdAt).toLocaleDateString()}</span>
+                <span>{formatEntityDate(entity.createdAt)}</span>
               </div>
             </CardContent>
           </Card>

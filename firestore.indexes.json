@@ -750,6 +750,30 @@
       "collectionGroup": "indexer_swaps",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "_event.blockNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_bondingCurveTrades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "_event.blockNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_tokenTransfers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "_event.blockNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_swaps",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "sender", "order": "ASCENDING" },
         { "fieldPath": "blockNumber", "order": "DESCENDING" }
       ]
@@ -800,6 +824,14 @@
       "fields": [
         { "fieldPath": "submissionId", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "characterPipelines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
   ],
