@@ -47,7 +47,9 @@ async function main() {
     entries = await readdir(ASSETS_DIR);
   } catch (err) {
     if (err.code === 'ENOENT') {
-      console.error(`[bundle-size] ${ASSETS_DIR} does not exist. Run \`pnpm --filter web build\` first.`);
+      console.error(
+        `[bundle-size] ${ASSETS_DIR} does not exist. Run \`pnpm --filter web build\` first.`
+      );
       process.exit(2);
     }
     throw err;
