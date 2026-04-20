@@ -116,8 +116,5 @@ function NodeOutputPreview({ outputs }: { outputs: Record<string, unknown> }) {
   const url = (outputs.imageUrl ?? outputs.videoUrl) as string | undefined;
   if (!url || typeof url !== 'string') return null;
   if (outputs.videoUrl) return <video src={url} controls className="mt-2 max-h-32 rounded" />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" className="mt-2 max-h-32 rounded object-contain" />
-  );
+  return <img src={url} alt="" className="mt-2 max-h-32 rounded object-contain" />;
 }

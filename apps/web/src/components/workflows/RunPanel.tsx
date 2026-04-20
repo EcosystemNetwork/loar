@@ -41,10 +41,7 @@ function OutputPreview({ outputs }: { outputs: Record<string, unknown> }) {
   if (outputs.videoUrl) {
     return <video src={url} controls className="mt-2 max-h-40 rounded" />;
   }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" className="mt-2 max-h-40 rounded object-contain" />
-  );
+  return <img src={url} alt="" className="mt-2 max-h-40 rounded object-contain" />;
 }
 
 export function RunPanel({

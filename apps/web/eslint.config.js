@@ -19,6 +19,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '**/*.gen.ts'],
+    ignores: ['dist/**', 'node_modules/**', 'public/**', '**/*.gen.ts'],
   }
 );

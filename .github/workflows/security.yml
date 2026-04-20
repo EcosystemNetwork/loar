@@ -52,7 +52,11 @@ jobs:
           ln -sf . dependencies/@openzeppelin-contracts-upgradeable-5.0.2/contracts
 
       - name: Forge build (required for Slither)
-        run: forge build
+        # Skip test/ — HookTest.sol pragma =0.8.30 transitively imports
+        # uniswap-v4-core/src/PoolManager.sol pragma =0.8.26, which solc
+        # can't reconcile in a single compile unit. Slither filters test/
+        # via slither.config.json anyway.
+        run: forge build --skip 'test/**'
 
       - name: Run Slither
         id: slither
@@ -149,7 +153,8 @@ jobs:
           ln -sf . dependencies/@openzeppelin-contracts-upgradeable-5.0.2/contracts
 
       - name: Forge build
-        run: forge build
+        # Skip test/ — same pragma incompat as the Slither job above.
+        run: forge build --skip 'test/**'
 
       - name: Install Mythril
         run: pip3 install mythril

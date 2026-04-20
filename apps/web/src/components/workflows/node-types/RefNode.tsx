@@ -24,7 +24,6 @@ export const RefNode = memo(({ data, selected, isConnectable }: NodeProps<RefNod
       </div>
       <div className="px-3 py-2">
         {data.assetUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={data.assetUrl}
             alt=""
