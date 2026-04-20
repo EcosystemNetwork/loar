@@ -131,6 +131,9 @@ async function refundCredits(uid: string, cost: number) {
 }
 
 // ── Throttle ────────────────────────────────────────────────────────────
+// In-process throttle (L15). Same caveat as editing.routes.ts: on horizontal
+// deployments the authoritative guard is the spend-cap in generation-guards;
+// this map only guards against accidental double-clicks from the canvas UI.
 
 const lastOpByUser = new Map<string, number>();
 function throttle(uid: string, minMs = 2_000) {
@@ -219,6 +222,12 @@ export const editJobsRouter = router({
       throttle(ctx.user.uid, 500);
 
       const stripped = input.pngBase64.replace(/^data:image\/png;base64,/, '');
+      // H9: reject before we decode. base64 is ~4/3× the raw bytes, so a 5MB
+      // limit on decoded mask ⇒ ~7.0MB of encoded string. Giving a tiny bit of
+      // headroom (8MB) to accommodate padding + whitespace without over-rejecting.
+      if (stripped.length > 8 * 1024 * 1024) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Mask larger than 5MB' });
+      }
       const buffer = Buffer.from(stripped, 'base64');
       if (buffer.length === 0) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Empty mask payload' });
@@ -269,6 +278,10 @@ export const editJobsRouter = router({
         });
       }
       const mime = match[1];
+      // H9-style pre-decode guard: 15MB raw cap ⇒ ~20MB base64 payload.
+      if (match[2].length > 22 * 1024 * 1024) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Frame exceeds 15MB' });
+      }
       const buffer = Buffer.from(match[2], 'base64');
       if (buffer.length === 0) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Empty frame payload' });

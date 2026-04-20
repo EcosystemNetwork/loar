@@ -864,6 +864,33 @@ function MostEpisodesRow({ universes }: { universes: any[] }) {
 }
 
 /* ──────────────────────────────────────────
+ * All Universes — every universe, newest first
+ * ────────────────────────────────────────── */
+function AllUniversesRow({ universes }: { universes: any[] }) {
+  const sorted = useMemo(
+    () => [...universes].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+    [universes]
+  );
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader
+        icon={BookOpen}
+        title="All Universes"
+        subtitle={`Browse every universe (${sorted.length})`}
+      />
+      <ScrollRow>
+        {sorted.map((u) => (
+          <UniverseCard key={u.id} universe={u} />
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
  * Community Creations — published off-chain content
  * ────────────────────────────────────────── */
 function CommunityCreations() {
@@ -1396,6 +1423,7 @@ function HomeComponent() {
           <TrendingRow universes={universes} />
           {ponderOnline && <RecentEpisodes universes={universes} />}
           <NewArrivalsRow universes={universes} />
+          <AllUniversesRow universes={universes} />
           <MostEpisodesRow universes={universes} />
           <CommunityCreations />
           <TokenPoweredRow universes={universes} />

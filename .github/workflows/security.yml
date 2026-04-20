@@ -64,15 +64,21 @@ jobs:
       - name: Run Slither
         id: slither
         # crytic/slither-action@v0.4.0 runs `npm install` at the repo root
-        # inside its Docker image and chokes on pnpm's `workspace:*`
-        # protocol. Run slither directly against the foundry artifacts we
-        # already built so we skip all of that.
+        # inside its Docker image and chokes on pnpm's `workspace:*` protocol.
+        # Install slither via pip and let it drive forge directly — foundry
+        # is already on PATH from foundry-toolchain above. `--compile-force-
+        # framework foundry` prevents crytic-compile from trying hardhat/
+        # truffle first (the `--foundry-ignore-compile` path crashes with
+        # `KeyError: 'output'` parsing foundry's build-info).
         run: |
           slither . \
+            --compile-force-framework foundry \
+            --foundry-out-directory out \
             --config-file slither.config.json \
             --fail-medium \
             --sarif results.sarif \
-            --foundry-ignore-compile || EXIT=$?
+            --foundry-compile-all=false \
+            --foundry-ignore-compile=false || EXIT=$?
           if [ "${STRICT}" = "true" ]; then exit ${EXIT:-0}; fi
           exit 0
 

@@ -32,6 +32,25 @@ import { recordAssetEventAsync } from '../../services/lineage';
 import type { AssetEventStep, AssetOutputKind } from '../../services/lineage/types';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
+
+// Prompt length caps. Kept tight (≤500) because these strings are forwarded to
+// Flux/FAL/Google where unbounded input drives GPU memory and provider cost.
+// Composition adds ~200 chars of scaffolding, so user input + scaffolding still
+// stays well under downstream model context limits.
+const PROMPT_MAX = 500;
+const NEG_PROMPT_MAX = 500;
+
+function safeErrorMessage(raw: string | undefined, fallback: string): string {
+  const msg = raw?.trim() || fallback;
+  // Strip provider names so error strings don't disclose the routing stack.
+  return msg
+    .replace(/\bFAL\b/gi, 'provider')
+    .replace(/\bGoogle\b/gi, 'provider')
+    .replace(/\bImagen\b/gi, 'provider')
+    .replace(/\bFlux\b/gi, 'model')
+    .replace(/\bElevenLabs\b/gi, 'provider');
+}
 
 // Shared idempotency + webhook schema fragments for this router's mutations.
 const clientTokenSchema = z
@@ -146,6 +165,13 @@ async function saveJobRecord(record: EditingJobRecord): Promise<void> {
 }
 
 // ── Throttle ────────────────────────────────────────────────────────────
+// NOTE (L15): this throttle lives in-process. On a multi-instance deployment
+// (e.g. horizontal autoscaling on Railway/Fly) a coordinated attacker can
+// bypass it by spraying across replicas. The spend-cap in
+// `lib/generation-guards.ts` is the authoritative global limiter — this map
+// only softens accidental client-side double-clicks. If the deployment
+// scales beyond a single node, migrate this to Redis (see lib/redis.ts)
+// rather than relaxing the cap.
 
 const lastEditByUser = new Map<string, number>();
 
@@ -296,12 +322,17 @@ export const editingRouter = router({
       z.object({
         imageUrl: z.string().url(),
         modelId: z.string().default('upscale-esrgan'),
-        prompt: z.string().optional(),
+        prompt: z.string().max(PROMPT_MAX).optional(),
         scale: z.number().min(2).max(4).default(4),
         sourceGenerationId: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.imageUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       checkEditThrottle(ctx.user.uid);
 
       const model = getEditingModelById(input.modelId);
@@ -331,7 +362,7 @@ export const editingRouter = router({
           inputUrl: input.imageUrl,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: result.error || 'Upscale failed',
+          failureReason: safeErrorMessage(result.error, 'Upscale failed'),
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -339,7 +370,7 @@ export const editingRouter = router({
         saveJobRecord(record).catch(console.error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Upscale failed',
+          message: safeErrorMessage(result.error, 'Upscale failed'),
         });
       }
 
@@ -375,6 +406,11 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.videoUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       checkEditThrottle(ctx.user.uid);
 
       const model = getEditingModelById(input.modelId);
@@ -403,7 +439,7 @@ export const editingRouter = router({
           inputUrl: input.videoUrl,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: result.error || 'Interpolation failed',
+          failureReason: safeErrorMessage(result.error, 'Interpolation failed'),
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -411,7 +447,7 @@ export const editingRouter = router({
         saveJobRecord(record).catch(console.error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Interpolation failed',
+          message: safeErrorMessage(result.error, 'Interpolation failed'),
         });
       }
 
@@ -441,16 +477,21 @@ export const editingRouter = router({
     .input(
       z.object({
         videoUrl: z.string().url(),
-        prompt: z.string().min(1, 'Describe the new style'),
+        prompt: z.string().min(1, 'Describe the new style').max(PROMPT_MAX),
         modelId: z.string().default('restyle-wan-v2v'),
-        strength: z.number().min(0).max(1).default(0.65),
-        negativePrompt: z.string().optional(),
+        strength: z.number().min(0.1).max(1).default(0.65),
+        negativePrompt: z.string().max(NEG_PROMPT_MAX).optional(),
         sourceGenerationId: z.string().optional(),
         clientToken: clientTokenSchema,
         webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.videoUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       const model = getEditingModelById(input.modelId);
       if (!model || model.operation !== 'restyle') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid restyle model' });
@@ -512,7 +553,7 @@ export const editingRouter = router({
           prompt: input.prompt,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: result.error || 'Restyle failed',
+          failureReason: safeErrorMessage(result.error, 'Restyle failed'),
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -530,13 +571,13 @@ export const editingRouter = router({
           payload: {
             operation: 'restyle',
             status: 'failed',
-            errorMessage: result.error || 'Restyle failed',
+            errorMessage: safeErrorMessage(result.error, 'Restyle failed'),
             creditsRefunded: true,
           },
         });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Restyle failed',
+          message: safeErrorMessage(result.error, 'Restyle failed'),
         });
       }
 
@@ -611,10 +652,10 @@ export const editingRouter = router({
       z.object({
         imageUrl: z.string().url(),
         maskUrl: z.string().url(),
-        prompt: z.string().default(''),
+        prompt: z.string().max(PROMPT_MAX).default(''),
         mode: inpaintModeSchema.default('replace'),
         modelId: z.string().default('inpaint-flux'),
-        negativePrompt: z.string().optional(),
+        negativePrompt: z.string().max(NEG_PROMPT_MAX).optional(),
         seed: z.number().int().optional(),
         strength: z.number().min(0).max(1).optional(),
         guidanceScale: z.number().min(1).max(20).optional(),
@@ -625,6 +666,11 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.imageUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       checkEditThrottle(ctx.user.uid);
 
       const model = getEditingModelById(input.modelId);
@@ -695,7 +741,7 @@ export const editingRouter = router({
           seed: input.seed,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: result.error || 'Inpaint failed',
+          failureReason: safeErrorMessage(result.error, 'Inpaint failed'),
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -703,7 +749,7 @@ export const editingRouter = router({
         saveJobRecord(record).catch(console.error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Inpaint failed',
+          message: safeErrorMessage(result.error, 'Inpaint failed'),
         });
       }
 
@@ -784,6 +830,11 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.imageUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       checkEditThrottle(ctx.user.uid);
 
       const model = getEditingModelById(input.modelId);
@@ -804,7 +855,7 @@ export const editingRouter = router({
         await refundCredits(ctx.user.uid, model.creditCost);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Background removal failed',
+          message: safeErrorMessage(result.error, 'Background removal failed'),
         });
       }
 
@@ -834,13 +885,18 @@ export const editingRouter = router({
     .input(
       z.object({
         videoUrl: z.string().url(),
-        prompt: z.string().min(1, 'Describe what happens next'),
+        prompt: z.string().min(1, 'Describe what happens next').max(PROMPT_MAX),
         durationSec: z.number().min(2).max(10).default(5),
         modelId: z.string().default('extend-wan'),
         sourceGenerationId: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.videoUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       checkEditThrottle(ctx.user.uid);
 
       const model = getEditingModelById(input.modelId);
@@ -917,7 +973,7 @@ export const editingRouter = router({
         await refundCredits(ctx.user.uid, model.creditCost);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Video extension failed',
+          message: safeErrorMessage(result.error, 'Video extension failed'),
         });
       }
 
@@ -983,6 +1039,11 @@ export const editingRouter = router({
         })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.imageUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
       checkEditThrottle(ctx.user.uid);
 
       const model = getEditingModelById(input.modelId);
@@ -1053,7 +1114,7 @@ export const editingRouter = router({
           negativePrompt: composed.negativePrompt,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: result.error || 'Relight failed',
+          failureReason: safeErrorMessage(result.error, 'Relight failed'),
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -1065,7 +1126,7 @@ export const editingRouter = router({
         saveJobRecord(failedRecord).catch(console.error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Relight failed',
+          message: safeErrorMessage(result.error, 'Relight failed'),
         });
       }
 

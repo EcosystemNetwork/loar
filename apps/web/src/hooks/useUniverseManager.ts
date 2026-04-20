@@ -6,9 +6,11 @@ import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/
 import { isSupportedChain } from '@/configs/chains';
 import { encodeAbiParameters } from 'viem';
 
-// WETH addresses per chain (hooks require ERC20 paired token, not native ETH)
+// WETH addresses per chain (hooks require ERC20 paired token, not native ETH).
+// MUST match UniverseManager.weth() on each chain — the contract rejects any
+// other pairedToken with "Paired token must be WETH" (UniverseManager.sol:317).
 const WETH: Partial<Record<number, `0x${string}`>> = {
-  11155111: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9', // Sepolia
+  11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Sepolia (Uniswap v4 WETH; prior value 0x7b79…E7f9 was wrong)
   84532: '0x4200000000000000000000000000000000000006', // Base Sepolia
   8453: '0x4200000000000000000000000000000000000006', // Base Mainnet
 };

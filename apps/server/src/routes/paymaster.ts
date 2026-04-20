@@ -115,10 +115,6 @@ paymasterRoutes.post('/sponsor', async (c) => {
   }
   body.chainId = chainId;
 
-  // Require sender to be present and well-formed. Quota is keyed on the
-  // userOp.sender (not the session uid) so a single user cannot drain
-  // `DAILY_SPONSOR_LIMIT × N` by cycling senders, and so a leaked session
-  // cannot attack an unlimited number of smart accounts.
   const sender = (body.userOp as { sender?: unknown })?.sender;
   if (typeof sender !== 'string' || !ADDRESS_RE.test(sender)) {
     return c.json(
@@ -139,17 +135,38 @@ paymasterRoutes.post('/sponsor', async (c) => {
     );
   }
 
-  // Per-sender daily quota.
-  const { blocked } = await consumeRateLimit(
-    `paymaster:daily:${sender.toLowerCase()}:${chainId}`,
+  // Quota is anchored to the authenticated session uid — `userOp.sender` is
+  // attacker-controlled (counterfactual ERC-4337 addresses pass the regex
+  // without needing to exist on-chain), so keying on sender alone lets one
+  // session mint unlimited fresh buckets by rotating the field. The
+  // per-sender bucket below is retained only as a secondary cap so a
+  // compromised session cannot funnel all of its quota into a single
+  // target smart account.
+  const { blocked: userBlocked } = await consumeRateLimit(
+    `paymaster:daily:${user.uid.toLowerCase()}:${chainId}`,
     24 * 60 * 60 * 1000,
     DAILY_SPONSOR_LIMIT
   );
-  if (blocked) {
+  if (userBlocked) {
     return c.json(
       {
         code: 'QUOTA_EXCEEDED',
         message: `Daily sponsored transaction limit reached (${DAILY_SPONSOR_LIMIT}/day).`,
+      },
+      429
+    );
+  }
+
+  const { blocked: senderBlocked } = await consumeRateLimit(
+    `paymaster:daily:sender:${sender.toLowerCase()}:${chainId}`,
+    24 * 60 * 60 * 1000,
+    DAILY_SPONSOR_LIMIT
+  );
+  if (senderBlocked) {
+    return c.json(
+      {
+        code: 'QUOTA_EXCEEDED',
+        message: `Daily sponsored transaction limit reached for this smart account (${DAILY_SPONSOR_LIMIT}/day).`,
       },
       429
     );

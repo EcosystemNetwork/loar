@@ -26,17 +26,9 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import { universeManagerAbi } from '../packages/abis/src/generated';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-
-// ── ABI ───────────────────────────────────────────────────────────────────────
-const artifact = JSON.parse(
-  readFileSync(
-    path.resolve(process.cwd(), 'apps/contracts/out/UniverseManager.sol/UniverseManager.json'),
-    'utf-8'
-  )
-);
-const universeManagerAbi = artifact.abi;
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';
@@ -54,7 +46,7 @@ const deployment = JSON.parse(
 const UNIVERSE_MANAGER = getAddress(deployment.contracts.UniverseManager) as `0x${string}`;
 const HOOK = getAddress(deployment.contracts.LoarHookStaticFee) as `0x${string}`;
 const LOCKER = getAddress(deployment.contracts.LoarLpLockerMultiple) as `0x${string}`;
-const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9' as const; // Sepolia WETH
+const WETH = '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14' as const; // UniverseManager.weth() on Sepolia
 
 // ── Universe config ───────────────────────────────────────────────────────────
 const UNIVERSE_NAME = 'Voidborn Saga';
@@ -441,10 +433,13 @@ async function registerInFirestore(deploy: DeployResult, imageUrl: string): Prom
   });
   const signature = await account.signMessage({ message: siweMessage });
 
-  // 3. Verify to get JWT
+  // 3. Verify to get JWT. Origin must match server's CORS_ORIGIN (default
+  // http://localhost:3001 in dev) — both /auth/verify and csrfProtection reject
+  // otherwise. SERVER_URL is the API host, not an allowed browser Origin.
+  const AUTH_ORIGIN = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3001';
   const verifyRes = await fetch(`${SERVER_URL}/auth/verify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: SERVER_URL },
+    headers: { 'Content-Type': 'application/json', Origin: AUTH_ORIGIN },
     body: JSON.stringify({ message: siweMessage, signature }),
   });
 

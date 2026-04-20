@@ -591,6 +591,16 @@ export function useUniverseMetrics(universeId: string) {
   });
 }
 
+export function useUniversesMetricsBatch(universeIds: string[]) {
+  const ids = [...universeIds].sort();
+  return useQuery({
+    queryKey: ['universe-metrics-batch', ids],
+    queryFn: () => trpcClient.analytics.getUniversesMetricsBatch.query({ universeIds: ids }),
+    enabled: ids.length > 0,
+    staleTime: 60_000,
+  });
+}
+
 export function useRecordView() {
   return useMutation({
     mutationFn: (input: Parameters<typeof trpcClient.analytics.recordView.mutate>[0]) =>

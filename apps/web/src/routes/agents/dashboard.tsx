@@ -1,7 +1,7 @@
 /**
  * Agent Dashboard — Manage clients, contracts, and commissions
  */
-import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router';
 import {
   useMyAgentProfile,
   useMyContracts,
@@ -12,7 +12,7 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Briefcase,
   Users,
@@ -34,35 +34,30 @@ export const Route = createFileRoute('/agents/dashboard')({
 
 function AgentDashboardPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isAuthenticating } = useWalletAuth();
+  // Auth is gated by `beforeLoad` (hasSession). isAuthenticating still covers
+  // the SIWE-hydration window where the cached session is being verified.
+  const { isAuthenticating } = useWalletAuth();
   const { data: profile, isLoading: profileLoading } = useMyAgentProfile();
   const { data: clients } = useAgentClients();
   const { data: contracts } = useMyContracts('ALL');
   const { data: commissionStats } = useAgentCommissionStats();
   const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'commissions'>('clients');
 
-  useEffect(() => {
-    if (!isAuthenticated && !isAuthenticating) {
-      navigate({ to: '/login', search: { redirect: '/agents/dashboard' } });
+  const contractList = (contracts as any[]) ?? [];
+  const { activeCount, proposedCount } = useMemo(() => {
+    let active = 0;
+    let proposed = 0;
+    for (const c of contractList) {
+      if (c.status === 'ACTIVE') active++;
+      else if (c.status === 'PROPOSED') proposed++;
     }
-  }, [isAuthenticated, isAuthenticating, navigate]);
+    return { activeCount: active, proposedCount: proposed };
+  }, [contractList]);
 
-  if (isAuthenticating) {
+  if (isAuthenticating || profileLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  if (profileLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
       </div>
     );
   }
@@ -79,17 +74,13 @@ function AgentDashboardPage() {
     );
   }
 
-  const activeCount = (contracts as any[])?.filter((c: any) => c.status === 'ACTIVE').length || 0;
-  const proposedCount =
-    (contracts as any[])?.filter((c: any) => c.status === 'PROPOSED').length || 0;
-
   const tabs = [
     { key: 'clients', label: 'Clients', icon: Users, count: clients?.length || 0 },
     {
       key: 'contracts',
       label: 'Contracts',
       icon: FileText,
-      count: (contracts as any[])?.length || 0,
+      count: contractList.length,
     },
     { key: 'commissions', label: 'Commissions', icon: DollarSign },
   ] as const;
@@ -186,10 +177,10 @@ function AgentDashboardPage() {
 
       {activeTab === 'contracts' && (
         <div className="space-y-3">
-          {!(contracts as any[])?.length ? (
+          {!contractList.length ? (
             <p className="py-8 text-center text-zinc-500">No contracts yet</p>
           ) : (
-            (contracts as any[]).map((contract: any) => (
+            contractList.map((contract: any) => (
               <Card key={contract.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>

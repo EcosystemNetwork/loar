@@ -4,7 +4,7 @@
  * Shows earnings breakdown by source, universe performance,
  * revenue timeline, and export functionality.
  */
-import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
+import { createFileRoute, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -102,6 +102,7 @@ function formatCompact(value: number): string {
 
 function RevenueDashboardPage() {
   const { isAuthenticated, address } = useWalletAuth();
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>('month');
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('month');
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -151,19 +152,26 @@ function RevenueDashboardPage() {
 
   // ── Derived data ─────────────────────────────────────────────────
 
-  const summaryData: RevenueSummary = (summary as unknown as RevenueSummary) ?? {
-    totalRevenue: 0,
-    netCredits: 0,
-    creditsEarned: 0,
-    creditsSpent: 0,
-    topUniverse: null,
-  };
+  const summaryData: RevenueSummary = useMemo(
+    () =>
+      (summary as unknown as RevenueSummary) ?? {
+        totalRevenue: 0,
+        netCredits: 0,
+        creditsEarned: 0,
+        creditsSpent: 0,
+        topUniverse: null,
+      },
+    [summary]
+  );
 
-  const timelineData: TimelinePoint[] = ((timeline as any)?.dataPoints ??
-    timeline ??
-    []) as TimelinePoint[];
-  const universeList: UniverseRevenue[] = ((universeData as any)?.universes ??
-    []) as UniverseRevenue[];
+  const timelineData: TimelinePoint[] = useMemo(
+    () => ((timeline as any)?.dataPoints ?? timeline ?? []) as TimelinePoint[],
+    [timeline]
+  );
+  const universeList: UniverseRevenue[] = useMemo(
+    () => ((universeData as any)?.universes ?? []) as UniverseRevenue[],
+    [universeData]
+  );
 
   // Derive source breakdown from summary data
   const sourcesLoading = summaryLoading;
@@ -554,30 +562,32 @@ function RevenueDashboardPage() {
                 </thead>
                 <tbody>
                   {universeList.map((u, idx) => (
-                    <RouterLink key={u.id} to="/universe/$id" params={{ id: u.id }}>
-                      <tr className="border-b border-zinc-800/50 hover:bg-zinc-800/50 transition-colors cursor-pointer">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-violet-500/10 text-violet-400 text-sm font-bold">
-                              {idx + 1}
-                            </div>
-                            <span className="text-sm font-medium text-white">{u.name}</span>
+                    <tr
+                      key={u.id}
+                      onClick={() => navigate({ to: '/universe/$id', params: { id: u.id } })}
+                      className="border-b border-zinc-800/50 hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-violet-500/10 text-violet-400 text-sm font-bold">
+                            {idx + 1}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm font-semibold text-white">
-                          {formatUSD(u.revenue)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm text-zinc-400">
-                          <span className="inline-flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {u.holders.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm text-zinc-400">
-                          {u.subscribers.toLocaleString()}
-                        </td>
-                      </tr>
-                    </RouterLink>
+                          <span className="text-sm font-medium text-white">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-semibold text-white">
+                        {formatUSD(u.revenue)}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-zinc-400">
+                        <span className="inline-flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          {u.holders.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-zinc-400">
+                        {u.subscribers.toLocaleString()}
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>

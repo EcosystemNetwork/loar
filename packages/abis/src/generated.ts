@@ -6148,11 +6148,12 @@ export const governanceErc20Abi = [
     inputs: [
       { name: '_name', internalType: 'string', type: 'string' },
       { name: '_symbol', internalType: 'string', type: 'string' },
-      { name: '_maxSupply', internalType: 'uint256', type: 'uint256' },
-      { name: '_admin', internalType: 'address', type: 'address' },
       { name: '_imageUrl', internalType: 'string', type: 'string' },
       { name: '_metadata', internalType: 'string', type: 'string' },
       { name: '_context', internalType: 'string', type: 'string' },
+      { name: '_tokenAdmin', internalType: 'address', type: 'address' },
+      { name: '_supply', internalType: 'uint256', type: 'uint256' },
+      { name: '_mintTo', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -6168,20 +6169,6 @@ export const governanceErc20Abi = [
     inputs: [],
     name: 'DOMAIN_SEPARATOR',
     outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'symbols', internalType: 'string[]', type: 'string[]' }],
-    name: 'addBlockedSymbols',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'admin',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -6209,13 +6196,6 @@ export const governanceErc20Abi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'balanceOf',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '', internalType: 'string', type: 'string' }],
-    name: 'blockedSymbols',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -6290,13 +6270,6 @@ export const governanceErc20Abi = [
   {
     type: 'function',
     inputs: [],
-    name: 'deployer',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'eip712Domain',
     outputs: [
       { name: 'fields', internalType: 'bytes1', type: 'bytes1' },
@@ -6338,13 +6311,6 @@ export const governanceErc20Abi = [
     inputs: [],
     name: 'imageUrl',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '_symbol', internalType: 'string', type: 'string' }],
-    name: 'isSymbolBlocked',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -6392,16 +6358,16 @@ export const governanceErc20Abi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'symbols', internalType: 'string[]', type: 'string[]' }],
-    name: 'removeBlockedSymbols',
-    outputs: [],
-    stateMutability: 'nonpayable',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
     inputs: [],
-    name: 'symbol',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    name: 'tokenAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -6431,13 +6397,6 @@ export const governanceErc20Abi = [
     name: 'transferFrom',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'universe',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
   },
   {
     type: 'event',
@@ -6632,9 +6591,6 @@ export const governanceErc20Abi = [
     inputs: [{ name: 'str', internalType: 'string', type: 'string' }],
     name: 'StringTooLong',
   },
-  { type: 'error', inputs: [], name: 'SymbolBlocked' },
-  { type: 'error', inputs: [], name: 'SymbolTooLong' },
-  { type: 'error', inputs: [], name: 'SymbolTooShort' },
   {
     type: 'error',
     inputs: [{ name: 'expiry', internalType: 'uint256', type: 'uint256' }],
@@ -7076,6 +7032,13 @@ export const launchpadStakingAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'distributors',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'earlyUnstakePenaltyBps',
     outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
@@ -7130,6 +7093,20 @@ export const launchpadStakingAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'initializeDistributionGuardV2',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'lastDistributionBlock',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'liquidityPool',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -7139,6 +7116,20 @@ export const launchpadStakingAbi = [
     inputs: [],
     name: 'loarToken',
     outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'maxRewardBpsPerDistribution',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'minDistributionInterval',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -7190,6 +7181,26 @@ export const launchpadStakingAbi = [
     type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newMinInterval', internalType: 'uint256', type: 'uint256' },
+      { name: 'newMaxRewardBps', internalType: 'uint16', type: 'uint16' },
+    ],
+    name: 'setDistributionGuard',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'who', internalType: 'address', type: 'address' },
+      { name: 'allowed', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setDistributor',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -7392,6 +7403,34 @@ export const launchpadStakingAbi = [
     name: 'wouldIncurPenalty',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'minInterval',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'maxRewardBps',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'DistributionGuardChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'who', internalType: 'address', type: 'address', indexed: true },
+      { name: 'allowed', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'DistributorChanged',
   },
   {
     type: 'event',
@@ -7743,6 +7782,8 @@ export const launchpadStakingAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'AddressInsufficientBalance',
   },
+  { type: 'error', inputs: [], name: 'DistributionExceedsCap' },
+  { type: 'error', inputs: [], name: 'DistributionTooSoon' },
   {
     type: 'error',
     inputs: [{ name: 'implementation', internalType: 'address', type: 'address' }],
@@ -7755,6 +7796,7 @@ export const launchpadStakingAbi = [
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InsufficientStake' },
   { type: 'error', inputs: [], name: 'InvalidInitialization' },
+  { type: 'error', inputs: [], name: 'NotDistributor' },
   { type: 'error', inputs: [], name: 'NotInitializing' },
   { type: 'error', inputs: [], name: 'NothingStaked' },
   { type: 'error', inputs: [], name: 'NothingToClaim' },
@@ -16148,6 +16190,13 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'cancelBondingCurveHalt',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'recipient', internalType: 'address', type: 'address' }],
     name: 'claimEth',
     outputs: [],
@@ -16384,6 +16433,13 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'emergencyHaltBondingCurve',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'hook', internalType: 'address', type: 'address' }],
     name: 'enabledHooks',
     outputs: [{ name: 'enabled', internalType: 'bool', type: 'bool' }],
@@ -16398,6 +16454,13 @@ export const universeManagerAbi = [
     name: 'enabledLockers',
     outputs: [{ name: 'enabled', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'universeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'executeBondingCurveHalt',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -16589,6 +16652,16 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'halted', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'queueBondingCurveHalt',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'renounceOwnership',
     outputs: [],
@@ -16624,16 +16697,6 @@ export const universeManagerAbi = [
       { name: 'approved', internalType: 'bool', type: 'bool' },
     ],
     name: 'setApprovalForAll',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'universeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'halted', internalType: 'bool', type: 'bool' },
-    ],
-    name: 'setBondingCurveHalted',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -16737,6 +16800,13 @@ export const universeManagerAbi = [
     name: 'symbol',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'syncUniverseAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -17492,7 +17562,16 @@ export const universeManagerAbi = [
 export const universeTokenDeployerAbi = [
   {
     type: 'constructor',
-    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    inputs: [
+      { name: '_universeManager', internalType: 'address', type: 'address' },
+      { name: '_tokenFactory', internalType: 'address', type: 'address' },
+      { name: '_governorFactory', internalType: 'address', type: 'address' },
+      {
+        name: '_bondingCurveFactory',
+        internalType: 'address',
+        type: 'address',
+      },
+    ],
     stateMutability: 'nonpayable',
   },
   {
@@ -17512,15 +17591,15 @@ export const universeTokenDeployerAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'DEFAULT_CURVE_BPS',
-    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
+    name: 'DEFAULT_GRADUATION_ETH',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     inputs: [],
-    name: 'DEFAULT_GRADUATION_ETH',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'DEFAULT_LP_BPS',
+    outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
     stateMutability: 'view',
   },
   {
@@ -17547,7 +17626,7 @@ export const universeTokenDeployerAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'MIN_CURVE_BPS',
+    name: 'MIN_LP_BPS',
     outputs: [{ name: '', internalType: 'uint16', type: 'uint16' }],
     stateMutability: 'view',
   },
@@ -17563,6 +17642,26 @@ export const universeTokenDeployerAbi = [
     inputs: [],
     name: 'TOKEN_SUPPLY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'bondingCurveFactory',
+    outputs: [
+      {
+        name: '',
+        internalType: 'contract IBondingCurveFactory',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'communityRecipient',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -17634,7 +17733,7 @@ export const universeTokenDeployerAbi = [
             internalType: 'struct IUniverseManager.AllocationConfig',
             type: 'tuple',
             components: [
-              { name: 'curveBps', internalType: 'uint16', type: 'uint16' },
+              { name: 'lpBps', internalType: 'uint16', type: 'uint16' },
               { name: 'creatorBps', internalType: 'uint16', type: 'uint16' },
               { name: 'treasuryBps', internalType: 'uint16', type: 'uint16' },
               { name: 'communityBps', internalType: 'uint16', type: 'uint16' },
@@ -17655,8 +17754,8 @@ export const universeTokenDeployerAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'deprecated',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    name: 'governorFactory',
+    outputs: [{ name: '', internalType: 'contract IGovernorFactory', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -17668,8 +17767,68 @@ export const universeTokenDeployerAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: '_deprecated', internalType: 'bool', type: 'bool' }],
-    name: 'setDeprecated',
+    inputs: [{ name: '_factory', internalType: 'address', type: 'address' }],
+    name: 'setBondingCurveFactory',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_communityRecipient', internalType: 'address', type: 'address' }],
+    name: 'setCommunityRecipient',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_factory', internalType: 'address', type: 'address' }],
+    name: 'setGovernorFactory',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_timelock', internalType: 'address', type: 'address' }],
+    name: 'setTimelock',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_factory', internalType: 'address', type: 'address' }],
+    name: 'setTokenFactory',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '_vestingContract', internalType: 'address', type: 'address' },
+      { name: '_cliff', internalType: 'uint64', type: 'uint64' },
+      { name: '_duration', internalType: 'uint64', type: 'uint64' },
+    ],
+    name: 'setVestingConfig',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'timelock',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'tokenFactory',
+    outputs: [{ name: '', internalType: 'contract ITokenFactory', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -17677,7 +17836,28 @@ export const universeTokenDeployerAbi = [
     type: 'function',
     inputs: [],
     name: 'universeManager',
-    outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'vestingCliff',
+    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'vestingContract',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'vestingDuration',
+    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
     stateMutability: 'view',
   },
   {
@@ -17691,7 +17871,44 @@ export const universeTokenDeployerAbi = [
         indexed: true,
       },
       {
-        name: 'curveAmount',
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'vestingId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CreatorVestingCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'universeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'lpAmount',
         internalType: 'uint256',
         type: 'uint256',
         indexed: false,
@@ -17733,20 +17950,35 @@ export const universeTokenDeployerAbi = [
         type: 'address',
         indexed: true,
       },
+      { name: 'hook', internalType: 'address', type: 'address', indexed: true },
       {
-        name: 'bondingCurve',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'governor',
+        name: 'locker',
         internalType: 'address',
         type: 'address',
         indexed: false,
       },
     ],
     name: 'TokenDeployed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'vestingContract',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      { name: 'cliff', internalType: 'uint64', type: 'uint64', indexed: false },
+      {
+        name: 'duration',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'VestingConfigUpdated',
   },
   {
     type: 'error',
@@ -17759,9 +17991,11 @@ export const universeTokenDeployerAbi = [
     name: 'AddressInsufficientBalance',
   },
   { type: 'error', inputs: [], name: 'AllocationSupplyMismatch' },
-  { type: 'error', inputs: [], name: 'DeprecatedUseV2' },
+  { type: 'error', inputs: [], name: 'BondingCurveFactoryNotSet' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
   { type: 'error', inputs: [], name: 'InvalidAllocation' },
+  { type: 'error', inputs: [], name: 'OnlyOwner' },
+  { type: 'error', inputs: [], name: 'OnlyUniverseManager' },
   { type: 'error', inputs: [], name: 'Reentrancy' },
   {
     type: 'error',
@@ -22837,14 +23071,6 @@ export const useGovernanceErc20_DomainSeparator_read = /*#__PURE__*/ createUseRe
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"admin"`
- */
-export const useGovernanceErc20_Admin_read = /*#__PURE__*/ createUseReadContract({
-  abi: governanceErc20Abi,
-  functionName: 'admin',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"allowance"`
  */
 export const useGovernanceErc20_Allowance_read = /*#__PURE__*/ createUseReadContract({
@@ -22858,14 +23084,6 @@ export const useGovernanceErc20_Allowance_read = /*#__PURE__*/ createUseReadCont
 export const useGovernanceErc20_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
   abi: governanceErc20Abi,
   functionName: 'balanceOf',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"blockedSymbols"`
- */
-export const useGovernanceErc20_BlockedSymbols_read = /*#__PURE__*/ createUseReadContract({
-  abi: governanceErc20Abi,
-  functionName: 'blockedSymbols',
 });
 
 /**
@@ -22909,14 +23127,6 @@ export const useGovernanceErc20_Delegates_read = /*#__PURE__*/ createUseReadCont
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"deployer"`
- */
-export const useGovernanceErc20_Deployer_read = /*#__PURE__*/ createUseReadContract({
-  abi: governanceErc20Abi,
-  functionName: 'deployer',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"eip712Domain"`
  */
 export const useGovernanceErc20_Eip712Domain_read = /*#__PURE__*/ createUseReadContract({
@@ -22954,14 +23164,6 @@ export const useGovernanceErc20_GetVotes_read = /*#__PURE__*/ createUseReadContr
 export const useGovernanceErc20_ImageUrl_read = /*#__PURE__*/ createUseReadContract({
   abi: governanceErc20Abi,
   functionName: 'imageUrl',
-});
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"isSymbolBlocked"`
- */
-export const useGovernanceErc20_IsSymbolBlocked_read = /*#__PURE__*/ createUseReadContract({
-  abi: governanceErc20Abi,
-  functionName: 'isSymbolBlocked',
 });
 
 /**
@@ -23005,6 +23207,14 @@ export const useGovernanceErc20_Symbol_read = /*#__PURE__*/ createUseReadContrac
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"tokenAdmin"`
+ */
+export const useGovernanceErc20_TokenAdmin_read = /*#__PURE__*/ createUseReadContract({
+  abi: governanceErc20Abi,
+  functionName: 'tokenAdmin',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"totalSupply"`
  */
 export const useGovernanceErc20_TotalSupply_read = /*#__PURE__*/ createUseReadContract({
@@ -23013,26 +23223,10 @@ export const useGovernanceErc20_TotalSupply_read = /*#__PURE__*/ createUseReadCo
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"universe"`
- */
-export const useGovernanceErc20_Universe_read = /*#__PURE__*/ createUseReadContract({
-  abi: governanceErc20Abi,
-  functionName: 'universe',
-});
-
-/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__
  */
 export const useGovernanceErc20_undefined_write = /*#__PURE__*/ createUseWriteContract({
   abi: governanceErc20Abi,
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"addBlockedSymbols"`
- */
-export const useGovernanceErc20_AddBlockedSymbols_write = /*#__PURE__*/ createUseWriteContract({
-  abi: governanceErc20Abi,
-  functionName: 'addBlockedSymbols',
 });
 
 /**
@@ -23068,14 +23262,6 @@ export const useGovernanceErc20_Permit_write = /*#__PURE__*/ createUseWriteContr
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"removeBlockedSymbols"`
- */
-export const useGovernanceErc20_RemoveBlockedSymbols_write = /*#__PURE__*/ createUseWriteContract({
-  abi: governanceErc20Abi,
-  functionName: 'removeBlockedSymbols',
-});
-
-/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"transfer"`
  */
 export const useGovernanceErc20_Transfer_write = /*#__PURE__*/ createUseWriteContract({
@@ -23097,15 +23283,6 @@ export const useGovernanceErc20_TransferFrom_write = /*#__PURE__*/ createUseWrit
 export const useGovernanceErc20_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: governanceErc20Abi,
 });
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"addBlockedSymbols"`
- */
-export const useGovernanceErc20_AddBlockedSymbols_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'addBlockedSymbols',
-  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"approve"`
@@ -23138,15 +23315,6 @@ export const useGovernanceErc20_Permit_simulate = /*#__PURE__*/ createUseSimulat
   abi: governanceErc20Abi,
   functionName: 'permit',
 });
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"removeBlockedSymbols"`
- */
-export const useGovernanceErc20_RemoveBlockedSymbols_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: governanceErc20Abi,
-    functionName: 'removeBlockedSymbols',
-  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link governanceErc20Abi}__ and `functionName` set to `"transfer"`
@@ -23539,6 +23707,14 @@ export const useLaunchpadStaking_UpgradeInterfaceVersion_read = /*#__PURE__*/ cr
 );
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"distributors"`
+ */
+export const useLaunchpadStaking_Distributors_read = /*#__PURE__*/ createUseReadContract({
+  abi: launchpadStakingAbi,
+  functionName: 'distributors',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"earlyUnstakePenaltyBps"`
  */
 export const useLaunchpadStaking_EarlyUnstakePenaltyBps_read = /*#__PURE__*/ createUseReadContract({
@@ -23587,6 +23763,14 @@ export const useLaunchpadStaking_HasPriorityAccess_read = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"lastDistributionBlock"`
+ */
+export const useLaunchpadStaking_LastDistributionBlock_read = /*#__PURE__*/ createUseReadContract({
+  abi: launchpadStakingAbi,
+  functionName: 'lastDistributionBlock',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"liquidityPool"`
  */
 export const useLaunchpadStaking_LiquidityPool_read = /*#__PURE__*/ createUseReadContract({
@@ -23601,6 +23785,25 @@ export const useLaunchpadStaking_LoarToken_read = /*#__PURE__*/ createUseReadCon
   abi: launchpadStakingAbi,
   functionName: 'loarToken',
 });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"maxRewardBpsPerDistribution"`
+ */
+export const useLaunchpadStaking_MaxRewardBpsPerDistribution_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchpadStakingAbi,
+    functionName: 'maxRewardBpsPerDistribution',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"minDistributionInterval"`
+ */
+export const useLaunchpadStaking_MinDistributionInterval_read = /*#__PURE__*/ createUseReadContract(
+  {
+    abi: launchpadStakingAbi,
+    functionName: 'minDistributionInterval',
+  }
+);
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"minLockPeriod"`
@@ -23755,6 +23958,15 @@ export const useLaunchpadStaking_Initialize_write = /*#__PURE__*/ createUseWrite
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"initializeDistributionGuardV2"`
+ */
+export const useLaunchpadStaking_InitializeDistributionGuardV2_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: launchpadStakingAbi,
+    functionName: 'initializeDistributionGuardV2',
+  });
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"pause"`
  */
 export const useLaunchpadStaking_Pause_write = /*#__PURE__*/ createUseWriteContract({
@@ -23768,6 +23980,22 @@ export const useLaunchpadStaking_Pause_write = /*#__PURE__*/ createUseWriteContr
 export const useLaunchpadStaking_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
   abi: launchpadStakingAbi,
   functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"setDistributionGuard"`
+ */
+export const useLaunchpadStaking_SetDistributionGuard_write = /*#__PURE__*/ createUseWriteContract({
+  abi: launchpadStakingAbi,
+  functionName: 'setDistributionGuard',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"setDistributor"`
+ */
+export const useLaunchpadStaking_SetDistributor_write = /*#__PURE__*/ createUseWriteContract({
+  abi: launchpadStakingAbi,
+  functionName: 'setDistributor',
 });
 
 /**
@@ -23901,6 +24129,15 @@ export const useLaunchpadStaking_Initialize_simulate = /*#__PURE__*/ createUseSi
 });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"initializeDistributionGuardV2"`
+ */
+export const useLaunchpadStaking_InitializeDistributionGuardV2_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchpadStakingAbi,
+    functionName: 'initializeDistributionGuardV2',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"pause"`
  */
 export const useLaunchpadStaking_Pause_simulate = /*#__PURE__*/ createUseSimulateContract({
@@ -23916,6 +24153,23 @@ export const useLaunchpadStaking_RenounceOwnership_simulate =
     abi: launchpadStakingAbi,
     functionName: 'renounceOwnership',
   });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"setDistributionGuard"`
+ */
+export const useLaunchpadStaking_SetDistributionGuard_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchpadStakingAbi,
+    functionName: 'setDistributionGuard',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"setDistributor"`
+ */
+export const useLaunchpadStaking_SetDistributor_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: launchpadStakingAbi,
+  functionName: 'setDistributor',
+});
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchpadStakingAbi}__ and `functionName` set to `"setEarlyUnstakePenalty"`
@@ -24027,6 +24281,24 @@ export const useLaunchpadStaking_UpgradeToAndCall_simulate =
 export const useLaunchpadStaking_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: launchpadStakingAbi,
 });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"DistributionGuardChanged"`
+ */
+export const useLaunchpadStaking_DistributionGuardChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchpadStakingAbi,
+    eventName: 'DistributionGuardChanged',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"DistributorChanged"`
+ */
+export const useLaunchpadStaking_DistributorChanged_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchpadStakingAbi,
+    eventName: 'DistributorChanged',
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchpadStakingAbi}__ and `eventName` set to `"EarlyUnstakePenaltyChanged"`
@@ -31536,6 +31808,16 @@ export const useUniverseManager_Approve_write = /*#__PURE__*/ createUseWriteCont
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"cancelBondingCurveHalt"`
+ */
+export const useUniverseManager_CancelBondingCurveHalt_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: universeManagerAbi,
+    functionName: 'cancelBondingCurveHalt',
+  }
+);
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimEth"`
  */
 export const useUniverseManager_ClaimEth_write = /*#__PURE__*/ createUseWriteContract({
@@ -31577,6 +31859,24 @@ export const useUniverseManager_DeployUniverseToken_write = /*#__PURE__*/ create
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"emergencyHaltBondingCurve"`
+ */
+export const useUniverseManager_EmergencyHaltBondingCurve_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeManagerAbi,
+    functionName: 'emergencyHaltBondingCurve',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"executeBondingCurveHalt"`
+ */
+export const useUniverseManager_ExecuteBondingCurveHalt_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeManagerAbi,
+    functionName: 'executeBondingCurveHalt',
+  });
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"graduateFromBondingCurve"`
  */
 export const useUniverseManager_GraduateFromBondingCurve_write =
@@ -31602,6 +31902,14 @@ export const useUniverseManager_Pause_write = /*#__PURE__*/ createUseWriteContra
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"queueBondingCurveHalt"`
+ */
+export const useUniverseManager_QueueBondingCurveHalt_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'queueBondingCurveHalt',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"renounceOwnership"`
  */
 export const useUniverseManager_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
@@ -31623,14 +31931,6 @@ export const useUniverseManager_SafeTransferFrom_write = /*#__PURE__*/ createUse
 export const useUniverseManager_SetApprovalForAll_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeManagerAbi,
   functionName: 'setApprovalForAll',
-});
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setBondingCurveHalted"`
- */
-export const useUniverseManager_SetBondingCurveHalted_write = /*#__PURE__*/ createUseWriteContract({
-  abi: universeManagerAbi,
-  functionName: 'setBondingCurveHalted',
 });
 
 /**
@@ -31722,6 +32022,14 @@ export const useUniverseManager_SetWeth_write = /*#__PURE__*/ createUseWriteCont
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"syncUniverseAdmin"`
+ */
+export const useUniverseManager_SyncUniverseAdmin_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'syncUniverseAdmin',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferFrom"`
  */
 export const useUniverseManager_TransferFrom_write = /*#__PURE__*/ createUseWriteContract({
@@ -31759,6 +32067,15 @@ export const useUniverseManager_Approve_simulate = /*#__PURE__*/ createUseSimula
   abi: universeManagerAbi,
   functionName: 'approve',
 });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"cancelBondingCurveHalt"`
+ */
+export const useUniverseManager_CancelBondingCurveHalt_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'cancelBondingCurveHalt',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"claimEth"`
@@ -31803,6 +32120,24 @@ export const useUniverseManager_DeployUniverseToken_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"emergencyHaltBondingCurve"`
+ */
+export const useUniverseManager_EmergencyHaltBondingCurve_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'emergencyHaltBondingCurve',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"executeBondingCurveHalt"`
+ */
+export const useUniverseManager_ExecuteBondingCurveHalt_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'executeBondingCurveHalt',
+  });
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"graduateFromBondingCurve"`
  */
 export const useUniverseManager_GraduateFromBondingCurve_simulate =
@@ -31827,6 +32162,15 @@ export const useUniverseManager_Pause_simulate = /*#__PURE__*/ createUseSimulate
   abi: universeManagerAbi,
   functionName: 'pause',
 });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"queueBondingCurveHalt"`
+ */
+export const useUniverseManager_QueueBondingCurveHalt_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'queueBondingCurveHalt',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"renounceOwnership"`
@@ -31854,15 +32198,6 @@ export const useUniverseManager_SetApprovalForAll_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeManagerAbi,
     functionName: 'setApprovalForAll',
-  });
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setBondingCurveHalted"`
- */
-export const useUniverseManager_SetBondingCurveHalted_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeManagerAbi,
-    functionName: 'setBondingCurveHalted',
   });
 
 /**
@@ -31958,6 +32293,15 @@ export const useUniverseManager_SetWeth_simulate = /*#__PURE__*/ createUseSimula
   abi: universeManagerAbi,
   functionName: 'setWeth',
 });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"syncUniverseAdmin"`
+ */
+export const useUniverseManager_SyncUniverseAdmin_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeManagerAbi,
+    functionName: 'syncUniverseAdmin',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"transferFrom"`
@@ -32229,14 +32573,6 @@ export const useUniverseTokenDeployer_DefaultCreatorBps_read = /*#__PURE__*/ cre
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"DEFAULT_CURVE_BPS"`
- */
-export const useUniverseTokenDeployer_DefaultCurveBps_read = /*#__PURE__*/ createUseReadContract({
-  abi: universeTokenDeployerAbi,
-  functionName: 'DEFAULT_CURVE_BPS',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"DEFAULT_GRADUATION_ETH"`
  */
 export const useUniverseTokenDeployer_DefaultGraduationEth_read =
@@ -32244,6 +32580,14 @@ export const useUniverseTokenDeployer_DefaultGraduationEth_read =
     abi: universeTokenDeployerAbi,
     functionName: 'DEFAULT_GRADUATION_ETH',
   });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"DEFAULT_LP_BPS"`
+ */
+export const useUniverseTokenDeployer_DefaultLpBps_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'DEFAULT_LP_BPS',
+});
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"DEFAULT_MAX_BUY_BPS"`
@@ -32272,11 +32616,11 @@ export const useUniverseTokenDeployer_MaxCreatorBps_read = /*#__PURE__*/ createU
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"MIN_CURVE_BPS"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"MIN_LP_BPS"`
  */
-export const useUniverseTokenDeployer_MinCurveBps_read = /*#__PURE__*/ createUseReadContract({
+export const useUniverseTokenDeployer_MinLpBps_read = /*#__PURE__*/ createUseReadContract({
   abi: universeTokenDeployerAbi,
-  functionName: 'MIN_CURVE_BPS',
+  functionName: 'MIN_LP_BPS',
 });
 
 /**
@@ -32296,11 +32640,30 @@ export const useUniverseTokenDeployer_TokenSupply_read = /*#__PURE__*/ createUse
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"deprecated"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"bondingCurveFactory"`
  */
-export const useUniverseTokenDeployer_Deprecated_read = /*#__PURE__*/ createUseReadContract({
+export const useUniverseTokenDeployer_BondingCurveFactory_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'bondingCurveFactory',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"communityRecipient"`
+ */
+export const useUniverseTokenDeployer_CommunityRecipient_read = /*#__PURE__*/ createUseReadContract(
+  {
+    abi: universeTokenDeployerAbi,
+    functionName: 'communityRecipient',
+  }
+);
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"governorFactory"`
+ */
+export const useUniverseTokenDeployer_GovernorFactory_read = /*#__PURE__*/ createUseReadContract({
   abi: universeTokenDeployerAbi,
-  functionName: 'deprecated',
+  functionName: 'governorFactory',
 });
 
 /**
@@ -32312,11 +32675,51 @@ export const useUniverseTokenDeployer_Owner_read = /*#__PURE__*/ createUseReadCo
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"timelock"`
+ */
+export const useUniverseTokenDeployer_Timelock_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'timelock',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"tokenFactory"`
+ */
+export const useUniverseTokenDeployer_TokenFactory_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'tokenFactory',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"universeManager"`
  */
 export const useUniverseTokenDeployer_UniverseManager_read = /*#__PURE__*/ createUseReadContract({
   abi: universeTokenDeployerAbi,
   functionName: 'universeManager',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"vestingCliff"`
+ */
+export const useUniverseTokenDeployer_VestingCliff_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'vestingCliff',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"vestingContract"`
+ */
+export const useUniverseTokenDeployer_VestingContract_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'vestingContract',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"vestingDuration"`
+ */
+export const useUniverseTokenDeployer_VestingDuration_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'vestingDuration',
 });
 
 /**
@@ -32336,12 +32739,66 @@ export const useUniverseTokenDeployer_DeployTokenAndGovernance_write =
   });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setDeprecated"`
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setBondingCurveFactory"`
  */
-export const useUniverseTokenDeployer_SetDeprecated_write = /*#__PURE__*/ createUseWriteContract({
+export const useUniverseTokenDeployer_SetBondingCurveFactory_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setBondingCurveFactory',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setCommunityRecipient"`
+ */
+export const useUniverseTokenDeployer_SetCommunityRecipient_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setCommunityRecipient',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setGovernorFactory"`
+ */
+export const useUniverseTokenDeployer_SetGovernorFactory_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setGovernorFactory',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setTimelock"`
+ */
+export const useUniverseTokenDeployer_SetTimelock_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeTokenDeployerAbi,
-  functionName: 'setDeprecated',
+  functionName: 'setTimelock',
 });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setTokenFactory"`
+ */
+export const useUniverseTokenDeployer_SetTokenFactory_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeTokenDeployerAbi,
+  functionName: 'setTokenFactory',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setVestingConfig"`
+ */
+export const useUniverseTokenDeployer_SetVestingConfig_write = /*#__PURE__*/ createUseWriteContract(
+  {
+    abi: universeTokenDeployerAbi,
+    functionName: 'setVestingConfig',
+  }
+);
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useUniverseTokenDeployer_TransferOwnership_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'transferOwnership',
+  });
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__
@@ -32360,12 +32817,66 @@ export const useUniverseTokenDeployer_DeployTokenAndGovernance_simulate =
   });
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setDeprecated"`
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setBondingCurveFactory"`
  */
-export const useUniverseTokenDeployer_SetDeprecated_simulate =
+export const useUniverseTokenDeployer_SetBondingCurveFactory_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeTokenDeployerAbi,
-    functionName: 'setDeprecated',
+    functionName: 'setBondingCurveFactory',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setCommunityRecipient"`
+ */
+export const useUniverseTokenDeployer_SetCommunityRecipient_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setCommunityRecipient',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setGovernorFactory"`
+ */
+export const useUniverseTokenDeployer_SetGovernorFactory_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setGovernorFactory',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setTimelock"`
+ */
+export const useUniverseTokenDeployer_SetTimelock_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setTimelock',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setTokenFactory"`
+ */
+export const useUniverseTokenDeployer_SetTokenFactory_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setTokenFactory',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"setVestingConfig"`
+ */
+export const useUniverseTokenDeployer_SetVestingConfig_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'setVestingConfig',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useUniverseTokenDeployer_TransferOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeTokenDeployerAbi,
+    functionName: 'transferOwnership',
   });
 
 /**
@@ -32374,6 +32885,15 @@ export const useUniverseTokenDeployer_SetDeprecated_simulate =
 export const useUniverseTokenDeployer_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeTokenDeployerAbi,
 });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `eventName` set to `"CreatorVestingCreated"`
+ */
+export const useUniverseTokenDeployer_CreatorVestingCreated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeTokenDeployerAbi,
+    eventName: 'CreatorVestingCreated',
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `eventName` set to `"TokenAllocation"`
@@ -32391,4 +32911,13 @@ export const useUniverseTokenDeployer_TokenDeployed_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeTokenDeployerAbi,
     eventName: 'TokenDeployed',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeTokenDeployerAbi}__ and `eventName` set to `"VestingConfigUpdated"`
+ */
+export const useUniverseTokenDeployer_VestingConfigUpdated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeTokenDeployerAbi,
+    eventName: 'VestingConfigUpdated',
   });

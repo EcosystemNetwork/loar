@@ -4,11 +4,11 @@ import type { Abi } from 'viem';
 import { etherscan, react, foundry } from '@wagmi/cli/plugins';
 import { mainnet, sepolia, baseSepolia } from 'wagmi/chains';
 
-import UniverseTokenDeployer from './apps/contracts/out/UniverseTokenDeployer.sol/UniverseTokenDeployer.json';
+import UniverseTokenDeployer from './apps/contracts/out/UniverseTokenDeployerV3.sol/UniverseTokenDeployerV3.json';
 import UniverseManagerAbi from './apps/contracts/out/UniverseManager.sol/UniverseManager.json';
 import LoarLpLockerMultiple from './apps/contracts/out/LoarLpLockerMultiple.sol/LoarLpLockerMultiple.json';
 import Universe from './apps/contracts/out/Universe.sol/Universe.json';
-import GovernanceERC20 from './apps/contracts/out/GovernanceERC20.sol/GovernanceERC20.json';
+import GovernanceERC20 from './apps/contracts/out/GovernanceTokenFactory.sol/GovernanceERC20.json';
 import UniverseGovernor from './apps/contracts/out/UniverseGovernor.sol/UniverseGovernor.json';
 import LoarFeeLocker from './apps/contracts/out/LoarFeeLocker.sol/LoarFeeLocker.json';
 import LoarHookStaticFee from './apps/contracts/out/LoarHookStaticFee.sol/LoarHookStaticFee.json';

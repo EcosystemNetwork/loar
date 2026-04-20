@@ -31,6 +31,16 @@ import { logFailedRefund } from '../../lib/refund-audit';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { getImageModelById } from '../../services/image-models';
+import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
+
+function maskProviderName(raw: string): string {
+  return raw
+    .replace(/\bFAL\b/gi, 'provider')
+    .replace(/\bGoogle\b/gi, 'provider')
+    .replace(/\bImagen\b/gi, 'provider')
+    .replace(/\bGOOGLE_API_KEY\b/g, 'image-provider credential')
+    .replace(/\bFAL_KEY\b/g, 'image-provider credential');
+}
 
 // ── Schemas ────────────────────────────────────────────────────────────
 
@@ -39,6 +49,9 @@ export type OutpaintAspect = (typeof TARGET_ASPECTS)[number];
 
 const expandSchema = z.object({
   sourceImageUrl: z.string().url(),
+  /** Existing generation id the caller is reframing from. Used for ownership
+   *  authz in edit-source-authz (an imageUrl alone isn't always in our tables). */
+  sourceGenerationId: z.string().optional(),
   targetAspect: z.enum(TARGET_ASPECTS),
   /** 0 = source pinned to left, 0.5 = centered, 1 = pinned to right */
   anchorX: z.number().min(0).max(1).default(0.5),
@@ -47,7 +60,9 @@ const expandSchema = z.object({
   /** 1 = source fills target, >1 = zoomed out (source shrinks, more canvas fills in) */
   zoomFactor: z.number().min(1).max(4).default(1),
   mode: z.enum(['preserve', 'creative']).default('preserve'),
-  prompt: z.string().max(1000).default(''),
+  // Prompt caps tightened (was 1000) — long user prompts compose with ~400 chars
+  // of scaffolding, and the provider reliably degrades past ~800 chars total.
+  prompt: z.string().max(500).default(''),
   negativePrompt: z.string().max(500).optional(),
   universeId: z.string().optional(),
   entityId: z.string().optional(),
@@ -250,6 +265,12 @@ export const outpaintRouter = router({
         });
       }
 
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.sourceImageUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
+
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
 
@@ -391,7 +412,9 @@ export const outpaintRouter = router({
           const isConfig = /API_KEY|FAL_KEY|GOOGLE_API_KEY|not configured/i.test(result.error);
           throw new TRPCError({
             code: isConfig ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
-            message: result.error,
+            message: isConfig
+              ? 'Image generation temporarily unavailable'
+              : maskProviderName(result.error),
           });
         }
 

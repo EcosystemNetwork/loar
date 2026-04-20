@@ -30,7 +30,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia, baseSepolia } from 'viem/chains';
 
-const RECIPIENT: Address = getAddress('0xf6be8B4ee63994277E88B3e0e76171a0Ab267D99');
+const RECIPIENT: Address = getAddress('0x7180560dF50c671b99F8B8d102F3439203a8F761');
 const AMOUNT_WHOLE = 5000n;
 
 const LOAR_SEPOLIA: Address = getAddress('0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F');

@@ -100,7 +100,17 @@ const MODE_CONFIG: Record<
   },
 };
 
+// Client-side blob cap. The `/api/upload` endpoint enforces a stricter server
+// limit (10MB masks, 15MB frames); this pre-check keeps the user from spending
+// seconds uploading a 400MB canvas only to be rejected — and prevents the
+// browser from blowing through memory while building the form body.
+const CLIENT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
+
 async function uploadBlob(blob: Blob, filename: string): Promise<string> {
+  if (blob.size === 0) throw new Error('Upload payload is empty');
+  if (blob.size > CLIENT_UPLOAD_MAX_BYTES) {
+    throw new Error(`Upload exceeds ${(CLIENT_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(0)}MB limit`);
+  }
   const form = new FormData();
   form.append('file', blob, filename);
   const res = await fetch(`${import.meta.env.VITE_SERVER_URL || ''}/api/upload`, {
@@ -116,6 +126,24 @@ async function uploadBlob(blob: Blob, filename: string): Promise<string> {
   const url = data.manifest?.uploads?.[0]?.url;
   if (!url) throw new Error('Upload returned no URL');
   return url;
+}
+
+// Strip internal-sounding bits (stack traces, provider names) from server error
+// messages before showing them in a toast. Keeps the signal — "upload failed",
+// "insufficient credits" — without leaking operational details.
+function toastableError(err: unknown, fallback = 'Something went wrong'): string {
+  if (!err) return fallback;
+  const raw = err instanceof Error ? err.message : String(err);
+  if (!raw || raw === 'undefined') return fallback;
+  return raw
+    .replace(/\bFAL\b/gi, 'provider')
+    .replace(/\bGoogle\b/gi, 'provider')
+    .replace(/\bElevenLabs\b/gi, 'provider')
+    .replace(/\bImagen\b/gi, 'provider')
+    .replace(/\bFlux\b/gi, 'model')
+    .replace(/\bat .*\.ts:\d+:\d+/g, '') // strip stack locations if any leaked
+    .slice(0, 240)
+    .trim();
 }
 
 const uploadMask = (blob: Blob) => uploadBlob(blob, `inpaint-mask-${Date.now()}.png`);
@@ -155,11 +183,16 @@ function FramePicker({
       ctx.drawImage(video, 0, 0);
       const blob: Blob | null = await new Promise((r) => canvas.toBlob((b) => r(b), 'image/png'));
       if (!blob) throw new Error('Frame export failed');
+      if (blob.size > CLIENT_UPLOAD_MAX_BYTES) {
+        throw new Error(
+          'Captured frame is too large — try a shorter video or lower resolution source'
+        );
+      }
       const url = await uploadBlob(blob, `frame-${Date.now()}.png`);
       onCaptured(url);
       toast.success('Frame captured');
-    } catch (err: any) {
-      toast.error(err.message || 'Capture failed');
+    } catch (err: unknown) {
+      toast.error(toastableError(err, 'Capture failed'));
     } finally {
       setCapturing(false);
     }
@@ -325,7 +358,7 @@ export function InpaintStudio({
       queryClient.invalidateQueries({ queryKey: ['gallery'] });
       toast.success(`${MODE_CONFIG[mode].label} complete`);
     },
-    onError: (err: any) => toast.error(err.message || 'Inpaint failed'),
+    onError: (err: unknown) => toast.error(toastableError(err, 'Inpaint failed')),
   });
 
   const handleDownload = useCallback(async () => {

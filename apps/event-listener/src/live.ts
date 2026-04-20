@@ -17,7 +17,7 @@
  */
 import { env } from './env.js';
 import { logger } from './logger.js';
-import { client } from './rpc.js';
+import { client, chainId } from './rpc.js';
 import { db } from './firestore.js';
 import { loadCheckpoint, writeCheckpoint } from './checkpoint.js';
 import { ingestRange } from './ingest.js';
@@ -56,7 +56,12 @@ const PER_EVENT_COLLECTIONS = [
 
 async function detectReorg(windowStart: number): Promise<number | null> {
   // Pick a collection likely to have events in the window — swaps are highest
-  // volume on most chains. Fall back to scanning bondingCurveTrades.
+  // volume on most chains. Fall back to bondingCurveTrades / tokenTransfers.
+  // MUST filter by chainId: both event-listener services (sepolia + base-sepolia)
+  // write to the same Firestore collections, so a cross-chain sample would look
+  // up a foreign block number on the wrong RPC and throw "Block not found" —
+  // or, worse, false-positive a reorg and purge valid same-block data from the
+  // sibling chain.
   for (const coll of [
     COLLECTIONS.swaps,
     COLLECTIONS.bondingCurveTrades,
@@ -64,6 +69,7 @@ async function detectReorg(windowStart: number): Promise<number | null> {
   ]) {
     const sample = await db
       .collection(coll)
+      .where('_event.chainId', '==', chainId)
       .where('_event.blockNumber', '>=', windowStart)
       .orderBy('_event.blockNumber', 'asc')
       .limit(1)
@@ -83,10 +89,13 @@ async function purgeFromBlock(blockNumber: number): Promise<number> {
   let totalDeleted = 0;
   for (const coll of PER_EVENT_COLLECTIONS) {
     let deletedInColl = 0;
-    // Firestore `in` is capped, but we page by ranges on blockNumber.
+    // Firestore `in` is capped, but we page by ranges on blockNumber. Filter
+    // by chainId so we don't purge the sibling chain's records from the
+    // shared collections.
     while (true) {
       const snap = await db
         .collection(coll)
+        .where('_event.chainId', '==', chainId)
         .where('_event.blockNumber', '>=', blockNumber)
         .limit(500)
         .get();
@@ -126,16 +135,29 @@ export async function runLiveLoop(): Promise<never> {
         const to = head;
         const finalityCut = head - env.LISTENER_FINALITY_DEPTH;
 
+        // If the service was offline and the gap exceeds one RPC chunk, we
+        // must iterate — a single eth_getLogs over N blocks fails when N > the
+        // provider's per-call cap. Free-tier Alchemy caps at 10; PAYG at 2000+.
+        // Chunk size matches the backfill knob so live & backfill behave
+        // identically on catch-up.
+        const step = env.LISTENER_BLOCK_RANGE;
+
         // Process confirmed portion (if any) first — these won't need rewrite.
         if (finalityCut >= from) {
-          const { eventCount } = await ingestRange(from, finalityCut, { unconfirmed: false });
-          logger.debug({ from, to: finalityCut, eventCount }, 'ingested confirmed');
+          for (let cur = from; cur <= finalityCut; cur += step) {
+            const end = Math.min(cur + step - 1, finalityCut);
+            const { eventCount } = await ingestRange(cur, end, { unconfirmed: false });
+            logger.debug({ from: cur, to: end, eventCount }, 'ingested confirmed chunk');
+          }
         }
         // Then the unconfirmed window up to head.
         const unconfirmedFrom = Math.max(from, finalityCut + 1);
         if (unconfirmedFrom <= to) {
-          const { eventCount } = await ingestRange(unconfirmedFrom, to, { unconfirmed: true });
-          logger.debug({ from: unconfirmedFrom, to, eventCount }, 'ingested unconfirmed');
+          for (let cur = unconfirmedFrom; cur <= to; cur += step) {
+            const end = Math.min(cur + step - 1, to);
+            const { eventCount } = await ingestRange(cur, end, { unconfirmed: true });
+            logger.debug({ from: cur, to: end, eventCount }, 'ingested unconfirmed chunk');
+          }
         }
 
         await writeCheckpoint(head, head);

@@ -33,6 +33,8 @@ import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
+import { assertVoiceIdAllowed } from '../../lib/voice-authz';
 
 const clientTokenSchema = z
   .string()
@@ -218,7 +220,7 @@ const voiceModelSchema = z.enum([
 
 export const talkingSceneRouter = router({
   estimateCost: protectedProcedure
-    .input(z.object({ dialogue: z.string().min(1).max(2000) }))
+    .input(z.object({ dialogue: z.string().min(1).max(800) }))
     .query(({ input }) => {
       const tts = estimateTtsCredits(input.dialogue);
       return {
@@ -234,8 +236,15 @@ export const talkingSceneRouter = router({
     .input(
       z.object({
         imageUrl: z.string().url(),
-        dialogue: z.string().min(1).max(2000),
-        voiceId: z.string().min(1),
+        // Dialogue cap tightened from 2000 → 800 (M10). 800 chars is ~60–80s of
+        // spoken audio at typical TTS pacing — far beyond the 10s clip length,
+        // so no legitimate talking-scene needs more. Keeps TTS cost bounded.
+        dialogue: z.string().min(1).max(800),
+        voiceId: z
+          .string()
+          .min(10)
+          .max(64)
+          .regex(/^[A-Za-z0-9_-]+$/, 'voiceId must be alphanumeric'),
         voiceModelId: voiceModelSchema.default('eleven_v3'),
         /** Optional motion instruction layered onto the portrait animation. */
         motionPrompt: z.string().max(500).optional(),
@@ -243,11 +252,19 @@ export const talkingSceneRouter = router({
         durationSec: z.number().min(3).max(10).default(6),
         entityId: z.string().optional(),
         universeId: z.string().optional(),
+        /** Optional — lets the authz layer verify ownership of the portrait. */
+        sourceGenerationId: z.string().optional(),
         clientToken: clientTokenSchema,
         webhookUrl: webhookUrlSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.imageUrl,
+        sourceGenerationId: input.sourceGenerationId,
+      });
+      await assertVoiceIdAllowed(ctx.user.uid, input.voiceId);
       const dialogue = sanitizePrompt(input.dialogue);
       const motionPrompt = input.motionPrompt ? sanitizePrompt(input.motionPrompt) : '';
       const sceneId = randomUUID();

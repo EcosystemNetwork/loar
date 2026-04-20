@@ -2,37 +2,57 @@
  * Event-listener entry point. Starts a tiny Hono health server on PORT so
  * Railway's healthcheck can validate the service, hydrates the factory cache,
  * runs historical backfill, and then enters the live follow loop.
+ *
+ * The health endpoint MUST respond instantly (<1s) even during heavy backfill.
+ * Railway marks the service FAILED if the healthcheck times out. We read from
+ * an in-memory snapshot that the loops update; no Firestore calls on the hot
+ * path.
  */
 import { env } from './env.js';
 import { logger } from './logger.js';
 import './firestore.js'; // side-effectful init
 import { runBackfill } from './backfill.js';
 import { runLiveLoop } from './live.js';
-import { loadCheckpoint } from './checkpoint.js';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 
 const app = new Hono();
 
-let ready = false;
+// In-memory health snapshot updated by the loops. Health check reads this
+// synchronously — no awaited I/O — so healthcheck latency is independent of
+// backfill load on the Firestore client.
+const state = {
+  ready: false,
+  phase: 'booting' as 'booting' | 'backfilling' | 'live',
+  lastBlockIndexed: 0,
+  startedAt: Date.now(),
+};
 
-app.get('/health', async (c) => {
-  const cp = await loadCheckpoint().catch(() => null);
-  return c.json({
-    status: ready ? 'ok' : 'starting',
+export function setPhase(phase: typeof state.phase) {
+  state.phase = phase;
+}
+export function setLastBlock(block: number) {
+  state.lastBlockIndexed = block;
+}
+export function markReady() {
+  state.ready = true;
+}
+
+app.get('/health', (c) =>
+  c.json({
+    status: state.ready ? 'ok' : 'starting',
+    phase: state.phase,
     chain: env.LISTENER_CHAIN,
-    checkpoint: cp
-      ? {
-          lastBlockIndexed: cp.lastBlockIndexed,
-          lastBlockFinalized: cp.lastBlockFinalized,
-          headBlockKnown: cp.headBlockKnown,
-        }
-      : null,
-  });
-});
+    lastBlockIndexed: state.lastBlockIndexed,
+    uptimeMs: Date.now() - state.startedAt,
+  })
+);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info({ port: info.port }, 'health server listening');
+  // Respond healthy once the HTTP server is listening — Railway's deploy
+  // gate only cares that the endpoint answers, not that backfill is complete.
+  state.ready = true;
 });
 
 process.on('unhandledRejection', (err) => {
@@ -41,16 +61,11 @@ process.on('unhandledRejection', (err) => {
 });
 
 async function main(): Promise<void> {
-  logger.info(
-    {
-      chain: env.LISTENER_CHAIN,
-      skipBackfill: false,
-    },
-    'event-listener booting'
-  );
+  logger.info({ chain: env.LISTENER_CHAIN }, 'event-listener booting');
 
+  setPhase('backfilling');
   await runBackfill();
-  ready = true;
+  setPhase('live');
   logger.info('backfill complete, entering live loop');
   await runLiveLoop();
 }

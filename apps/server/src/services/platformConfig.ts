@@ -78,6 +78,10 @@ export interface PlatformConfig {
   monthlySpendCapEnabled: boolean;
   /** Maximum credits a wallet may spend in a rolling 30-day window. */
   monthlySpendCapCredits: number;
+  /** Enforce the daily spend cap — second-layer backstop for bursty abuse. */
+  dailySpendCapEnabled: boolean;
+  /** Maximum credits a wallet may spend in a rolling 24-hour window. */
+  dailySpendCapCredits: number;
 
   // ── Metadata ─────────────────────────────────────────────────────
   updatedAt?: Date;
@@ -112,6 +116,8 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
 
   monthlySpendCapEnabled: true,
   monthlySpendCapCredits: 2000,
+  dailySpendCapEnabled: true,
+  dailySpendCapCredits: 500,
 };
 
 // ── Simple in-process cache (TTL: 60 s) ──────────────────────────────────

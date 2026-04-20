@@ -40,7 +40,7 @@ import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
-import { useCreditBalance, useMyNFTs, useUniverseMetrics } from '@/hooks/useRevenue';
+import { useCreditBalance, useMyNFTs, useUniversesMetricsBatch } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
@@ -85,7 +85,7 @@ function RouteComponent() {
     staleTime: 60_000,
   });
 
-  const { data: myUniverses, isLoading: isLoadingMine } = useQuery({
+  const { data: myUniverses } = useQuery({
     queryKey: ['my-universes', address],
     queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
     enabled: !!address,
@@ -113,7 +113,14 @@ function RouteComponent() {
     );
   }, [tokenList, address]);
 
-  if (isAuthenticating || !isConnected || isLoadingMine) {
+  // Batch metrics — single round-trip for all universe cards (vs N+1 per card).
+  const universeIds = useMemo(
+    () => myUniverseList.map((u: any) => u.id).filter(Boolean),
+    [myUniverseList]
+  );
+  const { data: metricsByUniverseId } = useUniversesMetricsBatch(universeIds);
+
+  if (isAuthenticating || !isConnected) {
     return <DashboardSkeleton />;
   }
 
@@ -293,7 +300,11 @@ function RouteComponent() {
                   </Badge>
                 </div>
               </div>
-              <UniverseGrid universes={myUniverseList} onSelect={selectUniverse} />
+              <UniverseGrid
+                universes={myUniverseList}
+                onSelect={selectUniverse}
+                metricsByUniverseId={(metricsByUniverseId as Record<string, any>) ?? {}}
+              />
             </section>
           )}
 
@@ -388,6 +399,17 @@ function RouteComponent() {
 
 // ─── Stats Card ──────────────────────────────────────────────────────
 
+// Static map — Tailwind JIT purges dynamic class strings, so background tints
+// for StatCard icons must be statically discoverable.
+const STAT_ACCENT_BG: Record<string, string> = {
+  amber: 'bg-amber-500/10',
+  green: 'bg-green-500/10',
+  blue: 'bg-blue-500/10',
+  purple: 'bg-purple-500/10',
+  orange: 'bg-orange-500/10',
+  pink: 'bg-pink-500/10',
+};
+
 function StatCard({
   icon,
   label,
@@ -399,13 +421,13 @@ function StatCard({
   label: string;
   value: string;
   sub?: string;
-  accent: string;
+  accent: keyof typeof STAT_ACCENT_BG;
 }) {
   return (
     <Card>
       <CardContent className="p-3">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className={`p-1.5 rounded-md bg-${accent}-500/10`}>{icon}</div>
+          <div className={`p-1.5 rounded-md ${STAT_ACCENT_BG[accent] ?? 'bg-muted'}`}>{icon}</div>
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
             {label}
           </span>
@@ -499,7 +521,9 @@ function RecentWorkCard({ item }: { item: any }) {
             muted
             loop
             playsInline
-            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseEnter={(e) => {
+              void e.currentTarget.play().catch(() => {});
+            }}
             onMouseLeave={(e) => {
               e.currentTarget.pause();
               e.currentTarget.currentTime = 0;
@@ -535,23 +559,36 @@ function RecentWorkCard({ item }: { item: any }) {
 function UniverseGrid({
   universes,
   onSelect,
+  metricsByUniverseId,
 }: {
   universes: any[];
   onSelect: (id: string) => void;
+  metricsByUniverseId: Record<string, any>;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {universes.map((universe: any) => (
-        <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
+        <UniverseCard
+          key={universe.id}
+          universe={universe}
+          onSelect={onSelect}
+          metrics={metricsByUniverseId[universe.id]}
+        />
       ))}
     </div>
   );
 }
 
-function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
-  const { data: metrics } = useUniverseMetrics(universe.id);
-
-  const m = (metrics as any) ?? null;
+function UniverseCard({
+  universe,
+  onSelect,
+  metrics,
+}: {
+  universe: any;
+  onSelect: (id: string) => void;
+  metrics: any;
+}) {
+  const m = metrics ?? null;
   const views = m?.totalViews ?? 0;
   const mints = m?.totalMints ?? 0;
   const subscribers = m?.totalSubscribers ?? 0;

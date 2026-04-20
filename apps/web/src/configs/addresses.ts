@@ -28,6 +28,7 @@ export interface EvmAddresses {
   feeLocker: `0x${string}`;
   swapRouter: `0x${string}`;
   tokenVesting: `0x${string}`;
+  loarFaucet: `0x${string}`;
   // Beacon addresses (for upgrades, not direct interaction)
   episodeEditionBeacon: `0x${string}`;
   characterBeacon: `0x${string}`;
@@ -57,6 +58,7 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
     feeLocker: '0x965f5C192E38b86Fa4a79A561E695C48B1DC3582',
     swapRouter: '0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5',
     tokenVesting: '0x5d74D9e42a52D04DEC9F895F2c9D2e14b1DdCD64',
+    loarFaucet: ZERO_ADDR,
     episodeEditionBeacon: '0x14742D6BB8eeE513D0D70a235d8B4d801F19F9ed',
     characterBeacon: '0x0BEcc54417e9AaC9289C748eb72ECBb55292756f',
     entityBeacon: '0xF951065C7d4d28805188F60a3F8bd398B7776EC8',
@@ -81,6 +83,7 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
     feeLocker: '0x40e4e01735Be9e8cC5eF64E1f36188e1763e9740',
     swapRouter: '0x69c2aA66B3bB3e5f6658Dc2a77022558e7022398',
     tokenVesting: '0x36E25222f7E5C6f4dC8f918B68C61da83330C97F',
+    loarFaucet: '0x5Cc879CE26E38e4c9dAeecc0318f0EbdC22aa806',
     episodeEditionBeacon: '0x7980622e335E72fc339b2FaA3d08DEE8CC745F4f',
     characterBeacon: '0x52b42135703A0B4180F56323e01a75B7186dB3F9',
     entityBeacon: '0x4EE8A6055270Ee5b9Cc4132c98CAd686bBb08Fc4',

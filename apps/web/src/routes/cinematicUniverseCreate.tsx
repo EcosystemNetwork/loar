@@ -1310,10 +1310,10 @@ function CinematicUniverseCreate() {
                     onChange={(e) => setDescription(e.target.value)}
                     disabled={deploymentStep !== DeploymentStep.IDLE || isGeneratingCover}
                     className="min-h-[100px] resize-none"
-                    maxLength={500}
+                    maxLength={1000}
                   />
                   <p className="text-[10px] text-muted-foreground mt-1 text-right tabular-nums">
-                    {description.length}/500
+                    {description.length}/1000
                   </p>
                 </div>
 

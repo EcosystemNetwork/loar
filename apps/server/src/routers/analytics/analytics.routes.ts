@@ -131,6 +131,30 @@ export const analyticsRouter = router({
       return { id: doc.id, ...doc.data() };
     }),
 
+  // Batch variant — single round-trip for multiple universes (dashboard grid).
+  getUniversesMetricsBatch: publicProcedure
+    .input(z.object({ universeIds: z.array(z.string()).min(1).max(50) }))
+    .query(async ({ input }) => {
+      const ids = Array.from(new Set(input.universeIds));
+      const refs = ids.map((id) => analyticsCol().doc(id));
+      const snaps = await db!.getAll(...refs);
+      const byId: Record<string, any> = {};
+      snaps.forEach((doc, i) => {
+        const id = ids[i];
+        byId[id] = doc.exists
+          ? { id: doc.id, ...doc.data() }
+          : {
+              universeId: id,
+              totalViews: 0,
+              totalMints: 0,
+              totalVotes: 0,
+              totalSubscribers: 0,
+              totalRevenue: '0',
+            };
+      });
+      return byId;
+    }),
+
   // ---- Episode Analytics ----
 
   getEpisodeMetrics: publicProcedure

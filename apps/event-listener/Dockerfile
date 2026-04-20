@@ -11,12 +11,11 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY apps/mcp/package.json ./apps/mcp/
 COPY apps/mcp-gateway/package.json ./apps/mcp-gateway/
 COPY apps/contracts/package.json ./apps/contracts/
-COPY apps/mobile/package.json ./apps/mobile/
 COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN mkdir -p .git && npm pkg set scripts.prepare="echo skip" && \
-    pnpm install --frozen-lockfile --filter "event-listener..." && \
+    pnpm install --no-frozen-lockfile --filter "event-listener..." && \
     rm -rf .git
 
 COPY apps/event-listener/src ./apps/event-listener/src
@@ -39,13 +38,12 @@ COPY apps/indexer/package.json ./apps/indexer/
 COPY apps/mcp/package.json ./apps/mcp/
 COPY apps/mcp-gateway/package.json ./apps/mcp-gateway/
 COPY apps/contracts/package.json ./apps/contracts/
-COPY apps/mobile/package.json ./apps/mobile/
 COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate && \
     npm pkg set scripts.prepare="echo skip" && \
-    pnpm install --frozen-lockfile --prod --filter "event-listener..."
+    pnpm install --no-frozen-lockfile --prod --filter "event-listener..."
 
 COPY --from=builder /app/apps/event-listener/dist ./apps/event-listener/dist
 COPY --from=builder /app/deployments ./deployments

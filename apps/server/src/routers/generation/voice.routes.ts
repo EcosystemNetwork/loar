@@ -749,7 +749,11 @@ export const voiceRouter = router({
     .input(
       z.object({
         audioUrl: z.string().url(),
-        targetVoiceId: z.string().min(1),
+        targetVoiceId: z
+          .string()
+          .min(10)
+          .max(64)
+          .regex(/^[A-Za-z0-9_-]+$/, 'voiceId must be alphanumeric'),
         modelId: z
           .enum(['eleven_multilingual_sts_v2', 'eleven_english_sts_v2'])
           .default('eleven_multilingual_sts_v2'),
@@ -766,6 +770,15 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // C1 + C2 + H8: source-asset IDOR, voice allowlist, and (below) content-type check
+      const { assertEditSourceAuthorized } = await import('../../lib/edit-source-authz');
+      const { assertVoiceIdAllowed } = await import('../../lib/voice-authz');
+      await assertEditSourceAuthorized({
+        uid: ctx.user.uid,
+        mediaUrl: input.audioUrl,
+        sourceGenerationId: input.parentGenerationId,
+      });
+      await assertVoiceIdAllowed(ctx.user.uid, input.targetVoiceId);
       const genId = randomUUID();
 
       let validatedWebhookUrl: string | undefined;
@@ -834,11 +847,25 @@ export const voiceRouter = router({
         await validateUploadUrl(input.audioUrl);
         const sourceRes = await fetchWithTimeout(input.audioUrl);
         if (!sourceRes.ok) {
-          throw new Error(`Failed to fetch source audio from ${input.audioUrl}`);
+          throw new Error('Failed to fetch source audio');
+        }
+        // H8: verify the fetched resource is actually audio before we forward
+        // it to the voice-changer. Rejecting here prevents us paying for a
+        // provider call that'll 4xx on obviously-wrong payloads (JSON, HTML,
+        // binary garbage) and avoids arbitrary-MIME smuggling.
+        const sourceContentType =
+          sourceRes.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
+        if (!sourceContentType || !sourceContentType.startsWith('audio/')) {
+          throw new Error('Source URL did not return an audio content-type');
         }
         const sourceBuffer = Buffer.from(await sourceRes.arrayBuffer());
         if (sourceBuffer.length === 0) {
           throw new Error('Source audio is empty');
+        }
+        // Cap the pulled payload at 50 MB — longer clips have never been a
+        // legitimate input to voice-modify and bloat ElevenLabs cost.
+        if (sourceBuffer.length > 50 * 1024 * 1024) {
+          throw new Error('Source audio exceeds 50MB');
         }
 
         const result = await elevenLabsService.voiceChanger({
