@@ -43,11 +43,13 @@ jobs:
 
       - name: OZ compat shim (@openzeppelin/contracts/X → flat dep dir)
         run: |
-          # The OZ 5.0.2 soldeer zip is laid out flat (access/, token/, …),
-          # but uniswap-v4-periphery internals import @openzeppelin/contracts/X.
-          # A `contracts/` → `.` symlink makes both import styles resolve
-          # against the flat directory under the single `@openzeppelin/` remap.
+          # Both OZ 5.0.2 soldeer zips are laid out flat (access/, token/, …),
+          # but uniswap-v4-periphery internals + remappings.txt both reference
+          # `@openzeppelin/contracts-upgradeable/contracts/…` / `@openzeppelin/
+          # contracts/…`. A `contracts/` → `.` symlink in each dep dir makes
+          # those paths resolve back to the flat layout.
           ln -sf . dependencies/@openzeppelin-contracts-5.0.2/contracts
+          ln -sf . dependencies/@openzeppelin-contracts-upgradeable-5.0.2/contracts
 
       - name: Forge build (required for Slither)
         run: forge build
@@ -138,11 +140,13 @@ jobs:
 
       - name: OZ compat shim (@openzeppelin/contracts/X → flat dep dir)
         run: |
-          # The OZ 5.0.2 soldeer zip is laid out flat (access/, token/, …),
-          # but uniswap-v4-periphery internals import @openzeppelin/contracts/X.
-          # A `contracts/` → `.` symlink makes both import styles resolve
-          # against the flat directory under the single `@openzeppelin/` remap.
+          # Both OZ 5.0.2 soldeer zips are laid out flat (access/, token/, …),
+          # but uniswap-v4-periphery internals + remappings.txt both reference
+          # `@openzeppelin/contracts-upgradeable/contracts/…` / `@openzeppelin/
+          # contracts/…`. A `contracts/` → `.` symlink in each dep dir makes
+          # those paths resolve back to the flat layout.
           ln -sf . dependencies/@openzeppelin-contracts-5.0.2/contracts
+          ln -sf . dependencies/@openzeppelin-contracts-upgradeable-5.0.2/contracts
 
       - name: Forge build
         run: forge build
