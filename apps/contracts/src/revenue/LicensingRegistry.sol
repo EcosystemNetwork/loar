@@ -141,6 +141,18 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         emit UniverseRegistered(universeId, creator);
     }
 
+    /// @notice Live universe owner lookup via the UniverseManager ERC-721.
+    /// @dev REVENUE-01 follow-up: the stored `universeCreators` mapping becomes
+    ///      stale the moment the Universe NFT is transferred. All authority
+    ///      and revenue-routing reads must use the live ERC-721 owner so a
+    ///      sale / DAO handoff immediately reassigns control. The stored
+    ///      mapping is retained only as a "has-been-registered" flag.
+    function _currentCreator(uint256 universeId) internal view returns (address) {
+        address um = universeManager;
+        require(um != address(0), "Universe manager not set");
+        return IERC721(um).ownerOf(universeId);
+    }
+
     // ---- Licensing ----
 
     /// @notice Create a licensing deal (universe creator or platform only)
@@ -153,7 +165,8 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         uint256 duration,
         string calldata terms
     ) external whenNotPaused returns (uint256 licenseId) {
-        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotUniverseCreator();
+        address liveCreator = _currentCreator(universeId);
+        if (msg.sender != liveCreator && msg.sender != platform) revert NotUniverseCreator();
         licenseId = nextLicenseId++;
 
         licenses[licenseId] = License({
@@ -161,7 +174,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
             universeId: universeId,
             licenseType: licenseType,
             status: LicenseStatus.PROPOSED,
-            licensor: universeCreators[universeId],
+            licensor: liveCreator,
             licensee: licensee,
             upfrontFee: upfrontFee,
             royaltyBps: royaltyBps,
@@ -241,7 +254,8 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         string calldata metadataURI,
         uint256 price
     ) external whenNotPaused returns (uint256 merchId) {
-        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotUniverseCreator();
+        address liveCreator = _currentCreator(universeId);
+        if (msg.sender != liveCreator && msg.sender != platform) revert NotUniverseCreator();
         merchId = nextMerchId++;
         merchItems[merchId] = MerchItem({
             id: merchId,
@@ -250,7 +264,7 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
             metadataURI: metadataURI,
             price: price,
             sold: 0,
-            creator: msg.sender,
+            creator: liveCreator,
             active: true
         });
         universeMerch[universeId].push(merchId);

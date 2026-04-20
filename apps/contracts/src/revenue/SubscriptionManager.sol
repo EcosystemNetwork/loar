@@ -105,9 +105,21 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
     error NotAuthorized();
 
+    /// @notice Live universe owner lookup via the UniverseManager ERC-721.
+    /// @dev REVENUE-01 follow-up: `universeCreators` stored at registration
+    ///      time becomes stale when the Universe NFT is transferred. All
+    ///      authority + revenue-routing reads must use the live owner so
+    ///      a sale / DAO handoff immediately reassigns control. The stored
+    ///      mapping is retained only as a "has-been-registered" flag.
+    function _currentCreator(uint256 universeId) internal view returns (address) {
+        address um = universeManager;
+        require(um != address(0), "Universe manager not set");
+        return IERC721(um).ownerOf(universeId);
+    }
+
     /// @notice Deactivate a subscription tier
     function deactivateTier(uint256 universeId, SubscriptionTier tier) external {
-        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
+        if (msg.sender != _currentCreator(universeId) && msg.sender != platform) revert NotAuthorized();
         tierConfigs[universeId][tier].active = false;
         emit TierDeactivated(universeId, tier);
     }
@@ -124,7 +136,7 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint16 creditBonus
     ) external {
         // Must be universe creator or platform
-        if (msg.sender != universeCreators[universeId] && msg.sender != platform) revert NotAuthorized();
+        if (msg.sender != _currentCreator(universeId) && msg.sender != platform) revert NotAuthorized();
         // SUB-02: Price cap to prevent abusive pricing
         require(pricePerMonth <= 100 ether, "Price too high");
 
@@ -167,8 +179,12 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();
 
-        address creator = universeCreators[universeId];
-        if (creator == address(0)) revert CreatorNotRegistered();
+        // Require registration (prevents accidental routing to an unowned
+        // universe), but route revenue to the CURRENT on-chain owner rather
+        // than the stale value stored at registration.
+        if (universeCreators[universeId] == address(0)) revert CreatorNotRegistered();
+        address creator = _currentCreator(universeId);
+        if (creator == address(0)) revert ZeroAddress();
 
         uint256 totalPrice = config.pricePerMonth * months;
         if (msg.value < totalPrice) revert InsufficientPayment();

@@ -223,7 +223,19 @@ contract Escrow is
 
     function setPlatform(address _platform) external onlyOwner {
         if (_platform == address(0)) revert ZeroAddress();
-        emit PlatformUpdated(platform, _platform);
+        address old = platform;
+        // Migrate any accrued platform fees from the previous address onto
+        // the new address. Without this, rotating out a compromised key
+        // leaves every fee resolved before the rotation claimable by the
+        // attacker — the exact risk the rotation is trying to close.
+        if (old != _platform && old != address(0)) {
+            uint256 pending = claimable[old];
+            if (pending > 0) {
+                claimable[old] = 0;
+                claimable[_platform] += pending;
+            }
+        }
+        emit PlatformUpdated(old, _platform);
         platform = _platform;
     }
 

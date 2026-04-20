@@ -171,9 +171,23 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
 
     // ── Universe config ─────────────────────────────────────────
 
+    /// @notice Live universe owner lookup via the UniverseManager ERC-721.
+    /// @dev REVENUE-01 follow-up: `universeCreators` is only a registration
+    ///      flag; the live ERC-721 owner is authoritative for authority.
+    function _currentCreator(uint256 universeId) internal view returns (address) {
+        address um = universeManager;
+        if (um == address(0)) return address(0);
+        try IERC721(um).ownerOf(universeId) returns (address owner) {
+            return owner;
+        } catch {
+            return address(0);
+        }
+    }
+
     /// @notice Universe creator sets a custom remix fee for their universe
     function setUniverseRemixFee(uint256 universeId, uint256 fee) external whenNotPaused {
-        if (msg.sender != universeCreators[universeId] && msg.sender != platform && msg.sender != owner()) {
+        address liveCreator = _currentCreator(universeId);
+        if (msg.sender != liveCreator && msg.sender != platform && msg.sender != owner()) {
             revert NotCreatorOrPlatform();
         }
         if (fee > 0 && fee < minRemixFee) revert FeeBelowMinimum();

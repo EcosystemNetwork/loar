@@ -100,6 +100,12 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
     ) external payable returns (uint128 amountOut) {
         if (block.timestamp > deadline) revert DeadlineExpired();
 
+        // Snapshot the balance this caller did NOT contribute. _refundETH
+        // will only return ETH that accumulated on top of this baseline,
+        // so stale/accidental ETH in the contract cannot be swept by the
+        // next swap caller — it stays claimable via `rescueETH` only.
+        uint256 preSwapBaseline = address(this).balance - msg.value;
+
         // For exact input, amountSpecified is negative (convention: negative = exact input)
         SwapParams memory params = SwapParams({
             zeroForOne: zeroForOne,
@@ -129,8 +135,8 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
             revert InsufficientOutputAmount(outputDelta, amountOutMinimum);
         }
 
-        // Refund excess ETH
-        _refundETH(msg.sender);
+        // Refund only the portion that came from this caller.
+        _refundETH(msg.sender, preSwapBaseline);
 
         emit Swap(
             msg.sender,
@@ -158,6 +164,9 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
         bytes calldata hookData
     ) external payable returns (uint128 amountIn) {
         if (block.timestamp > deadline) revert DeadlineExpired();
+
+        // Snapshot the balance this caller did NOT contribute (see swapExactInput).
+        uint256 preSwapBaseline = address(this).balance - msg.value;
 
         // For exact output, amountSpecified is positive (convention: positive = exact output)
         SwapParams memory params = SwapParams({
@@ -197,8 +206,8 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
             }
         }
 
-        // Refund excess ETH
-        _refundETH(msg.sender);
+        // Refund only the portion that came from this caller.
+        _refundETH(msg.sender, preSwapBaseline);
 
         emit Swap(
             msg.sender,
@@ -275,11 +284,16 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
     // Internal helpers
     // ──────────────────────────────────────────────────────────────────────
 
-    /// @dev Refund any ETH balance remaining in the contract to the recipient.
-    function _refundETH(address recipient) internal {
+    /// @dev Refund only the portion of the contract balance that exceeds
+    ///      `baseline`. The baseline is captured at function entry as
+    ///      `address(this).balance - msg.value`, so any ETH that was
+    ///      already sitting in the contract (accidental sends, stuck
+    ///      prior-swap remnants) stays out of reach of the swap caller
+    ///      and can only be withdrawn via `rescueETH` by the owner.
+    function _refundETH(address recipient, uint256 baseline) internal {
         uint256 balance = address(this).balance;
-        if (balance > 0) {
-            Address.sendValue(payable(recipient), balance);
+        if (balance > baseline) {
+            Address.sendValue(payable(recipient), balance - baseline);
         }
     }
 

@@ -133,6 +133,16 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         emit UniverseRegistered(universeId, creator);
     }
 
+    /// @notice Live universe owner lookup via the UniverseManager ERC-721.
+    /// @dev REVENUE-01 follow-up: the stored mapping is only a registration
+    ///      flag. Authorization and revenue routing read the current owner
+    ///      so a Universe NFT transfer immediately reassigns control.
+    function _currentCreator(uint256 universeId) internal view returns (address) {
+        address um = universeManager;
+        require(um != address(0), "Universe manager not set");
+        return IERC721(um).ownerOf(universeId);
+    }
+
     /// @notice Create an ad placement slot
     function createAdSlot(
         uint256 universeId,
@@ -143,7 +153,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     ) external whenNotPaused returns (uint256 slotId) {
         require(universeCreators[universeId] != address(0), "Universe not registered");
         require(
-            msg.sender == universeCreators[universeId] || msg.sender == platform,
+            msg.sender == _currentCreator(universeId) || msg.sender == platform,
             "Not authorized"
         );
 
@@ -222,8 +232,9 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     /// @notice Accept winning bid and activate sponsorship
     function acceptBid(uint256 slotId) external nonReentrant whenNotPaused returns (uint256 sponsorshipId) {
         AdSlot storage slot = adSlots[slotId];
+        address liveCreator = _currentCreator(slot.universeId);
         require(
-            msg.sender == universeCreators[slot.universeId] || msg.sender == platform,
+            msg.sender == liveCreator || msg.sender == platform,
             "Not authorized"
         );
         require(slot.currentBidder != address(0), "No bids");
@@ -231,7 +242,7 @@ contract AdPlacement is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         // Cache values before clearing state (CEI pattern)
         address bidder = slot.currentBidder;
         uint256 bidAmount = slot.currentBid;
-        address creator = universeCreators[slot.universeId];
+        address creator = liveCreator;
 
         // Effects: reset slot state before external calls
         slot.currentBid = 0;
