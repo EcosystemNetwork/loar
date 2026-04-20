@@ -49,8 +49,7 @@ contract LaunchpadStakingHandler is Test {
         loar.approve(address(staking), amount);
         try staking.stake(amount) {
             stakeCount++;
-        }
-            catch {}
+        } catch {}
         vm.stopPrank();
     }
 
@@ -66,8 +65,7 @@ contract LaunchpadStakingHandler is Test {
         vm.prank(actor);
         try staking.unstake(amount) {
             unstakeCount++;
-        }
-            catch {}
+        } catch {}
     }
 
     function stakeInUniverse(uint256 actorSeed, uint256 universeSeed, uint256 amount) external {
@@ -80,8 +78,7 @@ contract LaunchpadStakingHandler is Test {
         loar.approve(address(staking), amount);
         try staking.stakeInUniverse(universeId, amount) {
             universeStakeCount++;
-        }
-            catch {}
+        } catch {}
         vm.stopPrank();
     }
 
@@ -99,8 +96,7 @@ contract LaunchpadStakingHandler is Test {
         vm.prank(actor);
         try staking.unstakeFromUniverse(universeId, amount) {
             universeUnstakeCount++;
-        }
-            catch {}
+        } catch {}
     }
 
     function actorCount() external view returns (uint256) {

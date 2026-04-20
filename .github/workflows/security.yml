@@ -76,9 +76,7 @@ jobs:
             --foundry-out-directory out \
             --config-file slither.config.json \
             --fail-medium \
-            --sarif results.sarif \
-            --foundry-compile-all=false \
-            --foundry-ignore-compile=false || EXIT=$?
+            --sarif results.sarif || EXIT=$?
           if [ "${STRICT}" = "true" ]; then exit ${EXIT:-0}; fi
           exit 0
 

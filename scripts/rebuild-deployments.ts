@@ -299,6 +299,7 @@ async function main() {
     feeLocker: 'LoarFeeLocker',
     swapRouter: 'LoarSwapRouter',
     tokenVesting: 'TokenVesting',
+    loarFaucet: 'LoarFaucet',
   };
   const ZERO = '0x0000000000000000000000000000000000000000';
   const webChains = [11155111, 84532] as const;
