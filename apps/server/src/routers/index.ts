@@ -109,6 +109,7 @@ import { workflowsRouter } from './workflows/workflows.index';
 import { mcpRouter } from './mcp/mcp.routes';
 import { jobsRouter } from './jobs/jobs.routes';
 import { vlmRouter } from './vlm/vlm.index';
+import { indexerRouter } from './indexer/indexer.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -171,6 +172,9 @@ export const appRouter = router({
 
       return { ok: true };
     }),
+
+  // ── Indexer reads (replaces Ponder GraphQL) ─────────────────────────
+  indexer: indexerRouter,
 
   // ── Universes domain ────────────────────────────────────────────────
   universes: universesRouter,

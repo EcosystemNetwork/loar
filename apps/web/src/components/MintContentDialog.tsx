@@ -129,7 +129,6 @@ export function MintContentDialog({
               episodeId: contentId,
               tokenId: 1,
               txHash: mintTxHash,
-              price: price,
             });
           } catch {
             // Non-critical
@@ -152,7 +151,6 @@ export function MintContentDialog({
               episodeId: contentId,
               tokenId: 0,
               txHash: 'offchain',
-              price: price,
             });
           } catch {
             // Non-critical
@@ -170,7 +168,6 @@ export function MintContentDialog({
             episodeId: contentId,
             tokenId: 0,
             txHash: 'offchain',
-            price: price,
           });
         } catch {
           // Non-critical

@@ -116,7 +116,6 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
           episodeId: listing.contentId || listing.id,
           tokenId: 0,
           txHash: txHash ?? 'pending',
-          price: listing.mintPrice,
         });
       } catch {
         // Non-critical — listing purchase already succeeded

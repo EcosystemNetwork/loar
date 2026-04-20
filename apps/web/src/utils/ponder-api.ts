@@ -6,6 +6,12 @@
  * Used instead of @ponder/client for direct GraphQL access with React Query.
  */
 
+// Feature flag — when true, ponderGql dispatches known query shapes to the
+// Firestore-backed tRPC indexer (trpc.indexer.*) instead of hitting the Ponder
+// GraphQL endpoint. Query shapes we don't recognize fall back to GraphQL so
+// the cutover can be staged. See docs/prd-indexer-firestore-migration.md.
+const USE_TRPC_INDEXER = import.meta.env.VITE_USE_TRPC_INDEXER === 'true';
+
 const PONDER_URL = import.meta.env.VITE_PONDER_URL || '';
 // Comma-separated failover URLs — tried in order on primary failure. A single
 // Ponder host is a single point of failure, so ops should run at least one
@@ -75,6 +81,15 @@ export async function ponderGql<T = any>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
+  // Feature-flagged route through the Firestore-backed tRPC indexer. Only
+  // handles query shapes we've explicitly mapped; anything else falls through
+  // to the GraphQL path so adoption can be incremental.
+  if (USE_TRPC_INDEXER) {
+    const trpcResult = await tryTrpcIndexer<T>(query, variables);
+    if (trpcResult !== undefined) return trpcResult;
+    // else fall through to GraphQL as legacy fallback
+  }
+
   // No indexer configured — return empty silently
   if (_disabled) {
     return EMPTY_RESULT as T;
@@ -138,6 +153,121 @@ export function getIndexerHealth(): Array<{
       cooldownMsRemaining: Math.max(0, cooldown - now),
     };
   });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// tRPC indexer fallback (feature-flagged via VITE_USE_TRPC_INDEXER)
+//
+// Pattern-matches the GraphQL query text to a known tRPC procedure call and
+// reshapes the response to match the GraphQL envelope (`{ items: [...] }` or
+// single-object shape). Returns undefined when the query doesn't match any
+// handled shape — caller falls through to GraphQL.
+// ──────────────────────────────────────────────────────────────────────
+
+async function tryTrpcIndexer<T>(
+  query: string,
+  variables?: Record<string, unknown>
+): Promise<T | undefined> {
+  const { trpcClient } = await import('./trpc');
+  const q = query.replace(/\s+/g, ' ').trim();
+
+  // universes(limit: $l)  →  trpc.indexer.universes
+  if (/query.*\buniverses\s*\(/i.test(q) && !/universe\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const res = await trpcClient.indexer.universes.query({ limit, includeUnconfirmed: false });
+    return { universes: { items: res.items } } as unknown as T;
+  }
+
+  // universe(id: $id)  →  trpc.indexer.universe
+  if (/query.*\buniverse\s*\(\s*id:/i.test(q)) {
+    const id = variables?.id as string;
+    const item = await trpcClient.indexer.universe.query({ id });
+    return { universe: item } as unknown as T;
+  }
+
+  // tokens(..., where: { universeAddress: ... })  →  trpc.indexer.tokens
+  if (/query.*\btokens\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const universeAddress = variables?.universeAddress as string | undefined;
+    const res = await trpcClient.indexer.tokens.query({
+      limit,
+      universeAddress,
+      includeUnconfirmed: false,
+    });
+    return { tokens: { items: res.items } } as unknown as T;
+  }
+
+  // token(id: $id)
+  if (/query.*\btoken\s*\(\s*id:/i.test(q)) {
+    const id = variables?.id as string;
+    const item = await trpcClient.indexer.token.query({ id });
+    return { token: item } as unknown as T;
+  }
+
+  // nodes(...) or nodes(orderBy, limit)
+  if (/query.*\bnodes\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const universeAddress = variables?.universeAddress as string | undefined;
+    const res = await trpcClient.indexer.nodes.query({
+      limit,
+      universeAddress,
+      includeUnconfirmed: false,
+    });
+    return { nodes: { items: res.items } } as unknown as T;
+  }
+
+  // nodeContents (paginated prefix by universe address)
+  if (/query.*\bnodeContents\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const universeAddress = variables?.universeAddress as string | undefined;
+    const cursor = variables?.cursor as string | undefined;
+    const res = await trpcClient.indexer.nodeContents.query({ limit, universeAddress, cursor });
+    return {
+      nodeContents: { items: res.items, pageInfo: { endCursor: res.nextCursor } },
+    } as unknown as T;
+  }
+
+  // tokenHolders(tokenAddress)
+  if (/query.*\btokenHolders\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const tokenAddress = variables?.tokenAddress as string | undefined;
+    const res = await trpcClient.indexer.tokenHolders.query({
+      limit,
+      tokenAddress,
+      includeUnconfirmed: false,
+    });
+    return { tokenHolders: { items: res.items } } as unknown as T;
+  }
+
+  // swaps(poolId | sender)
+  if (/query.*\bswaps\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const poolId = variables?.poolId as string | undefined;
+    const sender = variables?.sender as string | undefined;
+    const res = await trpcClient.indexer.swaps.query({
+      limit,
+      poolId,
+      sender,
+      includeUnconfirmed: false,
+    });
+    return { swaps: { items: res.items } } as unknown as T;
+  }
+
+  // pool(poolId)
+  if (/query.*\bpool\s*\(\s*poolId:/i.test(q)) {
+    const poolId = variables?.poolId as string;
+    const item = await trpcClient.indexer.pool.query({ poolId });
+    return { pool: item } as unknown as T;
+  }
+
+  // pools(limit)
+  if (/query.*\bpools\s*\(/i.test(q)) {
+    const limit = (variables?.limit as number) ?? 40;
+    const res = await trpcClient.indexer.pools.query({ limit });
+    return { pools: { items: res.items } } as unknown as T;
+  }
+
+  return undefined;
 }
 
 /** Default React Query options for all ponder queries. */

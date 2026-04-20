@@ -2,6 +2,7 @@ packages:
   - 'apps/web'
   - 'apps/server'
   - 'apps/indexer'
+  - 'apps/event-listener'
   - 'apps/contracts'
   - 'apps/mcp'
   - 'apps/mcp-gateway'
