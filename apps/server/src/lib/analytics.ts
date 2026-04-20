@@ -43,7 +43,9 @@ function getClient(): Promise<PosthogClientOrNull> {
   const p: Promise<PosthogClientOrNull> = (async () => {
     try {
       const modName = 'posthog-node';
-      const mod = await import(/* @ts-ignore */ modName as any);
+      const mod = await import(
+        /* @ts-expect-error posthog-node types resolved at runtime */ modName as any
+      );
       const PostHog = mod.PostHog ?? mod.default;
       const instance = new PostHog(POSTHOG_KEY, {
         host: POSTHOG_HOST,

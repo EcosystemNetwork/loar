@@ -77,6 +77,7 @@ function makeInMemoryDb() {
       },
       // Minimal query builder — only covers what getDescriptorHistory uses.
       orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         return {
           limit(n: number) {
