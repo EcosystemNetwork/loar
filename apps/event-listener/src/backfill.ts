@@ -19,7 +19,7 @@ export async function runBackfill(): Promise<number> {
   await hydrateFactoryCache();
 
   const existing = await loadCheckpoint();
-  let fromBlock =
+  const fromBlock =
     existing && existing.lastBlockIndexed >= chainConfig.startBlock
       ? existing.lastBlockIndexed + 1
       : chainConfig.startBlock;

@@ -84,7 +84,6 @@ async function purgeFromBlock(blockNumber: number): Promise<number> {
   for (const coll of PER_EVENT_COLLECTIONS) {
     let deletedInColl = 0;
     // Firestore `in` is capped, but we page by ranges on blockNumber.
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const snap = await db
         .collection(coll)
@@ -108,7 +107,6 @@ export async function runLiveLoop(): Promise<never> {
   // Track local last-processed so we don't churn Firestore on every poll.
   let lastIndexed = (await loadCheckpoint())?.lastBlockIndexed ?? 0;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const head = Number(await client.getBlockNumber());

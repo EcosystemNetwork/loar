@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --packages=external",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src/ --ext .ts"
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20"
@@ -25,9 +25,12 @@
     "zod": "^4.0.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@types/node": "^20.9.0",
     "esbuild": "^0.25.0",
+    "eslint": "^9.18.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.21.0"
   }
 }
