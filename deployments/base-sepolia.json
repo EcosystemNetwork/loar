@@ -2,7 +2,7 @@
   "chainId": 84532,
   "environment": "base-sepolia",
   "startBlock": 40078359,
-  "updatedAt": "2026-04-20T17:14:00.615Z",
+  "updatedAt": "2026-04-20T17:22:24.056Z",
   "contracts": {
     "LoarToken": "0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5",
     "LoarFaucet": "0x5Cc879CE26E38e4c9dAeecc0318f0EbdC22aa806",
