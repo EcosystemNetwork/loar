@@ -66,6 +66,10 @@ jobs:
           slither-config: apps/contracts/slither.config.json
           fail-on: medium
           sarif: results.sarif
+          # forge build above already compiled; skip the action's own build
+          # step so it doesn't try `npm install` and choke on pnpm's
+          # `workspace:*` protocol in the monorepo root package.json.
+          ignore-compile: true
         continue-on-error: ${{ env.STRICT != 'true' }}
 
       - name: Upload Slither SARIF to GitHub Security tab
