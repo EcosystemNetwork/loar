@@ -149,10 +149,9 @@ export function getSessionValidationDone(): Promise<void> {
       }
     })
     .catch(() => {
-      // AUTH-04: Fail closed on network error — clear session rather than keeping potentially stale auth
-      localStorage.removeItem(ADDRESS_KEY);
-      localStorage.removeItem(EXPIRY_KEY);
-      emitChange();
+      // AUTH-04: Fail open on transient network errors (server cold start, latency, DNS).
+      // Only the explicit `authenticated: false` branch above should clear the session.
+      // Clearing here caused sign-in spam on the live app whenever /auth/me was unreachable.
     })
     .finally(() => {
       _sessionValidated = true;
@@ -417,21 +416,43 @@ export function useWalletAuth() {
     }
   }, [isConnected, address, storedAddress]);
 
-  // Auto-trigger SIWE sign-in when wallet connects without an existing session.
-  // Requires thirdwebAccount to be available so signIn has a signer.
-  // Guards against infinite retry: stops after MAX_AUTO_SIGN_IN_ATTEMPTS failures.
+  // Track whether the user explicitly connected their wallet in THIS session
+  // (as opposed to thirdweb auto-reconnecting from browser storage on page load).
+  // Only auto-trigger SIWE for explicit connects to prevent sign-in spam.
+  const userInitiatedConnectRef = useRef(false);
+  const prevConnectedRef = useRef(isConnected);
+  useEffect(() => {
+    // Detect explicit wallet connect: was disconnected, now connected.
+    // On page load, isConnected starts false then becomes true from auto-reconnect,
+    // but validated is false during that window. We only set userInitiatedConnect
+    // when the transition happens AFTER session validation is done (i.e., the user
+    // clicked connect, not thirdweb restoring from storage).
+    if (!prevConnectedRef.current && isConnected && validated) {
+      userInitiatedConnectRef.current = true;
+    }
+    prevConnectedRef.current = isConnected;
+  }, [isConnected, validated]);
+
+  // Auto-trigger SIWE sign-in ONLY when the user explicitly connected their wallet
+  // in this session — never on thirdweb auto-reconnect from storage.
+  const autoSignInPendingRef = useRef(false);
   useEffect(() => {
     if (
+      userInitiatedConnectRef.current &&
       isConnected &&
       address &&
       thirdwebAccount &&
       !storedAddress &&
       !isAuthenticating &&
       !rejectedRef.current &&
+      !autoSignInPendingRef.current &&
       signInFailCountRef.current < MAX_AUTO_SIGN_IN_ATTEMPTS &&
       autoSignedForRef.current !== address.toLowerCase()
     ) {
-      signIn();
+      autoSignInPendingRef.current = true;
+      signIn().finally(() => {
+        autoSignInPendingRef.current = false;
+      });
     }
   }, [isConnected, address, thirdwebAccount, storedAddress, isAuthenticating, signIn]);
 

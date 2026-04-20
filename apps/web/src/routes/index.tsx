@@ -140,12 +140,14 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between px-4 md:px-12 mb-4">
-      <div className="flex items-center gap-3">
-        <Icon className="h-6 w-6 text-primary" />
+    <div className="flex items-end justify-between px-4 md:px-12 mb-5">
+      <div className="flex items-baseline gap-3">
+        <Icon className="h-5 w-5 text-primary self-center" />
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-white">{title}</h2>
-          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+          <h2 className="text-xl md:text-2xl font-display italic text-foreground">{title}</h2>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground font-light mt-0.5">{subtitle}</p>
+          )}
         </div>
       </div>
       {action}
@@ -173,16 +175,16 @@ function UniverseCard({ universe }: { universe: any }) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+          <div className="w-full h-full bg-gradient-to-br from-amber-900/80 via-stone-900 to-stone-950" />
         )}
 
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
 
-        {/* Hover play button */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-            <Play className="h-5 w-5 text-white fill-white ml-0.5" />
+        {/* Hover play indicator */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+            <Play className="h-4 w-4 text-primary-foreground fill-primary-foreground ml-0.5" />
           </div>
         </div>
 
@@ -249,15 +251,15 @@ function WideCard({ universe }: { universe: any }) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+          <div className="w-full h-full bg-gradient-to-br from-amber-900/80 via-stone-900 to-stone-950" />
         )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
         {/* Hover play */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-            <Play className="h-6 w-6 text-white fill-white ml-0.5" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+            <Play className="h-5 w-5 text-primary-foreground fill-primary-foreground ml-0.5" />
           </div>
         </div>
 
@@ -355,10 +357,10 @@ function HeroBillboard({ universes }: { universes: any[] }) {
     return (
       <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
         <div className="text-center px-4">
-          <h1 className="text-4xl md:text-5xl lg:text-7xl font-black text-white mb-4 tracking-tight">
-            LOAR
+          <h1 className="text-4xl md:text-5xl lg:text-7xl font-display italic text-white mb-4 tracking-tight">
+            Your universe awaits
           </h1>
-          <p className="text-lg md:text-xl text-white/70 mb-8 max-w-lg mx-auto px-4">
+          <p className="text-lg md:text-xl text-white/60 mb-8 max-w-lg mx-auto px-4 font-light">
             Create, own, and trade narrative universes on-chain
           </p>
           <Button
@@ -397,7 +399,7 @@ function HeroBillboard({ universes }: { universes: any[] }) {
               }}
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900" />
+            <div className="w-full h-full bg-gradient-to-br from-amber-950 via-stone-950 to-stone-950" />
           )}
         </div>
       ))}
@@ -429,12 +431,12 @@ function HeroBillboard({ universes }: { universes: any[] }) {
           </div>
 
           {/* Title */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white mb-3 tracking-tight leading-none">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display italic text-white mb-4 leading-[1.1]">
             {current.name || current.tokenData?.name}
           </h1>
 
           {/* Description */}
-          <p className="text-base md:text-lg text-white/70 mb-6 max-w-xl line-clamp-3 leading-relaxed">
+          <p className="text-base md:text-lg text-white/50 mb-6 max-w-xl line-clamp-3 leading-relaxed font-light">
             {current.description || current.tokenData?.metadata}
           </p>
 
@@ -442,19 +444,19 @@ function HeroBillboard({ universes }: { universes: any[] }) {
           <div className="flex items-center gap-3 flex-wrap">
             <Button
               size="lg"
-              className="rounded-full px-6 bg-white text-black hover:bg-white/90 font-bold"
+              className="px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
               onClick={() => navigate({ to: `/universe/${current.id}` })}
             >
-              <Play className="h-5 w-5 mr-2 fill-current" />
+              <Play className="h-4 w-4 mr-2 fill-current" />
               Explore
             </Button>
             <Button
               size="lg"
-              variant="outline"
-              className="rounded-full px-6 border-white/30 text-white hover:bg-white/10 font-bold"
+              variant="ghost"
+              className="px-6 text-white/80 hover:text-white hover:bg-white/10 font-medium"
               onClick={() => navigate({ to: `/universe/${current.id}` })}
             >
-              <BookOpen className="h-5 w-5 mr-2" />
+              <BookOpen className="h-4 w-4 mr-2" />
               Details
             </Button>
             {current.tokenData && (
@@ -925,7 +927,7 @@ function ContentCard({ item }: { item: any }) {
             />
           )
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+          <div className="w-full h-full bg-gradient-to-br from-amber-900/80 via-stone-900 to-stone-950" />
         )}
 
         {/* Gradient overlay */}
